@@ -34,8 +34,11 @@ public:
 	int depth;
 	vector<int> nodeIndx;
 	Tree() {};
-    Tree(Data data, int height,int maxHeight);
-	virtual ~Tree();
+    Tree(Data* data, int height,int maxHeight);
+	virtual ~Tree(){
+	//delete *leftChild;
+	//delete *rightChild;
+	};
 	double pathLength(vector<float> inst);
 };
 
@@ -47,13 +50,18 @@ public:
     bool rSample;
     int nsample;
 	IsolationForest();
-	IsolationForest(int ntree,Data data,int maxheight,const int nsample,bool rSample);
-	virtual ~IsolationForest();
+	IsolationForest(int ntree,Data* data,int maxheight,const int nsample,bool rSample);
+	virtual ~IsolationForest()
+	{
+for(int i=0;i<(int)trees.size();i++)
+	delete[] trees[i];
+	delete data;
+	}
 	void readData(string filename);
 	void buildForest(int ntree, Data data,int maxheight);
 	float instanceScore(vector<float> inst);
+	vector<float> AnomalyScore(Data* data);
 
-	vector<float> AnomalyScore(Data data);
 };
 
 

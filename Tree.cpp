@@ -6,16 +6,10 @@
  */
 #include "classes.hpp"
 #include "utility.h"
-
 using namespace std;
 
-Tree::~Tree() {
-	// TODO Auto-generated destructor stub
 
-}
-
-
-Tree::Tree(Data data,int height,int maxheight)
+Tree::Tree(Data* data,int height,int maxheight)
 {
 	if(this->parent==NULL)
 	{
@@ -24,19 +18,20 @@ Tree::Tree(Data data,int height,int maxheight)
 	}
 
 	// Set size of the node
-  nodeSize = data.nrows;
-  if(data.nrows<2 || height==maxheight)
+  nodeSize = data->nrows;
+  if(data->nrows<2 || height==maxheight)
 	  return;
-  //compute min and max
- double minmax[2][data.ncols];
- for(int j=0;j<data.ncols;j++)
+  //compute min and max of the attribute
+ double minmax[2][data->ncols];
+ for(int j=0;j<data->ncols;j++)
  {
-	 minmax[0][j]=data.data[0][j];
+	 minmax[0][j]=data->data[0][j];
 	 minmax[1][j]=minmax[0][j];
  }
- for(int i=0;i<data.nrows;i++) {
-    vector<float> inst= data.data[i];
-	 for(int j=0;j<data.ncols;j++)
+
+ for(int i=0;i<data->nrows;i++) {
+    vector<float> inst= data->data[i];
+	 for(int j=0;j<data->ncols;j++)
 	 {
 		 if(inst[j]<minmax[0][j])
 			 minmax[0][j]=inst[j];
@@ -46,7 +41,7 @@ Tree::Tree(Data data,int height,int maxheight)
 
  }
  vector<int> attributes;
- for(int j=0;j<data.ncols;j++)
+ for(int j=0;j<data->ncols;j++)
  {
 	 if(minmax[0][j]<minmax[1][j]){
 		 attributes.push_back(j);
@@ -63,22 +58,22 @@ Tree::Tree(Data data,int height,int maxheight)
  vector<vector<float> > rnodeData;
 
 //Split the node into two
- for(int j=0;j<data.nrows;j++)
+ for(int j=0;j<data->nrows;j++)
  {
-	 if(data.data[j][splittingAtt] > splittingPoint)
+	 if(data->data[j][splittingAtt] > splittingPoint)
 	 {
-		 lnodeData.push_back(data.data[j]);
+		 lnodeData.push_back(data->data[j]);
 	 }
 	 else
 	 {
-		 rnodeData.push_back(data.data[j]);
+		 rnodeData.push_back(data->data[j]);
 	 }
-
- leftChild= new Tree((Data){data.ncols,lnodeData.size(),lnodeData},height+1,maxheight);
+Data dataL ={data->ncols,lnodeData.size(),lnodeData};
+ leftChild= new Tree(&dataL,height+1,maxheight);
  leftChild->parent=this;
  leftChild->depth = this->depth +1;
-
- rightChild= new Tree((Data){data.ncols,lnodeData.size(),lnodeData},height+1,maxheight);
+Data dataR= {data->ncols,rnodeData.size(),rnodeData};
+ rightChild= new Tree(&dataR,height+1,maxheight);
  rightChild->parent=this;
  rightChild->depth = this->depth +1;
  }
@@ -99,5 +94,6 @@ double Tree::pathLength(vector<float> inst)
       return this->rightChild->pathLength(inst) +1.0;
     }
 }
+
 
 

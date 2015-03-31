@@ -11,30 +11,28 @@
 #include<cmath>
 #include "classes.hpp"
 #include "utility.h"
-using namespace std;
-//build ntree forest from the data
 
 //build the forest
-IsolationForest::IsolationForest(const int ntree,Data data,int maxheight,const int nsample,bool rSample)
+IsolationForest::IsolationForest(const int ntree,Data* data,int maxheight,const int nsample,bool rSample)
 {
 
 	this->trees[ntree];
 	this->nsample = nsample;
 	int* sampleIndex;
-
+    this->data = data;
 	for(int n=0;n<ntree;n++)
 	{
 		  if(rSample==true)
 		   {
 			  //get sample index data from the
-			  sampleIndex =sampleI(0,data.nrows,nsample);
+			  sampleIndex =sampleI(0,data->nrows,nsample);
 			  vector<vector<float> > tempdata;
 			  for(int i=0;i<nsample;i++)
 			  {
 
-				  tempdata.push_back(data.data[sampleIndex[i]]);
+				  tempdata.push_back(data->data[sampleIndex[i]]);
 			  }
-			  data.data=tempdata;
+			  data->data=tempdata;
 			tempdata.clear();
 
 		   }
@@ -42,7 +40,7 @@ IsolationForest::IsolationForest(const int ntree,Data data,int maxheight,const i
 	 this->trees.push_back(new Tree(data,0,maxheight));
 
 	}
-	buildForest(ntree,data,maxheight);
+	//buildForest(ntree,data,maxheight);
 }
 
 /*
@@ -64,14 +62,14 @@ float IsolationForest::instanceScore(vector<float> inst)
 /*
  * Score for all points
  */
-vector<float> IsolationForest::AnomalyScore(Data data){
+vector<float> IsolationForest::AnomalyScore(Data* data){
   vector<float> scores;
 
-	for(int inst=0;inst<data.data.size();inst++)
+	for(int inst=0;inst<(int)data->data.size();inst++)
 	{
 
 
-    scores.push_back(instanceScore(data.data[0]));
+    scores.push_back(instanceScore(data->data[0]));
 
 	}
 	return scores;
@@ -79,5 +77,6 @@ vector<float> IsolationForest::AnomalyScore(Data data){
 
 
 }
+
 
 

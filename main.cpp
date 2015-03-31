@@ -11,7 +11,7 @@
 using namespace std;
 int main()
 {
-// 2-D data
+//synthetic 2-D data
 const int NROW=100;
 const int NCOL=10;
 float data[NROW][NCOL];
@@ -33,16 +33,20 @@ train.data = dt;
 train.ncols=NCOL;
 train.nrows=NROW;
 
+//forest configuration
 int ntree=10;
 int nsample=256;
 bool rsample=true;
 int maxheight = (int)ceil(log2(NROW));
-IsolationForest *iff;
-iff =new IsolationForest(ntree,train,maxheight,nsample,rsample);
-Data test = train;
-iff->AnomalyScore(test);
+IsolationForest iff(ntree,&train,maxheight,nsample,rsample);
+Data test = train; //assuming train and test data are same.
+vector<float> scores = iff.AnomalyScore(&test);
+for(int j=0;j<scores.size();j++)
+	cout<<"Score "<<j<<"= "<<scores[j]<<endl;
 
+return 0;
 }
+
 
 
 
