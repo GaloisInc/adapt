@@ -8,31 +8,75 @@
 #include<string>
 #include<fstream>
 #include<vector>
-using namespace std;
+#include<cmath>
+#include "classes.hpp"
+#include "utility.h"
 
-class DataTable {
+//build the forest
+IsolationForest::IsolationForest(const int ntree,Data* data,int maxheight,const int nsample,bool rSample)
+{
 
-	// private class variables
+	this->trees[ntree];
+	this->nsample = nsample;
+	int* sampleIndex;
+    this->data = data;
+	for(int n=0;n<ntree;n++)
+	{
+		  if(rSample==true)
+		   {
+			  //get sample index data from the
+			  sampleIndex =sampleI(0,data->nrows,nsample);
+			  vector<vector<float> > tempdata;
+			  for(int i=0;i<nsample;i++)
+			  {
 
-	// private methods
+				  tempdata.push_back(data->data[sampleIndex[i]]);
+			  }
+			  data->data=tempdata;
+			tempdata.clear();
 
-public:
-	// public class variables
-	vector<string> labels;
-	vector<vector<float>> data;
-	vector<string> dataClasses;
+		   }
 
-	// public methods
+	 this->trees.push_back(new Tree(data,0,maxheight));
 
-}; // class DataTable
+	}
+	//buildForest(ntree,data,maxheight);
+}
 
-class IsolationForest {
+/*
+ * Accepts single row point and return Anomaly Score
+ */
+float IsolationForest::instanceScore(vector<float> inst)
+{
+	double avgPathLength=0;
+	for(int t=0;t<this->ntree;t++)
+	{
+	avgPathLength +=  this->trees[t]->pathLength(inst);
+	}
+	float scores;
+	avgPathLength /=(double) this->ntree;
+   scores= pow(2,-avgPathLength/avgPL(this->nsample));
+  return scores;
+}
 
-public:
-	IsolationForest();
-	virtual ~IsolationForest();
-	void readData(string filename);
-	void trainTree();
-};
+/*
+ * Score for all points
+ */
+vector<float> IsolationForest::AnomalyScore(Data* data){
+  vector<float> scores;
+
+	for(int inst=0;inst<(int)data->data.size();inst++)
+	{
+
+
+    scores.push_back(instanceScore(data->data[0]));
+
+	}
+	return scores;
+
+
+
+}
+
 
 
