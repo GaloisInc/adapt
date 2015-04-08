@@ -13,34 +13,37 @@
 #include "utility.h"
 
 //build the forest
-IsolationForest::IsolationForest(const int ntree,Data* data,int maxheight,const int nsample,bool rSample)
+IsolationForest::IsolationForest(const int ntree,Data data,int maxheight,const int nsample,bool rSample)
 {
 
-	this->trees[ntree];
-	this->nsample = nsample;
-	int* sampleIndex;
-    this->data = data;
-	for(int n=0;n<ntree;n++)
-	{
-		  if(rSample==true)
+this->nsample = nsample;
+this->ntree=ntree;
+Data sampleData;
+int sampleIndex[nsample];
+for(int n=0;n<ntree;n++)
+{
+    	if(rSample==true && nsample<data.nrows)
 		   {
-			  //get sample index data from the
-			  sampleIndex =sampleI(0,data->nrows,nsample);
+			  sampleI(0,data.nrows,nsample,sampleIndex);
 			  vector<vector<float> > tempdata;
 			  for(int i=0;i<nsample;i++)
-			  {
+			  	  tempdata.push_back(data.data[*(sampleIndex+i)]);
+			 sampleData.data=tempdata;
+			 sampleData.nrows = nsample;
+			 sampleData.ncols=data.ncols;
+			 tempdata.clear();
+		 }
 
-				  tempdata.push_back(data->data[sampleIndex[i]]);
-			  }
-			  data->data=tempdata;
-			tempdata.clear();
+	else
+	  sampleData=data;
 
-		   }
+ this->data= sampleData;
+ //cout<<data.nrows<<" Rows"<<this->data->ncols;
+Tree *tree =new Tree();
+tree->iTree(sampleData,0,maxheight);
+this->trees.push_back(tree);
+}
 
-	 this->trees.push_back(new Tree(data,0,maxheight));
-
-	}
-	//buildForest(ntree,data,maxheight);
 }
 
 /*
@@ -49,27 +52,33 @@ IsolationForest::IsolationForest(const int ntree,Data* data,int maxheight,const 
 float IsolationForest::instanceScore(vector<float> inst)
 {
 	double avgPathLength=0;
-	for(int t=0;t<this->ntree;t++)
+	//pointer based
+	for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();++it)
 	{
-	avgPathLength +=  this->trees[t]->pathLength(inst);
+	avgPathLength += (*it)->pathLength(inst);
+
 	}
 	float scores;
 	avgPathLength /=(double) this->ntree;
    scores= pow(2,-avgPathLength/avgPL(this->nsample));
+
+  // outF[i] = 1/pow(2,totDepth[i]/(scaleF * (double) *ntree));
+
+   //cout<<scores<<endl;
   return scores;
 }
 
 /*
  * Score for all points
  */
-vector<float> IsolationForest::AnomalyScore(Data* data){
+vector<float> IsolationForest::AnomalyScore(Data data){
   vector<float> scores;
 
-	for(int inst=0;inst<(int)data->data.size();inst++)
+	for(int inst=0;inst<(int)data.data.size();inst++)
 	{
 
 
-    scores.push_back(instanceScore(data->data[0]));
+    scores.push_back(instanceScore(data.data[inst]));
 
 	}
 	return scores;

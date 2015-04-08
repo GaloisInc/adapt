@@ -15,8 +15,6 @@
 
 using namespace std;
 
-
-
 struct Data{
 int ncols;
 int nrows;
@@ -33,41 +31,46 @@ public:
 	double splittingPoint;
 	int depth;
 	vector<int> nodeIndx;
-	Tree() {};
-    Tree(Data* data, int height,int maxHeight);
+	Tree(){
+	leftChild=NULL;
+	rightChild=NULL;
+	parent=NULL;
+	splittingAtt=-1;
+	splittingPoint=999;
+	depth=0;
+	};
+    Tree(Data data, int height,int maxHeight);
 	virtual ~Tree(){
 	//delete *leftChild;
 	//delete *rightChild;
 	};
+	void iTree(Data data, int height,int maxHeight);
 	double pathLength(vector<float> inst);
 };
 
 class IsolationForest {
 public:
     vector<Tree*> trees;
-    Data *data;
+    Data data;
     int ntree;
     bool rSample;
     int nsample;
-	IsolationForest();
-	IsolationForest(int ntree,Data* data,int maxheight,const int nsample,bool rSample);
+	IsolationForest()
+    {
+
+    };
+	IsolationForest(int ntree,Data data,int maxheight,const int nsample,bool rSample);
 	virtual ~IsolationForest()
 	{
-for(int i=0;i<(int)trees.size();i++)
-	delete[] trees[i];
-	delete data;
+for(vector<Tree*>::iterator it=trees.begin();it!=trees.end();++it)
+	delete *it;
+//    trees.clear();
+//delete data;
 	}
-	void readData(string filename);
+//	void readData(string filename);
 	void buildForest(int ntree, Data data,int maxheight);
 	float instanceScore(vector<float> inst);
-	vector<float> AnomalyScore(Data* data);
+	vector<float> AnomalyScore(Data data);
 
 };
-
-
-
-
-
-
-
 #endif /* CLASSES_HPP_ */
