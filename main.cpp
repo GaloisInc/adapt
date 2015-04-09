@@ -12,10 +12,15 @@
 using namespace std;
 int main()
 {
+srand(time(NULL));
+//input parameters
+int ntree=1000;
+int nsample=256;
+bool rsample=true;
 
 //Prepare synthetic data
-const int NROW=100;
-const int NCOL=10;
+const int NROW=10000;
+const int NCOL=40;
 float data[NROW][NCOL];
 vector< vector<float> > dt;
 //save data
@@ -43,10 +48,7 @@ train.ncols=NCOL;
 train.nrows=NROW;
 
 //forest configuration
-int ntree=100;
-int nsample=100;
-bool rsample=false;
-int maxheight = (int)ceil(log2(NROW));
+int maxheight =(int)ceil(log2(NROW));
 IsolationForest iff(ntree,train,maxheight,nsample,rsample);
 
 //Scores
@@ -59,9 +61,6 @@ for(int j=0;j<(int)scores.size();j++)
     scoref<<j+1<<","<<scores[j]<<"\n";
 }
 scoref.close();
-
-
-
 
 return 0;
 }

@@ -21,6 +21,7 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 minmax[0][j]=data.data[0][j];
 		 minmax[1][j]=minmax[0][j];
 	 }
+
 	  for(int i=0;i<data.nrows;i++) {
 	    vector<float> inst= data.data[i];
 		 for(int j=0;j<data.ncols;j++)
@@ -45,9 +46,8 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 return ;
 
 	 //Randomly pick an attribute and a split point
-	int randAtt = attributes[randomI(0,9)];
+	int randAtt = attributes[randomI(0,data.ncols-1)];
 	this->splittingAtt=randAtt;
-
 
 	this->splittingPoint = randomD(minmax[0][this->splittingAtt],minmax[1][this->splittingAtt]); //(double) rand()/(RAND_MAX+1) *(minmax[1][this->splittingAtt] - minmax[0][this->splittingAtt]);
 	 vector<vector<float> > lnodeData;
@@ -69,7 +69,6 @@ void Tree::iTree(Data data, int height,int maxheight)
 	Data dataL ={data.ncols,lnodeData.size(),lnodeData};
 	 leftChild= new Tree();//&dataL,height+1,maxheight);
 	 leftChild->parent=this;
-	 //leftChild->depth = this->depth +1;
 
 	 leftChild->iTree(dataL,this->depth+1,maxheight);
 	Data dataR= {data.ncols,rnodeData.size(),rnodeData};

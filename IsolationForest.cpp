@@ -23,25 +23,26 @@ int sampleIndex[nsample];
 for(int n=0;n<ntree;n++)
 {
     	if(rSample==true && nsample<data.nrows)
-		   {
-			  sampleI(0,data.nrows,nsample,sampleIndex);
+		   {  //sample index data and construct sample data
+			  sampleI(0,data.nrows-1,nsample,sampleIndex);
 			  vector<vector<float> > tempdata;
-			  for(int i=0;i<nsample;i++)
-			  	  tempdata.push_back(data.data[*(sampleIndex+i)]);
-			 sampleData.data=tempdata;
+			  for(int ind=0;ind<nsample;ind++)
+				  tempdata.push_back(data.data[sampleIndex[ind]]);
+			   sampleData.data=tempdata;
 			 sampleData.nrows = nsample;
 			 sampleData.ncols=data.ncols;
-			 tempdata.clear();
+			 //tempdata.clear();
+
 		 }
 
 	else
 	  sampleData=data;
-
- this->data= sampleData;
+  this->data= sampleData;
  //cout<<data.nrows<<" Rows"<<this->data->ncols;
 Tree *tree =new Tree();
 tree->iTree(sampleData,0,maxheight);
 this->trees.push_back(tree);
+
 }
 
 }
@@ -61,11 +62,7 @@ float IsolationForest::instanceScore(vector<float> inst)
 	float scores;
 	avgPathLength /=(double) this->ntree;
    scores= pow(2,-avgPathLength/avgPL(this->nsample));
-
-  // outF[i] = 1/pow(2,totDepth[i]/(scaleF * (double) *ntree));
-
-   //cout<<scores<<endl;
-  return scores;
+    return scores;
 }
 
 /*

@@ -13,9 +13,9 @@
 
 #include "utility.h"
 int randomI(int min,int max)
-{
+{ //srand(time(NULL));
 int output;
-//srand(time(NULL));
+
 return (int)ceil(min + ((double)rand() / (RAND_MAX))*(max - min ));
 }
 double randomD(double min, double max)
@@ -51,11 +51,7 @@ duplicate=false;
 }
 double avgPL(double n) {
 
-   /*if (n <= 1.0) return 0;
-   return 2 * (log2(n - 1) + 0.5772156649) - (2 * (n - 1) / n);
-   */
-
-  return (((n-1) <= 0) ? 0.0 : (( 2.0 * (log((double)(n-1)) + 0.5772156649)) - ( 2.0 * (double)(n-1))/( 1.0 + (double)(n-1))));
+   return (((n-1) <= 0) ? 0.0 : (( 2.0 * (log((double)(n-1)) + 0.5772156649)) - ( 2.0 * (double)(n-1))/( 1.0 + (double)(n-1))));
 
  }
 void swapInt(int a,int b,int* x)
