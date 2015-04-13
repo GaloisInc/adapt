@@ -16,7 +16,7 @@ int randomI(int min,int max)
 { //srand(time(NULL));
 int output;
 
-return (int)ceil(min + ((double)rand() / (RAND_MAX))*(max - min ));
+return (int)(min + ((double)rand() / (RAND_MAX))*(max - min ));
 }
 double randomD(double min, double max)
 {
@@ -62,7 +62,13 @@ void swapInt(int a,int b,int* x)
 	x[b]=hold;
 }
 
-
+float mean(std::vector<float> points)
+{
+float sum=0;
+for(int f=0;f<points.size();f++)
+	sum+=points[f];
+return sum/(float)points.size();
+}
 
 
 

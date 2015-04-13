@@ -30,6 +30,7 @@ public:
 	int splittingAtt;
 	double splittingPoint;
 	int depth;
+	bool isLeaf;
 	vector<int> nodeIndx;
 	Tree(){
 	leftChild=NULL;
@@ -38,6 +39,9 @@ public:
 	splittingAtt=-1;
 	splittingPoint=999;
 	depth=0;
+	isLeaf=false;
+	nodeSize=0;
+
 	};
     Tree(Data data, int height,int maxHeight);
 	virtual ~Tree(){
@@ -55,11 +59,14 @@ public:
     int ntree;
     bool rSample;
     int nsample;
-	IsolationForest()
+   	IsolationForest()
     {
-
+rSample=false;
+ntree=0;
+nsample=256;
     };
 	IsolationForest(int ntree,Data data,int maxheight,const int nsample,bool rSample);
+
 	virtual ~IsolationForest()
 	{
 for(vector<Tree*>::iterator it=trees.begin();it!=trees.end();++it)
@@ -71,6 +78,7 @@ for(vector<Tree*>::iterator it=trees.begin();it!=trees.end();++it)
 	void buildForest(int ntree, Data data,int maxheight);
 	float instanceScore(vector<float> inst);
 	vector<float> AnomalyScore(Data data);
-
+	vector<float> pathLength(vector<float> inst);
+    vector<vector<float> > pathLength(Data data);
 };
 #endif /* CLASSES_HPP_ */

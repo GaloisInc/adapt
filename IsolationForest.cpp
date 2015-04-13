@@ -20,6 +20,7 @@ this->nsample = nsample;
 this->ntree=ntree;
 Data sampleData;
 int sampleIndex[nsample];
+this->rSample=rSample;
 for(int n=0;n<ntree;n++)
 {
     	if(rSample==true && nsample<data.nrows)
@@ -53,16 +54,17 @@ this->trees.push_back(tree);
 float IsolationForest::instanceScore(vector<float> inst)
 {
 	double avgPathLength=0;
+	vector<float> depthInTree;
 	//pointer based
 	for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();++it)
 	{
-	avgPathLength += (*it)->pathLength(inst);
-
+		avgPathLength +=(*it)->pathLength(inst);
 	}
 	float scores;
 	avgPathLength /=(double) this->ntree;
    scores= pow(2,-avgPathLength/avgPL(this->nsample));
-    return scores;
+
+   return scores;
 }
 
 /*
@@ -79,9 +81,32 @@ vector<float> IsolationForest::AnomalyScore(Data data){
 
 	}
 	return scores;
+}
+/*
+ * Return instance depth in all trees
+ */
+vector<float> IsolationForest::pathLength(vector<float> inst)
+{
+vector<float> depth;
+for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();++it)
+{
 
+	depth.push_back(ceil((*it)->pathLength(inst)));
 
+}
+return depth;
+}
 
+/*
+ * PathLength for all points
+ */
+vector<vector<float> > IsolationForest::pathLength(Data data)
+{
+vector<vector<float> > depths;
+for(int r=0;r<data.nrows;r++)
+	depths.push_back(pathLength(data.data[r]));
+
+	return depths;
 }
 
 

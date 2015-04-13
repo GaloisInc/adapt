@@ -13,7 +13,9 @@ void Tree::iTree(Data data, int height,int maxheight)
 	// Set size of the node
 	  nodeSize = data.nrows;
 	  if(data.nrows<=1 || this->depth>maxheight)
+	  {   this->isLeaf=true;
 		  return;
+	  }
 	  //compute min and max of the attribute
 	 double minmax[2][data.ncols];
 	 for(int j=0;j<data.ncols;j++)
@@ -46,9 +48,7 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 return ;
 
 	 //Randomly pick an attribute and a split point
-	int randAtt = attributes[randomI(0,data.ncols-1)];
-	this->splittingAtt=randAtt;
-
+	 this->splittingAtt=attributes[randomI(0,data.ncols-1)];
 	this->splittingPoint = randomD(minmax[0][this->splittingAtt],minmax[1][this->splittingAtt]); //(double) rand()/(RAND_MAX+1) *(minmax[1][this->splittingAtt] - minmax[0][this->splittingAtt]);
 	 vector<vector<float> > lnodeData;
 	 vector<vector<float> > rnodeData;
@@ -69,13 +69,11 @@ void Tree::iTree(Data data, int height,int maxheight)
 	Data dataL ={data.ncols,lnodeData.size(),lnodeData};
 	 leftChild= new Tree();//&dataL,height+1,maxheight);
 	 leftChild->parent=this;
-
 	 leftChild->iTree(dataL,this->depth+1,maxheight);
+
 	Data dataR= {data.ncols,rnodeData.size(),rnodeData};
 	 rightChild= new Tree();//&dataR,height+1,maxheight);
-
 	 rightChild->parent=this;
-	 rightChild->depth = this->depth +1;
 	 rightChild->iTree(dataR,this->depth +1,maxheight);
 
 
@@ -85,12 +83,13 @@ void Tree::iTree(Data data, int height,int maxheight)
 double Tree::pathLength(vector<float> inst)
 {
 
-    if (this->leftChild == NULL || this->rightChild==NULL || this->splittingAtt==-1) {
+    if (this->isLeaf) //leftChild == NULL || this->rightChild==NULL || this->splittingAtt==-1) //if it is leaf node.
+    {
       return avgPL(this->nodeSize);
     }
 
 
-    if (inst[this->splittingAtt] < this->splittingPoint) {
+    if (inst[this->splittingAtt] > this->splittingPoint) {
 
       return this->leftChild->pathLength(inst) +1.0;
 
