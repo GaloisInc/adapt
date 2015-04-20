@@ -23,16 +23,17 @@ void Tree::iTree(Data data, int height,int maxheight)
 	 {
 		 //minmax[0][j]=data.data[0][j];
 		 //minmax[1][j]=minmax[0][j];
-	vector<double> tmp;
-        tmp.push_back( data.data[0][j]);
-  	tmp.push_back( data.data[0][j] );
-	minmax.push_back(tmp); //initialize max and min to random value
+		 vector<double> tmp;
+		 tmp.push_back( data.data[0][j]);
+		 tmp.push_back( data.data[0][j] );
+		 minmax.push_back(tmp); //initialize max and min to random value
 	 }
 	 
-
+try
+{
 	for(int i=0;i<data.nrows;i++) 
 	{
-	    vector<double> inst= data.data.at(i);
+	     vector<double> inst= data.data.at(i);
 		 for(int j=0;j<data.ncols;j++)
 		 {
 			 if(inst[j]<minmax[j].at(0))
@@ -56,10 +57,8 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 return ;
 
 	 //Randomly pick an attribute and a split point
-	 int randx=randomI(0,attributes.size());
+	int randx=randomI(0,attributes.size());
 	this->splittingAtt=attributes[randx];
-	ffile<<"splitting att\t"<<this->splittingAtt<<endl;
-	//cout<<randx<<"\t Att "<<randAtt<<endl;
 	this->splittingPoint = randomD(minmax[this->splittingAtt][0],minmax[this->splittingAtt][1]); //(double) rand()/(RAND_MAX+1) *(minmax[1][this->splittingAtt] - minmax[0][this->splittingAtt]);
 	vector<vector<double> > lnodeData;
 	vector<vector<double> > rnodeData;
@@ -86,7 +85,11 @@ void Tree::iTree(Data data, int height,int maxheight)
 	rightChild= new Tree();//&dataR,height+1,maxheight);
 	rightChild->parent=this;
 	rightChild->iTree(dataR,this->depth +1,maxheight);
-
+}
+catch(const exception& er)
+{
+	ffile<<"Error in tree building..."<<er.what()<<"\n";
+}
 
 
 }

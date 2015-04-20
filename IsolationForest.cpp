@@ -18,7 +18,7 @@ vector<int> sampleIndex;
 this->rSample=rSample;
 for(int n=0;n<ntree;n++)
   {
-ffile<<"-----Tree number----------- "<<n+1<<"\n";
+   ffile<<"-----Tree number----------- "<<n+1<<"\n";
    if(rSample==true && nsample<data.nrows)
         {  //sample index data and construct sample data
 	    sampleI(0,data.nrows-1,nsample,sampleIndex);
@@ -115,14 +115,6 @@ vector<vector<double> > IsolationForest::pathLength(Data data)
     return depths;
 }
 
-/* Idea to traverse the deepest Node.
-int IsolationForest::Maxheight(Tree* tree)
-{
-	if(!tree->isLeaf)
-		return Maxheight(tree->leftChild);
-	else
-		return tree->depth;
-}
-*/
+
 
 
