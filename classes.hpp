@@ -12,18 +12,20 @@
 #include<stdlib.h>
 #include<cmath>
 #include<vector>
+#include <fstream>
 
-using namespace std;
 
-struct Data{
-int ncols;
-int nrows;
-vector<vector<float> > data;
+
+struct Data
+{
+  int ncols;
+  int nrows;
+ std::vector<std::vector<double> > data;
 };
 
 class Tree {
 public:
-	Tree *leftChild;
+    Tree *leftChild;
 	Tree *rightChild;
 	Tree *parent;
 	int nodeSize;
@@ -31,7 +33,8 @@ public:
 	double splittingPoint;
 	int depth;
 	bool isLeaf;
-	vector<int> nodeIndx;
+	std::vector<int> nodeIndx;
+
 	Tree(){
 	leftChild=NULL;
 	rightChild=NULL;
@@ -41,44 +44,40 @@ public:
 	depth=0;
 	isLeaf=false;
 	nodeSize=0;
+	};
+    
+Tree(Data data, int height,int maxHeight);
+virtual ~Tree(){	//delete *leftChild;
+	};
+void iTree(Data data, int height,int maxHeight);
+double pathLength(std::vector<double> inst);
 
-	};
-    Tree(Data data, int height,int maxHeight);
-	virtual ~Tree(){
-	//delete *leftChild;
-	//delete *rightChild;
-	};
-	void iTree(Data data, int height,int maxHeight);
-	double pathLength(vector<float> inst);
 };
 
 class IsolationForest {
 public:
-    vector<Tree*> trees;
+    std::vector<Tree*> trees;
     Data data;
     int ntree;
     bool rSample;
     int nsample;
-   	IsolationForest()
-    {
-rSample=false;
-ntree=0;
-nsample=256;
-    };
-	IsolationForest(int ntree,Data data,int maxheight,const int nsample,bool rSample);
+   IsolationForest()
+  {
+    rSample=false;
+    ntree=0;
+    nsample=256;
+   };
+IsolationForest(int ntree,Data data,int maxheight,const int nsample,bool rSample);
 
-	virtual ~IsolationForest()
-	{
-for(vector<Tree*>::iterator it=trees.begin();it!=trees.end();++it)
+virtual ~IsolationForest()
+ {
+    for(std::vector<Tree*>::iterator it=trees.begin();it!=trees.end();++it)
 	delete *it;
-//    trees.clear();
-//delete data;
-	}
-//	void readData(string filename);
-	void buildForest(int ntree, Data data,int maxheight);
-	float instanceScore(vector<float> inst);
-	vector<float> AnomalyScore(Data data);
-	vector<float> pathLength(vector<float> inst);
-    vector<vector<float> > pathLength(Data data);
+  }
+double instanceScore(std::vector<double> inst);
+std::vector<double> AnomalyScore(Data data);
+std::vector<double> pathLength(std::vector<double> inst);
+std::vector<std::vector<double> > pathLength(Data data);
+int countleft(Tree* tree);
 };
 #endif /* CLASSES_HPP_ */

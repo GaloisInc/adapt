@@ -8,30 +8,37 @@
 #include "utility.h"
 using namespace std;
 void Tree::iTree(Data data, int height,int maxheight)
-
-{   this->depth=height;
+{   
+	this->depth=height;
 	// Set size of the node
-	  nodeSize = data.nrows;
-	  if(data.nrows<=1 || this->depth>maxheight)
-	  {   this->isLeaf=true;
-		  return;
+	nodeSize = data.nrows;
+	if(data.nrows<=1 || this->depth>maxheight)
+	  {  
+		 this->isLeaf=true;
+		 return;
 	  }
 	  //compute min and max of the attribute
-	 double minmax[2][data.ncols];
-	 for(int j=0;j<data.ncols;j++)
+	vector<vector<double> > minmax;//[2][data.ncols];
+	 for(int j=0;j<data.ncols;j++) //look better design for performance
 	 {
-		 minmax[0][j]=data.data[0][j];
-		 minmax[1][j]=minmax[0][j];
+		 //minmax[0][j]=data.data[0][j];
+		 //minmax[1][j]=minmax[0][j];
+	vector<double> tmp;
+        tmp.push_back( data.data[0][j]);
+  	tmp.push_back( data.data[0][j] );
+	minmax.push_back(tmp); //initialize max and min to random value
 	 }
+	 
 
-	  for(int i=0;i<data.nrows;i++) {
-	    vector<float> inst= data.data[i];
+	for(int i=0;i<data.nrows;i++) 
+	{
+	    vector<double> inst= data.data.at(i);
 		 for(int j=0;j<data.ncols;j++)
 		 {
-			 if(inst[j]<minmax[0][j])
-				 minmax[0][j]=inst[j];
-			 if(inst[j]>minmax[1][j])
-				 minmax[1][j]=inst[j];
+			 if(inst[j]<minmax[j].at(0))
+				 minmax[j].at(0)=inst[j];
+			 if(inst[j]>minmax.at(j).at(1))
+				 minmax[j].at(1)=inst[j];
 		 }
 
 	 }
@@ -40,7 +47,8 @@ void Tree::iTree(Data data, int height,int maxheight)
 	 vector<int> attributes;
 	 for(int j=0;j<data.ncols;j++)
 	 {
-		 if(minmax[0][j]<minmax[1][j]){
+		 if(minmax[j][0]<minmax[j][1])
+		 {
 			 attributes.push_back(j);
 		 }
 	 }
@@ -48,10 +56,13 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 return ;
 
 	 //Randomly pick an attribute and a split point
-	 this->splittingAtt=attributes[randomI(0,data.ncols-1)];
-	this->splittingPoint = randomD(minmax[0][this->splittingAtt],minmax[1][this->splittingAtt]); //(double) rand()/(RAND_MAX+1) *(minmax[1][this->splittingAtt] - minmax[0][this->splittingAtt]);
-	 vector<vector<float> > lnodeData;
-	 vector<vector<float> > rnodeData;
+	 int randx=randomI(0,attributes.size());
+	this->splittingAtt=attributes[randx];
+	ffile<<"splitting att\t"<<this->splittingAtt<<endl;
+	//cout<<randx<<"\t Att "<<randAtt<<endl;
+	this->splittingPoint = randomD(minmax[this->splittingAtt][0],minmax[this->splittingAtt][1]); //(double) rand()/(RAND_MAX+1) *(minmax[1][this->splittingAtt] - minmax[0][this->splittingAtt]);
+	vector<vector<double> > lnodeData;
+	vector<vector<double> > rnodeData;
 
 	//Split the node into two
 	 for(int j=0;j<data.nrows;j++)
@@ -66,28 +77,27 @@ void Tree::iTree(Data data, int height,int maxheight)
 		 }
 	 }
 
-	Data dataL ={data.ncols,lnodeData.size(),lnodeData};
-	 leftChild= new Tree();//&dataL,height+1,maxheight);
-	 leftChild->parent=this;
-	 leftChild->iTree(dataL,this->depth+1,maxheight);
+	Data dataL ={data.ncols,(int)lnodeData.size(),lnodeData};
+	leftChild= new Tree();//&dataL,height+1,maxheight);
+	leftChild->parent=this;
+	leftChild->iTree(dataL,this->depth+1,maxheight);
 
-	Data dataR= {data.ncols,rnodeData.size(),rnodeData};
-	 rightChild= new Tree();//&dataR,height+1,maxheight);
-	 rightChild->parent=this;
-	 rightChild->iTree(dataR,this->depth +1,maxheight);
+	Data dataR= {data.ncols,(int)rnodeData.size(),rnodeData};
+	rightChild= new Tree();//&dataR,height+1,maxheight);
+	rightChild->parent=this;
+	rightChild->iTree(dataR,this->depth +1,maxheight);
 
 
 
 }
 
-double Tree::pathLength(vector<float> inst)
+double Tree::pathLength(vector<double> inst)
 {
-
-    if (this->isLeaf) //leftChild == NULL || this->rightChild==NULL || this->splittingAtt==-1) //if it is leaf node.
+//cout<<this->depth;
+    if (this->isLeaf)
     {
       return avgPL(this->nodeSize);
     }
-
 
     if (inst[this->splittingAtt] > this->splittingPoint) {
 
@@ -98,6 +108,7 @@ double Tree::pathLength(vector<float> inst)
       return this->rightChild->pathLength(inst) +1.0;
     }
 }
+
 
 
 
