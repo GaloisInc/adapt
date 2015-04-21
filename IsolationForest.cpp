@@ -8,48 +8,51 @@
 #include "utility.h"
 //build the forest
 using namespace std;
-IsolationForest::IsolationForest(const int ntree,Data data,int maxheight,const int nsample,bool rSample)
+
+int cnt;
+IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
+		const int nsample, bool rSample)
 {
 
-this->nsample = nsample;
-this->ntree=ntree;
-Data sampleData;
-vector<int> sampleIndex;
-this->rSample=rSample;
-for(int n=0;n<ntree;n++)
-  {
-   ffile<<"-----Tree number----------- "<<n+1<<"\n";
-   if(rSample==true && nsample<data.nrows)
-        {  //sample index data and construct sample data
-	    sampleI(0,data.nrows-1,nsample,sampleIndex);
-	    vector<vector<double> > tempdata;
-	    for(int ind=0;ind<nsample;ind++)
-	       tempdata.push_back(data.data[sampleIndex[ind]]);
-	    sampleData.data=tempdata;
-	    sampleData.nrows = nsample;
-	    sampleData.ncols=data.ncols;
-		 tempdata.clear();
-		 sampleIndex.clear();
-           }
+	this->nsample = nsample;
+	this->ntree = ntree;
+	Data sampleData;
+	vector<int> sampleIndex;
+	this->rSample = rSample;
+	for (int n = 0; n < ntree; n++)
+	{
+		//ffile << "-----Tree number----------- " << n + 1 << "\n";
+		if (rSample == true && nsample < data.nrows)
+		{ //sample index data and construct sample data
+			sampleI(0, data.nrows - 1, nsample, sampleIndex);
+			vector < vector<double> > tempdata;
+			for (int ind = 0; ind < nsample; ind++)
+				tempdata.push_back(data.data[sampleIndex[ind]]);
+			sampleData.data = tempdata;
+			sampleData.nrows = nsample;
+			sampleData.ncols = data.ncols;
+			tempdata.clear();
+			sampleIndex.clear();
+		}
 
-	else
-	  sampleData=data;
-  this->data= sampleData;
-  Tree *tree =new Tree();
-  tree->iTree(sampleData,0,maxheight);
-  this->trees.push_back(tree);
+		else
+			sampleData = data;
+		this->data = sampleData;
+		Tree *tree = new Tree();
+		tree->iTree(sampleData, 0, maxheight);
+		this->trees.push_back(tree);
 //ffile<<n<<"\t " splitt at "<<tree->splittingAtt<<"\t depth "<<countleft(tree)<<endl;
 
-  }
+	}
 
 }
-
+//used only for debugging purpose
 int IsolationForest::countleft(Tree *tree)
 {
-	if(tree->isLeaf)
+	if (tree->isLeaf)
 		return 1;
 	else
-	 return	countleft(tree->leftChild)+1;
+		return countleft(tree->leftChild) + 1;
 
 }
 
@@ -58,18 +61,21 @@ int IsolationForest::countleft(Tree *tree)
  */
 double IsolationForest::instanceScore(vector<double> inst)
 {
-	double avgPathLength=0;
+	double avgPathLength = 0;
 	vector<double> depthInTree;
 	//pointer based
-	for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();++it)
+	int x=0;
+	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
+			++it)
 	{
-		avgPathLength +=(*it)->pathLength(inst);
+	avgPathLength += (*it)->pathLength(inst);
+	ffile <<cnt<<","<<++x<<","<<avgPathLength <<"\n";
 	}
 	double scores;
-	avgPathLength /=(double) this->ntree;
-       scores= pow(2,-avgPathLength/avgPL(this->nsample));
+	avgPathLength /= (double) this->ntree;
+	scores = pow(2, -avgPathLength / avgPL(this->nsample));
 
-      return scores;
+	return scores;
 
 }
 
@@ -78,13 +84,14 @@ double IsolationForest::instanceScore(vector<double> inst)
  */
 vector<double> IsolationForest::AnomalyScore(Data data)
 {
-        vector<double> scores;
-
-	for(int inst=0;inst<(int)data.data.size();inst++)
+	vector<double> scores;
+	ffile<<"instance,tree,depth\n";// ---------Scoring for all dataset-----------\n";
+cnt=0;
+	for (int inst = 0; inst < (int) data.data.size(); inst++)
 	{
-
-
-           scores.push_back(instanceScore(data.data[inst]));
+    //ffile<<"         #########instance number -- "<<inst+1<<" ---#############\n";
+    cnt++;
+		scores.push_back(instanceScore(data.data[inst]));
 
 	}
 	return scores;
@@ -94,14 +101,15 @@ vector<double> IsolationForest::AnomalyScore(Data data)
  */
 vector<double> IsolationForest::pathLength(vector<double> inst)
 {
-   vector<double> depth;
-   for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();++it)
-     {
+	vector<double> depth;
+	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
+			++it)
+	{
 
-	depth.push_back(ceil((*it)->pathLength(inst)));
+		depth.push_back(ceil((*it)->pathLength(inst)));
 
-     }
-return depth;
+	}
+	return depth;
 }
 
 /*
@@ -109,12 +117,9 @@ return depth;
  */
 vector<vector<double> > IsolationForest::pathLength(Data data)
 {
-    vector<vector<double> > depths;
-    for(int r=0;r<data.nrows;r++)
-	depths.push_back(pathLength(data.data[r]));
-    return depths;
+	vector < vector<double> > depths;
+	for (int r = 0; r < data.nrows; r++)
+		depths.push_back(pathLength(data.data[r]));
+	return depths;
 }
-
-
-
 
