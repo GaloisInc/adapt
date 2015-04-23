@@ -8,47 +8,63 @@
  */
 #include "classes.hpp"
 #include "utility.h"
+#include "cincl.hpp"
 using namespace std;
 //log file
 ofstream ffile;
 
 int main(int argc, char* argv[])
 {
+    parsed_args* pargs = parse_args(argc,argv);
+    ntstring input_name = pargs->input_name;
+    ntstring output_name = pargs->output_name;
+    d(int)* metacol = pargs->metacol;
+    int ntree = pargs->ntrees;
+    int nsample = pargs->sampsize;
+    int maxheight = pargs->maxdepth;
+    bool header = pargs->header;
+    bool verbose = pargs->verbose;
+    verbose=verbose;//Clears warning for now.
+	bool rsample=nsample!=0;
+    bool stopheight = maxheight!=0;
 
-	if (argc <= 2)
-	{
-		cout << "No input and output file given, \n"
-				"iForest <inputfile> <outputfile> "<<endl;
-		exit(1);
-	}
-	srand (time(NULL));try
-{	//string logfile=strcat("log_",argv[1]);
-	ffile.open("log.csv");
+    ntstringframe* csv = read_csv(input_name,header,false,false);
+    ntstringframe* metadata = split_frame(ntstring,csv,metacol);
+    metadata = metadata;//Clears warning for now.
+    doubleframe* df = conv_frame(double,ntstring,csv);
+    
+    /*NOTE: We convert to your data structure for now, but we will
+     *want to standardize this soon. -Andrew*/
+    Data train;
+    train.ncols = df->ncol;
+    train.nrows = df->nrow;
+    vector<double> inst;
+    for_each_in_frame(r,c,item,df,({
+        inst.push_back(*item);
+        if (c==df->ncol-1) {
+            train.data.push_back(inst);
+            inst.clear();
+        }
+    });)
+
+    srand (time(NULL));
+try
+{
+	ffile.open("log.txt");
 	ffile<<"-------Main program...data input \n";
 
-	int ntree=100;
-	int nsample=256;
-	bool rsample=true;//true;
-	string filename(argv[1]);
-	char* fname=&filename[0];
-	vector<vector<double> > dt=readcsv(fname, ',', true);
-	Data train;
-	train.data = dt;
-	train.ncols=(int)dt[0].size();//NCOL;
-	train.nrows = (int)dt.size();//(int)dt.size();//
 	//forest configuration
-	int maxheight =(int)ceil(log2(nsample));
-	IsolationForest iff(ntree,train,maxheight,nsample,rsample);
+	IsolationForest iff(ntree,train,maxheight,stopheight,nsample,rsample);
 	//traverse(iff.trees[1]);
 	ffile<<"Training ends ...\n";
 	Data test = train;
-	test.nrows=dt.size();
+	test.nrows=train.data.size();
 	//assuming train and test data are same.
 	vector<double> scores = iff.AnomalyScore(test);
 	ffile<<" Anomaly Scores end \n";
 	vector<vector<double> > pathLength=iff.pathLength(test);
 	//scoref
-	ofstream outscore(argv[2]);
+	ofstream outscore(output_name);
 	outscore<<"indx,score,avgDepth\n";
 	for(int j=0;j<(int)scores.size();j++)
 	{

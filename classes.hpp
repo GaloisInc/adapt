@@ -47,12 +47,12 @@ public:
 	}
 	;
 
-	Tree(Data data, int height, int maxHeight);
+	Tree(Data data, int height, int maxHeight, bool stopheight);
 	virtual ~Tree()
 	{	//delete *leftChild;
 	}
 	;
-	void iTree(Data data, int height, int maxHeight);
+	void iTree(Data data, int height, int maxHeight, bool stopheight);
 	double pathLength(std::vector<double> inst);
 
 };
@@ -65,6 +65,8 @@ public:
 	int ntree;
 	bool rSample;
 	int nsample;
+    bool stopheight;
+    int maxheight;
 	IsolationForest()
 	{
 		rSample = false;
@@ -72,7 +74,7 @@ public:
 		nsample = 256;
 	}
 	;
-	IsolationForest(int ntree, Data data, int maxheight, const int nsample,
+	IsolationForest(int ntree, Data data, int maxheight, bool stopheight, const int nsample,
 			bool rSample);
 
 	virtual ~IsolationForest()

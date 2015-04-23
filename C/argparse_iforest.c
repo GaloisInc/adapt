@@ -106,6 +106,7 @@ parsed_args* validate_args(d(option*) opts) {
         if (pargs->metacol==NULL) {
             err_and_exit(1,"Invalid specification of meta columns.");
         }
+        for_each_in_vec(i,cn,pargs->metacol,(*cn)--;)
     }
     if (str_conv_strict(&(pargs->ntrees),int,opts[TOPT].value)) {
         err_and_exit(1,"Expected integer as number of trees.\n");

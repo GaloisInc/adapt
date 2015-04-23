@@ -4,7 +4,7 @@ parsed_args* parse_args(int argc, char** argv) {
     const char* pname = *(argv++);
     d(option)* dopts = option_spec();
     d(option)* opts = vecalloc(option,length(dopts)+1);
-    vcopy(opts,dopts);
+    copy_into(opts,dopts);
     opts[length(opts)-1] =
         (option){
             .sarg='h',
@@ -28,7 +28,7 @@ parsed_args* parse_args(int argc, char** argv) {
 }
 
 d(option)* populate_options(d(option)* opts, int argc, char** argv) {
-    forveach(opt,opts,
+    for_each_in_vec(i,opt,opts,
         opt->value = nstrdup(opt->default_value);
     )
     while (argc--) {
@@ -54,7 +54,7 @@ d(option)* populate_options(d(option)* opts, int argc, char** argv) {
                     flipflag=true;
                 }
                 option* copt = NULL;
-                forveach(opt,opts,
+                for_each_in_vec(i,opt,opts,
                     if (streq(larg,opt->larg)) {
                         copt = opt;
                         break;
@@ -62,7 +62,7 @@ d(option)* populate_options(d(option)* opts, int argc, char** argv) {
                 )
                 if (copt) {
                     if (isflag&&copt->isflag) {
-                        copt->flagged=tern(flipflag,!(copt->flagged),setflag);
+                        copt->flagged=choice(flipflag,!(copt->flagged),setflag);
                     } else if (!isflag&&!(copt->isflag)) {
                         copt->value = nstrdup(val);
                     } else if (isflag&&!(copt->isflag)) {
@@ -77,7 +77,7 @@ d(option)* populate_options(d(option)* opts, int argc, char** argv) {
                 char *sarg = cur;
                 while (*(++sarg)!='\0') {
                     option* copt = NULL;
-                    forveach(opt,opts,
+                    for_each_in_vec(i,opt,opts,
                         if (opt->sarg==*sarg) {
                             copt = opt;
                             break;
@@ -108,7 +108,7 @@ d(option)* populate_options(d(option)* opts, int argc, char** argv) {
 
 void print_help(const char* pname,d(option*) opts) {
     printf("Usage: %s [options]\nOptions:\n",pname);
-    forveach(opt,opts,
+    for_each_in_vec(i,opt,opts,
         if (opt->isflag) {
             printf("\t-%c, --%s\n\t\t%s\n",opt->sarg,opt->larg,opt->desc);
         } else {
@@ -152,7 +152,7 @@ d(int*) parse_multi_ints(const char* cspec) {
         str_conv_adv(&inc,int,spec);
         if (*spec==','||*spec=='\0') {
             if (range) {
-                while (last!=inc) vec[idx++]=tern(last<inc,last++,last--);
+                while (last!=inc) vec[idx++]=choice(last<inc,last++,last--);
             }
             vec[idx++]=inc;
             range = false;

@@ -7,19 +7,14 @@
 #include "common.h"
 #include "object.h"
 #include "strfun.h"
+#include "frames.h"
 
 #define ee_fopen(fname,mode) ({\
     FILE* ret = fopen(fname,mode);\
-    tern(ret!=NULL,ret,({err_and_exit(1,"Could not open file: %s\n",fname);ret;}));\
+    choice(ret!=NULL,ret,({err_and_exit(1,"Could not open file: %s\n",fname);ret;}));\
 })
 
-typedef struct stringframe {
-    d(char*)* colnames;
-    d(char*)* rownames;
-    d(char*)** data;
-} stringframe;
-
-stringframe* read_csv(char* fname,bool header,bool rownames);
+ntstringframe* read_csv(char* fname,bool header,bool rownames,bool column_major);
 char* read_next_line(FILE* file);
 
 #endif

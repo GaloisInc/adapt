@@ -6,13 +6,14 @@
  */
 #include "classes.hpp"
 #include "utility.h"
+#include "cincl.hpp"
 using namespace std;
-void Tree::iTree(Data data, int height, int maxheight)
+void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 {
 	this->depth = height;
 	// Set size of the node
 	nodeSize = data.nrows;
-	if (data.nrows <= 1 || this->depth > maxheight)
+	if (data.nrows <= 1 || (stopheight && this->depth > maxheight))
 	{
 		this->isLeaf = true;
 		return;
@@ -79,13 +80,13 @@ void Tree::iTree(Data data, int height, int maxheight)
 		{ data.ncols, (int) lnodeData.size(), lnodeData };
 		leftChild = new Tree(); //&dataL,height+1,maxheight);
 		leftChild->parent = this;
-		leftChild->iTree(dataL, this->depth + 1, maxheight);
+		leftChild->iTree(dataL, this->depth + 1, maxheight, stopheight);
 
 		Data dataR =
 		{ data.ncols, (int) rnodeData.size(), rnodeData };
 		rightChild = new Tree(); //&dataR,height+1,maxheight);
 		rightChild->parent = this;
-		rightChild->iTree(dataR, this->depth + 1, maxheight);
+		rightChild->iTree(dataR, this->depth + 1, maxheight, stopheight);
 	} catch (const exception& er)
 	{
 		ffile << "Error in tree building..." << er.what() << "\n";

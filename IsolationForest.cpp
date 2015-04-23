@@ -6,12 +6,13 @@
  */
 #include "classes.hpp"
 #include "utility.h"
+#include "cincl.hpp"
 //build the forest
 using namespace std;
 
 int cnt;
 IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
-		const int nsample, bool rSample)
+		bool stopheight, const int nsample, bool rSample)
 {
 
 	this->nsample = nsample;
@@ -39,7 +40,7 @@ IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
 			sampleData = data;
 		this->data = sampleData;
 		Tree *tree = new Tree();
-		tree->iTree(sampleData, 0, maxheight);
+		tree->iTree(sampleData, 0, maxheight, stopheight);
 		this->trees.push_back(tree);
 //ffile<<n<<"\t " splitt at "<<tree->splittingAtt<<"\t depth "<<countleft(tree)<<endl;
 
@@ -86,7 +87,7 @@ vector<double> IsolationForest::AnomalyScore(Data data)
 {
 	vector<double> scores;
 	ffile<<"instance,tree,depth\n";// ---------Scoring for all dataset-----------\n";
-cnt=0;
+    cnt=0;
 	for (int inst = 0; inst < (int) data.data.size(); inst++)
 	{
     //ffile<<"         #########instance number -- "<<inst+1<<" ---#############\n";

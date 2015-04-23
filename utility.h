@@ -16,6 +16,7 @@
 #include<string>
 #include<iterator>
 #include<vector>
+
 int randomI(int min, int max);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
 double avgPL(double n);

@@ -5,20 +5,20 @@ char* read_next_line(FILE* file) {
     char c;
     do {
         c=(char)fgetc(file);
-        if (c!=EOF) n++;
+        n++;
     } while(c!=EOF&&c!='\n'&&c!='\0');
     fseek(file,-n,SEEK_CUR);
-    char* line = talloc(char,n+1);
-    line = fgets(line,n+1,file);
-    if (strlen(line)<=0) {
+    char* line = talloc(char,n);
+    line = fgets(line,n,file);
+    c=(char)fgetc(file);
+    if (strlen(line)==0) {
         free(line);
         return NULL;
     }
     return line;
 }
 
-stringframe* read_csv(char* fname,bool header,bool rownames) {
-    stringframe* csv = talloc(stringframe,1);
+ntstringframe* read_csv(char* fname,bool header,bool rownames,bool column_major) {
     FILE* file = ee_fopen(fname,"rb");
     list* lines = talloc(list,1);
     char* line = read_next_line(file);
@@ -33,29 +33,29 @@ stringframe* read_csv(char* fname,bool header,bool rownames) {
     int ncols = count_char(line,',');
     line = list_prev(char*,lines);
     line = list_prev(char*,lines);
-    if (rownames) {
-        csv->rownames = vecalloc(char*,linecount);
-    } else {
-        ncols++;
-    }
-    csv->data = matalloc(char*,linecount,ncols);
+    if (!rownames) ncols++;
+    ntstringframe* csv = init_frame(ntstring,linecount,ncols,column_major);
+    if (rownames) csv->rownames = vecalloc(char*,linecount);
     d(char*)* tokens;
-    forseq(r,0,nrow(csv->data),
+    line = list_consume(char*,lines);
+    tokens = tokenize(line,',');
+    if (header) {
+        csv->colnames = tokens;
         line = list_consume(char*,lines);
         tokens = tokenize(line,',');
-        if (r==0&&header) {
-            csv->colnames = tokens;
+    }
+    forseq(ln,0,linecount,({
+        if (rownames) {
+            csv->rownames[ln] = tokens[0];
+        }
+        forseq(ti,0,ncols,csv->data[choice(column_major,ti,ln)][choice(column_major,ln,ti)] = tokens[ti+choice(rownames,1,0)];)
+        dimfree(tokens);
+        free(line);
+        if (ln<(linecount-1)) {
             line = list_consume(char*,lines);
             tokens = tokenize(line,',');
         }
-        if (rownames) {
-            csv->rownames[r] = tokens[0];
-        }
-        forvindex(c,csv->data[r],
-            csv->data[r][c] = tokens[c+tern(rownames,1,0)];
-        )
-        dimfree(tokens);
-    )
+    });)
     return csv;
 }
 
