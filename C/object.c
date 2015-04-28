@@ -132,7 +132,7 @@ pointer _list_out_(list* lst, bool head, bool remove, bool iterate) {
     pointer el = target->el;
     if (remove) {
         lst->ptr = target->next;
-        node_attach(lst->ptr,target->prev);
+        node_attach(target->prev,lst->ptr);
         if (lst->size == 1) lst->ptr = NULL;
         free(target);
         (lst->size)--;

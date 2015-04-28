@@ -20,6 +20,7 @@
 }
 
 #define CODEGEN_SPLITFRAME(t) CODEGEN_SPLITFRAMESIG(t) {\
+    if (!majors) return NULL;\
     t##frame* oldframe = *tosplit;\
     t##frame* postcut = _cut_##t##frame_(oldframe,majors);\
     hash_table* umaj = make_hash_table(nrow(oldframe->data));\
