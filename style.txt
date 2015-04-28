@@ -1,0 +1,15 @@
+
+
+
+file names:
+    All C modules must be named with
+        {name}.c for source
+        {name}.h for header
+    All C++ modules must be named with
+        {name}.cpp for cource
+        {name}.hpp for header
+
+comments:
+    Minimum provide an explanation for each function,class,macro and loop.
+
+
