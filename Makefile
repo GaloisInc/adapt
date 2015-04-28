@@ -5,11 +5,11 @@ PFLAGS=-Wall -Werror -g
 
 all: iforest.exe
 
-cincl.o: C/common.o C/object.o C/strfun.o C/readwrite.o C/argparse.o C/argparse_iforest.o C/frames.o
-	ld -r C/common.o C/object.o C/strfun.o C/readwrite.o C/argparse.o C/argparse_iforest.o C/frames.o -o cincl.o
-
 C/%.o: C/%.c C/%.h
 	$(CC) $(CFLAGS) -c $< -o $@
+
+cincl.o: C/common.o C/object.o C/strfun.o C/readwrite.o C/argparse.o C/argparse_iforest.o C/frames.o
+	ld -r C/common.o C/object.o C/strfun.o C/readwrite.o C/argparse.o C/argparse_iforest.o C/frames.o -o cincl.o
 
 IsolationForest.o: IsolationForest.cpp classes.hpp
 	$(PP) $(PFLAGS) -c $< -o $@
@@ -33,3 +33,5 @@ fresh:
 clean:
 	rm -rf *.o*
 	rm -rf *.exe
+	rm -rf C/*.o*
+	rm -rf C/*.exe

@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
         bool_as_string(pargs->header),
         bool_as_string(pargs->verbose)
     );
-    stringframe* sf = read_csv(pargs->input_name,false,false,true);
+    ntstringframe* sf = read_csv(pargs->input_name,false,false,true);
     printf("number of rows: %d\nnumber of columns: %d\nfirst element: %s\nlast element: %s\n",
             sf->nrow,
             sf->ncol,
@@ -33,12 +33,12 @@ int main(int argc, char** argv) {
     for_each_in_list(p_int,i,item,ht->keylist,{
         printf("%d - %td\n",i,item);
     })
-    stringframe* mf = split_frame(string,sf,pargs->metacol);
+    ntstringframe* mf = split_frame(ntstring,sf,pargs->metacol);
     for_each_in_frame_by_row(r,c,item,mf,{
         printf("%s",*item);
         if (c==mf->ncol-1) printf("\n"); else printf(" - ");
     })
-    floatframe* ff = conv_frame(float,string,sf);
+    doubleframe* ff = conv_frame(double,ntstring,sf);
     for_each_in_frame_by_row(r,c,item,ff,{
         printf("%f",*item);
         if (c==ff->ncol-1) printf("\n"); else printf(" - ");
