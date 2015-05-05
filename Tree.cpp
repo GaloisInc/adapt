@@ -4,9 +4,8 @@
  *  Created on: Mar 24, 2015
  *      Author: Tadeze
  */
-#include "classes.hpp"
-#include "utility.h"
-#include "cincl.hpp"
+#include "Tree.hpp"
+//#include "IsolationForest.hpp"
 using namespace std;
 void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 {

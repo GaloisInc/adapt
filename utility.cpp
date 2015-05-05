@@ -5,7 +5,8 @@
  *      Author: Tadeze
  */
 
-#include "utility.h"
+#include "utility.hpp"
+
 
 using namespace std;
 
@@ -88,6 +89,89 @@ vector<vector<double> > readcsv(const char* filename, char delim = ',',
 	}
 	return values;
 }
+/*
+ * Taken from http://www.johndcook.com/
+ */
+double phi(double x)
+{
+// constants
+     double a1 =  0.254829592;
+     double a2 = -0.284496736;
+     double a3 =  1.421413741;
+     double a4 = -1.453152027;
+     double a5 =  1.061405429;
+     double p  =  0.3275911;
 
+      // Save the sign of x
+      int sign = 1;
+      if (x < 0)
+      sign = -1;
+     x = fabs(x)/sqrt(2.0);
+
+  // A&S formula 7.1.26
+   double t = 1.0/(1.0 + p*x);
+   double y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*exp(-x*x);
+
+   return 0.5*(1.0 + sign*y);
+ }
+
+
+
+
+/*
+ * Compute the Anderson Darling normality test of vector X
+ */
+/*
+double ADtest(double x[],int size)
+{
+	double mean,sd;
+
+
+	if(size<8)
+	{
+		exit(0);
+	}
+	else
+	{
+	//	zscore(x,size,&mean,&sd);
+int x=2;
+
+
+
+
+	}
+
+
+}*/
+/*
+ * Z-score
+ */
+void zscore(double x[],const int size,double* mean,double* sd)
+	{
+	int n=size;
+	double sum=0.0,sum_deviation=0.0;
+	for(int i=0;i<n;i++)
+		sum +=x[i];
+	*mean= (sum/n);
+	for( int j=0;j<n;j++)
+		sum_deviation += (x[j]-*mean)*(x[j]-*mean);
+	*sd=sqrt(sum_deviation/n);
+	for(int k=0;k<n;k++)
+	 x[k]=(x[k]-*mean)/ *sd;
+
+	}
+
+
+
+
+
+/*
+ * takes Vector of points and returns empirical CDF
+ */
+/*vector<double> ecdf(double* points)
+{
+
+
+}*/
 /* UTITLITY_H_ */
 

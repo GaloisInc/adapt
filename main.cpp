@@ -6,9 +6,7 @@
  *  Created on: Mar 22, 2015
  *      Author: Tadeze
  */
-#include "classes.hpp"
-#include "utility.h"
-#include "cincl.hpp"
+#include "main.hpp"
 using namespace std;
 //log file
 ofstream ffile;
@@ -79,7 +77,6 @@ catch(const exception& e)
 }
 	ffile.close();
 	cout << "\n...Finished\n";
-
 	return 0;
 }
 

@@ -4,9 +4,7 @@
  *  Created on: Mar, 2015
  *      Author: Tadeze
  */
-#include "classes.hpp"
-#include "utility.h"
-#include "cincl.hpp"
+#include "IsolationForest.hpp"
 //build the forest
 using namespace std;
 

@@ -87,6 +87,7 @@ public:
 	std::vector<double> AnomalyScore(Data data);
 	std::vector<double> pathLength(std::vector<double> inst);
 	std::vector<std::vector<double> > pathLength(Data data);
+	std::vector<double> ADtest();
 	int countleft(Tree* tree);
 };
 #endif /* CLASSES_HPP_ */
