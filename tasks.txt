@@ -1,0 +1,12 @@
+
+
+TODO:
+
+Andrew -
+Standardize data frame
+Comment
+
+Tadesse -
+Comment
+Rename files
+Write general AD function
