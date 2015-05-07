@@ -26,6 +26,7 @@ int main(int argc, char* argv[])
 	bool rsample=nsample!=0;
     bool stopheight = maxheight!=0;
 
+
     ntstringframe* csv = read_csv(input_name,header,false,false);
     ntstringframe* metadata = split_frame(ntstring,csv,metacol);
     metadata = metadata;//Clears warning for now.
