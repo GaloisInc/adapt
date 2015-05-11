@@ -89,89 +89,92 @@ vector<vector<double> > readcsv(const char* filename, char delim = ',',
 	}
 	return values;
 }
+
 /*
- * Taken from http://www.johndcook.com/
+ * CDF function
  */
-double phi(double x)
-{
-// constants
-     double a1 =  0.254829592;
-     double a2 = -0.284496736;
-     double a3 =  1.421413741;
-     double a4 = -1.453152027;
-     double a5 =  1.061405429;
-     double p  =  0.3275911;
+map<double,double> ecdf(vector<double> points) {
+	map<double,double> cdfm;
 
-      // Save the sign of x
-      int sign = 1;
-      if (x < 0)
-      sign = -1;
-     x = fabs(x)/sqrt(2.0);
+	sort(points.begin(), points.end());
+	//cout<<dup.size()<<endl;
+	int j = -1;
+	double len = (double) points.size();
+	for (unsigned i = 0; i < points.size(); ++i) {
+		if (i == 0 || points[i - 1] != points[i]) {
+			j++;
+			cdfm.insert({points.at(i),(double) (i + 1) / len});
+		}
+		else
 
-  // A&S formula 7.1.26
-   double t = 1.0/(1.0 + p*x);
-   double y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*exp(-x*x);
-
-   return 0.5*(1.0 + sign*y);
- }
-
-
-
-
-/*
- * Compute the Anderson Darling normality test of vector X
- */
-/*
-double ADtest(double x[],int size)
-{
-	double mean,sd;
-
-
-	if(size<8)
-	{
-		exit(0);
+			{
+			cdfm[points.at(i)]=(double) (i + 1) / len;
+			}
 	}
-	else
-	{
-	//	zscore(x,size,&mean,&sd);
-int x=2;
+	return cdfm;
 
+}
+//compare the result with
+//taken from SO
+template <typename T>
+std::vector<T> flatten(const std::vector<std::vector<T>>& v) {
+    std::size_t total_size = 0;
+    for (const auto& sub : v)
+        total_size += sub.size(); // I wish there was a transform_accumulate
+    std::vector<T> result;
+    result.reserve(total_size);
+    for (const auto& sub : v)
+        result.insert(result.end(), sub.begin(), sub.end());
+    return result;
+}
+/*
+ * Compute the Anderson-Darling distance for the depth distribution of each point
+ * input: 2-d depth row X tree_depth
+ * return 1-D score of each point
+ */
+/*
+ * TODO: try using the depths and finish using the weightTotaltail
+ */
 
+vector<double> AD_distance(vector<vector<double> > depths,bool weightTotail=false) {
+    //flatten 2-d to 1-d and compute alldepth ECDF of using all points depths
+	vector<double> alldepth = flatten(depths);
+	vector<double, double> Fxm = ecdf(alldepth); //all depth cdf
 
+	vector<double> scores;
+   /*
+    * compute score of each point
+    * sort the depth, compute its ECDF
+    */
+	for (vector<double> x : depths) {
+		sort(x.begin(), x.end());
+		map<double, double>::iterator iter = Fxm.begin();
+		double sum = 0;
+		for (double elem : x) {
+			double val;
+			while (iter != Fxm.end()) {
+//	    		cout<<x.at(i)<<"\t"<<iter->first<<endl;
+				if (iter->first > elem) //x.at(i))
+						{
+
+					val = (--iter)->second; //= ((i==0)?.0:(--iter)->second);
+					//fx.push_back(val);  //cdf mapping in Fx  i.e. Fx is the theoretical CDF
+					break;
+				}
+				++iter;
+			}
+			if (iter == Fxm.end())
+				val = 0.99999999;  //close to 1 at the end of the distribution
+
+			sum += max(Fxm[elem] - val, 0.0); //distance of each point in the vector
+		}
+
+		score.push_back(sum); //check if map is better
 
 	}
 
 
-}*/
-/*
- * Z-score
- */
-void zscore(double x[],const int size,double* mean,double* sd)
-	{
-	int n=size;
-	double sum=0.0,sum_deviation=0.0;
-	for(int i=0;i<n;i++)
-		sum +=x[i];
-	*mean= (sum/n);
-	for( int j=0;j<n;j++)
-		sum_deviation += (x[j]-*mean)*(x[j]-*mean);
-	*sd=sqrt(sum_deviation/n);
-	for(int k=0;k<n;k++)
-	 x[k]=(x[k]-*mean)/ *sd;
-
 	}
 
-
-
-
-
-/*
- * takes Vector of points and returns empirical CDF
- */
-/*vector<double> ecdf(double* points)
-{
-
-
-}*/
 /* UTITLITY_H_ */
 
