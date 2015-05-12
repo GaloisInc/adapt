@@ -1,4 +1,4 @@
-/*
+/
  TODO: Debug the source of the problem in concret dataset
  *TODO: output log to file
  * main.cpp
@@ -60,14 +60,18 @@ try
 	test.nrows=train.data.size();
 	//assuming train and test data are same.
 	vector<double> scores = iff.AnomalyScore(test);
+	iff.data = test;
 	ffile<<" Anomaly Scores end \n";
 	vector<vector<double> > pathLength=iff.pathLength(test);
 	//scoref
+
 	ofstream outscore(output_name);
-	outscore<<"indx,score,avgDepth\n";
+	outscore<<"indx,score,avgDepth,adscore\n";
+	vector<double> adscore = iff.ADtest();
 	for(int j=0;j<(int)scores.size();j++)
 	{
-		outscore<<j<<","<<scores[j]<<","<<mean(pathLength[j])<<"\n";
+		outscore<<j<<","<<scores[j]<<","<<mean(pathLength[j])<<","<<adscore.at(j)<<"\n";
+
 	}
 	outscore.close();
 }

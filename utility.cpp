@@ -115,13 +115,17 @@ map<double,double> ecdf(vector<double> points) {
 
 }
 //compare the result with
-//taken from SO
+template<typename T>
+T Amax(T a, T b){
+return a>b?a:b;
+}
+
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<T>>& v) {
-    std::size_t total_size = 0;
+vector<T> flatten(const vector<vector<T>>& v) {
+    size_t total_size = 0;
     for (const auto& sub : v)
         total_size += sub.size(); // I wish there was a transform_accumulate
-    std::vector<T> result;
+    vector<T> result;
     result.reserve(total_size);
     for (const auto& sub : v)
         result.insert(result.end(), sub.begin(), sub.end());
@@ -136,10 +140,10 @@ std::vector<T> flatten(const std::vector<std::vector<T>>& v) {
  * TODO: try using the depths and finish using the weightTotaltail
  */
 
-vector<double> AD_distance(vector<vector<double> > depths,bool weightTotail=false) {
+vector<double> ADdistance(vector<vector<double> > depths,bool weightToTail=false) {
     //flatten 2-d to 1-d and compute alldepth ECDF of using all points depths
 	vector<double> alldepth = flatten(depths);
-	vector<double, double> Fxm = ecdf(alldepth); //all depth cdf
+	map<double,double> Fxm = ecdf(alldepth); //all depth cdf
 
 	vector<double> scores;
    /*
@@ -149,30 +153,35 @@ vector<double> AD_distance(vector<vector<double> > depths,bool weightTotail=fals
 	for (vector<double> x : depths) {
 		sort(x.begin(), x.end());
 		map<double, double>::iterator iter = Fxm.begin();
+		map<double,double> fxn = ecdf(x);  //empirical cdf of the point
 		double sum = 0;
 		for (double elem : x) {
 			double val;
 			while (iter != Fxm.end()) {
-//	    		cout<<x.at(i)<<"\t"<<iter->first<<endl;
+    		//cout<<elem<<"\t"<<iter->first<<"\t"<<iter->second<<endl;
 				if (iter->first > elem) //x.at(i))
 						{
 
 					val = (--iter)->second; //= ((i==0)?.0:(--iter)->second);
 					//fx.push_back(val);  //cdf mapping in Fx  i.e. Fx is the theoretical CDF
+					//cout<<val<<endl;
 					break;
 				}
 				++iter;
 			}
 			if (iter == Fxm.end())
-				val = 0.99999999;  //close to 1 at the end of the distribution
-
-			sum += max(Fxm[elem] - val, 0.0); //distance of each point in the vector
+				val = 0.99999999; //close to 1 at the end of the distribution
+			cout<<Fxm[elem]<<val<<endl;
+			double cdfDiff =max((val - fxn[elem]), 0.0);
+            sum += weightToTail?cdfDiff/sqrt(val):cdfDiff;//distance of each point in the vector
+         //   cout<<"current sum "<<sum<<endl;
+		//optional giving weight to tail
 		}
 
-		score.push_back(sum); //check if map is better
+		scores.push_back(sum); //check if map is better
 
 	}
-
+return scores;
 
 	}
 

@@ -122,3 +122,7 @@ vector<vector<double> > IsolationForest::pathLength(Data data)
 	return depths;
 }
 
+vector<double> IsolationForest::ADtest()
+{
+ return ADdistance(this->data.data,true);
+}
