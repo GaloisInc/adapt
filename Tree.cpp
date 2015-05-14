@@ -97,13 +97,11 @@ void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 double Tree::pathLength(vector<double> inst)
 {
 
-	if (this == NULL)
-		return 0.0;
+ if (this->leftChild==NULL||this->rightChild==NULL)
+	        { ///referenced as null for some input data .
+	                return avgPL(this->nodeSize);
+	        }
 
-	if (this->isLeaf)
-	{ ///referenced as null for some input data .
-		return avgPL(this->nodeSize);
-	}
 
 	if (inst[this->splittingAtt] > this->splittingPoint)
 	{
