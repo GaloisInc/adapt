@@ -21,8 +21,6 @@ public:
 	double splittingPoint;
 	int depth;
 	bool isLeaf;
-	std::vector<int> nodeIndx;
-
 	Tree()
 	{
 		leftChild = NULL;
@@ -36,7 +34,6 @@ public:
 	}
 	;
 
-	Tree(Data data, int height, int maxHeight, bool stopheight);
 	virtual ~Tree()
 	{	//delete *leftChild;
 	}

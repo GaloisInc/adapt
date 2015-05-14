@@ -5,18 +5,19 @@
  *      Author: Tadeze
  */
 #include "Tree.hpp"
-//#include "IsolationForest.hpp"
 using namespace std;
 void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 {
-	this->depth = height;
+	this->depth = height; //Tree height
 	// Set size of the node
 	nodeSize = data.nrows;
+	//stop growing if condition
 	if (data.nrows <= 1 || (stopheight && this->depth > maxheight))
 	{
 		this->isLeaf = true;
 		return;
 	}
+
 	//compute min and max of the attribute
 	vector < vector<double> > minmax;
 	for (int j = 0; j < data.ncols; j++)
@@ -92,10 +93,10 @@ void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 	}
 
 }
-
+//PathLength for an instance
 double Tree::pathLength(vector<double> inst)
 {
-//cout<<this->depth;
+
 	if (this == NULL)
 		return 0.0;
 

@@ -7,8 +7,6 @@
 #include "IsolationForest.hpp"
 //build the forest
 using namespace std;
-
-int cnt;
 IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
 		bool stopheight, const int nsample, bool rSample)
 {
@@ -18,9 +16,10 @@ IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
 	Data sampleData;
 	vector<int> sampleIndex;
 	this->rSample = rSample;
+	//build forest through all trees
 	for (int n = 0; n < ntree; n++)
 	{
-		//ffile << "-----Tree number----------- " << n + 1 << "\n";
+		//if sampling is true
 		if (rSample == true && nsample < data.nrows)
 		{ //sample index data and construct sample data
 			sampleI(0, data.nrows - 1, nsample, sampleIndex);
@@ -36,39 +35,28 @@ IsolationForest::IsolationForest(const int ntree, Data data, int maxheight,
 
 		else
 			sampleData = data;
+
 		this->data = sampleData;
 		Tree *tree = new Tree();
 		tree->iTree(sampleData, 0, maxheight, stopheight);
 		this->trees.push_back(tree);
-//ffile<<n<<"\t " splitt at "<<tree->splittingAtt<<"\t depth "<<countleft(tree)<<endl;
 
 	}
 
 }
-//used only for debugging purpose
-int IsolationForest::countleft(Tree *tree)
-{
-	if (tree->isLeaf)
-		return 1;
-	else
-		return countleft(tree->leftChild) + 1;
-
-}
-
 /*
- * Accepts single row point and return Anomaly Score
+ * Accepts single point (row) and return Anomaly Score
  */
 double IsolationForest::instanceScore(vector<double> inst)
 {
 	double avgPathLength = 0;
 	vector<double> depthInTree;
-	//pointer based
-	int x=0;
+
+	//compute depth, score from all trees in the forest
 	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
-	avgPathLength += (*it)->pathLength(inst);
-	ffile <<cnt<<","<<++x<<","<<avgPathLength <<"\n";
+	avgPathLength += (*it)->pathLength(inst);  //depth in a tree
 	}
 	double scores;
 	avgPathLength /= (double) this->ntree;
@@ -79,18 +67,15 @@ double IsolationForest::instanceScore(vector<double> inst)
 }
 
 /*
- * Score for all points
+ * Score for all points in the dataset
  */
 vector<double> IsolationForest::AnomalyScore(Data data)
 {
 	vector<double> scores;
-	ffile<<"instance,tree,depth\n";// ---------Scoring for all dataset-----------\n";
-    cnt=0;
+	//iterate through all points
 	for (int inst = 0; inst < (int) data.data.size(); inst++)
 	{
-    //ffile<<"         #########instance number -- "<<inst+1<<" ---#############\n";
-    cnt++;
-		scores.push_back(instanceScore(data.data[inst]));
+    scores.push_back(instanceScore(data.data[inst]));
 
 	}
 	return scores;
@@ -121,8 +106,12 @@ vector<vector<double> > IsolationForest::pathLength(Data data)
 		depths.push_back(pathLength(data.data[r]));
 	return depths;
 }
-
+/*
+ * Anderson_Darling test from the pathlength
+ */
 vector<double> IsolationForest::ADtest()
 {
- return ADdistance(this->data.data,true);
+
+
+	return ADdistance(pathLength(this->data),true);
 }
