@@ -18,6 +18,7 @@
 #include<vector>
 #include<algorithm>
 #include<map>
+#include "cincl.hpp"
 struct Data
 {
 	int ncols;
@@ -35,6 +36,8 @@ std::vector<std::vector<double> > readcsv(const char* filename, char delim,
 extern std::ofstream ffile; //("log.txt");
 std::map<double,double> ecdf(std::vector<double> points);
 std::vector<double> ADdistance(std::vector<std::vector<double> > depths,bool weightToTail);
+extern doubleframe* dt;
+
 #endif
 /* UTITLITY_H_ */
 

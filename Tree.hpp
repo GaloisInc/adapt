@@ -38,8 +38,8 @@ public:
 	{	//delete *leftChild;
 	}
 	;
-	void iTree(Data data, int height, int maxHeight, bool stopheight);
-	double pathLength(std::vector<double> inst);
+	void iTree(std::vector<int> const &dIndex, int height, int maxHeight, bool stopheight);
+	double pathLength(double* inst);
 
 };
 

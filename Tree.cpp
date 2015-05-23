@@ -6,46 +6,49 @@
  */
 #include "Tree.hpp"
 using namespace std;
-void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
+void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stopheight)
 {
 	this->depth = height; //Tree height
 	// Set size of the node
-	nodeSize = data.nrows;
+	nodeSize = dIndex.size();
 	//stop growing if condition
-	if (data.nrows <= 1 || (stopheight && this->depth > maxheight))
+	if (dIndex.size() <= 1 || (stopheight && this->depth > maxheight))
 	{
-		this->isLeaf = true;
+		//this->isLeaf = true;
 		return;
 	}
-
-	//compute min and max of the attribute
-	vector < vector<double> > minmax;
-	for (int j = 0; j < data.ncols; j++)
+//*** Need modification
+	//Initialize minmax array for holding max and min of an attributes
+	vector <vector<double> > minmax;
+	for (int j = 0; j < dt->ncol; j++)
 	{
 		vector<double> tmp;
-		tmp.push_back(data.data[0][j]);
-		tmp.push_back(data.data[0][j]);
+		tmp.push_back(dt->data[0][j]);
+		tmp.push_back(dt->data[0][j]);
 		minmax.push_back(tmp); //initialize max and min to random value
 	}
 
+
+
 	try
 	{
-		for (int i = 0; i < data.nrows; i++)
+		for (int i = 0; i < dt->nrow-1; i++)
 		{
-			vector<double> inst = data.data.at(i);
-			for (int j = 0; j < data.ncols; j++)
+			//vector<double> inst = data->data[i];
+			for (int j = 0; j < dt->ncol; j++)
 			{
-				if (inst[j] < minmax[j].at(0))
-					minmax[j].at(0) = inst[j];
-				if (inst[j] > minmax.at(j).at(1))
-					minmax[j].at(1) = inst[j];
+				if (dt->data[i][j] < minmax[j].at(0))
+					minmax[j].at(0) = dt->data[i][j];
+				if (dt->data[i][j] > minmax.at(j).at(1))
+					minmax[j].at(1) = dt->data[i][j];
 			}
 
 		}
 
 		//use only valid attributes
+
 		vector<int> attributes;
-		for (int j = 0; j < data.ncols; j++)
+		for (int j = 0; j < dt->ncol; j++)
 		{
 			if (minmax[j][0] < minmax[j][1])
 			{
@@ -60,41 +63,48 @@ void Tree::iTree(Data data, int height, int maxheight, bool stopheight)
 		this->splittingAtt = attributes[randx];
 		this->splittingPoint = randomD(minmax[this->splittingAtt][0],
 				minmax[this->splittingAtt][1]);
-		vector < vector<double> > lnodeData;
-		vector < vector<double> > rnodeData;
+		vector <int> lnodeData;
+		vector < int> rnodeData;
 
 		//Split the node into two
-		for (int j = 0; j < data.nrows; j++)
+		for (int j = 0; j < dt->nrow-1; j++)
 		{
-			if (data.data[j][splittingAtt] > splittingPoint)
+			if (dt->data[j][splittingAtt] > splittingPoint)
 			{
-				lnodeData.push_back(data.data[j]);
+				lnodeData.push_back(j);
 			}
 			else
 			{
-				rnodeData.push_back(data.data[j]);
+				rnodeData.push_back(j);
 			}
 		}
 
-		Data dataL =
+		/*Data dataL =
 		{ data.ncols, (int) lnodeData.size(), lnodeData };
+		*/
 		leftChild = new Tree(); //&dataL,height+1,maxheight);
 		leftChild->parent = this;
-		leftChild->iTree(dataL, this->depth + 1, maxheight, stopheight);
+		leftChild->iTree(lnodeData, this->depth + 1, maxheight, stopheight);
 
-		Data dataR =
+		/*Data dataR =
 		{ data.ncols, (int) rnodeData.size(), rnodeData };
+		*/
 		rightChild = new Tree(); //&dataR,height+1,maxheight);
 		rightChild->parent = this;
-		rightChild->iTree(dataR, this->depth + 1, maxheight, stopheight);
-	} catch (const exception& er)
+		rightChild->iTree(rnodeData, this->depth + 1, maxheight, stopheight);
+	}
+
+	catch (const exception& er)
 	{
 		ffile << "Error in tree building..." << er.what() << "\n";
 	}
 
 }
 //PathLength for an instance
-double Tree::pathLength(vector<double> inst)
+/*
+ * takes instance as vector of double
+ */
+double Tree::pathLength(double* inst)
 {
 
  if (this->leftChild==NULL||this->rightChild==NULL)
