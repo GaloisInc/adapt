@@ -19,7 +19,7 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 	}
 //*** Need modification
 	//Initialize minmax array for holding max and min of an attributes
-	vector <vector<double> > minmax;
+	vector<vector<double> > minmax;
 	for (int j = 0; j < dt->ncol; j++)
 	{
 		vector<double> tmp;
@@ -32,15 +32,15 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 
 	try
 	{
-		for (int i = 0; i < dt->nrow-1; i++)
+		for (unsigned i = 0; i <dIndex.size() ; i++)
 		{
 			//vector<double> inst = data->data[i];
 			for (int j = 0; j < dt->ncol; j++)
 			{
-				if (dt->data[i][j] < minmax[j].at(0))
-					minmax[j].at(0) = dt->data[i][j];
-				if (dt->data[i][j] > minmax.at(j).at(1))
-					minmax[j].at(1) = dt->data[i][j];
+				if (dt->data[dIndex.at(i)][j] < minmax[j].at(0))
+					minmax[j].at(0) =dt->data[dIndex.at(i)][j];
+				if (dt->data[dIndex.at(i)][j] > minmax.at(j).at(1))
+					minmax[j].at(1) = dt->data[dIndex.at(i)][j];
 			}
 
 		}
@@ -67,15 +67,15 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 		vector < int> rnodeData;
 
 		//Split the node into two
-		for (int j = 0; j < dt->nrow-1; j++)
+		for (unsigned i = 0; i < dIndex.size(); i++)
 		{
-			if (dt->data[j][splittingAtt] > splittingPoint)
+			if ( dt->data[dIndex.at(i)][splittingAtt] > splittingPoint)
 			{
-				lnodeData.push_back(j);
+				lnodeData.push_back(i);
 			}
 			else
 			{
-				rnodeData.push_back(j);
+				rnodeData.push_back(i);
 			}
 		}
 

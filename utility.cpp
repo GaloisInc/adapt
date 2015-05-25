@@ -15,6 +15,14 @@ int randomI(int min, int max) {
 	num = (int) (min + (rand() % (max - min)));
 	return num;
 }
+int randomI(int min,int max,set	<int>& exlude)
+{
+			int num;
+			num = (int) (min + (rand() % (max - min+1)));
+			return exlude.find(num)!=exlude.end()?randomI(min,max,exlude):num;
+			
+}
+
 /*unsigned randomi(int min,int max)
  {
  uniform_int_distribution<unsigned> u(min,max);
@@ -25,6 +33,7 @@ double randomD(double min, double max) {
 	return ceil((min + ((double) rand() / (RAND_MAX)) * (max - min)) * 100)
 			/ 100;
 }
+/*
 void sampleI(int min, int max, int nsample, vector<int> &samples) {
 	int cnt = 0;
 	bool duplicate = false;
@@ -44,7 +53,23 @@ void sampleI(int min, int max, int nsample, vector<int> &samples) {
 		}
 		duplicate = false;
 	}
+}*/
+void sampleI(int min,int max, int nsample,vector<int> &samples)
+{
+int cnt=0;
+int rndI;
+set<int> duplicate;
+while(cnt<nsample)
+{
+rndI = randomI(min,max,duplicate);
+samples.push_back(rndI);
+duplicate.insert(rndI);
+cnt++;
+
 }
+
+}
+
 double avgPL(double n) {
 
 	return (((n - 1) <= 0) ?

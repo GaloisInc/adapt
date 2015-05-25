@@ -22,10 +22,10 @@ IsolationForest::IsolationForest(const int ntree, doubleframe* data/*Data data*/
 		//if sampling is true
 	//Sample and shuffle the data.
 	sampleIndex.clear();
-	if(rSample && nsample<data->nrow)
-	sampleI(0, data->nrow - 1, nsample, sampleIndex); //sample nsample
+	if(rSample && nsample<dt->nrow)
+	sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
 	else
-	sampleI(0, data->nrow - 1, data->nrow-1, sampleIndex);   //shuffle all index of the data if sampling is false
+	sampleI(0, dt->nrow-1, dt->nrow, sampleIndex);   //shuffle all index of the data if sampling is false
 
 
 	/*
