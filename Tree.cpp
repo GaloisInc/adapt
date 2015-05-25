@@ -29,9 +29,6 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 	}
 
 
-
-	try
-	{
 		for (unsigned i = 0; i <dIndex.size() ; i++)
 		{
 			//vector<double> inst = data->data[i];
@@ -94,17 +91,11 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 		rightChild->iTree(rnodeData, this->depth + 1, maxheight, stopheight);
 	}
 
-	catch (const exception& er)
-	{
-		ffile << "Error in tree building..." << er.what() << "\n";
-	}
 
-}
-//PathLength for an instance
 /*
  * takes instance as vector of double
  */
-double Tree::pathLength(double* inst)
+double Tree::pathLength(double *inst)
 {
 
  if (this->leftChild==NULL||this->rightChild==NULL)

@@ -35,11 +35,11 @@ public:
 	;
 
 	virtual ~Tree()
-	{	//delete *leftChild;
+	{	//delete *leftChild; //check if deleting the child is need.
 	}
 	;
 	void iTree(std::vector<int> const &dIndex, int height, int maxHeight, bool stopheight);
-	double pathLength(double* inst);
+	double pathLength(double *inst);
 
 };
 

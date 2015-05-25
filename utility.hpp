@@ -35,7 +35,7 @@ void swapInt(int a, int b, int* x);
 double mean(std::vector<double> points);
 std::vector<std::vector<double> > readcsv(const char* filename, char delim,
 		bool header);
-extern std::ofstream ffile; //("log.txt");
+//extern std::ofstream ffile; //("log.txt");
 std::map<double,double> ecdf(std::vector<double> points);
 std::vector<double> ADdistance(std::vector<std::vector<double> > depths,bool weightToTail);
 extern doubleframe* dt;

@@ -14,12 +14,11 @@ class IsolationForest
 {
 public:
 	std::vector<Tree*> trees;
-	Data data;
 	int ntree;
 	bool rSample;
 	int nsample;
-    bool stopheight;
-    int maxheight;
+    	bool stopheight;
+    	int maxheight;
 	IsolationForest()
 	{
 		rSample = false;
@@ -27,7 +26,7 @@ public:
 		nsample = 256;
 	}
 	;
-	IsolationForest(int ntree, doubleframe* data, int maxheight, bool stopheight, const int nsample,
+	IsolationForest(int ntree, int maxheight, bool stopheight, const int nsample,
 			bool rSample);
 
 	virtual ~IsolationForest()
@@ -36,9 +35,9 @@ public:
 				++it)
 			delete *it;
 	}
-	double instanceScore(double* inst);
+	double instanceScore(double *inst);
 	std::vector<double> AnomalyScore(doubleframe* df);
-	std::vector<double> pathLength(std::vector<double> inst);
+	std::vector<double> pathLength(double *inst);
 	std::vector<std::vector<double> > pathLength(doubleframe* data);
 	std::vector<double> ADtest();
 
