@@ -1,4 +1,4 @@
-CC=gcc
+CC=/usr/local/common/gcc-4.9.0/bin/gcc
 CFLAGS=--std=c99 -D_GNU_SOURCE -Wall -Werror -g
 
 all: common.o object.o strfun.o readwrite.o argparse.o argparse_iforest.o frames.o
