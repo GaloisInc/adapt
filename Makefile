@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=--std=c99 -D_GNU_SOURCE -Wall -Werror -g
 PP=g++
-PFLAGS=--std=c++11 -Wall -Werror -g
+PFLAGS= --std=c++0x -Wall -Werror -g
 
 all: iforest.exe
 
