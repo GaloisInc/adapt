@@ -17,9 +17,9 @@
 #define CODEGEN_INITFRAMESIG(t)\
 t##frame* _init_##t##frame_(int nrow,int ncol,bool column_major,d(t)** mat)
 #define CODEGEN_CUTFRAMESIG(t)\
-t##frame* _cut_##t##frame_(t##frame* tocut,d(int)* majors)
+t##frame* _cut_##t##frame_(t##frame* tocut,d(int)* majors,bool antimajor)
 #define CODEGEN_SPLITFRAMESIG(t)\
-t##frame* _split_##t##frame_(t##frame** tosplit,d(int)* majors)
+t##frame* _split_##t##frame_(t##frame** tosplit,d(int)* majors,bool antimajor)
 #define CODEGEN_CONVFRAMESIG(t,u)\
 t##frame* _conv_##t##frame_##u##frame_(u##frame* uf)
 
@@ -53,8 +53,8 @@ CODEGEN_CONVFRAMESIG(double,ntstring);
 
 #define init_frame(t,nrow,ncol,colmaj) _init_##t##frame_(nrow,ncol,colmaj,NULL)
 #define frame(t,mat,colmaj) _init_##t##frame_(0,0,colmaj,mat)
-#define cut_frame(t,frame,majors) _cut_##t##frame_(frame,majors)
-#define split_frame(t,frame,majors) _split_##t##frame_(&(frame),majors)
+#define cut_frame(t,frame,majors,antim) _cut_##t##frame_(frame,majors,antim)
+#define split_frame(t,frame,majors,antim) _split_##t##frame_(&(frame),majors,antim)
 #define conv_frame(t,u,uf) _conv_##t##frame_##u##frame_(uf)
 
 #endif

@@ -50,24 +50,38 @@ int main(int argc, char* argv[]) {
 	verbose = verbose; //Clears warning for now.
 	bool rsample = nsample != 0;
 	bool stopheight = maxheight != 0;
-	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
+//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
-	ntstringframe* metadata = split_frame(ntstring, csv, metacol);
-	metadata = metadata; //Clears warning for now.
+	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
-
 	//Build forest
 	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
 	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
-	vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
+	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
 	ofstream outscore(output_name);
-	outscore << "indx,score,avgDepth,adscore\n";
+    if (metadata!=NULL) {
+        if (header) {
+            for_each_in_vec(i,cname,metadata->colnames,{
+                outscore << *cname << ",";
+            })
+        } else {
+            forseq(c,0,metadata->ncol,{
+                outscore << "meta" << c << ",";
+            })
+        }
+    }
+	outscore << "indx,score,avgDepth\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
-		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << ","
-				<< adscore.at(j) << "\n";
+        if (metadata) {
+            forseq(m,0,metadata->ncol,{
+                outscore << metadata->data[j][m] << ",";
+            })
+        }
+		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << 
+			"\n";
 
 	}
 	outscore.close();

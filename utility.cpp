@@ -7,42 +7,59 @@
 
 #include "utility.hpp"
 
-using namespace std;
 
-template<typename T>
-T randomR(T min,T max,std::set<T>& exclude=NULL)
-{
-	T num;
-	num = (T) (min + (rand() % (max - min+1)));
-	return exclude.find(num)!=exclude.end()?randomI(min,max,exclude):num;
-}
+using namespace std;
 
 int randomI(int min, int max) {
 	int num;
 	num = (int) (min + (rand() % (max - min)));
 	return num;
 }
-int randomI(int min,int max,set	<int>& exclude)
+int randomI(int min,int max,set	<int>& exlude)
 {
 			int num;
 			num = (int) (min + (rand() % (max - min+1)));
-			return exclude.find(num)!=exclude.end()?randomI(min,max,exclude):num;
+			return exlude.find(num)!=exlude.end()?randomI(min,max,exlude):num;
 			
 }
 
+/*unsigned randomi(int min,int max)
+ {
+ uniform_int_distribution<unsigned> u(min,max);
+ default_random_engine e;
+ return u(e);
+ }*/
 double randomD(double min, double max) {
 	return ceil((min + ((double) rand() / (RAND_MAX)) * (max - min)) * 100)
 			/ 100;
 }
+/*
+void sampleI(int min, int max, int nsample, vector<int> &samples) {
+	int cnt = 0;
+	bool duplicate = false;
+	int rndI;
+	while (cnt < nsample) {
+		rndI = randomI(min, max);
+		for (int i = 0; i < cnt; i++) {
+			if (samples[i] == rndI) {
+				duplicate = true;
+				break;
+			}
 
-
+		}
+		if (!duplicate) {
+			samples.push_back(rndI);
+			cnt++;
+		}
+		duplicate = false;
+	}
+}*/
 void sampleI(int min,int max, int nsample,vector<int> &samples)
 {
 int cnt=0;
 int rndI;
-set<int> duplicate; //check if the number is already generated
-
-while(cnt<nsample)  //while still nsample not generated
+set<int> duplicate;
+while(cnt<nsample)
 {
 rndI = randomI(min,max,duplicate);
 samples.push_back(rndI);
@@ -74,7 +91,10 @@ double mean(vector<double> points) {
 		sum += points[f];
 	return sum / (double) points.size();
 }
-/* Read csv with delimitted format */
+/*
+ * Read csv file into vector,
+ *just used for testing
+ */
 vector<vector<double> > readcsv(const char* filename, char delim = ',',
 		bool header = true) {
 	vector < vector<double> > values;
@@ -99,33 +119,32 @@ vector<vector<double> > readcsv(const char* filename, char delim = ',',
  * CDF function
  */
 map<double,double> ecdf(vector<double> points) {
-
 	map<double,double> cdfm;
-	sort(points.begin(), points.end()); //sort the points
 
-	int j= -1;
+	sort(points.begin(), points.end());
+	//cout<<dup.size()<<endl;
+	int j = -1;
 	double len = (double) points.size();
 	for (unsigned i = 0; i < points.size(); ++i) {
 		if (i == 0 || points[i - 1] != points[i]) {
 			j++;
-			cdfm.insert({points.at(i),(double) (i + 1) / len}); /* compute F(x) ={number of element less than or equal to x}/n,
-																Empirical CDF calculation */
+			cdfm.insert({points.at(i),(double) (i + 1) / len});
 		}
-		else  //if there is duplicate take one element and compute F(x)
+		else
 
 			{
-			cdfm[points.at(j)]=(double) (j + 1) / len;
+			cdfm[points.at(i)]=(double) (i + 1) / len;
 			}
 	}
 	return cdfm;
 
 }
+//compare the result with
+template<typename T>
+T Amax(T a, T b){
+return a>b?a:b;
+}
 
-/*
- * Flatten  vector<vector<T> > into single Vector<T>
- * @param v nested vector of vector<vector<T> >
- * @return vector<T>  of single dimension
- */
 template <typename T>
 vector<T> flatten(const vector<vector<T>>& v) {
     size_t total_size = 0;
@@ -137,6 +156,11 @@ vector<T> flatten(const vector<vector<T>>& v) {
         result.insert(result.end(), sub.begin(), sub.end());
     return result;
 }
+/*
+ * Compute the Anderson-Darling distance for the depth distribution of each point
+ * input: 2-d depth row X tree_depth
+ * return 1-D score of each point
+ */
 
 
 vector<double> ADdistance(vector<vector<double> > depths, bool weightToTail =
@@ -158,16 +182,17 @@ vector<double> ADdistance(vector<vector<double> > depths, bool weightToTail =
 		for (double elem : x) {
 			double val;
 			while (iter != Fxm.end()) {
+				//cout<<elem<<"\t"<<iter->first<<"\t"<<iter->second<<endl;
 				if (iter->first > elem) //x.at(i))
-					{
+						{
 
-					val = (--iter)->second;
+					val = (--iter)->second; //= ((i==0)?.0:(--iter)->second);
 					break;
 				}
 				++iter;
 			}
 			if (iter == Fxm.end())
-				val = 1; //set to 1 for upper tail end of the CDF
+				val = 0.99999999; //close to 1 at the end of the distribution
 			double cdfDiff = max((fxn[elem]-val), 0.0);
 			sum += weightToTail ? cdfDiff / sqrt(val) : cdfDiff; //distance of each point in the vector
 
