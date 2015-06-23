@@ -86,7 +86,6 @@ int main(int argc, char* argv[]) {
 	}
 	outscore.close();
 
-	cout << "\n...Finished\n";
 	return 0;
 }
 

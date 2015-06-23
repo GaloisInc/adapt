@@ -4,17 +4,53 @@
  *  Created on: Mar 27, 2015
  *      Author: Tadeze
  */
-
+#include<random>
 #include "utility.hpp"
 
 
 using namespace std;
 
+/*
 int randomI(int min, int max) {
 	int num;
 	num = (int) (min + (rand() % (max - min)));
 	return num;
 }
+int randomI(int min,int max,set	<int>& exclude)
+{
+			int num;
+			num = (int) (min + (rand() % (max - min+1)));
+			return exclude.find(num)!=exclude.end()?randomI(min,max,exclude):num;
+			
+}
+
+double randomD(double min, double max) {
+	return ceil((min + ((double) rand() / (RAND_MAX)) * (max - min)) * 100)
+			/ 100;
+}
+*/
+
+
+
+
+
+double randomi(double min,double max)
+ {
+
+ random_device rd;
+ mt19937 gen(rd());
+ uniform_real_distribution<double> dist (min,max);
+ return dist(gen);
+
+ 
+ }
+
+int randomI(int min, int max) {
+	int num;
+	num =(int) (randomi(min,max)); // min + (rand() % (max - min)));
+	return num;
+}
+
 int randomI(int min,int max,set	<int>& exlude)
 {
 			int num;
@@ -23,37 +59,11 @@ int randomI(int min,int max,set	<int>& exlude)
 			
 }
 
-/*unsigned randomi(int min,int max)
- {
- uniform_int_distribution<unsigned> u(min,max);
- default_random_engine e;
- return u(e);
- }*/
-double randomD(double min, double max) {
-	return ceil((min + ((double) rand() / (RAND_MAX)) * (max - min)) * 100)
-			/ 100;
-}
-/*
-void sampleI(int min, int max, int nsample, vector<int> &samples) {
-	int cnt = 0;
-	bool duplicate = false;
-	int rndI;
-	while (cnt < nsample) {
-		rndI = randomI(min, max);
-		for (int i = 0; i < cnt; i++) {
-			if (samples[i] == rndI) {
-				duplicate = true;
-				break;
-			}
 
-		}
-		if (!duplicate) {
-			samples.push_back(rndI);
-			cnt++;
-		}
-		duplicate = false;
-	}
-}*/
+double randomD(double min, double max) {
+
+return ceil(randomi(min,max)*100)/100;
+}
 void sampleI(int min,int max, int nsample,vector<int> &samples)
 {
 int cnt=0;
