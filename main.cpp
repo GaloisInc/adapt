@@ -80,8 +80,7 @@ int main(int argc, char* argv[]) {
                 outscore << metadata->data[j][m] << ",";
             })
         }
-		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << 
-			"\n";
+		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << "\n";
 
 	}
 	outscore.close();
