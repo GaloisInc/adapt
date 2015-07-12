@@ -29,6 +29,7 @@
  Default value is false.
  -h, --help
  Print this help message and exit.
+*
  */
 
 #include "main.hpp"

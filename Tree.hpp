@@ -3,7 +3,7 @@
  *
  *  Created on: Mar 24, 2015
  *      Author: Tadeze
- * Tree: class build using the training data
+ * Tree: class build tree using the training data
 
  */
 

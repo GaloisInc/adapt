@@ -1,13 +1,8 @@
 CC=/usr/local/common/gcc-4.9.0/bin/gcc
 CFLAGS=--std=c99 -D_GNU_SOURCE -Wall -Werror -g
-<<<<<<< HEAD
-PP=g++
-PFLAGS= --std=c++0x -Wall -Werror -g
-=======
 PP=/usr/local/common/gcc-4.9.0/bin/g++
 PFLAGS=--std=c++11 -Wall -Werror -g
 LDFLAGS=-Wl,-rpath,/usr/local/common/gcc-4.9.0/lib64/
->>>>>>> 4a9c1790a33a07c45c2ccccc75964a0affe71ecf
 
 all: iforest.exe
 
