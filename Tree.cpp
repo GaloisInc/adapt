@@ -106,6 +106,7 @@ double Tree::pathLength(double *inst)
         }
 
 
+	logfile<<tmpVar<<","<<this->splittingAtt<<","<<this->splittingPoint<<"\n";
 	if (inst[this->splittingAtt] > this->splittingPoint)
 	{
 
@@ -118,3 +119,14 @@ double Tree::pathLength(double *inst)
 	}
 }
 
+/*
+ * Change direction whenever feature f encountered
+ *
+double Tree::fPathLength(double *inst,int f)
+{
+
+
+return 1.0;
+
+}
+*/

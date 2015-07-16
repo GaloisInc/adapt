@@ -95,6 +95,7 @@ void swapInt(int a, int b, int* x) {
 	x[b] = hold;
 }
 
+//template<typename T>
 double mean(vector<double> points) {
 	double sum = 0;
 	for (int f = 0; f < (int) points.size(); f++)
@@ -149,11 +150,7 @@ map<double,double> ecdf(vector<double> points) {
 	return cdfm;
 
 }
-//compare the result with
-template<typename T>
-T Amax(T a, T b){
-return a>b?a:b;
-}
+
 
 template <typename T>
 vector<T> flatten(const vector<vector<T>>& v) {

@@ -34,6 +34,9 @@
 #include "main.hpp"
 using namespace std;
 doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
+//log file
+ofstream logfile("treepath.csv");
+
 int main(int argc, char* argv[]) {
 
 	srand(time(NULL)); //randomize for random number generator.
@@ -50,7 +53,11 @@ int main(int argc, char* argv[]) {
 	verbose = verbose; //Clears warning for now.
 	bool rsample = nsample != 0;
 	bool stopheight = maxheight != 0;
-//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
+
+
+       logfile<<"tree,index,spAttr,spValue"<<"\n";
+	
+	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
@@ -85,6 +92,7 @@ int main(int argc, char* argv[]) {
 
 	}
 	outscore.close();
+        logfile.close();
 
 	return 0;
 }
