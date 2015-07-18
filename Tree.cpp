@@ -105,8 +105,8 @@ double Tree::pathLength(double *inst)
                	return avgPL(this->nodeSize);
         }
 
-
-	logfile<<tmpVar<<","<<this->splittingAtt<<","<<this->splittingPoint<<"\n";
+//Logging the isolation process
+//	logfile<<tmpVar<<","<<this->splittingAtt<<","<<this->splittingPoint<<"\n";
 	if (inst[this->splittingAtt] > this->splittingPoint)
 	{
 

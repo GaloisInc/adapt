@@ -20,12 +20,13 @@
 #include<map>
 #include<set>
 #include "cincl.hpp"
-struct Data
+/*struct Data
 {
 	int ncols;
 	int nrows;
 	std::vector<std::vector<double> > data;
 };
+*/
 int randomI(int min, int max);
 int randomI(int min,int max,std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
