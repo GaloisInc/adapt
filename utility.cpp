@@ -4,12 +4,12 @@
  *  Created on: Mar 27, 2015
  *      Author: Tadeze
  */
-#include<random>
+
 #include "utility.hpp"
 
 
 using namespace std;
-
+default_random_engine gen(time(NULL));
 /*
 int randomI(int min, int max) {
 	int num;
@@ -33,37 +33,44 @@ double randomD(double min, double max) {
 
 
 
-
-double randomi(double min,double max)
+double randomD (double min,double max)
  {
-
- random_device rd;
+//static default_random_engine gen;
+/* random_device rd;
  mt19937 gen(rd());
+*/
  uniform_real_distribution<double> dist (min,max);
  return dist(gen);
-
- 
  }
 
 int randomI(int min, int max) {
-	int num;
+
+
+uniform_int_distribution<unsigned> dist(min,max);
+return dist(gen);
+
+//Deperciated 	
+/*	int num;
+
 	num =(int) (randomi(min,max)); // min + (rand() % (max - min)));
 	return num;
-}
+*/
 
-int randomI(int min,int max,set	<int>& exlude)
+}
+int randomEx(int min,int max,set	<int>& exlude)
 {
 			int num;
-			num = (int) (min + (rand() % (max - min+1)));
-			return exlude.find(num)!=exlude.end()?randomI(min,max,exlude):num;
+			num =randomI(min,max);            //(int) (min + (rand() % (max - min+1)));
+			return exlude.find(num)!=exlude.end()?randomEx(min,max,exlude):num;
 			
 }
 
-
+/*
 double randomD(double min, double max) {
 
 return ceil(randomi(min,max)*100)/100;
 }
+*/
 void sampleI(int min,int max, int nsample,vector<int> &samples)
 {
 int cnt=0;
@@ -71,7 +78,7 @@ int rndI;
 set<int> duplicate;
 while(cnt<nsample)
 {
-rndI = randomI(min,max,duplicate);
+rndI = randomEx(min,max,duplicate);
 samples.push_back(rndI);
 duplicate.insert(rndI);
 cnt++;
@@ -95,6 +102,7 @@ void swapInt(int a, int b, int* x) {
 	x[b] = hold;
 }
 
+//template<typename T>
 double mean(vector<double> points) {
 	double sum = 0;
 	for (int f = 0; f < (int) points.size(); f++)
@@ -149,11 +157,7 @@ map<double,double> ecdf(vector<double> points) {
 	return cdfm;
 
 }
-//compare the result with
-template<typename T>
-T Amax(T a, T b){
-return a>b?a:b;
-}
+
 
 template <typename T>
 vector<T> flatten(const vector<vector<T>>& v) {

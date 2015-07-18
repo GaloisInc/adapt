@@ -40,9 +40,10 @@ public:
 	std::vector<double> pathLength(double *inst);
 	std::vector<std::vector<double> > pathLength(doubleframe* data);
 	std::vector<double> ADtest();
+	std::vector<double> importance(double *inst);
+
 
 };
-
 
 
 

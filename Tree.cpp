@@ -65,7 +65,7 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 	//Randomly pick an attribute and a split point
 	
 	//int randx = randomI(0, attributes.size());
-	this->splittingAtt = attributes[randomI(0,attributes.size())]; //randx];
+	this->splittingAtt = attributes[randomI(0,attributes.size()-1)]; //randx];
 	this->splittingPoint = randomD(minmax[this->splittingAtt][0],minmax[this->splittingAtt][1]);
 	
 	vector <int> lnodeData;
@@ -105,7 +105,8 @@ double Tree::pathLength(double *inst)
                	return avgPL(this->nodeSize);
         }
 
-
+//Logging the isolation process
+//	logfile<<tmpVar<<","<<this->splittingAtt<<","<<this->splittingPoint<<"\n";
 	if (inst[this->splittingAtt] > this->splittingPoint)
 	{
 
@@ -118,3 +119,14 @@ double Tree::pathLength(double *inst)
 	}
 }
 
+/*
+ * Change direction whenever feature f encountered
+ *
+double Tree::fPathLength(double *inst,int f)
+{
+
+
+return 1.0;
+
+}
+*/

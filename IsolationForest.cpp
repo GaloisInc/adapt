@@ -41,17 +41,18 @@ double IsolationForest::instanceScore(double *inst)
 {
 	double avgPathLength = 0;
 	vector<double> depthInTree;
-
-	//compute depth, score from all the forest
+//compute depth, score from all the forest
+/*
 	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
 
-		avgPathLength += (*it)->pathLength(inst);  //depth in a tree
+		  		avgPathLength += (*it)->pathLength(inst);  //depth in a tree
 
 	}
-	double scores;
-	avgPathLength /= (double) this->ntree;
+*/	double scores;
+	//avgPathLength /= (double) this->ntree;
+ 	avgPathLength = mean(pathLength(inst));
 	scores = pow(2, -avgPathLength / avgPL(this->nsample));
 
 	return scores;
@@ -74,16 +75,23 @@ vector<double> IsolationForest::AnomalyScore(doubleframe* df)
 /*
  * Return instance depth in all trees
 */
+string tmpVar;
 vector<double> IsolationForest::pathLength(double *inst)
 {
 	vector<double> depth;
+	int tr=0;
+	static int pnt=0;
+	
 	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
+          	tmpVar=to_string(++tr)+ ","+ to_string(pnt);
 
-		depth.push_back(ceil((*it)->pathLength(inst)));
+ 		 depth.push_back(ceil((*it)->pathLength(inst)));
 
+	
 	}
+       pnt++;   //for logging purpose
 	return depth;
 }
 
@@ -107,4 +115,19 @@ vector<double> IsolationForest::ADtest()
 
 	return ADdistance(pathLength(dt),true);
 }
+/* Compute the feature importance of a point
+ * input: *inst data instance
+ * output: feature importance
+ */
+vector<double> IsolationForest::importance(double *inst)
+{
+	vector<double> depth;
+	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
+			++it)
+	{
 
+		depth.push_back(ceil((*it)->pathLength(inst)));
+
+	}
+return depth;
+}

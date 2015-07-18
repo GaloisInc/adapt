@@ -20,26 +20,36 @@
 #include<map>
 #include<set>
 #include "cincl.hpp"
-struct Data
+#include<random>
+/*struct Data
 {
 	int ncols;
 	int nrows;
 	std::vector<std::vector<double> > data;
 };
+*/
+
+//default_random_engine gen(time(NULL));
 int randomI(int min, int max);
-int randomI(int min,int max,std::set<int>& exlude);
+int randomEx(int min,int max,std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
 double avgPL(double n);
 double randomD(double min, double max);
 void swapInt(int a, int b, int* x);
+
+//template<typename T>
 double mean(std::vector<double> points);
+
 std::vector<std::vector<double> > readcsv(const char* filename, char delim,
 		bool header);
 //extern std::ofstream ffile; //("log.txt");
 std::map<double,double> ecdf(std::vector<double> points);
 std::vector<double> ADdistance(std::vector<std::vector<double> > depths,bool weightToTail);
-extern doubleframe* dt;
 
+extern doubleframe* dt;
+//log file
+extern std::ofstream logfile;
+extern std::string tmpVar;
 #endif
 /* UTITLITY_H_ */
 
