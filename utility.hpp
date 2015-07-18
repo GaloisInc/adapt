@@ -20,6 +20,7 @@
 #include<map>
 #include<set>
 #include "cincl.hpp"
+#include<random>
 /*struct Data
 {
 	int ncols;
@@ -27,8 +28,10 @@
 	std::vector<std::vector<double> > data;
 };
 */
+
+//default_random_engine gen(time(NULL));
 int randomI(int min, int max);
-int randomI(int min,int max,std::set<int>& exlude);
+int randomEx(int min,int max,std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
 double avgPL(double n);
 double randomD(double min, double max);

@@ -65,7 +65,7 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 	//Randomly pick an attribute and a split point
 	
 	//int randx = randomI(0, attributes.size());
-	this->splittingAtt = attributes[randomI(0,attributes.size())]; //randx];
+	this->splittingAtt = attributes[randomI(0,attributes.size()-1)]; //randx];
 	this->splittingPoint = randomD(minmax[this->splittingAtt][0],minmax[this->splittingAtt][1]);
 	
 	vector <int> lnodeData;
