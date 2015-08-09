@@ -20,6 +20,8 @@ IsolationForest::IsolationForest(const int ntree,  int maxheight,
 	{
 		//if sampling is true
 		//Sample and shuffle the data.
+	
+
 		sampleIndex.clear();
 		if(rSample && nsample<dt->nrow)
 			sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
@@ -34,6 +36,65 @@ IsolationForest::IsolationForest(const int ntree,  int maxheight,
 	 }
 
 }
+/*
+ * Accept tua, which is confidence threshold level
+ * maxheight : max height of tree before pruninng 
+ * nsample: sample size
+ * rSample bool, which true by default. 
+ */
+
+
+
+IsolationForest::convergentIf(const int tua,  int maxheight,
+		bool stopheight, const int nsample, bool rSample)
+{
+	this->nsample = nsample;
+ //	this->e = ntree;
+  	vector<int> sampleIndex;
+ 	this->rSample = rSample;
+	vector<double> totalDepth;
+	vector<double> squaredDepth;
+	
+  //build forest through incremental trees
+  //
+		
+//if sampling is true
+		//Sample and shuffle the data.
+ 	while(tua>cnfMax)
+    	{	
+	//build a tree 
+		sampleIndex.clear();
+		if(rSample && nsample<dt->nrow)
+			sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
+		else
+			sampleI(0, dt->nrow-1, dt->nrow, sampleIndex);   //shuffle all index of the data if sampling is false
+ 
+       		//build a tree and add to forest 	
+		Tree *tree = new Tree(); 
+		tree->iTree(sampleIndex, 0, maxheight, stopheight
+		this->trees.push_back(tree);
+		double d;
+	 	for ( double *inst : dt)
+		{		
+ 			d = getdepth(inst,tree);
+	
+		}
+ 	 }
+
+
+
+}
+
+ //Get the path from a tree
+double getdepth(double *inst,const Tree &tree)
+{
+ 
+return tree.pathLength(inst);
+
+}
+
+
+
 /*
  * Accepts single point (row) and return Anomaly Score
  */
@@ -94,7 +155,6 @@ vector<double> IsolationForest::pathLength(double *inst)
        pnt++;   //for logging purpose
 	return depth;
 }
-
 
 /* PathLength for all points
 */
