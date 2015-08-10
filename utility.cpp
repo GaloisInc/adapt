@@ -35,10 +35,6 @@ double randomD(double min, double max) {
 
 double randomD (double min,double max)
  {
-//static default_random_engine gen;
-/* random_device rd;
- mt19937 gen(rd());
-*/
  uniform_real_distribution<double> dist (min,max);
  return dist(gen);
  }
@@ -49,12 +45,6 @@ int randomI(int min, int max) {
 uniform_int_distribution<unsigned> dist(min,max);
 return dist(gen);
 
-//Deperciated 	
-/*	int num;
-
-	num =(int) (randomi(min,max)); // min + (rand() % (max - min)));
-	return num;
-*/
 
 }
 int randomEx(int min,int max,set	<int>& exlude)

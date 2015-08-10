@@ -14,7 +14,7 @@
  Specify columns to preserve as meta-data. (Separated by ',' Use '-' to specify ranges).
  -t N, --ntrees=N
  Specify number of trees to build.
- Default value is 100.
+Default value is 100.
  -s S, --sampsize=S
  Specify subsampling rate for each tree. (Value of 0 indicates to use entire data set).
  Default value is 2048.
@@ -29,14 +29,13 @@
  Default value is false.
  -h, --help
  Print this help message and exit.
-*
  */
 
 #include "main.hpp"
 using namespace std;
 doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
 //log file
-ofstream logfile("treepath.csv");
+//ofstream logfile("treepath.csv");
 
 int main(int argc, char* argv[]) {
 
@@ -45,8 +44,8 @@ int main(int argc, char* argv[]) {
 	parsed_args* pargs = parse_args(argc, argv);
 	ntstring input_name = pargs->input_name;
 	ntstring output_name = pargs->output_name;
-	d(int)* metacol = pargs->metacol;
-	int ntree = pargs->ntrees;
+//	d(int)* metacol = pargs->metacol;
+//	int ntree = pargs->ntrees;
 	int nsample = pargs->sampsize;
 	int maxheight = pargs->maxdepth;
 	bool header = pargs->header;
@@ -56,21 +55,29 @@ int main(int argc, char* argv[]) {
 	bool stopheight = maxheight != 0;
 
 
-       logfile<<"tree,index,spAttr,spValue"<<"\n";
+//       logfile<<"tree,index,spAttr,spValue"<<"\n";
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
-	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
+//	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	//Build forest
-	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+//	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+	IsolationForest iff;
+	double tau=0.05;
+	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau);
+//	ntree= iff.trees.size();
+//	cout<<"Number of trees required="<<ntree<<endl;
+	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
-	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
+	
+//	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
 	ofstream outscore(output_name);
-    if (metadata!=NULL) {
+   /*
+      	if (metadata!=NULL) {
         if (header) {
             for_each_in_vec(i,cname,metadata->colnames,{
                 outscore << *cname << ",";
@@ -81,18 +88,20 @@ int main(int argc, char* argv[]) {
             })
         }
     }
-	outscore << "indx,score,avgDepth\n";
+*/	outscore << "indx,score\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
-        if (metadata) {
+  /*      if (metadata) {
             forseq(m,0,metadata->ncol,{
                 outscore << metadata->data[j][m] << ",";
             })
         }
-		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << "\n";
+*/		
+		outscore << j << "," << scores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
 
 	}
 	outscore.close();
-        logfile.close();
+    
+	   //	logfile.close();
 
 	return 0;
 }

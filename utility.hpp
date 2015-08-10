@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include<ctime>
 #include<algorithm>
+#include<queue>
 #include<string>
 #include<iterator>
 #include<vector>
@@ -21,6 +22,8 @@
 #include<set>
 #include "cincl.hpp"
 #include<random>
+#include<utility>
+
 /*struct Data
 {
 	int ncols;
@@ -44,8 +47,7 @@ std::vector<std::vector<double> > readcsv(const char* filename, char delim,
 		bool header);
 //extern std::ofstream ffile; //("log.txt");
 std::map<double,double> ecdf(std::vector<double> points);
-std::vector<double> ADdistance(std::vector<std::vector<double> > depths,bool weightToTail);
-
+std::vector<double> ADdistance(const std::vector<std::vector<double> > &depths, bool weightToTail);
 extern doubleframe* dt;
 //log file
 extern std::ofstream logfile;

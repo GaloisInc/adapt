@@ -3,10 +3,6 @@
  *
  *  Created on: Mar 24, 2015
  *      Author: Tadeze
-
- * Tree: class build tree using the training data
-
-
  */
 
 #ifndef TREE_H_
