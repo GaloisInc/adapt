@@ -62,14 +62,22 @@ int main(int argc, char* argv[]) {
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	//Build forest
-	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+//	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+	IsolationForest iff;
+	double tau=0.05;
+	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau);
+	ntree= iff.trees.size();
+	cout<<"Number of trees required="<<ntree<<endl;
+	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
+	
 	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
 	ofstream outscore(output_name);
-    if (metadata!=NULL) {
+   /*
+      	if (metadata!=NULL) {
         if (header) {
             for_each_in_vec(i,cname,metadata->colnames,{
                 outscore << *cname << ",";
@@ -80,18 +88,20 @@ int main(int argc, char* argv[]) {
             })
         }
     }
-	outscore << "indx,score,avgDepth\n";
+*/	outscore << "indx,score,avgDepth\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
-        if (metadata) {
+  /*      if (metadata) {
             forseq(m,0,metadata->ncol,{
                 outscore << metadata->data[j][m] << ",";
             })
         }
+*/		
 		outscore << j << "," << scores[j] << "," << mean(pathLength[j]) << "\n";
 
 	}
 	outscore.close();
-        logfile.close();
+    
+	   	logfile.close();
 
 	return 0;
 }
