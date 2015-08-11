@@ -2,6 +2,9 @@
 
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
+
+from cassandra.cluster import Cluster
+
 from os import getenv
 import logging
 
@@ -20,6 +23,9 @@ def main():
     producer = SimpleProducer(kafka)
     consumer = KafkaConsumer(fromTA1, bootstrap_servers=[kafkaServer], consumer_timeout_ms=20)
 
+    cassandraCluster = Cluster() # XXX connecting to cassandra for _every_ message
+    dbSession = cassandraCluster.connect('blackboard')
+
     def sendMsg(m): producer.send_messages(toTA1, m)
     def recvMsg():
         try:
@@ -28,15 +34,19 @@ def main():
         except ConsumerTimeout:
              return None
 
-    oper(sendMsg,recvMsg)
+    oper(sendMsg,recvMsg,dbSession)
 
-def oper(sendMsg,recvMsg):
+def oper(sendMsg,recvMsg,dbSession):
     state = False
     while True:
         v = recvMsg()
         if not (v is None):
             print(v)
+            storeInBlackBoard(dbSession,v)
         # XXX randomly send a message
+
+def storeInBlackBoard(db,v):
+    db.execute('INSERT INTO blackboard.test VALUES (%s)', [v])
 
 if __name__ == '__main__':
     main()
