@@ -23,7 +23,7 @@ def main():
     producer = SimpleProducer(kafka)
     consumer = KafkaConsumer(fromTA1, bootstrap_servers=[kafkaServer], consumer_timeout_ms=20)
 
-    cassandraCluster = Cluster() # XXX connecting to cassandra for _every_ message
+    cassandraCluster = Cluster()
     dbSession = cassandraCluster.connect('blackboard')
 
     def sendMsg(m): producer.send_messages(toTA1, m)
