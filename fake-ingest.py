@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
 from os import getenv
