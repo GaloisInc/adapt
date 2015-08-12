@@ -41,24 +41,23 @@ start_kafka_if_needed() {
     (cd ${KAFKA_DIR} &&
      bin/kafka-topics.sh --create \
                          --zookeeper localhost:2181 \
-			 --topic current_time \
-			 --replication-factor 1 \
+                         --topic current_time \
+                         --replication-factor 1 \
                          --partitions 1)
 
     (cd ${KAFKA_DIR} &&
      date | bin/kafka-console-producer.sh \
-                --broker-list localhost:9092 \
-                --topic current_time)
+                         --broker-list localhost:9092 \
+                         --topic current_time)
 }
 
 
-netstat -an | egrep '2181 |9092 '
+# netstat -an | egrep '2181 |9092 '
 
 start_zookeeper_if_needed
-set -x
+
 start_kafka_if_needed
 
 export TC_SERVICES_HOST=localhost
 
-set -x
 exec ./fake-ingest.py "$@"
