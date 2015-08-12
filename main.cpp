@@ -35,7 +35,7 @@ Default value is 100.
 using namespace std;
 doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
 //log file
-//ofstream logfile("treepath.csv");
+ofstream logfile("treepath.csv");
 
 int main(int argc, char* argv[]) {
 
@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
 	ntstring input_name = pargs->input_name;
 	ntstring output_name = pargs->output_name;
 //	d(int)* metacol = pargs->metacol;
-//	int ntree = pargs->ntrees;
+	int ntree = pargs->ntrees;
 	int nsample = pargs->sampsize;
 	int maxheight = pargs->maxdepth;
 	bool header = pargs->header;
@@ -66,7 +66,8 @@ int main(int argc, char* argv[]) {
 //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
 	IsolationForest iff;
 	double tau=0.05;
-	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau);
+	double alpha=0.01;
+	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
 	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
 	

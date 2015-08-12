@@ -47,7 +47,7 @@ public:
 	std::vector<double> importance(double *inst);
 
 	//convergent iForest
-	void convergeIF(int maxheight,bool stopheight, const int nsample, bool rSample,double tau);
+	void convergeIF(int maxheight,bool stopheight, const int nsample, bool rSample,double tau,double alpha);
 	double getdepth(double *inst,Tree* tree);
 
 
