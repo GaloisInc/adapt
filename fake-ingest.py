@@ -46,7 +46,7 @@ def oper(sendMsg,recvMsg,dbSession):
         # XXX randomly send a message
 
 def storeInBlackBoard(db,v):
-    db.execute('INSERT INTO blackboard.test VALUES (%s)', [v])
+    db.execute('INSERT INTO blackboard.test (msg) VALUES (%s)', [v.value])
 
 if __name__ == '__main__':
     main()
