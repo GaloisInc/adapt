@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
 
@@ -23,7 +25,7 @@ def main():
     cassandraCluster = Cluster()
     dbSession = cassandraCluster.connect('blackboard')
 
-    def sendMsg(m): producer.send_messages(toTA1, m)
+    def sendMsg(m): producer.send_messages(toTA5, m)
 
     oper(sendMsg,dbSession)
 
@@ -32,8 +34,7 @@ def oper(sendMsg,db):
     while True:
         xs = db.execute('SELECT * FROM blackboard.test')
         for x in xs:
-            print x
-            sendMsg(x)
+            sendMsg(x.msg.encode('utf-8'))
             time.sleep(5)
 
 if __name__ == '__main__':
