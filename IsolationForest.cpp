@@ -57,14 +57,7 @@ void IsolationForest::convergeIF(int maxheight,bool stopheight, const int nsampl
 	vector<double> totalDepth(dt->nrow,0);
 
 	vector<double> squaredDepth(dt->nrow,0);
-//priority_queue<pair<int,double>,vector<pair<int,double> >,topscore> pq ; //size of alpha*dt->nrow
  	priority_queue<pair<int,double>,vector<pair<int,double> >,topscore > pq;
-//priority_queue<int,vector<int>> pq;
- //vector<pair<int,double> > pq;
-//build forest through incremental trees
-//if sampling is true
-//Sample and shuffle the data.
-	
 	double  ntree=0.0;
 	bool converged=false;
 	while (!converged) {
@@ -102,9 +95,6 @@ void IsolationForest::convergeIF(int maxheight,bool stopheight, const int nsampl
 		if(ntree<2) continue;
 		double maxCIWidth =0;		
 	
-	
-	
-	
 		for(int i=0;i<tk;i++)  //where tk is top 2*\alpha * N index element
 		{ 	//int index=0;
 			int index = pq.top().first;
@@ -117,7 +107,10 @@ void IsolationForest::convergeIF(int maxheight,bool stopheight, const int nsampl
 		}
 
 	 logfile <<"Tree number "<<ntree<<" built with confidence\t"<<maxCIWidth<<endl;
-	 
+ 			maxCIWidth=max(maxCIWidth,scoreWidth);
+		}
+
+//	 logfile <<"Tree number "<<ntree<<" built with confidence\t"<<maxCIWidth<<endl;
        		converged = maxCIWidth <=tau;
 	}
 
