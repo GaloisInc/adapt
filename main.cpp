@@ -62,11 +62,16 @@ int main(int argc, char* argv[]) {
 //	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	//Build forest
+/* 	Basic IsolationForest  */
 
 //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
-	IsolationForest iff;
+//	IsolationForest iff;
+/*convergent IsolationForest */
+
 	double tau=0.05;
 	double alpha=0.01;
+ 	convForest iff(tau,alpha);
+
 	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
 	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
