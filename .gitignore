@@ -1,9 +1,0 @@
-Makefile
-*.settings
-*.txt
-*.csv
-*.exe
-*.o
-C/*.o
-*.csv
-*.gch
