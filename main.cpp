@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
 	parsed_args* pargs = parse_args(argc, argv);
 	ntstring input_name = pargs->input_name;
 	ntstring output_name = pargs->output_name;
-//	d(int)* metacol = pargs->metacol;
+	d(int)* metacol = pargs->metacol;
 	int ntree = pargs->ntrees;
 	int nsample = pargs->sampsize;
 	int maxheight = pargs->maxdepth;
@@ -59,14 +59,14 @@ int main(int argc, char* argv[]) {
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
-//	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
+	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	//Build forest
 
 //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
 	IsolationForest iff;
-	double tau=0.05;
-	double alpha=0.01;
+	double tau=0.04;
+	double alpha=0.04;
 	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
 	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
@@ -78,8 +78,8 @@ int main(int argc, char* argv[]) {
 
 	//Output file for score, averge depth and AD score
 	ofstream outscore(output_name);
-   /*
-      	if (metadata!=NULL) {
+   
+     /* 	if (metadata!=NULL) {
         if (header) {
             for_each_in_vec(i,cname,metadata->colnames,{
                 outscore << *cname << ",";
@@ -92,12 +92,12 @@ int main(int argc, char* argv[]) {
     }
 */	outscore << "indx,score\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
-  /*      if (metadata) {
+        if (metadata) {
             forseq(m,0,metadata->ncol,{
-                outscore << metadata->data[j][m] << ",";
+//                outscore << metadata->data[j][m] << ",";
             })
         }
-*/		
+		
 		outscore << j << "," << scores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
 
 	}
