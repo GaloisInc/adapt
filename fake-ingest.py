@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 
+import prov_pb2
+
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
 
@@ -26,18 +28,17 @@ def main():
     cassandraCluster = Cluster()
     dbSession = cassandraCluster.connect('blackboard')
 
-    def sendMsg(m): producer.send_messages(toTA1, m)
+    def sendMsg(m): producer.send_messages(toTA1, m.SerializeToString())
     def recvMsg():
         try:
              x = consumer.next()
-             return x
+             return prov_pb2.ParseFromString(x)
         except ConsumerTimeout:
              return None
 
     oper(sendMsg,recvMsg,dbSession)
 
 def oper(sendMsg,recvMsg,dbSession):
-    state = False
     while True:
         v = recvMsg()
         if not (v is None):
@@ -46,7 +47,7 @@ def oper(sendMsg,recvMsg,dbSession):
         # XXX randomly send a message
 
 def storeInBlackBoard(db,v):
-    db.execute('INSERT INTO blackboard.test (msg) VALUES (%s)', [v.value])
+    db.execute('INSERT INTO blackboard.test (provType, properties) VALUES (%s,%s)', [v.provType,v.properties])
 
 if __name__ == '__main__':
     main()
