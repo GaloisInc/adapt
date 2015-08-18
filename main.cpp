@@ -72,8 +72,9 @@ int main(int argc, char* argv[]) {
 	double alpha=0.01;
  	convForest iff(tau,alpha);
 
-	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
-	ntree= iff.trees.size();
+//	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
+	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
+		ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score

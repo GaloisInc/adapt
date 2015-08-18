@@ -7,13 +7,13 @@
 
 #include "convForest.hpp"
 using namespace std;
-/*
+
 struct topscore{
 	bool operator() (const pair<int,double> p1,const pair<int,double> p2)
 	{
 		return p1.second > p2.second;
 	}
-};*/
+};
 struct larger
 {
 	bool operator()(pair<int,int> p1,pair<int,int> p2)
@@ -124,4 +124,120 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 
 //return this;
 }
+
+//Sequential confidence interval stopping
+
+double variance(vector<double> x)
+{
+ 	double sum=0.0;
+	double mn=mean(x);
+	for(double elem : x)
+	{
+	 sum +=pow(elem-mn,2);
+	}
+	return sum/(double)x.size();
+}
+
+void getSample(vector<int> &sampleIndex,const int nsample,bool rSample)
+{
+	sampleIndex.clear();
+	if (rSample && nsample < dt->nrow)
+		sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
+	else
+		sampleI(0, dt->nrow - 1, dt->nrow, sampleIndex); //shuffle all index of the data if sampling is false
+
+
+
+}
+/*
+ * Stopping confidence interval width
+ */
+void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool rSample,double alpha)
+{
+	this->nsample = nsample;
+	double tk = ceil(alpha*2*dt->nrow);  //top k ranked scores 
+	vector<int> sampleIndex;  //index for sample row 
+	this->rSample = rSample;
+	vector<double> totalDepth(dt->nrow,0);
+	double tua = 1/(double)dt->nrow;
+	vector<double> squaredDepth(dt->nrow,0);
+ 	priority_queue<pair<int,double>,vector<pair<int,double> >,topscore > pq;
+	
+	double  ntree=0.0;
+	bool converged=false;
+	vector<double> theta_k; //top k score 
+	vector<pair<int ,double> > topk;	
+	logfile<<"ntree,index,currentscore,aggscore,vardepth,scorewidth \n";
+	while (!converged) {
+
+		//Sample data for training
+		topk.clear();
+		//get sample data
+		getSample(sampleIndex,nsample,rSample);
+		//build a tree based on the sample and add to forest
+		Tree *tree = new Tree();
+		tree->iTree(sampleIndex, 0, maxheight, stopheight);
+		this->trees.push_back(tree);
+		
+		ntree++;
+		double d,scores,dbar,currentscore;
+		for (int inst = 0; inst <dt->nrow; inst++)
+		{
+			d = getdepth(dt->data[inst],tree);
+			totalDepth[inst] += d;
+			squaredDepth[inst] +=d*d;
+			dbar=totalDepth[inst]/ntree; //Current average depth 
+			scores = pow(2, -dbar / avgPL(this->nsample));
+			currentscore = pow(2,-d/avgPL(this->nsample));
+			pq.push(pair<int, double>(inst,scores));
+			topk.push_back(pair<int,double>(inst,currentscore));
+			
+		}
+		
+		//if we have 1 tree we don't have variance
+		sort(topk.begin(),topk.end(),topscore());
+		theta_k.push_back((topk[tk].second + topk[tk+1].second)/2);	
+		if(ntree<2)
+		continue;
+				
+	//	double maxCIWidth =0;		
+	//	double mn = mean(theta_k);
+		double var = variance(theta_k);
+		double halfwidth=1.96*sqrt(var)/sqrt(ntree);	
+		logfile<<ntree<<","<<halfwidth<<","<<mean(theta_k)<<","<<var<<"\n";
+	
+       		converged = halfwidth <=tua;
+	}
+	
+	logfile<<"Current K="<<tk<<" K' = "<<mean(theta_k);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
