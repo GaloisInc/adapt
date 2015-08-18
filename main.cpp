@@ -65,9 +65,11 @@ int main(int argc, char* argv[]) {
 
 //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
 	IsolationForest iff;
-	double tau=0.04;
+//	double tau=0.04;
 	double alpha=0.04;
-	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
+//	iff.convergeIF(maxheight,stopheight,nsample,rsample,0.04,alpha);
+	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
+		
 	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
 	

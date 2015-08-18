@@ -48,6 +48,7 @@ public:
 
 	//convergent iForest
 	void convergeIF(int maxheight,bool stopheight, const int nsample, bool rSample,double tau,double alpha);
+	void confstop(int maxheight,bool stopheight, const int nsample, bool rSample,double alpha);
 	double getdepth(double *inst,Tree* tree);
 
 
