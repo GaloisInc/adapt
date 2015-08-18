@@ -22,8 +22,6 @@ public:
 	{
 	}
 	//convergent iForest
-	double getdepth(double *inst,Tree* tree);
-
 
 };
 
