@@ -111,3 +111,16 @@ vector<double> Forest::importance(double *inst)
 	}
 return depth;
 }
+//Sample data from the datset
+void Forest::getSample(vector<int> &sampleIndex,const int nsample,bool rSample)
+{
+	sampleIndex.clear();
+	if (rSample && nsample < dt->nrow)
+		sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
+	else
+		sampleI(0, dt->nrow - 1, dt->nrow, sampleIndex); //shuffle all index of the data if sampling is false
+
+
+
+}
+

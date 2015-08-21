@@ -16,9 +16,10 @@ struct topscore{
 };
 struct larger
 {
-	bool operator()(pair<int,int> p1,pair<int,int> p2)
+	bool operator()(const pair<int,double> p1,const pair<int,double> p2)
+
 	{
-		return p1.second >p2.second;
+		return p1.second <p2.second;
 	}	
 };
 
@@ -35,7 +36,8 @@ void inserTopK(vector<pair<int,int> > &sl,int b)
 	}
 	sl.push_back(pair<int,int>(b,1));
 }
-
+//Sample data from the datset
+/*
 void getSample(vector<int> &sampleIndex,const int nsample,bool rSample)
 {
 	sampleIndex.clear();
@@ -46,8 +48,11 @@ void getSample(vector<int> &sampleIndex,const int nsample,bool rSample)
 
 
 
-}
-
+}*/
+/*
+ * @input two vector v1 and v2 a
+ * @return proporation of intersection ,[0,1]
+ */
 double topcommonK(vector<int> &v1,vector<int> &v2)
 {
 	vector<int> v3;
@@ -103,7 +108,7 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 		//if we have 1 tree we don't have variance
 		if(ntree<2)
 		{	
-		/*	for(int i=0;i<tk;i++)
+			for(int i=0;i<tk;i++)
 			 {
 				inserTopK(topk,pq.top().first);
 				topIndex.push_back(pq.top().first);
@@ -111,11 +116,11 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 
 			 }
 		prevIndex = topIndex;
-		*/	continue;
+			continue;
 
 		}
 
-		double maxCIWidth =0;
+	/*	double maxCIWidth =0;
 		
 
 		for(int i=0;i<tk;i++)  //where tk is top 2*\alpha * N index element
@@ -130,13 +135,13 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 			double halfwidth = 1.96*sqrt(var)/sqrt(ntree);
 			double scoreWidth = pow(2, -(mn-halfwidth) / avgPL(this->nsample)) -pow(2, -(mn+halfwidth)/ avgPL(this->nsample));
 			maxCIWidth=max(maxCIWidth,scoreWidth);
-		//	logfile<<ntree<<","<<pq.top().first<<","<<pq.top().second<<","<<prob<<"\n";
-		logfile<<i<<ntree<<","<<index<<","<<pq.top().second<<","<<","<<var<<","<<scoreWidth<<"\n";
+	//		logfile<<ntree<<","<<pq.top().first<<","<<pq.top().second<<","<<prob<<"\n";
+	//	logfile<<i<<ntree<<","<<index<<","<<pq.top().second<<","<<","<<var<<","<<scoreWidth<<"\n";
 				pq.pop();
 		}
 	
+*/
 
-/*
 
 		for(int i=0;i<tk;i++)  //where tk is top 2*\alpha * N index element
 		{ 	//int index=0;
@@ -157,7 +162,7 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 	
 	prob=topcommonK(topIndex,prevIndex);
 	prevIndex = topIndex;
-*/
+
 	//	sort(topk.begin(),topk.end(),larger());
 	// logfile <<"Tree number "<<ntree<<" built with confidence\t"<<maxCIWidth<<endl;
 
@@ -178,11 +183,11 @@ double variance(vector<double> x)
 	{
 	 sum +=pow(elem-mn,2);
 	}
-	return sum/(double)x.size();
+	return sum/(double)(x.size()-1);
 }
 
 /*
- * Stopping confidence interval width
+ * Stopping confidence interval width on \theta (k)
  */
 void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool rSample,double alpha)
 {
@@ -191,19 +196,26 @@ void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool
 	vector<int> sampleIndex;  //index for sample row 
 	this->rSample = rSample;
 	vector<double> totalDepth(dt->nrow,0);
-	double tua = 1/(double)dt->nrow;
+	double tua =0.008; // 1/(double)dt->nrow;   //need to be changed 
 	vector<double> squaredDepth(dt->nrow,0);
- 	priority_queue<pair<int,double>,vector<pair<int,double> >,topscore > pq;
-	
+ ///	priority_queue<pair<int,double>,vector<pair<int,double> >,topscore > pq;
+	double hm=0.0 ; //inflation factor	
 	double  ntree=0.0;
 	bool converged=false;
-	vector<double> theta_k; //top k score 
+	double theta_es;
+	vector<double> theta_k; //top k score
+	vector<pair<int,double> > topk_ac; 
 	vector<pair<int ,double> > topk;	
-	logfile<<"rank,ntree,index,currentscore,treeciwidth \n";
+//	logfile<<"rank,ntree,index,currentscore,treeciwidth \n";
+//	logfile<<"tree,thetain,thetaacc\n";
+
+         priority_queue<pair<int,double>,vector<pair<int,double> >, larger> pq;
 	while (!converged) {
+	pq= priority_queue<pair<int,double>,vector<pair<int,double> >,larger >();
 
 		//Sample data for training
 		topk.clear();
+	//	topk_ac.clear();
 		//get sample data
 		getSample(sampleIndex,nsample,rSample);
 		//build a tree based on the sample and add to forest
@@ -212,33 +224,39 @@ void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool
 		this->trees.push_back(tree);
 		
 		ntree++;
-		double d,scores,dbar,currentscore;
+		double d,score,dbar;//,currentscore;
 		for (int inst = 0; inst <dt->nrow; inst++)
 		{
 			d = getdepth(dt->data[inst],tree);
 			totalDepth[inst] += d;
 			squaredDepth[inst] +=d*d;
 			dbar=totalDepth[inst]/ntree; //Current average depth 
-			scores = pow(2, -dbar / avgPL(this->nsample));
-			currentscore = pow(2,-d/avgPL(this->nsample));
-			pq.push(pair<int, double>(inst,scores));
-			topk.push_back(pair<int,double>(inst,currentscore));
-			
+			score = pow(2, -dbar / avgPL(this->nsample));
+//			currentscore = pow(2,-d/avgPL(this->nsample));
+			pq.push(pair<int, double>(inst,score));
+			topk.push_back(pair<int,double>(inst,score));
+		//	topk_ac.push_back(pair<int,double>(inst,scores));			
 		}
 		
 		//if we have 1 tree we don't have variance
 		sort(topk.begin(),topk.end(),topscore());
-		theta_k.push_back((topk[tk].second + topk[tk+1].second)/2);	
+	//	sort(topk_ac.begin(),topk_ac.end(),topscore());
+		double thetabar = (topk[tk].second + topk[tk+1].second)/2.0;
+	//	double thetabar_ac =(topk_ac[tk].second + topk_ac[tk+1].second)/2.0;
+		theta_k.push_back(thetabar);
+		//double thetaacc = (
 		if(ntree<2)
 		continue;
-				
+//	logfile<<ntree<<","<<thetabar<<","<<thetabar_ac<<"\n";				
 	//	double maxCIWidth =0;		
-	//	double mn = mean(theta_k);
+		//double mn = mean(theta_k);
 		double var = variance(theta_k);
 		double halfwidth=1.96*sqrt(var)/sqrt(ntree);	
-	//	logfile<<ntree<<","<<halfwidth<<","<<mean(theta_k)<<","<<var<<"\n";
+	
 
+//	logfile<<ntree<<","<<halfwidth<<","<<mean(theta_k)<<","<<var<<"\n";
 
+/*
 		for(int i=0;i<tk;i++)  //where tk is top 2*\alpha * N index element
 		{ 	//int index=0;
 
@@ -259,16 +277,28 @@ logfile<<i<<","<<ntree<<","<<pq.top().first<<","<<pq.top().second<<","<<halfwidt
 				pq.pop();
 		}
 
-
+*/
 
   
-
-    
-		converged = halfwidth <=tua;
-	if(ntree>300) converged=true;
+		converged=(halfwidth+hm)<=tua;
+   // converged = ntree>1;
+	//	converged = ntree>300; //    halfwidth <=tua;
+	
 	}
 	
+theta_es=mean(theta_k);
+std::cout<<theta_es<<endl;
 //	logfile<<"Current K="<<tk<<" K' = "<<mean(theta_k);
+logfile<<"index,score\n";
+int j=0;
+while(theta_es<pq.top().second)
+{
+ 
+logfile<<pq.top().first<<","<<pq.top().second<<"\n";
+pq.pop();	
+j++;
+}
+
 
 }
 
@@ -296,7 +326,4 @@ logfile<<i<<","<<ntree<<","<<pq.top().first<<","<<pq.top().second<<","<<halfwidt
 
 
 
-
-
-
-
+                                                                                                  

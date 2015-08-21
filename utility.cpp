@@ -77,7 +77,8 @@ cnt++;
 
 }
 
-double avgPL(double n) {
+
+double avgPL(int n) {
 
 	return (((n - 1) <= 0) ?
 			0.0 :
@@ -85,6 +86,12 @@ double avgPL(double n) {
 					- (2.0 * (double) (n - 1)) / (1.0 + (double) (n - 1))));
 
 }
+
+double score(double depth,int n)
+{
+return pow(2,-depth/avgPL(n));
+}
+
 void swapInt(int a, int b, int* x) {
 	int hold;
 	hold = x[a];

@@ -48,5 +48,9 @@ virtual ~Forest()
 	std::vector<double> ADtest(const std::vector<std::vector<double> > &pathlength, bool weighttotail);
 	std::vector<double> importance(double *inst);
 	double getdepth(double *inst,Tree* tree);
+	void getSample(std::vector<int> &sampleIndex,const int nsample,bool rSample);
+
+
+
 };
 #endif /* FOREST_H_ */

@@ -36,7 +36,7 @@
 int randomI(int min, int max);
 int randomEx(int min,int max,std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
-double avgPL(double n);
+double avgPL(int n);
 double randomD(double min, double max);
 void swapInt(int a, int b, int* x);
 
@@ -52,6 +52,7 @@ extern doubleframe* dt;
 //log file
 extern std::ofstream logfile;
 extern std::string tmpVar;
+double score(double depth,int n);
 #endif
 /* UTITLITY_H_ */
 
