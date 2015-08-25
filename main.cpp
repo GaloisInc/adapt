@@ -38,7 +38,6 @@ doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed
 ofstream logfile("treepath.csv");
 
 int main(int argc, char* argv[]) {
-
 	srand(time(NULL)); //randomize for random number generator.
 	/*parse argument from command line*/
 	parsed_args* pargs = parse_args(argc, argv);
@@ -55,38 +54,37 @@ int main(int argc, char* argv[]) {
 	bool stopheight = maxheight != 0;
 
 
-//       logfile<<"tree,index,spAttr,spValue"<<"\n";
+    // logfile<<"tree,index,spAttr,spValue"<<"\n";
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	//Build forest
-/* 	Basic IsolationForest  */
+    /* 	Basic IsolationForest  */
 
-//	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+    //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
 
-//	IsolationForest iff;
-//	convergent IsolationForest 
+    //	IsolationForest iff;
+    //	convergent IsolationForest 
 
 	double tau=0.05;
 	double alpha=0.01;
  	convForest iff(tau,alpha);
 
-//	iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
-	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
-		ntree= iff.trees.size();
+    iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
+    //	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
+	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
-	
 	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
 	ofstream outscore(output_name);
    
-     /* 	if (metadata!=NULL) {
+     /*if (metadata!=NULL) {
         if (header) {
             for_each_in_vec(i,cname,metadata->colnames,{
                 outscore << *cname << ",";
@@ -96,21 +94,19 @@ int main(int argc, char* argv[]) {
                 outscore << "meta" << c << ",";
             })
         }
-    }
-*/	outscore << "indx,score\n";
+         }
+    */	outscore << "indx,score\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
         if (metadata) {
             forseq(m,0,metadata->ncol,{
-//                outscore << metadata->data[j][m] << ",";
-            })
-        }
+                 //outscore << metadata->data[j][m] << ",";
+                })
+            }
 		
 		outscore << j << "," << scores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
-
-	}
+    	}
 	outscore.close();
-    
-	   	logfile.close();
+    logfile.close();
 
 	return 0;
 }
