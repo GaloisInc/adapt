@@ -1,0 +1,35 @@
+-------------------------------------------------
+Prerequisites:
+
+- Python 2.7.x
+- virtualenwrapper
+
+-------------------------------------------------
+
+Installation:
+
+mkvirtualenv segmenter
+pip install -r requirements.txt
+
+-------------------------------------------------
+
+Example:
+    workon segmenter
+    python segmenter.py test/prov_out.ttl 694575727
+
+or, to get the usage:
+
+    workon segmenter	
+    python segmenter.py -h
+
+-------------------------------------------------
+
+After segmentation, you can do, for example:
+
+    python segmented2dot.py test/prov_out.ttl
+
+This will generate .dot files for all the segment.
+You can the use zgrviewer (http://zvtm.sourceforge.net/zgrviewer.html)
+to visualize them.
+
+-------------------------------------------------
