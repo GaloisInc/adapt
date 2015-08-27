@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
 	bool stopheight = maxheight != 0;
 
 
+
     // logfile<<"tree,index,spAttr,spValue"<<"\n";
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test

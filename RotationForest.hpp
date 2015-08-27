@@ -1,24 +1,24 @@
 /*
- * Forest.h
+ * RotationForest.hpp
  *
- *  Created on: Aug 12, 2015
+ *  Created on: Aug 26 2015
  *      Author: tadeze
  */
 
-#ifndef FOREST_H_
-#define FOREST_H_
-#include "utility.hpp"
+#ifndef RFOREST_H_
+#define RFOREST_H_
+//#include "utility.hpp"
 #include "Tree.hpp"
-#include "cincl.hpp"
+//#include "cincl.hpp"
 
-class Forest {
+class RForest {
 public:
-	std::vector<Tree*> trees;
+	std::vector<MatrixXd> rotMatrix;
 	int ntree;
 	bool rSample;
 	int nsample;
-    bool stopheight;
-    int maxheight;
+    	bool stopheight;
+    	int maxheight;
 
     Forest()
 	{
