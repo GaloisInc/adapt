@@ -19,16 +19,17 @@ public:
 	int nsample;
     bool stopheight;
     int maxheight;
-
+    doubleframe* dataset;  //holds the original dataset will make private 
     Forest()
 	{
 		rSample = false;
 		ntree = 0;
 		nsample = 256;
 	};
-Forest(int _ntree,int _nsample,int _maxheight, bool _stopheight,bool _rSample)
+Forest(int _ntree,doubleframe* _dataset,int _nsample,int _maxheight, bool _stopheight,bool _rSample)
     {
 	ntree=_ntree;
+    dataset=_dataset;
 	nsample=_nsample;
 	stopheight=_stopheight;
 	maxheight=_maxheight;
@@ -48,7 +49,7 @@ virtual ~Forest()
 	std::vector<double> ADtest(const std::vector<std::vector<double> > &pathlength, bool weighttotail);
 	std::vector<double> importance(double *inst);
 	double getdepth(double *inst,Tree* tree);
-	void getSample(std::vector<int> &sampleIndex,const int nsample,bool rSample);
+	void getSample(std::vector<int> &sampleIndex,const int nsample,bool rSample,int nrow);
 
 
 

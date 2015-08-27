@@ -23,11 +23,11 @@
 #include "cincl.hpp"
 #include<random>
 #include<utility>
-
-/*struct Data
+/*
+struct Data
 {
-	int ncols;
-	int nrows;
+	int ncol;
+	int nrow;
 	std::vector<std::vector<double> > data;
 };
 */
@@ -53,6 +53,7 @@ extern doubleframe* dt;
 extern std::ofstream logfile;
 extern std::string tmpVar;
 double score(double depth,int n);
+//extern Data *dt;
 #endif
 /* UTITLITY_H_ */
 

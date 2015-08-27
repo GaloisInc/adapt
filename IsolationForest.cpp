@@ -7,8 +7,8 @@
 
 #include "IsolationForest.hpp"
 using namespace std;
-IsolationForest::IsolationForest(const int ntree,  int maxheight,
-		bool stopheight, const int nsample, bool rSample):Forest(ntree,nsample,maxheight,stopheight,rSample)
+IsolationForest::IsolationForest(const int ntree,doubleframe* df,  int maxheight,
+		bool stopheight, const int nsample, bool rSample):Forest(ntree,df,nsample,maxheight,stopheight,rSample)
 {
 
 	/*nsample = nsample;
@@ -22,11 +22,11 @@ IsolationForest::IsolationForest(const int ntree,  int maxheight,
 		//if sampling is true
 		//Sample and shuffle the data.
 		sampleIndex.clear();
-		getSample(sampleIndex,nsample,rSample);	
+		getSample(sampleIndex,nsample,rSample,df->nrow);	
 	       
 	//build tree	
 		Tree *tree = new Tree(); 
-		tree->iTree(sampleIndex, 0, maxheight, stopheight);
+		tree->iTree(sampleIndex,df, 0, maxheight, stopheight);
 		this->trees.push_back(tree);
 
 	 }

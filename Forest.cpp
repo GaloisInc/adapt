@@ -21,16 +21,7 @@ double Forest::instanceScore(double *inst)
 {
 	double avgPathLength = 0;
 	vector<double> depthInTree;
-//compute depth, score from all the forest
-/*
-	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
-			++it)
-	{
-
-		  		avgPathLength += (*it)->pathLength(inst);  //depth in a tree
-
-	}
-*/	double scores;
+	double scores;
 	//avgPathLength /= (double) this->ntree;
  	avgPathLength = mean(pathLength(inst));
 	scores = pow(2, -avgPathLength / avgPL(this->nsample));
@@ -40,7 +31,7 @@ double Forest::instanceScore(double *inst)
 }
 
 /*
- * Score for all points in the dataset
+ * Score for  a set of dataframe in the dataset
  */
 vector<double> Forest::AnomalyScore(doubleframe* df)
 {
@@ -112,13 +103,13 @@ vector<double> Forest::importance(double *inst)
 return depth;
 }
 //Sample data from the datset
-void Forest::getSample(vector<int> &sampleIndex,const int nsample,bool rSample)
+void Forest::getSample(vector<int> &sampleIndex,const int nsample,bool rSample,int nrow)
 {
 	sampleIndex.clear();
-	if (rSample && nsample < dt->nrow)
-		sampleI(0, dt->nrow - 1, nsample, sampleIndex); //sample nsample
+	if (rSample && nsample < nrow)
+		sampleI(0, nrow - 1, nsample, sampleIndex); //sample nsample
 	else
-		sampleI(0, dt->nrow - 1, dt->nrow, sampleIndex); //shuffle all index of the data if sampling is false
+		sampleI(0, nrow - 1, nrow, sampleIndex); //shuffle all index of the data 
 
 
 

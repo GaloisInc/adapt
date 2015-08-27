@@ -13,13 +13,14 @@ class convForest: public Forest {
 public:
 	int tau;
 	int alpha;
-	convForest(double _tau,double _alpha)
+	convForest(int ntree,doubleframe* df,int maxheight,bool stopheight, const int nsample, 
+            bool rSample,double _tau,double _alpha):Forest(ntree,df,nsample,maxheight,stopheight, rSample)
 	{tau=_tau;alpha=_alpha;}
 	virtual ~convForest()=default;
 
-	void convergeIF(int maxheight,bool stopheight, const int nsample, bool rSample,double tau,double alpha);
+	void convergeIF(double tau,double alpha);
 //Sequential confidence interval stopping 
-	void confstop(int maxheight,bool stopheight, const int nsample, bool rSample,double alpha);
+	void confstop(double alpha);
 
 
 };

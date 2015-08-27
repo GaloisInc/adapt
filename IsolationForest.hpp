@@ -13,9 +13,9 @@
 #include "Forest.hpp"
 
 class IsolationForest:public Forest{
-public:
+    public:
 	IsolationForest();
-	IsolationForest(int ntree, int maxheight, bool stopheight, const int nsample,
+	IsolationForest(int ntree,doubleframe* df, int maxheight, bool stopheight, const int nsample,
 			bool rSample);
 
 	virtual ~IsolationForest()

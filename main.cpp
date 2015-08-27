@@ -33,7 +33,8 @@ Default value is 100.
 
 #include "main.hpp"
 using namespace std;
-doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
+//doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
+//Data* dt;
 //log file
 ofstream logfile("treepath.csv");
 
@@ -60,20 +61,36 @@ int main(int argc, char* argv[]) {
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
-	dt = conv_frame(double, ntstring, csv); //read data to the global variable
+	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
+	/*******convert doubleframe for now ************/
+ /*NOTE: We convert to your data structure for now, but we will
+	    *want to standardize this soon. -Andrew*/
+	   //std::vector<std::vector<double> > train;
+/*	   std::vector<double> inst;
+	   dt->ncol = df->ncol;
+	   dt->nrow= df->nrow;
+	   for_each_in_frame(r,c,item,df,({
+	        inst.push_back(*item);
+	        if (c==df->ncol-1) {
+	           dt->data.push_back(inst);
+	            inst.clear();
+	        }
+	    });)
+*/
+
 	//Build forest
     /* 	Basic IsolationForest  */
 
-    //	IsolationForest iff(ntree, maxheight, stopheight, nsample, rsample);
+    	IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
 
     //	IsolationForest iff;
     //	convergent IsolationForest 
 
-	double tau=0.05;
-	double alpha=0.01;
- 	convForest iff(tau,alpha);
+	//double tau=0.05;
+	//double alpha=0.01;
+ 	//convForest iff(tau,alpha);
 
-    iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
+    //iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
     //	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
 	ntree= iff.trees.size();
 	cout<<"Number of trees required="<<ntree<<endl;

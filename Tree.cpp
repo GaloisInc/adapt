@@ -6,7 +6,7 @@
  */
 #include "Tree.hpp"
 using namespace std;
-void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stopheight)
+void Tree::iTree(vector<int> const &dIndex,const doubleframe *dt, int height, int maxheight, bool stopheight)
 {
 	/*TODO:  Check the randomizing algorithm/ or try to use the c++11 ;
 	 * random function and compare the results. 
@@ -85,11 +85,11 @@ void Tree::iTree(vector<int> const &dIndex, int height, int maxheight, bool stop
 
 	leftChild = new Tree(); //&dataL,height+1,maxheight);
 	leftChild->parent = this;
-	leftChild->iTree(lnodeData, this->depth + 1, maxheight, stopheight);
+	leftChild->iTree(lnodeData,dt, this->depth + 1, maxheight, stopheight);
 
 	rightChild = new Tree(); //&dataR,height+1,maxheight);
 	rightChild->parent = this;
-	rightChild->iTree(rnodeData, this->depth + 1, maxheight, stopheight);
+	rightChild->iTree(rnodeData,dt, this->depth + 1, maxheight, stopheight);
 
 }
 

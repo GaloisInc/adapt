@@ -64,17 +64,17 @@ double topcommonK(vector<int> &v1,vector<int> &v2)
 }
 
 
-void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bool rSample,double tau,double alpha)
+void convForest::convergeIF(double tau,double alpha)
 {
-	this->nsample = nsample;
-	double tk = ceil(alpha*4*dt->nrow);
+//	this->nsample = nsample;
+	double tk = ceil(alpha*4*dataset->nrow);
 	vector<int> sampleIndex;
-	this->rSample = rSample;
+//	this->rSample = rSample;
 	
-	vector<double> totalDepth(dt->nrow,0);
+	vector<double> totalDepth(dataset->nrow,0);
     int conv_cnt =0;  //convergence counter
 
-	vector<double> squaredDepth(dt->nrow,0);
+	vector<double> squaredDepth(dataset->nrow,0);
  	priority_queue<pair<int,double>,vector<pair<int,double> >, larger> pq;
 	double  ntree=0.0;
 	bool converged=false;
@@ -89,17 +89,17 @@ void convForest::convergeIF(int maxheight,bool stopheight, const int nsample, bo
 
 
 		//Sample data for training
-		getSample(sampleIndex,nsample,rSample);
+		getSample(sampleIndex,this->nsample,rSample,dataset->nrow);
 		//build a tree based on the sample and add to forest
 		Tree *tree = new Tree();
-		tree->iTree(sampleIndex, 0, maxheight, stopheight);
+		tree->iTree(sampleIndex,dataset, 0, maxheight, stopheight);
 		this->trees.push_back(tree);
 		ntree++;
 		double d,scores,dbar;
 		topIndex.clear();
-		for (int inst = 0; inst <dt->nrow; inst++)
+		for (int inst = 0; inst <dataset->nrow; inst++)
 		{
-			d = getdepth(dt->data[inst],tree);
+			d = getdepth(dataset->data[inst],tree);
 			totalDepth[inst] += d;
 			squaredDepth[inst] +=d*d;
 			dbar=totalDepth[inst]/ntree;
@@ -197,15 +197,15 @@ double variance(vector<double> x){
 /*
  * Stopping confidence interval width on \theta (k)
  */
-void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool rSample,double alpha)
+void convForest::confstop(double alpha)
 {
-	this->nsample = nsample;
-	double tk = ceil(alpha*2*dt->nrow);  //top k ranked scores 
+//	this->nsample = nsample;
+	double tk = ceil(alpha*2*dataset->nrow);  //top k ranked scores 
 	vector<int> sampleIndex;  //index for sample row 
-	this->rSample = rSample;
-	vector<double> totalDepth(dt->nrow,0);
+//	this->rSample = rSample;
+	vector<double> totalDepth(dataset->nrow,0);
 	double tua =0.008; // 1/(double)dt->nrow;   //need to be changed 
-	vector<double> squaredDepth(dt->nrow,0);
+	vector<double> squaredDepth(dataset->nrow,0);
     //priority_queue<pair<int,double>,vector<pair<int,double> >,topscore > pq;
 	double hm=0.0 ; //inflation factor will be used later 	
 	double  ntree=0.0;
@@ -225,17 +225,17 @@ void convForest::confstop(int maxheight,bool stopheight, const int nsample, bool
 		topk.clear();
 	    //	topk_ac.clear();
 		//get sample data
-		getSample(sampleIndex,nsample,rSample);
+		getSample(sampleIndex,nsample,rSample,dataset->nrow);
 		//build a tree based on the sample and add to forest
 		Tree *tree = new Tree();
-		tree->iTree(sampleIndex, 0, maxheight, stopheight);
+		tree->iTree(sampleIndex,dataset, 0, maxheight, stopheight);
 		this->trees.push_back(tree);
 		
 		ntree++;
 		double d,score,dbar;//,currentscore;
-		for (int inst = 0; inst <dt->nrow; inst++)
+		for (int inst = 0; inst <dataset->nrow; inst++)
 		{
-			d = getdepth(dt->data[inst],tree);
+			d = getdepth(dataset->data[inst],tree);
 			totalDepth[inst] += d;
 			squaredDepth[inst] +=d*d;
 			dbar=totalDepth[inst]/ntree; //Current average depth 
