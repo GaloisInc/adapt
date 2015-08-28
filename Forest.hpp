@@ -44,7 +44,7 @@ virtual ~Forest()
 
 	double instanceScore(double *inst);
 	std::vector<double> AnomalyScore(doubleframe* df);
-	std::vector<double> pathLength(double *inst);
+	virtual std::vector<double> pathLength(double *inst);
 	std::vector<std::vector<double> > pathLength(doubleframe* data);
 	std::vector<double> ADtest(const std::vector<std::vector<double> > &pathlength, bool weighttotail);
 	std::vector<double> importance(double *inst);

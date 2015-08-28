@@ -21,7 +21,6 @@ int main()
 {
 std::cout<<" Matrix rotation "<<std::endl;
 
-RForest rf;
 //rf.buildForest();
 
 doubleframe* df=new doubleframe();
@@ -46,17 +45,45 @@ for(int i=0;i<10;i++)
     std::cout<<"\n";
 }
 
-rf.buildForest(df);
+//rf.buildForest(df);
+cout<<"Let's build reallforest on realdata\n";
+
+RForest rf(10,df,true,7,true,10);
+rf.rForest();
+cout<<"Forest built\n";
+//rf.AnomalyScore(df);
+/*
+
+for(int i=0;i<rf.rotMatrices.size();i++)
+{
+	cout<<rf.rotMatrices.at(i)<<endl;
+	cout<<"-----------------\n";
+}
+
+*/
+
+vector<double> score= rf.AnomalyScore(df);
+
+for (int j = 0; j < (int) score.size(); j++) {
+	cout<<score[j]<<"\n";
+}
+cout<<"Score obtained"<<endl;
 
 
 
 
+/*
+int _ntree,doubleframe* df,bool _rSample,int _nsample,
+		   bool _stopheight,int _maxheight
+*/
 
+delete df;
 
-for(int i=0;i<10;i++)
- delete df->data[i];
- delete[] df->data;
- delete df;
+//
+//for(int i=0;i<10;i++)
+// delete df->data[i];
+// delete[] df->data;
+// delete df;
 
 return 0;
 

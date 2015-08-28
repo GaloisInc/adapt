@@ -50,19 +50,19 @@ vector<double> Forest::AnomalyScore(doubleframe* df)
 vector<double> Forest::pathLength(double *inst)
 {
 	vector<double> depth;
-	int tr=0;
-	static int pnt=0;
+	//int tr=0;
+	//static int pnt=0;
 
 	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
-          	tmpVar=to_string(++tr)+ ","+ to_string(pnt);
+          	//tmpVar=to_string(++tr)+ ","+ to_string(pnt);
 
- 		 depth.push_back(ceil((*it)->pathLength(inst)));
+ 		 depth.push_back((*it)->pathLength(inst));
 
 
 	}
-       pnt++;   //for logging purpose
+      // pnt++;   //for logging purpose
 	return depth;
 }
 

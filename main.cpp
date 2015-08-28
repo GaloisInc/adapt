@@ -81,8 +81,9 @@ int main(int argc, char* argv[]) {
 	//Build forest
     /* 	Basic IsolationForest  */
 
-    	IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
-
+    	//IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
+	    RForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
+       iff.rForest();     
     //	IsolationForest iff;
     //	convergent IsolationForest 
 
