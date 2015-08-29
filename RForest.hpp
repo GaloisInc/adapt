@@ -18,8 +18,8 @@ typedef struct _doubleframe doubleframe;
 #ifndef RFOREST_H_
 #define RFOREST_H_
 //#include "utility.hpp"
-#include <Dense>
-#include <QR>
+#include "Eigen/Dense"
+#include "Eigen/QR"
 #include "Forest.hpp"
 //#include "cincl.hpp"
 class RForest:public Forest {

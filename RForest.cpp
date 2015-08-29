@@ -1,13 +1,11 @@
 #include "RForest.hpp"
-#include<iostream>
 #include<random>
-#include<vector>
+
 //using namesapce Eigen;
 /*
  * Class for RandomRotation Matrix
  * TODO: convert from data to Matrix class of eigen ;
  */
-using namespace std;
 using namespace Eigen;
 
 /*Take Matrix and return doubleframe
@@ -43,7 +41,7 @@ return rotdata;
  * Takes matrix and empty vector data
  * Fill the vector-2d with the matrix value
  */
-void RForest::convert_to_vector(MatrixXd &m, vector<vector<double> > &v){
+void RForest::convert_to_vector(MatrixXd &m, std::vector<std::vector<double> > &v){
     for (int i=0; i<m.rows(); ++i)
     {
         const double* begin = &m.row(i).data()[0];
@@ -54,7 +52,7 @@ void RForest::convert_to_vector(MatrixXd &m, vector<vector<double> > &v){
 /*
  * Takes dataset of vector<vector<double> and return Matrix of data
  */
-MatrixXd RForest::convert_to_Matrix(vector<vector<double> > &data) {
+MatrixXd RForest::convert_to_Matrix(std::vector<std::vector<double> > &data) {
 	MatrixXd mat(data.size(), data[0].size());
 	for (int i = 0; i <(int)data.size(); i++)
 	      mat.row(i) =VectorXd::Map(&data[i][0],(int)data[i].size());
@@ -66,7 +64,7 @@ MatrixXd RForest::convert_to_Matrix(vector<vector<double> > &data) {
  */
 
 MatrixXd RForest::d_convert_to_Matrix(const doubleframe* data,
-        vector<int> &sampleIndex){
+        std::vector<int> &sampleIndex){
 	MatrixXd mat((int)sampleIndex.size(), data->ncol);
 	for (int i = 0; i <(int)sampleIndex.size(); i++)
 	  mat.row(i) =VectorXd::Map(&data->data[sampleIndex[i]][0],data->ncol);
@@ -176,7 +174,7 @@ cout<<" build forest\n";
 */
 void RForest::rForest(){
     //Build the RForest model 
-    vector<int> sampleIndex;
+    std::vector<int> sampleIndex;
 //cout<<"Random rotation matrix \n";
     for(int n=0;n<ntree;n++)
           {
@@ -205,13 +203,13 @@ void RForest::rForest(){
 /*
  * overrides method of pathLength for rotated data
  */
-vector<double> RForest::pathLength(double *inst)
+std::vector<double> RForest::pathLength(double *inst)
 {
-	vector<double> depth;
+    std::vector<double> depth;
     int i=0;
     MatrixXd rotmat;
     double* transInst=new double[rotmat.cols()];//NULL;
-    for(vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();it++)
+    for(std::vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();it++)
     {
     	transInst=rotateInstance(inst,rotMatrices[i]);
         double _depth = (*it)->pathLength(transInst);
