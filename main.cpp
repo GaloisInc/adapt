@@ -62,28 +62,11 @@ int main(int argc, char* argv[]) {
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
-	/*******convert doubleframe for now ************/
- /*NOTE: We convert to your data structure for now, but we will
-	    *want to standardize this soon. -Andrew*/
-	   //std::vector<std::vector<double> > train;
-/*	   std::vector<double> inst;
-	   dt->ncol = df->ncol;
-	   dt->nrow= df->nrow;
-	   for_each_in_frame(r,c,item,df,({
-	        inst.push_back(*item);
-	        if (c==df->ncol-1) {
-	           dt->data.push_back(inst);
-	            inst.clear();
-	        }
-	    });)
-*/
+   /* 	Basic IsolationForest  */
 
-	//Build forest
-    /* 	Basic IsolationForest  */
-
-    	//IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
-	    RForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
-       iff.rForest();     
+   // IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
+   RForest iff(ntree,dt, stopheight, nsample, rsample,maxheight);
+      iff.rForest();     
     //	IsolationForest iff;
     //	convergent IsolationForest 
 
@@ -97,7 +80,7 @@ int main(int argc, char* argv[]) {
 	cout<<"Number of trees required="<<ntree<<endl;
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
-	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
+///	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
@@ -126,7 +109,7 @@ int main(int argc, char* argv[]) {
     	}
 	outscore.close();
     logfile.close();
-
+    //delete df;
 	return 0;
 }
 

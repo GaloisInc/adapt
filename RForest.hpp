@@ -55,12 +55,3 @@ public:
 
 
 
-
-//double instanceScore(double *inst);
-//std::vector<double> AnomalyScore(doubleframe* df);
-//std::vector<double> pathLength(double *inst);
-//std::vector<std::vector<double> > pathLength(doubleframe* data);
-//std::vector<double> ADtest(const std::vector<std::vector<double> > &pathlength, bool weighttotail);
-//std::vector<dou_nble> importance(double *inst);
-//double getdepth(double *inst,Tree* tree);
-//void getSample(std::vector<int> &sampleIndex,const int nsample,bool rSample);
