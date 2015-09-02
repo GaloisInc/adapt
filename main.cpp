@@ -35,6 +35,7 @@ Default value is 100.
 using namespace std;
 //doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
 //Data* dt;
+
 //log file
 ofstream logfile("treepath.csv");
 
@@ -64,8 +65,9 @@ int main(int argc, char* argv[]) {
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
    /* 	Basic IsolationForest  */
 
-   // IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
-   RForest iff(ntree,dt, stopheight, nsample, rsample,maxheight);
+   //IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
+   RForest iff(ntree,dt,nsample,maxheight,stopheight,rsample);
+		 //  stopheight, nsample, rsample,maxheight);
       iff.rForest();     
     //	IsolationForest iff;
     //	convergent IsolationForest 
@@ -77,7 +79,7 @@ int main(int argc, char* argv[]) {
     //iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
     //	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
 	ntree= iff.trees.size();
-	cout<<"Number of trees required="<<ntree<<endl;
+	std::cout<<"Number of trees required="<<ntree<<std::endl;
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
 ///	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
@@ -109,7 +111,6 @@ int main(int argc, char* argv[]) {
     	}
 	outscore.close();
     logfile.close();
-    //delete df;
 	return 0;
 }
 

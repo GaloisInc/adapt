@@ -13,8 +13,8 @@ class convForest: public Forest {
 public:
 	int tau;
 	int alpha;
-	convForest(int ntree,doubleframe* df,int maxheight,bool stopheight, const int nsample, 
-            bool rSample,double _tau,double _alpha):Forest(ntree,df,nsample,maxheight,stopheight, rSample)
+	convForest(int _ntree,doubleframe* _df,const int _nsample,int _maxheight,bool _stopheight,
+            bool _rsample,double _tau,double _alpha):Forest(_ntree,_df,_nsample,_maxheight,_stopheight, _rsample)
 	{tau=_tau;alpha=_alpha;}
 	virtual ~convForest()=default;
 

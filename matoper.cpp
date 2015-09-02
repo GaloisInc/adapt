@@ -48,7 +48,7 @@ for(int i=0;i<10;i++)
 //rf.buildForest(df);
 cout<<"Let's build reallforest on realdata\n";
 
-RForest rf(10,df,true,7,true,10);
+RForest rf(10,df,0,7,true,true);
 rf.rForest();
 cout<<"Forest built\n";
 //rf.AnomalyScore(df);
@@ -77,13 +77,13 @@ int _ntree,doubleframe* df,bool _rSample,int _nsample,
 		   bool _stopheight,int _maxheight
 */
 
-delete df;
+//delete df;
 
 //
 //for(int i=0;i<10;i++)
 // delete df->data[i];
-// delete[] df->data;
-// delete df;
+ delete[] df->data;
+ delete df;
 
 return 0;
 

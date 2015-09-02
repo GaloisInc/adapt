@@ -15,31 +15,39 @@ class Forest {
 public:
 	std::vector<Tree*> trees;
 	int ntree;
-	bool rSample;
+	bool rsample;
 	int nsample;
     bool stopheight;
     int maxheight;
     doubleframe* dataset;  //holds the original dataset will make private 
     Forest()
 	{
-		rSample = false;
+		rsample = false;
 		ntree = 0;
 		nsample = 256;
+		dataset = NULL;
 	};
-Forest(int _ntree,doubleframe* _dataset,int _nsample,int _maxheight, bool _stopheight,bool _rSample)
+Forest(int _ntree,doubleframe* _dataset,int _nsample,int _maxheight, bool _stopheight,bool _rsample)
     {
 	ntree=_ntree;
     dataset=_dataset;
 	nsample=_nsample;
 	stopheight=_stopheight;
 	maxheight=_maxheight;
- 	rSample = _rSample;
+ 	rsample = _rsample;
     };
 virtual ~Forest()
 	{
 		for (std::vector<Tree*>::iterator it = trees.begin(); it != trees.end();
 				++it)
-			delete *it;
+		{
+			delete (*it);
+			//std::cout<<"tree deleted\n ";
+		}
+       
+      //delete[] dataset->data;
+     // delete dataset;
+
 	}
 
 	double instanceScore(double *inst);

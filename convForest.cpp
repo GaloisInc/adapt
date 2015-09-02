@@ -89,7 +89,7 @@ void convForest::convergeIF(double tau,double alpha)
 
 
 		//Sample data for training
-		getSample(sampleIndex,this->nsample,rSample,dataset->nrow);
+		getSample(sampleIndex,nsample,rsample,dataset->nrow);
 		//build a tree based on the sample and add to forest
 		Tree *tree = new Tree();
 		tree->iTree(sampleIndex,dataset, 0, maxheight, stopheight);
@@ -225,7 +225,7 @@ void convForest::confstop(double alpha)
 		topk.clear();
 	    //	topk_ac.clear();
 		//get sample data
-		getSample(sampleIndex,nsample,rSample,dataset->nrow);
+		getSample(sampleIndex,nsample,rsample,dataset->nrow);
 		//build a tree based on the sample and add to forest
 		Tree *tree = new Tree();
 		tree->iTree(sampleIndex,dataset, 0, maxheight, stopheight);

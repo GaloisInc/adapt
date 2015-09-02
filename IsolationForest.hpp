@@ -15,8 +15,8 @@
 class IsolationForest:public Forest{
     public:
 	IsolationForest();
-	IsolationForest(int ntree,doubleframe* df, int maxheight, bool stopheight, const int nsample,
-			bool rSample);
+	IsolationForest(int _ntree,doubleframe* _df,
+			int _nsample,int _maxheight, bool _stopheight,bool _rsample);
 
 	virtual ~IsolationForest()
 	{
