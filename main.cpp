@@ -60,9 +60,11 @@ int main(int argc, char* argv[]) {
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
-   /* 	Basic IsolationForest  */
+   
+    /* 	Basic IsolationForest  */
 
    IsolationForest iff(ntree,dt,nsample,maxheight,stopheight,rsample); //build iForest
+  
    RForest rff(ntree,dt,nsample,maxheight,stopheight,rsample);
    rff.rForest();     //build Rotation Forest
 
