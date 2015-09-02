@@ -6,8 +6,6 @@
  */
 
 #include "Forest.hpp"
-using namespace std;
-string tmpVar;
 
 double Forest::getdepth(double* inst,Tree* tree)
 {
@@ -19,23 +17,19 @@ double Forest::getdepth(double* inst,Tree* tree)
  */
 double Forest::instanceScore(double *inst)
 {
-	double avgPathLength = 0;
-	vector<double> depthInTree;
-	double scores;
-	//avgPathLength /= (double) this->ntree;
- 	avgPathLength = mean(pathLength(inst));
-	scores = pow(2, -avgPathLength / avgPL(this->nsample));
 
+	double avgPathLength = mean(pathLength(inst));
+	double scores = pow(2, -avgPathLength / avgPL(this->nsample));
 	return scores;
 
 }
 
 /*
- * Score for  a set of dataframe in the dataset
+ * Score for  a set of dataframe in dataset
  */
-vector<double> Forest::AnomalyScore(doubleframe* df)
+std::vector<double> Forest::AnomalyScore(doubleframe* df)
 {
-	vector<double> scores;
+	std::vector<double> scores;
 	//iterate through all points
 	for (int inst = 0; inst <df->nrow; inst++)
 	{
@@ -47,13 +41,10 @@ vector<double> Forest::AnomalyScore(doubleframe* df)
  * Return instance depth in all trees
 */
 
-vector<double> Forest::pathLength(double *inst)
+std::vector<double> Forest::pathLength(double *inst)
 {
-	vector<double> depth;
-	//int tr=0;
-	//static int pnt=0;
-
-	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
+	std::vector<double> depth;
+	for (std::vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
           	//tmpVar=to_string(++tr)+ ","+ to_string(pnt);
@@ -69,9 +60,9 @@ vector<double> Forest::pathLength(double *inst)
 
 /* PathLength for all points
 */
-vector<vector<double> > Forest::pathLength(doubleframe*  data)
+std::vector<std::vector<double> > Forest::pathLength(doubleframe*  data)
 {
-	vector < vector<double> > depths;
+	std::vector < std::vector<double> > depths;
 	for (int r = 0; r < data->nrow; r++)
 		depths.push_back(pathLength(data->data[r]));
 	return depths;
@@ -89,11 +80,14 @@ vector<double> IsolationForest::ADtest(const vector<vector<double> > &pathlength
 /* Compute the feature importance of a point
  * input: *inst data instance
  * output: feature importance
+ * status: Incomplete!!
  */
-vector<double> Forest::importance(double *inst)
+std::vector<double> Forest::importance(double *inst)
 {
-	vector<double> depth;
-	for (vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
+	//Need to be re-implemented
+	//Incorrect code
+	std::vector<double> depth;
+	for (std::vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
 
@@ -102,8 +96,9 @@ vector<double> Forest::importance(double *inst)
 	}
 return depth;
 }
+
 //Sample data from the datset
-void Forest::getSample(vector<int> &sampleIndex,const int nsample,bool rsample,int nrow)
+void Forest::getSample(std::vector<int> &sampleIndex,const int nsample,bool rsample,int nrow)
 {
 	sampleIndex.clear();
 	if (rsample && nsample < nrow)

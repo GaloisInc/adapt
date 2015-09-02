@@ -6,7 +6,6 @@
  */
 
 #include "IsolationForest.hpp"
-using namespace std;
 IsolationForest::IsolationForest(int _ntree,doubleframe* _df,
 		int _nsample,int _maxheight, bool _stopheight,bool _rsample)
 :Forest(_ntree,_df,_nsample,_maxheight,_stopheight,_rsample)
@@ -15,7 +14,8 @@ IsolationForest::IsolationForest(int _ntree,doubleframe* _df,
 	/*nsample = nsample;
  	this->ntree = ntree;
   	*/
-	vector<int> sampleIndex;
+
+	std::vector<int> sampleIndex;
 // 	this->rSample = rSample;
   //build forest through all trees
 	for (int n = 0; n < ntree; n++)

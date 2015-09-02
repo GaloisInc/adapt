@@ -17,14 +17,13 @@
 
 #ifndef RFOREST_H_
 #define RFOREST_H_
-//#include "utility.hpp"
 #include "Eigen/Dense"
 #include "Eigen/QR"
 #include "Forest.hpp"
-//#include "cincl.hpp"
 class RForest: public Forest {
 public:
 	std::vector<Eigen::MatrixXd> rotMatrices;
+	 int pnt;
 	void convertToDf(Eigen::MatrixXd &m, doubleframe* df);
 	void rotateInstance(double* inst, Eigen::MatrixXd &m,double* rotatedData);
 	void buildForest(doubleframe* df);
@@ -43,7 +42,7 @@ public:
 	RForest(int _ntree,doubleframe* _df,int _nsample,int _maxheight,
 			bool _stopheight,bool _rsample) :
 			Forest(_ntree, _df, _nsample, _maxheight, _stopheight, _rsample) {
-		}
+		pnt=0;}
 	;
 
 	RForest() {

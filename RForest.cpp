@@ -1,8 +1,7 @@
 #include "RForest.hpp"
-//using namesapce Eigen;
 /*
  * Class for RandomRotation Matrix
- * TODO: convert from data to Matrix class of eigen ;
+ *
  */
 using namespace Eigen;
 
@@ -170,7 +169,7 @@ void RForest::rForest(){
     std::vector<int> sampleIndex(this->nsample);
     doubleframe* sampleDf = new doubleframe();
     sampleDf->data = new double*[this->nsample];
-
+    //logfile<<"point,tree,x1,x2\n";
     for(int n=0;n<ntree;n++)
           {
             //zret sample datazr
@@ -180,7 +179,7 @@ void RForest::rForest(){
             generateRandomRotationMatrix(rotMat,dataset->ncol,n+1);
             //Save rotation matrix
             this->rotMatrices.push_back(rotMat);
-
+        //    logfile<<rotMat<<"\n";
             //Rotate data and convert to doubleframe format
             MatrixXd rotData =convertDfToMatrix(dataset,sampleIndex)*rotMat;
             sampleDf->nrow = this->nsample;
@@ -205,6 +204,7 @@ std::vector<double> RForest::pathLength(double *inst)
 {
     std::vector<double> depth;
     int i=0;
+   // pnt++;
     //MatrixXd rotmat;
     double* transInst=new double[dataset->ncol];//NULL;
     for(std::vector<Tree*>::iterator it=this->trees.begin();it!=trees.end();it++)
@@ -213,6 +213,7 @@ std::vector<double> RForest::pathLength(double *inst)
         double _depth = (*it)->pathLength(transInst);
     	depth.push_back(_depth);
         i++;
+   //     logfile<<pnt<<","<<i<<","<<*(transInst)<<","<<*(transInst+1)<<"\n";
  /*for(int i=0;i<dataset->ncol;i++) std::cout<<transInst[i]<<"\t";
  std::cout<<"\n------------Tree---------"<<i<<std::endl;
  */   }

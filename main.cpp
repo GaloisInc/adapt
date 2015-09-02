@@ -54,9 +54,6 @@ int main(int argc, char* argv[]) {
 	verbose = verbose; //Clears warning for now.
 	bool rsample = nsample != 0;
 	bool stopheight = maxheight != 0;
-
-
-
     // logfile<<"tree,index,spAttr,spValue"<<"\n";
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
@@ -65,24 +62,25 @@ int main(int argc, char* argv[]) {
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
    /* 	Basic IsolationForest  */
 
-   //IsolationForest iff(ntree,dt, maxheight, stopheight, nsample, rsample);
-   RForest iff(ntree,dt,nsample,maxheight,stopheight,rsample);
-		 //  stopheight, nsample, rsample,maxheight);
-      iff.rForest();     
-    //	IsolationForest iff;
-    //	convergent IsolationForest 
+   IsolationForest iff(ntree,dt,nsample,maxheight,stopheight,rsample); //build iForest
+   RForest rff(ntree,dt,nsample,maxheight,stopheight,rsample);
+   rff.rForest();     //build Rotation Forest
 
+   /*
+    * .........Parameters for convergent Forest..............
+	*/
 	//double tau=0.05;
 	//double alpha=0.01;
  	//convForest iff(tau,alpha);
 
     //iff.convergeIF(maxheight,stopheight,nsample,rsample,tau,alpha);
-    //	iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
-	ntree= iff.trees.size();
-	std::cout<<"Number of trees required="<<ntree<<std::endl;
+    //iff.confstop(maxheight,stopheight,nsample,rsample,alpha);
+	//ntree= iff.trees.size();
+	//std::cout<<"Number of trees required="<<ntree<<std::endl;
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
-///	vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
+	vector<double> rscores = rff.AnomalyScore(dt);
+	//vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
@@ -99,7 +97,7 @@ int main(int argc, char* argv[]) {
             })
         }
          }
-    */	outscore << "indx,score\n";
+    */	outscore << "indx,ifscore,rfscore\n";
 	for (int j = 0; j < (int) scores.size(); j++) {
         if (metadata) {
             forseq(m,0,metadata->ncol,{
@@ -107,7 +105,7 @@ int main(int argc, char* argv[]) {
                 })
             }
 		
-		outscore << j << "," << scores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
+		outscore << j << "," << scores[j]<<","<<rscores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
     	}
 	outscore.close();
     logfile.close();

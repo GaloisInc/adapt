@@ -7,9 +7,6 @@
 
 #ifndef ISOLATIONFOREST_HPP_
 #define ISOLATIONFOREST_HPP_
-#include "utility.hpp"
-#include "Tree.hpp"
-#include "cincl.hpp"
 #include "Forest.hpp"
 
 class IsolationForest:public Forest{
