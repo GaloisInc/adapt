@@ -51,13 +51,14 @@ int main(int argc, char* argv[]) {
 	verbose = verbose; //Clears warning for now.
 	bool rsample = nsample != 0;
 	bool stopheight = maxheight != 0;
+    
     // logfile<<"tree,index,spAttr,spValue"<<"\n";
 	
 	//	bool weightedTailAD=true; //weighed tail for Anderson-Darling test
 	ntstringframe* csv = read_csv(input_name, header, false, false);
 	ntstringframe* metadata = split_frame(ntstring, csv, metacol,true);
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
-   
+    nsample = nsample==0?dt->nrow:nsample;
     /* 	Basic IsolationForest  */
 
    IsolationForest iff(ntree,dt,nsample,maxheight,stopheight,rsample); //build iForest
@@ -79,7 +80,7 @@ int main(int argc, char* argv[]) {
 	
 	vector<double> scores = iff.AnomalyScore(dt); //generate anomaly score
 	vector<double> rscores = rff.AnomalyScore(dt);
-	//vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
+    vector<vector<double> > pathLength = iff.pathLength(dt); //generate Depth all points in all trees
 	//vector<double> adscore = iff.ADtest(pathLength,weightedTailAD); //generate Anderson-Darling difference.
 
 	//Output file for score, averge depth and AD score
@@ -105,10 +106,10 @@ int main(int argc, char* argv[]) {
             }
 		
 		outscore << j << "," << scores[j]<<","<<rscores[j]<<"\n";
-		/*for(int i=0;i<(int)pathLength[1].size();i++)
-			outscore<<pathLength[j][i]<<",";
-		outscore<<"\n"; // << "," << mean(pathLength[j]) << "\n";
-    	*/
+//		for(int i=0;i<(int)pathLength[1].size();i++)
+	//		outscore<<','<<pathLength[j][i];
+//		outscore<<"\n"; // << "," << mean(pathLength[j]) << "\n";
+    	
 	}
 	outscore.close();
     logfile.close();
