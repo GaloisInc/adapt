@@ -38,6 +38,8 @@ int randomEx(int min,int max,std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
 double avgPL(int n);
 double randomD(double min, double max);
+template <typename T>
+T randomT(T min, T max);
 void swapInt(int a, int b, int* x);
 
 //template<typename T>

@@ -47,7 +47,6 @@ std::vector<double> Forest::pathLength(double *inst)
 	for (std::vector<Tree*>::iterator it = this->trees.begin(); it != trees.end();
 			++it)
 	{
-          	//tmpVar=to_string(++tr)+ ","+ to_string(pnt);
 
  		 depth.push_back((*it)->pathLength(inst));
 

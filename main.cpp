@@ -33,9 +33,6 @@ Default value is 100.
 
 #include "main.hpp"
 using namespace std;
-//doubleframe* dt; /* global variable doubleframe to hold the data, to be accessed by all classes */
-//Data* dt;
-
 //log file
 ofstream logfile("treepath.csv");
 
@@ -107,8 +104,12 @@ int main(int argc, char* argv[]) {
                 })
             }
 		
-		outscore << j << "," << scores[j]<<","<<rscores[j]<<"\n"; // << "," << mean(pathLength[j]) << "\n";
-    	}
+		outscore << j << "," << scores[j]<<","<<rscores[j]<<"\n";
+		/*for(int i=0;i<(int)pathLength[1].size();i++)
+			outscore<<pathLength[j][i]<<",";
+		outscore<<"\n"; // << "," << mean(pathLength[j]) << "\n";
+    	*/
+	}
 	outscore.close();
     logfile.close();
 	return 0;

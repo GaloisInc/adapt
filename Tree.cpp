@@ -5,16 +5,8 @@
  *      Author: Tadeze
  */
 #include "Tree.hpp"
-using namespace std;
-void Tree::iTree(vector<int> const &dIndex,const doubleframe *dt, int height, int maxheight, bool stopheight)
+void Tree::iTree(std::vector<int> const &dIndex,const doubleframe *dt, int height, int maxheight, bool stopheight)
 {
-	/*TODO:  Check the randomizing algorithm/ or try to use the c++11 ;
-	 * random function and compare the results. 
-	 *
-	 *
-	 */
-	
-	
 	this->depth = height; //Tree height
 	// Set size of the node
 	nodeSize = dIndex.size();
@@ -26,16 +18,18 @@ void Tree::iTree(vector<int> const &dIndex,const doubleframe *dt, int height, in
 	}
 	//*** Need modification
 	//Initialize minmax array for holding max and min of an attributes
-	vector<vector<double> > minmax;
+	std::vector<std::vector<double> > minmax;
+	std::vector<double> tmp;
+
 	for (int j = 0; j < dt->ncol; j++)
 	{
-		vector<double> tmp;
 		tmp.push_back(dt->data[0][j]);
 		tmp.push_back(dt->data[0][j]);
 		minmax.push_back(tmp); //initialize max and min to random value
+		tmp.clear();
 	}
   
-       //Compute max and min of each attribute
+    //Compute max and min of each attribute
 	for (unsigned i = 0; i <dIndex.size() ; i++)
 	{
 		//vector<double> inst = data->data[i];
@@ -49,9 +43,8 @@ void Tree::iTree(vector<int> const &dIndex,const doubleframe *dt, int height, in
 
 	}
 
-		//use only valid attributes
-
-        vector<int> attributes;
+	//use only valid attributes
+    std::vector<int> attributes;
 	for (int j = 0; j < dt->ncol; j++)
 	{      
 		if (minmax[j][0] < minmax[j][1])
@@ -65,21 +58,22 @@ void Tree::iTree(vector<int> const &dIndex,const doubleframe *dt, int height, in
 	//Randomly pick an attribute and a split point
 	
 	//int randx = randomI(0, attributes.size());
+
 	this->splittingAtt = attributes[randomI(0,attributes.size()-1)]; //randx];
 	this->splittingPoint = randomD(minmax[this->splittingAtt][0],minmax[this->splittingAtt][1]);
 	
-	vector <int> lnodeData;
-	vector < int> rnodeData;
+	std::vector <int> lnodeData;
+	std::vector < int> rnodeData;
 	//Split the node into two
 	for (unsigned i = 0; i < dIndex.size(); i++)
 	{
 		if ( dt->data[dIndex.at(i)][splittingAtt] > splittingPoint)
 		{
-			lnodeData.push_back(i);
+			lnodeData.push_back(dIndex.at(i));
 		}
 		else
 		{
-			rnodeData.push_back(i);
+			rnodeData.push_back(dIndex.at(i));
 		}
 	}
 

@@ -19,7 +19,7 @@ public:
 	int nsample;
     bool stopheight;
     int maxheight;
-    doubleframe* dataset;  //holds the original dataset will make private 
+    doubleframe* dataset;  //holds the original dataset
     Forest()
 	{
 		rsample = false;
@@ -42,7 +42,7 @@ virtual ~Forest()
 				++it)
 		{
 			delete (*it);
-			//std::cout<<"tree deleted\n ";
+
 		}
        
       //delete[] dataset->data;

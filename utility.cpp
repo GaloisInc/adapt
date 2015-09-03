@@ -30,6 +30,13 @@ double randomD(double min, double max) {
 }
 */
 
+template <typename T>
+T randomT(T min, T max)
+{
+	uniform_real_distribution<T> dist (min,max);
+	return dist(gen);
+
+}
 
 
 
@@ -39,6 +46,7 @@ double randomD (double min,double max)
  return dist(gen);
  }
 
+
 int randomI(int min, int max) {
 
 
@@ -47,20 +55,14 @@ return dist(gen);
 
 
 }
-int randomEx(int min,int max,set	<int>& exlude)
+
+int randomEx(int min,int max,set<int>& exlude)
 {
 			int num;
 			num =randomI(min,max);            //(int) (min + (rand() % (max - min+1)));
 			return exlude.find(num)!=exlude.end()?randomEx(min,max,exlude):num;
 			
 }
-
-/*
-double randomD(double min, double max) {
-
-return ceil(randomi(min,max)*100)/100;
-}
-*/
 void sampleI(int min,int max, int nsample,vector<int> &samples)
 {
 int cnt=0;

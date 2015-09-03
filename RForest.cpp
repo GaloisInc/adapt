@@ -71,8 +71,8 @@ MatrixXd RForest::convertDfToMatrix(const doubleframe* data,
 void RForest::generateRandomRotationMatrix(MatrixXd& M,int n,int seed)
 {
 
-    //std::mt19937 eng{std::random_device{}()}; //For production
-    std::default_random_engine eng(seed); //for debugging
+    std::mt19937 eng{std::random_device{}()}; //For production
+    //std::default_random_engine eng(seed); //for debugging
 	std::normal_distribution<double> distribution(0.0, 1.0);
 	MatrixXd A(n, n);
 	const VectorXd ones(VectorXd::Ones(n));
@@ -101,69 +101,6 @@ MatrixXd  RForest::rotateData(doubleframe* dt, MatrixXd& M){
     return mData*M;
 }
 
-/*
-void RForest::buildForest(doubleframe* df){
-    int n=df->ncol;
-    //double dt[8] = { 1,2,3,4,5,6,7,8};
-    MatrixXd m(n,n);  //rotation matrix
-    generate_random_rotation_matrix(m,n,4);
-    //Map<MatrixXd> mt(dt,2,4); // = Map<MatrixXd>
-    std::cout<<"The rotation matrix is \n"<<m<<"\n";  //rotation matrix
-    std::vector<int> sampleIndex;//= { 1,6,7,8};
-    sampleI(0,df->nrow-1,4,sampleIndex);
-//   getSample(sampleIndex,4,true);
-   
-    MatrixXd Mdouble = d_convert_to_Matrix(df,sampleIndex);
-    cout<<"convert data to matriX\n";
-    cout<<Mdouble<<endl;
-    //Rotate data 
-   // MatrixXd rotdata = rotateData(df,m);
-   // cout<<"Rotated data"<<endl<<rotdata;
-
-    // Convert data to matrix
-    vector<vector<double> > data(10, vector<double>(4,5));
-    cout<<"Size "<<data.size()<<"X"<< data[0].size()<<endl;
-    MatrixXd mv=convert_to_Matrix(data);
-    cout<<mv<<" is the matrix"<<endl;
-    cout<<" New rotated data \n";
-    //cout<<mv*m; //rotate data;
-
-    //Convert matrix to data
-    cout<<"...Coverting Matrix to vector"<<endl;
-    //vector<vector<double> > v;
-    //convert_to_vector(mv,v);
-   doubleframe* xdf = new doubleframe();
-    xdf->data = new double*[mv.rows()];
-    xdf->nrow = mv.rows();
-    xdf->ncol = mv.cols();
-  
- doubleframe* xdf = convert_to_df(mv);
- cout<<xdf->nrow<<" by "<<xdf->ncol<<endl;
-
-
-for(int i=0;i<xdf->nrow;i++)
-{
-    for(int j=0;j<xdf->ncol ; j++)
-        cout<<xdf->data[i][j]<<"\t";
-        cout<<"\n";
-}
-
-double *vec =df->data[2];
-
-
-double* rotvec = rotateInstance(vec,m);
-cout<<"Finally rotated data\n";
-for(int i=0;i<4;i++) cout<<rotvec[i]<<"\t";
-cout<<"\nLet's do reall thing----------\n";
-//dataset->data = xdf;
-//dataset->ncol=4;
-//dataset->nrow = 10;
-cout<<" build forest\n";
-
-
-
-}
-*/
 void RForest::rForest(){
     //Build the RForest model 
     std::vector<int> sampleIndex(this->nsample);
