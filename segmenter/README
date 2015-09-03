@@ -33,3 +33,5 @@ You can the use zgrviewer (http://zvtm.sourceforge.net/zgrviewer.html)
 to visualize them.
 
 -------------------------------------------------
+dot2viz takes all dot files in a directory and converts to a given
+format (pdf is the default). Use dot2viz -h for help.
