@@ -2,7 +2,7 @@
 Prerequisites:
 
 - Python 2.7.x
-- virtualenwrapper
+- virtualenwrapper (http://virtualenvwrapper.readthedocs.org/en/latest/install.html)
 
 -------------------------------------------------
 
@@ -19,7 +19,7 @@ Example:
 
 or, to get the usage:
 
-    workon segmenter	
+    workon segmenter
     python segmenter.py -h
 
 -------------------------------------------------
