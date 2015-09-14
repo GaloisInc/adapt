@@ -1,10 +1,14 @@
 
-SEG1 =  testprov_out_segmented_694638006_1389213733.dot
+PRFX = prov_out_segmented
+
+SEG1 = test$(PRFX)_694638006_1389213733.dot
 
 OUT = \
- $(SEG1) \
+ $(SEG1).pdf \
 
 all: $(OUT)
+
+seg1: $(SEG1)
 
 $(SEG1):
 	cd $(HOME)/.virtualenvs/segmenter || mkvirtualenv segmenter
@@ -12,7 +16,9 @@ $(SEG1):
 	python -c 'import SPARQLWrapper' || pip install -r requirements.txt
 	./segmenter.py     test/prov_out.ttl 694575727
 	./segmented2dot.py test/prov_out.ttl
+
+%.dot.pdf: %.dot
 	./dot2viz.py
 
 clean:
-	rm -f $(OUT) *.dot *.dot.pdf test/prov_out_segmented_*.ttl
+	rm -f $(OUT) test$(PRFX)_*.dot test$(PRFX)_*.dot.pdf test/$(PRFX)_*.ttl
