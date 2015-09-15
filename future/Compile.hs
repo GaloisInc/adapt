@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns               #-}
 -- | Compiling typechecked data into the higher-level abstraction (PROV).
 
 module Compile
@@ -32,7 +33,7 @@ translate = execTranslate . mapM_ go
      go (TypeAnnotatedTriple t) =
                 do s <- rename (triSubject t)
                    o <- rename (triObject t)
-                   emit (TypeAnnotatedTriple $ Triple s (triVerb t) o)
+                   emit (TypeAnnotatedTriple $ provOrdering $ Triple s (triVerb t) o)
                    when (isOutputSubj t) $ step (triSubject t)
                    when (isOutputObj t)  $ step (triObject t)
 
@@ -45,6 +46,11 @@ isOutputObj (Triple _ p _) =
 isOutputSubj :: Triple a -> Bool
 isOutputSubj (Triple _ p _) =
     theObject p `elem` ["modified", "destroyed", "write"]
+
+provOrdering :: Triple a -> Triple a
+provOrdering t@(Triple v p o)
+    | theObject p == "write" = Triple o (p { theObject = "writtenBy"}) v
+    | otherwise              = t
 
 data TranslateState = TS { objectMap :: Map (Entity Type) Int
                          , emittedTriples :: [TypeAnnotatedTriple] -- XXX use dlist

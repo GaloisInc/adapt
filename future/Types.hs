@@ -21,7 +21,7 @@ module Types
       -- * Monomorphic wrappers around 'Triple'
     , RawTA1(..), TypeAnnotatedTriple(..)
       -- * Classes
-    , PP(..)
+    , PP(..), render
       -- * Re-exports
     , Text
     ) where
@@ -66,6 +66,9 @@ data ParseError = ParseFailure String | PartialParse
 --------------------------------------------------------------------------------
 --  PrettyPrinting
 
+render :: PP a => [a] -> Text
+render = Text.concat . map pp
+
 class PP a where
     pp :: a -> Text
 
@@ -88,10 +91,9 @@ instance PP Type where
     pp ty            = Text.pack $ show ty
 
 
---------------------------------------------------------------------------------
---  Typechecking (mostly just inference)
---  Notice there is no need for constraint propagation, so we don't need
---  any sort of MGU or typical type checking.
+instance PP TypeAnnotatedTriple where
+  pp (TypeAnnotatedTriple t) = pp t
+
 
 data Type = EntityClass | ActorClass | ResourceClass | DataClass | Agent
           | UnitOfExecution | Host | Socket | File | Packet | Memory

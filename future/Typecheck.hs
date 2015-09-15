@@ -9,6 +9,8 @@ module Typecheck
 
 import Types
 import MonadLib
+import Data.Monoid ((<>))
+import Data.Text ()
 
 --------------------------------------------------------------------------------
 --  Typechecking (mostly just inference)
@@ -80,5 +82,5 @@ tcVerb (IRI {..}) =
         "read"            -> f UnitOfExecution ResourceClass
         "write"           -> f UnitOfExecution ResourceClass
         "is"              -> f ResourceClass ResourceClass
-        _                 -> throwE $ CanNotInferType "Unsupported object.  Is this an attribute? We don't support those yet."
+        _                 -> throwE $ CanNotInferType $ "(" <> theObject <> ") Unsupported object.  Is this an attribute? We don't support those yet."
 
