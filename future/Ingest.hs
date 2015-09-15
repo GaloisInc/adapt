@@ -1,7 +1,7 @@
 
 module Ingest
     ( -- * High-level interface
-      readTriples
+      readTriples, readTriplesFromFile
     , Error(..), ParseError(..), TypeError(..)
     , TypeAnnotatedTriple(..)
     , Object(..), Entity, Verb
@@ -12,6 +12,12 @@ import Types
 import Typecheck
 import Compile
 import Parser
+import qualified Control.Exception as X
+import qualified Data.Text.IO as Text
+import Graph
+
+readTriplesFromFile ::  FilePath -> IO [TypeAnnotatedTriple]
+readTriplesFromFile fp = (either X.throw id . readTriples) <$> Text.readFile  fp
 
 readTriples :: Text -> Either Error [TypeAnnotatedTriple]
 readTriples raw =

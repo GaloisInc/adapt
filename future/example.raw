@@ -3,4 +3,3 @@
 <cid://someUUID/firefox> tc:read           <socket://tcpSocket> .
 <cid://someUUID/firefox> tc:write          <socket://tcpSocket> .
 <cid://someUUID/firefox> tc:read           <file://topsecret> .
-

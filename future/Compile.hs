@@ -26,19 +26,15 @@ import           Data.Map (Map)
 -- | Translate the TA1-style RDF inputs into the prov-motivated TA2 internal
 -- language.
 translate :: [TypeAnnotatedTriple] -> [TypeAnnotatedTriple]
-translate xs = execTranslate (go xs)
+translate = execTranslate . mapM_ go
  where
-     go :: [TypeAnnotatedTriple] -> Translate ()
-     go [] = return ()
-     go (tyT@(TypeAnnotatedTriple t) : ts)
-            | isOutputSubj t || isOutputObj t =
+     go :: TypeAnnotatedTriple -> Translate ()
+     go (TypeAnnotatedTriple t) =
                 do s <- rename (triSubject t)
                    o <- rename (triObject t)
                    emit (TypeAnnotatedTriple $ Triple s (triVerb t) o)
                    when (isOutputSubj t) $ step (triSubject t)
                    when (isOutputObj t)  $ step (triObject t)
-                   go ts
-            | otherwise = emit tyT >> go ts
 
 -- | Verbs with reversed causality: the object has impacted the subject.
 isOutputObj :: Triple a -> Bool
