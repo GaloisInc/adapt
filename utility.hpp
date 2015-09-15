@@ -24,21 +24,21 @@
 #include<random>
 #include<utility>
 /*
-struct Data
-{
-	int ncol;
-	int nrow;
-	std::vector<std::vector<double> > data;
-};
-*/
+ struct Data
+ {
+ int ncol;
+ int nrow;
+ std::vector<std::vector<double> > data;
+ };
+ */
 
 //default_random_engine gen(time(NULL));
 int randomI(int min, int max);
-int randomEx(int min,int max,std::set<int>& exlude);
+int randomEx(int min, int max, std::set<int>& exlude);
 void sampleI(int min, int max, int nsample, std::vector<int> &sampleIndx);
 double avgPL(int n);
 double randomD(double min, double max);
-template <typename T>
+template<typename T>
 T randomT(T min, T max);
 void swapInt(int a, int b, int* x);
 
@@ -46,15 +46,16 @@ void swapInt(int a, int b, int* x);
 double mean(std::vector<double> points);
 
 std::vector<std::vector<double> > readcsv(const char* filename, char delim,
-		bool header);
+bool header);
 //extern std::ofstream ffile; //("log.txt");
-std::map<double,double> ecdf(std::vector<double> points);
-std::vector<double> ADdistance(const std::vector<std::vector<double> > &depths, bool weightToTail);
+std::map<double, double> ecdf(std::vector<double> points);
+std::vector<double> ADdistance(const std::vector<std::vector<double> > &depths,
+bool weightToTail);
 //extern doubleframe* dt;
 //log file
 extern std::ofstream logfile;
 extern std::string tmpVar;
-double score(double depth,int n);
+double score(double depth, int n);
 //extern Data *dt;
 #endif
 /* UTITLITY_H_ */

@@ -7,10 +7,9 @@
 
 #ifndef MAIN_HPP_
 #define MAIN_HPP_
-#include "RForest.hpp"
 #include "IsolationForest.hpp"
+#include "OnlineIF.hpp"
 #include "utility.hpp"
 #include "cincl.hpp"
-#include "convForest.hpp"
 //#include "Forest.hpp"
 #endif /* MAIN_HPP_ */

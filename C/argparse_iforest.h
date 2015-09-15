@@ -12,6 +12,7 @@ struct parsed_args {
     int maxdepth;
     bool header;
     bool verbose;
+    int window_size;
 };
 
 

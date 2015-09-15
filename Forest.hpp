@@ -14,52 +14,41 @@
 class Forest {
 public:
 	std::vector<Tree*> trees;
-	int ntree;
-	bool rsample;
-	int nsample;
-    bool stopheight;
-    int maxheight;
-    doubleframe* dataset;  //holds the original dataset
-    Forest()
-	{
+	int ntree;bool rsample;
+	int nsample;bool stopheight;
+	int maxheight;
+
+	Forest() {
 		rsample = false;
 		ntree = 0;
 		nsample = 256;
-		dataset = NULL;
-	};
-Forest(int _ntree,doubleframe* _dataset,int _nsample,int _maxheight, bool _stopheight,bool _rsample)
-    {
-	ntree=_ntree;
-    dataset=_dataset;
-	nsample=_nsample;
-	stopheight=_stopheight;
-	maxheight=_maxheight;
- 	rsample = _rsample;
-    };
-virtual ~Forest()
-	{
+	}
+	Forest(int _ntree, int _nsample, int _maxheight,
+			bool _stopheight, bool _rsample) {
+		ntree = _ntree;
+		nsample = _nsample;
+		stopheight = _stopheight;
+		maxheight = _maxheight;
+		rsample = _rsample;
+	}
+	virtual ~Forest() {
 		for (std::vector<Tree*>::iterator it = trees.begin(); it != trees.end();
-				++it)
-		{
+				++it) {
 			delete (*it);
-
 		}
-       
-      //delete[] dataset->data;
-     // delete dataset;
-
 	}
 
-	double instanceScore(double *inst);
+	virtual double instanceScore(double *inst);
 	std::vector<double> AnomalyScore(doubleframe* df);
 	virtual std::vector<double> pathLength(double *inst);
 	std::vector<std::vector<double> > pathLength(doubleframe* data);
-	std::vector<double> ADtest(const std::vector<std::vector<double> > &pathlength, bool weighttotail);
+	std::vector<double> ADtest(
+			const std::vector<std::vector<double> > &pathlength,
+			bool weighttotail);
 	std::vector<double> importance(double *inst);
-	double getdepth(double *inst,Tree* tree);
-	void getSample(std::vector<int> &sampleIndex,const int nsample,bool rSample,int nrow);
-
-
-
+	double getdepth(double *inst, Tree* tree);
+	void getSample(std::vector<int> &sampleIndex, const int nsample,
+			bool rSample, int nrow);
+	void printStat(std::ofstream &out);
 };
 #endif /* FOREST_H_ */

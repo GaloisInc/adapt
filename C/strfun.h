@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "object.h"
+#include <string.h>
 
 #define streq(x,y) !strcmp(x,y)
 #define nstrdup(s) ({\
