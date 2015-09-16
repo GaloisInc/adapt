@@ -40,16 +40,16 @@ translate = execTranslate . mapM_ go
 -- | Verbs with reversed causality: the object has impacted the subject.
 isOutputObj :: Triple a -> Bool
 isOutputObj (Triple _ p _) =
-    theObject p `elem` ["wasDerivedFrom", "spawnedBy", "wasInformedBy", "wasKilledBy", "wasAttributedTo"]
+    theObject p `elem` [WasDerivedFrom, SpawnedBy, WasInformedBy, WasKilledBy, WasAttributedTo]
 
 -- | Verbs with forward causality: the subject has impacted the object.
 isOutputSubj :: Triple a -> Bool
 isOutputSubj (Triple _ p _) =
-    theObject p `elem` ["modified", "destroyed", "write"]
+    theObject p `elem` [Modified, Destroyed, Write]
 
 provOrdering :: Triple a -> Triple a
 provOrdering t@(Triple v p o)
-    | theObject p == "write" = Triple o (p { theObject = "writtenBy"}) v
+    | theObject p == Write = Triple o (p { theObject = WrittenBy } ) v
     | otherwise              = t
 
 data TranslateState = TS { objectMap :: Map (Entity Type) Int
@@ -79,7 +79,8 @@ emit v = do s <- get
 rename :: Entity Type -> Translate (Entity Type)
 rename e = do
   num <- getObjectNum e
-  return e { theObject = theObject e <> Text.pack (show num) }
+  let i = theObject e
+  return e { theObject = i { iriBody = iriBody i <> "$" <> Text.pack (show num) }}
 
 -- Step an object by incrementing the state _and_ emitting a new triple
 -- indicating 'was derived from'.
@@ -90,10 +91,13 @@ step e =
      e'' <- rename e
      emit $ TypeAnnotatedTriple $ Triple e'' wasDerivedFrom  e'
 
-wasDerivedFrom :: Object Type
-wasDerivedFrom =
+wasDerivedFrom :: Predicate Type
+wasDerivedFrom = predicate WasDerivedFrom
+
+predicate :: Verb -> Predicate Type
+predicate v =
   let (a,b) = either X.throw id $ runExcept $ tcVerb obj
-      obj   = IRI "tc://" "wasDerivedFrom" ()
+      obj   = Obj v ()
   in obj { objectTag = TyArrow a b }
 
 runExcept :: Except i b -> Either i b

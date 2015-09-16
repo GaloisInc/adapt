@@ -25,8 +25,6 @@ unify x y | x > y     = unify y x
 -- ^^ Most general unifier (mgu) comes first.  Actually possible in this primitive schema.
 unify EntityClass x                                                = return x
 unify ActorClass  x   | x `elem` [Agent,UnitOfExecution,Host]      = return x
-unify ResourceClass x | x `elem` [DataClass, Socket, File, Packet] = return x
-unify DataClass x     | x `elem` [File, Packet]                    = return x
 unify x y = throwE (TypeError x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
@@ -42,45 +40,44 @@ type Except i a = ExceptionT i Id a
 
 tcTriple :: RawTA1 -> Except TypeError TypeAnnotatedTriple
 tcTriple (RawTA1 (Triple subj verb obj)) = do
-     ty1        <- tcObject subj
+     ty1        <- tcEntity subj
      (ty2,ty3)  <- tcVerb   verb
-     ty4        <- tcObject obj
+     ty4        <- tcEntity obj
      tyLeft     <- unify ty1 ty2
      tyRight    <- unify ty4 ty3
      let tyF    = TyArrow tyLeft tyRight
      return $ TypeAnnotatedTriple $ Triple subj { objectTag = tyLeft } verb { objectTag = tyF }
                                            obj { objectTag = tyRight }
 
-tcObject :: Object () -> Except TypeError Type
-tcObject (IRI {..}) =
-    case namespace of
+tcEntity :: Entity () -> Except TypeError Type
+tcEntity (Obj {..}) =
+    case namespace theObject of
         "agent"  -> return Agent
         "mid"    -> return Host
         "cid"    -> return UnitOfExecution
-        "socket" -> return Socket
-        "packet" -> return Packet
-        "mem"    -> return Memory
-        "file"   -> return File
-        _        -> throwE $ CanNotInferType namespace
-tcObject (Lit {..}) =
-    case litValue of
-         _ -> return TyString -- XXX need to parse dates and stuff... so we do need namespace tags a la RDF.
+        "socket" -> return Resource
+        "packet" -> return Resource
+        "mem"    -> return Resource
+        "file"   -> return Resource
+        "string" -> return TyString
+        x        -> throwE $ CanNotInferType x
 
-tcVerb   :: Object ()   -> Except TypeError (Type,Type)
-tcVerb (IRI {..}) =
+tcVerb   :: Object Verb () -> Except TypeError (Type,Type)
+tcVerb (Obj {..}) =
   let f a b = return (a,b)
   in case theObject of
-        "wasDerivedFrom"  -> f EntityClass EntityClass
-        "spawnedBy"       -> f ActorClass ActorClass
-        "wasInformedBy"   -> f ActorClass ActorClass
-        "actedOnBehalfOf" -> f UnitOfExecution ActorClass
-        "wasKilledBy"     -> f UnitOfExecution UnitOfExecution
-        "wasAttributedTo" -> f ResourceClass ActorClass
-        "modified"        -> f UnitOfExecution DataClass
-        "generated"       -> f UnitOfExecution ResourceClass
-        "destroyed"       -> f UnitOfExecution ResourceClass
-        "read"            -> f UnitOfExecution ResourceClass
-        "write"           -> f UnitOfExecution ResourceClass
-        "is"              -> f ResourceClass ResourceClass
-        _                 -> throwE $ CanNotInferType $ "(" <> theObject <> ") Unsupported object.  Is this an attribute? We don't support those yet."
+        WasDerivedFrom  -> f EntityClass EntityClass
+        SpawnedBy       -> f ActorClass ActorClass
+        WasInformedBy   -> f ActorClass ActorClass
+        ActedOnBehalfOf -> f UnitOfExecution ActorClass
+        WasKilledBy     -> f UnitOfExecution UnitOfExecution
+        WasAttributedTo -> f Resource ActorClass
+        Modified        -> f UnitOfExecution Resource
+        Generated       -> f UnitOfExecution Resource
+        Destroyed       -> f UnitOfExecution Resource
+        Read            -> f UnitOfExecution Resource
+        Write           -> f UnitOfExecution Resource
+        Is              -> f Resource Resource
+        A               -> f Resource Resource
+        _               -> throwE $ CanNotInferType $ "(" <> pp theObject <> ") Unsupported object.  Is this an attribute? We don't support those yet."
 

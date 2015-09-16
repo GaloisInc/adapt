@@ -7,7 +7,7 @@ module Parser
     , RawTA1(..)
     , Object(..), Entity, Verb
     -- * Internal
-    , n3, triple, object
+    , n3, triple, entity, verb
     ) where
 
 -- Despite its maturity, we are not using the 'swish' package because it
@@ -28,28 +28,52 @@ import Types
 -- language tag. No blank nodes are supported.
 --
 -- XXX fails to parse embedded '"' or '>', as it uses those for termination.
-object :: Parser (Entity ())
-object =
+entity :: Parser (Entity ())
+entity =
   do skipSpace
      c   <- anyChar
      res <- case c of
               '<' -> iri <?> fail "Error parsing IRI"
               '"' -> stringLit <?> fail "Error parsing Lit"
-              't' -> (string "c:" >> tcIRI) <?> fail "Error parsing TC-centric value"
               _   -> fail $ "Expected an '<IRI>' '\"string\"' literal, or 'tc:obj'.  Found character: " ++ show c ++ "."
      return res
   where
-    tcIRI,iri, stringLit :: Parser (Object ())
+    iri, stringLit :: Parser (Entity ())
     -- XXX Fix the <someString> case, which is common RDF syntax
     iri       =
-        do r <- IRI <$> takeTill (== ':') <*> (takeWhile1 (`elem` (":/" :: String)) >> takeTill (== '>')) <*> pure ()
+        do r <- IRI <$> takeTill (== ':') <*> (takeWhile1 (`elem` (":/" :: String)) >> takeTill (== '>'))
            A.take 1
-           return r
+           return $ Obj r ()
     stringLit =
-        do r <- Lit <$> takeTill (== '"') <*> pure ()
+        do r <- IRI "string://" <$> takeTill (== '"')
            A.take 1
-           return r
-    tcIRI     = IRI "tc" <$> takeTill isSpace <*> pure ()
+           return $ Obj r ()
+
+verb :: Parser (Predicate ())
+verb =
+  do skipSpace
+     c   <- anyChar
+     case c of
+              't' -> (string "c:" >> Obj <$> pVerb <*> pure ()) <?> fail "Error parsing TC-centric value"
+              _   -> fail $ "Expected an '<IRI>' '\"string\"' literal, or 'tc:obj'.  Found character: " ++ show c ++ "."
+ where
+ pVerb :: Parser Verb
+ pVerb = do w <- takeTill isSpace
+            case w of
+              "wasDerivedFrom"    -> return WasDerivedFrom
+              "spawnedBy"         -> return SpawnedBy
+              "wasInformedBy"     -> return WasInformedBy
+              "actedOnBehalfOf"   -> return ActedOnBehalfOf
+              "wasKilledBy"       -> return WasKilledBy
+              "wasAttributedTo"   -> return WasAttributedTo
+              "modified"          -> return Modified
+              "generated"         -> return Generated
+              "destroyed"         -> return Destroyed
+              "read"              -> return Read
+              "write"             -> return Write
+              "is"                -> return Is
+              "a"                 -> return A
+              _                   -> fail $ "Expecteda  verb, found: " <> Text.unpack w
 
 -- Triples are RDF elements in the form `subject predicate object .\n`.
 -- That is, an Entity type, Verb type, and Entity type followed by a period
@@ -57,7 +81,7 @@ object =
 triple :: Parser RawTA1
 triple =
   do skipSpace
-     res <- RawTA1 <$> (Triple <$> object <*> object <*> object)
+     res <- RawTA1 <$> (Triple <$> entity <*> verb <*> entity)
      skipSpace
      _ <- char '.'
      return res

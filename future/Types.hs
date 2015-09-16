@@ -17,7 +17,9 @@ module Types
       -- * Key types
     , Triple(..)
     , Type(..)
-    , Object(..), Entity, Verb
+    , Object(..), Entity, Predicate
+    , Verb(..), IRI(..)
+    , Resource(..)
       -- * Monomorphic wrappers around 'Triple'
     , RawTA1(..), TypeAnnotatedTriple(..)
       -- * Classes
@@ -28,6 +30,7 @@ module Types
 
 import           Data.Monoid
 import           Data.Data
+import           Data.Char (toLower)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Control.Exception as X
@@ -36,23 +39,24 @@ data Error = PE ParseError | TE TypeError deriving (Eq, Ord, Show, Data, Typeabl
 
 data Triple a =
         Triple { triSubject  :: Entity a
-               , triVerb     :: Verb a
+               , triVerb     :: Predicate a
                , triObject   :: Entity a }
             deriving (Eq, Ord, Show, Read)
 
-data Object a
-        = -- IRIs are in the form 'http://some/location', 'cid://computation/identifier', etc.
-          IRI { namespace              :: Text  -- URI form such as 'http' 'cid' etc.
-              , theObject              :: Text  -- Everything after '://'
-              , objectTag              :: a
-              }
-        | Lit { litValue               :: Text
-              , objectTag              :: a
+data Object container tag =
+          Obj { theObject              :: container -- IRI: after '://'.  
+              , objectTag              :: tag
               }
             deriving (Eq, Ord, Show, Read)
 
-type Entity a = Object a
-type Verb a   = Object a
+-- IRIs are in the form 'http://some/location', 'cid://computation/identifier', etc.
+data IRI = IRI { namespace :: Text
+               , iriBody   :: Text
+               }
+            deriving (Eq, Ord, Show, Read)
+
+type Entity    a = Object IRI a
+type Predicate a = Object Verb a
 
 newtype RawTA1 = RawTA1 { unRTA :: Triple () }
             deriving (Eq, Ord, Show, Read)
@@ -82,22 +86,30 @@ instance PP (Triple Type) where
                      , ty, " .\n" ]
      where ty = Text.unwords [pp (objectTag s), "->", pp (objectTag o)]
 
-instance PP (Object a) where
-    pp (IRI ns o _) = ns <> "://" <> o
-    pp (Lit t    _) = t
+instance PP c => PP (Object c a) where
+    pp (Obj cont _) = pp cont
+
+instance PP IRI where
+   pp (IRI a b) = a <> "://" <> b
 
 instance PP Type where
     pp (TyArrow a b) = pp a <> " -> " <> pp b
     pp ty            = Text.pack $ show ty
 
+instance PP Verb where
+    pp v = case show v of
+            (l:ls) -> Text.pack (toLower l : ls)
+            []     -> ""
 
 instance PP TypeAnnotatedTriple where
-  pp (TypeAnnotatedTriple t) = pp t
+    pp (TypeAnnotatedTriple t) = pp t
 
-
-data Type = EntityClass | ActorClass | ResourceClass | DataClass | Agent
-          | UnitOfExecution | Host | Socket | File | Packet | Memory
+data Type = EntityClass | ActorClass | Resource | Agent
+          | UnitOfExecution | Host
           | TyString | TyArrow Type Type
+        deriving (Data, Typeable, Eq, Ord, Show, Read)
+
+data Resource = File | Socket | Semaphore | Memory | Packet
         deriving (Data, Typeable, Eq, Ord, Show, Read)
 
 data TypeError = TypeError Type Type | CanNotInferType Text
@@ -106,3 +118,19 @@ data TypeError = TypeError Type Type | CanNotInferType Text
 instance X.Exception TypeError
 instance X.Exception ParseError
 instance X.Exception Error
+
+data Verb
+  = WasDerivedFrom
+  | SpawnedBy
+  | WasInformedBy
+  | ActedOnBehalfOf
+  | WasKilledBy
+  | WasAttributedTo
+  | Modified
+  | Generated
+  | Destroyed
+  | Read
+  | Write | WrittenBy
+  | Is
+  | A
+            deriving (Eq, Ord, Show, Read)

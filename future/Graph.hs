@@ -12,7 +12,7 @@ import Text.Dot
 import MonadLib
 import Types
 
-type M a = StateT (Map (Object Type) NodeId) Dot a
+type M a = StateT (Map (Entity Type) NodeId) Dot a
 
 runMe :: M a -> String
 runMe = showDot . runStateT Map.empty
@@ -26,7 +26,7 @@ graphTriple (TypeAnnotatedTriple (Triple s v o)) =
      obj  <- memoNode o
      newEdge subj obj (verbProperties v)
 
-memoNode :: Object Type -> M NodeId
+memoNode :: Entity Type -> M NodeId
 memoNode obj =
   do mp <- get
      case Map.lookup obj mp of
@@ -41,12 +41,8 @@ newEdge a b ps = lift (edge a b ps)
 newNode :: [(String,String)] -> M NodeId
 newNode = lift . node
 
-verbProperties :: Verb Type -> [(String,String)]
-verbProperties v = [("label",Text.unpack $ objectText v)]
+verbProperties :: Predicate Type -> [(String,String)]
+verbProperties v = [("label",Text.unpack $ pp $ theObject v)]
 
-objectProperties :: Object a -> [(String,String)]
-objectProperties o = [("label",Text.unpack $ objectText o)]
-
-objectText :: Object a -> Text
-objectText (IRI {..}) = theObject
-objectText (Lit {..}) = litValue
+objectProperties :: Entity a -> [(String,String)]
+objectProperties o = [("label",Text.unpack $ pp $ theObject o)]
