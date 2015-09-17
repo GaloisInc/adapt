@@ -19,6 +19,11 @@ library
   exposed-modules:     Graph, Ingest, Types, Parser, Compile, Typecheck
   -- other-modules:       
   other-extensions:    RecordWildCards, DeriveDataTypeable, OverloadedStrings, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, ViewPatterns
-  build-depends:       base >=4.7 && <4.8, containers >=0.5 && <0.6, text >=1.2 && <1.3, dotgen >=0.4 && <0.5, monadLib >=3.7 && <3.8, attoparsec >=0.12 && <0.13
+  build-depends:       base >=4.7 && <4.9,
+                       containers >=0.5 && <0.6,
+                       text >=1.2 && <1.3,
+                       dotgen >=0.4 && <0.5,
+                       monadLib >=3.7 && <3.8,
+                       attoparsec >=0.12 && <0.13
   hs-source-dirs:      src
   default-language:    Haskell2010
