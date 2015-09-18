@@ -15,7 +15,7 @@ $ stack exec ghci
 > import Ingest
 > import Graph
 > ts <- readTriplesFromFile "example.raw"
-> writeFile "example2.dot" (graph ts)
+> writeFile "examples/example2.dot" (graph ts)
 > import Types
 > Data.Text.IO.putStrLn $ render ts
 ```
