@@ -86,6 +86,7 @@ Classifier queries are boring, and therefore easy to optimize.
 
 Output nodes with high risk score may be announced via Kafka,
 subject to rate limiting.
+Output nodes are immutable, forming an append-only log.
 
 #### DX queries
 
@@ -101,11 +102,14 @@ We don't know what is in the Knowledge Base, nor its format,
 so we do not yet attempt to query it or use it as an input for any models.
 
 Here is list of all upstream components we receive nodes from:
+
 - Segmenter
 - (possibly) Ingester
 
 Here are all the downstream components that directly read Classification nodes:
+
 - DX
 
 Here are all the downstream components that may indirectly read Classification nodes:
+
 - Recommender
