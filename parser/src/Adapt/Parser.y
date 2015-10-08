@@ -12,8 +12,8 @@ module Adapt.Parser (
 import           Adapt.Parser.AST as Exports
 import           Adapt.Parser.Lexeme
 import           Adapt.Parser.Lexer
-import           Adapt.Parser.PP as Exports
-import           Adapt.Parser.Position as Exports (PP(..), pp, pretty)
+import           Adapt.Parser.PP as Exports (PP(..), pp, pretty)
+import           Adapt.Parser.Position as Exports
 
 import qualified Control.Applicative as A
 import qualified Data.Text.Lazy as L
