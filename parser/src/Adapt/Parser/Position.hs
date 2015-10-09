@@ -26,6 +26,9 @@ instance Eq Position where
 instance Ord Position where
   compare = compare `on` posOff
 
+instance PP Position where
+  ppPrec _ Position { .. } = pp posRow <> char ':' <> pp posCol
+
 -- | Advance a position by one character.
 advance :: Char -> Position -> Position
 advance '\t' Position { .. } = Position { posCol = posCol + 8
@@ -54,15 +57,24 @@ instance M.Monoid Range where
   mappend NoLoc b                         = b
   mappend a NoLoc                         = a
 
+instance PP Range where
+  ppPrec _ NoLoc               = text "<no location>"
+  ppPrec _ (Range start end _) = parens (pp start <> char '-' <> pp end)
+
 
 -- | Select the lines included in the range given, with some amount of context
 -- lines around it.
 getLines :: L.Text -> Int -> Range -> L.Text
 getLines _     _   NoLoc         = L.empty
 getLines input cxt (Range s e _) = L.unlines
-                                 $ take (posRow e - posRow s + 2 * cxt)
-                                 $ drop (posRow s - 1 - cxt)
+                                 $ take len
+                                 $ drop start
                                  $ L.lines input
+  where
+
+  (start,len)
+    | cxt >= posRow s = (0,posRow s)
+    | otherwise       = (posRow s - 1 - cxt,cxt + 1)
 
 
 -- Located Things --------------------------------------------------------------
@@ -79,6 +91,9 @@ instance PP a => PP (Located a) where
 
 class HasRange a where
   getRange :: a -> Range
+
+instance (HasRange a, HasRange b) => HasRange (a,b) where
+  getRange (a,b) = getRange a `M.mappend` getRange b
 
 instance HasRange a => HasRange [a] where
   getRange = F.foldMap getRange

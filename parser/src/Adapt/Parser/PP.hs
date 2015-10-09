@@ -1,7 +1,5 @@
 module Adapt.Parser.PP (
-    PP(..),
-    pp,
-    pretty,
+    module Adapt.Parser.PP,
     module Text.PrettyPrint.HughesPJ
   ) where
 

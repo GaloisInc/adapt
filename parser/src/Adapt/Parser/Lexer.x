@@ -27,8 +27,11 @@ $digit = [0-9]
 $white+                ;
 "--" .*                ;
 
-"="                    { token (Symbol SymDef) }
-";"                    { token (Symbol SymSep) }
+"="                    { token (Symbol SymDef)    }
+";"                    { token (Symbol SymSep)    }
+"("                    { token (Symbol SymLParen) }
+")"                    { token (Symbol SymRParen) }
+","                    { token (Symbol SymComma)  }
 
 -- Terminals
 @activity              { tokenS Activity }
@@ -95,7 +98,7 @@ primLexer src inp = run AlexInput { alexPos           = start
 
       AlexError i'  ->
         let loc = Range (alexPos i) (alexPos i') src
-        in [ Error LexicalError `at` loc ]
+        in [ Error (LexicalError loc) `at` loc ]
 
       AlexSkip i' _ ->
         run i'
