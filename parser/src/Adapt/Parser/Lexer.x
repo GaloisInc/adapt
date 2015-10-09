@@ -31,7 +31,7 @@ $white+                ;
 ";"                    { token (Symbol SymSep)    }
 "("                    { token (Symbol SymLParen) }
 ")"                    { token (Symbol SymRParen) }
-","                    { token (Symbol SymComma)  }
+","                    ; -- { token (Symbol SymComma)  }
 
 -- Terminals
 @activity              { tokenS Activity }

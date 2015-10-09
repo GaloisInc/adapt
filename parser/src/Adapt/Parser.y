@@ -29,7 +29,6 @@ import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 
   ';'      { Located $$ (Symbol SymSep)    }
   '='      { Located $$ (Symbol SymDef)    }
-  ','      { Located $$ (Symbol SymComma)  }
 
   'Zero_day_activity'              { Located $$ (Activity "Zero_day_activity") }
   'Exploit_vulnerability_activity' { Located $$ (Activity "Exploit_vulnerability_activity") }
@@ -111,15 +110,15 @@ decl :: { Decl }
 
 apt :: { Located APT }
   : initial_compromise
-  ',' persistence
+      persistence
       expansion_list
-  ',' exfiltration
+      exfiltration
 
     { APT { aptInitialCompromise = $1
-          , aptPersistence       = $3
-          , aptExpansion         = reverse $4
-          , aptExfiltration      = $6
-          } `at` $1 }
+          , aptPersistence       = $2
+          , aptExpansion         = reverse $3
+          , aptExfiltration      = $4
+          } `at` ($1,$4) }
 
 
 -- Initial Compromise ----------------------------------------------------------
@@ -140,23 +139,23 @@ indirect_attack :: { IndirectAttack }
 
 malicious_attachment :: { MaliciousAttachment }
   : 'User_open_file_activity'
-    ',' 'Application_compromise_activity'
-    ',' 'Initial_malware_download_activity'
-    { MALoc (UserOpenFile `at` ($1,$5)) }
+        'Application_compromise_activity'
+        'Initial_malware_download_activity'
+    { MALoc (UserOpenFile `at` ($1,$3)) }
 
 drive_by_download :: { DriveByDownload }
   : 'User_click_link_activity'
-    ',' 'Browser_exploit_download_activity'
-    { DDLoc (UserClickLink `at` ($1,$3)) }
+        'Browser_exploit_download_activity'
+    { DDLoc (UserClickLink `at` ($1,$2)) }
 
 waterholing :: { Waterholing }
   : 'User_visits_tainted_URL_activity'
-    ',' 'Browser_exploit_download_activity'
-    { WHLoc (UserVisitsTaintedURL `at` ($1,$3)) }
+        'Browser_exploit_download_activity'
+    { WHLoc (UserVisitsTaintedURL `at` ($1,$2)) }
 
 usb_infection :: { UsbInfection }
-  : 'User_insert_usb_activity' ',' usb_exploit_start
-    { UILoc (UserInsertUsb $3 `at` ($1,$3)) }
+  : 'User_insert_usb_activity'     usb_exploit_start
+    { UILoc (UserInsertUsb $2 `at` ($1,$2)) }
 
 usb_exploit_start :: { UsbExploitStart }
   : 'Usb_autorun_activity'                { UELoc (UsbAutorun             `at` $1) }
@@ -170,9 +169,9 @@ persistence :: { Persistence }
 
 maintain_access :: { MaintainAccess }
   : command_control
-    ',' 'Download_backdoor_activity'
-    ',' opt_modify_target
-    { MaintainAccess $1 $5 }
+        'Download_backdoor_activity'
+        opt_modify_target
+    { MaintainAccess $1 $3 }
 
 opt_modify_target :: { Maybe ModifyTarget }
   : {- empty -}   { Nothing }
@@ -190,7 +189,7 @@ command_control :: { CommandControl }
 -- REVERSED
 maintain_command_control_list :: { [MaintainCommandControl] }
   : maintain_command_control                                   { [$1]    }
-  | maintain_command_control_list ',' maintain_command_control { $3 : $1 }
+  | maintain_command_control_list     maintain_command_control { $2 : $1 }
 
 maintain_command_control :: { MaintainCommandControl }
   : 'Listen_cc_activity' { MCLoc (ListenCC `at` $1) }
@@ -205,7 +204,7 @@ evade_defenses :: { EvadeDefenses }
 -- REVERSED
 expansion_list :: { [Expansion] }
   : {- empty -}                  { []      }
-  | expansion_list ',' expansion { $3 : $1 }
+  | expansion_list     expansion { $2 : $1 }
 
 expansion :: { Expansion }
   : host_enumeration   { ELoc (HostEnumeration   $1 `at` $1) }
@@ -232,19 +231,19 @@ move_laterally :: { MoveLaterally }
       in MLLoc (NewMachineAccess infect `at` ($1,end)) }
 
 opt_infect :: { Maybe Range }
-  : ',' 'Infect_new_machine_activity' { Just $2 }
+  :     'Infect_new_machine_activity' { Just $1 }
   | {- empty -}                       { Nothing }
 
 
 -- Exfiltration ----------------------------------------------------------------
 
 exfiltration :: { Exfiltration }
-  : exfil_staging ',' exfil_execution { Exfiltration (Just $1) $3 }
+  : exfil_staging     exfil_execution { Exfiltration (Just $1) $2 }
   | exfil_execution                   { Exfiltration Nothing $1 }
 
 exfil_staging :: { ExfilStaging }
-  : exfil_format ',' exfil_infrastructure
-    { ExfilStaging $1 $3 }
+  : exfil_format     exfil_infrastructure
+    { ExfilStaging $1 $2 }
 
 exfil_format :: { ExfilFormat }
   : 'Compress_activity' opt_encrypt
@@ -255,14 +254,14 @@ exfil_format :: { ExfilFormat }
 
 opt_encrypt :: { Maybe Range }
   : {- empty -}            { Nothing }
-  | ',' 'Encrypt_activity' { Just $2 }
+  |     'Encrypt_activity' { Just $1 }
 
 exfil_infrastructure :: { ExfilInfrastructure }
   : 'Establish_exfil_points_activity'
     { EILoc (EstablishExfilPoints `at` $1) }
 
 exfil_execution :: { ExfilExecution }
-  : exfil_channel ',' exfil_socket { ExfilExecution $1 $3 }
+  : exfil_channel     exfil_socket { ExfilExecution $1 $2 }
 
 exfil_channel :: { ExfilChannel }
   : 'Exfil_physical_medium_activity' { ECLoc (ExfilPhysicalMedium `at` $1) }

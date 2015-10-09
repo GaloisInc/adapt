@@ -219,6 +219,31 @@ instance HasRange MaintainCommandControl where
   getRange (MCLoc loc) = getRange loc
   getRange _           = M.mempty
 
+instance HasRange Exfiltration where
+  getRange (Exfiltration a b) = getRange (a,b)
+
+instance HasRange ExfilStaging where
+  getRange (ExfilStaging a b) = getRange (a,b)
+
+instance HasRange ExfilFormat where
+  getRange (EFLoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange ExfilInfrastructure where
+  getRange (EILoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange ExfilExecution where
+  getRange (ExfilExecution a b) = getRange (a,b)
+
+instance HasRange ExfilChannel where
+  getRange (ECLoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange ExfilSocket where
+  getRange (ESLoc loc) = getRange loc
+  getRange _           = M.mempty
+
 
 -- Pretty-printing -------------------------------------------------------------
 
