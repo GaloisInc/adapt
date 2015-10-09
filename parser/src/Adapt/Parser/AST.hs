@@ -16,7 +16,7 @@ data Decl = Decl { dName :: Located L.Text
 data APT = APT { aptInitialCompromise  :: InitialCompromise
                , aptPersistence        :: Persistence
                , aptExpansion          :: [Expansion]
-               -- , aptExfiltration       :: Exfiltration
+               , aptExfiltration       :: Exfiltration
                } deriving (Show)
 
 
@@ -24,7 +24,6 @@ data APT = APT { aptInitialCompromise  :: InitialCompromise
 
 data InitialCompromise = DirectAttack DirectAttack
                        | IndirectAttack IndirectAttack
-                       | ICLoc (Located InitialCompromise)
                          deriving (Show)
 
 data DirectAttack = ZeroDay
@@ -32,8 +31,32 @@ data DirectAttack = ZeroDay
                   | DALoc (Located DirectAttack)
                     deriving (Show)
 
-data IndirectAttack = IA
+data IndirectAttack = MaliciousAttachment MaliciousAttachment
+                    | DriveByDownload DriveByDownload
+                    | Waterholing Waterholing
+                    | UsbInfection UsbInfection
                       deriving (Show)
+
+data MaliciousAttachment = UserOpenFile
+                         | MALoc (Located MaliciousAttachment)
+                           deriving (Show)
+
+data DriveByDownload = UserClickLink
+                     | DDLoc (Located DriveByDownload)
+                       deriving (Show)
+
+data Waterholing = UserVisitsTaintedURL
+                 | WHLoc (Located Waterholing)
+                   deriving (Show)
+
+data UsbInfection = UserInsertUsb UsbExploitStart
+                  | UILoc (Located UsbInfection)
+                    deriving (Show)
+
+data UsbExploitStart = UsbAutorun
+                     | UserClickRogueLinkFile
+                     | UELoc (Located UsbExploitStart)
+                       deriving (Show)
 
 
 -- Persistence -----------------------------------------------------------------
@@ -92,21 +115,78 @@ data MoveLaterally = NewMachineAccess Bool
                      deriving (Show)
 
 
+-- Exfiltration-----------------------------------------------------------------
+
+data Exfiltration = Exfiltration (Maybe ExfilStaging) ExfilExecution
+                    deriving (Show)
+
+data ExfilStaging = ExfilStaging ExfilFormat ExfilInfrastructure
+                    deriving (Show)
+
+data ExfilFormat = Compress Bool
+                 | EFLoc (Located ExfilFormat)
+                   deriving (Show)
+
+data ExfilInfrastructure = EstablishExfilPoints
+                         | EILoc (Located ExfilInfrastructure)
+                           deriving (Show)
+
+data ExfilExecution = ExfilExecution ExfilChannel ExfilSocket
+                      deriving (Show)
+
+data ExfilChannel = ExfilPhysicalMedium
+                  | HttpPost
+                  | Dns
+                  | Https
+                  | Ftp
+                  | Ssh
+                  | ECLoc (Located ExfilChannel)
+                    deriving (Show)
+
+data ExfilSocket = UDP
+                 | TCP
+                 | ESLoc (Located ExfilSocket)
+                   deriving (Show)
+
+
 -- Location Management ---------------------------------------------------------
 
 instance HasRange Persistence where
   getRange (Persistence a b) = M.mappend (getRange a) (getRange b)
 
 instance HasRange InitialCompromise where
-  getRange (ICLoc lic) = getRange lic
-  getRange _           = M.mempty
+  getRange (DirectAttack da)   = getRange da
+  getRange (IndirectAttack ia) = getRange ia
 
 instance HasRange DirectAttack where
   getRange (DALoc ld) = getRange ld
   getRange _          = M.mempty
 
 instance HasRange IndirectAttack where
-  getRange _ = M.mempty
+  getRange (MaliciousAttachment a) = getRange a
+  getRange (DriveByDownload     a) = getRange a
+  getRange (Waterholing         a) = getRange a
+  getRange (UsbInfection        a) = getRange a
+
+instance HasRange MaliciousAttachment where
+  getRange (MALoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange DriveByDownload where
+  getRange (DDLoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange Waterholing where
+  getRange (WHLoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange UsbInfection where
+  getRange (UILoc loc) = getRange loc
+  getRange _           = M.mempty
+
+instance HasRange UsbExploitStart where
+  getRange (UELoc loc) = getRange loc
+  getRange _           = M.mempty
 
 instance HasRange HostEnumeration where
   getRange (HELoc loc) = getRange loc
@@ -157,7 +237,6 @@ instance PP APT where
 instance PP InitialCompromise where
   ppPrec p (DirectAttack   da)  = ppPrec p da
   ppPrec p (IndirectAttack ia)  = ppPrec p ia
-  ppPrec p (ICLoc          lic) = ppPrec p lic
 
 instance PP DirectAttack where
   ppPrec _ ZeroDay              = text "Zero_day_activity"

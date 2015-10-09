@@ -29,8 +29,6 @@ import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 
   ';'      { Located $$ (Symbol SymSep)    }
   '='      { Located $$ (Symbol SymDef)    }
-  '('      { Located $$ (Symbol SymLParen) }
-  ')'      { Located $$ (Symbol SymRParen) }
   ','      { Located $$ (Symbol SymComma)  }
 
   'Zero_day_activity'              { Located $$ (Activity "Zero_day_activity") }
@@ -59,7 +57,28 @@ import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
   'Dll_activity'                   { Located $$ (Activity "Dll_activity") }
   'Registry_activity'              { Located $$ (Activity "Registry_activity") }
 
-  ACTIVITY { $$ @ (Located _ Activity{}) }
+  'Compress_activity'              { Located $$ (Activity "Compress_activity") }
+  'Encrypt_activity'               { Located $$ (Activity "Encrypt_activity") }
+  'Establish_exfil_points_activity'{ Located $$ (Activity "Establish_exfil_points_activity") }
+  'Exfil_physical_medium_activity' { Located $$ (Activity "Exfil_physical_medium_activity") }
+
+  'Http_post_activity'             { Located $$ (Activity "Http_post_activity") }
+  'Dns_activity'                   { Located $$ (Activity "Dns_activity") }
+  'Https_activity'                 { Located $$ (Activity "Https_activity") }
+  'Ftp_activity'                   { Located $$ (Activity "Ftp_activity") }
+  'Ssh_activity'                   { Located $$ (Activity "Ssh_activity") }
+  'UDP_activity'                   { Located $$ (Activity "UDP_activity") }
+  'TCP_activity'                   { Located $$ (Activity "TCP_activity") }
+
+  'User_open_file_activity'             { Located $$ (Activity "User_open_file_activity") }
+  'Application_compromise_activity'     { Located $$ (Activity "Application_compromise_activity") }
+  'Initial_malware_download_activity'   { Located $$ (Activity "Initial_malware_download_activity") }
+  'User_click_link_activity'            { Located $$ (Activity "User_click_link_activity") }
+  'Browser_exploit_download_activity'   { Located $$ (Activity "Browser_exploit_download_activity") }
+  'User_visits_tainted_URL_activity'    { Located $$ (Activity "User_visits_tainted_URL_activity") }
+  'User_insert_usb_activity'            { Located $$ (Activity "User_insert_usb_activity") }
+  'Usb_autorun_activity'                { Located $$ (Activity "Usb_autorun_activity") }
+  'User_click_rogue_link_file_activity' { Located $$ (Activity "User_click_rogue_link_file_activity") }
 
 
 %tokentype { Lexeme }
@@ -75,11 +94,6 @@ import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 ident :: { Located L.Text }
   : IDENT { let Located r (Ident n) = $1
             in n `at` r }
-
--- any activity
-activity :: { Located L.Text }
-  : ACTIVITY { let Located r (Activity n) = $1
-               in n `at` r }
 
 -- Declarations ----------------------------------------------------------------
 
@@ -99,25 +113,54 @@ apt :: { Located APT }
   : initial_compromise
   ',' persistence
       expansion_list
+  ',' exfiltration
 
     { APT { aptInitialCompromise = $1
           , aptPersistence       = $3
           , aptExpansion         = reverse $4
+          , aptExfiltration      = $6
           } `at` $1 }
 
 
 -- Initial Compromise ----------------------------------------------------------
 
 initial_compromise :: { InitialCompromise }
-  : direct_attack   { ICLoc (DirectAttack   $1 `at` $1) }
-  | indirect_attack { ICLoc (IndirectAttack $1 `at` $1) }
-
-indirect_attack :: { IndirectAttack }
-  : {- empty -} { IA }
+  : direct_attack   { DirectAttack   $1 }
+  | indirect_attack { IndirectAttack $1 }
 
 direct_attack :: { DirectAttack }
   : 'Zero_day_activity'              { DALoc (ZeroDay              `at` $1) }
   | 'Exploit_vulnerability_activity' { DALoc (ExploitVulnerability `at` $1) }
+
+indirect_attack :: { IndirectAttack }
+  : malicious_attachment { MaliciousAttachment $1 }
+  | drive_by_download    { DriveByDownload     $1 }
+  | waterholing          { Waterholing         $1 }
+  | usb_infection        { UsbInfection        $1 }
+
+malicious_attachment :: { MaliciousAttachment }
+  : 'User_open_file_activity'
+    ',' 'Application_compromise_activity'
+    ',' 'Initial_malware_download_activity'
+    { MALoc (UserOpenFile `at` ($1,$5)) }
+
+drive_by_download :: { DriveByDownload }
+  : 'User_click_link_activity'
+    ',' 'Browser_exploit_download_activity'
+    { DDLoc (UserClickLink `at` ($1,$3)) }
+
+waterholing :: { Waterholing }
+  : 'User_visits_tainted_URL_activity'
+    ',' 'Browser_exploit_download_activity'
+    { WHLoc (UserVisitsTaintedURL `at` ($1,$3)) }
+
+usb_infection :: { UsbInfection }
+  : 'User_insert_usb_activity' ',' usb_exploit_start
+    { UILoc (UserInsertUsb $3 `at` ($1,$3)) }
+
+usb_exploit_start :: { UsbExploitStart }
+  : 'Usb_autorun_activity'                { UELoc (UsbAutorun             `at` $1) }
+  | 'User_click_rogue_link_file_activity' { UELoc (UserClickRogueLinkFile `at` $1) }
 
 
 -- Persistence -----------------------------------------------------------------
@@ -141,12 +184,12 @@ modify_target :: { ModifyTarget }
   | 'Registry_activity' { MTLoc (ModifyRegistry `at` $1) }
 
 command_control :: { CommandControl }
-  : 'Initiate_command_control_activity' ',' maintain_command_control_list
-    { CCLoc (InitialCommandControl (reverse $3) `at` ($1,$3)) }
+  : 'Initiate_command_control_activity' maintain_command_control_list
+    { CCLoc (InitialCommandControl (reverse $2) `at` ($1,$2)) }
 
 -- REVERSED
 maintain_command_control_list :: { [MaintainCommandControl] }
-  : {- empty -} { [] }
+  : maintain_command_control                                   { [$1]    }
   | maintain_command_control_list ',' maintain_command_control { $3 : $1 }
 
 maintain_command_control :: { MaintainCommandControl }
@@ -181,17 +224,57 @@ access_credentials :: { AccessCredentials }
   | 'Network_sniffing_activity'   { ACLoc (NetworkSniffing   `at` $1) }
   | 'Keyboard_logging_activity'   { ACLoc (KeyboardLogging   `at` $1) }
 
-
 move_laterally :: { MoveLaterally }
   : 'New_machine_access_activity' opt_infect
     { let (infect,end) = case $2 of
-                           Just r  -> (True,r)
-                           Nothing -> (False,M.mempty)
+                           Just loc -> (True,loc)
+                           Nothing  -> (False,M.mempty)
       in MLLoc (NewMachineAccess infect `at` ($1,end)) }
 
 opt_infect :: { Maybe Range }
-  : {- empty -}                       { Nothing }
-  | ',' 'Infect_new_machine_activity' { Just $2 }
+  : ',' 'Infect_new_machine_activity' { Just $2 }
+  | {- empty -}                       { Nothing }
+
+
+-- Exfiltration ----------------------------------------------------------------
+
+exfiltration :: { Exfiltration }
+  : exfil_staging ',' exfil_execution { Exfiltration (Just $1) $3 }
+  | exfil_execution                   { Exfiltration Nothing $1 }
+
+exfil_staging :: { ExfilStaging }
+  : exfil_format ',' exfil_infrastructure
+    { ExfilStaging $1 $3 }
+
+exfil_format :: { ExfilFormat }
+  : 'Compress_activity' opt_encrypt
+    { let (encrypt,end) = case $2 of
+                            Just end -> (True,end)
+                            Nothing  -> (False,M.mempty)
+      in EFLoc (Compress encrypt `at` ($1,end)) }
+
+opt_encrypt :: { Maybe Range }
+  : {- empty -}            { Nothing }
+  | ',' 'Encrypt_activity' { Just $2 }
+
+exfil_infrastructure :: { ExfilInfrastructure }
+  : 'Establish_exfil_points_activity'
+    { EILoc (EstablishExfilPoints `at` $1) }
+
+exfil_execution :: { ExfilExecution }
+  : exfil_channel ',' exfil_socket { ExfilExecution $1 $3 }
+
+exfil_channel :: { ExfilChannel }
+  : 'Exfil_physical_medium_activity' { ECLoc (ExfilPhysicalMedium `at` $1) }
+  | 'Http_post_activity'             { ECLoc (HttpPost            `at` $1) }
+  | 'Dns_activity'                   { ECLoc (Dns                 `at` $1) }
+  | 'Https_activity'                 { ECLoc (Https               `at` $1) }
+  | 'Ftp_activity'                   { ECLoc (Ftp                 `at` $1) }
+  | 'Ssh_activity'                   { ECLoc (Ssh                 `at` $1) }
+
+exfil_socket :: { ExfilSocket }
+  : 'UDP_activity' { ESLoc (UDP `at` $1) }
+  | 'TCP_activity' { ESLoc (TCP `at` $1) }
 
 {
 
