@@ -9,6 +9,6 @@ main :: IO ()
 main  =
   do [input] <- getArgs
      bytes   <- L.readFile input
-     case parseDecls input bytes of
-       Right decls -> print decls
-       Left err    -> print (ppError (Just bytes) err)
+     print $ case parseDecls input bytes of
+               Right decls -> pp decls
+               Left err    -> ppError (Just bytes) err

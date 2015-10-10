@@ -188,7 +188,7 @@ command_control :: { CommandControl }
 
 -- REVERSED
 maintain_command_control_list :: { [MaintainCommandControl] }
-  : maintain_command_control                                   { [$1]    }
+  : {- empty -}                                                { []      }
   | maintain_command_control_list     maintain_command_control { $2 : $1 }
 
 maintain_command_control :: { MaintainCommandControl }
