@@ -62,6 +62,7 @@ alexInputPrevChar = aiChar
 
 data LexState = Normal
               | InString String
+              | InURI String
 
 type Action = L.Text -> LexState -> (Maybe Token, LexState)
 
@@ -95,15 +96,26 @@ startString _ _ = (Nothing, InString "")
 -- | Discard the chunk, and use this string instead.
 litString :: String -> Action
 litString lit _ (InString str) = (Nothing, InString (str ++ lit))
-litString _   _ _              = panic "Lexer: Expected string literal state"
+litString _   _ _              = panic "Lexer expected string literal state"
 
 addString :: Action
 addString chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
-addString _     _              = panic "Lexer Expected string literal state"
+addString _     _              = panic "Lexer expected string literal state"
 
 mkString :: Action
 mkString _ (InString str) = (Just (String str ), Normal)
-mkString _ _              = panic "Lexer Expected string literal state"
+mkString _ _              = panic "Lexer expected string literal state"
+
+startURI :: Action
+startURI _ _ = (Nothing, InURI "")
+
+addURI :: Action
+addURI chunk (InURI uri)  = (Nothing, InURI (uri ++ L.unpack chunk))
+addURI _     _            = panic "Lexer expected uri state"
+
+mkURI :: Action
+mkURI _ (InURI uri)       = (Just (URI uri), Normal)
+mkURI _ _                 = panic "Lexer expected uri state"
 
 
 -- Tokens ----------------------------------------------------------------------
@@ -111,11 +123,20 @@ mkString _ _              = panic "Lexer Expected string literal state"
 data Token = KW Keyword
            | Num Integer
            | String String
-           | Ident String
+           | URI String
+           | Ident { unIdent :: String }
            | Sym Symbol
            | Eof
            | Err TokenError
              deriving (Show,Eq)
+
+tokenText :: Token -> L.Text
+tokenText (String s) = L.pack s
+tokenText _          = error "tokenText: Tried to extract the 'text' of a non-String token"
+
+tokenNum :: Token -> Integer
+tokenNum (Num n)     = n
+tokenNum  _          = error "tokenText: Tried to extract the 'num' of a non-Num token"
 
 -- | Virtual symbols inserted for layout purposes.
 data Virt = VOpen
@@ -131,23 +152,33 @@ data Keyword = KW_Activity
              | KW_Entity
              | KW_Used
              | KW_WasStartedBy
+             | KW_WasEndedBy
+             | KW_WasInformedBy
+             | KW_WasGeneratedBy
+             | KW_WasDerivedFrom
+             | KW_WasAttributedTo
+             | KW_Description
+             | KW_IsPartOf
              | KW_Document
              | KW_EndDocument
+             | KW_Prefix
                deriving (Show,Eq)
 
 data Symbol = BracketL
             | BracketR
             | Semi
             | Pipe
-            | BraceL
-            | BraceR
             | ParenL
             | ParenR
             | Assign
+            | Type
             | Comma
             | Period
             | Colon
             | Hyphen
+            | SingleQuote
+            | TimeSymT
+            | TimeSymZ
               deriving (Show,Eq)
 
 data TokenError = LexicalError
