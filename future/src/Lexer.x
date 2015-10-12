@@ -48,7 +48,6 @@ $bin_digit      = [0-1]
 }
 
 <0> {
-@time                   { mkTime        }
 $white+                 { skip }
 "//" .*                 { skip }
 
@@ -86,6 +85,7 @@ $white+                 { skip }
 \"                      { startString }
 \<                      { startURI    }
 
+@time                   { mkTime  }
 $id_first $id_next*     { mkIdent }
 $digit+                 { number  }
 
