@@ -253,10 +253,12 @@ instance PP Decl where
   ppList ds = vcat (map pp ds)
 
 instance PP APT where
-  ppPrec p APT { .. } =
+  ppPrec _ APT { .. } =
     fsep $ commas
-         $ concat [ [ ppPrec p aptInitialCompromise ]
-                  , [ ppPrec p ex | ex <- aptExpansion ]
+         $ concat [ [ pp aptInitialCompromise ]
+                  , [ pp aptPersistence ]
+                  , [ pp ex | ex <- aptExpansion ]
+                  , [ pp aptExfiltration ]
                   ]
 
 instance PP InitialCompromise where
@@ -269,7 +271,32 @@ instance PP DirectAttack where
   ppPrec p (DALoc lda)          = ppPrec p lda
 
 instance PP IndirectAttack where
-  ppPrec _ _ = text "..."
+  ppPrec p (MaliciousAttachment ma) = ppPrec p ma
+  ppPrec p (DriveByDownload d)      = ppPrec p d
+  ppPrec p (Waterholing w)          = ppPrec p w
+  ppPrec p (UsbInfection ui)        = ppPrec p ui
+
+instance PP MaliciousAttachment where
+  ppPrec _ UserOpenFile = text "User_open_file_activity"
+  ppPrec p (MALoc loc)  = ppPrec p loc
+
+instance PP DriveByDownload where
+  ppPrec _ UserClickLink = text "User_click_link_activity"
+  ppPrec p (DDLoc loc)   = ppPrec p loc
+
+instance PP Waterholing where
+  ppPrec _ UserVisitsTaintedURL = text "User_visits_tainted_URL_activity"
+  ppPrec p (WHLoc loc)          = ppPrec p loc
+
+instance PP UsbInfection where
+  ppPrec _ (UserInsertUsb es) = fsep $ commas [ text "User_insert_usb_activity"
+                                              , pp es ]
+  ppPrec p (UILoc loc)        = ppPrec p loc
+
+instance PP UsbExploitStart where
+  ppPrec _ UsbAutorun             = text "Usb_autorun_activity"
+  ppPrec _ UserClickRogueLinkFile = text "User_click_rogue_link_file_activity"
+  ppPrec p (UELoc loc)            = ppPrec p loc
 
 instance PP Expansion where
   ppPrec p (HostEnumeration he)   = ppPrec p he
@@ -329,3 +356,41 @@ instance PP MaintainCommandControl where
   ppPrec _ ListenCC    = text "Listen_cc_activity"
   ppPrec _ SendCC      = text "Send_cc_activity"
   ppPrec p (MCLoc loc) = ppPrec p loc
+
+instance PP Exfiltration where
+  ppPrec _ (Exfiltration mb b) =
+    case mb of
+      Just a  -> fsep (commas [ pp a, pp b])
+      Nothing -> pp b
+
+instance PP ExfilStaging where
+  ppPrec _ (ExfilStaging a b) =
+    fsep (commas [ pp a, pp b])
+
+instance PP ExfilFormat where
+  ppPrec _ (Compress encrypt)
+    | encrypt   = fsep (commas [ text "Compress_activity", text "Encrypt_activity" ])
+    | otherwise =                text "Compress_activity"
+
+  ppPrec p (EFLoc loc) = ppPrec p loc
+
+instance PP ExfilInfrastructure where
+  ppPrec _ EstablishExfilPoints = text "Establish_exfil_points_activity"
+  ppPrec p (EILoc loc)          = ppPrec p loc
+
+instance PP ExfilExecution where
+  ppPrec _ (ExfilExecution c s) = fsep (commas [ pp c, pp s ])
+
+instance PP ExfilChannel where
+  ppPrec _ ExfilPhysicalMedium = text "Exfil_physical_medium_activity"
+  ppPrec _ HttpPost            = text "Http_post_activity"
+  ppPrec _ Dns                 = text "Dns_activity"
+  ppPrec _ Https               = text "Https_activity"
+  ppPrec _ Ftp                 = text "Ftp_activity"
+  ppPrec _ Ssh                 = text "Ssh_activity"
+  ppPrec p (ECLoc loc)         = ppPrec p loc
+
+instance PP ExfilSocket where
+  ppPrec _ UDP         = text "UDP_activity"
+  ppPrec _ TCP         = text "Http_post_activity"
+  ppPrec p (ESLoc loc) = ppPrec p loc
