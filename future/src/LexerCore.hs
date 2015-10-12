@@ -3,10 +3,11 @@
 module LexerCore where
 
 import Data.Bits (shiftR,(.&.))
-import Data.Char (ord)
+import Data.Char (ord,isDigit)
 import Data.Word (Word8)
 import qualified Data.Text.Lazy as L
 import Numeric (readDec)
+import Data.Time
 
 -- Alex Compatibility ----------------------------------------------------------
 
@@ -88,6 +89,22 @@ number chunk sc =
     [(n, _)] -> (Just (Num n), sc)
     _        -> (Just (Err LexicalError), sc)
 
+-- Time Literal ----------------------------------------------------------------
+
+mkTime :: Action
+mkTime chunk Normal = (Just (Time t), Normal)
+  where
+  t        = UTCTime day diff
+  str      = L.unpack chunk
+  numbers  = map (\x -> if isDigit x then x else ' ') str
+  [y,m,d,hh,mm,ss] = [n | [(n,_)] <- map readDec $ words numbers]
+  day  = fromGregorian (fromIntegral y) (fromIntegral m) (fromIntegral d)
+  diff = picosecondsToDiffTime (fromIntegral hh*psH + fromIntegral mm*psM + fromIntegral ss*psS)
+  psH = 60 * psM
+  psM = 60 * psS
+  psS = 1000000000000
+
+mkTime _ _ = panic "Lexer tried to lex a time from withing a string literal."
 -- String Literals -------------------------------------------------------------
 
 startString :: Action
@@ -124,6 +141,7 @@ data Token = KW Keyword
            | Num Integer
            | String String
            | URI String
+           | Time UTCTime
            | Ident { unIdent :: String }
            | Sym Symbol
            | Eof
@@ -177,8 +195,6 @@ data Symbol = BracketL
             | Colon
             | Hyphen
             | SingleQuote
-            | TimeSymT
-            | TimeSymZ
               deriving (Show,Eq)
 
 data TokenError = LexicalError

@@ -20,7 +20,8 @@ import qualified Data.Text.Lazy as L
   IDENT                 { $$@(Ident {}) }
   NUMLIT                { $$@(Num   {}) }
   STRINGLIT             { $$@(String{}) }
-  URILIT                { $$@(URI{}) }
+  TIME                  { $$@(Time {})  }
+  URILIT                { $$@(URI{})    }
 
   'activity'            { KW KW_Activity        }
   'agent'               { KW KW_Agent           }
@@ -40,8 +41,6 @@ import qualified Data.Text.Lazy as L
   'document'            { KW KW_Document        }
   'endDocument'         { KW KW_EndDocument     }
   'prefix'              { KW KW_Prefix          }
-  'T'                   { Sym TimeSymT     }
-  'Z'                   { Sym TimeSymZ     }
   '%%'                  { Sym Type         }
   '='                   { Sym Assign       }
   ':'                   { Sym Colon        }
@@ -181,9 +180,7 @@ mayIdent
   | ident            { (Nothing, Just $1) }
 
 time :: { Time }
-  : NUMLIT '-' NUMLIT '-' NUMLIT 'T' NUMLIT ':' NUMLIT ':' NUMLIT may('Z')       { mkTime (tokenNum $1) (tokenNum $3) (tokenNum $5) (tokenNum $7) (tokenNum $9) (tokenNum $11) }
-  -- XXX we do not enforce time format entirely, the year/month/day/hour/minute/second values can be out of range
-  -- and the only supported timezone is Zulu.
+  : TIME           { (\(Time t) -> t) $1 }
 
 soattrVals :: { [(Key,Value)] }
   : ',' oattrVals       { $2 }

@@ -15,6 +15,7 @@ import qualified Data.Text.Lazy as T
 
 }
 
+@time           = [0-9]{4}[\-][0-9]{2}[\-][0-9]{2}[T][0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}Z?
 $id_first       = [A-Za-z]
 $id_next        = [A-Zaa-z0-9_\-]
 $digit          = [0-9]
@@ -47,6 +48,7 @@ $bin_digit      = [0-1]
 }
 
 <0> {
+@time                   { mkTime        }
 $white+                 { skip }
 "//" .*                 { skip }
 
@@ -69,8 +71,6 @@ $white+                 { skip }
 "document"              { emit $ KW KW_Document          }
 "endDocument"           { emit $ KW KW_EndDocument       }
 
-"T"                     { emit $ Sym TimeSymT    }
-"Z"                     { emit $ Sym TimeSymZ    }
 "("                     { emit $ Sym ParenL      }
 ")"                     { emit $ Sym ParenR      }
 "["                     { emit $ Sym BracketL    }
@@ -87,7 +87,7 @@ $white+                 { skip }
 \<                      { startURI    }
 
 $id_first $id_next*     { mkIdent }
-$digit+                 { number }
+$digit+                 { number  }
 
 }
 

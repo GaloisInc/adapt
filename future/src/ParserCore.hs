@@ -26,12 +26,6 @@ data Ident = Qualified Text Text
 
 type Time = UTCTime
 
-mkTime y m d hh mm ss = UTCTime (fromGregorian (fromIntegral y) (fromIntegral m) (fromIntegral d)) (picosecondsToDiffTime (fromIntegral hh*psH + fromIntegral mm*psM + fromIntegral ss*psS))
- where
-  psH = 60 * psM
-  psM = 60 * psS
-  psS = 1000000000000
-
 data Expr = Entity Ident KVs
           | Agent Ident KVs
           | RawEntity Ident [Ident] KVs
