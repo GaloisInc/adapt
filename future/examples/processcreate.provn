@@ -15,14 +15,6 @@ prefix dc <http://purl.org/dc/elements/1.1/>
 // Nepomuk file ontology
 prefix nfo <http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/>
 
-/* 
-	example:
-	simplified trace for a process running executable file /users/dwa/mystuff/bin/create.exe as follows:
-	   	intmain (void){ //fork example
-     	char *arg[] = { ”/users/dwa/mystuff/bin/newprog.exe", 0 }; 
-     	if (fork() == 0) {execv(arg[0], arg);} 
-     	} 
-*/
 
 // we use the namespace “ex” for UUIDs in our example
 // the parent process – only the activity portion carries additional attributes in order to save space
@@ -134,13 +126,6 @@ wasAssociatedWith(ex:childB, ex:childA, -)
 // parent creates the child via the fork in create.exe 
 wasStartedBy(ex:childB, -, ex:parentb, -, [prov:startedAtTime="2015-10-01T16:00:01"]) 
 
-/*
-	other possible operations between processes, unused in this example
-	wasEndedBy(ex:web1; ex:childB, ex:parentb, -, -)
-	wasInformedBy(ex:inf1; ex:childB, ex:parentb, [
-			prov:atTime="2015-10-01T16:00:01",
-			adapt:execOp="clone"])
-*/
 
 // forked child executes newprog.exe 
 used(ex:childB, ex:newprogExe, -, [
@@ -152,7 +137,7 @@ used(ex:childB, ex:newprogExe, -, [
 // a GPS sensor artifact
 entity(ex:GPSunit, [
 			adapt:devType="GPS",
-			adapt:devID="Default GPS sensor")] 
+			adapt:devID="Default GPS sensor"]) 
 
 // forked child uses the GPS sensor
 used(ex:childB, ex:GPSunit, -, [
@@ -174,4 +159,4 @@ actedOnBehalfOf(ex:parenta, ex:externalAgent, ex:parentb)
 // the parent process was also associated with this remote agent
 wasAssociatedWith(ex:parentb, ex:externalAgent, -)
 
-end document 
+endDocument 
