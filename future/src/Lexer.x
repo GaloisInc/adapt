@@ -39,6 +39,7 @@ $bin_digit      = [0-1]
 <string> {
 @strPart                { addString      }
 \\n                     { litString "\n" }
+\\\"                    { litString "\"" }
 \"                      { mkString       }
 \\                      { litString "\\" }
 }
