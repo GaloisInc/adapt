@@ -71,6 +71,7 @@ $white+                 { skip }
 "isPartOf"              { emit $ KW KW_IsPartOf          }
 "document"              { emit $ KW KW_Document          }
 "endDocument"           { emit $ KW KW_EndDocument       }
+"end" $white+ "document"          { emit $ KW KW_EndDocument       }
 
 "("                     { emit $ Sym ParenL      }
 ")"                     { emit $ Sym ParenR      }
