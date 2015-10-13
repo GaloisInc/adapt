@@ -26,7 +26,7 @@ $bin_digit      = [0-1]
 @uriPart        = [^\\\>]+
 @strPart        = [^\\\"]+
 @str1Part       = [^\\\']+
-@junk           = .+ | $white+ | [\n]
+@junk           = . | $white+ | [\n]
 
 :-
 
@@ -46,7 +46,8 @@ $bin_digit      = [0-1]
 
 
 <mlc> {
-"*/"                     { endComment}
+"/*"                     { startComment }
+"*/"                     { endComment }
 @junk                    { skip }
 }
 
@@ -90,7 +91,7 @@ $white+                 { skip }
 
 \"                      { startString }
 \<                      { startURI    }
-\/\*                    { startComment }
+"/*"                    { startComment }
 
 @time                   { mkTime  }
 $id_first $id_next*     { mkIdent }
@@ -101,7 +102,7 @@ $digit+                 { number  }
 {
 
 stateToInt :: LexState -> Int
-stateToInt Normal      = 0
+stateToInt Normal       = 0
 stateToInt (InString _) = string
 stateToInt InURI     {} = uri
 stateToInt InComment {} = mlc
@@ -124,5 +125,6 @@ primLexer = loop Normal . initialInput
                     Normal       -> [Eof]
                     InString s   -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
                     InURI    s   -> panic $ "Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s
+                    InComment _  -> panic $ "Unexpected end of file: non-terminated comment."
 
 }
