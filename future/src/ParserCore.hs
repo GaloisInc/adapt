@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 
 module ParserCore where
 
@@ -7,6 +8,7 @@ import LexerCore
 import Lexer
 
 import           Control.Applicative (Applicative)
+import           Data.Data
 import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
 import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
@@ -16,14 +18,25 @@ import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 import           Network.URI (URI)
 
 data Prov = Prov [Prefix] [Expr]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show,Data)
 
 data Prefix = Prefix Ident URI
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,Data)
 
 data Ident = Qualified Text Text
            | Unqualified Text
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,Data)
+
+domain :: Ident -> Maybe Text
+domain (Qualified t _ ) = Just t
+domain _                = Nothing
+
+local  :: Ident -> Text
+local (Qualified _ t) = t
+local (Unqualified t) = t
+
+mkIdent :: URI -> Text -> Ident
+mkIdent d l = Qualified (L.pack (show d)) l
 
 textOfIdent :: Ident -> Text
 textOfIdent (Qualified a b) = a <> ":" <> b
@@ -47,7 +60,7 @@ data Expr = Entity Ident KVs
           | WasInvalidatedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
           | IsPartOf Ident Ident
           | Description Ident KVs
-      deriving (Eq,Ord,Show)
+      deriving (Eq,Ord,Show,Data)
 
 type KVs   = [(Key,Value)]
 type Key   = Ident
@@ -56,7 +69,7 @@ data Value = ValString Text
            | ValIdent Ident
            | ValTypedLit Text Ident
            | ValTime Time
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,Data)
 
 
 newtype Parser a = Parser

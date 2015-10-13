@@ -150,6 +150,8 @@ usage           :: { Expr }
 
 start           :: { Expr }
   : 'wasStartedBy' '(' mayIdent ',' may(ident) ',' may(ident) ',' may(time) soattrVals ')' {  WasStartedBy (fst $3) (snd $3) $5 $7 $9 $10 }
+  | 'wasStartedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')' {  WasStartedBy (fst $3) (snd $3) Nothing $5 $7 $8 }
+  -- ^^^: XXX not part of the spec, but again, common in use.  This is reduce-reduce conflict #3.
   | 'wasStartedBy' '(' mayIdent soattrVals ')'                                             {  WasStartedBy (fst $3) (snd $3) Nothing Nothing Nothing $4 }
 
 end             :: { Expr }
