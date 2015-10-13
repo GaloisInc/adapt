@@ -62,7 +62,7 @@ alexInputPrevChar = aiChar
 -- Lexer Actions ---------------------------------------------------------------
 
 data LexState = Normal
-              | InString String
+              | InString  Char String
               | InURI String
 
 type Action = L.Text -> LexState -> (Maybe Token, LexState)
@@ -87,7 +87,7 @@ number :: Action
 number chunk sc =
   case readDec (L.unpack chunk) of
     [(n, _)] -> (Just (Num n), sc)
-    _        -> (Just (Err LexicalError), sc)
+    _        -> (Just (Err $ LexicalError "Could not decode number."), sc)
 
 -- Time Literal ----------------------------------------------------------------
 
@@ -107,20 +107,20 @@ mkTime chunk Normal = (Just (Time t), Normal)
 mkTime _ _ = panic "Lexer tried to lex a time from withing a string literal."
 -- String Literals -------------------------------------------------------------
 
-startString :: Action
-startString _ _ = (Nothing, InString "")
+startString :: Char -> Action
+startString term _ _ = (Nothing, InString term "")
 
 -- | Discard the chunk, and use this string instead.
 litString :: String -> Action
-litString lit _ (InString str) = (Nothing, InString (str ++ lit))
+litString lit _ (InString t str) = (Nothing, InString t (str ++ lit))
 litString _   _ _              = panic "Lexer expected string literal state"
 
 addString :: Action
-addString chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
+addString chunk (InString t str) = (Nothing, InString t (str ++ L.unpack chunk))
 addString _     _              = panic "Lexer expected string literal state"
 
 mkString :: Action
-mkString _ (InString str) = (Just (String str ), Normal)
+mkString _ (InString _ str) = (Just (String str), Normal)
 mkString _ _              = panic "Lexer expected string literal state"
 
 startURI :: Action
@@ -174,7 +174,9 @@ data Keyword = KW_Activity
              | KW_WasInformedBy
              | KW_WasGeneratedBy
              | KW_WasDerivedFrom
+             | KW_ActedOnBehalfOf
              | KW_WasAttributedTo
+             | KW_WasInvalidatedBy
              | KW_Description
              | KW_IsPartOf
              | KW_Document
@@ -197,9 +199,9 @@ data Symbol = BracketL
             | SingleQuote
               deriving (Show,Eq)
 
-data TokenError = LexicalError
+data TokenError = LexicalError String
                   deriving (Show,Eq)
 
 descTokenError :: TokenError -> String
 descTokenError e = case e of
-  LexicalError -> "lexical error"
+  LexicalError s -> "lexical error: " ++ s

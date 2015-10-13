@@ -25,13 +25,13 @@ $bin_digit      = [0-1]
 
 @uriPart        = [^\\\>]+
 @strPart        = [^\\\"]+
-@str1Part       = [^\\\"]+
+@str1Part       = [^\\\']+
 
 :-
 
 <uri> {
 @uriPart                { addURI }
-\\n                     { \_ _ -> (Just (Err LexicalError), Normal) }
+\\n                     { \_ _ -> (Just (Err $ LexicalError "Lexer: Newline in uri."), Normal) }
 >                       { mkURI         }
 }
 
@@ -58,6 +58,7 @@ $white+                 { skip }
 "resource"              { emit $ KW KW_Resource          }
 "wasAssociatedWith"     { emit $ KW KW_WasAssociatedWith }
 "wasDerivedFrom"        { emit $ KW KW_WasDerivedFrom    }
+"actedOnBehalfOf"       { emit $ KW KW_ActedOnBehalfOf   }
 "wasAttributedTo"       { emit $ KW KW_WasAttributedTo   }
 "wasInformedBy"         { emit $ KW KW_WasInformedBy     }
 "entity"                { emit $ KW KW_Entity            }
@@ -65,6 +66,7 @@ $white+                 { skip }
 "wasStartedBy"          { emit $ KW KW_WasStartedBy      }
 "wasEndedBy"            { emit $ KW KW_WasEndedBy        }
 "wasGeneratedBy"        { emit $ KW KW_WasGeneratedBy    }
+"wasInvalidatedBy"      { emit $ KW KW_WasInvalidatedBy  }
 "description"           { emit $ KW KW_Description       }
 "isPartOf"              { emit $ KW KW_IsPartOf          }
 "document"              { emit $ KW KW_Document          }
@@ -78,11 +80,12 @@ $white+                 { skip }
 "="                     { emit $ Sym Assign      }
 "%%"                    { emit $ Sym Type        }
 ":"                     { emit $ Sym Colon       }
+";"                     { emit $ Sym Semi        }
 "-"                     { emit $ Sym Hyphen      }
 "."                     { emit $ Sym Period      }
-"'"                     { emit $ Sym SingleQuote }
 
-\"                      { startString }
+\"                      { startString '"' }
+\'                      { startString '\'' }
 \<                      { startURI    }
 
 @time                   { mkTime  }
@@ -95,7 +98,8 @@ $digit+                 { number  }
 
 stateToInt :: LexState -> Int
 stateToInt Normal      = 0
-stateToInt InString {} = string
+stateToInt (InString t _) | t == '"'  = string
+                          | otherwise = string1
 stateToInt InURI    {} = uri
 
 primLexer :: T.Text -> [Token]
@@ -110,11 +114,11 @@ primLexer = loop Normal . initialInput
                 rest     = loop sc' ai'
             in maybe rest (:rest) mb
         AlexSkip ai' _            -> loop sc ai'
-        AlexError  _              -> [Err LexicalError]
+        AlexError  x              -> [Err $ LexicalError (show (aiChar x, aiBytes x))]
         AlexEOF                   ->
                 case sc of
-                    Normal     -> [Eof]
-                    InString s -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
-                    InURI    s -> panic $ "Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s
+                    Normal       -> [Eof]
+                    InString _ s -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
+                    InURI    s   -> panic $ "Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s
 
 }

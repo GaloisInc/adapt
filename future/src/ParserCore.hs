@@ -30,14 +30,16 @@ data Expr = Entity Ident KVs
           | Agent Ident KVs
           | RawEntity Ident [Ident] KVs
           | Activity Ident (Maybe Time) (Maybe Time) KVs
-          | WasGeneratedBy (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | Used (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | WasStartedBy (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | WasEndedBy (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | WasInformedBy (Maybe Ident) (Maybe Ident) (Maybe Ident) KVs
-          | WasAssociatedWith (Maybe Ident) (Maybe Ident) (Maybe Ident) (Maybe Ident) KVs
-          | WasDerivedFrom (Maybe Ident) (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) (Maybe Ident) KVs
-          | WasAttributedTo (Maybe Ident) (Maybe Ident) Ident KVs
+          | WasGeneratedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
+          | Used (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
+          | WasStartedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
+          | WasEndedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
+          | WasInformedBy (Maybe Ident) Ident (Maybe Ident) KVs
+          | WasAssociatedWith (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) KVs
+          | WasDerivedFrom (Maybe Ident) Ident Ident (Maybe Ident) (Maybe Ident) (Maybe Ident) KVs
+          | ActedOnBehalfOf (Maybe Ident) Ident Ident (Maybe Ident) KVs
+          | WasAttributedTo (Maybe Ident) Ident Ident KVs
+          | WasInvalidatedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
           | IsPartOf Ident Ident
           | Description Ident KVs
       deriving (Eq,Ord,Show)

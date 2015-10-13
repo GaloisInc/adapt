@@ -5,13 +5,17 @@
 -- happy parsers produce a lot of warnings
 {-# OPTIONS_GHC -w #-}
 
-module Parser (parseProv, runParser) where
+module Parser ( parseProvN, parseProvNFile
+              -- * Lower level
+              , parseProv, runParser) where
 
 import ParserCore
 import LexerCore
 import Data.Monoid ( mempty, mappend, mconcat )
 import qualified Network.URI as URI
 import qualified Data.Text.Lazy as L
+import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy.IO as L
 
 }
 
@@ -28,19 +32,21 @@ import qualified Data.Text.Lazy as L
 --  'artifact'            { KW KW_Artifact        }  XXX An entity with prov:type=tc:artifact
 --  'resource'            { KW KW_Resource        }  XXX An entity with a 'devType' property
   'wasAssociatedWith'   { KW KW_WasAssociatedWith       }
-  'entity'              { KW KW_Entity          }
-  'used'                { KW KW_Used            }
-  'wasStartedBy'        { KW KW_WasStartedBy    }
-  'wasGeneratedBy'      { KW KW_WasGeneratedBy  }
-  'wasEndedBy'          { KW KW_WasEndedBy      }
-  'wasInformedBy'       { KW KW_WasInformedBy   }
-  'wasAttributedTo'     { KW KW_WasAttributedTo }
-  'wasDerivedFrom'      { KW KW_WasDerivedFrom  }
-  'description'         { KW KW_Description     }
-  'isPartOf'            { KW KW_IsPartOf        }
-  'document'            { KW KW_Document        }
-  'endDocument'         { KW KW_EndDocument     }
-  'prefix'              { KW KW_Prefix          }
+  'entity'              { KW KW_Entity           }
+  'used'                { KW KW_Used             }
+  'wasStartedBy'        { KW KW_WasStartedBy     }
+  'wasGeneratedBy'      { KW KW_WasGeneratedBy   }
+  'wasEndedBy'          { KW KW_WasEndedBy       }
+  'wasInformedBy'       { KW KW_WasInformedBy    }
+  'wasAttributedTo'     { KW KW_WasAttributedTo  }
+  'wasDerivedFrom'      { KW KW_WasDerivedFrom   }
+  'actedOnBehalfOf'     { KW KW_ActedOnBehalfOf  }
+  'wasInvalidatedBy'    { KW KW_WasInvalidatedBy }
+  'description'         { KW KW_Description      }
+  'isPartOf'            { KW KW_IsPartOf         }
+  'document'            { KW KW_Document         }
+  'endDocument'         { KW KW_EndDocument      }
+  'prefix'              { KW KW_Prefix           }
   '%%'                  { Sym Type         }
   '='                   { Sym Assign       }
   ':'                   { Sym Colon        }
@@ -71,6 +77,7 @@ import qualified Data.Text.Lazy as L
 -- Names  ---------------------------------------------------------------------
 ident :: { Ident }
   : IDENT ':' IDENT     { Qualified (L.pack $ unIdent $1) (L.pack $ unIdent $3) }
+  | ':' IDENT           { Unqualified (L.pack $ unIdent $2)  }
   | IDENT               { Unqualified (L.pack $ unIdent $1)  }
 
 -- Prov-O ---------------------------------------------------------------------
@@ -96,12 +103,12 @@ provExpr :: { Expr }
   | usage            { $1 }
   | start            { $1 }
   | end              { $1 }
---  | invalidation   { $1 }
+  | invalidation   { $1 }
   | communication    { $1 }
   | agent            { $1 }
   | association      { $1 }
   | attribution      { $1 }
---  | delegation     { $1 }
+  | delegation     { $1 }
   | derivation       { $1 }
 --  | influence      { $1 }
 --  | alternate      { $1 }
@@ -158,6 +165,14 @@ association     :: { Expr }
 attribution     :: { Expr }
   : 'wasAttributedTo' '(' mayIdent ',' ident soattrVals ')' { WasAttributedTo (fst $3) (snd $3) $5 $6 }
 
+invalidation    :: { Expr }
+  : 'wasInvalidatedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')'         { WasInvalidatedBy (fst $3) (snd $3) $5 $7 $8 }
+  | 'wasInvalidatedBy' '(' mayIdent ',' soattrVals ')'                                  { WasInvalidatedBy (fst $3) (snd $3) Nothing Nothing $5 }
+
+delegation      :: { Expr }
+  : 'actedOnBehalfOf' '(' mayIdent ',' ident ',' may(ident) soattrVals ')'      { ActedOnBehalfOf (fst $3) (snd $3)  $5 $7 $8      }
+  | 'actedOnBehalfOf' '(' mayIdent ',' ident     soattrVals ')'                 { ActedOnBehalfOf (fst $3) (snd $3)  $5 Nothing $6 }
+
 derivation      :: { Expr }
   : 'wasDerivedFrom' '(' mayIdent ',' ident ',' may(ident) ',' may(ident) ',' may(ident) soattrVals ')' {  WasDerivedFrom (fst $3) (snd $3) $5 $7 $9 $11 $12 }
   | 'wasDerivedFrom' '(' mayIdent ',' ident soattrVals ')'                                              {  WasDerivedFrom (fst $3) (snd $3) $5 Nothing Nothing Nothing $6 }
@@ -175,15 +190,16 @@ may(p)
 
 -- Typical for optional identifiers
 mayIdent
-  : '-' ';' ident    { (Nothing, Just $3) }
-  | ident ';' ident  { (Just $1, Just $3) }
-  | ident            { (Nothing, Just $1) }
+  : '-' ';' ident    { (Nothing, $3) }
+  | ident ';' ident  { (Just $1, $3) }
+  | ident            { (Nothing, $1) }
 
 time :: { Time }
   : TIME           { (\(Time t) -> t) $1 }
 
 soattrVals :: { [(Key,Value)] }
   : ',' oattrVals       { $2 }
+  | ',' '-'             { [] {- XXX the Prov-N spec does not acknowledge this, but validators say OK -} }
   | {- empty -}         { [] }
 
 oattrVals :: { [(Key,Value)] }
@@ -200,7 +216,7 @@ literal :: { Value }
   | STRINGLIT '%%' ident        { ValTypedLit (tokenText $1) $3       }
   | NUMLIT                      { ValNum (tokenNum $1)                }
   | '-' NUMLIT                  { ValNum (negate $ tokenNum $1)       }
-  | '\'' ident '\''             { ValIdent $2                         }
+  -- XXX this will be lexed as a stringlit | '\'' ident '\''             { ValIdent $2                         }
 
 -- Utilities -------------------------------------------------------------------
 
@@ -228,5 +244,11 @@ sep1_body(punc,p)
   | p                        { [$1]    }
 
 {
+
+parseProvN:: Text -> Either ParseError Prov
+parseProvN txt = runParser txt parseProv
+
+parseProvNFile :: FilePath -> IO (Either ParseError Prov)
+parseProvNFile fp = parseProvN <$> L.readFile fp
 
 }
