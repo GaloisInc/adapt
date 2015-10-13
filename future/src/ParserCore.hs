@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
 module ParserCore where
 
@@ -8,7 +9,7 @@ import Lexer
 import           Control.Applicative (Applicative)
 import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
 import           Data.List ( nub )
-import           Data.Monoid (mconcat)
+import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
@@ -23,6 +24,10 @@ data Prefix = Prefix Ident URI
 data Ident = Qualified Text Text
            | Unqualified Text
   deriving (Eq,Ord,Show)
+
+textOfIdent :: Ident -> Text
+textOfIdent (Qualified a b) = a <> ":" <> b
+textOfIdent (Unqualified b) = b
 
 type Time = UTCTime
 
@@ -50,6 +55,7 @@ data Value = ValString Text
            | ValNum    Integer
            | ValIdent Ident
            | ValTypedLit Text Ident
+           | ValTime Time
   deriving (Eq,Ord,Show)
 
 

@@ -3,7 +3,7 @@
 module LexerCore where
 
 import Data.Bits (shiftR,(.&.))
-import Data.Char (ord,isDigit)
+import Data.Char (ord,isDigit,toLower)
 import Data.Word (Word8)
 import qualified Data.Text.Lazy as L
 import Numeric (readDec)
@@ -62,7 +62,7 @@ alexInputPrevChar = aiChar
 -- Lexer Actions ---------------------------------------------------------------
 
 data LexState = Normal
-              | InString  Char String
+              | InString String
               | InURI String
               | InComment Int
               deriving (Show)
@@ -99,12 +99,18 @@ mkTime chunk Normal = (Just (Time t), Normal)
   t        = UTCTime day diff
   str      = L.unpack chunk
   numbers  = map (\x -> if isDigit x then x else ' ') str
-  [y,m,d,hh,mm,ss] = [n | [(n,_)] <- map readDec $ words numbers]
-  day  = fromGregorian (fromIntegral y) (fromIntegral m) (fromIntegral d)
-  diff = picosecondsToDiffTime (fromIntegral hh*psH + fromIntegral mm*psM + fromIntegral ss*psS)
-  psH = 60 * psM
-  psM = 60 * psS
+  [y,m,d,hh,mm,ss] = words numbers -- Total because of alex regexp
+  psH = psM * 60
+
+  day  = fromGregorian (readD y) (readD m) (readD d)
+  diff = picosecondsToDiffTime ps
+
+  ps   = psH * readD hh + psM * readD mm + floor (psS * readD ss)
+  psM = psS * 60
+  psS :: Num a => a
   psS = 1000000000000
+
+  readD x = let ((n,_):_) = readDec x in n
 
 mkTime _ _ = panic "Lexer tried to lex a time from withing a string literal."
 
@@ -121,20 +127,20 @@ endComment _ (InComment n)
 
 -- String Literals -------------------------------------------------------------
 
-startString :: Char -> Action
-startString term _ _ = (Nothing, InString term "")
+startString :: Action
+startString _ _ = (Nothing, InString "")
 
 -- | Discard the chunk, and use this string instead.
 litString :: String -> Action
-litString lit _ (InString t str) = (Nothing, InString t (str ++ lit))
+litString lit _ (InString str) = (Nothing, InString (str ++ lit))
 litString _   _ _              = panic "Lexer expected string literal state"
 
 addString :: Action
-addString chunk (InString t str) = (Nothing, InString t (str ++ L.unpack chunk))
+addString chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
 addString _     _              = panic "Lexer expected string literal state"
 
 mkString :: Action
-mkString _ (InString _ str) = (Just (String str), Normal)
+mkString _ (InString str) = (Just (String str), Normal)
 mkString _ _              = panic "Lexer expected string literal state"
 
 startURI :: Action
@@ -178,7 +184,6 @@ data Virt = VOpen
 
 data Keyword = KW_Activity
              | KW_Agent
-             | KW_Artifact
              | KW_Resource
              | KW_WasAssociatedWith
              | KW_Entity
@@ -197,6 +202,11 @@ data Keyword = KW_Activity
              | KW_EndDocument
              | KW_Prefix
                deriving (Show,Eq)
+
+wordOfKeyword :: Keyword -> String
+wordOfKeyword kw =
+  let (x:xs) = drop 3 (show kw)
+  in toLower x : xs
 
 data Symbol = BracketL
             | BracketR

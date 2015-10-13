@@ -3,6 +3,7 @@
 {
 
 -- happy parsers produce a lot of warnings
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -w #-}
 
 module Parser ( parseProvN, parseProvNFile
@@ -60,10 +61,11 @@ import qualified Data.Text.Lazy.IO as L
 
   '-'                   { Sym Hyphen   }
   ';'                   { Sym Semi         }
+  'sq'                  { Sym SingleQuote  }
 
---  '_'                   { Sym Underscore   }
---  '{'                   { Sym BraceL       }
---  '}'                   { Sym BraceR       }
+--  '_'                 { Sym Underscore   }
+--  '{'                 { Sym BraceL       }
+--  '}'                 { Sym BraceR       }
 
 
 %name parseProv prov
@@ -79,6 +81,9 @@ ident :: { Ident }
   : IDENT ':' IDENT     { Qualified (L.pack $ unIdent $1) (L.pack $ unIdent $3) }
   | ':' IDENT           { Unqualified (L.pack $ unIdent $2)  }
   | IDENT               { Unqualified (L.pack $ unIdent $1)  }
+  -- XXX we should capture all possible prefixed keywords
+  -- so add a 'allKeywords :: { Text } case if this comes up again.
+  | IDENT ':' 'description'  { Qualified (L.pack $ unIdent $1) "description" }
 
 -- Prov-O ---------------------------------------------------------------------
 
@@ -121,10 +126,7 @@ dcExpr :: { Expr }
   | description { $1 }
 
 rawExpr :: { Expr }
-  : ident '(' args soattrVals ')' {  RawEntity $1 $3 $4 }
-
-args :: { [ Ident ] }
-  : sep(',', ident)      { $1 }
+  : ident '(' args(',', ident) soattrVals ')' {  RawEntity $1 $3 $4 }
 
 -- Prov Exprs ------------------------------------------------------------------
 
@@ -137,6 +139,9 @@ activity        :: { Expr }
 
 generation      :: { Expr }
   : 'wasGeneratedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')' {  WasGeneratedBy (fst $3) (snd $3) $5 $7 $8 }
+  | 'wasGeneratedBy' '(' mayIdent ',' may(ident) soattrVals ')' {  WasGeneratedBy (fst $3) (snd $3) $5 Nothing $6 }
+    -- ^^^ Omitting the marker on time is not to spec, but the examples suggest the spec is wrong.
+    -- XXX this causes a 2nd reduce-reduce conflict that didn't exist in a straight-forward spec impl.
   | 'wasGeneratedBy' '(' mayIdent soattrVals ')'                              {  WasGeneratedBy (fst $3) (snd $3) Nothing Nothing $4 }
 
 usage           :: { Expr }
@@ -199,7 +204,8 @@ time :: { Time }
 
 soattrVals :: { [(Key,Value)] }
   : ',' oattrVals       { $2 }
-  | ',' '-'             { [] {- XXX the Prov-N spec does not acknowledge this, but validators say OK -} }
+  | ',' '-'             { [] {- XXX the Prov-N spec does not acknowledge this -} }
+  -- ^^^ the above causes reduce-reduce conflicts. Twice over.  I think it's harmless.
   | {- empty -}         { [] }
 
 oattrVals :: { [(Key,Value)] }
@@ -216,7 +222,9 @@ literal :: { Value }
   | STRINGLIT '%%' ident        { ValTypedLit (tokenText $1) $3       }
   | NUMLIT                      { ValNum (tokenNum $1)                }
   | '-' NUMLIT                  { ValNum (negate $ tokenNum $1)       }
-  -- XXX this will be lexed as a stringlit | '\'' ident '\''             { ValIdent $2                         }
+  | 'sq' ident 'sq'             { ValIdent $2                         }
+  | ident                       { ValIdent $1 {- not in spec, see above -} }
+  | time                        { ValTime $1      {- not in spec -}   }
 
 -- Utilities -------------------------------------------------------------------
 
@@ -231,7 +239,6 @@ list1_body(p)
   : list1_body(p) p { $2 : $1 }
   | p               { [$1]    }
 
-
 sep(punc,p)
   : sep1(punc,p) { $1 }
   | {- empty -}  { [] }
@@ -242,6 +249,10 @@ sep1(punc,p)
 sep1_body(punc,p)
   : sep1_body(punc,p) punc p { $3 : $1 }
   | p                        { [$1]    }
+
+args(punc,p)
+  : p                           { [$1] }
+  | args(punc,p) punc p         { $3 : $1 }
 
 {
 

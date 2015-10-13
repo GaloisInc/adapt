@@ -15,7 +15,7 @@ import qualified Data.Text.Lazy as T
 
 }
 
-@time           = [0-9]{4}[\-][0-9]{2}[\-][0-9]{2}[T][0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}Z?
+@time           = [0-9]{4}[\-][0-9]{2}[\-][0-9]{2}[T][0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}(\.[0-9]{1,9})?Z?
 $id_first       = [A-Za-z]
 $id_next        = [A-Zaa-z0-9_\-]
 $digit          = [0-9]
@@ -40,13 +40,9 @@ $bin_digit      = [0-1]
 @strPart                { addString      }
 \\n                     { litString "\n" }
 \"                      { mkString       }
+\\                      { litString "\\" }
 }
 
-<string1> {
-@str1Part               { addString      }
-\\n                     { litString "\n" }
-\'                      { mkString       }
-}
 
 <mlc> {
 "*/"                     { endComment}
@@ -60,7 +56,6 @@ $white+                 { skip }
 "prefix"                { emit $ KW KW_Prefix            }
 "activity"              { emit $ KW KW_Activity          }
 "agent"                 { emit $ KW KW_Agent             }
-"artifact"              { emit $ KW KW_Artifact          }
 "resource"              { emit $ KW KW_Resource          }
 "wasAssociatedWith"     { emit $ KW KW_WasAssociatedWith }
 "wasDerivedFrom"        { emit $ KW KW_WasDerivedFrom    }
@@ -90,9 +85,9 @@ $white+                 { skip }
 ";"                     { emit $ Sym Semi        }
 "-"                     { emit $ Sym Hyphen      }
 "."                     { emit $ Sym Period      }
+"'"                     { emit $ Sym SingleQuote }
 
-\"                      { startString '"' }
-\'                      { startString '\'' }
+\"                      { startString }
 \<                      { startURI    }
 \/\*                    { startComment }
 
@@ -106,8 +101,7 @@ $digit+                 { number  }
 
 stateToInt :: LexState -> Int
 stateToInt Normal      = 0
-stateToInt (InString t _) | t == '"'  = string
-                          | otherwise = string1
+stateToInt (InString _) = string
 stateToInt InURI     {} = uri
 stateToInt InComment {} = mlc
 
@@ -127,7 +121,7 @@ primLexer = loop Normal . initialInput
         AlexEOF                   ->
                 case sc of
                     Normal       -> [Eof]
-                    InString _ s -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
+                    InString s   -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
                     InURI    s   -> panic $ "Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s
 
 }
