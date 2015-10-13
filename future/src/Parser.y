@@ -53,7 +53,7 @@ import qualified Data.Text.Lazy.IO as L
   ','                   { Sym Comma        }
   '('                   { Sym ParenL       }
   ')'                   { Sym ParenR       }
-  '\''                  { Sym SingleQuote  }
+-- XXX see 'ident' '\''                  { Sym SingleQuote  }
 
   '['                   { Sym BracketL     }
   ']'                   { Sym BracketR     }

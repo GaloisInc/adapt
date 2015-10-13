@@ -26,6 +26,7 @@ $bin_digit      = [0-1]
 @uriPart        = [^\\\>]+
 @strPart        = [^\\\"]+
 @str1Part       = [^\\\']+
+@junk           = .+ | $white+ | [\n]
 
 :-
 
@@ -45,6 +46,11 @@ $bin_digit      = [0-1]
 @str1Part               { addString      }
 \\n                     { litString "\n" }
 \'                      { mkString       }
+}
+
+<mlc> {
+"*/"                     { endComment}
+@junk                    { skip }
 }
 
 <0> {
@@ -88,6 +94,7 @@ $white+                 { skip }
 \"                      { startString '"' }
 \'                      { startString '\'' }
 \<                      { startURI    }
+\/\*                    { startComment }
 
 @time                   { mkTime  }
 $id_first $id_next*     { mkIdent }
@@ -101,7 +108,8 @@ stateToInt :: LexState -> Int
 stateToInt Normal      = 0
 stateToInt (InString t _) | t == '"'  = string
                           | otherwise = string1
-stateToInt InURI    {} = uri
+stateToInt InURI     {} = uri
+stateToInt InComment {} = mlc
 
 primLexer :: T.Text -> [Token]
 primLexer = loop Normal . initialInput
@@ -115,7 +123,7 @@ primLexer = loop Normal . initialInput
                 rest     = loop sc' ai'
             in maybe rest (:rest) mb
         AlexSkip ai' _            -> loop sc ai'
-        AlexError  x              -> [Err $ LexicalError (show (aiChar x, aiBytes x))]
+        AlexError  x              -> [Err $ LexicalError (show (sc, aiChar x, aiBytes x))]
         AlexEOF                   ->
                 case sc of
                     Normal       -> [Eof]

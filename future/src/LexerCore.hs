@@ -64,6 +64,8 @@ alexInputPrevChar = aiChar
 data LexState = Normal
               | InString  Char String
               | InURI String
+              | InComment Int
+              deriving (Show)
 
 type Action = L.Text -> LexState -> (Maybe Token, LexState)
 
@@ -105,6 +107,18 @@ mkTime chunk Normal = (Just (Time t), Normal)
   psS = 1000000000000
 
 mkTime _ _ = panic "Lexer tried to lex a time from withing a string literal."
+
+-- Multi-Line Comments ---------------------------------------------------------
+
+startComment :: Action
+startComment _ (InComment n) = (Nothing, InComment (n+1))
+startComment _ _             = (Nothing, InComment 1)
+
+endComment :: Action
+endComment _ (InComment n)
+  | n <= 1    = (Nothing, Normal)
+  | otherwise = (Nothing, InComment (n-1))
+
 -- String Literals -------------------------------------------------------------
 
 startString :: Char -> Action
