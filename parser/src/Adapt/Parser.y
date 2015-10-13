@@ -280,7 +280,9 @@ exfil_socket :: { ExfilSocket }
 -- External Interface-----------------------------------------------------------
 
 parseDecls :: String -> L.Text -> Either Error [Decl]
-parseDecls source bytes = runParseM (primLexer source bytes) decls
+parseDecls source bytes = runParseM (primLexer source bytes) $
+  do ds <- decls
+     return (reverse ds)
 
 
 -- Parser Internals ------------------------------------------------------------
