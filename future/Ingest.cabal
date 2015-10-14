@@ -3,8 +3,9 @@
 
 name:                Ingest
 version:             0.1.0.0
--- synopsis:            
+synopsis:            Ingester for team Adapt, TransparentComputing.
 -- description:         
+homepage:            github.com/GaloisInc/Adapt-Ingest.git
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
@@ -12,18 +13,14 @@ maintainer:          tommd@galois.com
 -- copyright:           
 category:            Language
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Graph, Ingest, Types, Parser, Compile, Typecheck
+  exposed-modules:     Graph, Ingest, Lexer, LexerCore, Namespaces, Parser, ParserCore, Translate, Typecheck, Types
   -- other-modules:       
-  other-extensions:    RecordWildCards, DeriveDataTypeable, OverloadedStrings, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, ViewPatterns
-  build-depends:       base >=4.7 && <4.9,
-                       containers >=0.5 && <0.6,
-                       text >=1.2 && <1.3,
-                       dotgen >=0.4 && <0.5,
-                       monadLib >=3.7 && <3.8,
-                       attoparsec >=0.12 && <0.14
+  other-extensions:    RecordWildCards, GeneralizedNewtypeDeriving, DeriveDataTypeable, OverloadedStrings, ViewPatterns, MultiParamTypeClasses, PartialTypeSignatures, TypeSynonymInstances, FlexibleInstances
+  build-depends:       base >=4.8 && <4.9, containers >=0.5 && <0.6, text >=1.2 && <1.3, dotgen >=0.4 && <0.5, monadLib >=3.7 && <3.8, time >=1.5 && <1.6, network-uri >=2.6 && <2.7
   hs-source-dirs:      src
+  build-tools:         alex, happy
   default-language:    Haskell2010
