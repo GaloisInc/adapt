@@ -96,25 +96,28 @@ number chunk sc =
 -- Time Literal ----------------------------------------------------------------
 
 mkTime :: Action
-mkTime chunk Normal = (Just (Time t), Normal)
+mkTime chunk Normal = (fmap Time (parseUTC chunk), Normal)
+mkTime _     _      = panic "Lexer tried to lex a time from within a string literal."
+
+parseUTC :: L.Text -> Maybe UTCTime
+parseUTC chunk =
+  let str      = L.unpack chunk
+      numbers  = map (\x -> if isDigit x then x else ' ') str
+  in case words numbers of
+      [y,m,d,hh,mm,ss] ->
+        let day  = fromGregorian (readD y) (readD m) (readD d)
+            ps   = psH * readD hh + psM * readD mm + floor (psS * readD ss)
+            diff = picosecondsToDiffTime ps
+        in Just (UTCTime day diff)
+      _ -> Nothing
   where
-  t        = UTCTime day diff
-  str      = L.unpack chunk
-  numbers  = map (\x -> if isDigit x then x else ' ') str
-  [y,m,d,hh,mm,ss] = words numbers -- Total because of alex regexp
   psH = psM * 60
-
-  day  = fromGregorian (readD y) (readD m) (readD d)
-  diff = picosecondsToDiffTime ps
-
-  ps   = psH * readD hh + psM * readD mm + floor (psS * readD ss)
   psM = psS * 60
   psS :: Num a => a
   psS = 1000000000000
 
   readD x = let ((n,_):_) = readDec x in n
 
-mkTime _ _ = panic "Lexer tried to lex a time from withing a string literal."
 
 -- Multi-Line Comments ---------------------------------------------------------
 

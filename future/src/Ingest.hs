@@ -1,4 +1,3 @@
-
 module Ingest
     ( -- * High-level interface
       ingestFile, ingestText

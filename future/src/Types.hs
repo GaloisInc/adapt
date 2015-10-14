@@ -16,9 +16,9 @@ module Types
     , Stmt(..)
     , Entity(..)
     , ModVec(..), UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
-    , Predicate(..) , PredicateAttr(..), PredicateType(..)
+    , Predicate(..) , PredicateAttr(..), PredicateType(..), DevType(..)
     , Version, CoarseLoc, FineLoc
-    , UseOp, GenOp, DeriveOp, ExecOp, PID, ArtifactType, DevType
+    , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
     , Time, EntryPoint
     , Text
     ) where
@@ -41,7 +41,7 @@ import ParserCore (Time)
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Eq, Ord, Show, Data, Typeable)
 data TypeError  = TypeError Type Type | CanNotInferType Text
         deriving (Data, Eq, Ord, Show, Read)
-data TranslateError = TranslateError Text
+data TranslateError = MissingRequiredField (Maybe Text) Text | TranslateError Text
         deriving (Data, Eq, Ord, Show, Read)
 
 instance X.Exception TypeError
@@ -82,11 +82,30 @@ data AgentAttr = AAName Text | AAUser Text | AAMachine MID
   deriving (Data, Eq, Ord, Show)
 
 -- | Attributes of units of execution
-data UoeAttr = UA PID | UARanOn MID | UAStarted Time | UAEnded Time | UAHadPrivs Privs | UAUser Text | UAGroup Text | UAPPID PID | UAMachine MID
+data UoeAttr = UAUser Text
+             | UAPID PID
+             | UAMachine MID
+             | UAStarted Time
+             -- XXX All the below constructors are unused, they lack any
+             -- translation path from ProvN, see Translate.hs
+             | UAEnded Time
+             | UAHadPrivs Privs
+             | UAGroup Text
   deriving (Data, Eq, Ord, Show)
 
 -- | Attributes of Artifacts
-data ArtifactAttr = ArtAType ArtifactType | ArtACoarseLoc CoarseLoc | ArtAFineLoc FineLoc | ArtACreated Time | ArtAVersion Version | ArtADeleted Time | ArtAOwner Text | ArtASize Integer | Taint Word64
+data ArtifactAttr = ArtAType ArtifactType
+                  | ArtARegistryKey Text
+                  -- XXX All the below constructors are unused, they lack
+                  -- any translation path from ProvN, see Translate.hs
+                  | ArtACoarseLoc CoarseLoc
+                  | ArtAFineLoc FineLoc
+                  | ArtACreated Time
+                  | ArtAVersion Version
+                  | ArtADeleted Time
+                  | ArtAOwner Text
+                  | ArtASize Integer
+                  | Taint Word64
   deriving (Data, Eq, Ord, Show)
 
 -- | XXX TBD
@@ -158,11 +177,10 @@ newtype PID       = PID Text  -- XXX consider MID|Word32
   deriving (Data, Eq, Ord, Show)
 
 -- | Type of artifacts
-data ArtifactType = File | Packet  | Memory | Socket
-  deriving (Data, Eq, Ord, Show)
+type ArtifactType = Text
 
 -- | Types of devices
-data DevType      = GPS  | Camera | Keyboard | Accelerometer
+data DevType      = GPS  | Camera | Keyboard | Accelerometer | OtherDev Text
   deriving (Data, Eq, Ord, Show)
 
 -- | Methods of deriving data from a source
@@ -209,6 +227,8 @@ type EntryPoint = Text
 -- the correct type.
 data Type = EntityClass
           | ActorClass
+          | DescribeClass
+          | ResourceClass
           | TyUnitOfExecution
           | TyHost
           | TyAgent

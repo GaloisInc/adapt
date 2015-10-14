@@ -2,11 +2,12 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
-module ParserCore where
+module ParserCore (module ParserCore, Ident(..), textOfIdent) where
 
-import LexerCore
+import LexerCore hiding (mkIdent)
 import Lexer
 
+import           Namespaces
 import           Control.Applicative (Applicative)
 import           Data.Data
 import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
@@ -22,25 +23,6 @@ data Prov = Prov [Prefix] [Expr]
 
 data Prefix = Prefix Ident URI
   deriving (Eq,Ord,Show,Data)
-
-data Ident = Qualified Text Text
-           | Unqualified Text
-  deriving (Eq,Ord,Show,Data)
-
-domain :: Ident -> Maybe Text
-domain (Qualified t _ ) = Just t
-domain _                = Nothing
-
-local  :: Ident -> Text
-local (Qualified _ t) = t
-local (Unqualified t) = t
-
-mkIdent :: URI -> Text -> Ident
-mkIdent d l = Qualified (L.pack (show d)) l
-
-textOfIdent :: Ident -> Text
-textOfIdent (Qualified a b) = a <> ":" <> b
-textOfIdent (Unqualified b) = b
 
 type Time = UTCTime
 
@@ -64,6 +46,7 @@ data Expr = Entity Ident KVs
 
 type KVs   = [(Key,Value)]
 type Key   = Ident
+
 data Value = ValString Text
            | ValNum    Integer
            | ValIdent Ident
@@ -71,6 +54,21 @@ data Value = ValString Text
            | ValTime Time
   deriving (Eq,Ord,Show,Data)
 
+valueString :: Value -> Maybe Text
+valueString (ValString t) = Just t
+valueString _             = Nothing
+
+valueTime :: Value -> Maybe Time
+valueTime (ValTime t) = Just t
+valueTime _           = Nothing
+
+valueIdent :: Value -> Maybe Ident
+valueIdent (ValIdent t) = Just t
+valueIdent _            = Nothing
+
+valueNum :: Value -> Maybe Integer
+valueNum (ValNum t) = Just t
+valueNum _          = Nothing
 
 newtype Parser a = Parser
   { getParser :: StateT RW (ExceptionT ParseError Id) a
