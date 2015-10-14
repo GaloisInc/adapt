@@ -3,134 +3,213 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-
--- | Usage:
---
--- @
--- translate . either error id . typecheck . parseTriples :: Text -> [TypeAnnotatedTriple]
--- @
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 module Types
     ( -- * Types
       Error(..)
     , ParseError(..)
     , TypeError(..)
       -- * Key types
-    , Triple(..)
     , Type(..)
-    , Object(..), Entity, Predicate
-    , Verb(..), IRI(..)
-    , Resource(..)
-      -- * Monomorphic wrappers around 'Triple'
-    , RawTA1(..), TypeAnnotatedTriple(..)
-      -- * Classes
-    , PP(..), render
-      -- * Re-exports
+    , Stmt(..)
+    , Entity(..)
+    , ModVec(..), UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
+    , Predicate(..) , PredicateAttr(..), PredicateType(..)
+    , Version, CoarseLoc, FineLoc
+    , UseOp, GenOp, DeriveOp, ExecOp, PID, ArtifactType, DevType
+    , Time, EntryPoint
     , Text
     ) where
 
 import           Data.Monoid
 import           Data.Data
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Char (toLower)
-import           Data.Text (Text)
-import qualified Data.Text as Text
+import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
+import           Data.Word (Word64)
 import qualified Control.Exception as X
 
-data Error = PE ParseError | TE TypeError deriving (Eq, Ord, Show, Data, Typeable)
+import ParserCore (Time)
 
-data Triple a =
-        Triple { triSubject  :: Entity a
-               , triVerb     :: Predicate a
-               , triObject   :: Entity a }
-            deriving (Eq, Ord, Show, Read)
-
-data Object container tag =
-          Obj { theObject              :: container -- IRI: after '://'.  
-              , objectTag              :: tag
-              }
-            deriving (Eq, Ord, Show, Read)
-
--- IRIs are in the form 'http://some/location', 'cid://computation/identifier', etc.
-data IRI = IRI { namespace :: Text
-               , iriBody   :: Text
-               }
-            deriving (Eq, Ord, Show, Read)
-
-type Entity    a = Object IRI a
-type Predicate a = Object Verb a
-
-newtype RawTA1 = RawTA1 { unRTA :: Triple () }
-            deriving (Eq, Ord, Show, Read)
-
-newtype TypeAnnotatedTriple = TypeAnnotatedTriple { unTAT :: Triple Type }
-            deriving (Eq, Ord, Show, Read)
-
+data Error      = PE String | TE TypeError deriving (Eq, Ord, Show, Data, Typeable)
 data ParseError = ParseFailure String | PartialParse
-            deriving (Eq, Ord, Show, Data, Typeable)
-
---------------------------------------------------------------------------------
---  PrettyPrinting
-
-render :: PP a => [a] -> Text
-render = Text.concat . map pp
-
-class PP a where
-    pp :: a -> Text
-
-instance PP (Triple ()) where
-    pp (Triple s p o) =
-        Text.unwords [ pp s , pp p , pp o , " .\n"]
-
-instance PP (Triple Type) where
-    pp (Triple s p o) =
-        Text.unwords [ pp s , pp p , pp o , " : "
-                     , ty, " .\n" ]
-     where ty = Text.unwords [pp (objectTag s), "->", pp (objectTag o)]
-
-instance PP c => PP (Object c a) where
-    pp (Obj cont _) = pp cont
-
-instance PP IRI where
-   pp (IRI a b) = a <> "://" <> b
-
-instance PP Type where
-    pp (TyArrow a b) = pp a <> " -> " <> pp b
-    pp ty            = Text.pack $ show ty
-
-instance PP Verb where
-    pp v = case show v of
-            (l:ls) -> Text.pack (toLower l : ls)
-            []     -> ""
-
-instance PP TypeAnnotatedTriple where
-    pp (TypeAnnotatedTriple t) = pp t
-
-data Type = EntityClass | ActorClass | Resource | Agent
-          | UnitOfExecution | Host
-          | TyString | TyArrow Type Type
-        deriving (Data, Typeable, Eq, Ord, Show, Read)
-
-data Resource = File | Socket | Semaphore | Memory | Packet
-        deriving (Data, Typeable, Eq, Ord, Show, Read)
-
-data TypeError = TypeError Type Type | CanNotInferType Text
-        deriving (Data, Typeable, Eq, Ord, Show, Read)
+        deriving (Data, Eq, Ord, Show)
+data TypeError  = TypeError Type Type | CanNotInferType Text
+        deriving (Data, Eq, Ord, Show, Read)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
 instance X.Exception Error
 
-data Verb
-  = WasDerivedFrom
-  | SpawnedBy
-  | WasInformedBy
-  | ActedOnBehalfOf
-  | WasKilledBy
-  | WasAttributedTo
-  | Modified
-  | Generated
-  | Destroyed
-  | Read
-  | Write | WrittenBy
-  | Is
-  | A
-            deriving (Eq, Ord, Show, Read)
+--------------------------------------------------------------------------------
+-- The below types encode the diagram found in the "TA1 Data Conceptual Model".
+-- However, the types do not enforce proper use; predicates are not
+-- inherently affiliated with Entities and there is no type-level
+-- enforcement of the fan-in fan-out.
+
+data Stmt = StmtEntity Entity | StmtPredicate Predicate
+  deriving (Data, Eq, Ord, Show)
+
+-- | Entities in our conceptual Model
+-- Notice each entity has a name (Text field) except for metadata.
+data Entity = Agent Text [AgentAttr]
+            | UnitOfExecution Text [UoeAttr]
+            | Artifact Text [ArtifactAttr]
+            | Resource Text DevType (Maybe DevID)
+            | Metadata Text Type Text -- Key, Type, Value
+  deriving (Eq, Ord, Show, Data)
+
+nameOf :: Entity -> Text
+nameOf e = case e of
+            Agent n _ -> n
+            UnitOfExecution n _ -> n
+            Artifact n _    -> n
+            Resource n _ _      -> n
+            Metadata _ _ _      -> ""
+
+-- | Machine ID
+type MID = UUID
+
+-- | Attributes of Agents
+data AgentAttr = AAName Text | AAUser Text | AAMachine MID
+  deriving (Data, Eq, Ord, Show)
+
+-- | Attributes of units of execution
+data UoeAttr = UA PID | UARanOn MID | UAStarted Time | UAEnded Time | UAHadPrivs Privs | UAUser Text | UAGroup Text | UAPPID PID | UAMachine MID
+  deriving (Data, Eq, Ord, Show)
+
+-- | Attributes of Artifacts
+data ArtifactAttr = ArtAType ArtifactType | ArtACoarseLoc CoarseLoc | ArtAFineLoc FineLoc | ArtACreated Time | ArtAVersion Version | ArtADeleted Time | ArtAOwner Text | ArtASize Integer | Taint Word64
+  deriving (Data, Eq, Ord, Show)
+
+-- | XXX TBD
+newtype Privs = Privs Word64
+  deriving (Data, Eq, Ord, Show, Num)
+
+type DevID = Text
+
+type Version = Text
+
+-- | FineLoc is specified as a offset, packet id, or memory address.  We
+-- currently capture these only as a raw string.
+type FineLoc   = Text
+
+-- | CoarseLoc is specified as a file path, packet or page of memory.  This
+-- has proven insufficient if it is a required artifact field (ex: what is the
+-- "location" of a socket?") so we currently model this as a raw string.
+type CoarseLoc = Text
+
+
+data Predicate = Predicate { predSubject    :: Text
+                           , predObject     :: Text
+                           , predType       :: PredicateType
+                           , predAttrs      :: [PredicateAttr]
+                           }
+  deriving (Data, Eq, Ord, Show)
+
+data PredicateAttr
+        = Raw Text Text
+        | AtTime Time
+        | StartTime Time
+        | EndTime Time
+        | GenOp GenOp
+        | Permissions ModVec
+        | ReturnVal Text
+        | Args [Text]
+        | Cmd Text
+        | DeriveOp DeriveOp
+  deriving (Data, Eq, Ord, Show)
+
+data PredicateType
+            = ActedOnBehalfOf
+            | WasAssociatedWith
+            | WasStartedBy
+            | WasEndedBy
+            | WasInformedBy
+            | Used
+            | WasGeneratedBy
+            | WasAttributedTo
+            | WasInvalidatedBy
+            | WasDerivedFrom
+            | Description
+            | IsPartOf
+  deriving (Data, Eq, Ord, Show)
+
+-- XXX TBD
+newtype ModVec = ModVec Word64
+  deriving (Data, Eq, Ord, Show, Num)
+
+data ExecOp = Fork | Clone | ExecVE | Kill | SetUID
+  deriving (Data, Eq, Ord, Show)
+
+newtype UUID      = UUID Text -- XXX consider (Word64,Word64)
+  deriving (Data, Eq, Ord, Show)
+
+-- | Globally unique process ID - this is _NOT_ a commodity OS PID, but that
+-- could be one component.
+newtype PID       = PID Text  -- XXX consider MID|Word32
+  deriving (Data, Eq, Ord, Show)
+
+-- | Type of artifacts
+data ArtifactType = File | Packet  | Memory | Socket
+  deriving (Data, Eq, Ord, Show)
+
+-- | Types of devices
+data DevType      = GPS  | Camera | Keyboard | Accelerometer
+  deriving (Data, Eq, Ord, Show)
+
+-- | Methods of deriving data from a source
+data DeriveOp     = Rename | Link
+        deriving (Data, Eq, Ord, Show, Read)
+
+-- | Methods of consuming (from) an artifact
+data UseOp        = Read | Recv | Accept | Execute
+        deriving (Data, Eq, Ord, Show, Read)
+
+-- Methods of pushing data to an artifact
+data GenOp        = Write | Send | Connect | Truncate | ChMod | Touch
+        deriving (Data, Eq, Ord, Show, Read)
+
+type EntryPoint = Text
+
+--------------------------------------------------------------------------------
+--  Types for type checking
+
+
+-- class Entity
+-- instance AnyNotPredicate
+--
+-- class Agent
+-- instance Agent UnitOfExecution
+--
+-- class ResourceClass
+-- instance Resource (should be 'device')
+-- instance Artifact
+--
+-- class String
+-- instance UUID
+-- instance Time
+-- instance Name
+
+-- | Basic types in the ED graph
+--
+-- Notice most types are enforced by the translation to the Haskell types
+-- and thus we do not bother to express them here or validate them in the
+-- checker. For example, the DevType is represented by an enumeration and
+-- not a typeless string.
+--
+-- What remains is to ensure the predicates are applied to entities of
+-- the correct type.
+data Type = TyUnitOfExecution
+          | TyAgent
+          | TyArtifact
+          | TyResource
+          | TyMetadata
+          | TyArrow Type Type
+        deriving (Data, Eq, Ord, Show, Read)
+

@@ -8,6 +8,7 @@
 
 module Parser ( parseProvN, parseProvNFile
               -- * Lower level
+              , textOfIdent, Ident
               , parseProv, runParser) where
 
 import ParserCore

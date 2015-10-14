@@ -19,8 +19,6 @@ import           Data.Generics.Uniplate.Data ()
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 
-type Entity = () -- XXX
-
 translate :: (Monad m) => Prov -> m [T.Stmt]
 translate p = tExprs (expandDomains p)
 
