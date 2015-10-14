@@ -82,7 +82,7 @@ data RW = RW { rwInput  :: [Token]
 
 data ParseError = HappyError (Maybe Token)
                 | HappyErrorMsg String
-                  deriving (Show)
+                  deriving (Data, Eq, Ord, Show)
 
 runParser :: L.Text -> Parser a -> Either ParseError a
 runParser txt p =

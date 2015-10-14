@@ -1,9 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 
 module LexerCore where
 
 import Data.Bits (shiftR,(.&.))
 import Data.Char (ord,isDigit,toLower)
+import Data.Data
 import Data.Word (Word8)
 import qualified Data.Text.Lazy as L
 import Numeric (readDec)
@@ -166,7 +168,7 @@ data Token = KW Keyword
            | Sym Symbol
            | Eof
            | Err TokenError
-             deriving (Show,Eq)
+             deriving (Data,Ord,Show,Eq)
 
 tokenText :: Token -> L.Text
 tokenText (String s) = L.pack s
@@ -175,12 +177,6 @@ tokenText _          = error "tokenText: Tried to extract the 'text' of a non-St
 tokenNum :: Token -> Integer
 tokenNum (Num n)     = n
 tokenNum  _          = error "tokenText: Tried to extract the 'num' of a non-Num token"
-
--- | Virtual symbols inserted for layout purposes.
-data Virt = VOpen
-          | VClose
-          | VSep
-            deriving (Show,Eq)
 
 data Keyword = KW_Activity
              | KW_Agent
@@ -201,7 +197,7 @@ data Keyword = KW_Activity
              | KW_Document
              | KW_EndDocument
              | KW_Prefix
-               deriving (Show,Eq)
+               deriving (Show,Eq,Ord,Data)
 
 wordOfKeyword :: Keyword -> String
 wordOfKeyword kw =
@@ -221,10 +217,10 @@ data Symbol = BracketL
             | Colon
             | Hyphen
             | SingleQuote
-              deriving (Show,Eq)
+              deriving (Show,Eq,Ord,Data)
 
 data TokenError = LexicalError String
-                  deriving (Show,Eq)
+                  deriving (Data, Eq, Ord, Show)
 
 descTokenError :: TokenError -> String
 descTokenError e = case e of

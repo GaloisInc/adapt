@@ -1,30 +1,30 @@
 
 module Ingest
     ( -- * High-level interface
-      readTriples, readTriplesFromFile
-    , Error(..), ParseError(..), TypeError(..)
-    , TypeAnnotatedTriple(..)
-    , Object(..), Entity, Verb
-    , PP(..)
+      ingestFile, ingestText
+    , Error(..), ParseError(..), TypeError(..), TranslateError(..)
+    , module Types
+    -- XXX PP
     ) where
 
 import Types
 import Typecheck
-import Compile
+import Translate
 import Parser
 import qualified Control.Exception as X
-import qualified Data.Text.IO as Text
+import qualified Data.Text.Lazy.IO as Text
 import Graph
+import MonadLib
 
-import Control.Applicative
 
-readTriplesFromFile ::  FilePath -> IO [TypeAnnotatedTriple]
-readTriplesFromFile fp = (either X.throw id . readTriples) <$> Text.readFile  fp
+ingestFile ::  FilePath -> IO [Stmt]
+ingestFile fp = (either X.throw id . ingestText) <$> Text.readFile fp
 
-readTriples :: Text -> Either Error [TypeAnnotatedTriple]
-readTriples raw =
-  case parseStrict raw of
-    Left e -> Left (PE e)
-    Right ts -> case typecheck ts of
-                  Left e   -> Left (TE e)
-                  Right xs -> Right (translate xs)
+eX :: ExceptionM m i => (e -> i) -> Either e a -> m a
+eX f = either (raise . f) return
+
+ingestText :: Text -> Either Error [Stmt]
+ingestText t = runId $ runExceptionT $ do
+  p  <- eX PE  (parseProvN t)
+  ts <- eX TRE (translate p)
+  eX TCE (typecheck ts)

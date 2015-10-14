@@ -10,6 +10,7 @@ module Types
       Error(..)
     , ParseError(..)
     , TypeError(..)
+    , TranslateError(..)
       -- * Key types
     , Type(..)
     , Stmt(..)
@@ -33,13 +34,14 @@ import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import           Data.Word (Word64)
 import qualified Control.Exception as X
+import           ParserCore (ParseError(..))
 
 import ParserCore (Time)
 
-data Error      = PE String | TE TypeError deriving (Eq, Ord, Show, Data, Typeable)
-data ParseError = ParseFailure String | PartialParse
-        deriving (Data, Eq, Ord, Show)
+data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Eq, Ord, Show, Data, Typeable)
 data TypeError  = TypeError Type Type | CanNotInferType Text
+        deriving (Data, Eq, Ord, Show, Read)
+data TranslateError = TranslateError Text
         deriving (Data, Eq, Ord, Show, Read)
 
 instance X.Exception TypeError
@@ -205,7 +207,10 @@ type EntryPoint = Text
 --
 -- What remains is to ensure the predicates are applied to entities of
 -- the correct type.
-data Type = TyUnitOfExecution
+data Type = EntityClass
+          | ActorClass
+          | TyUnitOfExecution
+          | TyHost
           | TyAgent
           | TyArtifact
           | TyResource

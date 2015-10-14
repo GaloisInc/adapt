@@ -6,33 +6,31 @@ module Graph
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Text as Text
-import Data.Text (Text)
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
 import Text.Dot
 import MonadLib
 import Types
 
-type M a = StateT (Map (Entity Type) NodeId) Dot a
+type M a = StateT (Map Text NodeId) Dot a
 
 runMe :: M a -> String
 runMe = showDot . runStateT Map.empty
 
-graph :: [TypeAnnotatedTriple] -> String
-graph = runMe . mapM_ graphTriple
+graph :: [Stmt] -> String
+graph = runMe . mapM_ graphStmt
 
-graphTriple :: TypeAnnotatedTriple -> M ()
-graphTriple (TypeAnnotatedTriple (Triple s v o)) =
-  do subj <- memoNode s
-     obj  <- memoNode o
-     newEdge subj obj (verbProperties v)
+graphStmt :: Stmt -> M ()
+graphStmt (StmtEntity e)  = undefined -- XXX graph entity
+graphStmt (StmtPredicate p) = undefined -- XXX graph pred
 
-memoNode :: Entity Type -> M NodeId
-memoNode obj =
+memoNode :: Text -> M NodeId
+memoNode i =
   do mp <- get
-     case Map.lookup obj mp of
+     case Map.lookup i mp of
         Just n  -> return n
-        Nothing -> do node <- newNode (objectProperties obj)
-                      set (Map.insert obj node mp)
+        Nothing -> do node <- newNode [("label", Text.unpack i)] -- (objectProperties obj)
+                      set (Map.insert i node mp)
                       return node
 
 newEdge  :: NodeId -> NodeId -> [(String,String)] -> M ()
@@ -41,8 +39,8 @@ newEdge a b ps = lift (edge a b ps)
 newNode :: [(String,String)] -> M NodeId
 newNode = lift . node
 
-verbProperties :: Predicate Type -> [(String,String)]
-verbProperties v = [("label",Text.unpack $ pp $ theObject v)]
-
-objectProperties :: Entity a -> [(String,String)]
-objectProperties o = [("label",Text.unpack $ pp $ theObject o)]
+-- verbProperties :: Predicate Type -> [(String,String)]
+-- verbProperties v = [("label",Text.unpack $ pp $ theObject v)]
+-- 
+-- objectProperties :: Entity a -> [(String,String)]
+-- objectProperties o = [("label",Text.unpack $ pp $ theObject o)]
