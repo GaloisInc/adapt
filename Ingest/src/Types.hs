@@ -46,7 +46,7 @@ data Warning    = Warn Text
 ppWarning :: Warning -> Text
 ppWarning (Warn w) = w
 
-data TypeError  = TypeError Type Type | CanNotInferType Text
+data TypeError  = TypeError Text Type Type | CanNotInferType Text
         deriving (Data, Eq, Ord, Show, Read)
 data TranslateError = MissingRequiredField (Maybe Text) Text | TranslateError Text
         deriving (Data, Eq, Ord, Show, Read)
@@ -91,21 +91,23 @@ data AgentAttr = AAName Text | AAUser Text | AAMachine MID
 -- | Attributes of units of execution
 data UoeAttr = UAUser Text
              | UAPID PID
+             | UAPPID PID
              | UAMachine MID
              | UAStarted Time
+             | UAHadPrivs Privs
+             | UAPWD Text
              -- XXX All the below constructors are unused, they lack any
              -- translation path from ProvN, see Translate.hs
              | UAEnded Time
-             | UAHadPrivs Privs
              | UAGroup Text
   deriving (Data, Eq, Ord, Show)
 
 -- | Attributes of Artifacts
 data ArtifactAttr = ArtAType ArtifactType
                   | ArtARegistryKey Text
+                  | ArtACoarseLoc CoarseLoc
                   -- XXX All the below constructors are unused, they lack
                   -- any translation path from ProvN, see Translate.hs
-                  | ArtACoarseLoc CoarseLoc
                   | ArtAFineLoc FineLoc
                   | ArtACreated Time
                   | ArtAVersion Version
@@ -116,8 +118,7 @@ data ArtifactAttr = ArtAType ArtifactType
   deriving (Data, Eq, Ord, Show)
 
 -- | XXX TBD
-newtype Privs = Privs Word64
-  deriving (Data, Eq, Ord, Show, Num)
+type Privs = Text
 
 type DevID = Text
 
@@ -243,5 +244,6 @@ data Type = EntityClass
           | TyResource
           | TyMetadata
           | TyArrow Type Type
+          | TyVoid
         deriving (Data, Eq, Ord, Show, Read)
 

@@ -10,6 +10,8 @@ module Typecheck
   ) where
 
 import Types as T
+import Namespaces (blankNode, textOfIdent)
+
 import MonadLib
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as Text
@@ -45,11 +47,13 @@ getType :: Text -> TC (Maybe Type)
 getType k = Map.lookup k <$> get
 
 unifyM :: Text -> Type -> TC ()
-unifyM k ty =
+unifyM k ty
+  | k == textOfIdent blankNode = return ()
+  | otherwise      =
   do tyOld <- getType k
      case tyOld of
       Nothing -> assignTy k ty
-      Just t  -> do newTy <- unify ty t
+      Just t  -> do newTy <- unify k ty t
                     when (t /= newTy) (assignTy k newTy)
 
 --------------------------------------------------------------------------------
@@ -59,17 +63,17 @@ unifyM k ty =
 --  existential - there is no proper polymorphism.
 
 -- hard-coded type schema, since it should never change.
-unify :: Type -> Type -> TC Type
+unify :: Text -> Type -> Type -> TC Type
 -- Identical types unify
-unify x y | x == y    = return x
+unify _ x y | x == y    = return x
 -- Most general unifier (mgu) comes first.  Actually possible in this primitive schema.
-unify x y | x > y     = unify y x
+unify t x y | x > y     = unify t y x
 -- Classes are strictly hierarchical
-unify EntityClass x                                                            = return x
-unify ActorClass  x   | x `elem` [ActorClass,TyAgent,TyUnitOfExecution,TyHost] = return x
-unify ResourceClass x | x `elem` [ResourceClass, TyResource, TyArtifact]       = return x
-unify DescribeClass x | x `elem` [DescribeClass, TyUnitOfExecution, TyArtifact] = return x
-unify x y = raise (TypeError x y)
+unify _ EntityClass x                                                            = return x
+unify _ ActorClass  x   | x `elem` [ActorClass,TyAgent,TyUnitOfExecution,TyHost] = return x
+unify _ ResourceClass x | x `elem` [ResourceClass, TyResource, TyArtifact]       = return x
+unify _ DescribeClass x | x `elem` [DescribeClass, TyUnitOfExecution, TyArtifact] = return x
+unify i x y = raise (TypeError i x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
 -- and return the annotated version of the AST.
@@ -111,7 +115,7 @@ predicateTypeToType p =
      WasAttributedTo    -> TyArtifact        .-> ActorClass
      WasInvalidatedBy   -> TyArtifact        .-> TyUnitOfExecution
      WasDerivedFrom     -> TyArtifact        .-> TyArtifact
-     Description        -> TyMetadata        .-> DescribeClass
+     Description        -> TyVoid            .-> DescribeClass
      IsPartOf           -> TyArtifact        .-> TyArtifact
 
 

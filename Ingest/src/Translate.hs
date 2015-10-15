@@ -91,7 +91,7 @@ tExpr (WasAssociatedWith mI subj mObj mPlan kvs                            ) = s
 tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs  ) = safely (T.StmtPredicate <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs)
 tExpr (WasAttributedTo mI subj obj kvs                                     ) = safely (T.StmtPredicate <$> wasAttributedTo mI subj obj kvs)
 tExpr (IsPartOf subj obj                                                   ) = safely (T.StmtPredicate <$> isPartOf subj obj)
-tExpr (Description subj kvs                                                ) = safely (T.StmtPredicate <$> description subj kvs)
+tExpr (Description obj  kvs                                                ) = safely (T.StmtPredicate <$> description obj kvs)
 tExpr (RawEntity i args kvs                                                )
     | i == mkIdent dc "description" =
         case args of
@@ -146,10 +146,11 @@ resource i _ _ = raise $ TranslateError $ "Device types must be string literals.
 -- of machine ID, foaf:name, and foaf:accountName.
 agent :: Ident -> KVs -> Tr T.Entity
 agent i kvs
-  | getProvType kvs == Just T.TyUnitOfExecution =
-      do attrs <- uoeAttrs kvs
-         return $ T.UnitOfExecution (textOfIdent i) attrs
-  | otherwise = T.Agent (textOfIdent i) <$> agentAttrs kvs
+  -- | getProvType kvs == Just T.TyUnitOfExecution =
+  --     do attrs <- uoeAttrs kvs
+  --        return $ T.UnitOfExecution (textOfIdent i) attrs
+  -- | otherwise
+  = T.Agent (textOfIdent i) <$> agentAttrs kvs
 
 -- All Activities are units of execution, no exceptions.
 activity :: Ident -> Maybe Time -> Maybe Time -> KVs -> Tr T.Entity
@@ -157,7 +158,7 @@ activity i mStart mEnd kvs
   | getProvType kvs == Just T.TyUnitOfExecution =
        do attrs <- uoeAttrs kvs
           return $ T.UnitOfExecution (textOfIdent i) (uoeTimes mStart mEnd ++ attrs)
-  | otherwise = raise $ TranslateError "The only recognized activities are prov:type=adapt:UnitOfExecution"
+  | otherwise = raise $ TranslateError $ "The only recognized activities are prov:type=adapt:UnitOfExecution.  Saw: " <> (L.pack $ show kvs)
 
 uoeTimes :: Maybe Time -> Maybe Time -> [T.UoeAttr]
 uoeTimes a b = catMaybes $ zipWith fmap [T.UAStarted, T.UAEnded] [a,b]
@@ -173,6 +174,11 @@ getProvType m =
 --------------------------------------------------------------------------------
 --  Entity Attributes
 
+(.->) :: a -> b -> (a,b)
+(.->) a b = (a,b)
+
+infixr 5 .->
+
 uoeAttrs :: KVs -> Tr [T.UoeAttr]
 uoeAttrs kvs = catMaybes <$> mapM (uncurry uoeAttr) kvs
 
@@ -180,23 +186,20 @@ uoeAttr :: Ident -> Value -> Tr (Maybe T.UoeAttr)
 uoeAttr i = attrOper uoeAttrTranslations w i
  where w = warnN $ "Unrecognized attribute for UnitOfExecution: " <> (textOfIdent i)
 
-(.->) :: a -> b -> (a,b)
-(.->) a b = (a,b)
-
-infixr 5 .->
-
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
   [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" (T.UAMachine . T.UUID) . valueString
-  , adaptPid       .-> warnOrOp "Non-Num value in adapt:PID" (T.UAPID . T.PID . L.pack . show) . valueNum
+  , adaptPid       .-> warnOrOp "Non-Num value in adapt:pid"  (T.UAPID . T.PID . L.pack . show) . valueNum
+  , adaptPPid      .-> warnOrOp "Non-Num value in adapt:ppid" (T.UAPPID . T.PID . L.pack . show) . valueNum
+  , adaptPrivs     .-> warnOrOp "Non-string vcalue in adapt:privs" T.UAHadPrivs . valueString
+  , adaptPwd       .-> warnOrOp "Non-string vcalue in adapt:pwd"   T.UAPWD . valueString
+  , provType       .-> ignore
   , provAtTime     .-> (\v -> return $ let mtime = case v of
                                                       ValString s -> parseUTC s
                                                       ValTime t   -> Just t
                                                       _           -> Nothing
                                        in fmap T.UAStarted mtime)
   , foafAccountName .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
-  , adaptCmdLine    .-> warnConst "Command lines have no matchine Adapt UoEAttr"
-  , adaptCmdString  .-> warnConst "Command string have no matchine Adapt UoEAttr"
   ]
 
 
@@ -212,6 +215,7 @@ agentAttrTranslations = Map.fromList
   [ adaptMachineID   .-> warnOrOp "Non-string value in adapt:machine"    (T.AAMachine . T.UUID) . valueString
   , foafName         .-> warnOrOp "Non-string value in foaf:name"        T.AAName . valueString
   , foafAccountName  .-> warnOrOp "Non-string value in foaf:accountName" T.AAUser . valueString
+  , provType         .-> ignore
   ]
 
 artifactAttrs :: KVs -> Tr [T.ArtifactAttr]
@@ -225,6 +229,8 @@ artifactAttrTranslations :: Map Ident (Value -> Tr (Maybe T.ArtifactAttr))
 artifactAttrTranslations = Map.fromList
   [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
   , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
+  , adaptFilePath     .-> warnOrOp "Non-string value in adapt:FilePath" T.ArtACoarseLoc . valueString
+  , provType          .-> ignore
   ]
 
 attrOper :: Map Ident (Value -> a) -> a -> Ident -> Value -> a
@@ -237,6 +243,7 @@ attrOper m w i v =
 warnConst = const . warnN
 warnN s   = warn s >> return Nothing
 
+ignore = const (return Nothing)
 warnOrOp :: Text -> (a -> b) -> Maybe a -> Tr (Maybe b)
 warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 
@@ -282,7 +289,7 @@ isPartOf :: _ -> _ -> Tr T.Predicate
 isPartOf subj obj    = return $ predicate subj obj T.IsPartOf []
 
 description :: _ -> _ -> Tr T.Predicate
-description subj kvs = return $ predicate subj blankNode T.Description (predAttr kvs)
+description obj  kvs = return $ predicate blankNode obj T.Description (predAttr kvs)
 
 predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
 predicate s o ty attr = T.Predicate (textOfIdent s) (textOfIdent o) ty attr
@@ -293,6 +300,3 @@ predAttr _ = [] -- XXX
 
 orBlank :: Maybe Ident -> Ident
 orBlank = maybe blankNode id
-
-blankNode :: Ident
-blankNode = Unqualified "_"

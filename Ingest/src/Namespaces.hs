@@ -3,9 +3,12 @@
 module Namespaces
   ( prov,dc,adapt,foaf,nfo,URI
   , Ident(..), mkIdent, (.:), textOfIdent
-  , adaptUnitOfExecution, adaptPid, adaptRegistryKey, adaptDevType, adaptDeviceID, adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
+  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptFilePath
   , foafName, foafAccountName
   , provAtTime, provType
+  , blankNode
   ) where
 
 import Network.URI
@@ -40,22 +43,29 @@ foaf  = perr "http://xmlns.com/foaf/0.1/"
 nfo   = perr "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/"
 prov  = perr "http://www.w3.org/ns/prov#"
 
-adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, foafName, foafAccountName, provAtTime, provType :: Ident
+adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptFilePath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
 adaptUnitOfExecution = adapt .: "unitOfExecution"
 adaptPid             = adapt .: "pid"
+adaptPPid            = adapt .: "ppid"
 adaptRegistryKey     = adapt .: "registryKey"
+adaptPrivs           = adapt .: "privs"
+adaptPwd             = adapt .: "pwd"
 adaptDevType         = adapt .: "devType"
 adaptDeviceID        = adapt .: "devID"
 adaptArtifact        = adapt .: "artifact"
 adaptArtifactType    = adapt .: "artifactType"
 adaptCmdLine         = adapt .: "cmdLine"
 adaptCmdString       = adapt .: "cmdString"
+adaptFilePath        = adapt .: "filePath"
+
 adaptMachineID       = adapt .: "machineID"
 foafName             = foaf  .: "name"
 foafAccountName      = foaf  .: "accountName"
 provAtTime           = prov  .: "atTime"
 provType             = prov  .: "type"
 
+blankNode :: Ident
+blankNode = Unqualified "_"
 
 mkIdent :: URI -> Text -> Ident
 mkIdent d l = Qualified (L.pack (show d)) l
