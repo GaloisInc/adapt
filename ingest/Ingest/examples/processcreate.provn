@@ -15,7 +15,7 @@ prefix dc <http://purl.org/dc/elements/1.1/>
 // Nepomuk file ontology
 prefix nfo <http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/>
 
-/* 
+/*
 	example:
 	simplified trace for a process running executable file /users/dwa/mystuff/bin/create.exe as follows:
 	   	intmain (void){ //fork example
@@ -152,7 +152,7 @@ used(ex:childB, ex:newprogExe, -, [
 // a GPS sensor artifact
 entity(ex:GPSunit, [
 			adapt:devType="GPS",
-			adapt:devID="Default GPS sensor")] 
+			adapt:devID="Default GPS sensor"]) 
 
 // forked child uses the GPS sensor
 used(ex:childB, ex:GPSunit, -, [
