@@ -70,7 +70,6 @@ data Entity = Agent Text [AgentAttr]
             | UnitOfExecution Text [UoeAttr]
             | Artifact Text [ArtifactAttr]
             | Resource Text DevType (Maybe DevID)
-            | Metadata Text Type Text -- Key, Type, Value
   deriving (Eq, Ord, Show, Data)
 
 nameOf :: Entity -> Text
@@ -79,7 +78,6 @@ nameOf e = case e of
             UnitOfExecution n _ -> n
             Artifact n _    -> n
             Resource n _ _      -> n
-            Metadata _ _ _      -> ""
 
 -- | Machine ID
 type MID = UUID
@@ -242,7 +240,6 @@ data Type = EntityClass
           | TyAgent
           | TyArtifact
           | TyResource
-          | TyMetadata
           | TyArrow Type Type
           | TyVoid
         deriving (Data, Eq, Ord, Show, Read)

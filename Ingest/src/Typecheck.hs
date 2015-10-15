@@ -89,7 +89,6 @@ tcEntity (Agent i as)           = unifyM i TyAgent
 tcEntity (UnitOfExecution i as) = unifyM i TyUnitOfExecution
 tcEntity (Artifact i as)        = unifyM i TyArtifact
 tcEntity (Resource i ty mDevId) = unifyM i TyResource
-tcEntity (Metadata i ty val)    = unifyM i TyMetadata
 
 tcPredicate :: Predicate -> TC ()
 tcPredicate (Predicate { .. }) =

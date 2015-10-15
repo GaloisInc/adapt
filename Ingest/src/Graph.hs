@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Graph
   (graph
@@ -6,6 +7,7 @@ module Graph
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid ((<>))
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Text.Dot
@@ -21,8 +23,23 @@ graph :: [Stmt] -> String
 graph = runMe . mapM_ graphStmt
 
 graphStmt :: Stmt -> M ()
-graphStmt (StmtEntity e)  = undefined -- XXX graph entity
-graphStmt (StmtPredicate p) = undefined -- XXX graph pred
+graphStmt (StmtEntity e)    = graphEntity e
+graphStmt (StmtPredicate p) = graphPredicate p
+
+graphEntity :: Entity -> M ()
+graphEntity e =
+  do case e of
+      Agent i _aattr              -> memoNode $ "Agent:"    <> i
+      UnitOfExecution i _uattr    -> memoNode $ "UoE:"      <> i
+      Artifact i _aattr           -> memoNode $ "Artifact:" <> i
+      Resource i _devTy _devId    -> memoNode $ "Resource:" <> i
+     return ()
+
+graphPredicate :: Predicate -> M ()
+graphPredicate (Predicate s o pTy _attr) =
+  do sN <- memoNode s
+     oN <- memoNode o
+     newEdge sN oN [("label", show pTy)]
 
 memoNode :: Text -> M NodeId
 memoNode i =
