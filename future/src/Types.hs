@@ -11,6 +11,7 @@ module Types
     , ParseError(..)
     , TypeError(..)
     , TranslateError(..)
+    , Warning(..), ppWarning
       -- * Key types
     , Type(..)
     , Stmt(..)
@@ -39,6 +40,12 @@ import           ParserCore (ParseError(..))
 import ParserCore (Time)
 
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Eq, Ord, Show, Data, Typeable)
+data Warning    = Warn Text
+  deriving (Eq, Ord, Show, Data, Typeable)
+
+ppWarning :: Warning -> Text
+ppWarning (Warn w) = w
+
 data TypeError  = TypeError Type Type | CanNotInferType Text
         deriving (Data, Eq, Ord, Show, Read)
 data TranslateError = MissingRequiredField (Maybe Text) Text | TranslateError Text

@@ -73,8 +73,8 @@ unify x y = raise (TypeError x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
 -- and return the annotated version of the AST.
-typecheck :: [Stmt] -> Either TypeError [Stmt]
-typecheck g = runTC $ mapM_ tcStmt g >> return g
+typecheck :: [Stmt] -> Either TypeError ()
+typecheck g = runTC $ mapM_ tcStmt g
 
 tcStmt :: Stmt -> TC ()
 tcStmt (StmtEntity e)    = tcEntity e

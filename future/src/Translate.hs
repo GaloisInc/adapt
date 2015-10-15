@@ -17,6 +17,7 @@ import LexerCore (parseUTC) -- XXX move this
 import qualified Types as T
 import           Types (TranslateError(..))
 
+import           Data.DList
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import qualified Data.Map.Strict as Map
@@ -31,7 +32,7 @@ import           MonadLib
 --------------------------------------------------------------------------------
 --  Translate Monad
 
-newtype Tr a = Tr { unTr :: ExceptionT TranslateError Id a }
+newtype Tr a = Tr { unTr :: WriterT (DList T.Warning) (ExceptionT TranslateError Id) a }
   deriving (Monad, Applicative, Functor)
 
 instance ExceptionM Tr TranslateError where
@@ -40,23 +41,27 @@ instance ExceptionM Tr TranslateError where
 instance RunExceptionM Tr TranslateError where
   try = Tr . try . unTr
 
-runTr :: Tr a -> Either TranslateError a
-runTr = runId . runExceptionT . unTr
+instance WriterM Tr T.Warning where
+  put w = Tr (put $ singleton w)
+
+runTr :: Tr a -> Either TranslateError (a,[T.Warning])
+runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
 
 safely :: Tr a -> Tr (Maybe a)
 safely m =
   do x <- try m
      case x of
-        Left e  -> warn (L.pack $ show e) >> return Nothing
         Right r -> return $ Just r
+        Left (TranslateError txt) -> warn txt >> return Nothing
+        Left e  -> warn (L.pack $ show e) >> return Nothing
 
 warn :: Text -> Tr ()
-warn _ = return () -- XXX
+warn = put . T.Warn
 
 --------------------------------------------------------------------------------
 --  Translation
 
-translate ::  Prov -> Either TranslateError [T.Stmt]
+translate ::  Prov -> Either TranslateError ([T.Stmt], [T.Warning])
 translate p = runTr $ tExprs (expandDomains p)
 
 -- Everywhere the 'domain' of an 'Ident' is a member prefixMap, replace
@@ -106,12 +111,18 @@ tExpr (RawEntity i _args _kvs) = fail $ "Unknown prov element: " ++ show i
 --   * it has 'devType' is Resource.
 --   * it has prov:type='adapt:artifact' is Artifact
 entity :: Ident -> KVs -> Tr T.Entity
-entity i kvs
-  | getProvType kvs == Just T.TyArtifact = artifact i kvs
-  | otherwise =
+entity i kvs =
+  case pTy of
+    Just T.TyArtifact -> artifact i kvs
+    Nothing ->
       case lookup adaptDevType kvs of
         Just devtype    -> resource i devtype kvs
-        Nothing         -> raise $ TranslateError $ "Unrecognized entity: " <> textOfIdent i
+        Nothing         -> raise $ TranslateError $
+                            L.unlines [ "Unrecognized entity: " <> textOfIdent i
+                                      , "\tprovType: " <> L.pack (show pTy)
+                                      , "\tAttributes: " <> (L.pack $ show kvs)
+                                      ]
+ where pTy = getProvType kvs
 
 artifact :: Ident -> KVs -> Tr T.Entity
 artifact i kvs = T.Artifact (textOfIdent i) <$> artifactAttrs kvs
@@ -156,7 +167,7 @@ getProvType m =
   case lookup provType m of
     Nothing -> Nothing
     Just (ValIdent i) | i == adaptUnitOfExecution -> Just T.TyUnitOfExecution
-                      | i == adaptArtifactType    -> Just T.TyArtifact
+                      | i == adaptArtifact        -> Just T.TyArtifact
     _                                  -> Nothing -- warn?
 
 --------------------------------------------------------------------------------

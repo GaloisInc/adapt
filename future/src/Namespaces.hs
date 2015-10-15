@@ -3,7 +3,7 @@
 module Namespaces
   ( prov,dc,adapt,foaf,nfo,URI
   , Ident(..), mkIdent, (.:), textOfIdent
-  , adaptUnitOfExecution, adaptPid, adaptRegistryKey, adaptDevType, adaptDeviceID, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptUnitOfExecution, adaptPid, adaptRegistryKey, adaptDevType, adaptDeviceID, adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
   , foafName, foafAccountName
   , provAtTime, provType
   ) where
@@ -46,6 +46,7 @@ adaptPid             = adapt .: "pid"
 adaptRegistryKey     = adapt .: "registryKey"
 adaptDevType         = adapt .: "devType"
 adaptDeviceID        = adapt .: "devID"
+adaptArtifact        = adapt .: "artifact"
 adaptArtifactType    = adapt .: "artifactType"
 adaptCmdLine         = adapt .: "cmdLine"
 adaptCmdString       = adapt .: "cmdString"
