@@ -112,7 +112,7 @@ in 'used', 'wasStartedBy', and 'wasEndedBy' predicates.
 
 ```
 generation      :: { Expr }
-  : 'wasGeneratedBy' '(' ident ',' may(ident) ',' time >   optAttrs(generationAttr) ')'
+  : 'wasGeneratedBy' '(' ident ',' may(ident) ',' time  optAttrs(generationAttr) ')'
 
 generationAttr
  : 'genOp'    '=' genOp
