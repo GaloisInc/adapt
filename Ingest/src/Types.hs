@@ -24,6 +24,7 @@ module Types
     , Text
     ) where
 
+import qualified Control.Exception as X
 import           Data.Monoid
 import           Data.Data
 import           Data.IntMap (IntMap)
@@ -33,13 +34,14 @@ import qualified Data.Map as Map
 import           Data.Char (toLower)
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
+import           Data.Time (UTCTime)
 import           Data.Word (Word64)
-import qualified Control.Exception as X
 import           ParserCore (ParseError(..))
+import           Text.Show.Functions ()
 
 import ParserCore (Time)
 
-data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Eq, Ord, Show, Data, Typeable)
+data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Show)
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
@@ -48,8 +50,10 @@ ppWarning (Warn w) = w
 
 data TypeError  = TypeError Text Type Type | CanNotInferType Text
         deriving (Data, Eq, Ord, Show, Read)
-data TranslateError = MissingRequiredField (Maybe Text) Text | TranslateError Text
-        deriving (Data, Eq, Ord, Show, Read)
+data TranslateError = MissingRequiredField (Maybe Text) Text
+                    | MissingRequiredTimeField (Maybe Text) Text (UTCTime -> Stmt)
+                    | TranslateError Text
+        deriving (Show)
 
 instance X.Exception TypeError
 instance X.Exception ParseError

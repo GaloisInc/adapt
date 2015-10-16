@@ -26,6 +26,7 @@ import qualified Data.Generics.Uniplate.Operations as Uniplate
 import           Data.Generics.Uniplate.Data ()
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
+import           Data.Time (UTCTime(..), fromGregorian)
 import           MonadLib
 
 
@@ -47,13 +48,18 @@ instance WriterM Tr T.Warning where
 runTr :: Tr a -> Either TranslateError (a,[T.Warning])
 runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
 
-safely :: Tr a -> Tr (Maybe a)
+safely :: Tr T.Stmt -> Tr (Maybe T.Stmt)
 safely m =
   do x <- try m
      case x of
         Right r -> return $ Just r
         Left (TranslateError txt) -> warn txt >> return Nothing
-        Left e  -> warn (L.pack $ show e) >> return Nothing
+        Left (MissingRequiredTimeField i f constr) ->
+          do warn $ "Filling missing required time field with epoch (entity/field: " <> maybe "" id i <> " " <> f <> ")"
+             return $ Just $ constr timeZero
+        Left e                    -> warn (L.pack $ show e) >> return Nothing
+  where
+  timeZero = UTCTime (fromGregorian 1900 1 1) 0
 
 warn :: Text -> Tr ()
 warn = put . T.Warn
@@ -257,20 +263,32 @@ warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 -- XXX Parital type signatures until thing stop changing.
 
 wasGeneratedBy :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
-wasGeneratedBy mI subj (orBlank -> obj) (Just at) kvs = return $ predicate subj obj T.WasGeneratedBy (T.AtTime at : predAttr kvs)
-wasGeneratedBy i  _    _          Nothing   _         = raise (MissingRequiredField (fmap textOfIdent i) "AtTime")
+wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
+  let constr time = predicate subj obj T.WasGeneratedBy (T.AtTime time : predAttr kvs)
+  in case mTime of
+      Just at -> return $ constr at
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
 used :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
-used _i subj (orBlank -> obj) (Just at) kvs = return $ predicate subj obj T.Used (T.AtTime at : predAttr kvs)
-used i  _    _                 Nothing    _ = raise (MissingRequiredField (fmap textOfIdent i) "AtTime")
+used mI subj (orBlank -> obj) mTime kvs =
+  let constr time = predicate subj obj T.Used (T.AtTime time : predAttr kvs)
+  in case mTime of
+      Just at -> return $ constr at
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
 wasStartedBy :: _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
-wasStartedBy _i subj (orBlank -> obj) _mParentTrigger (Just at) kvs = return $ predicate subj obj T.WasStartedBy (T.AtTime at : predAttr kvs)
-wasStartedBy i  _    _                 _               Nothing    _ = raise (MissingRequiredField (fmap textOfIdent i) "AtTime")
+wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
+  let constr time = predicate subj obj T.WasStartedBy (T.AtTime time : predAttr kvs)
+  in case mTime of
+      Just at -> return $ constr at
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
 wasEndedBy :: _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
-wasEndedBy _i subj  (orBlank -> obj) _mParentTrigger (Just at) kvs = return $ predicate subj obj T.WasEndedBy (T.AtTime at : predAttr kvs)
-wasEndedBy i  _     _                _               Nothing   _   = raise (MissingRequiredField (fmap textOfIdent i) "AtTime")
+wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
+  let constr time = predicate subj obj T.WasEndedBy (T.AtTime time : predAttr kvs)
+  in case mTime of
+      Just at -> return $ constr at
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
 wasInformedBy :: _ -> _ -> _ -> _ -> Tr T.Predicate
 wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (predAttr kvs)
