@@ -66,7 +66,7 @@ unifyM k ty
 unify :: Text -> Type -> Type -> TC Type
 -- Identical types unify
 unify _ x y | x == y    = return x
--- Most general unifier (mgu) comes first.  Actually possible in this primitive schema.
+-- Unifier comes second. Actually possible in this primitive schema.
 unify t x y | x > y     = unify t y x
 -- Classes are strictly hierarchical
 unify _ EntityClass x                                                            = return x

@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PartialTypeSignatures      #-}
+{-# LANGUAGE PatternSynonyms            #-}
 
 module Translate
   ( translate
@@ -29,7 +30,6 @@ import           Data.Text.Lazy (Text)
 import           Data.Time (UTCTime(..), fromGregorian)
 import           MonadLib
 
-
 --------------------------------------------------------------------------------
 --  Translate Monad
 
@@ -48,11 +48,11 @@ instance WriterM Tr T.Warning where
 runTr :: Tr a -> Either TranslateError (a,[T.Warning])
 runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
 
-safely :: Tr T.Stmt -> Tr (Maybe T.Stmt)
+safely :: Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
 safely m =
   do x <- try m
      case x of
-        Right r -> return $ Just r
+        Right r                   -> return r
         Left (TranslateError txt) -> warn txt >> return Nothing
         Left (MissingRequiredTimeField i f constr) ->
           do warn $ "Filling missing required time field with epoch (entity/field: " <> maybe "" id i <> " " <> f <> ")"
@@ -68,47 +68,56 @@ warn = put . T.Warn
 --  Translation
 
 translate ::  Prov -> Either TranslateError ([T.Stmt], [T.Warning])
-translate p = runTr $ tExprs (expandDomains p)
-
--- Everywhere the 'domain' of an 'Ident' is a member prefixMap, replace
--- it with the key value.
-expandDomains :: Prov -> Prov
-expandDomains (Prov ps es) = Prov ps (Uniplate.transformBi f es)
-  where
-  f :: Ident -> Ident
-  f i@(Qualified d l) = maybe i (\d' -> mkIdent d' l) $ Map.lookup d m
-  f i                 = i
-
-  m = Map.fromList $ ("prov", NS.prov) : [(l,v) | Prefix (Unqualified l) v <- ps]
+translate p = runTr (tExprs p)
 
 tExprs :: Prov -> Tr [T.Stmt]
-tExprs (Prov _prefix es) = catMaybes <$> mapM tExpr es
+tExprs (Prov _prefix es) = catMaybes <$> mapM (safely . tExpr) es
+
+pattern PIdent i <- Just (Left i)
+pattern PTime t <- Just (Right t)
+
+-- View maybe time
+vMTime (PTime t)   = Just t
+vMTime _           = Nothing
+vMIdent (PIdent i) = Just i
+vMIdent _          = Nothing
+
+eqIdent :: Ident -> Ident -> Bool
+eqIdent p e = e == p
+
+pattern Entity i kvs <- RawEntity (eqIdent provEntity -> True) Nothing [vMIdent -> Just i] kvs
+pattern Agent i kvs <- RawEntity (eqIdent provAgent -> True) Nothing [vMIdent -> Just i] kvs
+pattern Activity i mStart mEnd kvs <- RawEntity (eqIdent provActivity -> True) Nothing [vMIdent -> Just i, vMTime -> mStart, vMTime -> mEnd] kvs
+pattern WasGeneratedBy mI subj mObj t kvs <- RawEntity (eqIdent provWasGeneratedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> t] kvs
+pattern Used mI subj mObj time kvs <- RawEntity (eqIdent provUsed -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> Just time] kvs
+pattern WasStartedBy mI subj mObj mPT mTime kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT, vMTime -> mTime] kvs
+pattern NonStandardWasStartedBy mI subj mObj mPT kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT] kvs
+pattern WasEndedBy mI subj mObj mParentTrigger mTime kvs <- RawEntity (eqIdent provWasEndedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mParentTrigger, vMTime -> mTime] kvs
+pattern WasInformedBy mI subj mObj kvs <- RawEntity (eqIdent provWasInformedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj] kvs
+-- XXX Prov-N spec does not allow for a marker in place of KVs, but some tools generate the marker anyway.
+-- pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPlan] kvs
+pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI ((vMIdent -> Just subj) : (vMIdent -> mObj) : (vMIdent -> mPlan) : _) kvs
+pattern WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj, vMIdent -> mGeneratingEnt, vMIdent -> mGeneratingAct, vMIdent -> useId] kvs
+pattern WasAttributedTo mI subj obj kvs <- RawEntity (eqIdent provWasAttributedTo -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs
+pattern IsPartOf subj obj <- RawEntity (eqIdent dcIsPartOf -> True) Nothing [vMIdent -> Just subj, vMIdent -> Just obj] (null -> True)
+pattern Description obj kvs <- RawEntity (eqIdent dcDescription -> True) Nothing [vMIdent -> Just obj] kvs
 
 tExpr :: Expr -> Tr (Maybe T.Stmt)
-tExpr (Entity i kvs                                                        ) = safely (T.StmtEntity <$> entity i kvs)
-tExpr (Activity i mStart mEnd kvs                                          ) = safely (T.StmtEntity <$> activity i mStart mEnd kvs)
-tExpr (Agent i kvs                                                         ) = safely (T.StmtEntity    <$> agent i kvs)
-tExpr (WasGeneratedBy mI subj mObj mTime kvs                               ) = safely (T.StmtPredicate <$> wasGeneratedBy mI subj mObj mTime kvs)
-tExpr (Used mI subj mObj mTime kvs                                         ) = safely (T.StmtPredicate <$> used mI subj mObj mTime kvs)
-tExpr (WasStartedBy mI subj mObj mParentTrigger mTime kvs                  ) = safely (T.StmtPredicate <$> wasStartedBy mI subj mObj mParentTrigger mTime kvs)
-tExpr (WasEndedBy mI subj  mObj mParentTrigger mTime kvs                   ) = safely (T.StmtPredicate <$> wasEndedBy mI subj  mObj mParentTrigger mTime kvs)
-tExpr (WasInformedBy mI subj mObj kvs                                      ) = safely (T.StmtPredicate <$> wasInformedBy mI subj mObj kvs)
-tExpr (WasAssociatedWith mI subj mObj mPlan kvs                            ) = safely (T.StmtPredicate <$> wasAssociatedWith mI subj mObj mPlan kvs)
-tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs  ) = safely (T.StmtPredicate <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs)
-tExpr (WasAttributedTo mI subj obj kvs                                     ) = safely (T.StmtPredicate <$> wasAttributedTo mI subj obj kvs)
-tExpr (IsPartOf subj obj                                                   ) = safely (T.StmtPredicate <$> isPartOf subj obj)
-tExpr (Description obj  kvs                                                ) = safely (T.StmtPredicate <$> description obj kvs)
-tExpr (RawEntity i args kvs                                                )
-    | i == mkIdent dc "description" =
-        case args of
-          [s]   -> tExpr (Description s kvs)
-          _     -> fail $ "Dublin core 'description' requires a single argument, has " ++ show (length args)
-    | i == mkIdent dc "isPartOf" =
-        case (args,kvs) of
-          ([s,o],[]) -> tExpr (IsPartOf s o)
-          _     -> fail $ "Dublin core 'isPartOf' requires two argument and no attributes, but has " ++ show (length args, length kvs)
-tExpr (RawEntity i _args _kvs) = fail $ "Unknown prov element: " ++ show i
-
+tExpr (Entity i kvs)                                                       = Just . T.StmtEntity <$> entity i kvs
+tExpr (Activity i mStart mEnd kvs)                                         = Just . T.StmtEntity <$> activity i mStart mEnd kvs
+tExpr (Agent i kvs)                                                        = Just . T.StmtEntity <$> agent i kvs
+tExpr (WasGeneratedBy mI subj mObj mTime kvs)                              = Just . T.StmtPredicate <$> wasGeneratedBy mI subj mObj mTime kvs
+tExpr (Used mI subj mObj time kvs)                                         = Just . T.StmtPredicate <$> used mI subj mObj time kvs
+tExpr (WasStartedBy mI subj mObj mParentTrigger mTime kvs)                 = Just . T.StmtPredicate <$> wasStartedBy mI subj mObj mParentTrigger mTime kvs
+tExpr (NonStandardWasStartedBy mI subj mObj mParentTrigger kvs)            = Just . T.StmtPredicate <$> wasStartedBy mI subj mObj mParentTrigger Nothing kvs
+tExpr (WasEndedBy mI subj mObj mParentTrigger mTime kvs)                   = Just . T.StmtPredicate <$> wasEndedBy mI subj  mObj mParentTrigger mTime kvs
+tExpr (WasInformedBy mI subj mObj kvs)                                     = Just . T.StmtPredicate <$> wasInformedBy mI subj mObj kvs
+tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = Just . T.StmtPredicate <$> wasAssociatedWith mI subj mObj mPlan kvs
+tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = Just . T.StmtPredicate <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
+tExpr (WasAttributedTo mI subj obj kvs)                                    = Just . T.StmtPredicate <$> wasAttributedTo mI subj obj kvs
+tExpr (IsPartOf subj obj)                                                  = Just . T.StmtPredicate <$> isPartOf subj obj
+tExpr (Description obj kvs)                                                = Just . T.StmtPredicate <$> description obj kvs
+tExpr r@(RawEntity pred mI _ _)                                            = warnN $ "Unrecognized statement: " <> L.pack (show r)
 
 --------------------------------------------------------------------------------
 --  Entity Translation
@@ -270,11 +279,8 @@ wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
       Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
 used :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
-used mI subj (orBlank -> obj) mTime kvs =
-  let constr time = predicate subj obj T.Used (T.AtTime time : predAttr kvs)
-  in case mTime of
-      Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
+used mI subj (orBlank -> obj) time kvs =
+  return $ predicate subj obj T.Used (T.AtTime time : predAttr kvs)
 
 wasStartedBy :: _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
 wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =

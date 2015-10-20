@@ -56,22 +56,6 @@ $white+                 { skip }
 "//" .*                 { skip }
 
 "prefix"                { emit $ KW KW_Prefix            }
-"activity"              { emit $ KW KW_Activity          }
-"agent"                 { emit $ KW KW_Agent             }
-"resource"              { emit $ KW KW_Resource          }
-"wasAssociatedWith"     { emit $ KW KW_WasAssociatedWith }
-"wasDerivedFrom"        { emit $ KW KW_WasDerivedFrom    }
-"actedOnBehalfOf"       { emit $ KW KW_ActedOnBehalfOf   }
-"wasAttributedTo"       { emit $ KW KW_WasAttributedTo   }
-"wasInformedBy"         { emit $ KW KW_WasInformedBy     }
-"entity"                { emit $ KW KW_Entity            }
-"used"                  { emit $ KW KW_Used              }
-"wasStartedBy"          { emit $ KW KW_WasStartedBy      }
-"wasEndedBy"            { emit $ KW KW_WasEndedBy        }
-"wasGeneratedBy"        { emit $ KW KW_WasGeneratedBy    }
-"wasInvalidatedBy"      { emit $ KW KW_WasInvalidatedBy  }
-"description"           { emit $ KW KW_Description       }
-"isPartOf"              { emit $ KW KW_IsPartOf          }
 "document"              { emit $ KW KW_Document          }
 "endDocument"           { emit $ KW KW_EndDocument       }
 "end" $white+ "document"          { emit $ KW KW_EndDocument       }

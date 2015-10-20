@@ -181,23 +181,7 @@ tokenNum :: Token -> Integer
 tokenNum (Num n)     = n
 tokenNum  _          = error "tokenText: Tried to extract the 'num' of a non-Num token"
 
-data Keyword = KW_Activity
-             | KW_Agent
-             | KW_Resource
-             | KW_WasAssociatedWith
-             | KW_Entity
-             | KW_Used
-             | KW_WasStartedBy
-             | KW_WasEndedBy
-             | KW_WasInformedBy
-             | KW_WasGeneratedBy
-             | KW_WasDerivedFrom
-             | KW_ActedOnBehalfOf
-             | KW_WasAttributedTo
-             | KW_WasInvalidatedBy
-             | KW_Description
-             | KW_IsPartOf
-             | KW_Document
+data Keyword = KW_Document
              | KW_EndDocument
              | KW_Prefix
                deriving (Show,Eq,Ord,Data)

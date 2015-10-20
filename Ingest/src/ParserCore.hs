@@ -7,42 +7,57 @@ module ParserCore (module ParserCore, Ident(..), textOfIdent) where
 import LexerCore hiding (mkIdent)
 import Lexer
 
-import           Namespaces
+import           Namespaces as NS
 import           Control.Applicative (Applicative)
-import           Data.Data
+import           Data.Data (Data)
 import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
 import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
+import qualified Data.Map.Strict as Map
+import           Data.Map.Strict (Map)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 import           Network.URI (URI)
+import qualified Data.Generics.Uniplate.Operations as Uniplate
+import           Data.Generics.Uniplate.Data ()
 
 data Prov = Prov [Prefix] [Expr]
   deriving (Eq, Ord, Show,Data)
 
-data Prefix = Prefix Ident URI
+data Prefix = Prefix Text URI
   deriving (Eq,Ord,Show,Data)
 
 type Time = UTCTime
 
-data Expr = Entity Ident KVs
-          | Agent Ident KVs
-          | RawEntity Ident [Ident] KVs
-          | Activity Ident (Maybe Time) (Maybe Time) KVs
-          | WasGeneratedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
-          | Used (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
-          | WasStartedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | WasEndedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) (Maybe Time) KVs
-          | WasInformedBy (Maybe Ident) Ident (Maybe Ident) KVs
-          | WasAssociatedWith (Maybe Ident) Ident (Maybe Ident) (Maybe Ident) KVs
-          | WasDerivedFrom (Maybe Ident) Ident Ident (Maybe Ident) (Maybe Ident) (Maybe Ident) KVs
-          | ActedOnBehalfOf (Maybe Ident) Ident Ident (Maybe Ident) KVs
-          | WasAttributedTo (Maybe Ident) Ident Ident KVs
-          | WasInvalidatedBy (Maybe Ident) Ident (Maybe Ident) (Maybe Time) KVs
-          | IsPartOf Ident Ident
-          | Description Ident KVs
+data Expr = RawEntity { exprOper  :: Ident
+                      , exprIdent :: (Maybe Ident)
+                      , exprArgs  :: [Maybe (Either Ident Time)]
+                      , exprAttrs :: KVs
+                      }
       deriving (Eq,Ord,Show,Data)
+
+fullyQualifyIdents :: Prov -> Prov
+fullyQualifyIdents = explicitProvPrefixes . expandPrefixes
+
+explicitProvPrefixes :: Prov -> Prov
+explicitProvPrefixes (Prov ps ex) = Prov ps  (Uniplate.transformBi f ex)
+ where
+  f :: Ident -> Ident
+  f i = maybe i id $ Map.lookup i m
+
+  m :: Map Ident Ident
+  m = Map.fromList $ map (\ident -> (Unqualified (local ident),ident)) allIdent
+
+expandPrefixes :: Prov -> Prov
+expandPrefixes (Prov ps ex) = Prov ps (Uniplate.transformBi f ex)
+  where
+  prefixToTuple (Prefix t uri) = (t,uri)
+  m = Map.fromList $ ("prov", NS.prov) : map prefixToTuple ps
+
+  f :: Ident -> Ident
+  f i@(Qualified d l) = maybe i (\d' -> mkIdent d' l) $ Map.lookup d m
+  f i                 = i
 
 type KVs   = [(Key,Value)]
 type Key   = Ident

@@ -14,6 +14,7 @@ module Parser ( parseProvN, parseProvNFile
 import ParserCore
 import LexerCore
 import Data.Monoid ( mempty, mappend, mconcat )
+import Namespaces
 import qualified Network.URI as URI
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
@@ -29,33 +30,16 @@ import qualified Data.Text.Lazy.IO as L
   TIME                  { $$@(Time {})  }
   URILIT                { $$@(URI{})    }
 
-  'activity'            { KW KW_Activity        }
-  'agent'               { KW KW_Agent           }
---  'artifact'            { KW KW_Artifact        }  XXX An entity with prov:type=tc:artifact
---  'resource'            { KW KW_Resource        }  XXX An entity with a 'devType' property
-  'wasAssociatedWith'   { KW KW_WasAssociatedWith       }
-  'entity'              { KW KW_Entity           }
-  'used'                { KW KW_Used             }
-  'wasStartedBy'        { KW KW_WasStartedBy     }
-  'wasGeneratedBy'      { KW KW_WasGeneratedBy   }
-  'wasEndedBy'          { KW KW_WasEndedBy       }
-  'wasInformedBy'       { KW KW_WasInformedBy    }
-  'wasAttributedTo'     { KW KW_WasAttributedTo  }
-  'wasDerivedFrom'      { KW KW_WasDerivedFrom   }
-  'actedOnBehalfOf'     { KW KW_ActedOnBehalfOf  }
-  'wasInvalidatedBy'    { KW KW_WasInvalidatedBy }
-  'description'         { KW KW_Description      }
-  'isPartOf'            { KW KW_IsPartOf         }
   'document'            { KW KW_Document         }
   'endDocument'         { KW KW_EndDocument      }
   'prefix'              { KW KW_Prefix           }
+
   '%%'                  { Sym Type         }
   '='                   { Sym Assign       }
   ':'                   { Sym Colon        }
   ','                   { Sym Comma        }
   '('                   { Sym ParenL       }
   ')'                   { Sym ParenR       }
--- XXX see 'ident' '\''                  { Sym SingleQuote  }
 
   '['                   { Sym BracketL     }
   ']'                   { Sym BracketR     }
@@ -63,10 +47,6 @@ import qualified Data.Text.Lazy.IO as L
   '-'                   { Sym Hyphen   }
   ';'                   { Sym Semi         }
   'sq'                  { Sym SingleQuote  }
-
---  '_'                 { Sym Underscore   }
---  '{'                 { Sym BraceL       }
---  '}'                 { Sym BraceR       }
 
 
 %name parseProv prov
@@ -82,9 +62,6 @@ ident :: { Ident }
   : IDENT ':' IDENT     { Qualified (L.pack $ unIdent $1) (L.pack $ unIdent $3) }
   | ':' IDENT           { Unqualified (L.pack $ unIdent $2)  }
   | IDENT               { Unqualified (L.pack $ unIdent $1)  }
-  -- XXX we should capture all possible prefixed keywords
-  -- so add a 'allKeywords :: { Text } case if this comes up again.
-  | IDENT ':' 'description'  { Qualified (L.pack $ unIdent $1) "description" }
 
 -- Prov-O ---------------------------------------------------------------------
 
@@ -95,120 +72,33 @@ prov :: { Prov }
     { Prov $2 $3 }
 
 prefix :: { Prefix }
-  : 'prefix' ident URILIT       { Prefix $2 (maybe (error $ "could not parse URI" ++ show $3) id $ (\(URI s) -> URI.parseURI s) $3) }
+  : 'prefix' IDENT URILIT       { Prefix (L.pack $ unIdent $2) (maybe (error $ "could not parse URI " ++ show $3) id $ (\(URI s) -> URI.parseURI s) $3) }
 
 expr :: { Expr }
-  : provExpr            { $1 }
-  | dcExpr              { $1 }
-  | rawExpr             { $1 }
+  : ident '(' ident ';' args(',', may(identOrTime)) soattrVals ')' {  RawEntity $1 (Just $3) (reverse $5) $6 }
+  | ident '(' args(',', may(identOrTime)) soattrVals ')'           {  RawEntity $1 Nothing (reverse $3) $4 }
 
-provExpr :: { Expr }
-  : entity           { $1 }
-  | activity         { $1 }
-  | generation       { $1 }
-  | usage            { $1 }
-  | start            { $1 }
-  | end              { $1 }
-  | invalidation   { $1 }
-  | communication    { $1 }
-  | agent            { $1 }
-  | association      { $1 }
-  | attribution      { $1 }
-  | delegation     { $1 }
-  | derivation       { $1 }
---  | influence      { $1 }
---  | alternate      { $1 }
---  | specialization { $1 }
---  | membership     { $1 }
---  | extensibility  { $1 }
-
-dcExpr :: { Expr }
-  : isPartOf    { $1 }
-  | description { $1 }
-
-rawExpr :: { Expr }
-  : ident '(' args(',', ident) soattrVals ')' {  RawEntity $1 $3 $4 }
-
--- Prov Exprs ------------------------------------------------------------------
-
-entity          :: { Expr }
-  : 'entity' '(' ident soattrVals ')'     {  Entity $3 $4 }
-
-activity        :: { Expr }
-  : 'activity' '(' ident ',' may(time) ',' may(time) soattrVals ')'     {  Activity $3 $5 $7 $8 }
-  | 'activity' '(' ident soattrVals ')'                                 {  Activity $3 Nothing Nothing $4 }
-
-generation      :: { Expr }
-  : 'wasGeneratedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')' {  WasGeneratedBy (fst $3) (snd $3) $5 $7 $8 }
-  | 'wasGeneratedBy' '(' mayIdent ',' may(ident) soattrVals ')' {  WasGeneratedBy (fst $3) (snd $3) $5 Nothing $6 }
-    -- ^^^ Omitting the marker on time is not to spec, but the examples suggest the spec is wrong.
-    -- XXX this causes a 2nd reduce-reduce conflict that didn't exist in a straight-forward spec impl.
-  | 'wasGeneratedBy' '(' mayIdent soattrVals ')'                              {  WasGeneratedBy (fst $3) (snd $3) Nothing Nothing $4 }
-
-usage           :: { Expr }
-  : 'used' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')' {  Used (fst $3) (snd $3) $5 $7 $8 }
-  | 'used' '(' mayIdent soattrVals ')'                              {  Used (fst $3) (snd $3) Nothing Nothing $4 }
-
-start           :: { Expr }
-  : 'wasStartedBy' '(' mayIdent ',' may(ident) ',' may(ident) ',' may(time) soattrVals ')' {  WasStartedBy (fst $3) (snd $3) $5 $7 $9 $10 }
-  | 'wasStartedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')' {  WasStartedBy (fst $3) (snd $3) Nothing $5 $7 $8 }
-  -- ^^^: XXX not part of the spec, but again, common in use.  This is reduce-reduce conflict #3.
-  | 'wasStartedBy' '(' mayIdent soattrVals ')'                                             {  WasStartedBy (fst $3) (snd $3) Nothing Nothing Nothing $4 }
-
-end             :: { Expr }
-  : 'wasEndedBy' '(' mayIdent ',' may(ident) ',' may(ident) ',' may(time) soattrVals ')' {  WasEndedBy (fst $3) (snd $3) $5 $7 $9 $10 }
-  | 'wasEndedBy' '(' mayIdent soattrVals ')'                                             {  WasEndedBy (fst $3) (snd $3) Nothing Nothing Nothing $4 }
-
-communication   :: { Expr }
-  : 'wasInformedBy' '(' mayIdent ',' ident soattrVals ')'  {  WasInformedBy (fst $3) (snd $3) (Just $5) $6 }
-  | 'wasInformedBy' '(' mayIdent soattrVals ')'            {  WasInformedBy (fst $3) (snd $3) Nothing $4 }
-
-agent           :: { Expr }
-  : 'agent' '(' ident soattrVals ')'    { Agent $3 $4 }
-
-association     :: { Expr }
-  : 'wasAssociatedWith' '(' mayIdent ',' may(ident) ',' may(ident) soattrVals ')' { WasAssociatedWith (fst $3) (snd $3) $5 $7 $8 }
-  | 'wasAssociatedWith' '(' mayIdent soattrVals ')' { WasAssociatedWith (fst $3) (snd $3) Nothing Nothing $4 }
-
-attribution     :: { Expr }
-  : 'wasAttributedTo' '(' mayIdent ',' ident soattrVals ')' { WasAttributedTo (fst $3) (snd $3) $5 $6 }
-
-invalidation    :: { Expr }
-  : 'wasInvalidatedBy' '(' mayIdent ',' may(ident) ',' may(time) soattrVals ')'         { WasInvalidatedBy (fst $3) (snd $3) $5 $7 $8 }
-  | 'wasInvalidatedBy' '(' mayIdent ',' soattrVals ')'                                  { WasInvalidatedBy (fst $3) (snd $3) Nothing Nothing $5 }
-
-delegation      :: { Expr }
-  : 'actedOnBehalfOf' '(' mayIdent ',' ident ',' may(ident) soattrVals ')'      { ActedOnBehalfOf (fst $3) (snd $3)  $5 $7 $8      }
-  | 'actedOnBehalfOf' '(' mayIdent ',' ident     soattrVals ')'                 { ActedOnBehalfOf (fst $3) (snd $3)  $5 Nothing $6 }
-
-derivation      :: { Expr }
-  : 'wasDerivedFrom' '(' mayIdent ',' ident ',' may(ident) ',' may(ident) ',' may(ident) soattrVals ')' {  WasDerivedFrom (fst $3) (snd $3) $5 $7 $9 $11 $12 }
-  | 'wasDerivedFrom' '(' mayIdent ',' ident soattrVals ')'                                              {  WasDerivedFrom (fst $3) (snd $3) $5 Nothing Nothing Nothing $6 }
-
-isPartOf        :: { Expr}
-  : 'isPartOf'  '(' ident ',' ident ')'         {  IsPartOf $3 $5 }
-
-description     :: { Expr }
-  : 'description' '(' ident soattrVals ')'      {  Description $3 $4 }
+identOrTime :: { Either Ident Time }
+ : ident                { Left $1  }
+ | time                 { Right $1 }
 
 -- Can use marker instead
 may(p)
   : '-'         { Nothing }
   | p           { Just $1 }
 
--- Typical for optional identifiers
-mayIdent
-  : '-' ';' ident    { (Nothing, $3) }
-  | ident ';' ident  { (Just $1, $3) }
-  | ident            { (Nothing, $1) }
-
 time :: { Time }
   : TIME           { (\(Time t) -> t) $1 }
 
+optAttrs(avParse)
+  : ',' attrs(avParse)          { $2 }
+  | {- empty -}                 { [] }
+
+attrs(avParse)
+  : '[' sep(',', avParse) ']'        { $2 }
+
 soattrVals :: { [(Key,Value)] }
   : ',' oattrVals       { $2 }
-  | ',' '-'             { [] {- XXX the Prov-N spec does not acknowledge this -} }
-  -- ^^^ the above causes reduce-reduce conflicts. Twice over.  I think it's harmless.
   | {- empty -}         { [] }
 
 oattrVals :: { [(Key,Value)] }
@@ -254,13 +144,13 @@ sep1_body(punc,p)
   | p                        { [$1]    }
 
 args(punc,p)
-  : p                           { [$1] }
-  | args(punc,p) punc p         { $3 : $1 }
+  : p                           { [$1]    }
+  | args(punc,p) punc p        { $3 : $1 }
 
 {
 
 parseProvN:: Text -> Either ParseError Prov
-parseProvN txt = runParser txt parseProv
+parseProvN txt = fmap fullyQualifyIdents (runParser txt parseProv)
 
 parseProvNFile :: FilePath -> IO (Either ParseError Prov)
 parseProvNFile fp = parseProvN <$> L.readFile fp

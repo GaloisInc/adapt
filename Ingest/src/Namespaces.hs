@@ -2,12 +2,33 @@
 {-# LANGUAGE OverloadedStrings  #-}
 module Namespaces
   ( prov,dc,adapt,foaf,nfo,URI
-  , Ident(..), mkIdent, (.:), textOfIdent
+  , Ident(..), domain, local, mkIdent, (.:), textOfIdent
+  , allIdent
+  , adaptIdent
   , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
   , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp
   , adaptFilePath
+  , foafIdent
   , foafName, foafAccountName
-  , provAtTime, provType
+  , provIdent
+  , provAtTime
+  , provType
+  , provActivity
+  , provAgent
+  , provWasAssociatedWith
+  , provEntity
+  , provUsed
+  , provWasStartedBy
+  , provWasGeneratedBy
+  , provWasEndedBy
+  , provWasInformedBy
+  , provWasAttributedTo
+  , provWasDerivedFrom
+  , provActedOnBehalfOf
+  , provWasInvalidatedBy
+  , dcIdent
+  , dcDescription, dcIsPartOf
   , blankNode
   ) where
 
@@ -43,6 +64,17 @@ foaf  = perr "http://xmlns.com/foaf/0.1/"
 nfo   = perr "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/"
 prov  = perr "http://www.w3.org/ns/prov#"
 
+allIdent :: [Ident]
+allIdent = adaptIdent ++ provIdent ++ foafIdent ++ dcIdent
+
+adaptIdent :: [Ident]
+adaptIdent =
+  [ adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
+  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp
+  , adaptFilePath
+  ]
+
 adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptFilePath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
 adaptUnitOfExecution = adapt .: "unitOfExecution"
 adaptPid             = adapt .: "pid"
@@ -57,12 +89,50 @@ adaptArtifactType    = adapt .: "artifactType"
 adaptCmdLine         = adapt .: "cmdLine"
 adaptCmdString       = adapt .: "cmdString"
 adaptFilePath        = adapt .: "filePath"
-
 adaptMachineID       = adapt .: "machineID"
-foafName             = foaf  .: "name"
-foafAccountName      = foaf  .: "accountName"
-provAtTime           = prov  .: "atTime"
-provType             = prov  .: "type"
+adaptRead            = adapt .: "read"
+adaptRecv            = adapt .: "recv"
+adaptAccept          = adapt .: "accept"
+adaptExecute         = adapt .: "execute"
+adaptReturnVal       = adapt .: "returnVal"
+adaptArgs            = adapt .: "args"
+adaptUseOp           = adapt .: "useOp"
+
+
+foafIdent :: [Ident]
+foafIdent = [foafName, foafAccountName]
+
+foafName              = foaf  .: "name"
+foafAccountName       = foaf  .: "accountName"
+
+provIdent :: [Ident]
+provIdent =
+  [ provAtTime , provType , provActivity , provAgent , provWasAssociatedWith , provEntity
+  , provUsed , provWasStartedBy , provWasGeneratedBy , provWasEndedBy , provWasInformedBy
+  , provWasAttributedTo , provWasDerivedFrom , provActedOnBehalfOf , provWasInvalidatedBy
+  ]
+
+provAtTime            = prov  .: "atTime"
+provType              = prov  .: "type"
+provActivity          = prov  .: "activity"
+provAgent             = prov  .: "agent"
+provWasAssociatedWith = prov  .: "wasAssociatedWith"
+provEntity            = prov  .: "entity"
+provUsed              = prov  .: "used"
+provWasStartedBy      = prov  .: "wasStartedBy"
+provWasGeneratedBy    = prov  .: "wasGeneratedBy"
+provWasEndedBy        = prov  .: "wasEndedBy"
+provWasInformedBy     = prov  .: "wasInformedBy"
+provWasAttributedTo   = prov  .: "wasAttributedTo"
+provWasDerivedFrom    = prov  .: "wasDerivedFrom"
+provActedOnBehalfOf   = prov  .: "actedOnBehalfOf"
+provWasInvalidatedBy  = prov  .: "wasInvalidatedBy"
+
+dcIdent :: [Ident]
+dcIdent = [dcDescription, dcIsPartOf]
+
+dcDescription = dc .: "description"
+dcIsPartOf    = dc .: "isPartOf"
 
 blankNode :: Ident
 blankNode = Unqualified "_"

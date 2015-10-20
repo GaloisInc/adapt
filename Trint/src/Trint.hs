@@ -22,7 +22,7 @@ import System.FilePath ((<.>))
 
 data Config = Config { lintOnly   :: Bool
                      , graph      :: Bool
-                     , largestSub :: Bool
+                     , stats      :: Bool
                      , files      :: [FilePath]
                      }
 
@@ -40,9 +40,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['g'] ["graph"]
                     "Produce a dot file representing a graph of the conceptual model."
                     $ NoArg $ \s -> Right s { graph = True }
-                  , Option [] ["largestSub"]
-                    "Print the size of the largest subgraph (an int)."
-                    $ NoArg $ \s -> Right s { largestSub = True }
+                  , Option ['s'] ["stats"]
+                    "Print statistics."
+                    $ NoArg $ \s -> Right s { stats = True }
                   ]
                }
 
@@ -65,7 +65,7 @@ doRest c fp res
   | lintOnly c = return ()
   | otherwise =
       do when (graph c) (writeFile (fp <.> "dot") (G.graph res))
-         when (largestSub c) (printLargestSubgraph res)
+         when (stats c) (printStats res)
          -- XXX
          -- let doc = T.unlines $ map ppStmt res
          -- when (not lint) (writeFile (fp <.> "trint") doc)
@@ -76,8 +76,8 @@ printWarnings ws =
   do let doc = L.unlines $ intersperse "\n" $ map ppWarning ws
      L.putStrLn doc
 
-printLargestSubgraph :: [Stmt] -> IO ()
-printLargestSubgraph ss =
+printStats :: [Stmt] -> IO ()
+printStats ss =
   do let g  = mkGraph ss
          vs = vertices g
          mn = length (take 1 ss) -- one node suggests the minimum subgraph is one.
