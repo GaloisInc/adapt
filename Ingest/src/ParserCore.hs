@@ -6,6 +6,8 @@ module ParserCore (module ParserCore, Ident(..), textOfIdent) where
 
 import LexerCore hiding (mkIdent)
 import Lexer
+import Position
+import PP
 
 import           Namespaces as NS
 import           Control.Applicative (Applicative)
@@ -19,6 +21,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 import           Network.URI (URI)
+import qualified Network.URI as URI
 import qualified Data.Generics.Uniplate.Operations as Uniplate
 import           Data.Generics.Uniplate.Data ()
 
@@ -30,10 +33,11 @@ data Prefix = Prefix Text URI
 
 type Time = UTCTime
 
-data Expr = RawEntity { exprOper  :: Ident
-                      , exprIdent :: (Maybe Ident)
-                      , exprArgs  :: [Maybe (Either Ident Time)]
-                      , exprAttrs :: KVs
+data Expr = RawEntity { exprOper     :: Ident
+                      , exprIdent    :: (Maybe Ident)
+                      , exprArgs     :: [Maybe (Either Ident Time)]
+                      , exprAttrs    :: KVs
+                      , exprLocation :: Range
                       }
       deriving (Eq,Ord,Show,Data)
 
@@ -58,6 +62,13 @@ expandPrefixes (Prov ps ex) = Prov ps (Uniplate.transformBi f ex)
   f :: Ident -> Ident
   f i@(Qualified d l) = maybe i (\d' -> mkIdent d' l) $ Map.lookup d m
   f i                 = i
+
+mkPrefix :: Located Token -> Located Token -> Prefix
+mkPrefix (Located _ (Ident i)) (Located uriLoc (URI s)) =
+  case URI.parseURI s of
+    Just u  -> Prefix (L.pack i) u
+    Nothing -> error $ "Could not parse URI: " ++ show (s, pretty uriLoc)
+                -- XXX Make the parser an exception monad
 
 type KVs   = [(Key,Value)]
 type Key   = Ident
@@ -89,11 +100,11 @@ newtype Parser a = Parser
   { getParser :: StateT RW (ExceptionT ParseError Id) a
   } deriving (Functor,Monad, Applicative)
 
-data RW = RW { rwInput  :: [Token]
-             , rwCursor :: Maybe Token
+data RW = RW { rwInput  :: [Located Token]
+             , rwCursor :: Maybe (Located Token)
              }
 
-data ParseError = HappyError (Maybe Token)
+data ParseError = HappyError (Maybe (Located Token))
                 | HappyErrorMsg String
                   deriving (Data, Eq, Ord, Show)
 
@@ -108,7 +119,7 @@ runParser txt p =
           , rwCursor = Nothing
           }
 
-lexerP :: (Token -> Parser a) -> Parser a
+lexerP :: ((Located Token) -> Parser a) -> Parser a
 lexerP k = Parser $ do
   rw <- get
   case rwInput rw of

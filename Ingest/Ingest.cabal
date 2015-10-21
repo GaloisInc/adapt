@@ -17,7 +17,7 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Graph, Ingest, Lexer, LexerCore, Namespaces, Parser, ParserCore, Translate, Typecheck, Types
+  exposed-modules:     Graph, Ingest, Lexer, LexerCore, Namespaces, Parser, ParserCore, Translate, Typecheck, Types, Position, PP
   -- other-modules:       
   other-extensions:    RecordWildCards, GeneralizedNewtypeDeriving, DeriveDataTypeable, OverloadedStrings, ViewPatterns, MultiParamTypeClasses, PartialTypeSignatures, TypeSynonymInstances, FlexibleInstances
   build-depends:       base >=4.8 && <4.9
@@ -30,6 +30,7 @@ library
                      , uniplate >= 1.6 && <1.7
                      , dlist >= 0.7 && <0.8
                      , array >= 0.5 && <0.6
+                     , pretty
   hs-source-dirs:      src
   build-tools:         alex, happy
   default-language:    Haskell2010

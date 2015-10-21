@@ -10,8 +10,11 @@ module Lexer (
 
 import Data.Char
 import Numeric
-import LexerCore
 import qualified Data.Text.Lazy as T
+
+import LexerCore
+import PP
+import Position
 
 }
 
@@ -32,7 +35,7 @@ $bin_digit      = [0-1]
 
 <uri> {
 @uriPart                { addURI }
-\\n                     { \_ _ -> (Just (Err $ LexicalError "Lexer: Newline in uri."), Normal) }
+\\n                     { \r _ _ -> (Just (Err (LexicalError "Lexer: Newline in uri.") `at` r), Normal) }
 >                       { mkURI         }
 }
 
@@ -91,24 +94,26 @@ stateToInt (InString _) = string
 stateToInt InURI     {} = uri
 stateToInt InComment {} = mlc
 
-primLexer :: T.Text -> [Token]
+primLexer :: T.Text -> [Located Token]
 primLexer = loop Normal . initialInput
  where
- loop :: LexState -> AlexInput -> [Token]
+ loop :: LexState -> AlexInput -> [Located Token]
  loop sc ai =
     case alexScan ai (stateToInt sc) of
         AlexToken ai' len action  ->
             let chunk    = T.take (fromIntegral len) (aiInput ai)
-                (mb,sc') = action chunk sc
+                (mb,sc') = action (Range (aiPos ai) (aiPos ai') "") chunk sc
                 rest     = loop sc' ai'
             in maybe rest (:rest) mb
         AlexSkip ai' _            -> loop sc ai'
-        AlexError  x              -> [Err $ LexicalError (show (sc, aiChar x, aiBytes x))]
+        AlexError  x              -> err (show (sc, aiChar x, aiBytes x))
         AlexEOF                   ->
                 case sc of
-                    Normal       -> [Eof]
-                    InString s   -> panic $ "Unexpected end of file: non-terminated string starting with: " ++ take 10 s
-                    InURI    s   -> panic $ "Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s
-                    InComment _  -> panic $ "Unexpected end of file: non-terminated comment."
+                    Normal       -> [Eof `at` aiRng ai]
+                    InString s   -> err ("Unexpected end of file: non-terminated string starting with: " ++ take 10 s)
+                    InURI    s   -> err ("Unexpected end of file: non-terminated URI starting with: "    ++ take 10 s)
+                    InComment _  -> err "Unexpected end of file: non-terminated comment."
+   where
+   err s = [Err (LexicalError s) `at` (aiRng ai)]
 
 }

@@ -32,4 +32,4 @@ ingestText t = runId $ runExceptionT $ do
   p       <- eX PE  (parseProvN t)
   (ts,ws) <- eX TRE (translate p)
   ()      <- eX TCE (typecheck ts)
-  return (ts,ws)
+  return  (ts,ws)

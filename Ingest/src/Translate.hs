@@ -12,6 +12,7 @@ module Translate
   ( translate
   ) where
 
+import PP hiding ((<>))
 import Namespaces as NS
 import ParserCore
 import LexerCore (parseUTC) -- XXX move this
@@ -74,7 +75,7 @@ tExprs :: Prov -> Tr [T.Stmt]
 tExprs (Prov _prefix es) = catMaybes <$> mapM (safely . tExpr) es
 
 pattern PIdent i <- Just (Left i)
-pattern PTime t <- Just (Right t)
+pattern PTime t  <- Just (Right t)
 
 -- View maybe time
 vMTime (PTime t)   = Just t
@@ -85,39 +86,45 @@ vMIdent _          = Nothing
 eqIdent :: Ident -> Ident -> Bool
 eqIdent p e = e == p
 
-pattern Entity i kvs <- RawEntity (eqIdent provEntity -> True) Nothing [vMIdent -> Just i] kvs
-pattern Agent i kvs <- RawEntity (eqIdent provAgent -> True) Nothing [vMIdent -> Just i] kvs
-pattern Activity i mStart mEnd kvs <- RawEntity (eqIdent provActivity -> True) Nothing [vMIdent -> Just i, vMTime -> mStart, vMTime -> mEnd] kvs
-pattern WasGeneratedBy mI subj mObj t kvs <- RawEntity (eqIdent provWasGeneratedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> t] kvs
-pattern Used mI subj mObj time kvs <- RawEntity (eqIdent provUsed -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> Just time] kvs
-pattern WasStartedBy mI subj mObj mPT mTime kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT, vMTime -> mTime] kvs
-pattern NonStandardWasStartedBy mI subj mObj mPT kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT] kvs
-pattern WasEndedBy mI subj mObj mParentTrigger mTime kvs <- RawEntity (eqIdent provWasEndedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mParentTrigger, vMTime -> mTime] kvs
-pattern WasInformedBy mI subj mObj kvs <- RawEntity (eqIdent provWasInformedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj] kvs
+pattern Entity i kvs <- RawEntity (eqIdent provEntity -> True) Nothing [vMIdent -> Just i] kvs _
+pattern Agent i kvs <- RawEntity (eqIdent provAgent -> True) Nothing [vMIdent -> Just i] kvs _
+pattern Activity i mStart mEnd kvs <- RawEntity (eqIdent provActivity -> True) Nothing [vMIdent -> Just i, vMTime -> mStart, vMTime -> mEnd] kvs _
+pattern WasGeneratedBy mI subj mObj t kvs <- RawEntity (eqIdent provWasGeneratedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> t] kvs _
+pattern Used mI subj mObj time kvs <- RawEntity (eqIdent provUsed -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> Just time] kvs _
+pattern WasStartedBy mI subj mObj mPT mTime kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT, vMTime -> mTime] kvs _
+pattern NonStandardWasStartedBy mI subj mObj mPT kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT] kvs _
+pattern WasEndedBy mI subj mObj mParentTrigger mTime kvs <- RawEntity (eqIdent provWasEndedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mParentTrigger, vMTime -> mTime] kvs _
+pattern WasInformedBy mI subj mObj kvs <- RawEntity (eqIdent provWasInformedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj] kvs _
 -- XXX Prov-N spec does not allow for a marker in place of KVs, but some tools generate the marker anyway.
--- pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPlan] kvs
-pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI ((vMIdent -> Just subj) : (vMIdent -> mObj) : (vMIdent -> mPlan) : _) kvs
-pattern WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj, vMIdent -> mGeneratingEnt, vMIdent -> mGeneratingAct, vMIdent -> useId] kvs
-pattern WasAttributedTo mI subj obj kvs <- RawEntity (eqIdent provWasAttributedTo -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs
-pattern IsPartOf subj obj <- RawEntity (eqIdent dcIsPartOf -> True) Nothing [vMIdent -> Just subj, vMIdent -> Just obj] (null -> True)
-pattern Description obj kvs <- RawEntity (eqIdent dcDescription -> True) Nothing [vMIdent -> Just obj] kvs
+-- pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPlan] kvs _
+pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI ((vMIdent -> Just subj) : (vMIdent -> mObj) : (vMIdent -> mPlan) : _) kvs _
+pattern WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj, vMIdent -> mGeneratingEnt, vMIdent -> mGeneratingAct, vMIdent -> useId] kvs _
+pattern WasAttributedTo mI subj obj kvs <- RawEntity (eqIdent provWasAttributedTo -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs _
+pattern IsPartOf subj obj <- RawEntity (eqIdent dcIsPartOf -> True) Nothing [vMIdent -> Just subj, vMIdent -> Just obj] (null -> True) _
+pattern Description obj kvs <- RawEntity (eqIdent dcDescription -> True) Nothing [vMIdent -> Just obj] kvs _
+
+mkStmt :: T.Entity -> Maybe T.Stmt
+mkStmt = Just . T.StmtEntity
+
+mkPred :: T.Predicate -> Maybe T.Stmt
+mkPred = Just . T.StmtPredicate
 
 tExpr :: Expr -> Tr (Maybe T.Stmt)
-tExpr (Entity i kvs)                                                       = Just . T.StmtEntity <$> entity i kvs
-tExpr (Activity i mStart mEnd kvs)                                         = Just . T.StmtEntity <$> activity i mStart mEnd kvs
-tExpr (Agent i kvs)                                                        = Just . T.StmtEntity <$> agent i kvs
-tExpr (WasGeneratedBy mI subj mObj mTime kvs)                              = Just . T.StmtPredicate <$> wasGeneratedBy mI subj mObj mTime kvs
-tExpr (Used mI subj mObj time kvs)                                         = Just . T.StmtPredicate <$> used mI subj mObj time kvs
-tExpr (WasStartedBy mI subj mObj mParentTrigger mTime kvs)                 = Just . T.StmtPredicate <$> wasStartedBy mI subj mObj mParentTrigger mTime kvs
-tExpr (NonStandardWasStartedBy mI subj mObj mParentTrigger kvs)            = Just . T.StmtPredicate <$> wasStartedBy mI subj mObj mParentTrigger Nothing kvs
-tExpr (WasEndedBy mI subj mObj mParentTrigger mTime kvs)                   = Just . T.StmtPredicate <$> wasEndedBy mI subj  mObj mParentTrigger mTime kvs
-tExpr (WasInformedBy mI subj mObj kvs)                                     = Just . T.StmtPredicate <$> wasInformedBy mI subj mObj kvs
-tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = Just . T.StmtPredicate <$> wasAssociatedWith mI subj mObj mPlan kvs
-tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = Just . T.StmtPredicate <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
-tExpr (WasAttributedTo mI subj obj kvs)                                    = Just . T.StmtPredicate <$> wasAttributedTo mI subj obj kvs
-tExpr (IsPartOf subj obj)                                                  = Just . T.StmtPredicate <$> isPartOf subj obj
-tExpr (Description obj kvs)                                                = Just . T.StmtPredicate <$> description obj kvs
-tExpr r@(RawEntity pred mI _ _)                                            = warnN $ "Unrecognized statement: " <> L.pack (show r)
+tExpr (Entity i kvs)                                                       = mkStmt <$> entity i kvs
+tExpr (Activity i mStart mEnd kvs)                                         = mkStmt <$> activity i mStart mEnd kvs
+tExpr (Agent i kvs)                                                        = mkStmt <$> agent i kvs
+tExpr (WasGeneratedBy mI subj mObj mTime kvs)                              = mkPred <$> wasGeneratedBy mI subj mObj mTime kvs
+tExpr (Used mI subj mObj time kvs)                                         = mkPred <$> used mI subj mObj time kvs
+tExpr (WasStartedBy mI subj mObj mParentTrigger mTime kvs)                 = mkPred <$> wasStartedBy mI subj mObj mParentTrigger mTime kvs
+tExpr (NonStandardWasStartedBy mI subj mObj mParentTrigger kvs)            = mkPred <$> wasStartedBy mI subj mObj mParentTrigger Nothing kvs
+tExpr (WasEndedBy mI subj mObj mParentTrigger mTime kvs)                   = mkPred <$> wasEndedBy mI subj  mObj mParentTrigger mTime kvs
+tExpr (WasInformedBy mI subj mObj kvs)                                     = mkPred <$> wasInformedBy mI subj mObj kvs
+tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkPred <$> wasAssociatedWith mI subj mObj mPlan kvs
+tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = mkPred <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
+tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
+tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
+tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
+tExpr r@(RawEntity pred mI _ _ loc)                                        = warnN $ "Unrecognized statement at " <> L.pack (pretty loc) <> "(" <> L.pack (show r) <> ")"
 
 --------------------------------------------------------------------------------
 --  Entity Translation

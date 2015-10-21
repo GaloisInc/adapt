@@ -10,18 +10,27 @@ import Data.Word (Word8)
 import qualified Data.Text.Lazy as L
 import Numeric (readDec)
 import Data.Time
+import Data.List (foldl')
+
+import Position
+import PP
 
 -- Alex Compatibility ----------------------------------------------------------
 
 data AlexInput = AlexInput { aiChar    :: !Char
                            , aiBytes   :: [Word8]
                            , aiInput   :: L.Text
+                           , aiPos     :: Position
                            }
 
+aiRng :: AlexInput -> Range
+aiRng p = Range (aiPos p) (aiPos p) ""
+
 initialInput :: L.Text -> AlexInput
-initialInput txt = AlexInput { aiChar = '\n'
+initialInput txt = AlexInput { aiChar  = '\n'
                              , aiBytes = []
                              , aiInput = txt
+                             , aiPos   = Position 0 0 0
                              }
 
 fillBuffer :: AlexInput -> Maybe AlexInput
@@ -30,6 +39,7 @@ fillBuffer ai = do
   return ai { aiBytes = utf8Encode c
             , aiChar  = c
             , aiInput = rest
+            , aiPos   = advance c (aiPos ai)
             }
 
 -- | Encode a Haskell String to a list of Word8 values, in UTF8 format.
@@ -69,35 +79,35 @@ data LexState = Normal
               | InComment Int
               deriving (Show)
 
-type Action = L.Text -> LexState -> (Maybe Token, LexState)
+type Action = Range -> L.Text -> LexState -> (Maybe (Located Token), LexState)
 
-panic :: String -> a
-panic = error
+panic :: String -> Range -> Maybe (Located Token)
+panic s r = Just ((Err (LexicalError s)) `at` r)
 
 -- | Emit a token.
 emit :: Token -> Action
-emit tok _chunk sc = (Just tok, sc)
+emit tok r chunk sc = (Just (tok `at` r), sc)
 
 -- | Skip the current input.
 skip :: Action
-skip _ sc = (Nothing,sc)
+skip _ _ sc = (Nothing,sc)
 
 -- | Generate an identifier token.
 mkIdent :: Action
-mkIdent chunk sc = (Just (Ident (L.unpack chunk) ), sc)
+mkIdent r chunk sc = (Just (Ident (L.unpack chunk) `at` r), sc)
 
 -- | Read  number
 number :: Action
-number chunk sc =
+number r chunk sc =
   case readDec (L.unpack chunk) of
-    [(n, _)] -> (Just (Num n), sc)
-    _        -> (Just (Err $ LexicalError "Could not decode number."), sc)
+    [(n, _)] -> (Just (Num n `at` r), sc)
+    _        -> (Just (Err (LexicalError "Could not decode number.") `at` r), sc)
 
 -- Time Literal ----------------------------------------------------------------
 
 mkTime :: Action
-mkTime chunk Normal = (fmap Time (parseUTC chunk), Normal)
-mkTime _     _      = panic "Lexer tried to lex a time from within a string literal."
+mkTime r chunk Normal = (fmap (Located r . Time) (parseUTC chunk), Normal)
+mkTime r _     _      = (panic "Lexer tried to lex a time from within a string literal." r, Normal)
 
 parseUTC :: L.Text -> Maybe UTCTime
 parseUTC chunk =
@@ -122,42 +132,42 @@ parseUTC chunk =
 -- Multi-Line Comments ---------------------------------------------------------
 
 startComment :: Action
-startComment _ (InComment n) = (Nothing, InComment (n+1))
-startComment _ _             = (Nothing, InComment 1)
+startComment _ _ (InComment n) = (Nothing, InComment (n+1))
+startComment _ _ _             = (Nothing, InComment 1)
 
 endComment :: Action
-endComment _ (InComment n)
+endComment _ _ (InComment n)
   | n <= 1    = (Nothing, Normal)
   | otherwise = (Nothing, InComment (n-1))
 
 -- String Literals -------------------------------------------------------------
 
 startString :: Action
-startString _ _ = (Nothing, InString "")
+startString _ _ _ = (Nothing, InString "")
 
 -- | Discard the chunk, and use this string instead.
 litString :: String -> Action
-litString lit _ (InString str) = (Nothing, InString (str ++ lit))
-litString _   _ _              = panic "Lexer expected string literal state"
+litString lit _ _ (InString str) = (Nothing, InString (str ++ lit))
+litString _   r _ _              = (panic "Lexer expected string literal state" r, Normal)
 
 addString :: Action
-addString chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
-addString _     _              = panic "Lexer expected string literal state"
+addString _ chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
+addString r _     _            = (panic "Lexer expected string literal state" r, Normal)
 
 mkString :: Action
-mkString _ (InString str) = (Just (String str), Normal)
-mkString _ _              = panic "Lexer expected string literal state"
+mkString r _ (InString str) = (Just (String str `at` r), Normal)
+mkString r _ _              = (panic "Lexer expected string literal state" r, Normal)
 
 startURI :: Action
-startURI _ _ = (Nothing, InURI "")
+startURI _ _ _ = (Nothing, InURI "")
 
 addURI :: Action
-addURI chunk (InURI uri)  = (Nothing, InURI (uri ++ L.unpack chunk))
-addURI _     _            = panic "Lexer expected uri state"
+addURI _ chunk (InURI uri) = (Nothing, InURI (uri ++ L.unpack chunk))
+addURI r  _  _             = (panic "Lexer expected uri state" r, Normal)
 
 mkURI :: Action
-mkURI _ (InURI uri)       = (Just (URI uri), Normal)
-mkURI _ _                 = panic "Lexer expected uri state"
+mkURI r _ (InURI uri)       = (Just (URI uri `at` r), Normal)
+mkURI r _ _               = (panic "Lexer expected uri state at pos" r, Normal)
 
 
 -- Tokens ----------------------------------------------------------------------
