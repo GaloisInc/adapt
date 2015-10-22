@@ -377,7 +377,7 @@ The 'used' predicate is invalid without the 'useOp' attribute.
 
 ```
 usage           :: { Expr }
-  : 'used' '(' ident ',' may(ident) ',' time attrs(usageAttr) ')'
+  : 'used' '(' ident ',' may(ident) ',' time ',' attrs(usageAttr) ')'
 
 usageAttr :: { (Key,Value) }
   : 'atTime'    '=' time
