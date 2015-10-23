@@ -63,12 +63,15 @@ entity(ex:createExe, [
 			adapt:artifactType='nfo:FileDataObject', //required
 			// alternately, 'adapt:packet'
 			// alternately, 'adapt:memory'
+			// alternately, 'adapt:registry-entry'
 			nfo:fileName="/users/dwa/mystuff/bin/create.exe",
 			// alternately, 'adapt:portID'
 			// alternately, 'adapt:pageID'
+			// alternately, 'adapt:registry-key'
 			adapt:fileOffset="0x00000000",
 			// alternately, adapt:packetID="0x1234"
 			// alternately, adapt:address="0x00000000"
+			// alternately, adapt:registry-value="some value"
 			prov:generatedAtTime="2015-09-01T12:00:00",
 			dc:hasVersion="23",
 			prov:invalidatedAtTime="NA", 
@@ -100,8 +103,8 @@ agent(ex:parenta, [prov:type='adapt:unitOfExecution'])
 activity(ex:parentb, -, -, [
 			prov:type='adapt:unitOfExecution', //required
 			adapt:machineID="0000000100000001",
-			prov:startedAtTime="2015-10-01T15:30:00",
-			prov:endedAtTime="2015-10-01T17:00:00",
+			prov:startedAtTime="015-10-16T02:13:07Z",
+			prov:endedAtTime="015-10-16T02:13:07Z",
 			adapt:privs="mode=u",
 			foaf:accountName="dwa",
 			foaf:group="Group1",
@@ -111,7 +114,7 @@ activity(ex:parentb, -, -, [
 			adapt:cmdLine="xterm",
 			adapt:cmdString="xterm"])
 //     the connection between them 
-wasAssociatedWith(ex:parentb, ex:parenta, -) 
+wasAssociatedWith(ex:parentb, ex:parenta, 015-10-16T02:13:07Z) 
 // end of parent process record
 ```
 
@@ -143,34 +146,29 @@ An artifact such as *ex:createExe* can be created by a UoE such as *ex:parentb* 
 
 ```
 // newprog.exe was created by the parent process (activity ex:parentb)
-wasGeneratedBy(ex:createExe, ex:parentb, -, [
+wasGeneratedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z, [
 				adapt:genOp='write', \\required
-				prov:atTime="2015-09-01T12:00:00", \\required
 				nfo:permissions="0o775"])
 ```
 
 An artifact such as *ex:createExe* can be deleted by a UoE such as *ex:parentb*. The sole attribute, required, is the deletion time.
 
 ```
-wasInvalidatedBy(ex:createExe, ex:parentb, -, [prov:atTime="2015-09-01T12:00:00", \\required])
+wasInvalidatedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z)
 ```
 An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* executing an operation *adapt:useOp* that is one of 'read', 'recv', 'accept', or 'execute'. Required attributes include the start and end times of the use action, and the use operation. Optional attributes include an entry address (for example, if useOp is 'execute'), an argument list passed to an executed function, and a return value returned by an executed function.
 
 ```
-used(ex:parentb, ex:createExe, -,[
-			prov:startedAtTime="2015-10-01T16:00:00", //required
-			prov:endedAtTime="2015-10-01T16:00:01", //required
+used(ex:parentb, ex:createExe, 015-10-16T02:13:07Z,[
 			adapt:entryAddress="0x8048170",
-			adapt:argList="",
+			adapt:args="",
 			adapt:returnValue="0",
-			adapt:useOp="execute"] //required)
+			adapt:operation="execute"] //required)
 ```
 Similarly, a resource such as *ex:GPSunit* may be used by a UoE such as *ex:childB*. Required are the start and end time of the use. Optionsl are a command string sent to the device and a value returned from the device.
 
 ```
-used(ex:childB, ex:GPSunit, -, [
-			prov:startedAtTime="2015-10-01T16:00:01", 
-			prov:endedAtTime="2015-10-01T16:00:22",
+used(ex:childB, ex:GPSunit, 015-10-16T02:13:07Z, [
 			adapt:cmd="read location",
 			adapt:returnVal="45.52119128833272,-122.67789063043892"
 			])
@@ -179,7 +177,7 @@ used(ex:childB, ex:GPSunit, -, [
 An artifact such as *ex:createExe* can be attributed to a UoE or an agent such as *ex:parenta*.
 
 ```
-wasAttributedTo(ex:createExe, ex:parenta, -)
+wasAttributedTo(ex:createExe, ex:parenta)
 ```
 
 A UoE such as *ex:parenta* can act on behalf of an agent such as *ex:externalAgent*. Note that the activity portion of the UoE is shown in the third argument position:
@@ -198,11 +196,11 @@ wasAssociatedWith(ex:parentb, ex:externalAgent, -)
 A UoE can start, end, or inform another UoE. The former requires a start time, while the middle requires an end time. The latter requires both a timestamp and the operation that must  be one of fork, clone, execve, kill, or setuid.
 
 ```
-wasStartedBy(ex:childB, -, ex:parentb, -, [prov:startedAtTime="2015-10-01T16:00:01"])
+wasStartedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z)
 
-wasEndedBy(ex:childB, -, ex:parentb, -, [prov:endedAtTime="2015-10-01T16:00:01"])
+wasEndedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z)
 
-wasInformedBy(ex:childB, -, ex:parentb, -, [prov:atTime="2015-10-01T16:00:01", adapt:execOp='kill'])
+wasInformedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z, [adapt:execOp='kill'])
 ```
 
 An artifact such as *ex:newprogExe* can be derived from another artifact such as *ex:newprogSrc* using an *adapt:deriveOp* operation that is one of rename, link, or compile.
@@ -362,7 +360,7 @@ generation      :: { Expr }
 
 generationAttr
  : 'genOp'    '=' genOp
- | 'modVec'   '=' NUM
+ | 'nfo:permissions'   '=' NUM
 
 genOp
  : 'write'
@@ -377,11 +375,10 @@ The 'used' predicate is invalid without the 'useOp' attribute.
 
 ```
 usage           :: { Expr }
-  : 'used' '(' ident ',' may(ident) ',' time ',' attrs(usageAttr) ')'
+  : 'used' '(' ident ',' ident ',' time ',' attrs(usageAttr) ')'
 
 usageAttr :: { (Key,Value) }
-  : 'atTime'    '=' time
-  | 'args'      '=' STRINGLIT
+  : 'args'      '=' STRINGLIT
   | 'returnVal' '=' STRINGLIT
   | 'operation' '=' '\'' useOp '\''
 
@@ -475,7 +472,7 @@ said to act on behalf of agents.
 
 ```
 delegation      :: { Expr }
-  : 'actedOnBehalfOf' '(' ident ',' ident ')'
+  : 'actedOnBehalfOf' '(' ident ',' ident ', ' may(ident) ')'
 ```
 
 Similarly, artifacts can be derived from other artifacts.   Both the subject and
@@ -484,7 +481,7 @@ resource.
 
 ```
 derivation      :: { Expr }
-  | 'wasDerivedFrom' '(' ident ',' ident optAttrs(derivationAttr) ')'
+I  | 'wasDerivedFrom' '(' ident ',' ident optAttrs(derivationAttr) ')'
 
 deriviationAttr
   : 'prov:atTime' '=' time
