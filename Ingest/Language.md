@@ -26,16 +26,8 @@ document
 prefix ex <http://example.org/> 
 
 // namespace for our specific attributes
-prefix adapt <http://adapt.org/> 
+prefix prov-tc <http://adapt.org/> 
 
-// friend-of-a-friend has classes such as account name, account group
-prefix foaf <http://xmlns.com/foaf/0.1/>
-
-// dublin core has classes such as name, document length
-prefix dc <http://purl.org/dc/elements/1.1/>
-
-// Nepomuk file ontology has some attributes we use
-prefix nfo <http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/>
 ```
 
 Every valid PROV-TC document concludes with
@@ -59,25 +51,25 @@ An artifact is an entity that may be created, referenced, used, or destroyed, bu
 
 ```
 entity(ex:createExe, [
-			prov:type='adapt:artifact', //required
-			adapt:artifactType='nfo:FileDataObject', //required
-			// alternately, 'adapt:packet'
-			// alternately, 'adapt:memory'
-			// alternately, 'adapt:registry-entry'
-			nfo:fileName="/users/dwa/mystuff/bin/create.exe",
-			// alternately, 'adapt:portID'
-			// alternately, 'adapt:pageID'
-			// alternately, 'adapt:registry-key'
-			adapt:fileOffset="0x00000000",
-			// alternately, adapt:packetID="0x1234"
-			// alternately, adapt:address="0x00000000"
-			// alternately, adapt:registry-value="some value"
-			prov:generatedAtTime="2015-09-01T12:00:00",
-			dc:hasVersion="23",
+			prov:type='tcArtifact', // optional, may be required in a later version
+			prov-tc:artifactType='file', //required: one of the 4 options here
+			// alternately, 'network'
+			// alternately, 'memory'
+			// alternately, 'registry-entry'
+			prov-tc:path="/users/dwa/mystuff/bin/create.exe",
+			// alternately, portID="88"
+			// alternately, pageID="0x123"
+			// alternately, registry-key="stuff"
+			prov-tc:fileOffset="0x00000000",
+			// alternately, packetID="0x1234"
+			// alternately, address="0x00000000"
+			// alternately, registry-value="some value"
+			prov:generatedAtTime="015-10-16T02:13:07Z",
+			prov-tc:hasVersion="23",
 			prov:invalidatedAtTime="NA", 
-			nfo:fileOwner="dwa", 
-			nfo:fileSize="4096",
-			adapt:taint="0x00000001"])
+			prov-tc:uid="dwa", 
+			prov-tc:size="4096",
+			prov-tc:taint="0x00000001"])
 ```
 
 Resource
@@ -87,8 +79,9 @@ A resource is a thing that may be used, but not created or destroyed. Typical re
 ```
 // a GPS sensor resource called ex:GPSunit
 entity(ex:GPSunit, [
-			adapt:devType="GPS", //required
-			adapt:devID="Default GPS sensor")] 
+			prov:type='tcDevice', //optional, may be required later
+			prov-tc:devType="GPS",
+			prov-tc:devID="Default GPS sensor")] 
 ```
 
 Unit of Execution (UoE)
@@ -96,25 +89,25 @@ Unit of Execution (UoE)
 A UoE is a thread of execution running on a processor. It may be created or destroyed, and may take action on its own to create or destroy other UoEs or to affect artifacts. A UoE is reified in PROV as both an *agent* and an *activity*. To show that the pair represent the same entity in our model, they are linked by a particular *relationship*. Below we show an example UoE called "parent". A UoE has only one required attribute, *prov:type*, marked in the example. Other recognized but optional attributes are an ID string unique to the machine where the UoE runs, the times at which the UoE started and ended, the privileges with which the UoE ran, the account name and group name under which it ran, its process ID and parent process ID, the directory where it started, the command line used, and the command used.
 
 ```
-//      the agent portion of a UoE, called ex:parenta
+//      the agent portion of a UoE, called ex:parenta. optional for now
 agent(ex:parenta, [prov:type='adapt:unitOfExecution'])
 //
 //     the activity portion, called ex:parentb, using all defined optional attributes 
 activity(ex:parentb, -, -, [
-			prov:type='adapt:unitOfExecution', //required
-			adapt:machineID="0000000100000001",
+			prov:type='adapt:unitOfExecution',
+			prov-tc:machineID="0000000100000001",
 			prov:startedAtTime="015-10-16T02:13:07Z",
 			prov:endedAtTime="015-10-16T02:13:07Z",
-			adapt:privs="mode=u",
-			foaf:accountName="dwa",
-			foaf:group="Group1",
-			adapt:pid="12",
-			adapt:ppid="1",
-			adapt:pwd="/users/dwa",
-			adapt:cmdLine="xterm",
-			adapt:cmdString="xterm"])
+			prov-tc:privs="mode=u",
+			prov-tc:accountName="dwa",
+			prov-tc:group="Group1",
+			prov-tc:pid="12",
+			prov-tc:ppid="1",
+			prov-tc:cwd="/users/dwa",
+			prov-tc:commandLine="xterm",
+			prov-tc:programName="xterm"])
 //     the connection between them 
-wasAssociatedWith(ex:parentb, ex:parenta, 015-10-16T02:13:07Z) 
+wasAssociatedWith(ex:parentb, ex:parenta, 015-10-16T02:13:07Z) // optional for now
 // end of parent process record
 ```
 
@@ -125,9 +118,7 @@ An agent represents an actor that is not a UoE on a monitored machine. An agent 
 ```
 // a remote agent named ex:exernalAgent
 agent(ex:externalAgent, [
-		adapt:machineID="0000000100000002",
-		foaf:name="Bad Actor",
-		foaf:accountName="badactor"])
+		prov-tc:machineID="0000000100000002"])
 ```
 
 Metadatum
@@ -136,7 +127,7 @@ A metadatum is a thing that describes a UoE or an artifact. A metadatum is an en
 
 ```
 // a metadatum named ex:mdata1
-entity(ex:mdata1, [adapt:metadata="name, type, value"]) //required
+entity(ex:mdata1, [prov-tc:metadata="name, type, value"]) //required
 ```
 
 
@@ -147,8 +138,8 @@ An artifact such as *ex:createExe* can be created by a UoE such as *ex:parentb* 
 ```
 // newprog.exe was created by the parent process (activity ex:parentb)
 wasGeneratedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z, [
-				adapt:genOp='write', \\required
-				nfo:permissions="0o775"])
+				prov-tc:operation='write', \\required
+				prov-tc:permissions="0o775"])
 ```
 
 An artifact such as *ex:createExe* can be deleted by a UoE such as *ex:parentb*. The sole attribute, required, is the deletion time.
@@ -160,17 +151,17 @@ An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* exe
 
 ```
 used(ex:parentb, ex:createExe, 015-10-16T02:13:07Z,[
-			adapt:entryAddress="0x8048170",
-			adapt:args="",
-			adapt:returnValue="0",
-			adapt:operation="execute"] //required)
+			prov-tc:entryAddress="0x8048170",
+			prov-tc:args="",
+			prov-tc:returnValue="0",
+			prov-tc:operation="execute"] //required)
 ```
 Similarly, a resource such as *ex:GPSunit* may be used by a UoE such as *ex:childB*. Required are the start and end time of the use. Optionsl are a command string sent to the device and a value returned from the device.
 
 ```
 used(ex:childB, ex:GPSunit, 015-10-16T02:13:07Z, [
-			adapt:cmd="read location",
-			adapt:returnVal="45.52119128833272,-122.67789063043892"
+			prov-tc:devCommand="read",
+			prov-tc:returnValue="45.52119128833272,-122.67789063043892"
 			])
 ```
 
@@ -208,7 +199,7 @@ An artifact such as *ex:newprogExe* can be derived from another artifact such as
 ```
 // showing the derivation of newprog.exe from newprog.c
 wasDerivedFrom(ex:newprogExe, ex:newprogSrc, [
-			adapt:deriveOp="compile",
+			prov-tc:operation="compile",
 			prov:atTime="2015-08-31T12:00:00"])
 ```
 
@@ -216,7 +207,7 @@ An artifact can be part of another artifact. We use dc:isPartOf for this constru
 
 Detailed PROV-TC Syntax Guide
 ==============
-This section provides a detailed grammatical structure for composition of the statement examples above.
+This section provides a detailed grammatical structure for composition of the statement examples above. Currently under revision to match the section above.
 
 Token Set
 -----------
