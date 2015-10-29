@@ -57,7 +57,8 @@ entity(ex:createExe, [
 			// alternately, 'memory'
 			// alternately, 'registry-entry'
 			prov-tc:path="/users/dwa/mystuff/bin/create.exe",
-			// alternately, portID="88"
+      // alternately, networkAddress="128.10.125.71"
+			// alternately, networkPort="88"
 			// alternately, pageID="0x123"
 			// alternately, registry-key="stuff"
 			prov-tc:fileOffset="0x00000000",
