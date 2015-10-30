@@ -5,59 +5,70 @@ module RDF
   ( turtle
   ) where
 
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Monoid ((<>))
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
-import Text.Dot
 import MonadLib
 import Types
 
 turtle :: [Stmt] -> Text
-turtle = Text.pack . runMe . mapM_ graphStmt
+turtle = runMe . mapM_ tripleStmt
 
-type M a = StateT (Map Text NodeId) Dot a
+data Triple = Triple Text Text Text
 
-runMe :: M a -> String
-runMe = showDot . runStateT Map.empty
+type M a = StateT (Set Text) (StateT [Triple] Id) a
 
-graphStmt :: Stmt -> M ()
-graphStmt (StmtEntity e)    = graphEntity e
-graphStmt (StmtPredicate p) = graphPredicate p
+type NodeId = Text
 
-graphEntity :: Entity -> M ()
-graphEntity e =
-  do case e of
-      Agent i _aattr              -> memoNode $ "Agent:"    <> i
-      UnitOfExecution i _uattr    -> memoNode $ "UoE:"      <> i
-      Artifact i _aattr           -> memoNode $ "Artifact:" <> i
-      Resource i _devTy _devId    -> memoNode $ "Resource:" <> i
-     return ()
+runMe :: M a -> Text
+runMe m = showTriples ts
+  where (_, ts) = runId $ runStateT [] $ runStateT Set.empty m
 
-graphPredicate :: Predicate -> M ()
-graphPredicate (Predicate s o pTy _attr) =
-  do sN <- memoNode s
-     oN <- memoNode o
+
+showTriples :: [Triple] -> Text
+showTriples ts = Text.unlines (headers ++ map showTriple ts)
+  where headers = [] -- XXX FIXME
+
+showTriple :: Triple -> Text
+showTriple (Triple a b c) = Text.intercalate " " [ a, b, c, "."]
+
+tripleStmt :: Stmt -> M ()
+tripleStmt (StmtEntity e)    = tripleEntity e
+tripleStmt (StmtPredicate p) = triplePredicate p
+
+tripleEntity :: Entity -> M ()
+tripleEntity e = void $ case e of
+  Agent i _aattr              -> memoNode i "Agent"
+  UnitOfExecution i _uattr    -> memoNode i "UoE"
+  Artifact i _aattr           -> memoNode i "Artifact"
+  Resource i _devTy _devId    -> memoNode i "Resource"
+
+triplePredicate :: Predicate -> M ()
+triplePredicate (Predicate s o pTy _attr) =
+  do sN <- memoNode s undefined
+     oN <- memoNode o undefined
      newEdge sN oN [("label", show pTy)]
 
-memoNode :: Text -> M NodeId
-memoNode i =
-  do mp <- get
-     case Map.lookup i mp of
-        Just n  -> return n
-        Nothing -> do node <- newNode [("label", Text.unpack i)] -- (objectProperties obj)
-                      set (Map.insert i node mp)
-                      return node
+memoNode :: NodeId -> Text -> M NodeId
+memoNode i nodetype = do
+  s <- get
+  if Set.member i s
+  then return i
+  else do node <- newNode i nodetype
+          set (Set.insert node s)
+          return i
 
 newEdge  :: NodeId -> NodeId -> [(String,String)] -> M ()
-newEdge a b ps = lift (edge a b ps)
+newEdge a b ps = lift (sets_ (\ts -> edge:ts))
+  where
+  edge = Triple a "XXX" b
 
-newNode :: [(String,String)] -> M NodeId
-newNode = lift . node
+newNode :: NodeId -> a -> M NodeId
+newNode nodeid _typeof = do
+  lift (sets_ (\ts -> node:ts))
+  return nodeid
+  where
+  node = Triple nodeid "a" "XXX"
 
--- verbProperties :: Predicate Type -> [(String,String)]
--- verbProperties v = [("label",Text.unpack $ pp $ theObject v)]
--- 
--- objectProperties :: Entity a -> [(String,String)]
--- objectProperties o = [("label",Text.unpack $ pp $ theObject o)]
