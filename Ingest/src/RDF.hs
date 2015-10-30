@@ -14,8 +14,8 @@ import Text.Dot
 import MonadLib
 import Types
 
-turtle :: [Stmt] -> String
-turtle = runMe . mapM_ graphStmt
+turtle :: [Stmt] -> Text
+turtle = Text.pack . runMe . mapM_ graphStmt
 
 type M a = StateT (Map Text NodeId) Dot a
 

@@ -16,10 +16,10 @@ import Types
 
 type M a = StateT (Map Text NodeId) Dot a
 
-runMe :: M a -> String
-runMe = showDot . runStateT Map.empty
+runMe :: M a -> Text
+runMe = Text.pack . showDot . runStateT Map.empty
 
-graph :: [Stmt] -> String
+graph :: [Stmt] -> Text
 graph = runMe . mapM_ graphStmt
 
 graphStmt :: Stmt -> M ()
