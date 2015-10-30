@@ -15,6 +15,7 @@ import ParserCore
 import LexerCore
 import Position
 
+import Control.Applicative ((<$>))
 import Data.Monoid ( mempty, mappend, mconcat )
 import Namespaces
 import qualified Network.URI as URI

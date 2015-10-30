@@ -1,11 +1,9 @@
 -- | Translate the parsed AST ('ParseCore's 'Prov' type) into our domain
 -- representation (list of 'Entity').
-{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ViewPatterns               #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE PatternSynonyms            #-}
 
 module Translate
@@ -19,6 +17,7 @@ import LexerCore (parseUTC) -- XXX move this
 import qualified Types as T
 import           Types (TranslateError(..))
 
+import           Control.Applicative
 import           Data.DList
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
@@ -276,50 +275,48 @@ warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 -- and activity that cause a data derivation, or the "plan" for an
 -- association.
 
--- XXX Parital type signatures until thing stop changing.
-
-wasGeneratedBy :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+wasGeneratedBy :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
 wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
   let constr time = predicate subj obj T.WasGeneratedBy (T.AtTime time : predAttr kvs)
   in case mTime of
       Just at -> return $ constr at
       Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
-used :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+used :: Maybe Ident -> Ident -> Maybe Ident -> Time -> KVs -> Tr T.Predicate
 used mI subj (orBlank -> obj) time kvs =
   return $ predicate subj obj T.Used (T.AtTime time : predAttr kvs)
 
-wasStartedBy :: _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+wasStartedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr time = predicate subj obj T.WasStartedBy (T.AtTime time : predAttr kvs)
   in case mTime of
       Just at -> return $ constr at
       Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
-wasEndedBy :: _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr time = predicate subj obj T.WasEndedBy (T.AtTime time : predAttr kvs)
   in case mTime of
       Just at -> return $ constr at
       Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
 
-wasInformedBy :: _ -> _ -> _ -> _ -> Tr T.Predicate
+wasInformedBy :: a -> Ident -> Maybe Ident -> KVs -> Tr T.Predicate
 wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (predAttr kvs)
 
-wasAssociatedWith :: _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+wasAssociatedWith :: a -> Ident -> Maybe Ident -> d -> KVs -> Tr T.Predicate
 wasAssociatedWith _i subj (orBlank -> obj) _mPlan kvs                 = return $ predicate subj obj T.WasAssociatedWith (predAttr kvs)
 
-wasDerivedFrom  :: _ -> _ -> _ -> _ -> _ -> _ -> _ -> Tr T.Predicate
+wasDerivedFrom  :: a -> Ident -> Ident -> d -> e -> f -> KVs -> Tr T.Predicate
 wasDerivedFrom _i subj obj _mGeneratingEnt _mGeneratingAct _useId kvs = return $ predicate subj obj T.WasDerivedFrom (predAttr kvs)
 
-wasAttributedTo :: _ -> _ -> _ -> _ -> Tr T.Predicate
+wasAttributedTo :: a -> Ident -> Ident -> KVs -> Tr T.Predicate
 wasAttributedTo _i subj obj kvs                                       = return $ predicate subj obj T.WasAttributedTo (predAttr kvs)
 
 -- Dublin Core
-isPartOf :: _ -> _ -> Tr T.Predicate
+isPartOf :: Ident -> Ident -> Tr T.Predicate
 isPartOf subj obj    = return $ predicate subj obj T.IsPartOf []
 
-description :: _ -> _ -> Tr T.Predicate
+description :: Ident -> KVs -> Tr T.Predicate
 description obj  kvs = return $ predicate blankNode obj T.Description (predAttr kvs)
 
 predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate

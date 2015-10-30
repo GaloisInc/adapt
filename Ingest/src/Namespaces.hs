@@ -43,7 +43,7 @@ import Data.Monoid ((<>))
 
 data Ident = Qualified Text Text -- XXX the domain should be a URI.
            | Unqualified Text
-  deriving (Eq,Ord,Show,Data)
+  deriving (Eq,Ord,Show,Data,Typeable)
 
 domain :: Ident -> Maybe Text
 domain (Qualified t _ ) = Just t

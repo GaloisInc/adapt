@@ -11,7 +11,7 @@ import PP
 
 import           Namespaces as NS
 import           Control.Applicative (Applicative)
-import           Data.Data (Data)
+import           Data.Data (Data,Typeable)
 import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
 import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
@@ -26,10 +26,10 @@ import qualified Data.Generics.Uniplate.Operations as Uniplate
 import           Data.Generics.Uniplate.Data ()
 
 data Prov = Prov [Prefix] [Expr]
-  deriving (Eq, Ord, Show,Data)
+  deriving (Eq, Ord, Show,Data,Typeable)
 
 data Prefix = Prefix Text URI
-  deriving (Eq,Ord,Show,Data)
+  deriving (Eq,Ord,Show,Data,Typeable)
 
 type Time = UTCTime
 
@@ -39,7 +39,7 @@ data Expr = RawEntity { exprOper     :: Ident
                       , exprAttrs    :: KVs
                       , exprLocation :: Range
                       }
-      deriving (Eq,Ord,Show,Data)
+      deriving (Eq,Ord,Show,Data,Typeable)
 
 fullyQualifyIdents :: Prov -> Prov
 fullyQualifyIdents = explicitProvPrefixes . expandPrefixes
@@ -78,7 +78,7 @@ data Value = ValString Text
            | ValIdent Ident
            | ValTypedLit Text Ident
            | ValTime Time
-  deriving (Eq,Ord,Show,Data)
+  deriving (Eq,Ord,Show,Data,Typeable)
 
 valueString :: Value -> Maybe Text
 valueString (ValString t) = Just t
@@ -106,7 +106,7 @@ data RW = RW { rwInput  :: [Located Token]
 
 data ParseError = HappyError (Maybe (Located Token))
                 | HappyErrorMsg String
-                  deriving (Data, Eq, Ord, Show)
+                  deriving (Data,Typeable, Eq, Ord, Show)
 
 runParser :: L.Text -> Parser a -> Either ParseError a
 runParser txt p =
