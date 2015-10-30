@@ -22,6 +22,7 @@ import MonadLib.Monads hiding (handle)
 import qualified Data.Text.Lazy as L
 import qualified Data.Text.Lazy.IO as L
 import System.FilePath ((<.>))
+import System.Exit (exitFailure)
 
 data Config = Config { lintOnly   :: Bool
                      , quiet      :: Bool
@@ -31,7 +32,7 @@ data Config = Config { lintOnly   :: Bool
                      , ast        :: Bool
                      , verbose    :: Bool
                      , files      :: [FilePath]
-                     }
+                     } deriving (Show)
 
 defaultConfig :: Config
 defaultConfig = Config
@@ -80,16 +81,27 @@ main =
      mapM_ (trint c) (files c)
 
 trint :: Config -> FilePath -> IO ()
-trint c fp =
-  do eres <- ingestText <$> L.readFile fp
-     case eres of
-      Left e            -> L.putStrLn $ "Error: " <> (L.pack $ show e)
-      Right (res,ws)    ->
-          do unless (quiet c) $ printWarnings ws
-             doRest c fp res
+trint c fp = do
+  eres <- ingest
+  case eres of
+    Left e  -> do
+      putStrLn $ "Error ingesting " ++ fp ++ ":"
+      print e
+    Right (res,ws) -> do
+      unless (quiet c) $ printWarnings ws
+      processStmts c fp res
 
-doRest :: Config -> FilePath -> [Stmt] -> IO ()
-doRest c fp res
+  where
+  ingest = do
+    t <- handle onError (L.readFile fp)
+    return (ingestText t)
+  onError :: IOException -> IO a
+  onError e = do putStrLn ("Error reading " ++ fp ++ ":")
+                 print e
+                 exitFailure
+
+processStmts :: Config -> FilePath -> [Stmt] -> IO ()
+processStmts c fp res
   | lintOnly c = return ()
   | otherwise = do
       when (graph  c) $ do
@@ -106,20 +118,19 @@ doRest c fp res
       when (ast c) $ do
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
-        output astfile $ unlines $ map show res
-        dbg "done"
+        output astfile $ L.unlines $ map (L.pack . show) res
+
   where
   dbg s = when (verbose c) (putStrLn s)
-  output f s = handle (onError f) $ writeFile f s
+  output f t = handle (onError f) $ L.writeFile f t
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
 
 printWarnings :: [Warning] -> IO ()
-printWarnings ws =
-  do let doc = L.unlines $ intersperse "\n" $ map ppWarning ws
-     L.putStrLn doc
+printWarnings ws = L.putStrLn doc
+  where doc = L.unlines $ intersperse "\n" $ map ppWarning ws
 
 printStats :: [Stmt] -> IO ()
 printStats ss =
