@@ -52,12 +52,10 @@ safely m =
      case x of
         Right r                   -> return r
         Left (TranslateError txt) -> warn txt >> return Nothing
-        Left (MissingRequiredTimeField i f constr) ->
+        Left (MissingRequiredTimeField i f stmt) ->
           do warn $ "Filling missing required time field with epoch (entity/field: " <> maybe "" id i <> " " <> f <> ")"
-             return $ Just $ constr timeZero
+             return $ Just stmt
         Left e                    -> warn (L.pack $ show e) >> return Nothing
-  where
-  timeZero = UTCTime (fromGregorian 1900 1 1) 0
 
 warn :: Text -> Tr ()
 warn = put . T.Warn
@@ -280,7 +278,7 @@ wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
   let constr time = predicate subj obj T.WasGeneratedBy (T.AtTime time : generationAttr kvs)
   in case mTime of
       Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
 
 used :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
 used mI subj (orBlank -> obj) mTime kvs =
@@ -291,14 +289,17 @@ wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr time = predicate subj obj T.WasStartedBy (T.AtTime time : startedByAttr kvs)
   in case mTime of
       Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
 
 wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr time = predicate subj obj T.WasEndedBy (T.AtTime time : endedByAttr kvs)
   in case mTime of
       Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate . constr))
+      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
+
+timeZero :: UTCTime
+timeZero = UTCTime (fromGregorian 1900 1 1) 0
 
 wasInformedBy :: a -> Ident -> Maybe Ident -> KVs -> Tr T.Predicate
 wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (informedByAttr kvs)

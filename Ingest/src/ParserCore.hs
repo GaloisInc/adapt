@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
-module ParserCore (module ParserCore, Ident(..), textOfIdent, expandPrefixes) where
+module ParserCore (module ParserCore, Ident(..), textOfIdent) where
 
 import LexerCore hiding (mkIdent)
 import Lexer

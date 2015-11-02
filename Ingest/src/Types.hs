@@ -3,6 +3,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Types
     ( -- * Types
       Error(..)
@@ -39,19 +41,20 @@ import           Text.Show.Functions ()
 
 import ParserCore (Time)
 
-data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Show)
+data Error      = PE ParseError | TCE TypeError | TRE TranslateError
+  deriving (Show, Data, Typeable)
 data Warning    = Warn Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 ppWarning :: Warning -> Text
 ppWarning (Warn w) = w
 
 data TypeError  = TypeError Text Type Type | CanNotInferType Text
-        deriving (Eq, Ord, Show, Read)
+        deriving (Eq, Ord, Show, Read, Data, Typeable)
 data TranslateError = MissingRequiredField (Maybe Text) Text
-                    | MissingRequiredTimeField (Maybe Text) Text (UTCTime -> Stmt)
+                    | MissingRequiredTimeField (Maybe Text) Text Stmt
                     | TranslateError Text
-        deriving (Show)
+        deriving (Show, Data, Typeable)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
@@ -64,7 +67,7 @@ instance X.Exception Error
 -- enforcement of the fan-in fan-out.
 
 data Stmt = StmtEntity Entity | StmtPredicate Predicate
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Entities in our conceptual Model
 -- Notice each entity has a name (Text field) except for metadata.
@@ -72,7 +75,7 @@ data Entity = Agent Text [AgentAttr]
             | UnitOfExecution Text [UoeAttr]
             | Artifact Text [ArtifactAttr]
             | Resource Text DevType (Maybe DevID)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 nameOf :: Entity -> Text
 nameOf e = case e of
@@ -86,7 +89,7 @@ type MID = UUID
 
 -- | Attributes of Agents
 data AgentAttr = AAName Text | AAUser Text | AAMachine MID
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Attributes of units of execution
 data UoeAttr = UAUser Text
@@ -100,7 +103,7 @@ data UoeAttr = UAUser Text
              -- translation path from ProvN, see Translate.hs
              | UAEnded Time
              | UAGroup Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Attributes of Artifacts
 data ArtifactAttr = ArtAType ArtifactType
@@ -115,7 +118,7 @@ data ArtifactAttr = ArtAType ArtifactType
                   | ArtAOwner Text
                   | ArtASize Integer
                   | Taint Word64
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | XXX TBD
 type Privs = Text
@@ -139,7 +142,7 @@ data Predicate = Predicate { predSubject    :: Text
                            , predType       :: PredicateType
                            , predAttrs      :: [PredicateAttr]
                            }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateAttr
         = Raw Text Text
@@ -154,7 +157,7 @@ data PredicateAttr
         | Cmd Text
         | DeriveOp DeriveOp
         | ExecOp ExecOp
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateType
             = ActedOnBehalfOf
@@ -169,24 +172,24 @@ data PredicateType
             | WasDerivedFrom
             | Description
             | IsPartOf
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 type ExecOp = Text
 
 newtype UUID      = UUID Text -- XXX consider (Word64,Word64)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Globally unique process ID - this is _NOT_ a commodity OS PID, but that
 -- could be one component.
 newtype PID       = PID Text  -- XXX consider MID|Word32
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Type of artifacts
 type ArtifactType = Text
 
 -- | Types of devices
 data DevType      = GPS  | Camera | Keyboard | Accelerometer | OtherDev Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Methods of deriving data from a source
 type DeriveOp     = Text
@@ -211,5 +214,5 @@ data Type = EntityClass
           | TyResource
           | TyArrow Type Type
           | TyVoid
-        deriving (Eq, Ord, Show, Read)
+        deriving (Eq, Ord, Show, Read, Data, Typeable)
 
