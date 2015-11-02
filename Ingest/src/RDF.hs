@@ -5,11 +5,13 @@ module RDF
   ( turtle
   ) where
 
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.List (find)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
+import Data.Time
 import MonadLib
 import Types
 
@@ -18,57 +20,95 @@ turtle = runMe . mapM_ tripleStmt
 
 data Triple = Triple Text Text Text
 
-type M a = StateT (Set Text) (StateT [Triple] Id) a
+type UsedTimeMap = Map NodeId (Integer, Integer)
+
+type M a = StateT [Triple] (StateT UsedTimeMap Id) a
 
 type NodeId = Text
 
 runMe :: M a -> Text
-runMe m = showTriples ts
-  where (_, ts) = runId $ runStateT [] $ runStateT Set.empty m
+runMe m = showTriples ts'
+  where
+  ((_, ts), ntts) = runId
+                $ runStateT Map.empty
+                $ runStateT [] m
+  ts' = ts ++ nodeTimeTriples ntts
+
 
 
 showTriples :: [Triple] -> Text
-showTriples ts = Text.unlines (headers ++ map showTriple ts)
-  where headers = [] -- XXX FIXME
+showTriples ts = Text.unlines (headers ++ map turtleTriple ts)
+  where
+  headers =
+    [ "@prefix prov: <http://www.w3.org/ns/prov#> ."
+    , "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ."
+    , "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ."
+    , "@prefix dt: <http://m000.github.com/ns/v1/desktop#> ."
+    , "@prefix adapt: <http://parc.com/ns/v1/adapt#> ."
+    ]
 
-showTriple :: Triple -> Text
-showTriple (Triple a b c) = Text.intercalate " " [ a, b, c, "."]
+turtleTriple :: Triple -> Text
+turtleTriple (Triple a b c) = Text.intercalate " " [ a, b, c, "."]
 
 tripleStmt :: Stmt -> M ()
 tripleStmt (StmtEntity e)    = tripleEntity e
 tripleStmt (StmtPredicate p) = triplePredicate p
 
 tripleEntity :: Entity -> M ()
-tripleEntity e = void $ case e of
-  Agent i _aattr              -> memoNode i "Agent"
-  UnitOfExecution i _uattr    -> memoNode i "UoE"
-  Artifact i _aattr           -> memoNode i "Artifact"
-  Resource i _devTy _devId    -> memoNode i "Resource"
+tripleEntity e = case e of
+  Agent i _aattr           -> newNode i "prov:Activity"
+  UnitOfExecution i _uattr -> newNode i "prov:Activity"
+  Artifact i _aattr        -> newNode i "prov:Entity"
+  Resource i _devTy _devId -> newNode i "prov:Entity"
 
 triplePredicate :: Predicate -> M ()
-triplePredicate (Predicate s o pTy _attr) =
-  do sN <- memoNode s undefined
-     oN <- memoNode o undefined
-     newEdge sN oN [("label", show pTy)]
+triplePredicate pred = do
+  case predUsedTime pred of
+    Just (node, utc) ->
+      lift $ sets_ $ \s -> insertNodeTimeMap node utc s
+    Nothing -> return ()
 
-memoNode :: NodeId -> Text -> M NodeId
-memoNode i nodetype = do
-  s <- get
-  if Set.member i s
-  then return i
-  else do node <- newNode i nodetype
-          set (Set.insert node s)
-          return i
+newNode :: NodeId -> Text -> M ()
+newNode nodeid typeof = sets_ $ \ts -> node:ts
+  where node = Triple nodeid "a" typeof
 
-newEdge  :: NodeId -> NodeId -> [(String,String)] -> M ()
-newEdge a b ps = lift (sets_ (\ts -> edge:ts))
+
+predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
+predUsedTime Predicate{..} = case predType of
+  Used -> do
+    t <- foldl aux Nothing predAttrs
+    return (predSubject, t)
+  _ -> Nothing
   where
-  edge = Triple a "XXX" b
+  aux _ (AtTime t) = Just t
+  aux acc _        = acc
 
-newNode :: NodeId -> a -> M NodeId
-newNode nodeid _typeof = do
-  lift (sets_ (\ts -> node:ts))
-  return nodeid
+insertNodeTimeMap :: NodeId -> UTCTime -> UsedTimeMap -> UsedTimeMap
+insertNodeTimeMap node utc m = case Map.lookup node m of
+  Nothing -> Map.insert node (epoch, epoch) m
+  Just window -> Map.insert node (timeWindow window epoch) m
   where
-  node = Triple nodeid "a" "XXX"
+  epoch = utcToEpoch utc
+  timeWindow :: (Integer, Integer) -> Integer -> (Integer, Integer)
+  timeWindow (lo,hi) a | a < lo    = (a, hi)
+                       | a > hi    = (lo, a)
+                       | otherwise = (lo, hi)
 
+
+  utcToEpoch :: UTCTime -> Integer
+  utcToEpoch u = read $ formatTime defaultTimeLocale "%s" u
+
+nodeTimeTriples :: UsedTimeMap -> [Triple]
+nodeTimeTriples m = Map.foldrWithKey aux [] m
+  where
+  aux :: NodeId -> (Integer, Integer) -> [Triple] -> [Triple]
+  aux nodeid (mintime, maxtime) ts = start:end:ts
+    where
+    start = Triple n "prov:startedAtTime" (s mintime)
+    end   = Triple n "prov:endedAtTime"   (s maxtime)
+    n     = angleBracket nodeid
+    s     = Text.pack . show
+
+
+angleBracket :: Text -> Text
+angleBracket t = Text.concat [ "<", t, ">" ]

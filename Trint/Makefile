@@ -2,7 +2,7 @@
 .PHONY: test create-sandbox
 
 test:
-	cabal run -- --verbose --quiet --turtle ${PWD}/test/amazon_ie_template.provn
+	cabal run -- --verbose --quiet --turtle --ast ${PWD}/test/amazon_ie_template.provn
 
 create-sandbox:
 	cabal sandbox init
