@@ -181,7 +181,7 @@ data Token = KW Keyword
            | Sym Symbol
            | Eof
            | Err TokenError
-             deriving (Data,Ord,Show,Eq)
+             deriving (Data,Typeable,Ord,Show,Eq)
 
 tokenText :: Token -> L.Text
 tokenText (String s) = L.pack s
@@ -194,7 +194,7 @@ tokenNum  _          = error "tokenText: Tried to extract the 'num' of a non-Num
 data Keyword = KW_Document
              | KW_EndDocument
              | KW_Prefix
-               deriving (Show,Eq,Ord,Data)
+               deriving (Show,Eq,Ord,Data,Typeable)
 
 wordOfKeyword :: Keyword -> String
 wordOfKeyword kw =
@@ -214,10 +214,10 @@ data Symbol = BracketL
             | Colon
             | Hyphen
             | SingleQuote
-              deriving (Show,Eq,Ord,Data)
+              deriving (Show,Eq,Ord,Data,Typeable)
 
 data TokenError = LexicalError String
-                  deriving (Data, Eq, Ord, Show)
+                  deriving (Data,Typeable, Eq, Ord, Show)
 
 descTokenError :: TokenError -> String
 descTokenError e = case e of

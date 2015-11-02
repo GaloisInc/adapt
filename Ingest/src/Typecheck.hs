@@ -12,6 +12,7 @@ module Typecheck
 import Types as T
 import Namespaces (blankNode, textOfIdent)
 
+import Control.Applicative
 import MonadLib
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as Text
