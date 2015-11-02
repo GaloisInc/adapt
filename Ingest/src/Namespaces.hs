@@ -6,8 +6,8 @@ module Namespaces
   , allIdent
   , adaptIdent
   , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
-  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
-  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp
+  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
+  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp, adaptExecOp
   , adaptFilePath
   , foafIdent
   , foafName, foafAccountName
@@ -27,6 +27,8 @@ module Namespaces
   , provWasDerivedFrom
   , provActedOnBehalfOf
   , provWasInvalidatedBy
+  , nfoPermissions
+  , nfoOperation
   , dcIdent
   , dcDescription, dcIsPartOf
   , blankNode
@@ -37,13 +39,14 @@ import qualified Data.Text.Lazy as L
 import Data.Text.Lazy (Text)
 import Data.Data
 import Data.Monoid ((<>))
+import qualified PP as PP
 
 --------------------------------------------------------------------------------
 --  Identifiers
 
 data Ident = Qualified Text Text -- XXX the domain should be a URI.
            | Unqualified Text
-  deriving (Eq,Ord,Show,Data,Typeable)
+  deriving (Eq,Ord,Data,Typeable)
 
 domain :: Ident -> Maybe Text
 domain (Qualified t _ ) = Just t
@@ -52,6 +55,12 @@ domain _                = Nothing
 local  :: Ident -> Text
 local (Qualified _ t) = t
 local (Unqualified t) = t
+
+instance Show Ident where
+    show = show . PP.pp
+
+instance PP.PP Ident where
+  ppPrec _ = PP.text . L.unpack . textOfIdent
 
 textOfIdent :: Ident -> Text
 textOfIdent (Qualified a b) = a <> ":" <> b
@@ -97,6 +106,9 @@ adaptExecute         = adapt .: "execute"
 adaptReturnVal       = adapt .: "returnVal"
 adaptArgs            = adapt .: "args"
 adaptUseOp           = adapt .: "useOp"
+adaptGenOp           = adapt .: "genOp"
+adaptExecOp          = adapt .: "execOp"
+adaptDeriveOp        = adapt .: "deriveOp"
 
 
 foafIdent :: [Ident]
@@ -127,6 +139,9 @@ provWasAttributedTo   = prov  .: "wasAttributedTo"
 provWasDerivedFrom    = prov  .: "wasDerivedFrom"
 provActedOnBehalfOf   = prov  .: "actedOnBehalfOf"
 provWasInvalidatedBy  = prov  .: "wasInvalidatedBy"
+
+nfoPermissions        = nfo   .: "permissions"
+nfoOperation          = nfo   .: "operation"
 
 dcIdent :: [Ident]
 dcIdent = [dcDescription, dcIsPartOf]

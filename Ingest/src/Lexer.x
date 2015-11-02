@@ -19,7 +19,7 @@ import Position
 }
 
 @time           = [0-9]{4}[\-][0-9]{2}[\-][0-9]{2}[T][0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}(\.[0-9]{1,9})?Z?
-$id_first       = [A-Za-z]
+$id_first       = [A-Za-z0-9]
 $id_next        = [A-Zaa-z0-9_\-]
 $digit          = [0-9]
 $hex_digit      = [0-9a-fA-F]

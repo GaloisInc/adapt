@@ -16,7 +16,7 @@ module Types
     , Type(..)
     , Stmt(..)
     , Entity(..)
-    , ModVec(..), UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
+    , UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
     , Predicate(..) , PredicateAttr(..), PredicateType(..), DevType(..)
     , Version, CoarseLoc, FineLoc
     , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
@@ -149,11 +149,13 @@ data PredicateAttr
         | StartTime Time
         | EndTime Time
         | GenOp GenOp
-        | Permissions ModVec
+        | Permissions Text
         | ReturnVal Text
-        | Args [Text]
+        | Operation UseOp
+        | Args Text
         | Cmd Text
         | DeriveOp DeriveOp
+        | ExecOp ExecOp
   deriving (Data,Typeable, Eq, Ord, Show)
 
 data PredicateType
@@ -171,12 +173,7 @@ data PredicateType
             | IsPartOf
   deriving (Data,Typeable, Eq, Ord, Show)
 
--- XXX TBD
-newtype ModVec = ModVec Word64
-  deriving (Data,Typeable, Eq, Ord, Show, Num)
-
-data ExecOp = Fork | Clone | ExecVE | Kill | SetUID
-  deriving (Data,Typeable, Eq, Ord, Show)
+type ExecOp = Text
 
 newtype UUID      = UUID Text -- XXX consider (Word64,Word64)
   deriving (Data,Typeable, Eq, Ord, Show)
@@ -194,47 +191,17 @@ data DevType      = GPS  | Camera | Keyboard | Accelerometer | OtherDev Text
   deriving (Data,Typeable, Eq, Ord, Show)
 
 -- | Methods of deriving data from a source
-data DeriveOp     = Rename | Link
-        deriving (Data,Typeable, Eq, Ord, Show, Read)
+type DeriveOp     = Text
 
 -- | Methods of consuming (from) an artifact
-data UseOp        = Read | Recv | Accept | Execute
-        deriving (Data,Typeable, Eq, Ord, Show, Read)
+type UseOp        = Text
 
 -- Methods of pushing data to an artifact
-data GenOp        = Write | Send | Connect | Truncate | ChMod | Touch
-        deriving (Data,Typeable, Eq, Ord, Show, Read)
+type GenOp        = Text
 
 type EntryPoint = Text
 
---------------------------------------------------------------------------------
---  Types for type checking
-
-
--- class Entity
--- instance AnyNotPredicate
---
--- class Agent
--- instance Agent UnitOfExecution
---
--- class ResourceClass
--- instance Resource (should be 'device')
--- instance Artifact
---
--- class String
--- instance UUID
--- instance Time
--- instance Name
-
 -- | Basic types in the ED graph
---
--- Notice most types are enforced by the translation to the Haskell types
--- and thus we do not bother to express them here or validate them in the
--- checker. For example, the DevType is represented by an enumeration and
--- not a typeless string.
---
--- What remains is to ensure the predicates are applied to entities of
--- the correct type.
 data Type = EntityClass
           | ActorClass
           | DescribeClass
