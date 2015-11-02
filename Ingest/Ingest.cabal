@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Graph, RDF, Ingest, Lexer, LexerCore, Namespaces, Parser, ParserCore, Translate, Typecheck, Types, Position, PP
-  -- other-modules:       
+  other-modules:       Util
   other-extensions:    RecordWildCards, GeneralizedNewtypeDeriving, DeriveDataTypeable, OverloadedStrings, ViewPatterns, MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances
   build-depends:       base >=4.7 && <4.9
                      , containers >=0.5 && <0.6
