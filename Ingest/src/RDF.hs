@@ -18,9 +18,6 @@ turtle = runMe . mapM_ tripleStmt
 
 data Triple = Triple Text Text Text
 
-------------------------------------------------------------
---  Monad Operations
-
 type M a = StateT (Set Text) (StateT [Triple] Id) a
 
 type NodeId = Text
@@ -29,17 +26,6 @@ runMe :: M a -> Text
 runMe m = showTriples ts
   where (_, ts) = runId $ runStateT [] $ runStateT Set.empty m
 
-emitTriple :: Triple -> M ()
-emitTriple t = lift (sets_ (t:))
-
-markVisited :: Text -> M ()
-markVisited t = sets_ (Set.insert t)
-
-wasVisited :: Text -> M Bool
-wasVisited t = Set.member t `fmap` get
-
-------------------------------------------------------------
---  Stmt/Triple Conversion
 
 showTriples :: [Triple] -> Text
 showTriples ts = Text.unlines (headers ++ map showTriple ts)
@@ -67,21 +53,22 @@ triplePredicate (Predicate s o pTy _attr) =
 
 memoNode :: NodeId -> Text -> M NodeId
 memoNode i nodetype = do
-  b <- wasVisited i
-  if b
+  s <- get
+  if Set.member i s
   then return i
   else do node <- newNode i nodetype
-          markVisited node
+          set (Set.insert node s)
           return i
 
 newEdge  :: NodeId -> NodeId -> [(String,String)] -> M ()
-newEdge a b ps = emitTriple edge
+newEdge a b ps = lift (sets_ (\ts -> edge:ts))
   where
   edge = Triple a "XXX" b
 
 newNode :: NodeId -> a -> M NodeId
 newNode nodeid _typeof = do
-  emitTriple node
+  lift (sets_ (\ts -> node:ts))
   return nodeid
   where
   node = Triple nodeid "a" "XXX"
+
