@@ -57,7 +57,7 @@ entity(ex:createExe, [
 			// alternately, 'memory'
 			// alternately, 'registry-entry'
 			prov-tc:path="/users/dwa/mystuff/bin/create.exe",
-      // alternately, networkAddress="128.10.125.71"
+			// alternately, networkAddress="128.10.125.71"
 			// alternately, networkPort="88"
 			// alternately, pageID="0x123"
 			// alternately, registry-key="stuff"
@@ -148,14 +148,15 @@ An artifact such as *ex:createExe* can be deleted by a UoE such as *ex:parentb*.
 ```
 wasInvalidatedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z)
 ```
-An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* executing an operation *adapt:useOp* that is one of 'read', 'recv', 'accept', or 'execute'. Required attributes include the start and end times of the use action, and the use operation. Optional attributes include an entry address (for example, if useOp is 'execute'), an argument list passed to an executed function, and a return value returned by an executed function.
+An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* executing an operation *adapt:useOp* that is one of 'read', 'recv', 'accept', or 'execute'. Required attributes include the time of the use action, and the use operation. Optional attributes include an entry address (for example, if useOp is 'execute'), an argument list passed to an executed function, and a return value returned by an executed function.
 
 ```
 used(ex:parentb, ex:createExe, 015-10-16T02:13:07Z,[
 			prov-tc:entryAddress="0x8048170",
 			prov-tc:args="",
 			prov-tc:returnValue="0",
-			prov-tc:operation="execute"] //required)
+			prov-tc:operation="execute"] //optional
+                        )
 ```
 Similarly, a resource such as *ex:GPSunit* may be used by a UoE such as *ex:childB*. Required are the start and end time of the use. Optionsl are a command string sent to the device and a value returned from the device.
 
@@ -351,16 +352,16 @@ generation      :: { Expr }
   : 'wasGeneratedBy' '(' ident ',' may(ident) ',' time  optAttrs(generationAttr) ')'
 
 generationAttr
- : 'genOp'    '=' genOp
+ : 'genOp'    '=' '\"' genOp '\"'
  | 'nfo:permissions'   '=' NUM
 
 genOp
- : 'write'
- | 'send'
- | 'connect'
- | 'truncate'
- | 'chmod'
- | 'touch'
+ : "write"
+ | "send"
+ | "connect"
+ | "truncate"
+ | "chmod"
+ | "touch"
 ```
 
 The 'used' predicate is invalid without the 'useOp' attribute.
@@ -372,13 +373,13 @@ usage           :: { Expr }
 usageAttr :: { (Key,Value) }
   : 'args'      '=' STRINGLIT
   | 'returnVal' '=' STRINGLIT
-  | 'operation' '=' '\'' useOp '\''
+  | 'operation' '=' '\"' useOp '\"'
 
 useOp :: { Value }
-  : 'read'                      { ValIdent adaptRead    }
-  | 'recv'                      { ValIdent adaptRecv    }
-  | 'accept'                    { ValIdent adaptAccept  }
-  | 'execute'                   { ValIdent adaptExecute }
+  : "read"
+  | "recv"
+  | "accept"
+  | "execute"
 ```
 
 Start and end predicates require the time field, but are otherwise identical to
@@ -395,7 +396,10 @@ start           :: { Expr }
   : 'wasStartedBy' '(' ident ',' may(ident) ',' may(ident) ',' time soattrVals ')'
 
 end             :: { Expr }
-  : 'wasEndedBy' '(' ident ',' may(ident) ',' may(ident) ',' time soattrVals ')'
+  : 'wasEndedBy' '(' ident ',' may(ident) ',' may(ident) ',' time ',' attrs(endedAttr) ')'
+
+endedAttr :: { (Key,Value) }
+  : 'execOp' '=' '\"' execOp '\"'
 ```
 
 All inter-activity communication (conceptual, communication between two units of
@@ -409,14 +413,14 @@ communication   :: { Expr }
 
 informedAttr :: { (Key,Value) }
   : 'atTime'    '=' time
-  | 'useOp' '=' '\'' execOp '\''
+  | 'useOp' '=' '\"' execOp '\"'
 
 execOp :: { Value }
-  : 'fork'
-  | 'clone'
-  | 'execve'
-  | 'kill'
-  | 'setuid'
+  : "fork"
+  | "clone"
+  | "execve"
+  | "kill"
+  | "setuid"
 ```
 
 Agents remain an abstract concept and are legitimate for describing anything
