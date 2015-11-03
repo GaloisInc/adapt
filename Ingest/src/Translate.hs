@@ -109,19 +109,19 @@ mkPred :: T.Predicate -> Maybe T.Stmt
 mkPred = Just . T.StmtPredicate
 
 tExpr :: Expr -> Tr (Maybe T.Stmt)
+tExpr (Used mI subj mObj mTime kvs)                                        = mkPred <$> used mI subj mObj mTime kvs
 tExpr (Entity i kvs)                                                       = mkStmt <$> entity i kvs
 tExpr (Activity i mStart mEnd kvs)                                         = mkStmt <$> activity i mStart mEnd kvs
 tExpr (Activity2 i kvs)                                                    = mkStmt <$> activity i Nothing Nothing kvs
-tExpr (Agent i kvs)                                                        = mkStmt <$> agent i kvs
 tExpr (WasGeneratedBy mI subj mObj mTime kvs)                              = mkPred <$> wasGeneratedBy mI subj mObj mTime kvs
-tExpr (Used mI subj mObj mTime kvs)                                        = mkPred <$> used mI subj mObj mTime kvs
+tExpr (WasInformedBy mI subj mObj kvs)                                     = mkPred <$> wasInformedBy mI subj mObj kvs
+tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = mkPred <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
+tExpr (WasDerivedFrom2 mI subj obj kvs)                                    = mkPred <$> wasDerivedFrom mI subj obj Nothing Nothing Nothing kvs
+tExpr (Agent i kvs)                                                        = mkStmt <$> agent i kvs
 tExpr (WasStartedBy mI subj mObj mParentTrigger mTime kvs)                 = mkPred <$> wasStartedBy mI subj mObj mParentTrigger mTime kvs
 tExpr (NonStandardWasStartedBy mI subj mObj mParentTrigger kvs)            = mkPred <$> wasStartedBy mI subj mObj mParentTrigger Nothing kvs
 tExpr (WasEndedBy mI subj mObj mParentTrigger mTime kvs)                   = mkPred <$> wasEndedBy mI subj  mObj mParentTrigger mTime kvs
-tExpr (WasInformedBy mI subj mObj kvs)                                     = mkPred <$> wasInformedBy mI subj mObj kvs
 tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkPred <$> wasAssociatedWith mI subj mObj mPlan kvs
-tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = mkPred <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
-tExpr (WasDerivedFrom2 mI subj obj kvs)                                    = mkPred <$> wasDerivedFrom mI subj obj Nothing Nothing Nothing kvs
 tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
 tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
 tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
@@ -254,6 +254,10 @@ artifactAttrTranslations = Map.fromList
   [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
   , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
   , adaptPath         .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
+  , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.ArtADestinationAddress . valueString
+  , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.ArtADestinationPort . valueString
+  , adaptSourceAddress .-> warnOrOp "Non-string value in adapt:sourceAddress" T.ArtASourceAddress . valueString
+  , adaptSourcePort    .-> warnOrOp "Non-string value in adapt:sourcePort" T.ArtASourcePort . valueString
   , adaptHasVersion   .-> ignore
   , provType          .-> ignore
   , adaptEntityType   .-> ignore

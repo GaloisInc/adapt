@@ -120,6 +120,10 @@ data ArtifactAttr = ArtAType ArtifactType
                   | ArtADeleted Time
                   | ArtAOwner Text
                   | ArtASize Integer
+                  | ArtADestinationAddress Text
+                  | ArtADestinationPort Text
+                  | ArtASourceAddress Text
+                  | ArtASourcePort Text
                   | Taint Word64
   deriving (Eq, Ord, Show, Data, Typeable)
 
