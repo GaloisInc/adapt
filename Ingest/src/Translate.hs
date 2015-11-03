@@ -349,6 +349,7 @@ usedAttr = catMaybes . map ua
  ua (k,ValString v)  | eqIdent adaptArgs k      = Just $ T.Args v
                      | eqIdent adaptReturnVal k = Just $ T.ReturnVal v
                      | eqIdent nfoOperation k   = Just $ T.Operation v
+                     | eqIdent adaptTime k      = T.AtTime <$> parseUTC v
  ua _                                           = Nothing
 
 startedByAttr :: PredAttrTrans
