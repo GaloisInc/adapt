@@ -71,11 +71,13 @@ tripleEntity e = case e of
   putEntity nodeid typeof = putTriple $ Triple (angleBracket nodeid) "a" typeof
 
   subj = angleBracket (nameOf e)
-  put a b = putTriple (Triple subj a b)
+  put a b = putTriple (Triple subj a (quote b))
 
-  putAgentAttr (AAName t) = put "foaf:name" t
-  putAgentAttr (AAUser t) = put "foaf:user" t
-  putAgentAttr (AAMachine m) = put "tc:machine" m
+  putAgentAttr a =
+    case a of
+      AAName t    -> put "foaf:name" t
+      AAUser t    -> put "foaf:user" t
+      AAMachine m -> put "tc:machine" m
 
   putUOEAttr a =
     case a of
@@ -159,3 +161,6 @@ nodeTimeTriples m = Map.foldrWithKey aux [] m
 
 angleBracket :: Text -> Text
 angleBracket t = Text.concat [ "<", t, ">" ]
+
+quote :: Text -> Text
+quote t = Text.concat ["\"", t, "\""]
