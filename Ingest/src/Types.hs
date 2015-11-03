@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Types
     ( -- * Types
       Error(..)
@@ -16,12 +16,14 @@ module Types
     , Type(..)
     , Stmt(..)
     , Entity(..)
-    , ModVec(..), UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
+    , UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
     , Predicate(..) , PredicateAttr(..), PredicateType(..), DevType(..)
     , Version, CoarseLoc, FineLoc
     , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
     , Time, EntryPoint
     , Text
+    -- * Helpers
+    , nameOf
     ) where
 
 import qualified Control.Exception as X
@@ -41,7 +43,8 @@ import           Text.Show.Functions ()
 
 import ParserCore (Time)
 
-data Error      = PE ParseError | TCE TypeError | TRE TranslateError deriving (Show)
+data Error      = PE ParseError | TCE TypeError | TRE TranslateError
+  deriving (Show, Data, Typeable)
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
@@ -49,11 +52,11 @@ ppWarning :: Warning -> Text
 ppWarning (Warn w) = w
 
 data TypeError  = TypeError Text Type Type | CanNotInferType Text
-        deriving (Data, Eq, Ord, Show, Read)
+        deriving (Eq, Ord, Show, Read, Data, Typeable)
 data TranslateError = MissingRequiredField (Maybe Text) Text
-                    | MissingRequiredTimeField (Maybe Text) Text (UTCTime -> Stmt)
+                    | MissingRequiredTimeField (Maybe Text) Text Stmt
                     | TranslateError Text
-        deriving (Show)
+        deriving (Show, Data, Typeable)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
@@ -66,7 +69,7 @@ instance X.Exception Error
 -- enforcement of the fan-in fan-out.
 
 data Stmt = StmtEntity Entity | StmtPredicate Predicate
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Entities in our conceptual Model
 -- Notice each entity has a name (Text field) except for metadata.
@@ -74,7 +77,7 @@ data Entity = Agent Text [AgentAttr]
             | UnitOfExecution Text [UoeAttr]
             | Artifact Text [ArtifactAttr]
             | Resource Text DevType (Maybe DevID)
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 nameOf :: Entity -> Text
 nameOf e = case e of
@@ -88,7 +91,7 @@ type MID = UUID
 
 -- | Attributes of Agents
 data AgentAttr = AAName Text | AAUser Text | AAMachine MID
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Attributes of units of execution
 data UoeAttr = UAUser Text
@@ -98,11 +101,14 @@ data UoeAttr = UAUser Text
              | UAStarted Time
              | UAHadPrivs Privs
              | UAPWD Text
-             -- XXX All the below constructors are unused, they lack any
-             -- translation path from ProvN, see Translate.hs
              | UAEnded Time
              | UAGroup Text
-  deriving (Data, Eq, Ord, Show)
+             | UACommandLine Text
+             | UASource Text
+             | UAProgramName Text
+             | UACWD Text
+             | UAUID Text
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Attributes of Artifacts
 data ArtifactAttr = ArtAType ArtifactType
@@ -116,8 +122,12 @@ data ArtifactAttr = ArtAType ArtifactType
                   | ArtADeleted Time
                   | ArtAOwner Text
                   | ArtASize Integer
+                  | ArtADestinationAddress Text
+                  | ArtADestinationPort Text
+                  | ArtASourceAddress Text
+                  | ArtASourcePort Text
                   | Taint Word64
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | XXX TBD
 type Privs = Text
@@ -141,7 +151,7 @@ data Predicate = Predicate { predSubject    :: Text
                            , predType       :: PredicateType
                            , predAttrs      :: [PredicateAttr]
                            }
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateAttr
         = Raw Text Text
@@ -149,12 +159,14 @@ data PredicateAttr
         | StartTime Time
         | EndTime Time
         | GenOp GenOp
-        | Permissions ModVec
+        | Permissions Text
         | ReturnVal Text
-        | Args [Text]
+        | Operation UseOp
+        | Args Text
         | Cmd Text
         | DeriveOp DeriveOp
-  deriving (Data, Eq, Ord, Show)
+        | ExecOp ExecOp
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateType
             = ActedOnBehalfOf
@@ -169,72 +181,35 @@ data PredicateType
             | WasDerivedFrom
             | Description
             | IsPartOf
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
--- XXX TBD
-newtype ModVec = ModVec Word64
-  deriving (Data, Eq, Ord, Show, Num)
+type ExecOp = Text
 
-data ExecOp = Fork | Clone | ExecVE | Kill | SetUID
-  deriving (Data, Eq, Ord, Show)
-
-newtype UUID      = UUID Text -- XXX consider (Word64,Word64)
-  deriving (Data, Eq, Ord, Show)
+type UUID      = Text
 
 -- | Globally unique process ID - this is _NOT_ a commodity OS PID, but that
 -- could be one component.
-newtype PID       = PID Text  -- XXX consider MID|Word32
-  deriving (Data, Eq, Ord, Show)
+type PID       = Text
 
 -- | Type of artifacts
 type ArtifactType = Text
 
 -- | Types of devices
 data DevType      = GPS  | Camera | Keyboard | Accelerometer | OtherDev Text
-  deriving (Data, Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Methods of deriving data from a source
-data DeriveOp     = Rename | Link
-        deriving (Data, Eq, Ord, Show, Read)
+type DeriveOp     = Text
 
 -- | Methods of consuming (from) an artifact
-data UseOp        = Read | Recv | Accept | Execute
-        deriving (Data, Eq, Ord, Show, Read)
+type UseOp        = Text
 
 -- Methods of pushing data to an artifact
-data GenOp        = Write | Send | Connect | Truncate | ChMod | Touch
-        deriving (Data, Eq, Ord, Show, Read)
+type GenOp        = Text
 
 type EntryPoint = Text
 
---------------------------------------------------------------------------------
---  Types for type checking
-
-
--- class Entity
--- instance AnyNotPredicate
---
--- class Agent
--- instance Agent UnitOfExecution
---
--- class ResourceClass
--- instance Resource (should be 'device')
--- instance Artifact
---
--- class String
--- instance UUID
--- instance Time
--- instance Name
-
 -- | Basic types in the ED graph
---
--- Notice most types are enforced by the translation to the Haskell types
--- and thus we do not bother to express them here or validate them in the
--- checker. For example, the DevType is represented by an enumeration and
--- not a typeless string.
---
--- What remains is to ensure the predicates are applied to entities of
--- the correct type.
 data Type = EntityClass
           | ActorClass
           | DescribeClass
@@ -246,5 +221,5 @@ data Type = EntityClass
           | TyResource
           | TyArrow Type Type
           | TyVoid
-        deriving (Data, Eq, Ord, Show, Read)
+        deriving (Eq, Ord, Show, Read, Data, Typeable)
 

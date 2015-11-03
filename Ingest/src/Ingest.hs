@@ -11,6 +11,7 @@ import Types
 import Typecheck
 import Translate
 import Parser
+import Control.Applicative
 import qualified Control.Exception as X
 import qualified Data.Text.Lazy.IO as Text
 import qualified Data.Text.Lazy as Text

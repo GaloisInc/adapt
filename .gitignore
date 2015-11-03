@@ -1,3 +1,5 @@
 *~
 TAGS
-Trint/dist/
+dist
+.cabal-sandbox
+cabal.sandbox.config

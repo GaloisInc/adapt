@@ -19,7 +19,7 @@ import           Data.Data
 -- Positions -------------------------------------------------------------------
 
 data Position = Position { posRow, posCol, posOff :: {-# UNPACK #-} !Int
-                         } deriving (Show, Data)
+                         } deriving (Show, Data, Typeable)
 
 instance Eq Position where
   (==) = (==) `on` posOff
@@ -50,7 +50,7 @@ advance _    Position { .. } = Position { posCol = posCol + 1
 
 data Range = NoLoc
            | Range !Position !Position FilePath
-             deriving (Eq,Ord,Show,Data)
+             deriving (Eq,Ord,Show,Data,Typeable)
 
 instance M.Monoid Range where
   mempty = NoLoc
@@ -84,7 +84,7 @@ getLines input cxt (Range s e _) = L.unlines
 -- | A value paired with a source location.
 data Located a = Located { locRange :: !Range
                          , locValue :: a
-                         } deriving (Eq,Ord,Show,Functor,F.Foldable,T.Traversable,Data)
+                         } deriving (Eq,Ord,Show,Functor,F.Foldable,T.Traversable,Data,Typeable)
 
 -- by default, print with no location information
 instance PP a => PP (Located a) where

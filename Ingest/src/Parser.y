@@ -15,6 +15,7 @@ import ParserCore
 import LexerCore
 import Position
 
+import Control.Applicative ((<$>))
 import Data.Monoid ( mempty, mappend, mconcat )
 import Namespaces
 import qualified Network.URI as URI
@@ -152,7 +153,7 @@ args(punc,p)
 {
 
 parseProvN:: Text -> Either ParseError Prov
-parseProvN txt = fmap fullyQualifyIdents (runParser txt parseProv)
+parseProvN txt = expandPrefixes <$> runParser txt parseProv
 
 parseProvNFile :: FilePath -> IO (Either ParseError Prov)
 parseProvNFile fp = parseProvN <$> L.readFile fp
