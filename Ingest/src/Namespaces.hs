@@ -8,7 +8,8 @@ module Namespaces
   , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
   , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp, adaptExecOp
-  , adaptPath
+  , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptHasVersion
+  , adaptCWD, adaptUID, adaptProgramName
   , foafIdent
   , foafName, foafAccountName
   , provIdent
@@ -82,7 +83,7 @@ adaptIdent =
   , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp
   , adaptExecOp, adaptDeriveOp
-  , adaptPath
+  , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptProgramName, adaptCWD, adaptUID
   ]
 
 adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptPath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
@@ -111,7 +112,13 @@ adaptUseOp           = adapt .: "useOp"
 adaptGenOp           = adapt .: "genOp"
 adaptExecOp          = adapt .: "execOp"
 adaptDeriveOp        = adapt .: "deriveOp"
-
+adaptSource          = adapt .: "source"
+adaptCommandLine     = adapt .: "commandLine"
+adaptGroup           = adapt .: "group"
+adaptHasVersion      = adapt .: "hasVersion"
+adaptCWD             = adapt .: "cwd"
+adaptUID             = adapt .: "uid"
+adaptProgramName     = adapt .: "programName"
 
 foafIdent :: [Ident]
 foafIdent = [foafName, foafAccountName]

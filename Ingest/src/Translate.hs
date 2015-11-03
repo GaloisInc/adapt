@@ -207,10 +207,16 @@ uoeAttr i = attrOper uoeAttrTranslations w i
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
   [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" (T.UAMachine . T.UUID) . valueString
-  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  (T.UAPID . T.PID . L.pack . show) . valueString
-  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" (T.UAPPID . T.PID . L.pack . show) . valueString
-  , adaptPrivs     .-> warnOrOp "Non-string vcalue in adapt:privs" T.UAHadPrivs . valueString
-  , adaptPwd       .-> warnOrOp "Non-string vcalue in adapt:pwd"   T.UAPWD . valueString
+  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  (T.UAPID . T.PID) . valueString
+  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" (T.UAPPID . T.PID) . valueString
+  , adaptPrivs     .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
+  , adaptPwd       .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
+  , adaptGroup          .-> warnOrOp "Non-string value in adapt:group" T.UAGroup . valueString
+  , adaptCommandLine    .-> warnOrOp "Non-string value in adapt:commandLine" T.UACommandLine . valueString
+  , adaptSource         .-> warnOrOp "Non-string value in adapt:source"  T.UASource . valueString
+  , adaptCWD            .-> warnOrOp "Non-string value in adapt:cwd" T.UACWD . valueString
+  , adaptUID            .-> warnOrOp "Non-string value in adapt:uid" T.UAUID . valueString
+  , adaptProgramName    .-> warnOrOp "Non-string value in adapt:programName" T.UAProgramName . valueString
   , provType       .-> ignore
   , provAtTime     .-> (\v -> return $ let mtime = case v of
                                                       ValString s -> parseUTC s
@@ -248,6 +254,7 @@ artifactAttrTranslations = Map.fromList
   [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
   , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
   , adaptPath         .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
+  , adaptHasVersion   .-> ignore
   , provType          .-> ignore
   , adaptEntityType   .-> ignore
   ]
@@ -275,10 +282,8 @@ warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 
 wasGeneratedBy :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
 wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
-  let constr time = predicate subj obj T.WasGeneratedBy (T.AtTime time : generationAttr kvs)
-  in case mTime of
-      Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
+  let constr f = predicate subj obj T.WasGeneratedBy (f $ generationAttr kvs)
+  in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 used :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
 used mI subj (orBlank -> obj) mTime kvs =
@@ -286,17 +291,13 @@ used mI subj (orBlank -> obj) mTime kvs =
 
 wasStartedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
-  let constr time = predicate subj obj T.WasStartedBy (T.AtTime time : startedByAttr kvs)
-  in case mTime of
-      Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
+  let constr f = predicate subj obj T.WasStartedBy (f $ startedByAttr kvs)
+  in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
-  let constr time = predicate subj obj T.WasEndedBy (T.AtTime time : endedByAttr kvs)
-  in case mTime of
-      Just at -> return $ constr at
-      Nothing -> raise (T.MissingRequiredTimeField (fmap textOfIdent mI) "AtTime" (T.StmtPredicate (constr timeZero)))
+  let constr f = predicate subj obj T.WasEndedBy (f $ endedByAttr kvs)
+  in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 timeZero :: UTCTime
 timeZero = UTCTime (fromGregorian 1900 1 1) 0

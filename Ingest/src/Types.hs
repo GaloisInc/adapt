@@ -99,10 +99,13 @@ data UoeAttr = UAUser Text
              | UAStarted Time
              | UAHadPrivs Privs
              | UAPWD Text
-             -- XXX All the below constructors are unused, they lack any
-             -- translation path from ProvN, see Translate.hs
              | UAEnded Time
              | UAGroup Text
+             | UACommandLine Text
+             | UASource Text
+             | UAProgramName Text
+             | UACWD Text
+             | UAUID Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Attributes of Artifacts
