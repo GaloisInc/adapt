@@ -6,9 +6,9 @@ module Namespaces
   , allIdent
   , adaptIdent
   , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
-  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
+  , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp, adaptExecOp
-  , adaptFilePath
+  , adaptPath
   , foafIdent
   , foafName, foafAccountName
   , provIdent
@@ -68,7 +68,7 @@ textOfIdent (Unqualified b) = b
 
 dc,adapt,foaf,nfo :: URI
 dc    = perr "http://purl.org/dc/elements/1.1/"
-adapt = perr "http://adapt.galois.com/"
+adapt = perr "http://spade.csl.sri.com/rdf/audit-tc.rdfs#"
 foaf  = perr "http://xmlns.com/foaf/0.1/"
 nfo   = perr "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/"
 prov  = perr "http://www.w3.org/ns/prov#"
@@ -79,12 +79,13 @@ allIdent = adaptIdent ++ provIdent ++ foafIdent ++ dcIdent
 adaptIdent :: [Ident]
 adaptIdent =
   [ adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
-  , adaptArtifact, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
-  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp
-  , adaptFilePath
+  , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp
+  , adaptExecOp, adaptDeriveOp
+  , adaptPath
   ]
 
-adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptFilePath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
+adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptPath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
 adaptUnitOfExecution = adapt .: "unitOfExecution"
 adaptPid             = adapt .: "pid"
 adaptPPid            = adapt .: "ppid"
@@ -94,10 +95,11 @@ adaptPwd             = adapt .: "pwd"
 adaptDevType         = adapt .: "devType"
 adaptDeviceID        = adapt .: "devID"
 adaptArtifact        = adapt .: "artifact"
+adaptEntityType      = adapt .: "entityType"
 adaptArtifactType    = adapt .: "artifactType"
 adaptCmdLine         = adapt .: "cmdLine"
 adaptCmdString       = adapt .: "cmdString"
-adaptFilePath        = adapt .: "filePath"
+adaptPath            = adapt .: "path"
 adaptMachineID       = adapt .: "machineID"
 adaptRead            = adapt .: "read"
 adaptRecv            = adapt .: "recv"

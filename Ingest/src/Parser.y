@@ -153,7 +153,7 @@ args(punc,p)
 {
 
 parseProvN:: Text -> Either ParseError Prov
-parseProvN txt = fmap fullyQualifyIdents (runParser txt parseProv)
+parseProvN txt = expandPrefixes <$> runParser txt parseProv
 
 parseProvNFile :: FilePath -> IO (Either ParseError Prov)
 parseProvNFile fp = parseProvN <$> L.readFile fp

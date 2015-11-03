@@ -343,13 +343,11 @@ activity        :: { Expr }
   | 'activity' '(' ident soattrVals ')'
 ```
 
-Artifact creation is communicated with the 'wasGeneratedBy' predicate. Unlike
-in Prov-N, we require inclusion of the time field in 'wasGeneratedBy' as well as
-in 'used', 'wasStartedBy', and 'wasEndedBy' predicates.
+Artifact creation is communicated with the 'wasGeneratedBy' predicate.
 
 ```
 generation      :: { Expr }
-  : 'wasGeneratedBy' '(' ident ',' may(ident) ',' time  optAttrs(generationAttr) ')'
+  : 'wasGeneratedBy' '(' ident ',' may(ident) ',' may(time)  optAttrs(generationAttr) ')'
 
 generationAttr
  : 'genOp'    '=' '\"' genOp '\"'

@@ -23,8 +23,6 @@ import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes, maybeToList)
 import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
-import qualified Data.Generics.Uniplate.Operations as Uniplate
-import           Data.Generics.Uniplate.Data ()
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 import           Data.Time (UTCTime(..), fromGregorian)
@@ -83,11 +81,16 @@ vMIdent (PIdent i) = Just i
 vMIdent _          = Nothing
 
 eqIdent :: Ident -> Ident -> Bool
-eqIdent p e = e == p
+eqIdent p e =
+  case e of
+    Unqualified i -> i == NS.local p
+    _             -> e == p
+{-# INLINE eqIdent #-}
 
 pattern Entity i kvs <- RawEntity (eqIdent provEntity -> True) Nothing [vMIdent -> Just i] kvs _
 pattern Agent i kvs <- RawEntity (eqIdent provAgent -> True) Nothing [vMIdent -> Just i] kvs _
 pattern Activity i mStart mEnd kvs <- RawEntity (eqIdent provActivity -> True) Nothing [vMIdent -> Just i, vMTime -> mStart, vMTime -> mEnd] kvs _
+pattern Activity2 i kvs <- RawEntity (eqIdent provActivity -> True) Nothing [vMIdent -> Just i] kvs _
 pattern WasGeneratedBy mI subj mObj t kvs <- RawEntity (eqIdent provWasGeneratedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> t] kvs _
 pattern Used mI subj mObj mTime kvs <- RawEntity (eqIdent provUsed -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMTime -> mTime] kvs _
 pattern WasStartedBy mI subj mObj mPT mTime kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT, vMTime -> mTime] kvs _
@@ -96,6 +99,7 @@ pattern WasEndedBy mI subj mObj mParentTrigger mTime kvs <- RawEntity (eqIdent p
 pattern WasInformedBy mI subj mObj kvs <- RawEntity (eqIdent provWasInformedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj] kvs _
 pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI ((vMIdent -> Just subj) : (vMIdent -> mObj) : (vMIdent -> mPlan) : _) kvs _
 pattern WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj, vMIdent -> mGeneratingEnt, vMIdent -> mGeneratingAct, vMIdent -> useId] kvs _
+pattern WasDerivedFrom2 mI subj obj kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs _
 pattern WasAttributedTo mI subj obj kvs <- RawEntity (eqIdent provWasAttributedTo -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs _
 pattern IsPartOf subj obj <- RawEntity (eqIdent dcIsPartOf -> True) Nothing [vMIdent -> Just subj, vMIdent -> Just obj] (null -> True) _
 pattern Description obj kvs <- RawEntity (eqIdent dcDescription -> True) Nothing [vMIdent -> Just obj] kvs _
@@ -109,6 +113,7 @@ mkPred = Just . T.StmtPredicate
 tExpr :: Expr -> Tr (Maybe T.Stmt)
 tExpr (Entity i kvs)                                                       = mkStmt <$> entity i kvs
 tExpr (Activity i mStart mEnd kvs)                                         = mkStmt <$> activity i mStart mEnd kvs
+tExpr (Activity2 i kvs)                                                    = mkStmt <$> activity i Nothing Nothing kvs
 tExpr (Agent i kvs)                                                        = mkStmt <$> agent i kvs
 tExpr (WasGeneratedBy mI subj mObj mTime kvs)                              = mkPred <$> wasGeneratedBy mI subj mObj mTime kvs
 tExpr (Used mI subj mObj mTime kvs)                                        = mkPred <$> used mI subj mObj mTime kvs
@@ -118,6 +123,7 @@ tExpr (WasEndedBy mI subj mObj mParentTrigger mTime kvs)                   = mkP
 tExpr (WasInformedBy mI subj mObj kvs)                                     = mkPred <$> wasInformedBy mI subj mObj kvs
 tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkPred <$> wasAssociatedWith mI subj mObj mPlan kvs
 tExpr (WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs) = mkPred <$> wasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs
+tExpr (WasDerivedFrom2 mI subj obj kvs)                                    = mkPred <$> wasDerivedFrom mI subj obj Nothing Nothing Nothing kvs
 tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
 tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
 tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
@@ -131,17 +137,19 @@ tExpr r@(RawEntity pred mI _ _ loc)                                        = war
 --   * it has prov:type='adapt:artifact' is Artifact
 entity :: Ident -> KVs -> Tr T.Entity
 entity i kvs =
-  case pTy of
+  case eTy of
     Just T.TyArtifact -> artifact i kvs
     Nothing ->
       case lookup adaptDevType kvs of
         Just devtype    -> resource i devtype kvs
         Nothing         -> raise $ TranslateError $
                             L.unlines [ "Unrecognized entity: " <> textOfIdent i
-                                      , "\tprovType: " <> L.pack (show pTy)
                                       , "\tAttributes: " <> (L.pack $ show kvs)
                                       ]
- where pTy = getProvType kvs
+ where eTy = case lookup adaptEntityType kvs of
+              Just (ValString "file")    -> Just T.TyArtifact
+              Just (ValString "network") -> Just T.TyArtifact
+              _                          -> Nothing
 
 artifact :: Ident -> KVs -> Tr T.Entity
 artifact i kvs = T.Artifact (textOfIdent i) <$> artifactAttrs kvs
@@ -164,20 +172,13 @@ resource i _ _ = raise $ TranslateError $ "Device types must be string literals.
 -- Agents are either units of execution or exist largely for the metadata
 -- of machine ID, foaf:name, and foaf:accountName.
 agent :: Ident -> KVs -> Tr T.Entity
-agent i kvs
-  -- | getProvType kvs == Just T.TyUnitOfExecution =
-  --     do attrs <- uoeAttrs kvs
-  --        return $ T.UnitOfExecution (textOfIdent i) attrs
-  -- | otherwise
-  = T.Agent (textOfIdent i) <$> agentAttrs kvs
+agent i kvs = T.Agent (textOfIdent i) <$> agentAttrs kvs
 
 -- All Activities are units of execution, no exceptions.
 activity :: Ident -> Maybe Time -> Maybe Time -> KVs -> Tr T.Entity
-activity i mStart mEnd kvs
-  | getProvType kvs == Just T.TyUnitOfExecution =
-       do attrs <- uoeAttrs kvs
-          return $ T.UnitOfExecution (textOfIdent i) (uoeTimes mStart mEnd ++ attrs)
-  | otherwise = raise $ TranslateError $ "The only recognized activities are prov:type=adapt:UnitOfExecution.  Saw: " <> (L.pack $ show kvs)
+activity i mStart mEnd kvs =
+   do attrs <- uoeAttrs kvs
+      return $ T.UnitOfExecution (textOfIdent i) (uoeTimes mStart mEnd ++ attrs)
 
 uoeTimes :: Maybe Time -> Maybe Time -> [T.UoeAttr]
 uoeTimes a b = catMaybes $ zipWith fmap [T.UAStarted, T.UAEnded] [a,b]
@@ -186,8 +187,8 @@ getProvType :: KVs -> Maybe T.Type
 getProvType m =
   case lookup provType m of
     Nothing -> Nothing
-    Just (ValIdent i) | i == adaptUnitOfExecution -> Just T.TyUnitOfExecution
-                      | i == adaptArtifact        -> Just T.TyArtifact
+    Just (ValIdent i) | eqIdent adaptUnitOfExecution i -> Just T.TyUnitOfExecution
+                      | eqIdent adaptArtifact i        -> Just T.TyArtifact
     _                                  -> Nothing -- warn?
 
 --------------------------------------------------------------------------------
@@ -208,8 +209,8 @@ uoeAttr i = attrOper uoeAttrTranslations w i
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
   [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" (T.UAMachine . T.UUID) . valueString
-  , adaptPid       .-> warnOrOp "Non-Num value in adapt:pid"  (T.UAPID . T.PID . L.pack . show) . valueNum
-  , adaptPPid      .-> warnOrOp "Non-Num value in adapt:ppid" (T.UAPPID . T.PID . L.pack . show) . valueNum
+  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  (T.UAPID . T.PID . L.pack . show) . valueString
+  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" (T.UAPPID . T.PID . L.pack . show) . valueString
   , adaptPrivs     .-> warnOrOp "Non-string vcalue in adapt:privs" T.UAHadPrivs . valueString
   , adaptPwd       .-> warnOrOp "Non-string vcalue in adapt:pwd"   T.UAPWD . valueString
   , provType       .-> ignore
@@ -248,8 +249,9 @@ artifactAttrTranslations :: Map Ident (Value -> Tr (Maybe T.ArtifactAttr))
 artifactAttrTranslations = Map.fromList
   [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
   , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
-  , adaptFilePath     .-> warnOrOp "Non-string value in adapt:FilePath" T.ArtACoarseLoc . valueString
+  , adaptPath         .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
   , provType          .-> ignore
+  , adaptEntityType   .-> ignore
   ]
 
 attrOper :: Map Ident (Value -> a) -> a -> Ident -> Value -> a
@@ -331,17 +333,17 @@ type PredAttrTrans = KVs -> [T.PredicateAttr]
 generationAttr :: PredAttrTrans
 generationAttr = catMaybes . map ge
  where
- ge (k,ValString v) | k == adaptGenOp     = Just $ T.GenOp v
-                    | k == nfoPermissions = Just $ T.Permissions v
+ ge (k,ValString v) | eqIdent adaptGenOp k   = Just $ T.GenOp v
+                    | eqIdent nfoPermissions k = Just $ T.Permissions v
  ge _                                     = Nothing
 
 usedAttr :: PredAttrTrans
 usedAttr = catMaybes . map ua
  where
- ua (k,ValString v)  | k == adaptArgs         = Just $ T.Args v
-                     | k == adaptReturnVal    = Just $ T.ReturnVal v
-                     | k == nfoOperation      = Just $ T.Operation v
- ua _                                         = Nothing
+ ua (k,ValString v)  | eqIdent adaptArgs k      = Just $ T.Args v
+                     | eqIdent adaptReturnVal k = Just $ T.ReturnVal v
+                     | eqIdent nfoOperation k   = Just $ T.Operation v
+ ua _                                           = Nothing
 
 startedByAttr :: PredAttrTrans
 startedByAttr = const []
@@ -349,16 +351,16 @@ startedByAttr = const []
 endedByAttr :: PredAttrTrans
 endedByAttr = catMaybes . map eb
  where
- eb (k,ValString v) | k == adaptExecOp = Just $ T.ExecOp v
- eb _                                  = Nothing
+ eb (k,ValString v) | eqIdent adaptExecOp k = Just $ T.ExecOp v
+ eb _                                       = Nothing
 
 informedByAttr :: PredAttrTrans
 informedByAttr = catMaybes . map go
  where
-  go (k,ValString v) | k == provAtTime = T.AtTime <$> parseUTC v
-  go (k,ValTime   v) | k == provAtTime = Just $ T.AtTime v
-  go (k,ValString v) | k == adaptUseOp = Just $ T.Operation v
-  go _                                 = Nothing
+  go (k,ValString v) | eqIdent provAtTime k = T.AtTime <$> parseUTC v
+  go (k,ValTime   v) | eqIdent provAtTime k = Just $ T.AtTime v
+  go (k,ValString v) | eqIdent adaptUseOp k = Just $ T.Operation v
+  go _                                      = Nothing
 
 associatedWithAttr :: PredAttrTrans
 associatedWithAttr = const []
@@ -366,10 +368,10 @@ associatedWithAttr = const []
 derivedFromAttr :: PredAttrTrans
 derivedFromAttr = catMaybes . map go
  where
- go (k,ValString v) | k == provAtTime    = T.AtTime <$> parseUTC v
- go (k,ValTime   v) | k == provAtTime    = Just $ T.AtTime v
- go (k,ValString v) | k == adaptDeriveOp = Just $ T.DeriveOp v
- go _                                    = Nothing
+ go (k,ValString v) | eqIdent provAtTime    k = T.AtTime <$> parseUTC v
+ go (k,ValTime   v) | eqIdent provAtTime    k = Just $ T.AtTime v
+ go (k,ValString v) | eqIdent adaptDeriveOp k = Just $ T.DeriveOp v
+ go _                                         = Nothing
 
 attributedToAttr :: PredAttrTrans
 attributedToAttr = const []

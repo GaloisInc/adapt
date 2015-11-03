@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
-module ParserCore (module ParserCore, Ident(..), textOfIdent) where
+module ParserCore (module ParserCore, Ident(..), textOfIdent, expandPrefixes) where
 
 import LexerCore hiding (mkIdent)
 import Lexer
@@ -17,13 +17,11 @@ import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
-import qualified Data.Map.Strict as Map
-import           Data.Map.Strict (Map)
+import qualified Data.HashMap.Strict as Map
+import           Data.HashMap.Strict (HashMap)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 import           Network.URI (URI)
 import qualified Network.URI as URI
-import qualified Data.Generics.Uniplate.Operations as Uniplate
-import           Data.Generics.Uniplate.Data ()
 
 data Prov = Prov [Prefix] [Expr]
   deriving (Eq, Ord, Show,Data,Typeable)
@@ -41,21 +39,17 @@ data Expr = RawEntity { exprOper     :: Ident
                       }
       deriving (Eq,Ord,Show,Data,Typeable)
 
-fullyQualifyIdents :: Prov -> Prov
-fullyQualifyIdents = explicitProvPrefixes . expandPrefixes
-
-explicitProvPrefixes :: Prov -> Prov
-explicitProvPrefixes (Prov ps ex) = Prov ps  (Uniplate.transformBi f ex)
- where
-  f :: Ident -> Ident
-  f i = maybe i id $ Map.lookup i m
-
-  m :: Map Ident Ident
-  m = Map.fromList $ map (\ident -> (Unqualified (local ident),ident)) allIdent
-
 expandPrefixes :: Prov -> Prov
-expandPrefixes (Prov ps ex) = Prov ps (Uniplate.transformBi f ex)
-  where
+expandPrefixes (Prov ps ex) = Prov ps (map expand ex)
+ where
+  expand (RawEntity o i as ats l) =
+    RawEntity { exprOper     = f o
+              , exprIdent    = fmap f i
+              , exprArgs     = map (fmap (either (Left . f) Right)) as
+              , exprAttrs    = map (\(a,b) -> (f a, b)) ats
+              , exprLocation = l
+              }
+
   prefixToTuple (Prefix t uri) = (t,uri)
   m = Map.fromList $ ("prov", NS.prov) : map prefixToTuple ps
 
