@@ -35,6 +35,11 @@ runMe m = showTriples ts'
   ts' = ts ++ nodeTimeTriples ntts
 
 
+putTriple :: Triple -> M ()
+putTriple t = sets_ $ \ts -> t:ts
+
+setsUsedTimeMap :: (UsedTimeMap -> UsedTimeMap) -> M ()
+setsUsedTimeMap f = lift (sets_ f)
 
 showTriples :: [Triple] -> Text
 showTriples ts = Text.unlines (headers ++ map turtleTriple ts)
@@ -56,21 +61,19 @@ tripleStmt (StmtPredicate p) = triplePredicate p
 
 tripleEntity :: Entity -> M ()
 tripleEntity e = case e of
-  Agent i _aattr           -> newNode i "prov:Activity"
-  UnitOfExecution i _uattr -> newNode i "prov:Activity"
-  Artifact i _aattr        -> newNode i "prov:Entity"
-  Resource i _devTy _devId -> newNode i "prov:Entity"
+  Agent i _aattr           -> putEntity i "prov:Activity"
+  UnitOfExecution i _uattr -> putEntity i "prov:Activity"
+  Artifact i _aattr        -> putEntity i "prov:Entity"
+  Resource i _devTy _devId -> putEntity i "prov:Entity"
+  where
+  putEntity nodeid typeof = putTriple $ Triple (angleBracket nodeid) "a" typeof
 
 triplePredicate :: Predicate -> M ()
 triplePredicate pred = do
   case predUsedTime pred of
     Just (node, utc) ->
-      lift $ sets_ $ \s -> insertNodeTimeMap node utc s
+      setsUsedTimeMap $ \s -> insertNodeTimeMap node utc s
     Nothing -> return ()
-
-newNode :: NodeId -> Text -> M ()
-newNode nodeid typeof = sets_ $ \ts -> node:ts
-  where node = Triple nodeid "a" typeof
 
 
 predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
