@@ -5,7 +5,8 @@ module RDF
   ( turtle
   ) where
 
-import Data.List (find)
+import qualified Data.Set as Set
+import Data.Set (Set)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
@@ -19,24 +20,25 @@ turtle :: [Stmt] -> Text
 turtle = runMe . mapM_ tripleStmt
 
 data Triple = Triple Text Text Text
+  deriving (Eq, Ord)
 
 type UsedTimeMap = Map NodeId (Integer, Integer)
 
-type M a = StateT [Triple] (StateT UsedTimeMap Id) a
+type M a = StateT (Set Triple, [Triple]) (StateT UsedTimeMap Id) a
 
 type NodeId = Text
 
 runMe :: M a -> Text
 runMe m = showTriples ts'
   where
-  ((_, ts), ntts) = runId
+  ((_, (_,ts)), ntts) = runId
                 $ runStateT Map.empty
-                $ runStateT [] m
+                $ runStateT (Set.empty,[]) m
   ts' = ts ++ nodeTimeTriples ntts
 
 
 putTriple :: Triple -> M ()
-putTriple t = sets_ $ \ts -> t:ts
+putTriple t = sets_ (\(s,l) -> (Set.insert t s, if Set.member t s then l else t:l))
 
 setsUsedTimeMap :: (UsedTimeMap -> UsedTimeMap) -> M ()
 setsUsedTimeMap f = lift (sets_ f)
@@ -61,20 +63,62 @@ tripleStmt (StmtPredicate p) = triplePredicate p
 
 tripleEntity :: Entity -> M ()
 tripleEntity e = case e of
-  Agent i _aattr           -> putEntity i "prov:Activity"
-  UnitOfExecution i _uattr -> putEntity i "prov:Activity"
-  Artifact i _aattr        -> putEntity i "prov:Entity"
+  Agent i aattr           -> putEntity i "prov:Activity" >> mapM_ putAgentAttr aattr
+  UnitOfExecution i uattr -> putEntity i "prov:Activity" >> mapM_ putUOEAttr uattr
+  Artifact i aattr        -> putEntity i "prov:Entity"   >> mapM_ putArtifactAttr aattr
   Resource i _devTy _devId -> putEntity i "prov:Entity"
   where
   putEntity nodeid typeof = putTriple $ Triple (angleBracket nodeid) "a" typeof
 
-triplePredicate :: Predicate -> M ()
-triplePredicate pred = do
-  case predUsedTime pred of
-    Just (node, utc) ->
-      setsUsedTimeMap $ \s -> insertNodeTimeMap node utc s
-    Nothing -> return ()
+  subj = angleBracket (nameOf e)
+  put a b = putTriple (Triple subj a b)
 
+  putAgentAttr (AAName t) = put "foaf:name" t
+  putAgentAttr (AAUser t) = put "foaf:user" t
+  putAgentAttr (AAMachine m) = put "tc:machine" m
+
+  putUOEAttr a =
+    case a of
+         UAUser t       -> put "foaf:user" t
+         UAPID t        -> put "tc:pid" t
+         UAPPID t       -> put "tc:ppid" t
+         UAMachine t    -> put "tc:machine" t
+         UAHadPrivs t   -> put "tc:privs" t
+         UAPWD t        -> put "tc:pwd" t
+         UAStarted t    -> put "tc:time" (Text.pack $ show $ utcToEpoch t)
+         UAEnded t      -> return ()
+         UAGroup t      -> put "tc:group" t
+         UASource t     -> put "tc:source" t
+         UACWD t        -> put "tc:cwd" t
+         UAUID t        -> put "tc:uid" t
+         UACommandLine t        -> put "tc:commandLine" t
+         UAProgramName t        -> put "tc:programName" t
+  putArtifactAttr a =
+    case a of
+       ArtAType t               -> put "tc:artifactType" t
+       ArtARegistryKey t        -> put "tc:registryKey" t
+       ArtADestinationAddress t -> put "tc:destinationAddress" t
+       ArtADestinationPort t    -> put "tc:destinationPort" t
+       ArtASourceAddress t      -> put "tc:sourceAddress" t
+       ArtASourcePort t         -> put "tc:sourcePort" t
+       _ -> return ()
+
+triplePredicate :: Predicate -> M ()
+triplePredicate Predicate{..} = mapM_ aux predAttrs
+ where
+  subj = angleBracket predSubject
+  aux (Raw verb obj)    = putTriple $ Triple subj verb obj
+  aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
+  aux (StartTime t)     = putTriple $ Triple subj "prov:startTime" (Text.pack $ show $ utcToEpoch t)
+  aux (EndTime t)       = putTriple $ Triple subj "prov:endTime" (Text.pack $ show $ utcToEpoch t)
+  aux (GenOp g)         = putTriple $ Triple subj "tc:genOp" g
+  aux (Permissions t)   = putTriple $ Triple subj "tc:permissions" t
+  aux (ReturnVal t)     = putTriple $ Triple subj "tc:returnVal" t
+  aux (Operation t)     = putTriple $ Triple subj "tc:operation" t
+  aux (Args t)          = return () -- XXX  putTriple $ Triple subj "tc:args"
+  aux (Cmd t)           = putTriple $ Triple subj "tc:commandLine" t
+  aux (DeriveOp t)      = putTriple $ Triple subj "tc:deriveOp" t
+  aux (ExecOp t)        = putTriple $ Triple subj "tc:execOp" t
 
 predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
 predUsedTime Predicate{..} = case predType of
@@ -98,8 +142,8 @@ insertNodeTimeMap node utc m = case Map.lookup node m of
                        | otherwise = (lo, hi)
 
 
-  utcToEpoch :: UTCTime -> Integer
-  utcToEpoch u = read $ formatTime defaultTimeLocale "%s" u
+utcToEpoch :: UTCTime -> Integer
+utcToEpoch u = read $ formatTime defaultTimeLocale "%s" u
 
 nodeTimeTriples :: UsedTimeMap -> [Triple]
 nodeTimeTriples m = Map.foldrWithKey aux [] m

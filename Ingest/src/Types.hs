@@ -22,6 +22,8 @@ module Types
     , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
     , Time, EntryPoint
     , Text
+    -- * Helpers
+    , nameOf
     ) where
 
 import qualified Control.Exception as X
@@ -183,13 +185,11 @@ data PredicateType
 
 type ExecOp = Text
 
-newtype UUID      = UUID Text -- XXX consider (Word64,Word64)
-  deriving (Eq, Ord, Show, Data, Typeable)
+type UUID      = Text
 
 -- | Globally unique process ID - this is _NOT_ a commodity OS PID, but that
 -- could be one component.
-newtype PID       = PID Text  -- XXX consider MID|Word32
-  deriving (Eq, Ord, Show, Data, Typeable)
+type PID       = Text
 
 -- | Type of artifacts
 type ArtifactType = Text

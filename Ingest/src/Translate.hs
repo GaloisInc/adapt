@@ -206,9 +206,9 @@ uoeAttr i = attrOper uoeAttrTranslations w i
 
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
-  [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" (T.UAMachine . T.UUID) . valueString
-  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  (T.UAPID . T.PID) . valueString
-  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" (T.UAPPID . T.PID) . valueString
+  [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" T.UAMachine . valueString
+  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  T.UAPID . valueString
+  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" T.UAPPID . valueString
   , adaptPrivs     .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
   , adaptPwd       .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
   , adaptGroup          .-> warnOrOp "Non-string value in adapt:group" T.UAGroup . valueString
@@ -236,7 +236,7 @@ agentAttr i = attrOper agentAttrTranslations w i
 
 agentAttrTranslations :: Map Ident (Value -> Tr (Maybe T.AgentAttr))
 agentAttrTranslations = Map.fromList
-  [ adaptMachineID   .-> warnOrOp "Non-string value in adapt:machine"    (T.AAMachine . T.UUID) . valueString
+  [ adaptMachineID   .-> warnOrOp "Non-string value in adapt:machine"    T.AAMachine . valueString
   , foafName         .-> warnOrOp "Non-string value in foaf:name"        T.AAName . valueString
   , foafAccountName  .-> warnOrOp "Non-string value in foaf:accountName" T.AAUser . valueString
   , provType         .-> ignore
