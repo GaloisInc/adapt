@@ -206,26 +206,26 @@ uoeAttr i = attrOper uoeAttrTranslations w i
 
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
-  [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" T.UAMachine . valueString
-  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  T.UAPID . valueString
-  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" T.UAPPID . valueString
-  , adaptPrivs     .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
-  , adaptPwd       .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
+  [ adaptMachineID      .-> warnOrOp "Non-string value in adapt:machine" T.UAMachine . valueString
+  , adaptPid            .-> warnOrOp "Non-string value in adapt:pid"  T.UAPID . valueString
+  , adaptPPid           .-> warnOrOp "Non-string value in adapt:ppid" T.UAPPID . valueString
+  , adaptPrivs          .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
+  , adaptPwd            .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
   , adaptGroup          .-> warnOrOp "Non-string value in adapt:group" T.UAGroup . valueString
   , adaptCommandLine    .-> warnOrOp "Non-string value in adapt:commandLine" T.UACommandLine . valueString
   , adaptSource         .-> warnOrOp "Non-string value in adapt:source"  T.UASource . valueString
   , adaptCWD            .-> warnOrOp "Non-string value in adapt:cwd" T.UACWD . valueString
   , adaptUID            .-> warnOrOp "Non-string value in adapt:uid" T.UAUID . valueString
   , adaptProgramName    .-> warnOrOp "Non-string value in adapt:programName" T.UAProgramName . valueString
-  , provType       .-> ignore
-  , provAtTime     .-> (\v -> return $ let mtime = case v of
-                                                      ValString s -> parseUTC s
-                                                      ValTime t   -> Just t
-                                                      _           -> Nothing
-                                       in fmap T.UAStarted mtime)
-  , foafAccountName .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
+  , provAtTime          .-> warnOrOp "Non-time value in prov:atTime" T.UAStarted . getTime
+  , provType            .-> ignore
+  , foafAccountName     .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
   ]
 
+getTime :: Value -> Maybe Time
+getTime (ValString s) = parseUTC s
+getTime (ValTime t)   = Just t
+getTime _             = Nothing
 
 agentAttrs :: KVs -> Tr [T.AgentAttr]
 agentAttrs kvs = catMaybes <$> mapM (uncurry agentAttr) kvs
@@ -251,16 +251,16 @@ artifactAttr i v = attrOper artifactAttrTranslations w i v
 
 artifactAttrTranslations :: Map Ident (Value -> Tr (Maybe T.ArtifactAttr))
 artifactAttrTranslations = Map.fromList
-  [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
-  , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
-  , adaptPath         .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
+  [ adaptArtifactType       .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
+  , adaptRegistryKey        .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
+  , adaptPath               .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
   , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.ArtADestinationAddress . valueString
   , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.ArtADestinationPort . valueString
-  , adaptSourceAddress .-> warnOrOp "Non-string value in adapt:sourceAddress" T.ArtASourceAddress . valueString
-  , adaptSourcePort    .-> warnOrOp "Non-string value in adapt:sourcePort" T.ArtASourcePort . valueString
-  , adaptHasVersion   .-> ignore
-  , provType          .-> ignore
-  , adaptEntityType   .-> ignore
+  , adaptSourceAddress      .-> warnOrOp "Non-string value in adapt:sourceAddress" T.ArtASourceAddress . valueString
+  , adaptSourcePort         .-> warnOrOp "Non-string value in adapt:sourcePort" T.ArtASourcePort . valueString
+  , adaptHasVersion         .-> ignore
+  , provType                .-> ignore
+  , adaptEntityType         .-> ignore
   ]
 
 attrOper :: Map Ident (Value -> a) -> a -> Ident -> Value -> a
@@ -302,9 +302,6 @@ wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> T
 wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr f = predicate subj obj T.WasEndedBy (f $ endedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
-
-timeZero :: UTCTime
-timeZero = UTCTime (fromGregorian 1900 1 1) 0
 
 wasInformedBy :: a -> Ident -> Maybe Ident -> KVs -> Tr T.Predicate
 wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (informedByAttr kvs)
