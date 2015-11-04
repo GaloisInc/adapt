@@ -2,17 +2,27 @@ Purpose
 =======
 This document specifies the PROV-TC language, which is a dialect of the W3CPROV language (specifically the PROV-N compliant representation of that language). PROV-TC is meant to be used by the Transparent Computing ADAPT project team (and hopefully other teams) for communication between technical areas one and two.
 
+Contact
+========
+Please contact Dave Archer, <dwa@galois.com>, regarding this specification.
+
 Working Prototypes
 ========
 The ADAPT team has demonstrated the following so far:
 
 * a translator from the 5-Directions sample data syntax to PROV-TC
-* an ingestor that parses, syntax checks, and type checks PROV-TC, and creates a prototype graph database from the ingested data
 * successful translation of all 46 5-Directions data samples into PROV-TC (these are available, just ask)
+* an XML file specifying PROV-TC specific attributes to PROV-N constructs that is used to generate SRI SPADE data compliant to PROV-TC
+* successful generation of several SPADE samples in PROV-TC
+* an ingestor that parses, syntax checks, and type checks PROV-TC, and creates a prototype graph database from the ingested data
+* successful ingest of all 5-Directions and SPADE samples generated so far in PROV-TC
 * the examples used in this literate specification of PROV-TC
 
-In addition, we are currently working to ingest data samples from SPADE.
+Conceptual Model
+=======
+PROV-TC is a domain-specific language designed to implement a conceptual model for transfer of knowledge between Transparent Computing TA1 and TA2 teams. The conceptual model has been discussed and refined for several months, and is shown below.
 
+<img src="./languagediagram.png" alt="Conceptual Model Figure" style="width: 600px;"/>
 
 PROV-TC Prelude and Postlude
 =========
@@ -40,14 +50,16 @@ Quick checking for basic syntax correctness
 ========
 Because we specify a dialect of PROV-N, an easy on-line tool can be used as a basic check of syntactic correctness prior to using our ingester tools to check more deeply. You can find this tool [here](https://provenance.ecs.soton.ac.uk/validator/view/validator.html). 
 
+A more complete check, including checking of attributes specific to PROV-TC, can be had by contacting the ADAPT team.
+
 
 PROV-TC Entities
 =========
-We allow for instances of the following entity classes.
+We allow for instances of the following entity classes. In each case, we specify all currently recognized attributes. Those attributes that are required for syntactic correctness are marked as required in the code examples. All others are optional. No alternates to the attributes shown are allowed. That is, the shown attributes are the only option available to represent the semantics they represent. Other semantics may be included, but will be ignored for now. 
 
 Artifact
 --------
-An artifact is an entity that may be created, referenced, used, or destroyed, but does not take action on its own. Typical artifacts in the TC domain include files, network packets, memory locations, and registry file entries. More may be added later. An artifact instance is reified as an entity in the PROV model, and includes several attributes, many of which are optional. Shown below is an example artifact: a file with name */users/dwa/mystuff/bin/create.exe*, and referred to with the tag *ex:createExe*. Required attributes are marked with comments and include the type of entity (*prov:type*), the type of artifact (*adapt:artifactType*), an identifier (the type of which depends on the artifact type), a location within that item (which also depends on the artifact type), a creation time, a version, a destruction time, an owning account, a size, and a 32b taint. Alternative values for the different artifact types are shown in comments.
+An artifact is an entity that may be created, referenced, used, or destroyed, but does not take action on its own. Artifacts recognized at present in the TC domain include files, network packets, memory locations, and registry file entries. More may be added later. An artifact instance is reified as an entity in the PROV model, and includes several attributes, many of which are optional. Shown below is an example artifact: a file with name */users/dwa/mystuff/bin/create.exe*, and referred to with the tag *ex:createExe*. Required attributes are marked with comments and include the type of entity (*prov:type*), the type of artifact (*adapt:artifactType*), an identifier (the type of which depends on the artifact type), a location within that item (which also depends on the artifact type), a creation time, a version, a destruction time, an owning account, a size, and a 32b taint. Alternative values for the different artifact types are shown in comments.
 
 ```
 entity(ex:createExe, [
@@ -209,9 +221,11 @@ wasDerivedFrom(ex:newprogExe, ex:newprogSrc, [
 
 An artifact can be part of another artifact. We use dc:isPartOf for this construction. No good examples have been created yet.
 
+A metadatum describes an artifact or UoE. No good examples have been created yet.
+
 Detailed PROV-TC Syntax Guide
 ==============
-This section provides a detailed grammatical structure for composition of the statement examples above. Currently under revision to match the section above.
+This section provides a detailed grammatical structure for composition of the statement examples above. Currently under revision to match the section above, so please refer to the above examples and the related XML file as the gold standard for now.
 
 Token Set
 -----------
