@@ -24,6 +24,7 @@ EXAMPLE='entity(ex:e68f56, [tc:entityType="network", tc:destinationAddress="13.1
 	| sed \
             -e '1a \ prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>' \
             -e 's;^ artifact;entity;' \
+            -e 's;^ process;activity;' \
             -e 's;audit:subtype;tc:entityType;' \
             -e 's;data:destination host;tc:destinationAddress;' \
             -e 's;data:source host;tc:sourceAddress;' \
