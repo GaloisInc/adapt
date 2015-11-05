@@ -36,7 +36,7 @@ document
 prefix ex <http://example.org/> 
 
 // namespace for our specific attributes
-prefix prov-tc <http://adapt.org/> 
+prefix prov-tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>.
 
 ```
 
