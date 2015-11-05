@@ -17,11 +17,13 @@ test:
 
 EXAMPLE='entity(ex:e68f56, [tc:entityType="network", tc:destinationAddress="13.1.136.66"])'
 
+# c.f. https://github.com/ashish-gehani/SPADE/blob/master/cfg/opm2provtc-filter.config
+
 %.provn:
 	expand -t1 < $(HOME)/trace/current/$(shell basename $@) \
 	| sed \
             -e '1a \ prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>' \
-            -e 's;artifact;entity;' \
+            -e 's;^ artifact;entity;' \
             -e 's;audit:subtype;tc:entityType;' \
             -e 's;data:destination host;tc:destinationAddress;' \
             -e 's;data:source host;tc:sourceAddress;' \
