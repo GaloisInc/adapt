@@ -137,11 +137,12 @@ printStats ss =
   do let g  = mkGraph ss
          vs = vertices g
          mn = length (take 1 ss) -- one node suggests the minimum subgraph is one.
-         sz = maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
+         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
+         nrStmt = length ss
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (length vs)
-     putStrLn $ "\tPredicates:       " ++ show (length ss - length vs)
-     putStrLn $ "\tTotal statements: " ++ show (length ss)
+     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
+     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
+     putStrLn $ "\tTotal statements: " ++ show nrStmt
 
 data NodeInfo = Node Int | Edge (Int,Int)
 
