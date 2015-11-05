@@ -88,7 +88,7 @@ data Located a = Located { locRange :: !Range
 
 -- by default, print with no location information
 instance PP a => PP (Located a) where
-  ppPrec p Located { .. } = ppPrec p locValue
+  ppPrec p Located { .. } = text "\"" PP.<> ppPrec p locValue PP.<> text "\"" PP.<> text " at " PP.<> pp locRange
 
 
 class HasRange a where

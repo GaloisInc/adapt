@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 
-module ParserCore (module ParserCore, Ident(..), textOfIdent) where
+module ParserCore (module ParserCore, ParseError(..), Ident(..), textOfIdent, Time) where
 
 import LexerCore hiding (mkIdent)
 import Lexer
@@ -10,9 +10,10 @@ import Position
 import PP
 
 import           Namespaces as NS
+import           Types (ParseError(..), Time)
+
 import           Control.Applicative (Applicative)
 import           Data.Data (Data,Typeable)
-import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
 import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
@@ -28,8 +29,6 @@ data Prov = Prov [Prefix] [Expr]
 
 data Prefix = Prefix Text URI
   deriving (Eq,Ord,Show,Data,Typeable)
-
-type Time = UTCTime
 
 data Expr = RawEntity { exprOper     :: Ident
                       , exprIdent    :: (Maybe Ident)
@@ -97,10 +96,6 @@ newtype Parser a = Parser
 data RW = RW { rwInput  :: [Located Token]
              , rwCursor :: Maybe (Located Token)
              }
-
-data ParseError = HappyError (Maybe (Located Token))
-                | HappyErrorMsg String
-                  deriving (Data,Typeable, Eq, Ord, Show)
 
 runParser :: L.Text -> Parser a -> Either ParseError a
 runParser txt p =

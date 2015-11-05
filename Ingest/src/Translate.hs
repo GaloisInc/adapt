@@ -12,10 +12,10 @@ module Translate
 
 import PP hiding ((<>))
 import Namespaces as NS
-import ParserCore
 import Util (parseUTC)
 import qualified Types as T
-import           Types (TranslateError(..))
+import           Types (TranslateError(..),Time)
+import           ParserCore
 
 import           Control.Applicative
 import           Data.DList hiding (map)
@@ -52,10 +52,7 @@ safely m =
      case x of
         Right r                   -> return r
         Left (TranslateError txt) -> warn txt >> return Nothing
-        Left (MissingRequiredTimeField i f stmt) ->
-          do warn $ "Filling missing required time field with epoch (entity/field: " <> maybe "" id i <> " " <> f <> ")"
-             return $ Just stmt
-        Left e                    -> warn (L.pack $ show e) >> return Nothing
+        Left e                    -> warn (L.pack $ show $ pp e) >> return Nothing
 
 warn :: Text -> Tr ()
 warn = put . T.Warn

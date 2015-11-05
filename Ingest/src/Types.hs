@@ -11,7 +11,7 @@ module Types
     , ParseError(..)
     , TypeError(..)
     , TranslateError(..)
-    , Warning(..), ppWarning
+    , Warning(..)
       -- * Key types
     , Type(..)
     , Stmt(..)
@@ -38,25 +38,28 @@ import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import           Data.Time (UTCTime)
 import           Data.Word (Word64)
-import           ParserCore (ParseError(..))
 import           Text.Show.Functions ()
 
-import ParserCore (Time)
+
+import           PP as PP
+import           Position
+import           LexerCore (Token)
+
+type Time = UTCTime
 
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError
   deriving (Show, Data, Typeable)
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
-ppWarning :: Warning -> Text
-ppWarning (Warn w) = w
-
 data TypeError  = TypeError Text Type Type | CanNotInferType Text
         deriving (Eq, Ord, Show, Read, Data, Typeable)
-data TranslateError = MissingRequiredField (Maybe Text) Text
-                    | MissingRequiredTimeField (Maybe Text) Text Stmt
-                    | TranslateError Text
+data TranslateError = TranslateError Text
         deriving (Show, Data, Typeable)
+
+data ParseError = HappyError (Maybe (Located Token))
+                | HappyErrorMsg String
+                  deriving (Data,Typeable, Eq, Ord, Show)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
@@ -222,4 +225,35 @@ data Type = EntityClass
           | TyArrow Type Type
           | TyVoid
         deriving (Eq, Ord, Show, Read, Data, Typeable)
+
+--------------------------------------------------------------------------------
+--  Pretty Printing
+
+instance PP Error where
+  ppPrec _ (PE e)  = text "Parse error: " PP.<> pp e
+  ppPrec _ (TCE e) = text "Typecheck error: " PP.<> pp e
+  ppPrec _ (TRE e) = text "Translation error: " PP.<> pp e
+
+instance PP ParseError where
+  ppPrec _ (HappyError Nothing) = text "Unknown location."
+  ppPrec _ (HappyError (Just loc)) = text "At " PP.<> pp loc
+  ppPrec _ (HappyErrorMsg s) = text s
+
+instance PP TranslateError where
+  ppPrec _ (TranslateError t) = pp t
+
+instance PP TypeError where
+  ppPrec _ (CanNotInferType t) = text "Can not infer type for " PP.<> pp t
+  ppPrec _ (TypeError a b c)   =
+      text "Can not unify inferred types of " PP.<>
+               pp b PP.<> " and " PP.<> pp c PP.<> " for " PP.<> pp a
+
+instance PP Warning where
+  ppPrec _ (Warn w) = pp w
+
+instance PP Type where
+  ppPrec _ t =
+    case t of
+        TyArrow a b -> pp a PP.<> text " -> " PP.<> pp b
+        _ -> text (show t)
 

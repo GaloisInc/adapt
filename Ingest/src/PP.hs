@@ -28,6 +28,9 @@ instance PP a => PP [a] where
 instance PP Int where
   ppPrec _ = int
 
+instance PP Integer where
+  ppPrec _ = integer
+
 instance PP Char where
   ppPrec _ = char
   ppList   = text

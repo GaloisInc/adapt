@@ -14,10 +14,10 @@ module Parser ( parseProvN, parseProvNFile
 import ParserCore
 import LexerCore
 import Position
+import Namespaces
 
 import Control.Applicative ((<$>))
 import Data.Monoid ( mempty, mappend, mconcat )
-import Namespaces
 import qualified Network.URI as URI
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)

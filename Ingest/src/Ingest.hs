@@ -3,14 +3,15 @@ module Ingest
     ( -- * High-level interface
       ingestFile, ingestText
     , Error(..), ParseError(..), TypeError(..), TranslateError(..)
+    , pp, PP(..)
     , module Types
-    -- XXX PP
     ) where
 
 import Types
 import Typecheck
 import Translate
 import Parser
+import PP (pp, PP(..))
 import Control.Applicative
 import qualified Control.Exception as X
 import qualified Data.Text.Lazy.IO as Text
@@ -22,7 +23,7 @@ import System.IO
 ingestFile ::  FilePath -> IO [Stmt]
 ingestFile fp =
   do (stmts,ws) <- (either X.throw id . ingestText) <$> Text.readFile fp
-     mapM_ (hPutStrLn stderr . Text.unpack . ppWarning) ws
+     mapM_ (hPutStrLn stderr . show . pp) ws
      return stmts
 
 eX :: ExceptionM m i => (e -> i) -> Either e a -> m a

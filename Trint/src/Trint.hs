@@ -19,8 +19,8 @@ import qualified Data.Map as Map
 import           Data.Map (Map)
 import MonadLib        hiding (handle)
 import MonadLib.Monads hiding (handle)
-import qualified Data.Text.Lazy as L
-import qualified Data.Text.Lazy.IO as L
+import qualified Data.Text.Lazy as Text
+import qualified Data.Text.Lazy.IO as Text
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
 
@@ -86,14 +86,14 @@ trint c fp = do
   case eres of
     Left e  -> do
       putStrLn $ "Error ingesting " ++ fp ++ ":"
-      print e
+      print (pp e)
     Right (res,ws) -> do
       unless (quiet c) $ printWarnings ws
       processStmts c fp res
 
   where
   ingest = do
-    t <- handle onError (L.readFile fp)
+    t <- handle onError (Text.readFile fp)
     return (ingestText t)
   onError :: IOException -> IO a
   onError e = do putStrLn ("Error reading " ++ fp ++ ":")
@@ -118,19 +118,19 @@ processStmts c fp res
       when (ast c) $ do
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
-        output astfile $ L.unlines $ map (L.pack . show) res
+        output astfile $ Text.unlines $ map (Text.pack . show) res
 
   where
   dbg s = when (verbose c) (putStrLn s)
-  output f t = handle (onError f) $ L.writeFile f t
+  output f t = handle (onError f) $ Text.writeFile f t
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
 
 printWarnings :: [Warning] -> IO ()
-printWarnings ws = L.putStrLn doc
-  where doc = L.unlines $ intersperse "\n" $ map ppWarning ws
+printWarnings ws = Text.putStrLn doc
+  where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . pp) ws
 
 printStats :: [Stmt] -> IO ()
 printStats ss =
