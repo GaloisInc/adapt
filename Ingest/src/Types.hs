@@ -235,9 +235,9 @@ instance PP Error where
   ppPrec _ (TRE e) = text "Translation error: " PP.<> pp e
 
 instance PP ParseError where
-  ppPrec _ (HappyError Nothing) = text "Unknown parser error."
+  ppPrec _ (HappyError Nothing)    = text "Unknown parser error."
   ppPrec _ (HappyError (Just loc)) = text "Could not parse token " PP.<> pp loc
-  ppPrec _ (HappyErrorMsg s) = text s
+  ppPrec _ (HappyErrorMsg s)       = text s
 
 instance PP TranslateError where
   ppPrec _ (TranslateError t) = pp t

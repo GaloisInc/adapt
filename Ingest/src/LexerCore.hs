@@ -31,7 +31,7 @@ initialInput :: Text.Text -> AlexInput
 initialInput txt = AlexInput { aiChar  = '\n'
                              , aiBytes = []
                              , aiInput = txt
-                             , aiPos   = Position 0 0 0
+                             , aiPos   = Position 1 0 0
                              }
 
 fillBuffer :: AlexInput -> Maybe AlexInput
