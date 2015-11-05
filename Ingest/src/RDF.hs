@@ -109,6 +109,7 @@ triplePredicate :: Predicate -> M ()
 triplePredicate Predicate{..} = mapM_ aux predAttrs
  where
   subj = angleBracket predSubject
+  aux _ | predSubject == "_" = return () -- BUG COVERUP -- NEEDS REAL FIX
   aux (Raw verb obj)    = putTriple $ Triple subj verb obj
   aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
   aux (StartTime t)     = putTriple $ Triple subj "prov:startTime" (Text.pack $ show $ utcToEpoch t)
