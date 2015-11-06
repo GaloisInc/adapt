@@ -13,6 +13,7 @@ import Data.Monoid ((<>))
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Data.Time
+import Data.Char (toLower)
 import MonadLib
 import Types
 
@@ -34,14 +35,11 @@ runMe m = showTriples ts'
   ((_, (_,ts)), ntts) = runId
                 $ runStateT Map.empty
                 $ runStateT (Set.empty,[]) m
-  ts' = ts -- ++ nodeTimeTriples ntts
+  ts' = ts
 
 
 putTriple :: Triple -> M ()
 putTriple t = sets_ (\(s,l) -> (Set.insert t s, if Set.member t s then l else t:l))
-
-setsUsedTimeMap :: (UsedTimeMap -> UsedTimeMap) -> M ()
-setsUsedTimeMap f = lift (sets_ f)
 
 showTriples :: [Triple] -> Text
 showTriples ts = Text.unlines (headers ++ map turtleTriple ts)
@@ -107,8 +105,16 @@ tripleEntity e = case e of
        _ -> return ()
 
 triplePredicate :: Predicate -> M ()
-triplePredicate Predicate{..} = mapM_ aux predAttrs
+triplePredicate Predicate{..} =
+    thisPred >> mapM_ aux predAttrs
  where
+  thisVerb =
+      let (h:t) = show predType
+          vb    = Text.singleton  (toLower h) <> Text.pack t
+      in if predType < Description
+            then "prov:" <> vb
+            else "dc:" <> vb
+  thisPred = putTriple $ Triple subj thisVerb (angleBracket predObject)
   subj = angleBracket predSubject
   aux (Raw verb obj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
   aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
