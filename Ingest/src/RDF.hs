@@ -108,13 +108,16 @@ triplePredicate :: Predicate -> M ()
 triplePredicate Predicate{..} =
     thisPred >> mapM_ aux predAttrs
  where
+  thisObj  = angleBracket predObject
   thisVerb =
       let (h:t) = show predType
           vb    = Text.singleton  (toLower h) <> Text.pack t
       in if predType < Description
             then "prov:" <> vb
             else "dc:" <> vb
-  thisPred = putTriple $ Triple subj thisVerb (angleBracket predObject)
+  thisPred
+    | predType == Description = return ()
+    | otherwise               = putTriple $ Triple subj thisVerb thisObj
   subj = angleBracket predSubject
   aux (Raw verb obj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
   aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
