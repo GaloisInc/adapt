@@ -319,7 +319,7 @@ isPartOf :: Ident -> Ident -> Tr T.Predicate
 isPartOf subj obj    = return $ predicate subj obj T.IsPartOf []
 
 description :: Ident -> KVs -> Tr T.Predicate
-description obj  kvs = return $ predicate blankNode obj T.Description (descriptionAttr kvs)
+description obj  kvs = predicate blankNode obj T.Description <$> descriptionAttr kvs
 
 predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
 predicate s o ty attr = T.Predicate (textOfIdent s) (textOfIdent o) ty attr
@@ -379,11 +379,25 @@ derivedFromAttr = catMaybes . map go
 attributedToAttr :: PredAttrTrans
 attributedToAttr = const []
 
-descriptionAttr :: PredAttrTrans
-descriptionAttr = catMaybes . map go
- where
- go (k,ValString v) = Just (T.Raw (textOfIdent k) v)
- go _               = Nothing
+descriptionAttr :: KVs -> Tr [T.PredicateAttr]
+descriptionAttr kvs = catMaybes <$> mapM (uncurry descrAttr) kvs
+
+descrAttr :: Ident -> Value -> Tr (Maybe T.PredicateAttr)
+descrAttr i = attrOper descrAttrTranslations w i
+  where w = warnN $ "Unrecognized attribute for description: " <> (textOfIdent i)
+
+
+descrAttrTranslations :: Map Ident (Value -> Tr (Maybe T.PredicateAttr))
+descrAttrTranslations = Map.fromList
+  [ adaptMachineID          .-> warnOrOp "Non-string value in adapt:machine" T.MachineID . valueString
+  , adaptSourceAddress      .-> warnOrOp "Non-string value in adapt:sourceAddress" T.SourceAddress . valueString
+  , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.DestinationAddress . valueString
+  , adaptSourcePort         .-> warnOrOp "Non-string value in adapt:sourcePort" T.SourcePort . valueString
+  , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.DestinationPort . valueString
+  , adaptProtocol           .->
+      \v -> warnOrOp ("Non-num value in adapt:protocol" <> L.pack (show v)) T.Protocol . fmap (L.pack . show) . valueNum $ v
+  , adaptEntityType         .-> ignore
+  ]
 
 orBlank :: Maybe Ident -> Ident
 orBlank = maybe blankNode id

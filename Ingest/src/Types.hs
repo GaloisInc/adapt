@@ -169,6 +169,12 @@ data PredicateAttr
         | Cmd Text
         | DeriveOp DeriveOp
         | ExecOp ExecOp
+        | MachineID MID
+        | SourceAddress Text
+        | DestinationAddress Text
+        | SourcePort Text
+        | DestinationPort Text
+        | Protocol Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateType

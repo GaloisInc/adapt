@@ -119,7 +119,7 @@ literal :: { Value }
   | NUMLIT                      { ValNum $1                           }
   | '-' NUMLIT                  { ValNum (negate $2)                  }
   | 'sq' ident 'sq'             { let Located _ i = $2 in ValIdent i  }
-  | ident                       { let Located _ i = $1 in ValIdent i {- not in spec, see above -} }
+  | ident                       { let Located _ i = $1 in fixIdentLex i }
   | time                        { ValTime $1      {- not in spec -}   }
 
 -- Utilities -------------------------------------------------------------------

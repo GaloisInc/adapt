@@ -13,6 +13,7 @@ import           Namespaces as NS
 import           Types (ParseError(..), Time)
 
 import           Control.Applicative (Applicative)
+import           Data.Char (isDigit)
 import           Data.Data (Data,Typeable)
 import           Data.List ( nub )
 import           Data.Monoid (mconcat, (<>))
@@ -89,6 +90,14 @@ valueIdent _            = Nothing
 valueNum :: Value -> Maybe Integer
 valueNum (ValNum t) = Just t
 valueNum _          = Nothing
+
+-- Identifiers being allowed to have/start with numbers means the lexer
+-- produces identifier tokens instead of numbers, breaking the attribute
+-- lexing until/unless we add a new lexer state for attribute lists.
+fixIdentLex :: Ident -> Value
+fixIdentLex (Unqualified i)
+  | L.all isDigit i = ValNum (read (L.unpack i))
+fixIdentLex i = ValIdent i
 
 newtype Parser a = Parser
   { getParser :: StateT RW (ExceptionT ParseError Id) a

@@ -131,6 +131,14 @@ triplePredicate Predicate{..} =
   aux (Cmd t)           = putTriple $ Triple subj "tc:commandLine" t
   aux (DeriveOp t)      = putTriple $ Triple subj "tc:deriveOp" t
   aux (ExecOp t)        = putTriple $ Triple subj "tc:execOp" t
+  -- The prov description are rather contrary to everything else in our
+  -- language, so we must handle them in an unusual manner.
+  aux (MachineID t)          = putTriple $ Triple thisObj "tc:machineID" t
+  aux (SourceAddress t)      = putTriple $ Triple thisObj "tc:sourceAddress" t
+  aux (DestinationAddress t) = putTriple $ Triple thisObj "tc:destinationAddress" t
+  aux (SourcePort t)         = putTriple $ Triple thisObj "tc:sourcePort" t
+  aux (DestinationPort t)    = putTriple $ Triple thisObj "tc:destinationPort" t
+  aux (Protocol t)           = putTriple $ Triple thisObj "tc:protocol" t
 
 predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
 predUsedTime Predicate{..} = case predType of
