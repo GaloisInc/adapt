@@ -144,7 +144,8 @@ entity i kvs =
  where eTy = case lookup adaptEntityType kvs of
               Just (ValString "file")    -> Just T.TyArtifact
               Just (ValString "network") -> Just T.TyArtifact
-              _                          -> Nothing
+              Just (ValString "registryEntry") -> Just T.TyArtifact
+              _                          -> Just T.TyArtifact -- XXX for the demo, for 5D
 
 artifact :: Ident -> KVs -> Tr T.Entity
 artifact i kvs = T.Artifact (textOfIdent i) <$> artifactAttrs kvs
@@ -215,6 +216,7 @@ uoeAttrTranslations = Map.fromList
   , adaptUID            .-> warnOrOp "Non-string value in adapt:uid" T.UAUID . valueString
   , adaptProgramName    .-> warnOrOp "Non-string value in adapt:programName" T.UAProgramName . valueString
   , provAtTime          .-> warnOrOp "Non-time value in prov:atTime" T.UAStarted . getTime
+  , adaptTime           .-> ignore
   , provType            .-> ignore
   , foafAccountName     .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
   ]

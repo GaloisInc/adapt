@@ -39,8 +39,9 @@ data Expr = RawEntity { exprOper     :: Ident
       deriving (Eq,Ord,Show,Data,Typeable)
 
 expandPrefixes :: Prov -> Prov
-expandPrefixes (Prov ps ex) = Prov ps (map expand ex)
+expandPrefixes (Prov ps' ex) = Prov ps (map expand ex)
  where
+  ps = map (\orig@(Prefix t p) -> if p == adaptOld then Prefix t adapt else orig) ps'
   expand (RawEntity o i as ats l) =
     RawEntity { exprOper     = f o
               , exprIdent    = fmap f i

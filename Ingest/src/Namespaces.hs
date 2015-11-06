@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
 module Namespaces
-  ( prov,dc,adapt,foaf,nfo,URI
+  ( prov,dc,adapt,adaptOld,foaf,nfo,URI
   , Ident(..), domain, local, mkIdent, (.:), textOfIdent
   , allIdent
   , adaptIdent
@@ -68,9 +68,10 @@ textOfIdent :: Ident -> Text
 textOfIdent (Qualified a b) = a <> ":" <> b
 textOfIdent (Unqualified b) = b
 
-dc,adapt,foaf,nfo :: URI
+dc,adapt,adaptOld,foaf,nfo :: URI
 dc    = perr "http://purl.org/dc/elements/1.1/"
 adapt = perr "http://spade.csl.sri.com/rdf/audit-tc.rdfs#"
+adaptOld = perr "http://adapt.galois.com/"
 foaf  = perr "http://xmlns.com/foaf/0.1/"
 nfo   = perr "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/"
 prov  = perr "http://www.w3.org/ns/prov#"

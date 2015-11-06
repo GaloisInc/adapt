@@ -34,7 +34,7 @@ runMe m = showTriples ts'
   ((_, (_,ts)), ntts) = runId
                 $ runStateT Map.empty
                 $ runStateT (Set.empty,[]) m
-  ts' = ts ++ nodeTimeTriples ntts
+  ts' = ts -- ++ nodeTimeTriples ntts
 
 
 putTriple :: Triple -> M ()
@@ -87,7 +87,7 @@ tripleEntity e = case e of
          UAMachine t    -> put "tc:machine" t
          UAHadPrivs t   -> put "tc:privs" t
          UAPWD t        -> put "tc:pwd" t
-         UAStarted t    -> put "tc:time" (Text.pack $ show $ utcToEpoch t)
+         UAStarted t    -> putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
          UAEnded t      -> return ()
          UAGroup t      -> put "tc:group" t
          UASource t     -> put "tc:source" t
@@ -109,8 +109,7 @@ triplePredicate :: Predicate -> M ()
 triplePredicate Predicate{..} = mapM_ aux predAttrs
  where
   subj = angleBracket predSubject
-  aux _ | predSubject == "_" = return () -- BUG COVERUP -- NEEDS REAL FIX
-  aux (Raw verb obj)    = putTriple $ Triple subj verb obj
+  aux (Raw verb obj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
   aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
   aux (StartTime t)     = putTriple $ Triple subj "prov:startTime" (Text.pack $ show $ utcToEpoch t)
   aux (EndTime t)       = putTriple $ Triple subj "prov:endTime" (Text.pack $ show $ utcToEpoch t)
