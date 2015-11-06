@@ -119,26 +119,29 @@ triplePredicate Predicate{..} =
     | predType == Description = return ()
     | otherwise               = putTriple $ Triple subj thisVerb thisObj
   subj = angleBracket predSubject
+
+  put a b = putTriple (Triple subj a (quote b))
+
   aux (Raw verb obj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
-  aux (AtTime t)        = putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
-  aux (StartTime t)     = putTriple $ Triple subj "prov:startTime" (Text.pack $ show $ utcToEpoch t)
-  aux (EndTime t)       = putTriple $ Triple subj "prov:endTime" (Text.pack $ show $ utcToEpoch t)
-  aux (GenOp g)         = putTriple $ Triple subj "tc:genOp" g
-  aux (Permissions t)   = putTriple $ Triple subj "tc:permissions" t
-  aux (ReturnVal t)     = putTriple $ Triple subj "tc:returnVal" t
-  aux (Operation t)     = putTriple $ Triple subj "tc:operation" t
+  aux (AtTime t)        = put "tc:time" (Text.pack $ show $ utcToEpoch t)
+  aux (StartTime t)     = put "prov:startTime" (Text.pack $ show $ utcToEpoch t)
+  aux (EndTime t)       = put "prov:endTime" (Text.pack $ show $ utcToEpoch t)
+  aux (GenOp g)         = put "tc:genOp" g
+  aux (Permissions t)   = put "tc:permissions" t
+  aux (ReturnVal t)     = put "tc:returnVal" t
+  aux (Operation t)     = put "tc:operation" t
   aux (Args t)          = return () -- XXX  putTriple $ Triple subj "tc:args"
-  aux (Cmd t)           = putTriple $ Triple subj "tc:commandLine" t
-  aux (DeriveOp t)      = putTriple $ Triple subj "tc:deriveOp" t
-  aux (ExecOp t)        = putTriple $ Triple subj "tc:execOp" t
+  aux (Cmd t)           = put "tc:commandLine" t
+  aux (DeriveOp t)      = put "tc:deriveOp" t
+  aux (ExecOp t)        = put "tc:execOp" t
   -- The prov description are rather contrary to everything else in our
   -- language, so we must handle them in an unusual manner.
-  aux (MachineID t)          = putTriple $ Triple thisObj "tc:machineID" t
-  aux (SourceAddress t)      = putTriple $ Triple thisObj "tc:sourceAddress" t
-  aux (DestinationAddress t) = putTriple $ Triple thisObj "tc:destinationAddress" t
-  aux (SourcePort t)         = putTriple $ Triple thisObj "tc:sourcePort" t
-  aux (DestinationPort t)    = putTriple $ Triple thisObj "tc:destinationPort" t
-  aux (Protocol t)           = putTriple $ Triple thisObj "tc:protocol" t
+  aux (MachineID t)          = putTriple $ Triple thisObj "tc:machineID" (quote t)
+  aux (SourceAddress t)      = putTriple $ Triple thisObj "tc:sourceAddress" (quote t)
+  aux (DestinationAddress t) = putTriple $ Triple thisObj "tc:destinationAddress" (quote t)
+  aux (SourcePort t)         = putTriple $ Triple thisObj "tc:sourcePort" (quote t)
+  aux (DestinationPort t)    = putTriple $ Triple thisObj "tc:destinationPort" (quote t)
+  aux (Protocol t)           = putTriple $ Triple thisObj "tc:protocol" (quote t)
 
 predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
 predUsedTime Predicate{..} = case predType of
