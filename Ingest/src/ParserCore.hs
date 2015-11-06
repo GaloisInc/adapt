@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE CPP                        #-}
 
 module ParserCore (module ParserCore, ParseError(..), Ident(..), textOfIdent, Time) where
 
@@ -12,17 +13,15 @@ import PP
 import           Namespaces as NS
 import           Types (ParseError(..), Time)
 
+#if (__GLASGOW_HASKELL__ < 710)
 import           Control.Applicative (Applicative)
+#endif
 import           Data.Char (isDigit)
 import           Data.Data (Data,Typeable)
-import           Data.List ( nub )
-import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 import qualified Data.HashMap.Strict as Map
-import           Data.HashMap.Strict (HashMap)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
-import           Network.URI (URI)
 import qualified Network.URI as URI
 
 data Prov = Prov [Prefix] [Expr]
@@ -64,6 +63,7 @@ mkPrefix (Located _ (Ident i)) (Located uriLoc (URI s)) =
     Just u  -> Prefix (L.pack i) u
     Nothing -> error $ "Could not parse URI: " ++ show (s, pretty uriLoc)
                 -- XXX Make the parser an exception monad
+mkPrefix _ _ = error "Impossible: mkPrefix called onn non-URI, non-Ident."
 
 type KVs   = [(Key,Value)]
 type Key   = Ident

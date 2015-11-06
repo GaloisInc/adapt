@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP           #-}
 module Ingest
     ( -- * High-level interface
       ingestFile, ingestText
@@ -12,11 +13,11 @@ import Typecheck
 import Translate
 import Parser
 import PP (pp, PP(..))
+#if (__GLASGOW_HASKELL__ < 710)
 import Control.Applicative
+#endif
 import qualified Control.Exception as X
 import qualified Data.Text.Lazy.IO as Text
-import qualified Data.Text.Lazy as Text
-import Graph
 import MonadLib
 import System.IO
 

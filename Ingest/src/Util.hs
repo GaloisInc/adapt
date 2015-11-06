@@ -12,7 +12,7 @@ parseUTC chunk =
   in case words numbers of
       [y,m,d,hh,mm,ss] ->
         let day  = fromGregorian (readD y) (readD m) (readD d)
-            ps   = psH * readD hh + psM * readD mm + floor (psS * readD ss)
+            ps   = psH * readD hh + psM * readD mm + floor (psS * (readD ss :: Double))
             diff = picosecondsToDiffTime ps
         in Just (UTCTime day diff)
       _ -> Nothing

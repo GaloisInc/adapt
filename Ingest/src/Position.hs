@@ -68,7 +68,7 @@ instance PP Range where
 -- lines around it.
 getLines :: L.Text -> Int -> Range -> L.Text
 getLines _     _   NoLoc         = L.empty
-getLines input cxt (Range s e _) = L.unlines
+getLines input cxt (Range s _ _) = L.unlines
                                  $ take len
                                  $ drop start
                                  $ L.lines input

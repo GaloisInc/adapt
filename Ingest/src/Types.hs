@@ -16,10 +16,10 @@ module Types
     , Type(..)
     , Stmt(..)
     , Entity(..)
-    , UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
+    , UUID, MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
     , Predicate(..) , PredicateAttr(..), PredicateType(..), DevType(..)
     , Version, CoarseLoc, FineLoc
-    , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
+    , UseOp, GenOp, DeriveOp, ExecOp, PID, ArtifactType
     , Time, EntryPoint
     , Text
     -- * Helpers
@@ -27,15 +27,8 @@ module Types
     ) where
 
 import qualified Control.Exception as X
-import           Data.Monoid
 import           Data.Data
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Char (toLower)
 import           Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
 import           Data.Time (UTCTime)
 import           Data.Word (Word64)
 import           Text.Show.Functions ()

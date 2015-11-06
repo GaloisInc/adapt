@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances         #-}
 {-# LANGUAGE FlexibleInstances            #-}
 {-# LANGUAGE RecordWildCards              #-}
+{-# LANGUAGE CPP                          #-}
 
 module Typecheck
   ( typecheck, TypeError(..)
@@ -12,16 +13,13 @@ module Typecheck
 import Types as T
 import Namespaces (blankNode, textOfIdent)
 
+#if (__GLASGOW_HASKELL__ < 710)
 import Control.Applicative
+#endif
 import MonadLib
-import Data.Monoid ((<>))
-import qualified Data.Text.Lazy as Text
-import           Data.Text.Lazy (Text)
 
 import           Data.Map (Map)
 import qualified Data.Map as Map
-
-import Network.URI (URI(..))
 
 --------------------------------------------------------------------------------
 --  Typechecker Monad
@@ -86,10 +84,10 @@ tcStmt (StmtEntity e)    = tcEntity e
 tcStmt (StmtPredicate p) = tcPredicate p
 
 tcEntity :: Entity -> TC ()
-tcEntity (Agent i as)           = unifyM i TyAgent
-tcEntity (UnitOfExecution i as) = unifyM i TyUnitOfExecution
-tcEntity (Artifact i as)        = unifyM i TyArtifact
-tcEntity (Resource i ty mDevId) = unifyM i TyResource
+tcEntity (Agent i _as)           = unifyM i TyAgent
+tcEntity (UnitOfExecution i _as) = unifyM i TyUnitOfExecution
+tcEntity (Artifact i _as)        = unifyM i TyArtifact
+tcEntity (Resource i _ty _mDevId) = unifyM i TyResource
 
 tcPredicate :: Predicate -> TC ()
 tcPredicate (Predicate { .. }) =

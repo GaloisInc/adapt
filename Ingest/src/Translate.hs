@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE CPP                        #-}
 
 module Translate
   ( translate
@@ -14,10 +15,12 @@ import PP hiding ((<>))
 import Namespaces as NS
 import Util (parseUTC)
 import qualified Types as T
-import           Types (TranslateError(..),Time)
+import           Types (TranslateError(..))
 import           ParserCore
 
+#if (__GLASGOW_HASKELL__ < 710)
 import           Control.Applicative
+#endif
 import           Data.DList hiding (map)
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes, maybeToList)
@@ -25,7 +28,6 @@ import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
-import           Data.Time (UTCTime(..), fromGregorian)
 import           MonadLib
 
 --------------------------------------------------------------------------------
@@ -52,7 +54,6 @@ safely m =
      case x of
         Right r                   -> return r
         Left (TranslateError txt) -> warn txt >> return Nothing
-        Left e                    -> warn (L.pack $ show $ pp e) >> return Nothing
 
 warn :: Text -> Tr ()
 warn = put . T.Warn
@@ -70,8 +71,12 @@ pattern PIdent i <- Just (Left i)
 pattern PTime t  <- Just (Right t)
 
 -- View maybe time
+
+vMTime :: Maybe (Either t a) -> Maybe a
 vMTime (PTime t)   = Just t
 vMTime _           = Nothing
+
+vMIdent :: Maybe (Either a t) -> Maybe a
 vMIdent (PIdent i) = Just i
 vMIdent _          = Nothing
 
@@ -122,7 +127,7 @@ tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkP
 tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
 tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
 tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
-tExpr r@(RawEntity pred mI _ _ loc)                                        = warnN $ "Unrecognized statement at " <> L.pack (pretty loc) <> "(" <> L.pack (show r) <> ")"
+tExpr r@(RawEntity _pred _mI _ _ loc)                                      = warnN $ "Unrecognized statement at " <> L.pack (pretty loc) <> "(" <> L.pack (show r) <> ")"
 
 --------------------------------------------------------------------------------
 --  Entity Translation
@@ -134,6 +139,7 @@ entity :: Ident -> KVs -> Tr T.Entity
 entity i kvs =
   case eTy of
     Just T.TyArtifact -> artifact i kvs
+    Just _            -> raise $ TranslateError $ "Invalid type for entity: " <> textOfIdent i
     Nothing ->
       case lookup adaptDevType kvs of
         Just devtype    -> resource i devtype kvs
@@ -178,14 +184,6 @@ activity i mStart mEnd kvs =
 
 uoeTimes :: Maybe Time -> Maybe Time -> [T.UoeAttr]
 uoeTimes a b = catMaybes $ zipWith fmap [T.UAStarted, T.UAEnded] [a,b]
-
-getProvType :: KVs -> Maybe T.Type
-getProvType m =
-  case lookup provType m of
-    Nothing -> Nothing
-    Just (ValIdent i) | eqIdent adaptUnitOfExecution i -> Just T.TyUnitOfExecution
-                      | eqIdent adaptArtifact i        -> Just T.TyArtifact
-    _                                  -> Nothing -- warn?
 
 --------------------------------------------------------------------------------
 --  Entity Attributes
@@ -264,15 +262,16 @@ artifactAttrTranslations = Map.fromList
 
 attrOper :: Map Ident (Value -> a) -> a -> Ident -> Value -> a
 attrOper m w i v =
-  do let op = Map.lookup i m
-     case Map.lookup i m of
+  case Map.lookup i m of
       Just o  -> o v
       Nothing -> w
 
-warnConst = const . warnN
+warnN :: Text -> Tr (Maybe a)
 warnN s   = warn s >> return Nothing
 
+ignore :: b -> Tr (Maybe a)
 ignore = const (return Nothing)
+
 warnOrOp :: Text -> (a -> b) -> Maybe a -> Tr (Maybe b)
 warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 
@@ -284,21 +283,21 @@ warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 -- association.
 
 wasGeneratedBy :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
-wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
+wasGeneratedBy _mI subj (orBlank -> obj) mTime kvs =
   let constr f = predicate subj obj T.WasGeneratedBy (f $ generationAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 used :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
-used mI subj (orBlank -> obj) mTime kvs =
+used _mI subj (orBlank -> obj) mTime kvs =
   return $ predicate subj obj T.Used (maybeToList (T.AtTime <$> mTime) ++ usedAttr kvs)
 
 wasStartedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
-wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
+wasStartedBy _mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr f = predicate subj obj T.WasStartedBy (f $ startedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
-wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
+wasEndedBy _mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr f = predicate subj obj T.WasEndedBy (f $ endedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 

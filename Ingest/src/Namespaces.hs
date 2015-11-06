@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
+{-# OPTIONS_GHC -Wwarn -fno-warn-missing-signatures #-}
 module Namespaces
   ( prov,dc,adapt,adaptOld,foaf,nfo,URI
   , Ident(..), domain, local, mkIdent, (.:), textOfIdent

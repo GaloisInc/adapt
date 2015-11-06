@@ -10,7 +10,6 @@ import Data.Set (Set)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
-import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Data.Time
 import Data.Char (toLower)
@@ -32,7 +31,7 @@ type NodeId = Text
 runMe :: M a -> Text
 runMe m = showTriples ts'
   where
-  ((_, (_,ts)), ntts) = runId
+  ((_, (_,ts)), _ntts) = runId
                 $ runStateT Map.empty
                 $ runStateT (Set.empty,[]) m
   ts' = ts
@@ -70,38 +69,38 @@ tripleEntity e = case e of
   putEntity nodeid typeof = putTriple $ Triple (angleBracket nodeid) "a" typeof
 
   subj = angleBracket (nameOf e)
-  put a b = putTriple (Triple subj a (quote b))
+  putT a b = putTriple (Triple subj a (quote b))
 
   putAgentAttr a =
     case a of
-      AAName t    -> put "foaf:name" t
-      AAUser t    -> put "foaf:user" t
-      AAMachine m -> put "tc:machine" m
+      AAName t    -> putT "foaf:name" t
+      AAUser t    -> putT "foaf:user" t
+      AAMachine m -> putT "tc:machine" m
 
   putUOEAttr a =
     case a of
-         UAUser t       -> put "foaf:user" t
-         UAPID t        -> put "tc:pid" t
-         UAPPID t       -> put "tc:ppid" t
-         UAMachine t    -> put "tc:machine" t
-         UAHadPrivs t   -> put "tc:privs" t
-         UAPWD t        -> put "tc:pwd" t
+         UAUser t       -> putT "foaf:user" t
+         UAPID t        -> putT "tc:pid" t
+         UAPPID t       -> putT "tc:ppid" t
+         UAMachine t    -> putT "tc:machine" t
+         UAHadPrivs t   -> putT "tc:privs" t
+         UAPWD t        -> putT "tc:pwd" t
          UAStarted t    -> putTriple $ Triple subj "tc:time" (Text.pack $ show $ utcToEpoch t)
-         UAEnded t      -> return ()
-         UAGroup t      -> put "tc:group" t
-         UASource t     -> put "tc:source" t
-         UACWD t        -> put "tc:cwd" t
-         UAUID t        -> put "tc:uid" t
-         UACommandLine t        -> put "tc:commandLine" t
-         UAProgramName t        -> put "tc:programName" t
+         UAEnded _      -> return ()
+         UAGroup t      -> putT "tc:group" t
+         UASource t     -> putT "tc:source" t
+         UACWD t        -> putT "tc:cwd" t
+         UAUID t        -> putT "tc:uid" t
+         UACommandLine t        -> putT "tc:commandLine" t
+         UAProgramName t        -> putT "tc:programName" t
   putArtifactAttr a =
     case a of
-       ArtAType t               -> put "tc:artifactType" t
-       ArtARegistryKey t        -> put "tc:registryKey" t
-       ArtADestinationAddress t -> put "tc:destinationAddress" t
-       ArtADestinationPort t    -> put "tc:destinationPort" t
-       ArtASourceAddress t      -> put "tc:sourceAddress" t
-       ArtASourcePort t         -> put "tc:sourcePort" t
+       ArtAType t               -> putT "tc:artifactType" t
+       ArtARegistryKey t        -> putT "tc:registryKey" t
+       ArtADestinationAddress t -> putT "tc:destinationAddress" t
+       ArtADestinationPort t    -> putT "tc:destinationPort" t
+       ArtASourceAddress t      -> putT "tc:sourceAddress" t
+       ArtASourcePort t         -> putT "tc:sourcePort" t
        _ -> return ()
 
 triplePredicate :: Predicate -> M ()
@@ -120,20 +119,20 @@ triplePredicate Predicate{..} =
     | otherwise               = putTriple $ Triple subj thisVerb thisObj
   subj = angleBracket predSubject
 
-  put a b = putTriple (Triple subj a (quote b))
+  putT a b = putTriple (Triple subj a (quote b))
 
-  aux (Raw verb obj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
-  aux (AtTime t)        = put "tc:time" (Text.pack $ show $ utcToEpoch t)
-  aux (StartTime t)     = put "prov:startTime" (Text.pack $ show $ utcToEpoch t)
-  aux (EndTime t)       = put "prov:endTime" (Text.pack $ show $ utcToEpoch t)
-  aux (GenOp g)         = put "tc:genOp" g
-  aux (Permissions t)   = put "tc:permissions" t
-  aux (ReturnVal t)     = put "tc:returnVal" t
-  aux (Operation t)     = put "tc:operation" t
-  aux (Args t)          = return () -- XXX  putTriple $ Triple subj "tc:args"
-  aux (Cmd t)           = put "tc:commandLine" t
-  aux (DeriveOp t)      = put "tc:deriveOp" t
-  aux (ExecOp t)        = put "tc:execOp" t
+  aux (Raw _erb _bj)    = return () -- XXX blank nodes in RDF are unloved by all putTriple $ Triple subj verb obj
+  aux (AtTime t)        = putT "tc:time" (Text.pack $ show $ utcToEpoch t)
+  aux (StartTime t)     = putT "prov:startTime" (Text.pack $ show $ utcToEpoch t)
+  aux (EndTime t)       = putT "prov:endTime" (Text.pack $ show $ utcToEpoch t)
+  aux (GenOp g)         = putT "tc:genOp" g
+  aux (Permissions t)   = putT "tc:permissions" t
+  aux (ReturnVal t)     = putT "tc:returnVal" t
+  aux (Operation t)     = putT "tc:operation" t
+  aux (Args _)          = return () -- XXX  putTriple $ Triple subj "tc:args"
+  aux (Cmd t)           = putT "tc:commandLine" t
+  aux (DeriveOp t)      = putT "tc:deriveOp" t
+  aux (ExecOp t)        = putT "tc:execOp" t
   -- The prov description are rather contrary to everything else in our
   -- language, so we must handle them in an unusual manner.
   aux (MachineID t)          = putTriple $ Triple thisObj "tc:machineID" (quote t)
@@ -143,42 +142,8 @@ triplePredicate Predicate{..} =
   aux (DestinationPort t)    = putTriple $ Triple thisObj "tc:destinationPort" (quote t)
   aux (Protocol t)           = putTriple $ Triple thisObj "tc:protocol" (quote t)
 
-predUsedTime :: Predicate -> Maybe (NodeId, UTCTime)
-predUsedTime Predicate{..} = case predType of
-  Used -> do
-    t <- foldl aux Nothing predAttrs
-    return (predSubject, t)
-  _ -> Nothing
-  where
-  aux _ (AtTime t) = Just t
-  aux acc _        = acc
-
-insertNodeTimeMap :: NodeId -> UTCTime -> UsedTimeMap -> UsedTimeMap
-insertNodeTimeMap node utc m = case Map.lookup node m of
-  Nothing -> Map.insert node (epoch, epoch) m
-  Just window -> Map.insert node (timeWindow window epoch) m
-  where
-  epoch = utcToEpoch utc
-  timeWindow :: (Integer, Integer) -> Integer -> (Integer, Integer)
-  timeWindow (lo,hi) a | a < lo    = (a, hi)
-                       | a > hi    = (lo, a)
-                       | otherwise = (lo, hi)
-
-
 utcToEpoch :: UTCTime -> Integer
 utcToEpoch u = read $ formatTime defaultTimeLocale "%s" u
-
-nodeTimeTriples :: UsedTimeMap -> [Triple]
-nodeTimeTriples m = Map.foldrWithKey aux [] m
-  where
-  aux :: NodeId -> (Integer, Integer) -> [Triple] -> [Triple]
-  aux nodeid (mintime, maxtime) ts = start:end:ts
-    where
-    start = Triple n "prov:startedAtTime" (s mintime)
-    end   = Triple n "prov:endedAtTime"   (s maxtime)
-    n     = angleBracket nodeid
-    s     = Text.pack . show
-
 
 angleBracket :: Text -> Text
 angleBracket t = Text.concat [ "<", t, ">" ]
