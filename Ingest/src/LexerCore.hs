@@ -174,6 +174,7 @@ instance PP Token where
       Time t   -> text (show t)
       Ident s  -> text s
       Sym s    -> pp s
+      Eof      -> text "EOF"
       Err e    -> text $ descTokenError e
 
 tokenText :: Token -> Text.Text
