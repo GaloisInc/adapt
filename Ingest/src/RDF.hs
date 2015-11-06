@@ -52,6 +52,7 @@ showTriples ts = Text.unlines (headers ++ map turtleTriple ts)
     , "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ."
     , "@prefix dt: <http://m000.github.com/ns/v1/desktop#> ."
     , "@prefix tc: <http://spade.csl.sri.com/rdf/audit-tc.rdfs#> ."
+    , "@prefix foaf: <http://xmlns.com/foaf/0.1/>"
     ]
 
 turtleTriple :: Triple -> Text
