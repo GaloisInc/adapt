@@ -15,7 +15,7 @@ import PP hiding ((<>))
 import Namespaces as NS
 import Util (parseUTC)
 import qualified Types as T
-import           Types (TranslateError(..))
+import           Types (TranslateError(..),Range(..))
 import           ParserCore
 
 #if (__GLASGOW_HASKELL__ < 710)
@@ -28,12 +28,12 @@ import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
-import           MonadLib
+import           MonadLib as ML
 
 --------------------------------------------------------------------------------
 --  Translate Monad
 
-newtype Tr a = Tr { unTr :: WriterT (DList T.Warning) (ExceptionT TranslateError Id) a }
+newtype Tr a = Tr { unTr :: ReaderT Range (WriterT (DList T.Warning) (ExceptionT TranslateError Id)) a }
   deriving (Monad, Applicative, Functor)
 
 instance ExceptionM Tr TranslateError where
@@ -45,8 +45,14 @@ instance RunExceptionM Tr TranslateError where
 instance WriterM Tr T.Warning where
   put w = Tr (put $ singleton w)
 
+instance ReaderM Tr Range where
+  ask = Tr ask
+
+instance RunReaderM Tr Range where
+  local i (Tr m) = Tr (ML.local i m)
+
 runTr :: Tr a -> Either TranslateError (a,[T.Warning])
-runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
+runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . runReaderT NoLoc . unTr
 
 safely :: T.Range -> Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
 safely e m =
@@ -70,7 +76,8 @@ tExprs :: Prov -> Tr [T.Stmt]
 tExprs (Prov _prefix es) = catMaybes <$> mapM (\e -> safely (exprLocation e) (tExprLoc e)) es
 
 tExprLoc :: Expr -> Tr (Maybe T.Stmt)
-tExprLoc e = fmap (T.StmtLoc . T.Located (exprLocation e)) <$> tExpr e
+tExprLoc e = fmap (T.StmtLoc . T.Located l) <$> ML.local l (tExpr e)
+ where l = exprLocation e
 
 pattern PIdent i <- Just (Left i)
 pattern PTime t  <- Just (Right t)
@@ -132,7 +139,7 @@ tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkP
 tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
 tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
 tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
-tExpr r@(RawEntity _pred _mI _ _ loc)                                      = warnN $ "Unrecognized statement at " <> L.pack (pretty loc) <> "(" <> L.pack (show r) <> ")"
+tExpr (RawEntity _pred _mI _ _ loc)                                      = warnN $ "Unrecognized statement " <> L.pack (pretty loc)
 
 --------------------------------------------------------------------------------
 --  Entity Translation
@@ -278,7 +285,10 @@ ignore :: b -> Tr (Maybe a)
 ignore = const (return Nothing)
 
 warnOrOp :: Text -> (a -> b) -> Maybe a -> Tr (Maybe b)
-warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
+warnOrOp w f m =
+  do l <- ask
+     let w' = pretty l <> ": " <> w
+     maybe (warn w' >> return Nothing) (return . Just . f) m
 
 --------------------------------------------------------------------------------
 --  Predicate Translation
