@@ -56,6 +56,7 @@ turtleTriple :: Triple -> Text
 turtleTriple (Triple a b c) = Text.intercalate " " [ a, b, c, "."]
 
 tripleStmt :: Stmt -> M ()
+tripleStmt (StmtLoc (Located _ s))     = tripleStmt s
 tripleStmt (StmtEntity e)    = tripleEntity e
 tripleStmt (StmtPredicate p) = triplePredicate p
 

@@ -48,12 +48,14 @@ instance WriterM Tr T.Warning where
 runTr :: Tr a -> Either TranslateError (a,[T.Warning])
 runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
 
-safely :: Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
-safely m =
+safely :: T.Range -> Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
+safely e m =
   do x <- try m
      case x of
         Right r                   -> return r
-        Left (TranslateError txt) -> warn txt >> return Nothing
+        Left (TranslateError txt) ->
+            do warn (pretty e <> ": " <> txt)
+               return Nothing
 
 warn :: Text -> Tr ()
 warn = put . T.Warn
@@ -65,7 +67,10 @@ translate ::  Prov -> Either TranslateError ([T.Stmt], [T.Warning])
 translate p = runTr (tExprs p)
 
 tExprs :: Prov -> Tr [T.Stmt]
-tExprs (Prov _prefix es) = catMaybes <$> mapM (safely . tExpr) es
+tExprs (Prov _prefix es) = catMaybes <$> mapM (\e -> safely (exprLocation e) (tExprLoc e)) es
+
+tExprLoc :: Expr -> Tr (Maybe T.Stmt)
+tExprLoc e = fmap (T.StmtLoc . T.Located (exprLocation e)) <$> tExpr e
 
 pattern PIdent i <- Just (Left i)
 pattern PTime t  <- Just (Right t)

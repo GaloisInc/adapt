@@ -22,8 +22,9 @@ graph :: [Stmt] -> Text
 graph = runMe . mapM_ graphStmt
 
 graphStmt :: Stmt -> M ()
-graphStmt (StmtEntity e)    = graphEntity e
-graphStmt (StmtPredicate p) = graphPredicate p
+graphStmt (StmtEntity e)          = graphEntity e
+graphStmt (StmtPredicate p)       = graphPredicate p
+graphStmt (StmtLoc (Located _ s)) = graphStmt s
 
 graphEntity :: Entity -> M ()
 graphEntity e =

@@ -22,6 +22,7 @@ module Types
     , UseOp, GenOp, DeriveOp, ExecOp, PID, ArtifactType
     , Time, EntryPoint
     , Text
+    , Located(..), Range(..)
     -- * Helpers
     , nameOf
     ) where
@@ -45,8 +46,8 @@ data Error      = PE ParseError | TCE TypeError | TRE TranslateError
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
-data TypeError  = TypeError Text Type Type | CanNotInferType Text
-        deriving (Eq, Ord, Show, Read, Data, Typeable)
+data TypeError  = TypeError Range Text Type Type | CanNotInferType Text
+        deriving (Eq, Ord, Show, Data, Typeable)
 data TranslateError = TranslateError Text
         deriving (Show, Data, Typeable)
 
@@ -64,7 +65,9 @@ instance X.Exception Error
 -- inherently affiliated with Entities and there is no type-level
 -- enforcement of the fan-in fan-out.
 
-data Stmt = StmtEntity Entity | StmtPredicate Predicate
+data Stmt = StmtEntity Entity
+          | StmtPredicate Predicate
+          | StmtLoc (Located Stmt)
   deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Entities in our conceptual Model
@@ -243,8 +246,8 @@ instance PP TranslateError where
 
 instance PP TypeError where
   ppPrec _ (CanNotInferType t) = text "Can not infer type for " PP.<> pp t
-  ppPrec _ (TypeError a b c)   =
-      text "Can not unify inferred types of " PP.<>
+  ppPrec _ (TypeError r a b c)   =
+      pp r <> text ": Can not unify inferred types of " PP.<>
                pp b PP.<> " and " PP.<> pp c PP.<> " for " PP.<> pp a
 
 instance PP Warning where
@@ -253,6 +256,15 @@ instance PP Warning where
 instance PP Type where
   ppPrec _ t =
     case t of
-        TyArrow a b -> pp a PP.<> text " -> " PP.<> pp b
-        _ -> text (show t)
+        TyArrow a b       -> pp a PP.<> text " -> " PP.<> pp b
+        EntityClass       -> text "Entity class"
+        ActorClass        -> text "Actor class"
+        DescribeClass     -> text "Describable class"
+        ResourceClass     -> text "Resource class"
+        TyUnitOfExecution -> text "UOE"
+        TyHost            -> text "Host"
+        TyAgent           -> text "Agent"
+        TyArtifact        -> text "Artifact"
+        TyResource        -> text "Resource"
+        TyVoid            -> text "Void"
 

@@ -61,7 +61,7 @@ mkPrefix :: Located Token -> Located Token -> Prefix
 mkPrefix (Located _ (Ident i)) (Located uriLoc (URI s)) =
   case URI.parseURI s of
     Just u  -> Prefix (L.pack i) u
-    Nothing -> error $ "Could not parse URI: " ++ show (s, pretty uriLoc)
+    Nothing -> error $ "Could not parse URI: " ++ show (s, prettyStr uriLoc)
                 -- XXX Make the parser an exception monad
 mkPrefix _ _ = error "Impossible: mkPrefix called onn non-URI, non-Ident."
 

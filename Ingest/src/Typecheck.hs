@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 
 type TyEnv = Map Text Type
 
-newtype TC a = TC { unTC :: ExceptionT TypeError (StateT TyEnv Id) a }
+newtype TC a = TC { unTC :: ExceptionT TypeError (ReaderT Range (StateT TyEnv Id)) a }
   deriving(Monad, Applicative, Functor)
 
 instance ExceptionM TC TypeError where
@@ -36,8 +36,14 @@ instance StateM TC TyEnv where
   get = TC get
   set = TC . set
 
+instance ReaderM TC Range where
+  ask = TC ask
+
+instance RunReaderM TC Range where
+  local i (TC m) = TC (local i m)
+
 runTC :: TC a -> Either TypeError a
-runTC = fst . runId . runStateT Map.empty . runExceptionT . unTC
+runTC = fst . runId . runStateT Map.empty . runReaderT NoLoc . runExceptionT . unTC
 
 assignTy :: Text -> Type -> TC ()
 assignTy k v = sets_ (Map.insert k v)
@@ -72,7 +78,7 @@ unify _ EntityClass x                                                           
 unify _ ActorClass  x   | x `elem` [ActorClass,TyAgent,TyUnitOfExecution,TyHost] = return x
 unify _ ResourceClass x | x `elem` [ResourceClass, TyResource, TyArtifact]       = return x
 unify _ DescribeClass x | x `elem` [DescribeClass, TyUnitOfExecution, TyArtifact] = return x
-unify i x y = raise (TypeError i x y)
+unify i x y = ask >>= \r -> raise (TypeError r i x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
 -- and return the annotated version of the AST.
@@ -80,8 +86,9 @@ typecheck :: [Stmt] -> Either TypeError ()
 typecheck g = runTC $ mapM_ tcStmt g
 
 tcStmt :: Stmt -> TC ()
-tcStmt (StmtEntity e)    = tcEntity e
-tcStmt (StmtPredicate p) = tcPredicate p
+tcStmt (StmtEntity e)          = tcEntity e
+tcStmt (StmtPredicate p)       = tcPredicate p
+tcStmt (StmtLoc (Located r s)) = local r (tcStmt s)
 
 tcEntity :: Entity -> TC ()
 tcEntity (Agent i _as)           = unifyM i TyAgent
@@ -121,27 +128,3 @@ predicateTypeToType p =
 (.->) = TyArrow
 
 infixr 4 .->
-
-
--- data Range = MaybeOne           -- 0..1
---             | Any               -- 0..
---             | One               -- 1..1
---             deriving (Eq,Ord,Show,Enum)
---
--- (<->) :: ScopedName -> Range -> (ScopedName,Range)
--- (<->) a b = (a,b)
-
--- fanInFanOut :: Map ScopedName Range
--- fanInFanOut = Map.fromList
---   [ provwasAttributedTo         <-> (Any, Any)
---   , provactedOnBehalfOf         <-> (Any, MaybeOne)
---   , provwasAssociatedWith       <-> (Any, MaybeOne)
---   , provwasInvalidatedBy        <-> (MaybeOne, Any)
---   , provused                    <-> (Any, Any)
---   , provwasStartedBy            <-> (Any, MaybeOne)
---   , provwasEndedBy              <-> (Any, MaybeOne)
---   , provwasInformedBy           <-> (Any, MaybeOne)
---   , provwasGeneratedBy          <-> (Any, Any)
---   , provwasDerivedFrom          <-> (Any, MaybeOne)
---   , tcDevType                   <-> (Any,Any)
---   ]
