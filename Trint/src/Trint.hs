@@ -158,7 +158,8 @@ mkEdge (StmtPredicate (Predicate s o _ _)) =
   do nS <- nodeOf s
      nO <- nodeOf o
      return $ Just (nS,nO)
-mkEdge _ = return Nothing
+mkEdge (StmtLoc (T.Located _ s)) = mkEdge s
+mkEdge (StmtEntity {})         = return Nothing
 
 -- Memoizing node numbering
 nodeOf :: Text -> State (Map Text Vertex, Vertex) Vertex
