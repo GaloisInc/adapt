@@ -2,6 +2,7 @@
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
+import PP
 import Ingest
 import SimpleGetOpt
 import Types as T
@@ -162,8 +163,8 @@ mkGraph ss =
 -- Memoizing edge creation
 mkEdge :: Stmt -> State (Map Text Vertex,Vertex) (Maybe Edge)
 mkEdge (StmtPredicate (Predicate s o _ _)) =
-  do nS <- nodeOf s
-     nO <- nodeOf o
+  do nS <- nodeOf (pretty s)
+     nO <- nodeOf (pretty o)
      return $ Just (nS,nO)
 mkEdge (StmtLoc (T.Located _ s)) = mkEdge s
 mkEdge (StmtEntity {})         = return Nothing

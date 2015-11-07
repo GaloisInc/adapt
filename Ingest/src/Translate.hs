@@ -79,18 +79,14 @@ tExprLoc :: Expr -> Tr (Maybe T.Stmt)
 tExprLoc e = fmap (T.StmtLoc . T.Located l) <$> ML.local l (tExpr e)
  where l = exprLocation e
 
-pattern PIdent i <- Just (Left i)
-pattern PTime t  <- Just (Right t)
-
 -- View maybe time
-
 vMTime :: Maybe (Either t a) -> Maybe a
-vMTime (PTime t)   = Just t
-vMTime _           = Nothing
+vMTime (Just (Right t)) = Just t
+vMTime _                = Nothing
 
 vMIdent :: Maybe (Either a t) -> Maybe a
-vMIdent (PIdent i) = Just i
-vMIdent _          = Nothing
+vMIdent (Just (Left i)) = Just i
+vMIdent _               = Nothing
 
 eqIdent :: Ident -> Ident -> Bool
 eqIdent p e =
@@ -166,10 +162,10 @@ entity i kvs =
               _                          -> Just T.TyArtifact -- XXX for the demo, for 5D
 
 artifact :: Ident -> KVs -> Tr T.Entity
-artifact i kvs = T.Artifact (textOfIdent i) <$> artifactAttrs kvs
+artifact i kvs = T.Artifact i <$> artifactAttrs kvs
 
 resource :: Ident -> Value -> KVs -> Tr T.Entity
-resource i (ValString devTy) kvs = return $ T.Resource (textOfIdent i) dev devId
+resource i (ValString devTy) kvs = return $ T.Resource i dev devId
  where dev =
         case L.toLower devTy of
           "gps"             -> T.GPS
@@ -186,13 +182,13 @@ resource i _ _ = raise $ TranslateError $ "Device types must be string literals.
 -- Agents are either units of execution or exist largely for the metadata
 -- of machine ID, foaf:name, and foaf:accountName.
 agent :: Ident -> KVs -> Tr T.Entity
-agent i kvs = T.Agent (textOfIdent i) <$> agentAttrs kvs
+agent i kvs = T.Agent i <$> agentAttrs kvs
 
 -- All Activities are units of execution, no exceptions.
 activity :: Ident -> Maybe Time -> Maybe Time -> KVs -> Tr T.Entity
 activity i mStart mEnd kvs =
    do attrs <- uoeAttrs kvs
-      return $ T.UnitOfExecution (textOfIdent i) (uoeTimes mStart mEnd ++ attrs)
+      return $ T.UnitOfExecution i (uoeTimes mStart mEnd ++ attrs)
 
 uoeTimes :: Maybe Time -> Maybe Time -> [T.UoeAttr]
 uoeTimes a b = catMaybes $ zipWith fmap [T.UAStarted, T.UAEnded] [a,b]
@@ -336,7 +332,7 @@ description :: Ident -> KVs -> Tr T.Predicate
 description obj  kvs = predicate blankNode obj T.Description <$> descriptionAttr kvs
 
 predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
-predicate s o ty attr = T.Predicate (textOfIdent s) (textOfIdent o) ty attr
+predicate s o ty attr = T.Predicate s o ty attr
 
 
 --------------------------------------------------------------------------------

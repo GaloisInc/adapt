@@ -11,7 +11,9 @@ module Typecheck
   ) where
 
 import Types as T
-import Namespaces (blankNode, textOfIdent)
+import Namespaces (Ident)
+import PP (pretty)
+import Namespaces (blankNode)
 
 #if (__GLASGOW_HASKELL__ < 710)
 import Control.Applicative
@@ -24,7 +26,7 @@ import qualified Data.Map as Map
 --------------------------------------------------------------------------------
 --  Typechecker Monad
 
-type TyEnv = Map Text Type
+type TyEnv = Map Ident Type
 
 newtype TC a = TC { unTC :: ExceptionT TypeError (ReaderT Range (StateT TyEnv Id)) a }
   deriving(Monad, Applicative, Functor)
@@ -45,15 +47,15 @@ instance RunReaderM TC Range where
 runTC :: TC a -> Either TypeError a
 runTC = fst . runId . runStateT Map.empty . runReaderT NoLoc . runExceptionT . unTC
 
-assignTy :: Text -> Type -> TC ()
+assignTy :: Ident -> Type -> TC ()
 assignTy k v = sets_ (Map.insert k v)
 
-getType :: Text -> TC (Maybe Type)
+getType :: Ident -> TC (Maybe Type)
 getType k = Map.lookup k <$> get
 
-unifyM :: Text -> Type -> TC ()
+unifyM :: Ident -> Type -> TC ()
 unifyM k ty
-  | k == textOfIdent blankNode = return ()
+  | k == blankNode = return ()
   | otherwise      =
   do tyOld <- getType k
      case tyOld of
@@ -68,7 +70,7 @@ unifyM k ty
 --  existential - there is no proper polymorphism.
 
 -- hard-coded type schema, since it should never change.
-unify :: Text -> Type -> Type -> TC Type
+unify :: Ident -> Type -> Type -> TC Type
 -- Identical types unify
 unify _ x y | x == y    = return x
 -- Unifier comes second. Actually possible in this primitive schema.
@@ -78,7 +80,7 @@ unify _ EntityClass x                                                           
 unify _ ActorClass  x   | x `elem` [ActorClass,TyAgent,TyUnitOfExecution,TyHost] = return x
 unify _ ResourceClass x | x `elem` [ResourceClass, TyResource, TyArtifact]       = return x
 unify _ DescribeClass x | x `elem` [DescribeClass, TyUnitOfExecution, TyArtifact] = return x
-unify i x y = ask >>= \r -> raise (TypeError r i x y)
+unify i x y = ask >>= \r -> raise (TypeError r (pretty i) x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
 -- and return the annotated version of the AST.

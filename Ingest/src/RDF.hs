@@ -15,6 +15,7 @@ import Data.Time
 import Data.Char (toLower)
 import MonadLib
 import Types
+import PP (pretty)
 
 turtle :: [Stmt] -> Text
 turtle = runMe . mapM_ tripleStmt
@@ -67,7 +68,7 @@ tripleEntity e = case e of
   Artifact i aattr        -> putEntity i "prov:Entity"   >> mapM_ putArtifactAttr aattr
   Resource i _devTy _devId -> putEntity i "prov:Entity"
   where
-  putEntity nodeid typeof = putTriple $ Triple (angleBracket nodeid) "a" typeof
+  putEntity nodeid typeof = putTriple $ Triple (angleBracket $ pretty nodeid) "a" typeof
 
   subj = angleBracket (nameOf e)
   putT a b = putTriple (Triple subj a (quote b))
@@ -108,7 +109,7 @@ triplePredicate :: Predicate -> M ()
 triplePredicate Predicate{..} =
     thisPred >> mapM_ aux predAttrs
  where
-  thisObj  = angleBracket predObject
+  thisObj  = angleBracket (pretty predObject)
   thisVerb =
       let (h:t) = show predType
           vb    = Text.singleton  (toLower h) <> Text.pack t
@@ -118,7 +119,7 @@ triplePredicate Predicate{..} =
   thisPred
     | predType == Description = return ()
     | otherwise               = putTriple $ Triple subj thisVerb thisObj
-  subj = angleBracket predSubject
+  subj = angleBracket (pretty predSubject)
 
   putT a b = putTriple (Triple subj a (quote b))
 

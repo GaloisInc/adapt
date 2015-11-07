@@ -35,6 +35,7 @@ import           Data.Word (Word64)
 import           Text.Show.Functions ()
 
 
+import           Namespaces (Ident(..), textOfIdent)
 import           PP as PP
 import           Position
 import           LexerCore (Token)
@@ -72,14 +73,15 @@ data Stmt = StmtEntity Entity
 
 -- | Entities in our conceptual Model
 -- Notice each entity has a name (Text field) except for metadata.
-data Entity = Agent Text [AgentAttr]
-            | UnitOfExecution Text [UoeAttr]
-            | Artifact Text [ArtifactAttr]
-            | Resource Text DevType (Maybe DevID)
+data Entity = Agent Ident [AgentAttr]
+            | UnitOfExecution Ident [UoeAttr]
+            | Artifact Ident [ArtifactAttr]
+            | Resource Ident DevType (Maybe DevID)
   deriving (Eq, Ord, Show, Data, Typeable)
 
 nameOf :: Entity -> Text
-nameOf e = case e of
+nameOf e = 
+ textOfIdent $ case e of
             Agent n _ -> n
             UnitOfExecution n _ -> n
             Artifact n _    -> n
@@ -145,8 +147,8 @@ type FineLoc   = Text
 type CoarseLoc = Text
 
 
-data Predicate = Predicate { predSubject    :: Text
-                           , predObject     :: Text
+data Predicate = Predicate { predSubject    :: Ident
+                           , predObject     :: Ident
                            , predType       :: PredicateType
                            , predAttrs      :: [PredicateAttr]
                            }
