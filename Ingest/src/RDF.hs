@@ -7,8 +7,6 @@ module RDF
 
 import qualified Data.Set as Set
 import Data.Set (Set)
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as Text
 import Data.Time
@@ -23,20 +21,12 @@ turtle = runMe . mapM_ tripleStmt
 data Triple = Triple Text Text Text
   deriving (Eq, Ord)
 
-type UsedTimeMap = Map NodeId (Integer, Integer)
-
-type M a = StateT (Set Triple, [Triple]) (StateT UsedTimeMap Id) a
-
-type NodeId = Text
+type M a = StateT (Set Triple, [Triple]) Id a
 
 runMe :: M a -> Text
-runMe m = showTriples ts'
+runMe m = showTriples ts
   where
-  ((_, (_,ts)), _ntts) = runId
-                $ runStateT Map.empty
-                $ runStateT (Set.empty,[]) m
-  ts' = ts
-
+  (_, (_,ts)) = runId $ runStateT (Set.empty,[]) m
 
 putTriple :: Triple -> M ()
 putTriple t = sets_ (\(s,l) -> (Set.insert t s, if Set.member t s then l else t:l))
@@ -63,9 +53,9 @@ tripleStmt (StmtPredicate p) = triplePredicate p
 
 tripleEntity :: Entity -> M ()
 tripleEntity e = case e of
-  Agent i aattr           -> putEntity i "prov:Activity" >> mapM_ putAgentAttr aattr
-  UnitOfExecution i uattr -> putEntity i "prov:Activity" >> mapM_ putUOEAttr uattr
-  Artifact i aattr        -> putEntity i "prov:Entity"   >> mapM_ putArtifactAttr aattr
+  Agent i aattr            -> putEntity i "prov:Activity" >> mapM_ putAgentAttr aattr
+  UnitOfExecution i uattr  -> putEntity i "prov:Activity" >> mapM_ putUOEAttr uattr
+  Artifact i aattr         -> putEntity i "prov:Entity"   >> mapM_ putArtifactAttr aattr
   Resource i _devTy _devId -> putEntity i "prov:Entity"
   where
   putEntity nodeid typeof = putTriple $ Triple (angleBracket $ pretty nodeid) "a" typeof
@@ -153,7 +143,7 @@ angleBracket t = Text.concat [ "<", t, ">" ]
 quote :: Text -> Text
 quote t = Text.concat ["\"", t', "\""]
   where t' = Text.concatMap esc t
-        escSet = "\\\"" :: String
+        escSet = "\\\"[]" :: String
         esc x = (if x `elem` escSet
                   then ("\\" <>)
                   else id ) (Text.singleton x)
