@@ -152,4 +152,8 @@ angleBracket t = Text.concat [ "<", t, ">" ]
 
 quote :: Text -> Text
 quote t = Text.concat ["\"", t', "\""]
-  where t' = Text.concatMap (\x -> if x == '"' then "\\\"" else Text.singleton x) t
+  where t' = Text.concatMap esc t
+        escSet = "\\\"" :: String
+        esc x = (if x `elem` escSet
+                  then ("\\" <>)
+                  else id ) (Text.singleton x)
