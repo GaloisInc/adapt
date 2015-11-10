@@ -10,7 +10,6 @@ import Data.Word (Word8)
 import qualified Data.Text.Lazy as Text
 import Numeric (readDec)
 import Data.Time
-import Data.List (foldl')
 
 import Util
 import Position
@@ -87,7 +86,7 @@ panic s r = Just ((Err (LexicalError s)) `at` r)
 
 -- | Emit a token.
 emit :: Token -> Action
-emit tok r chunk sc = (Just (tok `at` r), sc)
+emit tok r _chunk sc = (Just (tok `at` r), sc)
 
 -- | Skip the current input.
 skip :: Action
@@ -120,6 +119,7 @@ endComment :: Action
 endComment _ _ (InComment n)
   | n <= 1    = (Nothing, Normal)
   | otherwise = (Nothing, InComment (n-1))
+endComment r _ n = (panic "Internal lexer error. Ending a comment when not in a comment block." r, n)
 
 -- String Literals -------------------------------------------------------------
 
@@ -171,9 +171,10 @@ instance PP Token where
       Num i    -> pp i
       String s -> text s
       URI s    -> text s
-      Time t   -> text (show t)
+      Time s   -> text (show s)
       Ident s  -> text s
       Sym s    -> pp s
+      Eof      -> text "EOF"
       Err e    -> text $ descTokenError e
 
 tokenText :: Token -> Text.Text

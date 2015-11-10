@@ -2,6 +2,7 @@
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
+import PP
 import Ingest
 import SimpleGetOpt
 import Types as T
@@ -31,6 +32,7 @@ data Config = Config { lintOnly   :: Bool
                      , turtle     :: Bool
                      , ast        :: Bool
                      , verbose    :: Bool
+                     , help       :: Bool
                      , files      :: [FilePath]
                      } deriving (Show)
 
@@ -43,6 +45,7 @@ defaultConfig = Config
   , turtle   = False
   , ast      = False
   , verbose  = False
+  , help     = False
   , files    = []
   }
 
@@ -72,13 +75,18 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['t'] ["turtle"]
                     "Produce a turtle RDF description of the graph."
                     $ NoArg $ \s -> Right s { turtle = True }
+                  , Option ['h'] ["help"]
+                    "Prints this help message."
+                    $ NoArg $ \s -> Right s { help = True }
                   ]
                }
 
 main :: IO ()
 main =
   do c <- getOpts opts
-     mapM_ (trint c) (files c)
+     if help c
+      then dumpUsage opts
+      else mapM_ (trint c) (files c)
 
 trint :: Config -> FilePath -> IO ()
 trint c fp = do
@@ -137,11 +145,12 @@ printStats ss =
   do let g  = mkGraph ss
          vs = vertices g
          mn = length (take 1 ss) -- one node suggests the minimum subgraph is one.
-         sz = maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
+         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
+         nrStmt = length ss
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (length vs)
-     putStrLn $ "\tPredicates:       " ++ show (length ss - length vs)
-     putStrLn $ "\tTotal statements: " ++ show (length ss)
+     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
+     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
+     putStrLn $ "\tTotal statements: " ++ show nrStmt
 
 data NodeInfo = Node Int | Edge (Int,Int)
 
@@ -154,10 +163,11 @@ mkGraph ss =
 -- Memoizing edge creation
 mkEdge :: Stmt -> State (Map Text Vertex,Vertex) (Maybe Edge)
 mkEdge (StmtPredicate (Predicate s o _ _)) =
-  do nS <- nodeOf s
-     nO <- nodeOf o
+  do nS <- nodeOf (pretty s)
+     nO <- nodeOf (pretty o)
      return $ Just (nS,nO)
-mkEdge _ = return Nothing
+mkEdge (StmtLoc (T.Located _ s)) = mkEdge s
+mkEdge (StmtEntity {})         = return Nothing
 
 -- Memoizing node numbering
 nodeOf :: Text -> State (Map Text Vertex, Vertex) Vertex

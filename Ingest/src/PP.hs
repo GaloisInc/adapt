@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module PP (
     module PP,
     module Text.PrettyPrint.HughesPJ
@@ -5,10 +6,13 @@ module PP (
 
 import qualified Data.Text.Lazy as L
 import           Text.PrettyPrint.HughesPJ
+import           Data.String
 
+prettyStr :: PP a => a -> String
+prettyStr = pretty
 
-pretty :: PP a => a -> String
-pretty a = show (pp a)
+pretty :: (IsString s, PP a) => a -> s
+pretty a = fromString (show (pp a))
 
 pp :: PP a => a -> Doc
 pp  = ppPrec 0

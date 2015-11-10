@@ -5,16 +5,15 @@ module Graph
   (graph
   ) where
 
+import Namespaces as NS
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Monoid ((<>))
-import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import Text.Dot
 import MonadLib
 import Types
 
-type M a = StateT (Map Text NodeId) Dot a
+type M a = StateT (Map Ident NodeId) Dot a
 
 runMe :: M a -> Text
 runMe = Text.pack . showDot . runStateT Map.empty
@@ -23,16 +22,17 @@ graph :: [Stmt] -> Text
 graph = runMe . mapM_ graphStmt
 
 graphStmt :: Stmt -> M ()
-graphStmt (StmtEntity e)    = graphEntity e
-graphStmt (StmtPredicate p) = graphPredicate p
+graphStmt (StmtEntity e)          = graphEntity e
+graphStmt (StmtPredicate p)       = graphPredicate p
+graphStmt (StmtLoc (Located _ s)) = graphStmt s
 
 graphEntity :: Entity -> M ()
 graphEntity e =
-  do case e of
-      Agent i _aattr              -> memoNode $ "Agent:"    <> i
-      UnitOfExecution i _uattr    -> memoNode $ "UoE:"      <> i
-      Artifact i _aattr           -> memoNode $ "Artifact:" <> i
-      Resource i _devTy _devId    -> memoNode $ "Resource:" <> i
+  do _ <- case e of
+           Agent i _aattr              -> memoNode i
+           UnitOfExecution i _uattr    -> memoNode i
+           Artifact i _aattr           -> memoNode i
+           Resource i _devTy _devId    -> memoNode i
      return ()
 
 graphPredicate :: Predicate -> M ()
@@ -41,14 +41,14 @@ graphPredicate (Predicate s o pTy _attr) =
      oN <- memoNode o
      newEdge sN oN [("label", show pTy)]
 
-memoNode :: Text -> M NodeId
+memoNode :: Ident -> M NodeId
 memoNode i =
   do mp <- get
      case Map.lookup i mp of
         Just n  -> return n
-        Nothing -> do node <- newNode [("label", Text.unpack i)] -- (objectProperties obj)
-                      set (Map.insert i node mp)
-                      return node
+        Nothing -> do nd <- newNode [("label",Text.unpack $ NS.local i)]
+                      set (Map.insert i nd mp)
+                      return nd
 
 newEdge  :: NodeId -> NodeId -> [(String,String)] -> M ()
 newEdge a b ps = lift (edge a b ps)
