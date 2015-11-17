@@ -7,10 +7,9 @@ import Data.Bits (shiftR,(.&.))
 import Data.Char (ord,toLower)
 import Data.Data
 import Data.Word (Word8)
-import qualified Data.Text.Lazy as L
+import qualified Data.Text.Lazy as Text
 import Numeric (readDec)
 import Data.Time
-import Data.List (foldl')
 
 import Util
 import Position
@@ -20,23 +19,23 @@ import PP
 
 data AlexInput = AlexInput { aiChar    :: !Char
                            , aiBytes   :: [Word8]
-                           , aiInput   :: L.Text
+                           , aiInput   :: Text.Text
                            , aiPos     :: Position
                            }
 
 aiRng :: AlexInput -> Range
 aiRng p = Range (aiPos p) (aiPos p) ""
 
-initialInput :: L.Text -> AlexInput
+initialInput :: Text.Text -> AlexInput
 initialInput txt = AlexInput { aiChar  = '\n'
                              , aiBytes = []
                              , aiInput = txt
-                             , aiPos   = Position 0 0 0
+                             , aiPos   = Position 1 0 0
                              }
 
 fillBuffer :: AlexInput -> Maybe AlexInput
 fillBuffer ai = do
-  (c,rest) <- L.uncons (aiInput ai)
+  (c,rest) <- Text.uncons (aiInput ai)
   return ai { aiBytes = utf8Encode c
             , aiChar  = c
             , aiInput = rest
@@ -80,14 +79,14 @@ data LexState = Normal
               | InComment Int
               deriving (Show)
 
-type Action = Range -> L.Text -> LexState -> (Maybe (Located Token), LexState)
+type Action = Range -> Text.Text -> LexState -> (Maybe (Located Token), LexState)
 
 panic :: String -> Range -> Maybe (Located Token)
 panic s r = Just ((Err (LexicalError s)) `at` r)
 
 -- | Emit a token.
 emit :: Token -> Action
-emit tok r chunk sc = (Just (tok `at` r), sc)
+emit tok r _chunk sc = (Just (tok `at` r), sc)
 
 -- | Skip the current input.
 skip :: Action
@@ -95,12 +94,12 @@ skip _ _ sc = (Nothing,sc)
 
 -- | Generate an identifier token.
 mkIdent :: Action
-mkIdent r chunk sc = (Just (Ident (L.unpack chunk) `at` r), sc)
+mkIdent r chunk sc = (Just (Ident (Text.unpack chunk) `at` r), sc)
 
 -- | Read  number
 number :: Action
 number r chunk sc =
-  case readDec (L.unpack chunk) of
+  case readDec (Text.unpack chunk) of
     [(n, _)] -> (Just (Num n `at` r), sc)
     _        -> (Just (Err (LexicalError "Could not decode number.") `at` r), sc)
 
@@ -120,6 +119,7 @@ endComment :: Action
 endComment _ _ (InComment n)
   | n <= 1    = (Nothing, Normal)
   | otherwise = (Nothing, InComment (n-1))
+endComment r _ n = (panic "Internal lexer error. Ending a comment when not in a comment block." r, n)
 
 -- String Literals -------------------------------------------------------------
 
@@ -132,7 +132,7 @@ litString lit _ _ (InString str) = (Nothing, InString (str ++ lit))
 litString _   r _ _              = (panic "Lexer expected string literal state" r, Normal)
 
 addString :: Action
-addString _ chunk (InString str) = (Nothing, InString (str ++ L.unpack chunk))
+addString _ chunk (InString str) = (Nothing, InString (str ++ Text.unpack chunk))
 addString r _     _            = (panic "Lexer expected string literal state" r, Normal)
 
 mkString :: Action
@@ -143,7 +143,7 @@ startURI :: Action
 startURI _ _ _ = (Nothing, InURI "")
 
 addURI :: Action
-addURI _ chunk (InURI uri) = (Nothing, InURI (uri ++ L.unpack chunk))
+addURI _ chunk (InURI uri) = (Nothing, InURI (uri ++ Text.unpack chunk))
 addURI r  _  _             = (panic "Lexer expected uri state" r, Normal)
 
 mkURI :: Action
@@ -164,8 +164,21 @@ data Token = KW Keyword
            | Err TokenError
              deriving (Data,Typeable,Ord,Show,Eq)
 
-tokenText :: Token -> L.Text
-tokenText (String s) = L.pack s
+instance PP Token where
+  ppPrec _ t =
+    case t of
+      KW k     -> text (wordOfKeyword k)
+      Num i    -> pp i
+      String s -> text s
+      URI s    -> text s
+      Time s   -> text (show s)
+      Ident s  -> text s
+      Sym s    -> pp s
+      Eof      -> text "EOF"
+      Err e    -> text $ descTokenError e
+
+tokenText :: Token -> Text.Text
+tokenText (String s) = Text.pack s
 tokenText _          = error "tokenText: Tried to extract the 'text' of a non-String token"
 
 tokenNum :: Token -> Integer
@@ -196,6 +209,23 @@ data Symbol = BracketL
             | Hyphen
             | SingleQuote
               deriving (Show,Eq,Ord,Data,Typeable)
+
+instance PP Symbol where
+  ppPrec _ c =
+    text $ case c of
+        BracketL        -> "["
+        BracketR        -> "]"
+        Semi            -> ";"
+        Pipe            -> "|"
+        ParenL          -> "("
+        ParenR          -> ")"
+        Assign          -> "="
+        Comma           -> ","
+        Period          -> "."
+        Colon           -> ":"
+        Hyphen          -> "-"
+        SingleQuote     -> "'"
+        Type            -> "%%"
 
 data TokenError = LexicalError String
                   deriving (Data,Typeable, Eq, Ord, Show)

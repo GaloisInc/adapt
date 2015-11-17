@@ -4,31 +4,31 @@
 {-# LANGUAGE TypeSynonymInstances         #-}
 {-# LANGUAGE FlexibleInstances            #-}
 {-# LANGUAGE RecordWildCards              #-}
+{-# LANGUAGE CPP                          #-}
 
 module Typecheck
   ( typecheck, TypeError(..)
   ) where
 
 import Types as T
-import Namespaces (blankNode, textOfIdent)
+import Namespaces (Ident)
+import PP (pretty)
+import Namespaces (blankNode)
 
+#if (__GLASGOW_HASKELL__ < 710)
 import Control.Applicative
+#endif
 import MonadLib
-import Data.Monoid ((<>))
-import qualified Data.Text.Lazy as Text
-import           Data.Text.Lazy (Text)
 
 import           Data.Map (Map)
 import qualified Data.Map as Map
 
-import Network.URI (URI(..))
-
 --------------------------------------------------------------------------------
 --  Typechecker Monad
 
-type TyEnv = Map Text Type
+type TyEnv = Map Ident Type
 
-newtype TC a = TC { unTC :: ExceptionT TypeError (StateT TyEnv Id) a }
+newtype TC a = TC { unTC :: ExceptionT TypeError (ReaderT Range (StateT TyEnv Id)) a }
   deriving(Monad, Applicative, Functor)
 
 instance ExceptionM TC TypeError where
@@ -38,18 +38,24 @@ instance StateM TC TyEnv where
   get = TC get
   set = TC . set
 
-runTC :: TC a -> Either TypeError a
-runTC = fst . runId . runStateT Map.empty . runExceptionT . unTC
+instance ReaderM TC Range where
+  ask = TC ask
 
-assignTy :: Text -> Type -> TC ()
+instance RunReaderM TC Range where
+  local i (TC m) = TC (local i m)
+
+runTC :: TC a -> Either TypeError a
+runTC = fst . runId . runStateT Map.empty . runReaderT NoLoc . runExceptionT . unTC
+
+assignTy :: Ident -> Type -> TC ()
 assignTy k v = sets_ (Map.insert k v)
 
-getType :: Text -> TC (Maybe Type)
+getType :: Ident -> TC (Maybe Type)
 getType k = Map.lookup k <$> get
 
-unifyM :: Text -> Type -> TC ()
+unifyM :: Ident -> Type -> TC ()
 unifyM k ty
-  | k == textOfIdent blankNode = return ()
+  | k == blankNode = return ()
   | otherwise      =
   do tyOld <- getType k
      case tyOld of
@@ -64,7 +70,7 @@ unifyM k ty
 --  existential - there is no proper polymorphism.
 
 -- hard-coded type schema, since it should never change.
-unify :: Text -> Type -> Type -> TC Type
+unify :: Ident -> Type -> Type -> TC Type
 -- Identical types unify
 unify _ x y | x == y    = return x
 -- Unifier comes second. Actually possible in this primitive schema.
@@ -74,7 +80,7 @@ unify _ EntityClass x                                                           
 unify _ ActorClass  x   | x `elem` [ActorClass,TyAgent,TyUnitOfExecution,TyHost] = return x
 unify _ ResourceClass x | x `elem` [ResourceClass, TyResource, TyArtifact]       = return x
 unify _ DescribeClass x | x `elem` [DescribeClass, TyUnitOfExecution, TyArtifact] = return x
-unify i x y = raise (TypeError i x y)
+unify i x y = ask >>= \r -> raise (TypeError r (pretty i) x y)
 
 -- | Using the namespaces and verbs to infer types, type check raw triples
 -- and return the annotated version of the AST.
@@ -82,14 +88,15 @@ typecheck :: [Stmt] -> Either TypeError ()
 typecheck g = runTC $ mapM_ tcStmt g
 
 tcStmt :: Stmt -> TC ()
-tcStmt (StmtEntity e)    = tcEntity e
-tcStmt (StmtPredicate p) = tcPredicate p
+tcStmt (StmtEntity e)          = tcEntity e
+tcStmt (StmtPredicate p)       = tcPredicate p
+tcStmt (StmtLoc (Located r s)) = local r (tcStmt s)
 
 tcEntity :: Entity -> TC ()
-tcEntity (Agent i as)           = unifyM i TyAgent
-tcEntity (UnitOfExecution i as) = unifyM i TyUnitOfExecution
-tcEntity (Artifact i as)        = unifyM i TyArtifact
-tcEntity (Resource i ty mDevId) = unifyM i TyResource
+tcEntity (Agent i _as)           = unifyM i TyAgent
+tcEntity (UnitOfExecution i _as) = unifyM i TyUnitOfExecution
+tcEntity (Artifact i _as)        = unifyM i TyArtifact
+tcEntity (Resource i _ty _mDevId) = unifyM i TyResource
 
 tcPredicate :: Predicate -> TC ()
 tcPredicate (Predicate { .. }) =
@@ -123,27 +130,3 @@ predicateTypeToType p =
 (.->) = TyArrow
 
 infixr 4 .->
-
-
--- data Range = MaybeOne           -- 0..1
---             | Any               -- 0..
---             | One               -- 1..1
---             deriving (Eq,Ord,Show,Enum)
---
--- (<->) :: ScopedName -> Range -> (ScopedName,Range)
--- (<->) a b = (a,b)
-
--- fanInFanOut :: Map ScopedName Range
--- fanInFanOut = Map.fromList
---   [ provwasAttributedTo         <-> (Any, Any)
---   , provactedOnBehalfOf         <-> (Any, MaybeOne)
---   , provwasAssociatedWith       <-> (Any, MaybeOne)
---   , provwasInvalidatedBy        <-> (MaybeOne, Any)
---   , provused                    <-> (Any, Any)
---   , provwasStartedBy            <-> (Any, MaybeOne)
---   , provwasEndedBy              <-> (Any, MaybeOne)
---   , provwasInformedBy           <-> (Any, MaybeOne)
---   , provwasGeneratedBy          <-> (Any, Any)
---   , provwasDerivedFrom          <-> (Any, MaybeOne)
---   , tcDevType                   <-> (Any,Any)
---   ]

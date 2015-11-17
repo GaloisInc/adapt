@@ -1,8 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE CPP                        #-}
 
-module ParserCore (module ParserCore, Ident(..), textOfIdent) where
+module ParserCore (module ParserCore, ParseError(..), Ident(..), textOfIdent, Time) where
 
 import LexerCore hiding (mkIdent)
 import Lexer
@@ -10,17 +11,17 @@ import Position
 import PP
 
 import           Namespaces as NS
+import           Types (ParseError(..), Time)
+
+#if (__GLASGOW_HASKELL__ < 710)
 import           Control.Applicative (Applicative)
+#endif
+import           Data.Char (isDigit)
 import           Data.Data (Data,Typeable)
-import           Data.Time (UTCTime(..), fromGregorian, picosecondsToDiffTime)
-import           Data.List ( nub )
-import           Data.Monoid (mconcat, (<>))
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 import qualified Data.HashMap.Strict as Map
-import           Data.HashMap.Strict (HashMap)
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
-import           Network.URI (URI)
 import qualified Network.URI as URI
 
 data Prov = Prov [Prefix] [Expr]
@@ -28,8 +29,6 @@ data Prov = Prov [Prefix] [Expr]
 
 data Prefix = Prefix Text URI
   deriving (Eq,Ord,Show,Data,Typeable)
-
-type Time = UTCTime
 
 data Expr = RawEntity { exprOper     :: Ident
                       , exprIdent    :: (Maybe Ident)
@@ -40,8 +39,9 @@ data Expr = RawEntity { exprOper     :: Ident
       deriving (Eq,Ord,Show,Data,Typeable)
 
 expandPrefixes :: Prov -> Prov
-expandPrefixes (Prov ps ex) = Prov ps (map expand ex)
+expandPrefixes (Prov ps' ex) = Prov ps (map expand ex)
  where
+  ps = map (\orig@(Prefix t p) -> if p == adaptOld then Prefix t adapt else orig) ps'
   expand (RawEntity o i as ats l) =
     RawEntity { exprOper     = f o
               , exprIdent    = fmap f i
@@ -61,8 +61,9 @@ mkPrefix :: Located Token -> Located Token -> Prefix
 mkPrefix (Located _ (Ident i)) (Located uriLoc (URI s)) =
   case URI.parseURI s of
     Just u  -> Prefix (L.pack i) u
-    Nothing -> error $ "Could not parse URI: " ++ show (s, pretty uriLoc)
+    Nothing -> error $ "Could not parse URI: " ++ show (s, prettyStr uriLoc)
                 -- XXX Make the parser an exception monad
+mkPrefix _ _ = error "Impossible: mkPrefix called onn non-URI, non-Ident."
 
 type KVs   = [(Key,Value)]
 type Key   = Ident
@@ -90,6 +91,14 @@ valueNum :: Value -> Maybe Integer
 valueNum (ValNum t) = Just t
 valueNum _          = Nothing
 
+-- Identifiers being allowed to have/start with numbers means the lexer
+-- produces identifier tokens instead of numbers, breaking the attribute
+-- lexing until/unless we add a new lexer state for attribute lists.
+fixIdentLex :: Ident -> Value
+fixIdentLex (Unqualified i)
+  | L.all isDigit i = ValNum (read (L.unpack i))
+fixIdentLex i = ValIdent i
+
 newtype Parser a = Parser
   { getParser :: StateT RW (ExceptionT ParseError Id) a
   } deriving (Functor,Monad, Applicative)
@@ -97,10 +106,6 @@ newtype Parser a = Parser
 data RW = RW { rwInput  :: [Located Token]
              , rwCursor :: Maybe (Located Token)
              }
-
-data ParseError = HappyError (Maybe (Located Token))
-                | HappyErrorMsg String
-                  deriving (Data,Typeable, Eq, Ord, Show)
 
 runParser :: L.Text -> Parser a -> Either ParseError a
 runParser txt p =

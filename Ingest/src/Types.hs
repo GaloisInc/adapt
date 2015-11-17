@@ -11,52 +11,50 @@ module Types
     , ParseError(..)
     , TypeError(..)
     , TranslateError(..)
-    , Warning(..), ppWarning
+    , Warning(..)
       -- * Key types
     , Type(..)
     , Stmt(..)
     , Entity(..)
-    , UUID(..), MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
+    , UUID, MID, DevID, AgentAttr(..), ArtifactAttr(..), UoeAttr(..)
     , Predicate(..) , PredicateAttr(..), PredicateType(..), DevType(..)
     , Version, CoarseLoc, FineLoc
-    , UseOp, GenOp, DeriveOp, ExecOp, PID(..), ArtifactType
+    , UseOp, GenOp, DeriveOp, ExecOp, PID, ArtifactType
     , Time, EntryPoint
     , Text
+    , Located(..), Range(..)
     -- * Helpers
     , nameOf
     ) where
 
 import qualified Control.Exception as X
-import           Data.Monoid
 import           Data.Data
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Char (toLower)
 import           Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as Text
 import           Data.Time (UTCTime)
 import           Data.Word (Word64)
-import           ParserCore (ParseError(..))
 import           Text.Show.Functions ()
 
-import ParserCore (Time)
+
+import           Namespaces (Ident(..), textOfIdent)
+import           PP as PP
+import           Position
+import           LexerCore (Token)
+
+type Time = UTCTime
 
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError
   deriving (Show, Data, Typeable)
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
-ppWarning :: Warning -> Text
-ppWarning (Warn w) = w
-
-data TypeError  = TypeError Text Type Type | CanNotInferType Text
-        deriving (Eq, Ord, Show, Read, Data, Typeable)
-data TranslateError = MissingRequiredField (Maybe Text) Text
-                    | MissingRequiredTimeField (Maybe Text) Text Stmt
-                    | TranslateError Text
+data TypeError  = TypeError Range Text Type Type | CanNotInferType Text
+        deriving (Eq, Ord, Show, Data, Typeable)
+data TranslateError = TranslateError Text
         deriving (Show, Data, Typeable)
+
+data ParseError = HappyError (Maybe (Located Token))
+                | HappyErrorMsg String
+                  deriving (Data,Typeable, Eq, Ord, Show)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
@@ -68,19 +66,22 @@ instance X.Exception Error
 -- inherently affiliated with Entities and there is no type-level
 -- enforcement of the fan-in fan-out.
 
-data Stmt = StmtEntity Entity | StmtPredicate Predicate
+data Stmt = StmtEntity Entity
+          | StmtPredicate Predicate
+          | StmtLoc (Located Stmt)
   deriving (Eq, Ord, Show, Data, Typeable)
 
 -- | Entities in our conceptual Model
 -- Notice each entity has a name (Text field) except for metadata.
-data Entity = Agent Text [AgentAttr]
-            | UnitOfExecution Text [UoeAttr]
-            | Artifact Text [ArtifactAttr]
-            | Resource Text DevType (Maybe DevID)
+data Entity = Agent Ident [AgentAttr]
+            | UnitOfExecution Ident [UoeAttr]
+            | Artifact Ident [ArtifactAttr]
+            | Resource Ident DevType (Maybe DevID)
   deriving (Eq, Ord, Show, Data, Typeable)
 
 nameOf :: Entity -> Text
-nameOf e = case e of
+nameOf e = 
+ textOfIdent $ case e of
             Agent n _ -> n
             UnitOfExecution n _ -> n
             Artifact n _    -> n
@@ -146,8 +147,8 @@ type FineLoc   = Text
 type CoarseLoc = Text
 
 
-data Predicate = Predicate { predSubject    :: Text
-                           , predObject     :: Text
+data Predicate = Predicate { predSubject    :: Ident
+                           , predObject     :: Ident
                            , predType       :: PredicateType
                            , predAttrs      :: [PredicateAttr]
                            }
@@ -166,6 +167,12 @@ data PredicateAttr
         | Cmd Text
         | DeriveOp DeriveOp
         | ExecOp ExecOp
+        | MachineID MID
+        | SourceAddress Text
+        | DestinationAddress Text
+        | SourcePort Text
+        | DestinationPort Text
+        | Protocol Text
   deriving (Eq, Ord, Show, Data, Typeable)
 
 data PredicateType
@@ -222,4 +229,44 @@ data Type = EntityClass
           | TyArrow Type Type
           | TyVoid
         deriving (Eq, Ord, Show, Read, Data, Typeable)
+
+--------------------------------------------------------------------------------
+--  Pretty Printing
+
+instance PP Error where
+  ppPrec _ (PE e)  = text "Parse error: " PP.<> pp e
+  ppPrec _ (TCE e) = text "Typecheck error: " PP.<> pp e
+  ppPrec _ (TRE e) = text "Translation error: " PP.<> pp e
+
+instance PP ParseError where
+  ppPrec _ (HappyError Nothing)    = text "Unknown parser error."
+  ppPrec _ (HappyError (Just loc)) = text "Could not parse token " PP.<> pp loc
+  ppPrec _ (HappyErrorMsg s)       = text s
+
+instance PP TranslateError where
+  ppPrec _ (TranslateError t) = pp t
+
+instance PP TypeError where
+  ppPrec _ (CanNotInferType t) = text "Can not infer type for " PP.<> pp t
+  ppPrec _ (TypeError r a b c)   =
+      pp r <> text ": Can not unify inferred types of " PP.<>
+               pp b PP.<> " and " PP.<> pp c PP.<> " for " PP.<> pp a
+
+instance PP Warning where
+  ppPrec _ (Warn w) = pp w
+
+instance PP Type where
+  ppPrec _ t =
+    case t of
+        TyArrow a b       -> pp a PP.<> text " -> " PP.<> pp b
+        EntityClass       -> text "Entity class"
+        ActorClass        -> text "Actor class"
+        DescribeClass     -> text "Describable class"
+        ResourceClass     -> text "Resource class"
+        TyUnitOfExecution -> text "UOE"
+        TyHost            -> text "Host"
+        TyAgent           -> text "Agent"
+        TyArtifact        -> text "Artifact"
+        TyResource        -> text "Resource"
+        TyVoid            -> text "Void"
 

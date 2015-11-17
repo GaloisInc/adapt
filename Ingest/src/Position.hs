@@ -68,7 +68,7 @@ instance PP Range where
 -- lines around it.
 getLines :: L.Text -> Int -> Range -> L.Text
 getLines _     _   NoLoc         = L.empty
-getLines input cxt (Range s e _) = L.unlines
+getLines input cxt (Range s _ _) = L.unlines
                                  $ take len
                                  $ drop start
                                  $ L.lines input
@@ -88,7 +88,7 @@ data Located a = Located { locRange :: !Range
 
 -- by default, print with no location information
 instance PP a => PP (Located a) where
-  ppPrec p Located { .. } = ppPrec p locValue
+  ppPrec p Located { .. } = text "\"" PP.<> ppPrec p locValue PP.<> text "\"" PP.<> text " at " PP.<> pp locRange
 
 
 class HasRange a where

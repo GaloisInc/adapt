@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE CPP                        #-}
 
 module Translate
   ( translate
@@ -12,12 +13,14 @@ module Translate
 
 import PP hiding ((<>))
 import Namespaces as NS
-import ParserCore
 import Util (parseUTC)
 import qualified Types as T
-import           Types (TranslateError(..))
+import           Types (TranslateError(..),Range(..))
+import           ParserCore
 
+#if (__GLASGOW_HASKELL__ < 710)
 import           Control.Applicative
+#endif
 import           Data.DList hiding (map)
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes, maybeToList)
@@ -25,13 +28,12 @@ import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
-import           Data.Time (UTCTime(..), fromGregorian)
-import           MonadLib
+import           MonadLib as ML
 
 --------------------------------------------------------------------------------
 --  Translate Monad
 
-newtype Tr a = Tr { unTr :: WriterT (DList T.Warning) (ExceptionT TranslateError Id) a }
+newtype Tr a = Tr { unTr :: ReaderT Range (WriterT (DList T.Warning) (ExceptionT TranslateError Id)) a }
   deriving (Monad, Applicative, Functor)
 
 instance ExceptionM Tr TranslateError where
@@ -43,19 +45,23 @@ instance RunExceptionM Tr TranslateError where
 instance WriterM Tr T.Warning where
   put w = Tr (put $ singleton w)
 
-runTr :: Tr a -> Either TranslateError (a,[T.Warning])
-runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . unTr
+instance ReaderM Tr Range where
+  ask = Tr ask
 
-safely :: Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
-safely m =
+instance RunReaderM Tr Range where
+  local i (Tr m) = Tr (ML.local i m)
+
+runTr :: Tr a -> Either TranslateError (a,[T.Warning])
+runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . runReaderT NoLoc . unTr
+
+safely :: T.Range -> Tr (Maybe T.Stmt) -> Tr (Maybe T.Stmt)
+safely e m =
   do x <- try m
      case x of
         Right r                   -> return r
-        Left (TranslateError txt) -> warn txt >> return Nothing
-        Left (MissingRequiredTimeField i f stmt) ->
-          do warn $ "Filling missing required time field with epoch (entity/field: " <> maybe "" id i <> " " <> f <> ")"
-             return $ Just stmt
-        Left e                    -> warn (L.pack $ show e) >> return Nothing
+        Left (TranslateError txt) ->
+            do warn (pretty e <> ": " <> txt)
+               return Nothing
 
 warn :: Text -> Tr ()
 warn = put . T.Warn
@@ -67,16 +73,20 @@ translate ::  Prov -> Either TranslateError ([T.Stmt], [T.Warning])
 translate p = runTr (tExprs p)
 
 tExprs :: Prov -> Tr [T.Stmt]
-tExprs (Prov _prefix es) = catMaybes <$> mapM (safely . tExpr) es
+tExprs (Prov _prefix es) = catMaybes <$> mapM (\e -> safely (exprLocation e) (tExprLoc e)) es
 
-pattern PIdent i <- Just (Left i)
-pattern PTime t  <- Just (Right t)
+tExprLoc :: Expr -> Tr (Maybe T.Stmt)
+tExprLoc e = fmap (T.StmtLoc . T.Located l) <$> ML.local l (tExpr e)
+ where l = exprLocation e
 
 -- View maybe time
-vMTime (PTime t)   = Just t
-vMTime _           = Nothing
-vMIdent (PIdent i) = Just i
-vMIdent _          = Nothing
+vMTime :: Maybe (Either t a) -> Maybe a
+vMTime (Just (Right t)) = Just t
+vMTime _                = Nothing
+
+vMIdent :: Maybe (Either a t) -> Maybe a
+vMIdent (Just (Left i)) = Just i
+vMIdent _               = Nothing
 
 eqIdent :: Ident -> Ident -> Bool
 eqIdent p e =
@@ -125,7 +135,7 @@ tExpr (WasAssociatedWith mI subj mObj mPlan kvs)                           = mkP
 tExpr (WasAttributedTo mI subj obj kvs)                                    = mkPred <$> wasAttributedTo mI subj obj kvs
 tExpr (IsPartOf subj obj)                                                  = mkPred <$> isPartOf subj obj
 tExpr (Description obj kvs)                                                = mkPred <$> description obj kvs
-tExpr r@(RawEntity pred mI _ _ loc)                                        = warnN $ "Unrecognized statement at " <> L.pack (pretty loc) <> "(" <> L.pack (show r) <> ")"
+tExpr (RawEntity _pred _mI _ _ loc)                                      = warnN $ "Unrecognized statement " <> L.pack (pretty loc)
 
 --------------------------------------------------------------------------------
 --  Entity Translation
@@ -137,6 +147,7 @@ entity :: Ident -> KVs -> Tr T.Entity
 entity i kvs =
   case eTy of
     Just T.TyArtifact -> artifact i kvs
+    Just _            -> raise $ TranslateError $ "Invalid type for entity: " <> textOfIdent i
     Nothing ->
       case lookup adaptDevType kvs of
         Just devtype    -> resource i devtype kvs
@@ -147,13 +158,14 @@ entity i kvs =
  where eTy = case lookup adaptEntityType kvs of
               Just (ValString "file")    -> Just T.TyArtifact
               Just (ValString "network") -> Just T.TyArtifact
-              _                          -> Nothing
+              Just (ValString "registryEntry") -> Just T.TyArtifact
+              _                          -> Just T.TyArtifact -- XXX for the demo, for 5D
 
 artifact :: Ident -> KVs -> Tr T.Entity
-artifact i kvs = T.Artifact (textOfIdent i) <$> artifactAttrs kvs
+artifact i kvs = T.Artifact i <$> artifactAttrs kvs
 
 resource :: Ident -> Value -> KVs -> Tr T.Entity
-resource i (ValString devTy) kvs = return $ T.Resource (textOfIdent i) dev devId
+resource i (ValString devTy) kvs = return $ T.Resource i dev devId
  where dev =
         case L.toLower devTy of
           "gps"             -> T.GPS
@@ -170,24 +182,16 @@ resource i _ _ = raise $ TranslateError $ "Device types must be string literals.
 -- Agents are either units of execution or exist largely for the metadata
 -- of machine ID, foaf:name, and foaf:accountName.
 agent :: Ident -> KVs -> Tr T.Entity
-agent i kvs = T.Agent (textOfIdent i) <$> agentAttrs kvs
+agent i kvs = T.Agent i <$> agentAttrs kvs
 
 -- All Activities are units of execution, no exceptions.
 activity :: Ident -> Maybe Time -> Maybe Time -> KVs -> Tr T.Entity
 activity i mStart mEnd kvs =
    do attrs <- uoeAttrs kvs
-      return $ T.UnitOfExecution (textOfIdent i) (uoeTimes mStart mEnd ++ attrs)
+      return $ T.UnitOfExecution i (uoeTimes mStart mEnd ++ attrs)
 
 uoeTimes :: Maybe Time -> Maybe Time -> [T.UoeAttr]
 uoeTimes a b = catMaybes $ zipWith fmap [T.UAStarted, T.UAEnded] [a,b]
-
-getProvType :: KVs -> Maybe T.Type
-getProvType m =
-  case lookup provType m of
-    Nothing -> Nothing
-    Just (ValIdent i) | eqIdent adaptUnitOfExecution i -> Just T.TyUnitOfExecution
-                      | eqIdent adaptArtifact i        -> Just T.TyArtifact
-    _                                  -> Nothing -- warn?
 
 --------------------------------------------------------------------------------
 --  Entity Attributes
@@ -206,26 +210,27 @@ uoeAttr i = attrOper uoeAttrTranslations w i
 
 uoeAttrTranslations :: Map Ident (Value -> Tr (Maybe T.UoeAttr))
 uoeAttrTranslations = Map.fromList
-  [ adaptMachineID .-> warnOrOp "Non-string value in adapt:machine" T.UAMachine . valueString
-  , adaptPid       .-> warnOrOp "Non-string value in adapt:pid"  T.UAPID . valueString
-  , adaptPPid      .-> warnOrOp "Non-string value in adapt:ppid" T.UAPPID . valueString
-  , adaptPrivs     .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
-  , adaptPwd       .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
+  [ adaptMachineID      .-> warnOrOp "Non-string value in adapt:machine" T.UAMachine . valueString
+  , adaptPid            .-> warnOrOp "Non-string value in adapt:pid"  T.UAPID . valueString
+  , adaptPPid           .-> warnOrOp "Non-string value in adapt:ppid" T.UAPPID . valueString
+  , adaptPrivs          .-> warnOrOp "Non-string value in adapt:privs" T.UAHadPrivs . valueString
+  , adaptPwd            .-> warnOrOp "Non-string value in adapt:pwd"   T.UAPWD . valueString
   , adaptGroup          .-> warnOrOp "Non-string value in adapt:group" T.UAGroup . valueString
   , adaptCommandLine    .-> warnOrOp "Non-string value in adapt:commandLine" T.UACommandLine . valueString
   , adaptSource         .-> warnOrOp "Non-string value in adapt:source"  T.UASource . valueString
   , adaptCWD            .-> warnOrOp "Non-string value in adapt:cwd" T.UACWD . valueString
   , adaptUID            .-> warnOrOp "Non-string value in adapt:uid" T.UAUID . valueString
   , adaptProgramName    .-> warnOrOp "Non-string value in adapt:programName" T.UAProgramName . valueString
-  , provType       .-> ignore
-  , provAtTime     .-> (\v -> return $ let mtime = case v of
-                                                      ValString s -> parseUTC s
-                                                      ValTime t   -> Just t
-                                                      _           -> Nothing
-                                       in fmap T.UAStarted mtime)
-  , foafAccountName .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
+  , provAtTime          .-> warnOrOp "Non-time value in prov:atTime" T.UAStarted . getTime
+  , adaptTime           .-> ignore
+  , provType            .-> ignore
+  , foafAccountName     .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
   ]
 
+getTime :: Value -> Maybe Time
+getTime (ValString s) = parseUTC s
+getTime (ValTime t)   = Just t
+getTime _             = Nothing
 
 agentAttrs :: KVs -> Tr [T.AgentAttr]
 agentAttrs kvs = catMaybes <$> mapM (uncurry agentAttr) kvs
@@ -251,31 +256,35 @@ artifactAttr i v = attrOper artifactAttrTranslations w i v
 
 artifactAttrTranslations :: Map Ident (Value -> Tr (Maybe T.ArtifactAttr))
 artifactAttrTranslations = Map.fromList
-  [ adaptArtifactType .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
-  , adaptRegistryKey  .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
-  , adaptPath         .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
+  [ adaptArtifactType       .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
+  , adaptRegistryKey        .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
+  , adaptPath               .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
   , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.ArtADestinationAddress . valueString
   , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.ArtADestinationPort . valueString
-  , adaptSourceAddress .-> warnOrOp "Non-string value in adapt:sourceAddress" T.ArtASourceAddress . valueString
-  , adaptSourcePort    .-> warnOrOp "Non-string value in adapt:sourcePort" T.ArtASourcePort . valueString
-  , adaptHasVersion   .-> ignore
-  , provType          .-> ignore
-  , adaptEntityType   .-> ignore
+  , adaptSourceAddress      .-> warnOrOp "Non-string value in adapt:sourceAddress" T.ArtASourceAddress . valueString
+  , adaptSourcePort         .-> warnOrOp "Non-string value in adapt:sourcePort" T.ArtASourcePort . valueString
+  , adaptHasVersion         .-> ignore
+  , provType                .-> ignore
+  , adaptEntityType         .-> ignore
   ]
 
 attrOper :: Map Ident (Value -> a) -> a -> Ident -> Value -> a
 attrOper m w i v =
-  do let op = Map.lookup i m
-     case Map.lookup i m of
+  case Map.lookup i m of
       Just o  -> o v
       Nothing -> w
 
-warnConst = const . warnN
+warnN :: Text -> Tr (Maybe a)
 warnN s   = warn s >> return Nothing
 
+ignore :: b -> Tr (Maybe a)
 ignore = const (return Nothing)
+
 warnOrOp :: Text -> (a -> b) -> Maybe a -> Tr (Maybe b)
-warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
+warnOrOp w f m =
+  do l <- ask
+     let w' = pretty l <> ": " <> w
+     maybe (warn w' >> return Nothing) (return . Just . f) m
 
 --------------------------------------------------------------------------------
 --  Predicate Translation
@@ -285,26 +294,23 @@ warnOrOp w f m = maybe (warn w >> return Nothing) (return . Just . f) m
 -- association.
 
 wasGeneratedBy :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
-wasGeneratedBy mI subj (orBlank -> obj) mTime kvs =
+wasGeneratedBy _mI subj (orBlank -> obj) mTime kvs =
   let constr f = predicate subj obj T.WasGeneratedBy (f $ generationAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 used :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
-used mI subj (orBlank -> obj) mTime kvs =
+used _mI subj (orBlank -> obj) mTime kvs =
   return $ predicate subj obj T.Used (maybeToList (T.AtTime <$> mTime) ++ usedAttr kvs)
 
 wasStartedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
-wasStartedBy mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
+wasStartedBy _mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr f = predicate subj obj T.WasStartedBy (f $ startedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
-wasEndedBy mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
+wasEndedBy _mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
   let constr f = predicate subj obj T.WasEndedBy (f $ endedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
-
-timeZero :: UTCTime
-timeZero = UTCTime (fromGregorian 1900 1 1) 0
 
 wasInformedBy :: a -> Ident -> Maybe Ident -> KVs -> Tr T.Predicate
 wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (informedByAttr kvs)
@@ -323,10 +329,10 @@ isPartOf :: Ident -> Ident -> Tr T.Predicate
 isPartOf subj obj    = return $ predicate subj obj T.IsPartOf []
 
 description :: Ident -> KVs -> Tr T.Predicate
-description obj  kvs = return $ predicate blankNode obj T.Description (descriptionAttr kvs)
+description obj  kvs = predicate blankNode obj T.Description <$> descriptionAttr kvs
 
 predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
-predicate s o ty attr = T.Predicate (textOfIdent s) (textOfIdent o) ty attr
+predicate s o ty attr = T.Predicate s o ty attr
 
 
 --------------------------------------------------------------------------------
@@ -383,11 +389,25 @@ derivedFromAttr = catMaybes . map go
 attributedToAttr :: PredAttrTrans
 attributedToAttr = const []
 
-descriptionAttr :: PredAttrTrans
-descriptionAttr = catMaybes . map go
- where
- go (k,ValString v) = Just (T.Raw (textOfIdent k) v)
- go _               = Nothing
+descriptionAttr :: KVs -> Tr [T.PredicateAttr]
+descriptionAttr kvs = catMaybes <$> mapM (uncurry descrAttr) kvs
+
+descrAttr :: Ident -> Value -> Tr (Maybe T.PredicateAttr)
+descrAttr i = attrOper descrAttrTranslations w i
+  where w = warnN $ "Unrecognized attribute for description: " <> (textOfIdent i)
+
+
+descrAttrTranslations :: Map Ident (Value -> Tr (Maybe T.PredicateAttr))
+descrAttrTranslations = Map.fromList
+  [ adaptMachineID          .-> warnOrOp "Non-string value in adapt:machine" T.MachineID . valueString
+  , adaptSourceAddress      .-> warnOrOp "Non-string value in adapt:sourceAddress" T.SourceAddress . valueString
+  , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.DestinationAddress . valueString
+  , adaptSourcePort         .-> warnOrOp "Non-string value in adapt:sourcePort" T.SourcePort . valueString
+  , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.DestinationPort . valueString
+  , adaptProtocol           .->
+      \v -> warnOrOp ("Non-num value in adapt:protocol" <> L.pack (show v)) T.Protocol . fmap (L.pack . show) . valueNum $ v
+  , adaptEntityType         .-> ignore
+  ]
 
 orBlank :: Maybe Ident -> Ident
 orBlank = maybe blankNode id

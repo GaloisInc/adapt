@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
+{-# OPTIONS_GHC -Wwarn -fno-warn-missing-signatures #-}
 module Namespaces
-  ( prov,dc,adapt,foaf,nfo,URI
+  ( prov,dc,adapt,adaptOld,foaf,nfo,URI
   , Ident(..), domain, local, mkIdent, (.:), textOfIdent
   , allIdent
   , adaptIdent
@@ -10,7 +11,7 @@ module Namespaces
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp, adaptExecOp
   , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptHasVersion, adaptTime
   , adaptCWD, adaptUID, adaptProgramName, adaptDestinationAddress, adaptDestinationPort
-  , adaptSourceAddress, adaptSourcePort
+  , adaptSourceAddress, adaptSourcePort, adaptProtocol
   , foafIdent
   , foafName, foafAccountName
   , provIdent
@@ -68,9 +69,10 @@ textOfIdent :: Ident -> Text
 textOfIdent (Qualified a b) = a <> ":" <> b
 textOfIdent (Unqualified b) = b
 
-dc,adapt,foaf,nfo :: URI
+dc,adapt,adaptOld,foaf,nfo :: URI
 dc    = perr "http://purl.org/dc/elements/1.1/"
 adapt = perr "http://spade.csl.sri.com/rdf/audit-tc.rdfs#"
+adaptOld = perr "http://adapt.galois.com/"
 foaf  = perr "http://xmlns.com/foaf/0.1/"
 nfo   = perr "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/"
 prov  = perr "http://www.w3.org/ns/prov#"
@@ -84,7 +86,7 @@ adaptIdent =
   , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp
   , adaptExecOp, adaptDeriveOp, adaptDestinationAddress, adaptDestinationPort
-  , adaptSourceAddress, adaptSourcePort, adaptTime
+  , adaptSourceAddress, adaptSourcePort, adaptTime, adaptProtocol
   , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptProgramName, adaptCWD, adaptUID
   ]
 
@@ -125,6 +127,7 @@ adaptDestinationAddress = adapt .: "destinationAddress"
 adaptDestinationPort = adapt .: "destinationPort"
 adaptSourceAddress = adapt .: "sourceAddress"
 adaptSourcePort = adapt .: "sourcePort"
+adaptProtocol   = adapt .: "protocol"
 adaptTime           = adapt .: "time"
 
 foafIdent :: [Ident]
