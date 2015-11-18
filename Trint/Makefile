@@ -23,8 +23,10 @@ EXAMPLE='entity(ex:e68f56, [tc:entityType="network", tc:destinationAddress="13.1
 	expand -t1 < $(HOME)/trace/current/$(shell basename $@) \
 	| sed \
             -e '1a \ prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>' \
-            -e 's;^ artifact;entity;' \
+-e '9a activity(ex:ff156ad, -, -, [ prov:type="adapt:unitOfExecution",tc:accountName="dwa",tc:commandLine="sleep 1"])' \
+            -e '/^ process/s;\[ audit:; -, -, \[ prov:type="adapt:unitOfExecution",audit:;' \
             -e 's;^ process;activity;' \
+            -e 's;^ artifact;entity;' \
             -e 's;audit:subtype;tc:entityType;' \
             -e 's;data:destination host;tc:destinationAddress;' \
             -e 's;data:source host;tc:sourceAddress;' \
