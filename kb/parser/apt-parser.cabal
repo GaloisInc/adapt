@@ -1,0 +1,40 @@
+name:                apt-parser
+version:             0.1.0.0
+-- license:             
+license-file:        LICENSE
+author:              Trevor Elliott
+maintainer:          trevor@galois.com
+-- copyright:           
+category:            Text
+build-type:          Simple
+cabal-version:       >=1.10
+synopsis:            A parser for the APT grammar
+--description:         
+
+library
+  exposed-modules:     Adapt.Parser
+  other-modules:       Adapt.Parser.AST
+                       Adapt.Parser.Lexer
+                       Adapt.Parser.Lexeme
+                       Adapt.Parser.PP
+                       Adapt.Parser.Position
+  default-language:    Haskell2010
+  hs-source-dirs:      src
+  build-depends:       base >= 4.6 && <5,
+                       monadLib,
+                       text,
+                       pretty,
+                       array
+
+  ghc-options:         -Wall
+
+executable parser
+  main-is:             Main.hs
+  build-depends:       base >=4.6 && <5,
+                       text,
+                       pretty,
+                       apt-parser
+  hs-source-dirs:      parser
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall
