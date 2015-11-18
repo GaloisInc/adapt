@@ -1,5 +1,9 @@
 #! /usr/bin/env python
 
+import random
+from time import sleep
+import gremlinrestclient
+
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
 
@@ -28,11 +32,16 @@ def main():
     oper(sendMsg,recvMsg)
 
 def oper(sendMsg,recvMsg):
+    print("Wait for new data...")
+    client = gremlinrestclient.GremlinRestClient()
     while True:
         v = recvMsg()
         if not (v is None):
-            print("AD: " + v.value)
+            print("Searching for anomolies on segment #" + v.value + "...")
+            sleep(random.randint(0,20))
+            print("Anomolies annotated on graph. Notify prioritizer...")
             sendMsg(v.value)
+            print("Wait for new data...")
 
 if __name__ == '__main__':
     main()
