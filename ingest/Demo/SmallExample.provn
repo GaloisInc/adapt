@@ -1,0 +1,29 @@
+document
+
+prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>
+prefix data <http://spade.csl.sri.com/#>
+
+activity(data:prog1,[ tc:uid="01"
+                   , tc:programName="sudo"
+                   , tc:pid="7561"
+                   , tc:ppid="7555"
+                   , tc:group="0"])
+
+activity(data:prog2,[ tc:uid="02"
+                    , tc:programName="audit.sh"
+                    , tc:pid="7555"
+                    , tc:ppid="3708"
+                    , tc:group="0"])
+
+entity(data:file1,[ tc:path="/etc/login.defs"
+                  , tc:entityType="file"
+                  , tc:hasVersion="0"])
+used(data:prog1,data:file1, - ,
+            [ tc:time="2015-09-28T01:06:56Z"
+            , tc:operation="read"])
+
+wasInformedBy(data:prog1
+             ,data:prog2,[ tc:time="2015-09-28T01:06:56Z"
+                         , tc:operation="clone"])
+
+endDocument
