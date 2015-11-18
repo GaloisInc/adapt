@@ -1,5 +1,9 @@
 #! /usr/bin/env python
 
+import random
+from time import sleep
+import gremlinrestclient
+
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
 
@@ -27,13 +31,19 @@ def main():
     oper(sendMsg,recvMsg)
 
 def oper(sendMsg,recvMsg):
+    print("Wait for new data...")
     start = 0
+    client = gremlinrestclient.GremlinRestClient()
     while True:
         v = recvMsg()
         if not (v is None):
-            print("SG: " + v.value)
+            print("Processing vertices " + v.value)
+            sleep(random.randint(0,20))
+            client.execute("graph.addVertex(label, p1, 'id', p2)", bindings={"p1": "segment", "p2": str(start)})
+            print("Segmented! Notify feature extractor...")
             sendMsg(str(start))
             start = start + 1;
+            print("Wait for new data...")
 
 if __name__ == '__main__':
     main()

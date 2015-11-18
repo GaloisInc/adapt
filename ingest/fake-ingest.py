@@ -1,14 +1,12 @@
 #! /usr/bin/env python
 
-import prov_pb2
 import random
+import gremlinrestclient
 
 from time import sleep
 
 from kafka import SimpleProducer, KafkaClient, KafkaConsumer
 from kafka.common import ConsumerTimeout
-
-from os import getenv
 
 def main():
     ta3Host = '127.0.0.1'
@@ -22,23 +20,28 @@ def main():
 
     def sendMsg(m): producer.send_messages(toSeg, m)
     def recvMsg():
-#        try:
-#             x = consumer.next()
-#             return x;
-#        except ConsumerTimeout:
              return None
 
     oper(sendMsg,recvMsg)
 
 def oper(sendMsg,recvMsg):
     start = 0
+    client = gremlinrestclient.GremlinRestClient()
+    print("Wait for new data from TA1...");
+    sleep(10);
     while True:
+        print("New data recieved.")
         v = recvMsg()
         if not (v is None):
             print("IN: " + v.value)
         count = random.randint(1,100)
+        print("Processing inserts " + str(start) + " to " + str(start+count-1) + "...")
+        for id in range(start, start+count):
+          client.execute("graph.addVertex(label, p1, 'id', p2)", bindings={"p1": "process", "p2": str(id)})
+        print("Inserted! Notify segmenter.")
         sendMsg("{"+str(start)+","+str(start+count-1)+"}")
         start = start + count;
+        print("Wait for new data from TA1...");
         sleep(10)
 
 if __name__ == '__main__':
