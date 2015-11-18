@@ -28,6 +28,8 @@ WAS_GENERATED_BY = 'http://www.w3.org/ns/prov#wasGeneratedBy'
 WAS_DERIVED_FROM = 'http://www.w3.org/ns/prov#wasDerivedFrom'
 WAS_ACCESSED_BY = 'http://www.w3.org/ns/prov#wasAccessedBy'
 USED = 'http://www.w3.org/ns/prov#used'
+TIME = 'http://spade.csl.sri.com/rdf/audit-tc.rdfs#time'
+
 
 VERBOSE = True
 
@@ -44,7 +46,10 @@ class Segmenter:
         WAS_ACCESSED_BY = 'http://www.w3.org/ns/prov#wasAccessedBy'
         USED = 'http://www.w3.org/ns/prov#used'
 
-        For a detailed explanation see doc/segmenter_proposal.pdf
+
+    and the tc events:
+        TIME = http://spade.csl.sri.com/rdf/audit-tc.rdfs#time
+
     """
 
     def __init__(self, filepath, interval_len):
@@ -61,10 +66,10 @@ class Segmenter:
 
         for s, p, o in self.rdf_graph:
             p_str = str(p)
-            if str(p) == STARTED_AT_TIME:
+            if str(p) == STARTED_AT_TIME or str(p) == TIME:
                 self.smallest_time = int(o) if not self.smallest_time or self.smallest_time > int(o) \
                     else self.smallest_time
-            elif str(p) == ENDED_AT_TIME:
+            if str(p) == ENDED_AT_TIME or str(p) == TIME:
                 self.biggest_time = int(o) if not self.biggest_time or self.biggest_time < int(o) \
                     else self.biggest_time
 
@@ -99,7 +104,7 @@ class Segmenter:
         for s, o, i, d in self.graph.edges_iter(keys=True, data=True):
             pred_str = str(d['label'])
             # A subject that starts after t_end is marked as unstarted
-            if pred_str == STARTED_AT_TIME and int(o) > t_end:
+            if (pred_str == STARTED_AT_TIME or pred_str == TIME) and int(o) > t_end:
                 unstarted_resources.add(s)
             # A subject that ends after t_end is marked as unfinished
             elif pred_str == ENDED_AT_TIME and int(o) > t_start:
@@ -117,10 +122,12 @@ class Segmenter:
                     if pred_str == WAS_GENERATED_BY or pred_str == WAS_DERIVED_FROM:
                         unstarted_resources.add(s)
                         unstarted_res_stack.append(s)
+                        sys.exit()
                     # a) A "used" edge pointing into an unstarted entity is marked as unstarted
                     # b) A "was accessed by" edge pointing into an unstarted entity is marked as unstarted
                     if pred_str == USED or pred_str == WAS_ACCESSED_BY:
                         unstarted_relations.add((s, n, self.graph[s][n][i]['label']))
+                        print s
 
         # TODO: Deal similarly as above with unfinished resources
 
@@ -141,16 +148,18 @@ class Segmenter:
             self.smallest_time = None
             self.biggest_time = None
             for s, p, o in self.rdf_graph:
-                if str(p) == STARTED_AT_TIME:
+                if str(p) == STARTED_AT_TIME or str(p) == TIME:
                     self.smallest_time = int(o) if not self.smallest_time or self.smallest_time > int(o) \
                         else self.smallest_time
-                elif str(p) == ENDED_AT_TIME:
+                if str(p) == ENDED_AT_TIME or str(p) == TIME:
                     self.biggest_time = int(o) if not self.biggest_time or self.biggest_time < int(o) \
                         else self.biggest_time
-        print 'Smallest absolute time (A): {0}'.format(self.smallest_time)
-        print 'Biggest absolute time (B): {0}'.format(self.biggest_time)
-        print 'Length of time interval (B-A): {0}'.format(self.biggest_time - self.smallest_time)
-
+        try:
+            print 'Smallest absolute time (A): {0}'.format(self.smallest_time)
+            print 'Biggest absolute time (B): {0}'.format(self.biggest_time)
+            print 'Length of time interval (B-A): {0}'.format(self.biggest_time - self.smallest_time)
+        except:
+            pass
 
 if __name__ == "__main__":
     # Read file
