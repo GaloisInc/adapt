@@ -40,6 +40,7 @@ def oper(sendMsg,recvMsg):
             print("Processing vertices " + v.value)
             sleep(random.randint(0,20))
             client.execute("graph.addVertex(label, p1, 'id', p2)", bindings={"p1": "segment", "p2": str(start)})
+            print("Point segment at vertices and edges in segment")
             print("Segmented! Notify feature extractor...")
             sendMsg(str(start))
             start = start + 1;
