@@ -20,9 +20,41 @@ The ADAPT team has demonstrated the following so far:
 
 Conceptual Model
 =======
-PROV-TC is a domain-specific language designed to implement a conceptual model for transfer of knowledge between Transparent Computing TA1 and TA2 teams. The conceptual model has been discussed and refined for several months, and is shown below.
+PROV-TC is a conceptual model and a syntax for describing that model when transferring knowledge between Transparent Computing TA1 and TA2 teams. The conceptual model is shown below.
 
 <img src="./languagediagram.png" alt="Conceptual Model Figure" style="width: 600px;"/>
+
+Terminology for describing PROV-TC generally follows the language of E-R models. There are for example five entity classes and twelve relationship classes in the current model. Each instance of an entity or relationship class may have certain required as well as other optional attributes that describe that instance. Specific entities, relationships, and attributes are defined below.
+
+It is sometimes convenient to describe a collection of instances in PROV-TC. For example, a valid *provenance linkage* in PROV-TC is a set consisting of a relationship instance and the two entity instances that it connects, where each instance in the linkage is characterized by valuations of at least all required attribute terms. Following the usual E-R modeling standard, any entity instance in PROV-TC may participate in zero or more provenance linkages. Any relationship instance in our model must participate in exactly one provenance linkage.
+
+PROV-TC instances describe provenance relationships found in instances of execution of a software system. PROV-TC is designed such that any valid PROV-TC instance maintains certain properties. Specifically, for any execution of a software system, it is possible to
+
+* create a PROV-TC model such that all provenance linkages that are true are represented in the model (the Causal completeness property)
+
+* create a complete PROV-TC model such that only true provenance linkages are represented in the model (the Causal soundness property)
+
+* create a sound PROV-TC model instance such that removing any provenance linkage will make the instance causally incomplete (the Causal minimality property)
+
+* create a sound PROV-TC model where each entity, relationship, and attribute instance conforms to a defined static type system supporting the semantics of general computation (the Well-typed property)
+
+We are currently collecting ideas for extensions to the basic model. So far, our pending list includes:
+
+* the addition of a *program point* attribute to certain relationships or entities that allows for specifying the location in a program where an entity was used, generated, or invalidated
+
+* the addition of set constructs to the subject and object of wasDerivedFrom relationships, so that sets of artifacts may be shown to have the same derivation, or so that an artifact may be shown to have been derived from several other artifacts, or both
+
+* the addition of a set construct to the isPartOf relationship, so that sets of artifacts may be shown to be part of the same artifact
+
+The PROV-TC Type System
+=========
+PROV-TC defines types for all entity instances, relationship instances, and attribute instances. Types of relationship class instances are explicit in the conceptual model diagram, for example:
+
+```
+wasGeneratedBy: artifact > unitOfExecution > provenancePredicate
+```
+
+Types of entity class instances are the same as the class from which they are drawn. Types of attributes are intended to be unambiguous in the definitions below. We'll clarify as needed.
 
 PROV-TC Prelude and Postlude
 =========
