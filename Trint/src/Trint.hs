@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
@@ -14,7 +15,7 @@ import Control.Monad (when)
 import Control.Exception
 import Data.Monoid ((<>))
 import Data.Maybe (catMaybes)
-import Data.List (intersperse)
+import Data.List (partition,intersperse)
 import Data.Graph
 import qualified Data.Map as Map
 import           Data.Map (Map)
@@ -25,6 +26,9 @@ import qualified Data.Text.Lazy.IO as Text
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
 
+import Titan
+import Network.HTTP.Types
+
 data Config = Config { lintOnly   :: Bool
                      , quiet      :: Bool
                      , graph      :: Bool
@@ -33,6 +37,7 @@ data Config = Config { lintOnly   :: Bool
                      , ast        :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
+                     , upload     :: Maybe ServerInfo
                      , files      :: [FilePath]
                      } deriving (Show)
 
@@ -46,6 +51,7 @@ defaultConfig = Config
   , ast      = False
   , verbose  = False
   , help     = False
+  , upload   = Nothing
   , files    = []
   }
 
@@ -75,6 +81,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['t'] ["turtle"]
                     "Produce a turtle RDF description of the graph."
                     $ NoArg $ \s -> Right s { turtle = True }
+                  , Option ['u'] ["upload"]
+                    "Uploads the data by inserting it into a Titan database using gremlin."
+                    $ OptArg "Database host" $ \str s -> Right s { upload = Just $ maybe defaultServer ServerInfo str }
                   , Option ['h'] ["help"]
                     "Prints this help message."
                     $ NoArg $ \s -> Right s { help = True }
@@ -127,14 +136,112 @@ processStmts c fp res
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
         output astfile $ Text.unlines $ map (Text.pack . show) res
-
-  where
+      maybe (return ()) (doUpload c res) (upload c)
+ where
   dbg s = when (verbose c) (putStrLn s)
   output f t = handle (onError f) $ Text.writeFile f t
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
+doUpload :: Config -> [Stmt] -> ServerInfo -> IO ()
+doUpload c stmts svr =
+ do stats <- push (es ++ ps)
+    -- let err = filter ( (/= status200)) stats
+    -- when (not $ quiet c) $ putStrLn $ unlines $ map show err
+    return ()
+  where
+  (es,ps) = partition isEntity stmts
+
+  isEntity (StmtEntity {})         = True
+  isEntity (StmtPredicate {})      = False
+  isEntity (StmtLoc (Located _ s)) = isEntity s
+
+  push :: [Stmt] -> IO ()
+  push = mapM_ (titan svr . translateInsert)
+
+translateInsert :: Stmt -> Operation
+translateInsert (StmtPredicate (Predicate {..})) =
+    InsertEdge { label = pretty predType
+               , src   = pretty predSubject
+               , dst   = pretty predObject
+               , properties = pa }
+   where
+    pa = map transPA predAttrs
+    transPA p =
+      case p of
+        AtTime t             -> ("atTime"             , textOfTime t   )
+        StartTime t          -> ("startTime"          , textOfTime t   )
+        EndTime t            -> ("endTime"            , textOfTime t   )
+        GenOp gop            -> ("genOp"              , gop )
+        Permissions t        -> ("permissions"        , t   )
+        ReturnVal t          -> ("returnVal"          , t   )
+        Operation uop        -> ("operation"          , uop )
+        Args t               -> ("args"               , t   )
+        Cmd t                -> ("cmd"                , t   )
+        DeriveOp dop         -> ("deriveOp"           , dop )
+        ExecOp eop           -> ("execOp"             , eop )
+        MachineID mid        -> ("machineID"          , mid )
+        SourceAddress t      -> ("sourceAddress"      , t   )
+        DestinationAddress t -> ("destinationAddress" , t   )
+        SourcePort t         -> ("sourcePort"         , t   )
+        DestinationPort t    -> ("destinationPort"    , t   )
+        Protocol t           -> ("protocol"           , t   )
+        Raw k v              -> (k,v) -- XXX warn
+
+translateInsert (StmtEntity e)    =
+  case e of
+    Agent i as           -> InsertVertex (pretty i) (("vertexType", "agent") : (map translateAA as))
+    UnitOfExecution i as -> InsertVertex (pretty i) (("vertexType", "unitOfExecution") : (map translateUOEA as))
+    Artifact i as        -> InsertVertex (pretty i) (("vertexType", "artifact") : (map translateArA as))
+    Resource i devty as  -> InsertVertex (pretty i) (("vertexType", "resource") : (translateDevId as))
+  where
+  translateAA as   =
+   case as of
+    AAName t      -> ("name", t)
+    AAUser t      -> ("user", t)
+    AAMachine mid -> ("machine", mid)
+
+  translateUOEA as =
+    case as of
+        UAUser t        -> ("user"        , t)
+        UAPID p         -> ("PID"         , p)
+        UAPPID p        -> ("PPID"        , p)
+        UAMachine mid   -> ("machine"     , mid)
+        UAStarted t     -> ("started"     , textOfTime t)
+        UAHadPrivs p    -> ("hadPrivs"    , p)
+        UAPWD t         -> ("PWD"         , t)
+        UAEnded t       -> ("ended"       , textOfTime t)
+        UAGroup t       -> ("group"       , t)
+        UACommandLine t -> ("commandLine" , t)
+        UASource t      -> ("source"      , t)
+        UAProgramName t -> ("programName" , t)
+        UACWD t         -> ("CWD"         , t)
+        UAUID t         -> ("UID"         , t)
+
+  translateArA as  =
+    case as of
+      ArtAType at              -> ("type"               , at)
+      ArtARegistryKey t        -> ("registryKey"        , t)
+      ArtACoarseLoc cl         -> ("coarseLoc"          , cl)
+      ArtAFineLoc fl           -> ("fineLoc"            , fl)
+      ArtACreated t            -> ("created"            , textOfTime t)
+      ArtAVersion v            -> ("version"            , v)
+      ArtADeleted t            -> ("deleted"            , textOfTime t)
+      ArtAOwner t              -> ("owner"              , t)
+      ArtASize int             -> ("size"               , Text.pack $ show int)
+      ArtADestinationAddress t -> ("destinationAddress" , t)
+      ArtADestinationPort t    -> ("destinationPort"    , t)
+      ArtASourceAddress t      -> ("sourceAddress"      , t)
+      ArtASourcePort t         -> ("sourcePort"         , t)
+      Taint w                  -> ("Taint"              , Text.pack $ show w)
+  translateDevId Nothing   = []
+  translateDevId (Just i)  = [("devId", i)]
+
+translateInsert (StmtLoc (Located _ s)) = translateInsert s
+
+textOfTime :: Time -> Text
+textOfTime = Text.pack . show -- XXX
 
 printWarnings :: [Warning] -> IO ()
 printWarnings ws = Text.putStrLn doc
