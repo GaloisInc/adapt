@@ -21,8 +21,9 @@ class SegmentationGraph:
     color = "#8BEF91"
     out.write("digraph {\n node [margin=0 fontsize=6];\n")
     for node in self.G.nodes_iter():
-      if any(node in dx for dx in dxs):
-          color = "#8BEF91"
+      pos = [ind for ind in xrange(len(dxs)) if node in dxs[ind]]
+      if len(pos) > 0: #any(node in dx for dx in dxs):
+          color = self.convert_to_rgba(0,6,pos[0],[(0, 0, 255), (0, 255, 0), (255, 0, 0)]) #"#8BEF91"
       else:
           color = "#FFFFFF"
       out.write(" %d [label=\"%s\", style=filled, fillcolor = \"%s\"];\n" % (node, self.node_str(node), color))
@@ -55,3 +56,14 @@ class SegmentationGraph:
     return [x + [n] + y
       for x in self.create_paths(self.G.predecessors, n, [], [], skip=True)
       for y in self.create_paths(self.G.successors, n, [], [], skip=True, prepend=False)]
+
+  def convert_to_rgba(self,minval, maxval, val, colors):
+      max_index = len(colors)-1
+      v = float(val-minval) / float(maxval-minval) * max_index
+      i1, i2 = int(v), min(int(v)+1, max_index)
+      (r1, g1, b1), (r2, g2, b2) = colors[i1], colors[i2]
+      f = v - i1
+      rgba = "#" + "0x{:02X}".format(int(r1 + f*(r2-r1)))[2:]
+      rgba = rgba + "0x{:02X}".format(int(g1 + f*(g2-g1)))[2:]
+      rgba = rgba + "0x{:02X}".format(int(b1 + f*(b2-b1)))[2:]
+      return rgba
