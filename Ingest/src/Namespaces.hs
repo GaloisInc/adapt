@@ -7,7 +7,7 @@ module Namespaces
   , allIdent
   , adaptIdent
   , adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
-  , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
+  , adaptArtifact, adaptEntityType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptDeriveOp
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp, adaptExecOp
   , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptHasVersion, adaptTime
   , adaptCWD, adaptUID, adaptProgramName, adaptDestinationAddress, adaptDestinationPort
@@ -83,14 +83,14 @@ allIdent = adaptIdent ++ provIdent ++ foafIdent ++ dcIdent
 adaptIdent :: [Ident]
 adaptIdent =
   [ adaptUnitOfExecution, adaptPid, adaptPPid, adaptPrivs, adaptPwd, adaptRegistryKey, adaptDevType, adaptDeviceID
-  , adaptArtifact, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID
+  , adaptArtifact, adaptEntityType, adaptCmdLine, adaptCmdString, adaptMachineID
   , adaptAccept, adaptRecv, adaptArgs, adaptRead, adaptExecute, adaptReturnVal, adaptUseOp, adaptGenOp
   , adaptExecOp, adaptDeriveOp, adaptDestinationAddress, adaptDestinationPort
   , adaptSourceAddress, adaptSourcePort, adaptTime, adaptProtocol
   , adaptPath, adaptSource, adaptCommandLine, adaptGroup, adaptProgramName, adaptCWD, adaptUID
   ]
 
-adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptEntityType, adaptArtifactType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptPath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
+adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptEntityType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptPath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
 adaptUnitOfExecution = adapt .: "unitOfExecution"
 adaptPid             = adapt .: "pid"
 adaptPPid            = adapt .: "ppid"
@@ -101,7 +101,6 @@ adaptDevType         = adapt .: "devType"
 adaptDeviceID        = adapt .: "devID"
 adaptArtifact        = adapt .: "artifact"
 adaptEntityType      = adapt .: "entityType"
-adaptArtifactType    = adapt .: "artifactType"
 adaptCmdLine         = adapt .: "cmdLine"
 adaptCmdString       = adapt .: "cmdString"
 adaptPath            = adapt .: "path"
@@ -113,7 +112,7 @@ adaptExecute         = adapt .: "execute"
 adaptReturnVal       = adapt .: "returnVal"
 adaptArgs            = adapt .: "args"
 adaptUseOp           = adapt .: "useOp"
-adaptGenOp           = adapt .: "genOp"
+adaptGenOp           = adapt .: "genOp" -- XXX operation
 adaptExecOp          = adapt .: "execOp"
 adaptDeriveOp        = adapt .: "deriveOp"
 adaptSource          = adapt .: "source"
