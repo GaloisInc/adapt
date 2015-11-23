@@ -23,7 +23,9 @@ class SegmentationGraph:
     for node in self.G.nodes_iter():
       pos = [ind for ind in xrange(len(dxs)) if node in dxs[ind]]
       if len(pos) > 0: #any(node in dx for dx in dxs):
-          color = self.convert_to_rgba(0,6,pos[0],[(0, 0, 255), (0, 255, 0), (255, 0, 0)]) #"#8BEF91"
+          pos = map(lambda x: x+1, pos)
+          mx = sum(list(range(1, int(len(dxs)))))
+          color = self.convert_to_rgba(0, mx, sum(pos), [(0, 0, 255), (0, 255, 0), (255, 0, 0)]) #"#8BEF91"
       else:
           color = "#FFFFFF"
       out.write(" %d [label=\"%s\", style=filled, fillcolor = \"%s\"];\n" % (node, self.node_str(node), color))
