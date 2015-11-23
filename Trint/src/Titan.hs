@@ -68,7 +68,7 @@ titan (ServerInfo {..}) t =
          m <- newManager tlsManagerSettings
          withResponse req' m handleResponse
       )
-      (\e -> case e of (StatusCodeException s _ _) -> return s ; _ -> X.throw e)
+      (\e -> case e of { (StatusCodeException s _ _) -> return s ; _ -> X.throw e })
  where
   handleResponse :: Response BodyReader -> IO Status
   handleResponse = return .  responseStatus
