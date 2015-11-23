@@ -1,7 +1,7 @@
 import itertools
 
 
-class Matcher:
+class SymbolMatcher:
   
   def __init__(self, transitions, pattern, sequence, is_terminal):
     self.transitions = transitions
@@ -44,9 +44,9 @@ class Matcher:
       a = []
       if links:
         for l in links:
-          a.append(Matcher(self.transitions, l, new_sequence, terminal))
+          a.append(SymbolMatcher(self.transitions, l, new_sequence, terminal))
       else:
-        a.append(Matcher(self.transitions, None, new_sequence, terminal))
+        a.append(SymbolMatcher(self.transitions, None, new_sequence, terminal))
       
       return a
     else:

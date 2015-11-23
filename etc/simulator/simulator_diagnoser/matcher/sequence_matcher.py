@@ -1,4 +1,4 @@
-from matcher import *
+from symbol_matcher import *
 
 class SequenceMatcher:
   
@@ -10,7 +10,7 @@ class SequenceMatcher:
     self.matchers = []
     for k,v in self.transitions.iteritems():
       if v[0]:
-        self.matchers.append(Matcher(self.transitions, k, [], False))
+        self.matchers.append(SymbolMatcher(self.transitions, k, [], False))
   
   def accept_list(self, n, symbols):
     new_matchers = []

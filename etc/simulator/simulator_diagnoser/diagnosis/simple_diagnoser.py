@@ -1,4 +1,4 @@
-import matcher 
+import simulator_diagnoser.matcher as matcher
 
 class SimpleDiagnoser:
   
