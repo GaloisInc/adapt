@@ -1,14 +1,29 @@
 Purpose
 =======
-This document specifies the PROV-TC language, which is a dialect of the W3CPROV language (specifically the PROV-N compliant representation of that language). PROV-TC is meant to be used by the Transparent Computing ADAPT project team (and hopefully other teams) for communication between technical areas one and two.
+This document specifies the PROV-TC conceptual model, a specialization of the W3CPROV provenance model to the domain of computation and its attribution. PROV-TC is intended as the communication standard for data conveyed by TA-1 performers to TA-2 performers in the Transparent Computing program. 
 
-Contact
+Throughout this specification, we use the PROV-TC language to define and illustrate our model. The PROV-TC language is a dialect of the W3CPROV language (specifically the PROV-N compliant syntax of that language). The concrete syntax of PROV-TC used in this specification, and in sample data, is meant to be human-readable and usable by the Transparent Computing ADAPT project team (and hopefully other teams) for communication. Concise (and thus likely not human-readable) concrete representations are also realizable for the PROV-TC language, and will likely be used for live testing and demonstrations.
+
+Contact and Contributors
 ========
-Please contact Dave Archer, <dwa@galois.com>, regarding this specification.
+Please contact Dave Archer, <dwa@galois.com>, with questions regarding this specification.
+
+Many thanks to those who have contributed to the PROV-TC model to date. It's likely that there are "unsung heroes" who are not credited here due to oversight by the journaling author. Please feel free to abuse him for such oversights. In alphabetical order:
+
+* Armando Caro - acaro@bbn.com
+* James Cheney - jcheney@inf.ed.ac.uk
+* Mukesh Dalal - mukesh.dalal@baesystems.com
+* Tom DuBuisson - tommd@galois.com
+* Ashish Gehani - gehani@csl.sri.com
+* Joud Khoury - jkhoury@bbn.com
+* Rui Maranhao - Rui.Maranhao@parc.com
+* Alex Perez - Alexandre.Perez@parc.com
+* Jeff Perkins - jhp@csail.mit.edu
+* Martin Rinard - rinard@csail.mit.edu
 
 Working Prototypes
 ========
-The ADAPT team has demonstrated the following so far:
+The ADAPT team has demonstrated the following so far in support of developing PROV-TC:
 
 * a translator from the 5-Directions sample data syntax to PROV-TC
 * successful translation of all 46 5-Directions data samples into PROV-TC (these are available, just ask)
@@ -18,25 +33,37 @@ The ADAPT team has demonstrated the following so far:
 * successful ingest of all 5-Directions and SPADE samples generated so far in PROV-TC
 * the examples used in this literate specification of PROV-TC
 
-Conceptual Model
+Conceptual Model and Properties
 =======
-PROV-TC is a conceptual model and a syntax for describing that model when transferring knowledge between Transparent Computing TA1 and TA2 teams. The conceptual model is shown below.
+The PROV-TC conceptual model is shown below.
 
 <img src="./languagediagram.png" alt="Conceptual Model Figure" style="width: 600px;"/>
 
-Terminology for describing PROV-TC generally follows the language of E-R models. There are for example five entity classes and twelve relationship classes in the current model. Each instance of an entity or relationship class may have certain required as well as other optional attributes that describe that instance. Specific entities, relationships, and attributes are defined below.
+Terminology for describing PROV-TC generally follows the language of E-R models. There are for example five entity classes and twelve relationship classes in the current model. Each instance of an entity or relationship class may have certain required as well as other optional attributes that describe that instance. Details of entities, relationships, and attributes in the model are defined in the Entities and Relationships sections below.
 
-It is sometimes convenient to describe a collection of instances in PROV-TC. For example, a valid *provenance linkage* in PROV-TC is a set consisting of a relationship instance and the two entity instances that it connects, where each instance in the linkage is characterized by valuations of at least all required attribute terms. Following the usual E-R modeling standard, any entity instance in PROV-TC may participate in zero or more provenance linkages. Any relationship instance in our model must participate in exactly one provenance linkage.
+Properties of PROV-TC
+--------
+
+It is sometimes convenient to describe a collection of instances in PROV-TC. For example, a valid *provenance linkage* in PROV-TC consists of a relationship instance and the two entity instances that it connects, where each instance in the linkage is characterized by valuations of at least all required attribute terms. Any entity instance in PROV-TC may participate in zero or more provenance linkages. Any relationship instance in our model must participate in exactly one provenance linkage. The *dc:description* relationship class is the only class that does not participate in provenance linkages.
+
+We define a class of provenance linkages, called *direct flow linkages*, that indicate direct flow of information between the entity instances in the linkage. All provenance linkages that contain a relationship in the following classes are direct flow linkages: wasInvalidatedBy, used, wasGeneratedBy, wasDerivedFrom, wasStartedBy, wasEndedBy, wasInformedBy. Compositions of direct flow linkages are particularly useful for expressing "how" provenance.
 
 PROV-TC instances describe provenance relationships found in instances of execution of a software system. PROV-TC is designed such that any valid PROV-TC instance maintains certain properties. Specifically, for any execution of a software system, it is possible to
 
-* create a PROV-TC model such that all provenance linkages that are true are represented in the model (the Causal completeness property)
+* create a PROV-TC model such that all provenance linkages that are true are represented in the model (the causal completeness property)
 
-* create a complete PROV-TC model such that only true provenance linkages are represented in the model (the Causal soundness property)
+* create a complete PROV-TC model such that only true provenance linkages are represented in the model (the causal soundness property)
 
-* create a sound PROV-TC model instance such that removing any provenance linkage will make the instance causally incomplete (the Causal minimality property)
+PROV-TC model instances may include hierarchies of entity instances, using for example the isPartOf relationship among artifacts, and wasStartedBy or wasInformedBy relationship among units of execution. In a PROV-TC model instance containing only one hierarchical level representing any element, it is possible to
 
-* create a sound PROV-TC model where each entity, relationship, and attribute instance conforms to a defined static type system supporting the semantics of general computation (the Well-typed property)
+* create a sound PROV-TC model instance such that removing any provenance linkage will make the instance causally incomplete (the causal minimality property)
+
+In addition, there exists a simple syntactic grammar whose well-formed sentences are exactly an expression of PROV-TC model concepts, and for every sound PROV-TC model it is possible to express that model unambiguously in that grammar (the well-formed property).
+
+PROV-TC also has the property of non-causal extensibility, where new relationships that do not convey causality can be added. For example, the ADAPT team aims to extend PROV-TC for example by adding structure that conveys hierarchy, allowing representation of subgraphs by individual, higher-level vertices. 
+
+Likely extensions to PROV-TC
+-------
 
 We are currently collecting ideas for extensions to the basic model. So far, our pending list includes:
 
@@ -45,6 +72,8 @@ We are currently collecting ideas for extensions to the basic model. So far, our
 * the addition of set constructs to the subject and object of wasDerivedFrom relationships, so that sets of artifacts may be shown to have the same derivation, or so that an artifact may be shown to have been derived from several other artifacts, or both
 
 * the addition of a set construct to the isPartOf relationship, so that sets of artifacts may be shown to be part of the same artifact
+
+* the addition of attributes that convey lables for integrity and privacy of artifacts
 
 The PROV-TC Type System
 =========
@@ -81,16 +110,15 @@ Quick checking for basic syntax correctness
 ========
 Because we specify a dialect of PROV-N, an easy on-line tool can be used as a basic check of syntactic correctness prior to using our ingester tools to check more deeply. You can find this tool [here](https://provenance.ecs.soton.ac.uk/validator/view/validator.html). 
 
-A more complete check, including checking of attributes specific to PROV-TC, can be had by contacting the ADAPT team.
-
+A more complete check, including checking of attributes specific to PROV-TC and full type checking of PROV-TC instances, can be had by contacting the ADAPT team.
 
 PROV-TC Entities
 =========
-We allow for instances of the following entity classes. In each case, we specify all currently recognized attributes. Those attributes that are required for syntactic correctness are marked as required in the code examples. All others are optional. No alternates to the attributes shown are allowed. That is, the shown attributes are the only option available to represent the semantics they represent. Other semantics may be included, but will be ignored for now. 
+PROV-TC defines the following entity classes. In each case, we specify all currently recognized attributes. Those attributes that are required for syntactic correctness are marked as required in the code examples. All others are optional. No alternates to the attributes shown are allowed. That is, the shown attributes are the only option available to represent the semantics they represent. Other semantics may be included, but will be ignored for now. 
 
 Artifact
 --------
-An artifact is an entity that may be created, referenced, used, or destroyed, but does not take action on its own. Artifacts recognized at present in the TC domain include files, network packets, memory locations, and registry file entries. More may be added later. An artifact instance is reified as an entity in the PROV model, and includes several attributes, many of which are optional. Shown below is an example artifact: a file with name */users/dwa/mystuff/bin/create.exe*, and referred to with the tag *ex:createExe*. Required attributes are marked with comments and include the type of entity (*prov:type*), the type of artifact (*adapt:entityType*), an identifier (the type of which depends on the artifact type), a location within that item (which also depends on the artifact type), a creation time, a version, a destruction time, an owning account, a size, and a 32b taint. Alternative values for the different artifact types are shown in comments.
+An artifact is an entity that may be created, referenced, used, or destroyed, but does not take action on its own. Artifacts recognized at present in the TC domain include files, network packets, memory locations, and registry file entries. More may be added later. An artifact instance is reified as an entity in the PROV model, and includes several attributes, many of which are optional. Shown below is an example artifact: a file with path */users/dwa/mystuff/bin/create.exe*, and referred to with the tag *ex:createExe*. Required attributes are marked with comments and include the type of entity (*prov:type*), the type of artifact (*adapt:entityType*), an identifier (the type of which depends on the artifact type), a location within that item (which also depends on the artifact type), a creation time, a version, a destruction time, an owning account, a size, and a 32b taint. Alternative values for the different artifact types are shown in comments.
 
 ```
 entity(ex:createExe, [
@@ -137,7 +165,7 @@ entity(ex:GPSunit, [
 
 Unit of Execution (UoE)
 ------------------
-A UoE is a thread of execution running on a processor. It may be created or destroyed, and may take action on its own to create or destroy other UoEs or to affect artifacts. A UoE is reified in PROV as an *activity*. Below we show an example UoE called "parent". Recognized but optional attributes are an ID string unique to the machine where the UoE runs, the times at which the UoE started and ended, the privileges with which the UoE ran, the account name and group name under which it ran, its process ID and parent process ID, the directory where it started, the command line used, and the command used.
+A UoE is a thread of running computation. It may be created or destroyed, and may take action on its own to create or destroy other UoEs or to affect artifacts. A UoE is reified in PROV as an *activity*. While this is a slight abuse of W3CPROV, this abuse results in an unambiguous and more concise representation than W3CPROV allows. Below we show an example UoE called "parent". Recognized but optional attributes are an ID string unique to the machine where the UoE runs, the times at which the UoE started and ended, the privileges with which the UoE ran, the account name and group name under which it ran, its process ID and parent process ID, the directory where it started, the command line used, and the command used.
 
 ```
 //
@@ -185,7 +213,7 @@ entity(ex:mdata1, [
 
 Relationships Among PROV-TC Entities
 =============
-An artifact such as *ex:createExe* can be created by a UoE such as *ex:parentb* executing an operation *adapt:genOp* that is one of 'write', 'send', 'connect', 'truncate', 'chmod', or 'touch'. Other attributes include the time at which the generation event occurred, and the permissions with which the entity was created (if applicable).
+An artifact such as *ex:createExe* can be created by a UoE such as *ex:parentb* executing an operation *prov-tc:operation* that is one of 'write', 'send', 'connect', 'truncate', 'chmod', or 'touch'. Other attributes include the time at which the generation event occurred, and the permissions with which the entity was created (if applicable).
 
 ```
 // newprog.exe was created by the parent process (activity ex:parentb)
@@ -204,7 +232,7 @@ wasInvalidatedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z, [
 			prov-tc:source="/dev/audit",
 			//alternately, "/proc"])
 ```
-An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* executing an operation *adapt:useOp* that is one of 'read', 'recv', 'accept', or 'execute'. Required attributes include the time of the use action, and the use operation. Optional attributes include an entry address (for example, if useOp is 'execute'), an argument list passed to an executed function, and a return value returned by an executed function.
+An artifact such as *ex:createExe* can be used by a UoE such as *ex:parentb* executing an operation *prov-tc:operation* that is one of 'read', 'recv', 'accept', or 'execute'. Required attributes include the time of the use action, and the use operation. Optional attributes include an entry address (for example, if useOp is 'execute'), an argument list passed to an executed function, and a return value returned by an executed function.
 
 ```
 used(ex:parentb, ex:createExe, 015-10-16T02:13:07Z,[
@@ -218,7 +246,7 @@ used(ex:parentb, ex:createExe, 015-10-16T02:13:07Z,[
 			prov-tc:time="015-10-16T02:13:07Z"]
                         )
 ```
-Similarly, a resource such as *ex:GPSunit* may be used by a UoE such as *ex:childB*. Required are the start and end time of the use. Optionsl are a command string sent to the device and a value returned from the device.
+Similarly, a resource such as *ex:GPSunit* may be used by a UoE such as *ex:childB*. Required are the start and end time of the use. Options are a command string sent to the device and a value returned from the device.
 
 ```
 used(ex:childB, ex:GPSunit, 015-10-16T02:13:07Z, [
@@ -294,3 +322,4 @@ An artifact can be part of another artifact. We use dc:isPartOf for this constru
 ```
 dc:isPartOf(ex:childThing, ex:parentThing)
 ```
+
