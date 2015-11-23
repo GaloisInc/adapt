@@ -6,6 +6,9 @@ run: env
 pdf: env
 	env/bin/python sim.py pdf | dot -Tpdf -o sim.pdf
 
+dxpdf: env
+	env/bin/python sim.py dxpdf | dot -Tpdf -o sim.pdf
+
 env: env/bin/activate
 env/bin/activate: requirements.txt
 	test -d env || virtualenv env
