@@ -22,6 +22,4 @@ if __name__ == "__main__":
     else:
         dx = sd.SimpleDiagnoser(transitions)
         dxs = dx.diagnose(graph, symptom)
-        for i in dxs:
-            #print i
-            graph.print_dot(dxs)
+        graph.print_dot(dxs)
