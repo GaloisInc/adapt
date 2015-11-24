@@ -1,4 +1,4 @@
-.PHONY: run pdf
+.PHONY: run pdf dxpdf upreqs
 
 run: env
 	env/bin/python sim.py
@@ -15,3 +15,5 @@ env/bin/activate: requirements.txt
 	env/bin/pip install -r requirements.txt
 	touch env/bin/activate
 
+upreqs: env
+	env/bin/pip freeze > requirements.txt

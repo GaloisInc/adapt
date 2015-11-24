@@ -1,7 +1,7 @@
 import sys
+import colour
 import networkx as nx
 import simulator_diagnoser.generation as generation
-import colorsys
 
 class SegmentationGraph:
 
@@ -19,16 +19,10 @@ class SegmentationGraph:
     return node_s
 
   def print_dot(self, dxs=[], out=sys.stdout):
-    color = "#8BEF91"
     out.write("digraph {\n node [margin=0 fontsize=6];\n")
     for node in self.G.nodes_iter():
-      pos = [ind for ind in xrange(len(dxs)) if node in dxs[ind]]
-      if len(pos) > 0: #any(node in dx for dx in dxs):
-          #color = self.convert_to_rgba(0,6,len(pos),[(0, 0, 255), (0, 255, 0), (255, 0, 0)]) #"#8BEF91"
-          color = self.get_rgb_from_hue_spectrum(len(pos) / float(len(dxs)), 0.2, 0.0)
-          print color
-      else:
-          color = "#FFFFFF"
+      pos = len([1 for dx in dxs if node in dx])
+      color = self.get_color(pos, len(dxs))
       out.write(" %d [label=\"%s\", style=filled, fillcolor = \"%s\"];\n" % (node, self.node_str(node), color))
     for edge in self.G.edges_iter():
       out.write(" %d -> %d;\n" % edge)
@@ -60,13 +54,11 @@ class SegmentationGraph:
       for x in self.create_paths(self.G.predecessors, n, [], [], skip=True)
       for y in self.create_paths(self.G.successors, n, [], [], skip=True, prepend=False)]
 
-  def get_rgb_from_hue_spectrum(self, percent, start_hue, end_hue):
-      # spectrum is red (0.0), orange, yellow, green, blue, indigo, violet (0.9)
-      hue = percent * (end_hue - start_hue) + start_hue
-      lightness = 0.5
-      saturation = 1
-      r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
-      rgba = "#" + "0x{:02X}".format(int(r * 255))[2:]
-      rgba = rgba + "0x{:02X}".format(int(g * 255))[2:]
-      rgba = rgba + "0x{:02X}".format(int(b * 255))[2:]
-      return rgba
+  def get_color(self, current, max_value, range=(0.2,0.0)):
+    hue, saturation, luminance = (0.0, 1.0, 0.5)
+    if max_value > 0 and current > 0:
+      hue = range[0] + float(current) / float(max_value) * (range[1] - range[0])
+    else:
+      saturation, luminance = (0.0, 1.0)
+    return colour.Color(hue=hue, saturation=saturation, luminance=luminance).hex_l
+
