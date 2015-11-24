@@ -1,19 +1,26 @@
-.PHONY: run pdf dxpdf upreqs
+.PHONY: run pdf dxpdf upreqs check
 
-run: env
-	env/bin/python sim.py
+ENV = env
+REQS = requirements.txt
+MODULE = simulator_diagnoser
 
-pdf: env
-	env/bin/python sim.py pdf | dot -Tpdf -o sim.pdf
+run: $(ENV)
+	$(ENV)/bin/python sim.py
 
-dxpdf: env
-	env/bin/python sim.py dxpdf | dot -Tpdf -o sim.pdf
+pdf: $(ENV)
+	$(ENV)/bin/python sim.py pdf | dot -Tpdf -o sim.pdf
 
-env: env/bin/activate
-env/bin/activate: requirements.txt
-	test -d env || virtualenv env
-	env/bin/pip install -r requirements.txt
-	touch env/bin/activate
+dxpdf: $(ENV)
+	$(ENV)/bin/python sim.py dxpdf | dot -Tpdf -o sim.pdf
 
-upreqs: env
-	env/bin/pip freeze > requirements.txt
+$(ENV): $(ENV)/bin/activate
+$(ENV)/bin/activate: $(REQS)
+	test -d $(ENV) || virtualenv $(ENV)
+	$(ENV)/bin/pip install -r $(REQS)
+	touch $(ENV)/bin/activate
+
+upreqs:
+	$(ENV)/bin/pip freeze > $(REQS)
+
+check: $(ENV)
+	$(ENV)/bin/pep8 --config=.pep8 $(MODULE) sim.py
