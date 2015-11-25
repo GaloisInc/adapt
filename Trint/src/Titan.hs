@@ -17,6 +17,7 @@ import Network.HTTP.Types
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 
+import qualified Control.Exception as X
 import Data.List (intersperse)
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.Encoding as T
@@ -54,17 +55,20 @@ data Operation = InsertVertex { label :: Text
 
 titan :: ServerInfo -> Operation -> IO Status
 titan (ServerInfo {..}) t =
- do req <- parseUrl host
-    let req' = req { method      = "POST"
-                   , requestBody = RequestBodyLBS (serializeOperation t)
-                   , requestHeaders = [(hUserAgent, "Adapt/Trint")
-                                      ,(hAccept,"*/*")
-                                      ,(hContentType,  "application/x-www-form-urlencoded")
-                                      ,("Accept-Encoding", "")
-                                      ]
-                   }
-    m <- newManager tlsManagerSettings
-    withResponse req' m handleResponse
+ do X.catch
+     (do req <- parseUrl host
+         let req' = req { method      = "POST"
+                        , requestBody = RequestBodyLBS (serializeOperation t)
+                        , requestHeaders = [(hUserAgent, "Adapt/Trint")
+                                           ,(hAccept,"*/*")
+                                           ,(hContentType,  "application/x-www-form-urlencoded")
+                                           ,("Accept-Encoding", "")
+                                           ]
+                        }
+         m <- newManager tlsManagerSettings
+         withResponse req' m handleResponse
+      )
+      (\e -> case e of { (StatusCodeException s _ _) -> return s ; _ -> X.throw e })
  where
   handleResponse :: Response BodyReader -> IO Status
   handleResponse = return .  responseStatus
@@ -82,8 +86,8 @@ serializeOperation (InsertEdge l src dst ps)   = gremlinScript call
   where
      -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
      call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
-                        , ").next().addE(", encodeQuoteText l
-                                        , "g.V().has(label,", encodeQuoteText dst, ").next()"
+                        , ").next().addEdge(", encodeQuoteText l
+                                        , ", g.V().has(label,", encodeQuoteText dst, ").next(), "
                             ] ++ args ++ [")"]
      args = intersperse "," (concatMap attrs ps)
 
