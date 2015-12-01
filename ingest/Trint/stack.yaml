@@ -1,8 +1,0 @@
-resolver: nightly-2015-11-04
-packages:
-- '.'
-- ../Ingest
-extra-deps:
-- dotgen-0.4.2
-- simple-get-opt-0.1.0.0
-resolver: lts-3.3
