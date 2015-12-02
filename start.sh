@@ -6,11 +6,11 @@ supercfg=$ADAPT/config/supervisord.conf
 
 
 # run supervisord (zookeeper kafka, gremlin)
-tmux new-session -s adapt -n "ADAPT" -d "supervisord -c $superconf"
+tmux new-session -s adapt -n "ADAPT" -d "supervisord -c $supercfg"
 
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
-sleep 10
+sleep 5
 
 # Now start Adapt stuff
 tmux split-window -p 87 -t adapt "trint -u $ADAPT/example/small.provn"
