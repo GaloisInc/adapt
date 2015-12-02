@@ -7,7 +7,7 @@ to match agreed changes).
 
 # Installation
 
-First install [ghc](https://www.haskell.org/ghc/) and the
+First install [ghc](https://www.haskell.org/ghc/), a develop version of zlibc (on Debian: apt-get install zlib1g-dev, Mac: brew install lzlib), and the
 [stack](https://github.com/commercialhaskell/stack/releases) build tool then run
 `make` from the top level.
 

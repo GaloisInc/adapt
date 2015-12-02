@@ -5,10 +5,13 @@ module Titan
   ( -- * Types
     ServerInfo(..)
   , defaultServer
+  , ErrorHandle(..)
+  , defaultErrorHandle
   , Operation(..)
   , HostName
     -- * Insertion
   , titan
+  , titanWith
     -- * Query
   ) where
 
@@ -26,6 +29,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BC
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import System.IO (stderr, hPutStr)
 
 newtype ServerInfo = ServerInfo { host     :: HostName
                              }
@@ -53,23 +57,50 @@ data Operation = InsertVertex { label :: Text
                             }
   deriving (Eq,Ord,Show)
 
-titan :: ServerInfo -> Operation -> IO Status
-titan (ServerInfo {..}) t =
- do X.catch
-     (do req <- parseUrl host
-         let req' = req { method      = "POST"
-                        , requestBody = RequestBodyLBS (serializeOperation t)
-                        , requestHeaders = [(hUserAgent, "Adapt/Trint")
-                                           ,(hAccept,"*/*")
-                                           ,(hContentType,  "application/x-www-form-urlencoded")
-                                           ,("Accept-Encoding", "")
-                                           ]
-                        }
-         m <- newManager tlsManagerSettings
-         withResponse req' m handleResponse
-      )
-      (\e -> case e of { (StatusCodeException s _ _) -> return s ; _ -> X.throw e })
+data ErrorHandle = Custom (HttpException -> ServerInfo -> Operation -> IO TitanResult)
+                 | Silent    -- ^ Silently convert exceptions to Either types
+                 | ToStderr  -- ^ Emit a stderr message and convert exceptions to Either types
+                 | Rethrow   -- ^ re-throw exceptions
+
+defaultErrorHandle :: ErrorHandle
+defaultErrorHandle = Custom $ \x si t ->
+    do case x of
+              StatusCodeException {} -> return (Failure x)
+              ResponseTimeout        -> titanWith ToStderr si t -- Single retry on failure
+              _                      -> X.throw x
+
+data TitanResult = Success Status | Failure HttpException
+
+titan :: ServerInfo -> Operation -> IO TitanResult
+titan = titanWith defaultErrorHandle
+
+titanWith :: ErrorHandle -> ServerInfo -> Operation -> IO TitanResult
+titanWith eh si@(ServerInfo {..}) t =
+ do res <-  X.catch (Right <$> doRequest) (return . Left)
+    case res of
+       Right status        -> return (Success status)
+       Left  httpException ->
+          case eh of
+            Custom f -> f httpException si t
+            Silent   -> return (Failure httpException)
+            ToStderr -> do hPutStr stderr (show httpException)
+                           return (Failure httpException)
+            Rethrow  -> X.throw httpException
+
+
  where
+  doRequest =
+    do req <- parseUrl host
+       let req' = req { method      = "POST"
+                      , requestBody = RequestBodyLBS (serializeOperation t)
+                      , requestHeaders = [(hUserAgent, "Adapt/Trint")
+                                         ,(hAccept,"*/*")
+                                         ,(hContentType,  "application/x-www-form-urlencoded")
+                                         ,("Accept-Encoding", "")
+                                         ]
+                      }
+       m <- newManager tlsManagerSettings
+       withResponse req' m handleResponse
   handleResponse :: Response BodyReader -> IO Status
   handleResponse = return .  responseStatus
 
