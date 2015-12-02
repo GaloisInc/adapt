@@ -270,3 +270,18 @@ instance PP Type where
         TyResource        -> text "Resource"
         TyVoid            -> text "Void"
 
+instance PP PredicateType where
+   ppPrec _ t =
+    case t of
+       ActedOnBehalfOf   -> text "actedOnBehalfOf"
+       WasAssociatedWith -> text "wasAssociatedWith"
+       WasStartedBy      -> text "wasStartedBy"
+       WasEndedBy        -> text "wasEndedBy"
+       WasInformedBy     -> text "wasInformedBy"
+       Used              -> text "used"
+       WasGeneratedBy    -> text "wasGeneratedBy"
+       WasAttributedTo   -> text "wasAttributedTo"
+       WasInvalidatedBy  -> text "wasInvalidatedBy"
+       WasDerivedFrom    -> text "wasDerivedFrom"
+       Description       -> text "description"
+       IsPartOf          -> text "isPartOf"
