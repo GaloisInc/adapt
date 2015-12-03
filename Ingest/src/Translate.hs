@@ -105,6 +105,7 @@ pattern WasStartedBy mI subj mObj mPT mTime kvs <- RawEntity (eqIdent provWasSta
 pattern NonStandardWasStartedBy mI subj mObj mPT kvs <- RawEntity (eqIdent provWasStartedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mPT] kvs _
 pattern WasEndedBy mI subj mObj mParentTrigger mTime kvs <- RawEntity (eqIdent provWasEndedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj, vMIdent -> mParentTrigger, vMTime -> mTime] kvs _
 pattern WasInformedBy mI subj mObj kvs <- RawEntity (eqIdent provWasInformedBy -> True) mI [vMIdent -> Just subj, vMIdent -> mObj] kvs _
+-- XXX add WasInvalidatedBy if used.
 pattern WasAssociatedWith mI subj mObj mPlan kvs <- RawEntity (eqIdent provWasAssociatedWith -> True) mI ((vMIdent -> Just subj) : (vMIdent -> mObj) : (vMIdent -> mPlan) : _) kvs _
 pattern WasDerivedFrom mI subj obj mGeneratingEnt mGeneratingAct useId kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj, vMIdent -> mGeneratingEnt, vMIdent -> mGeneratingAct, vMIdent -> useId] kvs _
 pattern WasDerivedFrom2 mI subj obj kvs <- RawEntity (eqIdent provWasDerivedFrom -> True) mI [vMIdent -> Just subj, vMIdent -> Just obj] kvs _
@@ -221,16 +222,12 @@ uoeAttrTranslations = Map.fromList
   , adaptCWD            .-> warnOrOp "Non-string value in adapt:cwd" T.UACWD . valueString
   , adaptUID            .-> warnOrOp "Non-string value in adapt:uid" T.UAUID . valueString
   , adaptProgramName    .-> warnOrOp "Non-string value in adapt:programName" T.UAProgramName . valueString
-  , provAtTime          .-> warnOrOp "Non-time value in prov:atTime" T.UAStarted . getTime
+  , provAtTime          .-> ignore
+  -- XXX add Started at and ended at time support.
   , adaptTime           .-> ignore
   , provType            .-> ignore
   , foafAccountName     .-> warnOrOp "Non-string value in foaf:accountName" T.UAUser . valueString
   ]
-
-getTime :: Value -> Maybe Time
-getTime (ValString s) = parseUTC s
-getTime (ValTime t)   = Just t
-getTime _             = Nothing
 
 agentAttrs :: KVs -> Tr [T.AgentAttr]
 agentAttrs kvs = catMaybes <$> mapM (uncurry agentAttr) kvs
@@ -242,8 +239,8 @@ agentAttr i = attrOper agentAttrTranslations w i
 agentAttrTranslations :: Map Ident (Value -> Tr (Maybe T.AgentAttr))
 agentAttrTranslations = Map.fromList
   [ adaptMachineID   .-> warnOrOp "Non-string value in adapt:machine"    T.AAMachine . valueString
-  , foafName         .-> warnOrOp "Non-string value in foaf:name"        T.AAName . valueString
-  , foafAccountName  .-> warnOrOp "Non-string value in foaf:accountName" T.AAUser . valueString
+  -- XXX Remove? , foafName         .-> warnOrOp "Non-string value in foaf:name"        T.AAName . valueString
+  -- XXX Remove? , foafAccountName  .-> warnOrOp "Non-string value in foaf:accountName" T.AAUser . valueString
   , provType         .-> ignore
   ]
 
@@ -256,8 +253,7 @@ artifactAttr i v = attrOper artifactAttrTranslations w i v
 
 artifactAttrTranslations :: Map Ident (Value -> Tr (Maybe T.ArtifactAttr))
 artifactAttrTranslations = Map.fromList
-  [ adaptArtifactType       .-> warnOrOp "Non-string value in adapt:ArtifactType" T.ArtAType . valueString
-  , adaptRegistryKey        .-> warnOrOp "Non-string value in adapt:RegistryKey"  T.ArtARegistryKey . valueString
+  [ adaptRegistryKey        .-> warnOrOp "Non-string value in adapt:registryKey"  T.ArtARegistryKey . valueString
   , adaptPath               .-> warnOrOp "Non-string value in adapt:path" T.ArtACoarseLoc . valueString
   , adaptDestinationAddress .-> warnOrOp "Non-string value in adapt:destinationAddress" T.ArtADestinationAddress . valueString
   , adaptDestinationPort    .-> warnOrOp "Non-string value in adapt:destinationPort" T.ArtADestinationPort . valueString
@@ -345,17 +341,18 @@ type PredAttrTrans = KVs -> [T.PredicateAttr]
 generationAttr :: PredAttrTrans
 generationAttr = catMaybes . map ge
  where
- ge (k,ValString v) | eqIdent adaptGenOp k   = Just $ T.GenOp v
-                    | eqIdent nfoPermissions k = Just $ T.Permissions v
- ge _                                     = Nothing
+ ge (k,ValString v) | eqIdent adaptGenOp k     = Just $ T.GenOp v
+                    | eqIdent nfoPermissions k = Just $ T.Permissions v -- XXX prov tc permissions
+ ge _                                          = Nothing
 
 usedAttr :: PredAttrTrans
 usedAttr = catMaybes . map ua
  where
  ua (k,ValString v)  | eqIdent adaptArgs k      = Just $ T.Args v
                      | eqIdent adaptReturnVal k = Just $ T.ReturnVal v
-                     | eqIdent nfoOperation k   = Just $ T.Operation v
+                     | eqIdent nfoOperation k   = Just $ T.Operation v          -- XXX tc operation
                      | eqIdent adaptTime k      = T.AtTime <$> parseUTC v
+                     -- XXX entry address into file, etc
  ua _                                           = Nothing
 
 startedByAttr :: PredAttrTrans
@@ -370,9 +367,9 @@ endedByAttr = catMaybes . map eb
 informedByAttr :: PredAttrTrans
 informedByAttr = catMaybes . map go
  where
-  go (k,ValString v) | eqIdent provAtTime k = T.AtTime <$> parseUTC v
-  go (k,ValTime   v) | eqIdent provAtTime k = Just $ T.AtTime v
-  go (k,ValString v) | eqIdent adaptUseOp k = Just $ T.Operation v
+  go (k,ValString v) | eqIdent provAtTime k = T.AtTime <$> parseUTC v   -- XXX drop
+  go (k,ValTime   v) | eqIdent provAtTime k = Just $ T.AtTime v         --- XXX drop
+  go (k,ValString v) | eqIdent adaptUseOp k = Just $ T.Operation v -- XXX tc:operation
   go _                                      = Nothing
 
 associatedWithAttr :: PredAttrTrans
