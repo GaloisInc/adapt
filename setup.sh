@@ -47,4 +47,5 @@ fi
 
 # Compile all Adapt code
 export PATH=$PATH:$USER_BIN
+tar xJf example/infoleak-small.provn.tar.xz -C ./example
 make build

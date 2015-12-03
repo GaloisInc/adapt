@@ -13,7 +13,7 @@ tmux new-session -s adapt -n "ADAPT" -d "supervisord -c $supercfg"
 sleep 5
 
 # Now start Adapt stuff
-tmux split-window -p 87 -t adapt "trint -u $ADAPT/example/small.provn"
+tmux split-window -p 87 -t adapt "$HOME/.local/bin/Trint -u $ADAPT/example/infoleak-small.provn"
 
 # tmux new-session -s adapt -n "ADAPT" -d 'python ui/fake-ui.py'
 # tmux split-window -p 87 -t adapt 'python dx/fake-diagnose.py'
