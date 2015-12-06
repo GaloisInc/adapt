@@ -30,6 +30,7 @@ import qualified Data.ByteString.Lazy.Char8 as BC
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import System.IO (stderr, hPutStr)
+import qualified Data.ByteString.Char8 as BCNOTL
 
 newtype ServerInfo = ServerInfo { host     :: HostName
                              }
@@ -102,7 +103,7 @@ titanWith eh si@(ServerInfo {..}) t =
        m <- newManager tlsManagerSettings
        withResponse req' m handleResponse
   handleResponse :: Response BodyReader -> IO Status
-  handleResponse = return .  responseStatus
+  handleResponse x = responseBody x >>= BCNOTL.putStrLn >> return (responseStatus x)
 
 -- The generation of Gremlin code is currently done through simple (sinful)
 -- concatenation. A better solution would be a Haskell Gremlin Language library
