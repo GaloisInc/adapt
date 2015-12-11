@@ -16,7 +16,7 @@ mkdir -p $USER_BIN
 # Tools: git, stack, pip, tmux, wget
 sudo apt-get update
 sudo apt-get -y install git python python-pip tmux wget autotools-dev unzip libgmp-dev supervisor zlib1g-dev curl jq
-if [ ! \( -e $USER_BIN/stack || -e $TEMP/stack.tar.gz \) ] ; then
+if [ ! \( -e $USER_BIN/stack -o -e $TEMP/stack.tar.gz \) ] ; then
 	wget https://www.stackage.org/stack/linux-x86_64 -O $TEMP/stack.tar.gz
 	tar xzf $TEMP/stack.tar.gz -C $TEMP
 fi
@@ -26,7 +26,7 @@ fi
 sudo pip install kafka-python protobuf==2.5.0
 
 # Infrastructure Programs (Titan, Gremlin, Zookeeper, kafka)
-if [ ! \( -e $GREMLIN_SERVER_DIR || -e $TEMP/gremlin.zip \) ] ; then
+if [ ! \( -e $GREMLIN_SERVER_DIR -o -e $TEMP/gremlin.zip \) ] ; then
 	wget http://www.eu.apache.org/dist/incubator/tinkerpop/3.1.0-incubating/apache-gremlin-server-3.1.0-incubating-bin.zip -O $TEMP/gremlin.zip
 	unzip $TEMP/gremlin.zip
 fi
@@ -35,7 +35,7 @@ fi
 # Use stack to install ghc
 $USER_BIN/stack setup
 
-if [ ! \( -e $KAFKA_DIR || -e $TEMP/kafka.tgz \) ] ; then
+if [ ! \( -e $KAFKA_DIR -o -e $TEMP/kafka.tgz \) ] ; then
 	wget http://www.us.apache.org/dist/kafka/0.8.2.2/kafka_2.11-0.8.2.2.tgz -O $TEMP/kafka.tgz
 	tar xzf $TEMP/kafka.tgz -C .
 fi
