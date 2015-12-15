@@ -25,6 +25,10 @@ main  =
          do features <- runGen (vectorOf 100 genValue)
             dumpJSONList (features :: [SometimesAdmin ProgramReadsFile])
 
+       ["program-listens-on-port"] ->
+         do features <- runGen (vectorOf 100 genValue)
+            dumpJSONList (features :: [SometimesAdmin ProgramListensOnPort])
+
        _ ->
          putStrLn "Unknown feature"
 
@@ -51,6 +55,7 @@ data ProgramListensOnPort = ProgramListensOnPort !User !Program !Port
                             deriving (Show,Generic)
 
 instance ToFields ProgramListensOnPort
+instance GenValue ProgramListensOnPort
 
 
 
@@ -127,10 +132,11 @@ instance GenValue a => GenValue (SometimesAdmin a) where
 
 instance GenValue User where
   genValue =
-    do user <- frequency [ (3, pure "bob")
-                         , (2, pure "httpd")
-                         , (1, pure "root") ]
-       return (User user)
+    do isAdmin <- checkAdmin
+
+       if isAdmin then return (User "root")
+                  else frequency [ (3, pure (User "bob"))
+                                 , (2, pure (User "httpd")) ]
 
 instance GenValue Program where
   genValue =
@@ -186,3 +192,10 @@ directory  =
   tmpGen = pure []
 
 
+instance GenValue Port where
+  genValue =
+    do isAdmin <- checkAdmin
+       port    <- if isAdmin then frequency [ (4,choose (1,1024))
+                                            , (1,choose (1025,65535)) ]
+                             else choose (1025,65535)
+       return (Port port)
