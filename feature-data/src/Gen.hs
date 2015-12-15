@@ -9,7 +9,9 @@ module Gen (
     elements,
     oneOf,
     choose,
-    vectorOf
+    vectorOf,
+    withAdmin,
+    checkAdmin,
   ) where
 
 import Control.Monad (replicateM)
@@ -88,31 +90,41 @@ oneOf xs =
 {-# INLINE oneOf #-}
 
 choose :: Random a => (a,a) -> Gen a
-choose r = Gen (randomR r)
+choose r = Gen (\ _ -> randomR r)
 {-# INLINE choose #-}
 
 vectorOf :: Int -> Gen a -> Gen [a]
 vectorOf  = replicateM
 {-# INLINE vectorOf #-}
 
+-- | Generate data in the context of an administrator.
+withAdmin :: Gen a -> Gen a
+withAdmin m = Gen (\ _ i -> unGen m True i)
+{-# INLINE withAdmin #-}
+
+-- | True when data is being generated in the context of an administrator.
+checkAdmin :: Gen Bool
+checkAdmin  = Gen (\ s i -> (s,i))
+{-# INLINE checkAdmin #-}
+
 
 -- | NOTE: The Gen monad is a simplistic port of the Gen monad from QuickCheck,
 -- and many of the operations are exactly the same.
-newtype Gen a = Gen { unGen :: StdGen -> (a,StdGen) }
+newtype Gen a = Gen { unGen :: Bool -> StdGen -> (a,StdGen) }
 
 runGen :: Gen a -> IO a
 runGen f =
   do g <- newStdGen
-     case unGen f g of
+     case unGen f False g of
        (a,_) -> return a
 
 instance Functor Gen where
-  fmap f a = Gen $ \i ->
-    let (x,i') = unGen a i
+  fmap f a = Gen $ \ s i ->
+    let (x,i') = unGen a s i
      in (f x, i')
 
-  a <$ m = Gen $ \ i ->
-    let (_,i') = unGen m i
+  a <$ m = Gen $ \ s i ->
+    let (_,i') = unGen m s i
      in (a,i')
 
   {-# INLINE fmap #-}
@@ -120,20 +132,20 @@ instance Functor Gen where
 
 
 instance Applicative Gen where
-  pure x  = Gen (\i -> (x,i))
+  pure x  = Gen (\ _ i -> (x,i))
 
-  f <*> x = Gen $ \ i ->
-    let (g,i')  = unGen f i
-        (y,i'') = unGen x i'
+  f <*> x = Gen $ \ s i ->
+    let (g,i')  = unGen f s i
+        (y,i'') = unGen x s i'
      in (g y, i'')
 
-  a *> b = Gen $ \ i ->
-    let (_,i') = unGen a i
-     in unGen b i'
+  a *> b = Gen $ \ s i ->
+    let (_,i') = unGen a s i
+     in unGen b s i'
 
-  a <* b = Gen $ \ i ->
-    let (x,i')  = unGen a i
-        (_,i'') = unGen b i'
+  a <* b = Gen $ \ s i ->
+    let (x,i')  = unGen a s i
+        (_,i'') = unGen b s i'
      in (x,i'')
 
   {-# INLINE pure  #-}
@@ -144,9 +156,9 @@ instance Applicative Gen where
 instance Monad Gen where
   return = pure
 
-  m >>= k = Gen $ \ i ->
-    let (a,i') = unGen m i
-     in unGen (k a) i'
+  m >>= k = Gen $ \ s i ->
+    let (a,i') = unGen m s i
+     in unGen (k a) s i'
 
   (>>) = (*>)
 

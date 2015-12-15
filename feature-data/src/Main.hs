@@ -19,11 +19,11 @@ main  =
 
        ["user-executes-program"] ->
          do features <- runGen (vectorOf 100 genValue)
-            dumpJSONList (features :: [UserExecutesProgram])
+            dumpJSONList (features :: [SometimesAdmin UserExecutesProgram])
 
        ["program-reads-file"] ->
          do features <- runGen (vectorOf 100 genValue)
-            dumpJSONList (features :: [ProgramReadsFile])
+            dumpJSONList (features :: [SometimesAdmin ProgramReadsFile])
 
        _ ->
          putStrLn "Unknown feature"
@@ -90,6 +90,11 @@ isRoot _             = False
 
 -- Serialization Support -------------------------------------------------------
 
+newtype SometimesAdmin a = SometimesAdmin a deriving (Show)
+
+instance ToFields a => ToFields (SometimesAdmin a) where
+  toFields (SometimesAdmin a) = toFields a
+
 instance ToFields Program where
   toFields (Program a) = [ "program" .= a ]
 
@@ -110,6 +115,15 @@ instance ToFields Signal where
 
 
 -- Data Generation -------------------------------------------------------------
+
+instance GenValue a => GenValue (SometimesAdmin a) where
+  genValue =
+    do isAdmin <- choose (True,False)
+       a       <- if isAdmin
+                     then withAdmin genValue
+                     else           genValue
+
+       return (SometimesAdmin a)
 
 instance GenValue User where
   genValue =
