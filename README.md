@@ -13,7 +13,7 @@ First install [ghc](https://www.haskell.org/ghc/), a develop version of zlibc (o
 
 # Usage
 
-Trint command line is in the form "trint [Flags] Parameters" where
+Trint command line is in the form "Trint [Flags] Parameters" where
 
 ```
 Parameters:
@@ -35,9 +35,9 @@ For example (notice infoleak.provn is large and thus not in the database, see
 seaside for example traces):
 
 ```
-trint -s -l ./example/SRI/infoleak.provn
+Trint -s -l ./example/SRI/infoleak.provn
 // No output because the example is syntactically and type correct.
-trint -u ./example/SRI/infoleak.provn
+Trint -u ./example/SRI/infoleak.provn
 // No output (currently, just a long wait time)
 ```
 
