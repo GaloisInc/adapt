@@ -1,4 +1,6 @@
 #PROV-TC Specification (DRAFT)
+
+*Distribution Statement D: Distribution Authorized to the Department of Defense and U.S. DoD contractors only*
 Purpose of this Document
 =======
 This document specifies the PROV-TC conceptual model, a specialization of the W3CPROV provenance model to the domain of computation and its attribution. PROV-TC is intended as the communication standard for data conveyed by TA-1 performers to TA-2 performers in the Transparent Computing program.
@@ -41,6 +43,14 @@ PROV-TC model instances may include hierarchies of entity instances, using for e
 * create a sound PROV-TC model instance such that removing any provenance linkage will make the instance causally incomplete (the causal minimality property)
 
 In addition, there exists a simple syntactic grammar whose well-formed sentences are exactly an expression of PROV-TC model concepts, and for every sound PROV-TC model it is possible to express that model unambiguously in that grammar (the well-formed property).
+
+PROV-TC representations can be composed from other such representation, for example by adding traces from one sensor source to those from another. Because we expect this kind of aggregation to happen often, it is possible to
+
+* create a PROV-TC model by taking the union of other PROV-TC models (closure with respect to union)
+
+PROV-TC representations may be queried using tools such as relational algebra, in order to select certain subsets of models. Thus it is possible to
+
+* create a PROV-TC model by taking the intersection of other PROV-TC models (closure with respect to intersection).
 
 PROV-TC also has the property of non-causal extensibility, where new relationships that do not convey causality can be added. For example, the ADAPT team aims to extend PROV-TC for example by adding structure that conveys hierarchy, allowing representation of subgraphs by individual, higher-level vertices. 
 
@@ -104,9 +114,9 @@ Optional attrigutes include
 * a size (*prov-tc:size*). Natural number
 * an attribute that names the source of the information provided (*prov-tc:source*). String
 * access permissions (*prov-tc:permissions*). String (for now)
-* an indication of trustworthiness of the artifact, that is, to what extent the artifact's integrity is attested by a trusted authority (*prov-tc:trustworthiness*). Real in range [0..1]
-* an indication of the privacy sensitivity of the artifact, that is, to what extent leakage of the artifact to non-owners is a security failure (*prov-tc:privacyLevel*). Real in range [0..1]
-* an indication of the integrity sensitivity of the artifact, that is, to what extent modification of the artifact by non-owners is a security failure (*prov-tc:integrityLevel*). Real in range [0..1]
+* an indication of trustworthiness of the artifact, that is, a confidence assessment that the artifact's integrity is attested by a trusted authority (*prov-tc:trustworthiness*). Real in range [0..1]
+* an indication of the privacy sensitivity of the artifact, that is, a confidence assessment of the extent to which leakage of the artifact to non-owners is a security failure (*prov-tc:privacyLevel*). Real in range [0..1]
+* an indication of the integrity sensitivity of the artifact, that is, a confidence assessment of the extent to which  modification of the artifact by non-owners is a security failure (*prov-tc:integrityLevel*). Real in range [0..1]
 
 ```
 entity(ex:createExe, [
@@ -251,6 +261,7 @@ Required attributes include:
   * 'create'
 
 Optional attributes include:
+
 * a tag that specifies, in more detail than the granularity of the UoE, the *program point* that initiated this event. @TODO type for this
 * a list of arguments used in the operation initiated by that program point operation (*prov-tc:args*). List of Strings
 * a return value from the operation (*prov-tc:returnVal*). String
@@ -288,7 +299,7 @@ wasInvalidatedBy(ex:createExe, ex:parentb, 015-10-16T02:13:07Z, [
 
 used
 -------
-A used relationship indicates that an UoE such as *ex:parentb* in the example below (the subject of the relationship) gained information from, or modified, a pre-existing artifact such as *ex:createExe*  (the object of the relationship).
+A used relationship indicates that an UoE such as *ex:parentb* in the example below (the subject of the relationship) gained information from, or modified, but did not due to this relationship create nor delete, a pre-existing artifact such as *ex:createExe*  (the object of the relationship).
 
 Required attributes:
 
@@ -306,6 +317,7 @@ Required attributes:
    * 'execute'
 
 Optional attributes:
+
 * a tag that specifies, in more detail than the granularity of the UoE, the *program point* that initiated this event
 * a list of arguments used in the operation initiated by that program point operation (*prov-tc:args*). List of Strings
 * a return value from the operation (*prov-tc:returnVal*). String
@@ -349,49 +361,19 @@ Event Relationships Among UoEs
 ========
 A UoE can start, end, or inform another UoE. These relationships represent control flow in the monitored system.
 
-wasStartedBy
--------
-A UoE can start another UoE. Required attributes:
-
-* a start time (*prov-tc:time*)
-
-Optional attributes:
-
-* an attribute that names the source of the information provided (*prov-tc:source*)
-
-
-```
-wasStartedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z, [prov-tc:source="/dev/audit"])
-```
-
-wasEndedBy
-----------
-A UoE can stop, or terminate, another UoE. Required attributes:
-
-* a stop time (*prov-tc:time*)
-
-Optional attributes:
-
-* an attribute that names the source of the information provided (*prov-tc:source*)
-
-
-```
-wasEndedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z, [
-			prov-tc:source="/dev/audit"])
-
-```
-
 wasInformedBy
 -------
-A UoE can be otherwise influenced by another UoE. Required attributes:
+A UoE can be influenced by another UoE. That is, one may start, end, communicate with, or modify behavior of another. Required attributes:
 
 * the time of influence (*prov-tc:time*)
 * the operation that caused the influence (*prov-tc:operation*). Enum with valuations:
   * "fork"
   * "clone"
   * "execve"
-  * "signal"
+  * "signal" - may need to be further refined
   * "setuid"
+  * "kill"
+  * "follows"
   
 Optional attributes:
 
@@ -403,6 +385,21 @@ wasInformedBy(ex:childB, -, ex:parentb, 015-10-16T02:13:07Z, [
 			prov-tc:source="/dev/audit",
 			adapt:operation="signal"])
 ```
+
+Note: the operations listed above supercede the need for use of the W3CPROV relationships *wasStartedBy* and *wasEndedBy*, which have been removed from this model.
+
+wasCalledBy
+-----------
+A UoE can be a composition of other UoEs. For example, a process may execute functions. We use isCalledBy to represent the hierarchical structure of a UoE as needed. Note that order of execution is important, because state modifications made by one UoE can influence others that follow. However, timestamps may not be precise enough to indicate sequential flow. We use *wasInformedBy* with *tc:operation="follows"* to indicate sequential flow in threads of execution. Because each execution of a code element in an iterative structure such as a loop is represented by a distinct UoE instance, this relationship structure is capable of representing iterations. *isCalledBy* has no required attributes.
+
+Optional attributes:
+
+* an attribute that names the source of the information provided (*prov-tc:source*) 
+
+```
+wasCalledBy(ex:callee, -, ex:caller, -, [prov-tc:source="/dev/audit"])
+```
+
 
 Attribution Relationships Among Entities
 ========
