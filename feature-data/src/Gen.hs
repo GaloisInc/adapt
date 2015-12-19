@@ -95,7 +95,7 @@ instance A.Applicative Gen where
   {-# INLINE (<*>) #-}
 
 instance Monad Gen where
-  return = pure
+  return = A.pure
 
   m >>= k = Gen $ \ s i ->
     let (a,i') = unGen m s i

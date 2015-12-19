@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 executable feature-data
   main-is:             Main.hs
   other-modules:       JSON, Gen
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.7 && <5,
                        aeson,
                        bytestring,
                        random,

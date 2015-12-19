@@ -142,8 +142,8 @@ instance ToFields Signal  where toFields (Signal a)  = [ "signal"  .= a ]
 
 sometimesAdmin :: Gen a -> Gen a
 sometimesAdmin m =
-  do admin <- frequency [ (1, pure True)
-                        , (4, pure False) ]
+  do admin <- frequency [ (1, return True)
+                        , (4, return False) ]
      if admin
         then withAdmin m
         else           m
@@ -166,8 +166,8 @@ user :: Gen User
 user  =
   do isAdmin <- checkAdmin
      if isAdmin then return (User "root")
-                else frequency [ (3, pure (User "bob"))
-                               , (2, pure (User "httpd")) ]
+                else frequency [ (3, return (User "bob"))
+                               , (2, return (User "httpd")) ]
 
 program :: Gen Program
 program  =
@@ -205,25 +205,25 @@ directory (User u) =
   where
 
   usrGen len = vectorOf len $
-    frequency [ (3, pure "local")
-              , (3, pure "bin")
-              , (2, pure "share")
-              , (1, pure "lib") ]
+    frequency [ (3, return "local")
+              , (3, return "bin")
+              , (2, return "share")
+              , (1, return "lib") ]
 
   homeGen len = vectorOf len $
-    frequency [ (3, pure ".vim")
-              , (2, pure "bin")
-              , (1, pure ".config") ]
+    frequency [ (3, return ".vim")
+              , (2, return "bin")
+              , (1, return ".config") ]
 
   etcGen =
-    frequency [ (1, pure [])
-              , (2, pure ["system"]) ]
+    frequency [ (1, return [])
+              , (2, return ["system"]) ]
 
   varGen len = vectorOf len $
-    frequency [ (2, pure "run")
-              , (1, pure "lock") ]
+    frequency [ (2, return "run")
+              , (1, return "lock") ]
 
-  tmpGen = pure []
+  tmpGen = return []
 
 
 port :: Gen Port
