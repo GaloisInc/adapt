@@ -14,7 +14,7 @@ import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Control.Exception
 import Data.Monoid ((<>))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 import Data.List (partition,intersperse)
 import Data.Graph
 import qualified Data.Map as Map
@@ -144,23 +144,38 @@ processStmts c fp res
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
+-- We should probably do this in a transaction or something to tell when vertex insertion errors out
+-- For now, we're just assuming it's always successful
 doUpload :: Config -> [Stmt] -> ServerInfo -> IO ()
 doUpload c stmts svr =
- do stats <- push (es ++ ps)
+ do stats <- push es
+    let vertIds = Map.fromList(zip (map label es) stats)
+    let ps' = mapMaybe (resolveId vertIds) ps
+    print ps'
+    stats' <- push ps'
     -- let err = filter ( (/= status200)) stats
     -- when (not $ quiet c) $ putStrLn $ unlines $ map show err
     return ()
   where
-  (es,ps) = partition isEntity stmts
+  (es,ps) = partition isVert(map translateInsert stmts)
 
-  isEntity (StmtEntity {})         = True
-  isEntity (StmtPredicate {})      = False
-  isEntity (StmtLoc (Located _ s)) = isEntity s
+  isVert InsertVertex{} = True
+  isVert _ = False
 
-  push :: [Stmt] -> IO ()
-  push = mapM_ (titan svr . translateInsert)
+  resolveId vertIds (InsertEdge l s d p) = 
+    do s' <- Map.findWithDefault Nothing s vertIds
+       d' <- Map.findWithDefault Nothing d vertIds
+       return (InsertEdge l s' d' p)
+  resolveId _ (InsertVertex l p) = return (InsertVertex l p)
 
-translateInsert :: Stmt -> Operation
+  push :: GraphId i => [Operation i] -> IO [Maybe ResultId]
+  push = mapM $ \stmt ->
+    do res <- titan svr stmt
+       case res of
+         Success _ i -> return (Just i)
+         _ -> return Nothing
+
+translateInsert :: Stmt -> Operation Text
 translateInsert (StmtPredicate (Predicate {..})) =
     InsertEdge { label = pretty predType
                , src   = pretty predSubject
