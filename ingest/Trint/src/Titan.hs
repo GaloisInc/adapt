@@ -36,7 +36,6 @@ import qualified Data.Map as Map
 import System.IO (stderr, hPutStr)
 import qualified Data.ByteString.Char8 as BCNOTL
 import Data.Aeson (decode, Value(..), FromJSON(..), (.:))
-import Debug.Trace
 
 newtype ServerInfo = ServerInfo { host     :: HostName
                              }
@@ -169,9 +168,9 @@ instance GraphId ResultId where
     where
       call = "g.addV"
       args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = traceShowId $ gremlinScript call
+  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = gremlinScript call
     where
-      call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").addE(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, "), "] ++ args ++ [")"]
+      call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
       args = intersperse "," (concatMap attrs ps)
 
 gremlinScript :: ByteString -> ByteString

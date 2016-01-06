@@ -151,7 +151,6 @@ doUpload c stmts svr =
  do stats <- push es
     let vertIds = Map.fromList(zip (map label es) stats)
     let ps' = mapMaybe (resolveId vertIds) ps
-    print ps'
     stats' <- push ps'
     -- let err = filter ( (/= status200)) stats
     -- when (not $ quiet c) $ putStrLn $ unlines $ map show err
