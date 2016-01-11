@@ -21,6 +21,7 @@ sudo apt-get -y install \
     git \
     jq \
     libgmp-dev \
+    openjdk-8-jre-headless \
     python \
     python-pip \
     supervisor \
