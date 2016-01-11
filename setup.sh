@@ -26,9 +26,11 @@ fi
 sudo pip install kafka-python protobuf==2.5.0
 
 # Infrastructure Programs (Titan, Gremlin, Zookeeper, kafka)
-if [ ! \( -e $GREMLIN_SERVER_DIR -o -e $TEMP/gremlin.zip \) ] ; then
-	wget http://www.eu.apache.org/dist/incubator/tinkerpop/3.1.0-incubating/apache-gremlin-server-3.1.0-incubating-bin.zip -O $TEMP/gremlin.zip
-	unzip $TEMP/gremlin.zip
+GRZIP=$TEMP/gremlin.zip
+if [ ! \( -e $GREMLIN_SERVER_DIR -o -e $GRZIP \) ] ; then
+	wget http://apache.claz.org/incubator/tinkerpop/3.1.0-incubating/apache-gremlin-server-3.1.0-incubating-bin.zip -O $GRZIP
+	sha1sum $GRZIP | egrep '^ebfea8b66a305a15c71e2f3661b2b3e0  ' > /dev/null  # -e would bail on mismatch
+	unzip   $GRZIP
 fi
 [ -e $GREMLIN_SERVER_DIR ] || mv apache-gremlin-server-3.1.0-incubating $GREMLIN_SERVER_DIR
 
