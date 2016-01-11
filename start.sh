@@ -6,7 +6,7 @@ supercfg=$ADAPT/config/supervisord.conf
 
 
 # run supervisord (zookeeper kafka, gremlin)
-tmux new-session -s adapt -n "ADAPT" -d "supervisord -c $supercfg"
+tmux new-session -s adapt -n "ADAPT" -d "supervisord -c $supercfg --nodaemon"
 
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
