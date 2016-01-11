@@ -12,6 +12,7 @@
 if pgrep -U root supervisord > /dev/null
 then
     sudo service supervisor stop
+    sleep 1
 fi
 
 ADAPT=$HOME/adapt
