@@ -16,18 +16,18 @@ mkdir -p $USER_BIN
 # Tools: git, stack, pip, tmux, wget
 sudo apt-get update
 sudo apt-get -y install \
-     git \
-     python \
-     python-pip \
-     tmux \
-     wget \
-     autotools-dev \
-     unzip \
-     libgmp-dev \
-     supervisor \
-     zlib1g-dev \
-     curl \
-     jq \
+    autotools-dev \
+    curl \
+    git \
+    jq \
+    libgmp-dev \
+    python \
+    python-pip \
+    supervisor \
+    tmux \
+    unzip \
+    wget \
+    zlib1g-dev \
 
 if [ ! \( -e $USER_BIN/stack -o -e $TEMP/stack.tar.gz \) ] ; then
 	wget https://www.stackage.org/stack/linux-x86_64 -O $TEMP/stack.tar.gz
