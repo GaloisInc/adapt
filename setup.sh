@@ -53,3 +53,6 @@ fi
 export PATH=$PATH:$USER_BIN
 tar xJf example/infoleak-small.provn.tar.xz -C ./example
 make build
+
+# Now show what has been set up.
+git status --ignored
