@@ -5,3 +5,4 @@ hs_err_pid*.log
 kafka/
 node_modules/
 supervisord.log
+supervisord.pid
