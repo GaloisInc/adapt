@@ -1,12 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Types
     ( -- * Types
@@ -76,7 +77,6 @@ data Stmt = StmtEntity Entity
   deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | Entities in our conceptual Model
--- Notice each entity has a name (Text field) except for metadata.
 data Entity = Agent Ident [AgentAttr]
             | UnitOfExecution Ident [UoeAttr]
             | Artifact Ident [ArtifactAttr]
@@ -84,11 +84,11 @@ data Entity = Agent Ident [AgentAttr]
   deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 nameOf :: Entity -> Text
-nameOf e = 
+nameOf e =
  textOfIdent $ case e of
-            Agent n _ -> n
+            Agent n _           -> n
             UnitOfExecution n _ -> n
-            Artifact n _    -> n
+            Artifact n _        -> n
             Resource n _ _      -> n
 
 -- | Machine ID
@@ -383,9 +383,13 @@ instance PP UoeAttr where
 instance PP ArtifactAttr where
   ppPrec _ a0 =
     case a0 of
-      ArtAType ty        -> text "prov-tc:artifactType"             <=> ppq ty
-      ArtARegistryKey t  -> text "prov-tc:registryKey"              <=> ppq t
-      ArtACoarseLoc cloc -> text "prov-tc:coarseLoc"                <=> ppq cloc
+      ArtAType ty              -> text "prov-tc:artifactType"       <=> ppq ty
+      ArtARegistryKey t        -> text "prov-tc:registryKey"        <=> ppq t
+      ArtACoarseLoc cloc       -> text "prov-tc:coarseLoc"          <=> ppq cloc
+      ArtADestinationAddress t -> text "prov-tc:destinationAddress" <=> ppq t
+      ArtADestinationPort t    -> text "prov-tc:destinationPort"    <=> ppq t
+      ArtASourceAddress t      -> text "prov-tc:sourceAddress"      <=> ppq t
+      ArtASourcePort t         -> text "prov-tc:sourcePort"         <=> ppq t
       --  XXX All the below constructors are unused, they lack
       --  any translation path from ProvN, see Translate.hs
       ArtAFineLoc floc         -> text "prov-tc:fineLoc"            <=> ppq floc
@@ -394,10 +398,6 @@ instance PP ArtifactAttr where
       ArtADeleted t            -> text "prov-tc:deleted"            <=> ppq t
       ArtAOwner t              -> text "prov-tc:owner"              <=> ppq t
       ArtASize i               -> text "prov-tc:size"               <=> ppq i
-      ArtADestinationAddress t -> text "prov-tc:destinationAddress" <=> ppq t
-      ArtADestinationPort t    -> text "prov-tc:destinationPort"    <=> ppq t
-      ArtASourceAddress t      -> text "prov-tc:sourceAddress"      <=> ppq t
-      ArtASourcePort t         -> text "prov-tc:sourcePort"         <=> ppq t
       Taint w64                -> text "prov-tc:taint"              <=> pp (fromIntegral w64 :: Integer)
 
 (<=>) :: Doc -> Doc -> Doc
@@ -431,7 +431,7 @@ instance (GOnIdent a, GOnIdent b) => GOnIdent (a :+: b) where
 instance GOnIdent a => GOnIdent (M1 i c a) where
   gonIdent f (M1 x) = M1 (gonIdent f x)
 
-instance OnIdent a => GOnIdent (K1 i a) where
+instance OnIdent c => GOnIdent (K1 i c) where
   gonIdent f (K1 x) = K1 (onIdent f x)
 
 instance OnIdent Stmt where

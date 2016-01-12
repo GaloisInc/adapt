@@ -155,26 +155,62 @@ processStmts c fp res pxs
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
-  renderProv pfx0 stmts =
-     let pfx    = trintns : provtc : pfx0
-         header = map renderPrefix pfx
-         ss     = map (renderStmt pfx) (zipWith nameUsed stmts [0..])
-     in Text.unlines $ concatMap (map (Text.pack . show))
-                       [[text "document"]
-                       , header
-                       , ss
-                       , [text "endDocument"]]
+printWarnings :: [Warning] -> IO ()
+printWarnings ws = Text.putStrLn doc
+  where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . pp) ws
 
-  -- Any used predicate that does not have a self-identifier is given an
-  -- arbitrary ident of 'trint:NUM'.
-  nameUsed :: Stmt -> Integer -> Stmt
-  nameUsed (StmtPredicate p) i =
-        case (predType p,predIdent p) of
-          (Used,Nothing) -> StmtPredicate (p { predIdent = Just (trintURI NS..: Text.pack (showHex i "")) })
-          _              -> StmtPredicate p
-  nameUsed (StmtLoc (Located r p)) i = StmtLoc (Located r (nameUsed p i))
-  nameUsed x _ = x
+--------------------------------------------------------------------------------
+--  Pretty Printing
 
+renderProv :: [Prefix] -> [Stmt] -> Text
+renderProv pfx0 stmts =
+   let pfx    = trintns : provtc : pfx0
+       header = map renderPrefix pfx
+       ss     = map (renderStmt pfx) (zipWith nameUsed stmts [0..])
+   in Text.unlines $ concatMap (map (Text.pack . show))
+                     [[text "document"]
+                     , header
+                     , ss
+                     , [text "endDocument"]]
+
+-- Any used predicate that does not have a self-identifier is given an
+-- arbitrary ident of 'trint:NUM'.
+nameUsed :: Stmt -> Integer -> Stmt
+nameUsed (StmtPredicate p) i =
+      case (predType p,predIdent p) of
+        (Used,Nothing) -> StmtPredicate (p { predIdent = Just (trintURI NS..: Text.pack (showHex i "")) })
+        _              -> StmtPredicate p
+nameUsed (StmtLoc (Located r p)) i = StmtLoc (Located r (nameUsed p i))
+nameUsed x _ = x
+
+renderPrefix :: Prefix -> Doc
+renderPrefix (Prefix p u) = text "prefix " PP.<> pp p PP.<> text " <" PP.<> pp (show u) PP.<> text ">"
+
+renderStmt :: [Prefix] -> Stmt -> Doc
+renderStmt pfx stmt = pp (onIdent abbreviate stmt)
+  where
+  abbreviate (Qualified q x) = Qualified (shorthand q) x
+  abbreviate x               = x
+
+  shorthand :: Text -> Text
+  shorthand t = maybe t id (Map.lookup t dict)
+
+  dict :: Map Text Text
+  dict = Map.fromList [ (Text.pack $ show fq,sh) | Prefix sh fq <- pfx]
+
+-- | A fake Prov prefix for use with manufactured data such as generated 'used'
+-- identifiers.
+trintns :: Prefix
+trintns = Prefix "trint" trintURI
+
+trintURI :: NS.URI
+trintURI = NS.perr "http://galois.com/adapt/trint"
+
+-- | The prefix for ProvTC
+provtc :: Prefix
+provtc = Prefix "prov-tc" NS.adapt
+--------------------------------------------------------------------------------
+--  Database Upload
 
 doUpload :: Config -> [Stmt] -> ServerInfo -> IO ()
 doUpload c stmts svr =
@@ -272,27 +308,12 @@ translateInsert (StmtEntity e)    =
 
 translateInsert (StmtLoc (Located _ s)) = translateInsert s
 
-renderPrefix :: Prefix -> Doc
-renderPrefix (Prefix p u) = text "prefix " PP.<> pp p PP.<> text " <" PP.<> pp (show u) PP.<> text ">"
-
-renderStmt :: [Prefix] -> Stmt -> Doc
-renderStmt pfx stmt = pp (onIdent abbreviate stmt)
-  where
-  abbreviate (Qualified q x) = Qualified (shorthand q) x
-  abbreviate x               = x
-
-  shorthand :: Text -> Text
-  shorthand t = maybe t id (Map.lookup t dict)
-
-  dict :: Map Text Text
-  dict = Map.fromList [ (Text.pack $ show fq,sh) | Prefix sh fq <- pfx]
-
 textOfTime :: Time -> Text
 textOfTime = Text.pack . show -- XXX
 
-printWarnings :: [Warning] -> IO ()
-printWarnings ws = Text.putStrLn doc
-  where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . pp) ws
+
+--------------------------------------------------------------------------------
+--  Statistics
 
 printStats :: [Stmt] -> IO ()
 printStats ss =
@@ -305,6 +326,10 @@ printStats ss =
      putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
      putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
      putStrLn $ "\tTotal statements: " ++ show nrStmt
+
+
+--------------------------------------------------------------------------------
+--  Graphing
 
 data NodeInfo = Node Int | Edge (Int,Int)
 
@@ -332,14 +357,3 @@ nodeOf name =
                     return v
       Just n  -> return n
 
--- | A fake Prov prefix for use with manufactured data such as generated 'used'
--- identifiers.
-trintns :: Prefix
-trintns = Prefix "trint" trintURI
-
-trintURI :: NS.URI
-trintURI = NS.perr "http://galois.com/adapt/trint"
-
--- | The prefix for ProvTC
-provtc :: Prefix
-provtc = Prefix "prov-tc" NS.adapt
