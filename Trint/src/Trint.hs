@@ -3,9 +3,10 @@
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
-import PP
+import PP as PP
 import Ingest
 import SimpleGetOpt
+import qualified Namespaces as NS
 import Types as T
 import qualified Graph as G
 import qualified RDF
@@ -14,11 +15,12 @@ import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Control.Exception
 import Data.Monoid ((<>))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes,isNothing)
 import Data.List (partition,intersperse)
 import Data.Graph
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import Numeric (showHex)
 import MonadLib        hiding (handle)
 import MonadLib.Monads hiding (handle)
 import qualified Data.Text.Lazy as Text
@@ -35,6 +37,7 @@ data Config = Config { lintOnly   :: Bool
                      , stats      :: Bool
                      , turtle     :: Bool
                      , ast        :: Bool
+                     , provn      :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
@@ -49,6 +52,7 @@ defaultConfig = Config
   , stats    = False
   , turtle   = False
   , ast      = False
+  , provn    = False
   , verbose  = False
   , help     = False
   , upload   = Nothing
@@ -72,6 +76,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['a'] ["ast"]
                     "Produce a pretty-printed internal AST"
                     $ NoArg $ \s -> Right s { ast = True }
+                  , Option ['p'] ["provn"]
+                    "Produce a pretty-printed, reformatted, PROV representation"
+                    $ NoArg $ \s -> Right s { provn = True }
                   , Option ['g'] ["graph"]
                     "Produce a dot file representing a graph of the conceptual model."
                     $ NoArg $ \s -> Right s { graph = True }
@@ -104,9 +111,9 @@ trint c fp = do
     Left e  -> do
       putStrLn $ "Error ingesting " ++ fp ++ ":"
       print (pp e)
-    Right (res,ws) -> do
+    Right (pxs,res,ws) -> do
       unless (quiet c) $ printWarnings ws
-      processStmts c fp res
+      processStmts c fp res pxs
 
   where
   ingest = do
@@ -117,8 +124,8 @@ trint c fp = do
                  print e
                  exitFailure
 
-processStmts :: Config -> FilePath -> [Stmt] -> IO ()
-processStmts c fp res
+processStmts :: Config -> FilePath -> [Stmt] -> [Prefix] -> IO ()
+processStmts c fp res pxs
   | lintOnly c = return ()
   | otherwise = do
       when (graph  c) $ do
@@ -136,6 +143,10 @@ processStmts c fp res
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
         output astfile $ Text.unlines $ map (Text.pack . show) res
+      when (provn c) $ do
+        let provfile = fp <.> "trint.provn"
+        dbg ("Writing prettified prov-n to " ++ provfile)
+        output provfile (renderProv pxs res)
       maybe (return ()) (doUpload c res) (upload c)
  where
   dbg s = when (verbose c) (putStrLn s)
@@ -143,6 +154,27 @@ processStmts c fp res
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
+
+  renderProv pfx0 stmts =
+     let pfx    = trintns : provtc : pfx0
+         header = map renderPrefix pfx
+         ss     = map (renderStmt pfx) (zipWith nameUsed stmts [0..])
+     in Text.unlines $ concatMap (map (Text.pack . show))
+                       [[text "document"]
+                       , header
+                       , ss
+                       , [text "endDocument"]]
+
+  -- Any used predicate that does not have a self-identifier is given an
+  -- arbitrary ident of 'trint:NUM'.
+  nameUsed :: Stmt -> Integer -> Stmt
+  nameUsed (StmtPredicate p) i =
+        case (predType p,predIdent p) of
+          (Used,Nothing) -> StmtPredicate (p { predIdent = Just (trintURI NS..: Text.pack (showHex i "")) })
+          _              -> StmtPredicate p
+  nameUsed (StmtLoc (Located r p)) i = StmtLoc (Located r (nameUsed p i))
+  nameUsed x _ = x
+
 
 doUpload :: Config -> [Stmt] -> ServerInfo -> IO ()
 doUpload c stmts svr =
@@ -240,6 +272,21 @@ translateInsert (StmtEntity e)    =
 
 translateInsert (StmtLoc (Located _ s)) = translateInsert s
 
+renderPrefix :: Prefix -> Doc
+renderPrefix (Prefix p u) = text "prefix " PP.<> pp p PP.<> text " <" PP.<> pp (show u) PP.<> text ">"
+
+renderStmt :: [Prefix] -> Stmt -> Doc
+renderStmt pfx stmt = pp (onIdent abbreviate stmt)
+  where
+  abbreviate (Qualified q x) = Qualified (shorthand q) x
+  abbreviate x               = x
+
+  shorthand :: Text -> Text
+  shorthand t = maybe t id (Map.lookup t dict)
+
+  dict :: Map Text Text
+  dict = Map.fromList [ (Text.pack $ show fq,sh) | Prefix sh fq <- pfx]
+
 textOfTime :: Time -> Text
 textOfTime = Text.pack . show -- XXX
 
@@ -269,7 +316,7 @@ mkGraph ss =
 
 -- Memoizing edge creation
 mkEdge :: Stmt -> State (Map Text Vertex,Vertex) (Maybe Edge)
-mkEdge (StmtPredicate (Predicate s o _ _)) =
+mkEdge (StmtPredicate (Predicate s o _ _ _)) =
   do nS <- nodeOf (pretty s)
      nO <- nodeOf (pretty o)
      return $ Just (nS,nO)
@@ -284,3 +331,15 @@ nodeOf name =
       Nothing -> do set (Map.insert name v m, v+1)
                     return v
       Just n  -> return n
+
+-- | A fake Prov prefix for use with manufactured data such as generated 'used'
+-- identifiers.
+trintns :: Prefix
+trintns = Prefix "trint" trintURI
+
+trintURI :: NS.URI
+trintURI = NS.perr "http://galois.com/adapt/trint"
+
+-- | The prefix for ProvTC
+provtc :: Prefix
+provtc = Prefix "prov-tc" NS.adapt

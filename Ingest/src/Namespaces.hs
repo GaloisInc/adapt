@@ -30,11 +30,13 @@ module Namespaces
   , provWasDerivedFrom
   , provActedOnBehalfOf
   , provWasInvalidatedBy
-  , nfoPermissions
-  , nfoOperation
+  , adaptOperation
+  , adaptPermissions
   , dcIdent
   , dcDescription, dcIsPartOf
   , blankNode
+  -- * Helpers
+  , perr
   ) where
 
 import Network.URI
@@ -91,43 +93,45 @@ adaptIdent =
   ]
 
 adaptUnitOfExecution, adaptPid, adaptDevType, adaptDeviceID, adaptEntityType, adaptCmdLine, adaptCmdString, adaptMachineID, adaptPath, adaptPPid, foafName, foafAccountName, provAtTime, provType :: Ident
-adaptUnitOfExecution = adapt .: "unitOfExecution"
-adaptPid             = adapt .: "pid"
-adaptPPid            = adapt .: "ppid"
-adaptRegistryKey     = adapt .: "registryKey"
-adaptPrivs           = adapt .: "privs"
-adaptPwd             = adapt .: "pwd"
-adaptDevType         = adapt .: "devType"
-adaptDeviceID        = adapt .: "devID"
-adaptArtifact        = adapt .: "artifact"
-adaptEntityType      = adapt .: "entityType"
-adaptCmdLine         = adapt .: "cmdLine"
-adaptCmdString       = adapt .: "cmdString"
-adaptPath            = adapt .: "path"
-adaptMachineID       = adapt .: "machineID"
-adaptRead            = adapt .: "read"
-adaptRecv            = adapt .: "recv"
-adaptAccept          = adapt .: "accept"
-adaptExecute         = adapt .: "execute"
-adaptReturnVal       = adapt .: "returnVal"
-adaptArgs            = adapt .: "args"
-adaptUseOp           = adapt .: "useOp"
-adaptGenOp           = adapt .: "genOp" -- XXX operation
-adaptExecOp          = adapt .: "execOp"
-adaptDeriveOp        = adapt .: "deriveOp"
-adaptSource          = adapt .: "source"
-adaptCommandLine     = adapt .: "commandLine"
-adaptGroup           = adapt .: "group"
-adaptHasVersion      = adapt .: "hasVersion"
-adaptCWD             = adapt .: "cwd"
-adaptUID             = adapt .: "uid"
-adaptProgramName     = adapt .: "programName"
+adaptUnitOfExecution    = adapt .: "unitOfExecution"
+adaptPid                = adapt .: "pid"
+adaptPPid               = adapt .: "ppid"
+adaptRegistryKey        = adapt .: "registryKey"
+adaptPrivs              = adapt .: "privs"
+adaptPwd                = adapt .: "pwd"
+adaptDevType            = adapt .: "devType"
+adaptDeviceID           = adapt .: "devID"
+adaptArtifact           = adapt .: "artifact"
+adaptEntityType         = adapt .: "entityType"
+adaptCmdLine            = adapt .: "cmdLine"
+adaptCmdString          = adapt .: "cmdString"
+adaptPath               = adapt .: "path"
+adaptMachineID          = adapt .: "machineID"
+adaptRead               = adapt .: "read"
+adaptRecv               = adapt .: "recv"
+adaptAccept             = adapt .: "accept"
+adaptExecute            = adapt .: "execute"
+adaptReturnVal          = adapt .: "returnVal"
+adaptArgs               = adapt .: "args"
+adaptUseOp              = adapt .: "useOp"
+adaptGenOp              = adapt .: "genOp" -- XXX operation
+adaptExecOp             = adapt .: "execOp"
+adaptDeriveOp           = adapt .: "deriveOp"
+adaptSource             = adapt .: "source"
+adaptCommandLine        = adapt .: "commandLine"
+adaptGroup              = adapt .: "group"
+adaptHasVersion         = adapt .: "hasVersion"
+adaptCWD                = adapt .: "cwd"
+adaptUID                = adapt .: "uid"
+adaptProgramName        = adapt .: "programName"
 adaptDestinationAddress = adapt .: "destinationAddress"
-adaptDestinationPort = adapt .: "destinationPort"
-adaptSourceAddress = adapt .: "sourceAddress"
-adaptSourcePort = adapt .: "sourcePort"
-adaptProtocol   = adapt .: "protocol"
-adaptTime           = adapt .: "time"
+adaptDestinationPort    = adapt .: "destinationPort"
+adaptSourceAddress      = adapt .: "sourceAddress"
+adaptSourcePort         = adapt .: "sourcePort"
+adaptProtocol           = adapt .: "protocol"
+adaptTime               = adapt .: "time"
+adaptOperation          = adapt .: "operation"
+adaptPermissions        = adapt .: "permissions"
 
 foafIdent :: [Ident]
 foafIdent = [foafName, foafAccountName]
@@ -158,8 +162,6 @@ provWasDerivedFrom    = prov  .: "wasDerivedFrom"
 provActedOnBehalfOf   = prov  .: "actedOnBehalfOf"
 provWasInvalidatedBy  = prov  .: "wasInvalidatedBy"
 
-nfoPermissions        = nfo   .: "permissions"
-nfoOperation          = nfo   .: "operation"
 
 dcIdent :: [Ident]
 dcIdent = [dcDescription, dcIsPartOf]
