@@ -1,4 +1,4 @@
-#!/bin/sh
+#! /bin/sh
 
 # Starts daemons: supervisord, zookeeper, kafka, gremlin
 
@@ -32,4 +32,7 @@ fi
 echo Started.
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
-sleep 5
+sleep 4
+
+# This takes about one second of CPU if no building is needed.
+(cd ingest && make)
