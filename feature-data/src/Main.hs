@@ -1,250 +1,260 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
 import Gen
 import JSON
+import Options
 
-import           Data.List (intersperse,intercalate)
+import           Data.List (intersperse,intercalate,foldl')
+import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as T
-import           GHC.Generics (Generic)
-import           System.Environment (getArgs)
+import           Data.Proxy (Proxy(..),asProxyTypeOf)
+import           GHC.Generics
+import           System.IO (Handle,hPutStr,hPutStrLn,hPrint)
 
 
 main :: IO ()
 main  =
-  do args <- getArgs
-     case args of
-
-       ["user-executes-program"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 return (UserExecutesProgram u p)
-
-            dumpJSONList features
-
-       ["program-reads-file"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 f <- file u
-                 return (ProgramReadsFile u p f)
-
-            dumpJSONList features
-
-       ["program-listens-on-port"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 x <- port
-                 return (ProgramListensOnPort u p x)
-            dumpJSONList features
-
-       ["program-makes-tcp-connection"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 h <- host
-                 x <- port
-                 return (ProgramMakesTcpConnection u p h x)
-            dumpJSONList features
-
-       ["program-receives-signal"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 s <- signal
-                 return (ProgramReceivesSignal u p s)
-            dumpJSONList features
-
-       ["program-creates-file"] ->
-         do features <- runGen $ vectorOf 100 $ sometimesAdmin $
-              do u <- user
-                 p <- program
-                 f <- file u
-                 return (ProgramCreatesFile u p f)
-            dumpJSONList features
-
-       _ ->
-         putStrLn "Unknown feature"
+  do Options { .. } <- parseArgs
+     case optFeature of
+       "CreatesFile" -> genData optRaw (Proxy :: Proxy CreatesFile)
+       "DeletesFile" -> genData optRaw (Proxy :: Proxy DeletesFile)
+       "ReadsFile"   -> genData optRaw (Proxy :: Proxy ReadsFile)
+       "WritesFile"  -> genData optRaw (Proxy :: Proxy WritesFile)
 
 
--- Features --------------------------------------------------------------------
+-- Types -----------------------------------------------------------------------
 
-data UserExecutesProgram = UserExecutesProgram !User !Program
-                           deriving (Show,Generic)
+data User       = Root | Guest | Unprivileged
+                  deriving (Eq,Ord,Show,Enum,Generic)
 
-instance ToFields UserExecutesProgram
+data FileOrigin = GeneratedByOther | GeneratedByUser | GeneratedByRoot
+                  deriving (Eq,Ord,Show,Enum,Generic)
 
+data File       = TempFile | UserFile | ProtectedSystemFile
+                  deriving (Eq,Ord,Show,Enum,Generic)
 
-
-data ProgramReadsFile = ProgramReadsFile !User !Program !File
-                        deriving (Show,Generic)
-
-instance ToFields ProgramReadsFile
-
-
-
-data ProgramListensOnPort = ProgramListensOnPort !User !Program !Port
-                            deriving (Show,Generic)
-
-instance ToFields ProgramListensOnPort
+data Copy       = CopyRemote | CopyLocal
+                  deriving (Eq,Ord,Show,Enum,Generic)
 
 
+-- Primitive Features ----------------------------------------------------------
 
-data ProgramMakesTcpConnection =
-  ProgramMakesTcpConnection !User !Program !Host !Port
-  deriving (Show,Generic)
-
-instance ToFields ProgramMakesTcpConnection
-
-
-
-data ProgramReceivesSignal = ProgramReceivesSignal !User !Program !Signal
-                             deriving (Show,Generic)
-instance ToFields ProgramReceivesSignal
+data CreatesFile = CreatesFile User File       deriving (Show,Eq,Ord,Generic)
+data DeletesFile = DeletesFile User File       deriving (Show,Eq,Ord,Generic)
+data ReadsFile   = ReadsFile   User File       deriving (Show,Eq,Ord,Generic)
+data WritesFile  = WritesFile  User File       deriving (Show,Eq,Ord,Generic)
+data RunsProgram = RunsProgram User FileOrigin deriving (Show,Eq,Ord,Generic)
+data CopyFile    = CopyFile    Copy File       deriving (Show,Eq,Ord,Generic)
 
 
+-- Generation ------------------------------------------------------------------
 
-data ProgramCreatesFile = ProgramCreatesFile !User !Program !File
-                          deriving (Show,Generic)
+genData :: (ElementsOf a, ShowFeature a, GenData a) => Bool -> Proxy a -> IO ()
 
-instance ToFields ProgramCreatesFile
+genData False p =
+  do undefined
 
+genData True p =
+  do Sample { .. } <- runGen (sampleData 100)
+     let _ = head samples `asProxyTypeOf` p
+     mapM_ (putStrLn . showFeature) samples
 
--- Feature Elements ------------------------------------------------------------
+-- | 1% of the time, generate some data that is semantically bad.
+sampleData :: GenData a => Int -> Gen (Sample [a])
+sampleData  = go False []
+  where
 
-newtype Program = Program T.Text deriving Show
-newtype File    = File    T.Text deriving Show
-newtype User    = User    T.Text deriving Show
-newtype Port    = Port    Int    deriving Show
-newtype Host    = Host    T.Text deriving Show
-newtype Signal  = Signal  Int    deriving Show
+  lift b m =
+    do a <- m
+       return (b,a)
 
-newtype WriteFile  = WriteFile  File deriving (Show,ToFields)
-newtype ReadFile   = ReadFile   File deriving (Show,ToFields)
+  go hasBad as 0 =
+       return (Sample (not hasBad) as)
 
-
--- Serialization Support -------------------------------------------------------
-
-instance ToFields Program where toFields (Program a) = [ "program" .= a ]
-instance ToFields File    where toFields (File a)    = [ "file"    .= a ]
-instance ToFields User    where toFields (User a)    = [ "user"    .= a ]
-instance ToFields Port    where toFields (Port a)    = [ "port"    .= a ]
-instance ToFields Host    where toFields (Host a)    = [ "host"    .= a ]
-instance ToFields Signal  where toFields (Signal a)  = [ "signal"  .= a ]
-
-
--- Data Generation -------------------------------------------------------------
-
-sometimesAdmin :: Gen a -> Gen a
-sometimesAdmin m =
-  do admin <- frequency [ (1, return True)
-                        , (4, return False) ]
-     if admin
-        then withAdmin m
-        else           m
+  go hasBad as n =
+    do (hasBad',a) <- frequency [ (1,  lift True   genBad)
+                                , (99, lift hasBad genGood) ]
+       go hasBad' (a:as) (n-1)
 
 
-host :: Gen Host
-host  =
-  do a <- choose (1,254 :: Int)
-     case a of
-       127 -> return (Host "127.0.0.1")
-       _   -> do b <- choose (1,254 :: Int)
-                 c <- choose (1,254 :: Int)
-                 d <- choose (1,254 :: Int)
-                 return $ Host
-                        $ T.pack
-                        $ intercalate "." [show a,show b,show c,show d]
+class GenData a where
+  genGood :: Gen a
+  genBad  :: Gen a
 
+instance GenData CreatesFile where
+  genGood = goodFileOp CreatesFile
+  genBad  = badFileOp  CreatesFile
+
+instance GenData DeletesFile where
+  genGood = goodFileOp DeletesFile
+  genBad  = badFileOp  DeletesFile
+
+instance GenData ReadsFile where
+  genGood = goodFileOp ReadsFile
+  genBad  = badFileOp  ReadsFile
+
+instance GenData WritesFile where
+  genGood = goodFileOp WritesFile
+  genBad  = badFileOp  WritesFile
+
+
+goodFileOp, badFileOp :: (User -> File -> a) -> Gen a
+
+goodFileOp mk =
+  do u <- user
+     f <- case u of
+            Root -> file
+            _    -> elements [TempFile,UserFile]
+     return (mk u f)
+
+badFileOp mk =
+  do u <- elements [Guest,Unprivileged]
+     return (mk u ProtectedSystemFile)
 
 user :: Gen User
 user  =
-  do isAdmin <- checkAdmin
-     if isAdmin then return (User "root")
-                else frequency [ (3, return (User "bob"))
-                               , (2, return (User "httpd")) ]
+  frequency [ (2, return Root)
+            , (1, return Guest)
+            , (4, return Unprivileged) ]
 
-program :: Gen Program
-program  =
-  do bin  <- elements [ ["bin"]
-                      , ["usr", "bin"] ]
+file :: Gen File
+file  =
+  frequency [ (1, return ProtectedSystemFile)
+            , (4, return UserFile)
+            , (2, return TempFile) ]
 
-     prog <- elements [ "ls", "cd", "sh", "ssh" ]
 
-     return (Program (mkPath (bin ++ [prog])))
+-- Serialization ---------------------------------------------------------------
 
-mkPath :: [T.Text] -> T.Text
-mkPath chunks = T.concat ("/" : intersperse "/" chunks)
+class ShowFeature a where
+  showFeature :: a -> String
 
-file :: User -> Gen File
-file u =
-  do dir <- directory u
-     f   <- elements [ "key", "data.bin", "vimrc", "input.txt" ]
-     return (File (mkPath (dir ++ [f])))
+  default showFeature :: (Generic a, GShowFeature (Rep a)) => a -> String
+  showFeature a = gshowFeature (from a)
 
--- | Generate a random directory structure.
-directory :: User -> Gen [T.Text]
-directory (User u) =
-  do len   <- choose (0,3)
-     admin <- checkAdmin
-     if admin
-        then frequency [ (3, ("usr" :)       `fmap` usrGen  len)
-                       , (2, ("etc" :)       `fmap` etcGen     )
-                       , (2, ("var" :)       `fmap` varGen  len)
-                       , (1, ("tmp" :)       `fmap` tmpGen     )
-                       , (3, (["home",u] ++) `fmap` homeGen len) ]
+instance ShowFeature CreatesFile
+instance ShowFeature DeletesFile
+instance ShowFeature ReadsFile
+instance ShowFeature WritesFile
+instance ShowFeature RunsProgram
+instance ShowFeature CopyFile
 
-        else frequency [ (2, ("home":) `fmap` homeGen len)
-                       , (1, ("tmp" :) `fmap` tmpGen     ) ]
 
+-- | Generate a tuple-like formatting of a primitive feature.
+class GShowFeature f where
+  gshowFeature :: f a -> String
+
+instance GShowFeature f => GShowFeature (M1 D c f) where
+  gshowFeature (M1 a) = gshowFeature a
+
+instance (Constructor c, GFields f) => GShowFeature (M1 C c f) where
+  gshowFeature m@(M1 a) = conName m ++ "(" ++ intercalate "," (gfields a) ++ ")"
+
+instance (GShowFeature f, GShowFeature g) => GShowFeature (f :+: g) where
+  gshowFeature (L1 f) = gshowFeature f
+  gshowFeature (R1 g) = gshowFeature g
+
+
+class GFields f where
+  gfields :: f a -> [String]
+
+instance (GFields f, GFields g) => GFields (f :*: g) where
+  gfields (f :*: g) = gfields f ++ gfields g
+
+instance GFields f => GFields (S1 s f) where
+  gfields (M1 a) = gfields a
+
+instance GFields U1 where
+  gfields U1 = []
+
+instance Show a => GFields (K1 i a) where
+  gfields (K1 a) = [show a]
+
+
+-- Vectors ---------------------------------------------------------------------
+
+data Sample a = Sample { nominal :: Bool, samples :: a
+                       } deriving (Show,Functor)
+
+
+hPrintVectors :: (Ord a, ElementsOf a, ShowFeature a)
+              => Handle -> [Sample [a]] -> IO ()
+hPrintVectors h vs =
+  do hPutStrLn h (intercalate "," ("ground.truth" : header))
+     mapM_ (hPrintVector h . fmap genCounts) vs
   where
+  header = map show (genHeader (head (samples (head vs))))
 
-  usrGen len = vectorOf len $
-    frequency [ (3, return "local")
-              , (3, return "bin")
-              , (2, return "share")
-              , (1, return "lib") ]
-
-  homeGen len = vectorOf len $
-    frequency [ (3, return ".vim")
-              , (2, return "bin")
-              , (1, return ".config") ]
-
-  etcGen =
-    frequency [ (1, return [])
-              , (2, return ["system"]) ]
-
-  varGen len = vectorOf len $
-    frequency [ (2, return "run")
-              , (1, return "lock") ]
-
-  tmpGen = return []
+genHeader :: (ShowFeature a, ElementsOf a) => a -> [String]
+genHeader a = [ showFeature k | k <- elementsOf `asTypeOf` [a] ]
 
 
-port :: Gen Port
-port  =
-  do isAdmin <- checkAdmin
-     p       <- if isAdmin then frequency [ (4,choose (1,1024))
-                                          , (1,choose (1025,65535)) ]
-                           else choose (1025,65535)
-     return (Port p)
+type Vector = Sample [Int]
+
+hPrintVector :: Handle -> Vector -> IO ()
+hPrintVector h Sample { .. } =
+  do hPutStr h (if nominal then "nominal" else "anomaly")
+     go samples
+  where
+  go (v:vs) =
+    do hPutStr h ","
+       hPutStr h (show v)
+       go vs
+
+  go [] = hPutStrLn h ""
+
+genCounts :: (Ord a, ElementsOf a) => [a] -> [Int]
+genCounts as =
+  Map.elems (foldl' update (Map.fromList [ (k,0) | k <- elementsOf ]) as)
+  where
+  update acc a = Map.adjust (+1) a acc
 
 
-signal :: Gen Signal
-signal  =
-  do sig <- elements [ 6  -- SIGABRT
-                     , 14 -- SIGALRM
-                     , 1  -- SIGHUP
-                     , 2  -- SIGINT
-                     , 9  -- SIGKILL
-                     , 3  -- SIGQUIT
-                     , 15 -- SIGTERM
-                     , 11 -- SIGSEGV
-                     ]
+class ElementsOf a where
+  elementsOf :: [a]
 
-     return (Signal sig)
+  default elementsOf :: (Generic a, GElementsOf (Rep a)) => [a]
+  elementsOf = map to gelementsOf
+
+instance ElementsOf CreatesFile
+instance ElementsOf DeletesFile
+instance ElementsOf ReadsFile
+instance ElementsOf WritesFile
+instance ElementsOf RunsProgram
+instance ElementsOf CopyFile
+
+
+class GElementsOf f where
+  gelementsOf :: [f a]
+
+instance GElementsOf f => GElementsOf (M1 i t f) where
+  gelementsOf = map M1 gelementsOf
+
+instance (GElementsOf f, GElementsOf g) => GElementsOf (f :+: g) where
+  gelementsOf = go True gelementsOf gelementsOf
+    where
+
+    go True  (l:ls) rs = L1 l : (go False ls rs)
+    go False ls (r:rs) = R1 r : (go True  ls rs)
+
+    go _     [] rs     = map R1 rs
+    go _     ls []     = map L1 ls
+
+instance (GElementsOf f, GElementsOf g) => GElementsOf (f :*: g) where
+  gelementsOf = [ a :*: b | a <- gelementsOf, b <- gelementsOf ]
+
+instance GElementsOf U1 where
+  gelementsOf = []
+
+instance Enum a => GElementsOf (K1 t a) where
+  gelementsOf = [ K1 a | a <- [ toEnum 0 .. ] ]
