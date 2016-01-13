@@ -147,26 +147,6 @@ def get_events(db_client):
         yield v
 
 
-def hex_to_ascii(hex_cmd):
-    '''Converts sequence of hex bytes to string of printable characters.
-    >>> hex_to_ascii('41207A09')
-    'A_z0x09'
-    '''
-    if len(hex_cmd) % 2 == 1:
-        return hex_cmd
-    ret = []
-    i = 0
-    while i < len(hex_cmd):
-        h = hex_cmd[i: i+2]
-        c = chr(int(h, base=16))
-        if c == ' ':
-            c = '_'  # This groups cmd line args together.
-        is_printable = (' ' <= c) and (c <= '~')
-        ret.append(c if is_printable else '0x' + h)
-        i += 2
-    return ''.join(ret)
-
-
 def get_classifier():
     c = []
     for rex, classification in [

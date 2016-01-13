@@ -37,6 +37,9 @@ import re
 def get_nodes(db_client):
     sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
+    edges = list(db_client.execute("g.E()").data)
+    assert len(edges) == 0, resp  # There are no edges, only vertices.
+
     resp = db_client.execute("g.V()")
     for node in resp.data:
         assert node['id'] >= 0, node
@@ -63,6 +66,7 @@ def node_types(url, verbose=True):
             id = d[0]['id']
             value = d[0]['value']
             assert id >= 0, id
+            assert value in ['artifact', 'unitOfExecution'], type
             types[value] += 1
             if value == 'unitOfExecution':
                 # optional attributes: CWD, PPID, commandLine, programName
