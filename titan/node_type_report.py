@@ -35,13 +35,15 @@ import re
 
 
 def get_nodes(db_client):
+    '''Returns the interesting part of each node (its properties).'''
+
     sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
     edges = list(db_client.execute("g.E()").data)
-    assert len(edges) == 0, resp  # There are no edges, only vertices.
+    assert len(edges) == 0, edges  # There are no edges, only vertices.
 
-    resp = db_client.execute("g.V()")
-    for node in resp.data:
+    nodes = db_client.execute("g.V()").data
+    for node in nodes:
         assert node['id'] >= 0, node
         assert node['type'] == 'vertex', node
         assert sri_label_re.search(node['label']), node

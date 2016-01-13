@@ -80,30 +80,24 @@ class ExfilDetector(object):
         if m:
             self.cmd = m.group('cmd')
 
-    def remember(self, event):
+    def remember(self, cmd):
         '''Maintain a history of recently seen events.'''
         assert self.k == 1
-        self.recent_events = [event]  # Later we'll retain multiple events.
+        self.recent_events = [cmd]  # Later we'll retain multiple events.
 
-    def is_exfil(self, event):
+    def is_exfil(self, cmd):
         '''Predicate is True for sensitive file exfiltration events.'''
-        recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
-        return self.is_sensitive_file(event) and recent_foreign_ip
+        # recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
+        return self.is_sensitive_file(cmd)  # and recent_foreign_ip
 
-    def get_foreign_ip(self, event):
-        '''Predicate is true for IPs outside of the building's firewall.'''
-        m = self._ip_re.search(self.recent_events[0])
-        if m:
-            ip = m.group('ip')
-            mh_local_ip = '13.1.101.46'  # Current monitored host is hangang.
-            return ip if ip != mh_local_ip else None
-        else:
-            return None
-
-    def is_sensitive_file(self, event):
+    def is_sensitive_file(self, cmd):
         '''Predicate is True for files with restrictive markings.'''
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
         # File paths relative to cwd may require us to track additional state.
+        if (' auditctl ' in cmd
+            and cmd.startswith('sudo ')):
+            return True
+        event = cmd
         m = self._file_re.search(event)
         if m:
             fspec = m.group('fspec')
@@ -126,25 +120,20 @@ class ExfilDetector(object):
             return False
 
 
-def get_events(db_client):
+def get_nodes(db_client):
+    '''Returns the interesting part of each node (its properties).'''
 
-    ignores = set('document endDocument'.split())
-    ignore_re = re.compile(r'^\s*prefix '
-                           r'|\baudit:path="(anon_inode|pipe|socket):')
-    verbose_re = re.compile(r'\b(data:[0-9a-f]{5})[0-9a-f]{59}\b')
-    squeeze_blanks_re = re.compile(r'\s+')
-    squeeze_ids_re = re.compile(r'(?P<before>.*?)\b'
-                                r'(?P<nums>(\d+)\s+(\d+)\s+(\d+)\s+(\d+))\b'
-                                r'(?P<after>.*)')
-    cmd_re = re.compile(r'(?P<before>.*?\baudit:commandline="sh -c )'
-                        r'(?P<hexcmd>[0-9A-F]+)'
-                        r'(?P<after>.*)')
+    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
-    resp = db_client.execute("g.V()")
+    edges = list(db_client.execute("g.E()").data)
+    assert len(edges) == 0, edges  # There are no edges, only vertices.
 
-    for v in resp.data:
-        print(v)
-        yield v
+    nodes = db_client.execute("g.V()").data
+    for node in nodes:
+        assert node['id'] >= 0, node
+        assert node['type'] == 'vertex', node
+        # assert sri_label_re.search(node['label']), node
+        yield node['properties']
 
 
 def get_classifier():
@@ -157,29 +146,37 @@ def get_classifier():
     return c
 
 
+def add_vertext(client, cmd, classification):
+
+    resp = client.execute(
+        "graph.addVertex(label, p1, 'name', p2)",
+        bindings={'p1': 'classification', 'p2': 'foo'})
+    print(resp)
+
+
 def classify_provn_events(url):
     detector = ExfilDetector()
     c = get_classifier()
+    client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
 
-    client = gremlinrestclient.GremlinRestClient(url=url)
-    
-    for event in get_events(client):
-        print(event)
-        if 'programName' in event:
-            print(event['commandLine'])
-
-    for event in get_events(client):
-        detector.scan(event)
-        if detector.is_exfil(event):
-            assert detector.cmd == 'nc'
-            classification = 'step4_exfiltrate_sensitive_file'
-            print('\n' + classification)
-        for rex, classification in c:
-            if rex.search(event):
+    # Iterate through all TA1-observed event nodes.
+    for event in get_nodes(client):
+        if ('programName' in event and
+            'commandLine' in event):
+            cmds = event['commandLine']
+            assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
+            id, cmd = cmds[0]['id'], cmds[0]['value']
+            detector.scan(cmd)
+            if detector.is_exfil(cmd):
+                # assert detector.cmd == 'nc', cmd
+                classification = 'step4_exfiltrate_sensitive_file'
+                sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
+                cmd = re.sub(sudo_env, '', cmd)
+                add_vertext(client, cmd, classification)
                 print('\n' + classification)
-        detector.remember(event)
+            detector.remember(cmd)
 
 
 def arg_parser():
