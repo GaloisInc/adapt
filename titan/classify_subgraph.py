@@ -150,7 +150,7 @@ def add_vertex(client, cmd, classification):
 
     resp = client.execute(
         "graph.addVertex(label, p1, 'name', p2)",
-        bindings={'p1': 'classification', 'p2': 'foo'})
+        bindings={'p1': 'classification', 'p2': classification})
     print(resp.data)
 
 
