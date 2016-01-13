@@ -30,7 +30,6 @@ __author__ = 'John.Hanley@parc.com'
 import gremlinrestclient
 import argparse
 import collections
-import os
 import re
 
 

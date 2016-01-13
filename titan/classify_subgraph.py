@@ -123,7 +123,7 @@ class ExfilDetector(object):
 def get_nodes(db_client):
     '''Returns the interesting part of each node (its properties).'''
 
-    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
+    # sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
     edges = list(db_client.execute("g.E()").data)
     assert len(edges) == 0, edges  # There are no edges, only vertices.
@@ -146,17 +146,17 @@ def get_classifier():
     return c
 
 
-def add_vertext(client, cmd, classification):
+def add_vertex(client, cmd, classification):
 
     resp = client.execute(
         "graph.addVertex(label, p1, 'name', p2)",
         bindings={'p1': 'classification', 'p2': 'foo'})
-    print(resp)
+    print(resp.data)
 
 
 def classify_provn_events(url):
     detector = ExfilDetector()
-    c = get_classifier()
+    # c = get_classifier()
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
@@ -167,14 +167,15 @@ def classify_provn_events(url):
             'commandLine' in event):
             cmds = event['commandLine']
             assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
-            id, cmd = cmds[0]['id'], cmds[0]['value']
+            # id, cmd = cmds[0]['id'], cmds[0]['value']
+            cmd = cmds[0]['value']
             detector.scan(cmd)
             if detector.is_exfil(cmd):
                 # assert detector.cmd == 'nc', cmd
                 classification = 'step4_exfiltrate_sensitive_file'
                 sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
                 cmd = re.sub(sudo_env, '', cmd)
-                add_vertext(client, cmd, classification)
+                add_vertex(client, cmd, classification)
                 print('\n' + classification)
             detector.remember(cmd)
 
