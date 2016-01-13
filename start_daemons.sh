@@ -18,8 +18,7 @@ fi
 ADAPT=$HOME/adapt
 supercfg=$ADAPT/config/supervisord.conf
 
-(set -x
- cd $ADAPT || exit 1)
+cd $ADAPT || exit 1
 
 # run supervisord (zookeeper, kafka, gremlin)
 if pgrep supervisord > /dev/null
@@ -33,6 +32,10 @@ echo Started.
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
 sleep 4
+pstree -u | grep java
 
 # This takes about one second of CPU if no building is needed.
-(cd ingest && make)
+(cd $ADAPT/ingest && make)
+
+echo Ready to populate the Titan DB, e.g. with:
+echo Trint -u '~/adapt/infoleak.provn'
