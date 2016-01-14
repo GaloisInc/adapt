@@ -72,13 +72,6 @@ class ExfilDetector(object):
             r'|usr/lib/x86_64-linux-gnu'
             r'|usr/share/locale|usr/lib/sudo)/'
             r'|^/etc/localtime')
-        self._cmd_re = re.compile(r'audit:name="(?P<cmd>[\w\.-]+)",')  # slash?
-
-    def scan(self, event):
-        '''Updates state variable(s).'''
-        m = self._cmd_re.search(event)
-        if m:
-            self.cmd = m.group('cmd')
 
     def remember(self, cmd):
         '''Maintain a history of recently seen events.'''
@@ -156,7 +149,7 @@ def add_vertex(client, cmd, classification):
 
 def classify_provn_events(url):
     detector = ExfilDetector()
-    # c = get_classifier()
+    c = get_classifier()
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
@@ -169,7 +162,7 @@ def classify_provn_events(url):
             assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
             # id, cmd = cmds[0]['id'], cmds[0]['value']
             cmd = cmds[0]['value']
-            detector.scan(cmd)
+            detector.cmd = cmd
             if detector.is_exfil(cmd):
                 # assert detector.cmd == 'nc', cmd
                 classification = 'step4_exfiltrate_sensitive_file'
