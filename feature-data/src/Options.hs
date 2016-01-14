@@ -3,6 +3,7 @@
 module Options (
     Options(..),
     parseArgs,
+    showHelp,
   ) where
 
 import System.Environment (getArgs,getProgName)

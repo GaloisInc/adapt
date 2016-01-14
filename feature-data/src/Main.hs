@@ -11,15 +11,15 @@
 module Main where
 
 import Gen
-import JSON
 import Options
 
-import           Data.List (intersperse,intercalate,foldl')
+import           Control.Monad (replicateM)
+import           Data.List (intercalate,foldl')
 import qualified Data.Map.Strict as Map
-import qualified Data.Text.Lazy as T
 import           Data.Proxy (Proxy(..),asProxyTypeOf)
 import           GHC.Generics
-import           System.IO (Handle,hPutStr,hPutStrLn,hPrint)
+import           System.Exit (exitFailure)
+import           System.IO (Handle,stdout,hPutStr,hPutStrLn)
 
 
 main :: IO ()
@@ -30,6 +30,9 @@ main  =
        "DeletesFile" -> genData optRaw (Proxy :: Proxy DeletesFile)
        "ReadsFile"   -> genData optRaw (Proxy :: Proxy ReadsFile)
        "WritesFile"  -> genData optRaw (Proxy :: Proxy WritesFile)
+       "RunsProgram" -> genData optRaw (Proxy :: Proxy RunsProgram)
+       "CopyFile"    -> genData optRaw (Proxy :: Proxy CopyFile)
+       _             -> showHelp >> exitFailure
 
 
 -- Types -----------------------------------------------------------------------
@@ -59,15 +62,23 @@ data CopyFile    = CopyFile    Copy File       deriving (Show,Eq,Ord,Generic)
 
 -- Generation ------------------------------------------------------------------
 
-genData :: (ElementsOf a, ShowFeature a, GenData a) => Bool -> Proxy a -> IO ()
+genData :: (Ord a, ElementsOf a, ShowFeature a, GenData a)
+        => Bool -> Proxy a -> IO ()
 
 genData False p =
-  do undefined
+  do vs <- vectorData 100
+     let _ = head (samples (head vs)) `asProxyTypeOf` p
+     hPrintVectors stdout vs
 
 genData True p =
   do Sample { .. } <- runGen (sampleData 100)
      let _ = head samples `asProxyTypeOf` p
      mapM_ (putStrLn . showFeature) samples
+
+vectorData :: GenData a => Int -> IO [Sample [a]]
+vectorData numVectors = runGen $ replicateM numVectors $
+  do len <- choose (50, 1000)
+     sampleData len
 
 -- | 1% of the time, generate some data that is semantically bad.
 sampleData :: GenData a => Int -> Gen (Sample [a])
@@ -82,8 +93,8 @@ sampleData  = go False []
        return (Sample (not hasBad) as)
 
   go hasBad as n =
-    do (hasBad',a) <- frequency [ (1,  lift True   genBad)
-                                , (99, lift hasBad genGood) ]
+    do (hasBad',a) <- frequency [ (9999, lift hasBad genGood)
+                                , (1,  lift True   genBad) ]
        go hasBad' (a:as) (n-1)
 
 
@@ -106,6 +117,32 @@ instance GenData ReadsFile where
 instance GenData WritesFile where
   genGood = goodFileOp WritesFile
   genBad  = badFileOp  WritesFile
+
+instance GenData RunsProgram where
+  genGood =
+    do u <- user
+       o <- case u of
+              Root -> elements [ GeneratedByUser, GeneratedByRoot ]
+              _    -> elements [ GeneratedByOther, GeneratedByUser
+                               , GeneratedByRoot ]
+
+       return (RunsProgram u o)
+
+  genBad =
+       return (RunsProgram Root GeneratedByOther)
+
+instance GenData CopyFile where
+  genGood =
+    do c <- elements [ CopyRemote, CopyLocal ]
+       f <- case c of
+              CopyRemote -> elements [ TempFile, UserFile, ProtectedSystemFile ]
+              _          -> elements [ TempFile, UserFile ]
+
+       return (CopyFile c f)
+
+  genBad =
+       return (CopyFile CopyRemote ProtectedSystemFile)
+
 
 
 goodFileOp, badFileOp :: (User -> File -> a) -> Gen a
@@ -136,6 +173,7 @@ file  =
 
 -- Serialization ---------------------------------------------------------------
 
+-- | Displaying features, usually of the form @feature(args..)@.
 class ShowFeature a where
   showFeature :: a -> String
 
