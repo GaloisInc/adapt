@@ -14,10 +14,13 @@ import qualified RDF
 import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Control.Exception
+import Data.Int (Int32)
 import Data.Monoid ((<>))
 import Data.Maybe (catMaybes,isNothing)
 import Data.List (partition,intersperse)
 import Data.Graph
+import Data.Time (UTCTime, addUTCTime)
+import qualified Data.Set as Set
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import Numeric (showHex)
@@ -27,6 +30,9 @@ import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
+import System.Random (randoms,randomR)
+import System.Random.TF
+import System.Random.TF.Gen
 
 import Titan
 import Network.HTTP.Types
@@ -38,6 +44,7 @@ data Config = Config { lintOnly   :: Bool
                      , turtle     :: Bool
                      , ast        :: Bool
                      , provn      :: Bool
+                     , fakeData   :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
@@ -53,6 +60,7 @@ defaultConfig = Config
   , turtle   = False
   , ast      = False
   , provn    = False
+  , fakeData = False
   , verbose  = False
   , help     = False
   , upload   = Nothing
@@ -79,6 +87,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['p'] ["provn"]
                     "Produce a pretty-printed, reformatted, PROV representation"
                     $ NoArg $ \s -> Right s { provn = True }
+                  , Option ['f'] ["fake"]
+                    "When pretty-printing, use fake data to fill in missing fields"
+                    $ NoArg $ \s -> Right s { fakeData = True }
                   , Option ['g'] ["graph"]
                     "Produce a dot file representing a graph of the conceptual model."
                     $ NoArg $ \s -> Right s { graph = True }
@@ -146,7 +157,10 @@ processStmts c fp res pxs
       when (provn c) $ do
         let provfile = fp <.> "trint.provn"
         dbg ("Writing prettified prov-n to " ++ provfile)
-        output provfile (renderProv pxs res)
+        gen <- newTFGen
+        let theStatements | fakeData c = useFakeData gen res
+                         | otherwise  = res
+        output provfile (renderProv pxs theStatements)
       maybe (return ()) (doUpload c res) (upload c)
  where
   dbg s = when (verbose c) (putStrLn s)
@@ -209,6 +223,88 @@ trintURI = NS.perr "http://galois.com/adapt/trint"
 -- | The prefix for ProvTC
 provtc :: Prefix
 provtc = Prefix "prov-tc" NS.adapt
+
+
+--------------------------------------------------------------------------------
+--  Fake Data for 'used' relations
+
+useFakeData :: TFGen -> [Stmt] -> [Stmt]
+useFakeData g0 ss = zipWith fakeStmt gens ss
+ where
+  gens = map (splitn g0 (ceiling $ logBase 2 (fromIntegral nrSS))) [0 .. fromIntegral nrSS - 1]
+  nrSS = length ss
+
+fakeStmt :: TFGen -> Stmt -> Stmt
+fakeStmt g stmt@(StmtPredicate p@(Predicate {..}))
+    | predType == Used =
+      let ks  = Set.fromList (map reprOf predAttrs)
+          gs  = map (splitn g (ceiling $ logBase 2 (fromIntegral nrAttrs))) [0 .. fromIntegral nrAttrs - 1]
+          kgs = zip attrs gs
+          mkNewAttr (rep,gi) | rep `Set.member` ks = []
+                             | otherwise = randomValOf gi rep
+          newAttrs = concatMap mkNewAttr kgs
+      in StmtPredicate p { predAttrs = predAttrs ++ newAttrs }
+    | otherwise = stmt
+  where attrs :: [ PredicateAttrRepr ]
+        attrs = [ PR_AtTime, PR_Cmd, PR_MachineID {- UoE attrs have been requested: UR_CWD , UR_PPID, UR_PID, UR_ProgramName, UR_USER-} ]
+        nrAttrs = length attrs
+        epoch = read "2016-01-13 19:53:37.839456 UTC"
+        randomValOf :: TFGen -> PredicateAttrRepr -> [PredicateAttr]
+        randomValOf g r =
+            case r of
+              PR_AtTime    -> [ AtTime (addUTCTime (fromIntegral $ fst $ randomR (0::Int,10000000) g) epoch) ]
+              PR_Cmd       -> [ Cmd "./Fake-Command" ]
+              PR_MachineID -> [ MachineID $ randomUUID g ] -- Text.pack $ concatMap show $ flip showHex "" $ take 4 (randoms g :: [Int32]) ]
+              _            -> error "Incomplete random predicate attr generation."
+fakeStmt g (StmtLoc (Located r s)) = StmtLoc (Located r (fakeStmt g s))
+fakeStmt g sOther = sOther
+
+randomUUID :: TFGen -> Text
+randomUUID = Text.pack . concatMap (flip showHex "" . abs) . (take 4 :: [Int32] -> [Int32]). randoms
+
+data PredicateAttrRepr
+        = PR_Raw
+        | PR_AtTime
+        | PR_StartTime
+        | PR_EndTime
+        | PR_GenOp
+        | PR_Permissions
+        | PR_ReturnVal
+        | PR_Operation
+        | PR_Args
+        | PR_Cmd
+        | PR_DeriveOp
+        | PR_ExecOp
+        | PR_MachineID
+        | PR_SourceAddress
+        | PR_DestinationAddress
+        | PR_SourcePort
+        | PR_DestinationPort
+        | PR_Protocol
+        deriving (Eq, Ord)
+
+reprOf :: PredicateAttr -> PredicateAttrRepr
+reprOf p =
+  case p of
+        Raw {}                -> PR_Raw
+        AtTime {}             -> PR_AtTime
+        StartTime {}          -> PR_StartTime
+        EndTime {}            -> PR_EndTime
+        GenOp {}              -> PR_GenOp
+        Permissions {}        -> PR_Permissions
+        ReturnVal {}          -> PR_ReturnVal
+        Operation {}          -> PR_Operation
+        Args {}               -> PR_Args
+        Cmd {}                -> PR_Cmd
+        DeriveOp {}           -> PR_DeriveOp
+        ExecOp {}             -> PR_ExecOp
+        MachineID {}          -> PR_MachineID
+        SourceAddress {}      -> PR_SourceAddress
+        DestinationAddress {} -> PR_DestinationAddress
+        SourcePort {}         -> PR_SourcePort
+        DestinationPort {}    -> PR_DestinationPort
+        Protocol {}           -> PR_Protocol
+
 --------------------------------------------------------------------------------
 --  Database Upload
 
@@ -310,7 +406,6 @@ translateInsert (StmtLoc (Located _ s)) = translateInsert s
 
 textOfTime :: Time -> Text
 textOfTime = Text.pack . show -- XXX
-
 
 --------------------------------------------------------------------------------
 --  Statistics
