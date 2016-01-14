@@ -54,7 +54,7 @@ def node_types(url, verbose=True):
     files = []
     mandatory_attrs = set(['PID', 'UID', 'group', 'source', 'vertexType'])
     client = gremlinrestclient.GremlinRestClient(url=url)
-    
+
     for node in get_nodes(client):
         # for k, v in sorted(node.items()):
         #     print(k, v)

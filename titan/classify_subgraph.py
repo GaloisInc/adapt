@@ -95,7 +95,7 @@ class ExfilDetector(object):
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
         # File paths relative to cwd may require us to track additional state.
         if (' auditctl ' in cmd
-            and cmd.startswith('sudo ')):
+                and cmd.startswith('sudo ')):
             return True
         event = cmd
         m = self._file_re.search(event)
@@ -164,7 +164,7 @@ def classify_provn_events(url):
     # Iterate through all TA1-observed event nodes.
     for event in get_nodes(client):
         if ('programName' in event and
-            'commandLine' in event):
+                'commandLine' in event):
             cmds = event['commandLine']
             assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
             # id, cmd = cmds[0]['id'], cmds[0]['value']
