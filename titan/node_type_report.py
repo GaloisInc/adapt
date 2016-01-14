@@ -45,19 +45,30 @@ def get_nodes(db_client):
     for node in nodes:
         assert node['id'] >= 0, node
         assert node['type'] == 'vertex', node
-        assert sri_label_re.search(node['label']), node
+        # assert sri_label_re.search(node['label']), node
         yield node['properties']
 
 
 def node_types(url, verbose=True):
     types = collections.defaultdict(int)
     files = []
+    root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
     mandatory_attrs = set(['PID', 'UID', 'group', 'source', 'vertexType'])
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     for node in get_nodes(client):
         # for k, v in sorted(node.items()):
         #     print(k, v)
+
+        if 'PPID' in node:
+            ppid = int(node['PPID'][0]['value'])
+            if ppid in root_pids:
+                assert node['vertexType'][0]['value'] == 'unitOfExecution', node
+                assert node['source'][0]['value'] == '/dev/audit', node
+                if 'programName' in node:
+                    print(node['programName'][0]['value'])  # e.g., pool
+                else:
+                    print(sorted(node.keys()), node['UID'][0]['value'])
 
         value = None
 

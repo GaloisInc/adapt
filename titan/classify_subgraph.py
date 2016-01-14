@@ -148,8 +148,9 @@ def add_vertex(client, cmd, classification):
 
 
 def classify_provn_events(url):
-    detector = ExfilDetector()
     c = get_classifier()
+    del(c)
+    detector = ExfilDetector()
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
