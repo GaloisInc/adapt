@@ -14,6 +14,9 @@ KAFKA_DIR=kafka
 mkdir -p $USER_BIN
 
 # Tools: git, stack, pip, tmux, wget
+# Entries that occasionally should be locally deleted:
+#   openjdk-8-jre-headless -- not available on trusty (use oracle ppa instead)
+#   python-pip -- not advised if versionitis forced using "sudo easy_install pip"
 sudo apt-get update
 sudo apt-get -y install \
     autotools-dev \
