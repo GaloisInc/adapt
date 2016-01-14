@@ -40,7 +40,7 @@ fi
 [ -e $USER_BIN/stack ] || cp $TEMP/stack*/stack $USER_BIN
 
 # Python Libraries
-sudo pip install kafka-python protobuf==2.5.0
+sudo -H pip install kafka-python protobuf==2.5.0
 
 # Infrastructure Programs (Titan, Gremlin, Zookeeper, kafka)
 GRZIP=$TEMP/gremlin.zip
