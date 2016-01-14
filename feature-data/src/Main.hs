@@ -7,13 +7,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Main where
 
 import Gen
 import Options
 
-import           Control.Monad (replicateM)
 import           Data.List (intercalate,foldl')
 import qualified Data.Map.Strict as Map
 import           Data.Proxy (Proxy(..),asProxyTypeOf)
@@ -24,15 +24,16 @@ import           System.IO (Handle,stdout,hPutStr,hPutStrLn)
 
 main :: IO ()
 main  =
-  do Options { .. } <- parseArgs
-     case optFeature of
-       "CreatesFile" -> genData optRaw (Proxy :: Proxy CreatesFile)
-       "DeletesFile" -> genData optRaw (Proxy :: Proxy DeletesFile)
-       "ReadsFile"   -> genData optRaw (Proxy :: Proxy ReadsFile)
-       "WritesFile"  -> genData optRaw (Proxy :: Proxy WritesFile)
-       "RunsProgram" -> genData optRaw (Proxy :: Proxy RunsProgram)
-       "CopyFile"    -> genData optRaw (Proxy :: Proxy CopyFile)
-       _             -> showHelp >> exitFailure
+  do opts <- parseArgs
+     case optFeature opts of
+       "CreatesFile" -> genData opts (Proxy :: Proxy CreatesFile)
+       "DeletesFile" -> genData opts (Proxy :: Proxy DeletesFile)
+       "ReadsFile"   -> genData opts (Proxy :: Proxy ReadsFile)
+       "WritesFile"  -> genData opts (Proxy :: Proxy WritesFile)
+       "RunsProgram" -> genData opts (Proxy :: Proxy RunsProgram)
+       "CopyFile"    -> genData opts (Proxy :: Proxy CopyFile)
+       ""            -> showHelp ["Missing feature"]        >> exitFailure
+       f             -> showHelp ["Invalid feature: " ++ f] >> exitFailure
 
 
 -- Types -----------------------------------------------------------------------
@@ -63,39 +64,61 @@ data CopyFile    = CopyFile    Copy File       deriving (Show,Eq,Ord,Generic)
 -- Generation ------------------------------------------------------------------
 
 genData :: (Ord a, ElementsOf a, ShowFeature a, GenData a)
-        => Bool -> Proxy a -> IO ()
+        => Options -> Proxy a -> IO ()
 
-genData False p =
-  do vs <- vectorData 100
-     let _ = head (samples (head vs)) `asProxyTypeOf` p
-     hPrintVectors stdout vs
+genData Options { optRaw = False, .. } p =
+  do g <- newStdGen
+     let vs = vectorData g p optNumResults optMaxAnomalies
+     hPrintVectors stdout p vs
 
-genData True p =
-  do Sample { .. } <- runGen (sampleData 100)
+genData Options { .. } p =
+  do g <- newStdGen
+     let Sample { .. } = runGen g (sampleData optNumResults optMaxAnomalies)
      let _ = head samples `asProxyTypeOf` p
      mapM_ (putStrLn . showFeature) samples
 
-vectorData :: GenData a => Int -> IO [Sample [a]]
-vectorData numVectors = runGen $ replicateM numVectors $
-  do len <- choose (50, 1000)
-     sampleData len
 
--- | 1% of the time, generate some data that is semantically bad.
-sampleData :: GenData a => Int -> Gen (Sample [a])
-sampleData  = go False []
+-- | Generate random feature vectors.
+vectorData :: (Ord a, GenData a, ElementsOf a)
+           => StdGen -> Proxy a -> Int -> Int -> [Sample [Int]]
+vectorData g p numVectors numAnomalies =
+  take numVectors (iterateGen g numAnomalies step)
+  where
+
+  step a =
+    do len  <- choose (50, 1000)
+
+       b         <- elements [True,False]
+       (a',anom) <- if | a <= 0    -> return (0,0)
+                       | b         -> do anom <- choose (1,10)
+                                         return (a-1,anom)
+                       | otherwise -> return (a,0)
+
+       s <- sampleData len anom
+       let _ = head (samples s) `asProxyTypeOf` p
+       let counts = genCounts `fmap` s
+
+       return (counts,a')
+
+-- | Generate random raw feature data.
+sampleData :: GenData a => Int -> Int -> Gen (Sample [a])
+sampleData numRaw numBad =
   where
 
   lift b m =
     do a <- m
        return (b,a)
 
-  go hasBad as 0 =
-       return (Sample (not hasBad) as)
+  go acc n a
 
-  go hasBad as n =
-    do (hasBad',a) <- frequency [ (9999, lift hasBad genGood)
-                                , (1,  lift True   genBad) ]
-       go hasBad' (a:as) (n-1)
+    | n > 0 =
+      do (a',x) <- frequency [ (numRaw, lift a     genGood)
+                             , (a,      lift (a-1) genBad) ]
+
+         go (x:acc) (n-1) a'
+
+    | otherwise =
+       return (Sample (numBad == a) acc)
 
 
 class GenData a where
@@ -226,12 +249,12 @@ data Sample a = Sample { nominal :: Bool, samples :: a
 
 
 hPrintVectors :: (Ord a, ElementsOf a, ShowFeature a)
-              => Handle -> [Sample [a]] -> IO ()
-hPrintVectors h vs =
+              => Handle -> Proxy a -> [Sample [Int]] -> IO ()
+hPrintVectors h p vs =
   do hPutStrLn h (intercalate "," ("ground.truth" : header))
-     mapM_ (hPrintVector h . fmap genCounts) vs
+     mapM_ (hPrintVector h) vs
   where
-  header = map show (genHeader (head (samples (head vs))))
+  header = map show (genHeader (undefined `asProxyTypeOf` p))
 
 genHeader :: (ShowFeature a, ElementsOf a) => a -> [String]
 genHeader a = [ showFeature k | k <- elementsOf `asTypeOf` [a] ]
