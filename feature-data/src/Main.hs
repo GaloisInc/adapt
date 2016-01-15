@@ -85,10 +85,14 @@ vectorData g p numVectors numAnomalies =
   take numVectors (iterateGen g numAnomalies step)
   where
 
-  step a =
-    do len  <- choose (50, 1000)
+  hasAnomalies =
+    frequency [ (numVectors - numAnomalies, pure False)
+              , (numAnomalies,              pure True) ]
 
-       b         <- elements [True,False]
+  step a =
+    do len <- choose (50, 1000)
+
+       b         <- hasAnomalies
        (a',anom) <- if | a <= 0    -> return (0,0)
                        | b         -> do anom <- choose (1,10)
                                          return (a-1,anom)
@@ -102,7 +106,7 @@ vectorData g p numVectors numAnomalies =
 
 -- | Generate random raw feature data.
 sampleData :: GenData a => Int -> Int -> Gen (Sample [a])
-sampleData numRaw numBad =
+sampleData numRaw numBad = go [] numRaw numBad
   where
 
   lift b m =
@@ -112,8 +116,8 @@ sampleData numRaw numBad =
   go acc n a
 
     | n > 0 =
-      do (a',x) <- frequency [ (numRaw, lift a     genGood)
-                             , (a,      lift (a-1) genBad) ]
+      do (a',x) <- frequency [ (n, lift a     genGood)
+                             , (a, lift (a-1) genBad) ]
 
          go (x:acc) (n-1) a'
 

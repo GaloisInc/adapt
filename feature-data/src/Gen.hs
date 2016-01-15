@@ -21,7 +21,7 @@ import           System.Random (StdGen,newStdGen,Random(randomR),split)
 
 frequency :: [(Int,Gen a)] -> Gen a
 frequency xs =
-  do n <- choose (0,total)
+  do n <- choose (1,total)
      pick n xs
 
   where

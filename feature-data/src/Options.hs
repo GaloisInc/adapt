@@ -52,11 +52,17 @@ setNumResults str =
     [(n,"")] -> Ok (\Options { .. } -> Options { optNumResults = n, .. })
     _        -> Error ["Unable to parse --num-results argument"]
 
+-- | When the anomaly value is given as a percentage, the number is calculated
+-- based on previous values of @--num-results@.
 setMaxAnomalies :: String -> Parser Options
 setMaxAnomalies str =
   case reads str of
-    [(n,"")] -> Ok (\Options { .. } -> Options { optMaxAnomalies = n, .. })
-    _        -> Error ["Unable to parse --num-anomalies argument"]
+    [(n,"")]  -> Ok (\Options { .. } -> Options { optMaxAnomalies = n, .. })
+    [(n,"%")] -> Ok (\Options { .. } -> Options { optMaxAnomalies = n `percentOf` optNumResults, .. })
+    _         -> Error ["Unable to parse --num-anomalies argument"]
+
+percentOf :: Int -> Int -> Int
+percentOf p n = round ((fromIntegral p / 100) * fromIntegral n :: Double)
 
 setRaw :: Parser Options
 setRaw = Ok (\Options { .. } -> Options { optRaw = True, .. })
