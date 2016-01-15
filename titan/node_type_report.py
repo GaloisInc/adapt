@@ -45,7 +45,7 @@ def get_nodes(db_client):
     for node in nodes:
         assert node['id'] >= 0, node
         assert node['type'] == 'vertex', node
-        # assert sri_label_re.search(node['label']), node
+        assert True or sri_label_re.search(node['label']), node
         yield node['properties']
 
 
@@ -57,18 +57,22 @@ def node_types(url, verbose=True):
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     for node in get_nodes(client):
+
         # for k, v in sorted(node.items()):
         #     print(k, v)
 
-        if 'PPID' in node:
+        for et in ['used', 'wasGeneratedBy', 'wasInformedBy']:
+            if et in node:
+                assert None, node
+
+        if 'source' in node:
+            assert node['source'][0]['value'] == '/dev/audit', node
+
+        if 'PPID' in node and 'programName' in node:
             ppid = int(node['PPID'][0]['value'])
             if ppid in root_pids:
-                assert node['vertexType'][0]['value'] == 'unitOfExecution', node
-                assert node['source'][0]['value'] == '/dev/audit', node
-                if 'programName' in node:
-                    print(node['programName'][0]['value'])  # e.g., pool
-                else:
-                    print(sorted(node.keys()), node['UID'][0]['value'])
+                assert node['vertexType'][0]['value'] == 'unitOfExecution'
+                print(node['programName'][0]['value'])  # e.g., pool
 
         value = None
 
