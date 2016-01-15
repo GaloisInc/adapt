@@ -27,10 +27,32 @@ Reports on node types stored in a Titan graph.
 
 __author__ = 'John.Hanley@parc.com'
 
+import graphviz
 import gremlinrestclient
 import argparse
 import collections
 import re
+
+
+class ProcessGraphNodes:
+    '''Maintains a collection of processes we have seen.'''
+
+    def __init__(self):
+        self.nodes = {}  # process id to process name mapping
+
+    def was_seen(self, pid):
+        '''We have seen a certain process, so make a note of it.'''
+        if pid not in self.nodes:
+            self.nodes[pid] = 'parent'  # pre-existing parent of unknown name
+
+    def has_name(self, pid, name):
+        '''Note the name of a process.'''
+        self.nodes[pid] = name
+
+    def has_parent(self, pid, ppid, dot):
+        dot.node(pid, self.nodes[pid])
+        dot.node(ppid, self.nodes[ppid])
+        dot.edge(ppid, pid)
 
 
 def edge_types(url):
@@ -55,20 +77,23 @@ def edge_types(url):
 def get_nodes(db_client):
     '''Returns the interesting part of each node (its properties).'''
 
-    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
+    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
+                              '|^classification$')
 
     edges = list(db_client.execute("g.E()").data)
     assert len(edges) > 0, len(edges)
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:
-        assert node['id'] >= 0, node
         assert node['type'] == 'vertex', node
-        assert True or sri_label_re.search(node['label']), node
+        assert node['id'] >= 0, node
+        assert sri_label_re.search(node['label']), node
         yield node['properties']
 
 
-def node_types(url, verbose=True):
+def node_types(url, verbose=False, name='infoleak'):
+    dot = graphviz.Digraph(name=name, format='png')
+    pg_nodes = ProcessGraphNodes()
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
@@ -84,10 +109,13 @@ def node_types(url, verbose=True):
             assert node['source'][0]['value'] == '/dev/audit', node
 
         if 'PPID' in node and 'programName' in node:
-            ppid = int(node['PPID'][0]['value'])
-            if ppid in root_pids:
+            pid = node['PID'][0]['value']
+            ppid = node['PPID'][0]['value']
+            if int(ppid) in root_pids:
                 assert node['vertexType'][0]['value'] == 'unitOfExecution'
-                print(node['programName'][0]['value'])  # e.g., pool
+            pg_nodes.was_seen(ppid)
+            pg_nodes.has_name(pid, node['programName'][0]['value'])  # e.g., pool
+            pg_nodes.has_parent(pid, ppid, dot)
 
         value = None
 
@@ -115,6 +143,7 @@ def node_types(url, verbose=True):
             assert value.startswith('/') or value.startswith('address:'), value
             files.append(value)
 
+    dot.render(directory='/tmp')
     if verbose:
         print('\n'.join(sorted(files)))
     return types
