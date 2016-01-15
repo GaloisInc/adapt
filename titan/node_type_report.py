@@ -33,13 +33,32 @@ import collections
 import re
 
 
+def edge_types(url):
+    types = collections.defaultdict(int)
+    valid_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
+    db_client = gremlinrestclient.GremlinRestClient(url=url)
+    for edge in db_client.execute("g.E()").data:
+        if 'properties' in edge:
+            d = edge['properties']
+            assert len(d) == 1, d
+            assert 'atTime' in d, d  # e.g. '2015-09-28 01:06:56 UTC'
+        assert edge['type'] == 'edge', edge
+        assert edge['id'] >= 0, edge
+        assert edge['inV'] >= 0, edge
+        assert edge['outV'] >= 0, edge
+        typ = edge['label']
+        assert typ in valid_types, edge
+        types[typ] += 1
+    return types
+
+
 def get_nodes(db_client):
     '''Returns the interesting part of each node (its properties).'''
 
     sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
     edges = list(db_client.execute("g.E()").data)
-    assert len(edges) == 0, edges  # There are no edges, only vertices.
+    assert len(edges) > 0, len(edges)
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:
@@ -60,10 +79,6 @@ def node_types(url, verbose=True):
 
         # for k, v in sorted(node.items()):
         #     print(k, v)
-
-        for et in ['used', 'wasGeneratedBy', 'wasInformedBy']:
-            if et in node:
-                assert None, node
 
         if 'source' in node:
             assert node['source'][0]['value'] == '/dev/audit', node
@@ -115,8 +130,11 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    types = node_types(args.db_url)
+    for k, v in sorted(edge_types(args.db_url).items()):
+        print('%5d  %s' % (v, k))
+    print('')
+    types = sorted(node_types(args.db_url).items())
     print('=' * 70)
     print('')
-    for k, v in sorted(types.items()):
+    for k, v in types:
         print('%5d  %s' % (v, k))
