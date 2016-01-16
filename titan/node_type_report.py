@@ -38,12 +38,15 @@ class ProcessGraphNodes:
     '''Maintains a collection of processes we have seen.'''
 
     def __init__(self):
-        self.nodes = {}  # process id to process name mapping
+        self.nodes = {}     # Maps process id to process name.
+        self.ops = {}       # Maps process id to number of FS operations.
+        self.edges = set()  # Used for pruning multi-edges down to just one.
 
     def was_seen(self, pid):
         '''We have seen a certain process, so make a note of it.'''
         if pid not in self.nodes:
-            self.nodes[pid] = 'parent'  # pre-existing parent of unknown name
+            # pre-existing parent of unknown name
+            self.nodes[pid] = 'parent_%d' % int(pid)
 
     def has_name(self, pid, name):
         '''Note the name of a process.'''
@@ -52,7 +55,12 @@ class ProcessGraphNodes:
     def has_parent(self, pid, ppid, dot):
         dot.node(pid, self.nodes[pid])
         dot.node(ppid, self.nodes[ppid])
-        dot.edge(ppid, pid)
+
+        # Avoid multi-edges.
+        pair = (ppid, pid)
+        if pair not in self.edges:
+            self.edges.add(pair)
+            dot.edge(ppid, pid)
 
 
 def edge_types(url):
@@ -114,7 +122,7 @@ def node_types(url, verbose=False, name='infoleak'):
             if int(ppid) in root_pids:
                 assert node['vertexType'][0]['value'] == 'unitOfExecution'
             pg_nodes.was_seen(ppid)
-            pg_nodes.has_name(pid, node['programName'][0]['value'])  # e.g., pool
+            pg_nodes.has_name(pid, node['programName'][0]['value'])  # e.g.pool
             pg_nodes.has_parent(pid, ppid, dot)
 
         value = None
