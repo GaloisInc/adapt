@@ -38,9 +38,9 @@ class ProcessGraphNodes:
     '''Maintains a collection of processes we have seen.'''
 
     def __init__(self):
-        self.nodes = {}     # Maps process id to process name.
-        self.ops = {}       # Maps process id to number of FS operations.
+        self.ops = collections.defaultdict(int)  # PID to num. FS operations
         self.edges = set()  # Used for pruning multi-edges down to just one.
+        self.nodes = {}  # Maps process id to process name.
 
     def was_seen(self, pid):
         '''We have seen a certain process, so make a note of it.'''
@@ -50,7 +50,9 @@ class ProcessGraphNodes:
 
     def has_name(self, pid, name):
         '''Note the name of a process.'''
-        self.nodes[pid] = name
+        name = re.sub(r'-$', '', name)
+        self.nodes[pid] = '%s_%s' % (name, int(pid))
+        return self.nodes[pid]
 
     def has_parent(self, pid, ppid, dot):
         dot.node(pid, self.nodes[pid])
@@ -63,9 +65,11 @@ class ProcessGraphNodes:
             dot.edge(ppid, pid)
 
 
+valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
+
+
 def edge_types(url):
     types = collections.defaultdict(int)
-    valid_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
     db_client = gremlinrestclient.GremlinRestClient(url=url)
     for edge in db_client.execute("g.E()").data:
         if 'properties' in edge:
@@ -77,7 +81,7 @@ def edge_types(url):
         assert edge['inV'] >= 0, edge
         assert edge['outV'] >= 0, edge
         typ = edge['label']
-        assert typ in valid_types, edge
+        assert typ in valid_edge_types, edge
         types[typ] += 1
     return types
 
@@ -99,8 +103,10 @@ def get_nodes(db_client):
         yield node['properties']
 
 
-def node_types(url, verbose=False, name='infoleak'):
-    dot = graphviz.Digraph(name=name, format='png')
+def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
+    direction = {'rankdir': 'LR'}
+    dot = graphviz.Digraph(format='png', graph_attr=direction,
+                           name='%s_%s' % (name, edge_type))
     pg_nodes = ProcessGraphNodes()
     types = collections.defaultdict(int)
     files = []
@@ -151,10 +157,52 @@ def node_types(url, verbose=False, name='infoleak'):
             assert value.startswith('/') or value.startswith('address:'), value
             files.append(value)
 
+    for edge in client.execute("g.E()").data:
+        typ = edge['label']
+        if edge_type == typ:
+            in_v = lookup(client, edge['inV'])
+            out_v = lookup(client, edge['outV'])
+            if in_v and out_v:
+                dot.edge(in_v, out_v,
+                         style='dashed', color='blue', constraint='false')
+                if out_v.startswith('/'):
+                    dot.node(out_v, color='white')
+                if in_v.startswith('/'):
+                    dot.node(in_v, color='white')
+                    if verbose:
+                        print(out_v, in_v)
+
     dot.render(directory='/tmp')
     if verbose:
         print('\n'.join(sorted(files)))
     return types
+
+
+def is_unit_of_execution(properties):
+    return ('vertexType' in properties
+            and properties['vertexType'][0]['value'] == 'unitOfExecution')
+
+
+def lookup(client, id, verbose=False):
+    ret = {}
+    query = 'g.V(%d)' % id
+    for node in client.execute(query).data:
+        assert node['type'] == 'vertex', node
+        if verbose:
+            print(sorted(node['properties'].items()))
+        ret = node['properties']
+    if 'programName' in ret or is_unit_of_execution(ret):
+        return ret['PID'][0]['value']
+    if 'coarseLoc' in ret:
+        loc = ret['coarseLoc'][0]['value']
+        if loc.startswith('address:'):
+            loc = loc.replace(' ', '')
+            loc = loc.replace(':', '_')
+            loc = loc.replace(',', '_')
+            loc = '/' + loc
+        assert ' ' not in loc, loc
+        return loc
+    return None
 
 
 def arg_parser():
@@ -170,7 +218,10 @@ if __name__ == '__main__':
     for k, v in sorted(edge_types(args.db_url).items()):
         print('%5d  %s' % (v, k))
     print('')
-    types = sorted(node_types(args.db_url).items())
+
+    types = {}
+    for edge_type in sorted(valid_edge_types):
+        types = sorted(node_types(args.db_url, edge_type=edge_type).items())
     print('=' * 70)
     print('')
     for k, v in types:
