@@ -1,6 +1,0 @@
-flags: {}
-packages:
-- '.'
-extra-deps:
-- dotgen-0.4.2
-resolver: nightly-2015-09-13

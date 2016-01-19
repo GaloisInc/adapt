@@ -1,5 +1,0 @@
-<cid://someUUID/firefox> tc:wasDerivedFrom <cid://somdUUID/init> .
-<cid://someUUID/firefox> tc:write          <file://a> .
-<cid://someUUID/firefox> tc:read           <socket://tcpSocket> .
-<cid://someUUID/firefox> tc:write          <socket://tcpSocket> .
-<cid://someUUID/firefox> tc:read           <file://topsecret> .

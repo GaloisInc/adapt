@@ -1,0 +1,177 @@
+document
+// validated using https://provenance.ecs.soton.ac.uk/validator/view/validator.html
+
+// declare the ontologies used in the code
+prefix ex <http://example.org/>
+
+prefix adapt <http://adapt.org/>
+
+// friend-of-a-friend has classes such as account name, account group
+prefix foaf <http://xmlns.com/foaf/0.1/>
+
+// dublin core has classes such as name, document length
+prefix dc <http://purl.org/dc/elements/1.1/>
+
+// Nepomuk file ontology
+prefix nfo <http://www.semanticdesktop.org/ontologies/2007/03/22/nfo/v1.2/>
+
+/*
+	example:
+	simplified trace for a process running executable file /users/dwa/mystuff/bin/create.exe as follows:
+	   	intmain (void){ //fork example
+     	char *arg[] = { ”/users/dwa/mystuff/bin/newprog.exe", 0 }; 
+     	if (fork() == 0) {execv(arg[0], arg);} 
+     	} 
+*/
+
+// we use the namespace “ex” for UUIDs in our example
+// the parent process – only the activity portion carries additional attributes in order to save space
+//
+//      the agent portion
+agent(ex:parenta, [prov:type='adapt:unitOfExecution'])
+//     the activity portion, using all defined optional attributes 
+activity(ex:parentb, -, -, [
+			prov:type='adapt:unitOfExecution',
+			adapt:machineID="0000000100000001",
+			prov:startedAtTime="2015-10-01T15:30:00",
+			prov:endedAtTime="2015-10-01T17:00:00",
+			adapt:privs="mode=u",
+			foaf:accountName="dwa",
+			foaf:group="Group1",
+			adapt:pid="12",
+			adapt:ppid="1",
+			adapt:pwd="/users/dwa",
+			adapt:cmdLine="xterm",
+			adapt:cmdString="xterm"])
+//     the connection between them 
+wasAssociatedWith(ex:parentb, ex:parenta, -) 
+// end of parent process record
+
+// the file ~mystuff/bin/create.exe 
+entity(ex:createExe, [
+			prov:type='adapt:artifact', 
+			adapt:artifactType='nfo:FileDataObject',
+			// alternately, 'adapt:packet'
+			// alternately, 'adapt:memory'
+			nfo:fileName="/users/dwa/mystuff/bin/create.exe",
+			// alternately, 'adapt:portID'
+			// alternately, 'adapt:pageID'
+			adapt:fileOffset="0x00000000",
+			// alternately, adapt:packetID="0x1234"
+			// alternately, adapt:address="0x00000000"
+			prov:generatedAtTime="2015-09-01T12:00:00",
+			dc:hasVersion="23",
+			prov:invalidatedAtTime="NA", 
+			nfo:fileOwner="dwa", 
+			nfo:fileSize="4096",
+			adapt:taint="0x00000001"])
+
+// parent process runs file create.exe 
+used(ex:parentb, ex:createExe, -,[
+			prov:startedAtTime="2015-10-01T16:00:00", 
+			prov:endedAtTime="2015-10-01T16:00:01", 
+			adapt:entryAddress="0x8048170",
+			adapt:argList="",
+			adapt:returnValue="0",
+			adapt:useOp="execute"])
+
+// newprog.exe was created earlier by the parent process (activity ex:parentb)
+wasGeneratedBy(ex:createExe, ex:parentb, -, [
+				adapt:genOp="write",
+				prov:atTime="2015-09-01T12:00:00",
+				nfo:permissions="0o775"])
+
+// newprog.exe was later deleted by the parent process (activity ex:parentb)
+wasInvalidatedBy(ex:createExe, ex:parentb, -, [prov:atTime="2015-10-02T09:00:00"])
+
+// newprog.exe was attributed to the parent process ex:parenta and the external agent ex:externalAgent
+wasAttributedTo(ex:createExe, ex:parenta, -)
+wasAttributedTo(ex:createExe, ex:externalAgent, -)
+
+// another file ~mystuff/bin/newprog.exe 
+entity(ex:newprogExe, [
+			prov:type='adapt:artifact', 
+			adapt:artifactType='nfo:FileDataObject', 
+			nfo:fileName="/users/dwa/mystuff/bin/newprog.exe",
+			adapt:fileOffset="0",
+			prov:generatedAtTime="2015-09-01T12:00:00",
+			dc:hasVersion="23",
+			prov:invalidatedAtTime="NA", 
+			nfo:fileOwner="dwa", 
+			nfo:fileSize="1024000",
+			adapt:taint="0x00000001"])
+
+// the file ~mystuff/bin/newprog.exe was derived from
+entity(ex:newprogSrc, [
+			prov:type='adapt:artifact', 
+			adapt:artifactType='nfo:FileDataObject', 
+			nfo:fileName="/users/dwa/mystuff/bin/newprog.c",
+			adapt:fileOffset="0",
+			prov:generatedAtTime="2015-08-31T12:00:00",
+			dc:hasVersion="33",
+			prov:invalidatedAtTime="NA", 
+			nfo:fileOwner="dwa", 
+			nfo:fileSize="8192",
+			adapt:taint="0x00000002"])
+
+// showing the derivation of newprog.exe from newprog.c
+wasDerivedFrom(ex:newprogExe, ex:newprogSrc, [
+			adapt:deriveOp="compile",
+			prov:atTime="2015-08-31T12:00:00"])
+
+// not modeled here: dc:isPartOf
+// not modeled here: dc:description
+
+
+// the child process 
+agent(ex:childA, [prov:type='adapt:unitOfExecution'])
+activity(ex:childB, -, -, [
+			prov:type='adapt:unitOfExecution', 
+			adapt:pid="100", 
+			adapt:ipAddress="10.0.0.1"]) 
+wasAssociatedWith(ex:childB, ex:childA, -) 
+
+// parent creates the child via the fork in create.exe 
+wasStartedBy(ex:childB, -, ex:parentb, -, [prov:startedAtTime="2015-10-01T16:00:01"]) 
+
+/*
+	other possible operations between processes, unused in this example
+	wasEndedBy(ex:web1; ex:childB, ex:parentb, -, -)
+	wasInformedBy(ex:inf1; ex:childB, ex:parentb, [
+			prov:atTime="2015-10-01T16:00:01",
+			adapt:execOp="clone"])
+*/
+
+// forked child executes newprog.exe 
+used(ex:childB, ex:newprogExe, -, [
+			prov:startedAtTime="2015-10-01T16:00:01", 
+			prov:endedAtTime="2015-10-01T16:00:22", 
+			adapt:address="0x8048338", 
+			adapt:useOp="execute"])
+
+// a GPS sensor artifact
+entity(ex:GPSunit, [
+			adapt:devType="GPS",
+			adapt:devID="Default GPS sensor"]) 
+
+// forked child uses the GPS sensor
+used(ex:childB, ex:GPSunit, -, [
+			prov:startedAtTime="2015-10-01T16:00:01", 
+			prov:endedAtTime="2015-10-01T16:00:22",
+			adapt:cmd="read location",
+			adapt:returnVal="45.52119128833272,-122.67789063043892"
+			])
+
+// a remote agent responsible for the parent process
+agent(ex:externalAgent, [
+		adapt:machineID="0000000100000002",
+		foaf:name="Bad Actor",
+		foaf:accountName="badactor"])
+
+// the parent process acted on behalf of this remote agent
+actedOnBehalfOf(ex:parenta, ex:externalAgent, ex:parentb)
+
+// the parent process was also associated with this remote agent
+wasAssociatedWith(ex:parentb, ex:externalAgent, -)
+
+end document 
