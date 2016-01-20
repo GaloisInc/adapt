@@ -40,8 +40,13 @@ import gremlinrestclient
 import argparse
 import errno
 import io
+import logging
 import os
 import re
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())
+log.setLevel(logging.INFO)
 
 
 class ExfilDetector(object):
@@ -151,7 +156,7 @@ def add_vertex(client, cmd, classification):
     resp = client.execute(
         "graph.addVertex(label, p1, 'name', p2)",
         bindings={'p1': 'classification', 'p2': classification})
-    print(resp.data)
+    log.debug(repr(resp.data))
 
 
 def classify_provn_events(url):
