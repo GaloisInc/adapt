@@ -8,41 +8,41 @@ import random
 
 
 def main():
-    ta3Host = '127.0.0.1'
-    toClass = b'classifier'
-    toP = b'prioritizer'
+    ta3_host = '127.0.0.1'
+    to_class = b'classifier'
+    to_p = b'prioritizer'
 
-    kafkaServer = ta3Host + ':9092'
-    kafka = KafkaClient(kafkaServer)
+    kafka_server = ta3_host + ':9092'
+    kafka = KafkaClient(kafka_server)
     producer = SimpleProducer(kafka)
-    consumer = KafkaConsumer(toClass, bootstrap_servers=[kafkaServer],
+    consumer = KafkaConsumer(to_class, bootstrap_servers=[kafka_server],
                              consumer_timeout_ms=20)
 
-    def sendMsg(m):
-        producer.send_messages(toP, m)
+    def send_msg(m):
+        producer.send_messages(to_p, m)
 
-    def recvMsg():
+    def recv_msg():
         try:
             x = consumer.next()
             return x
         except ConsumerTimeout:
             return None
 
-    oper(sendMsg, recvMsg)
+    oper(send_msg, recv_msg)
 
 
-def oper(sendMsg, recvMsg):
+def oper(send_msg, recv_msg):
     print("Wait for new data...")
     client = gremlinrestclient.GremlinRestClient()
     while True:
-        v = recvMsg()
+        v = recv_msg()
         if not (v is None):
             print("Classify activites on segment #" + v.value + "...")
             sleep(random.randint(0, 20))
             print("Search for APT behavior on segment #" + v.value + "...")
             sleep(random.randint(0, 20))
             print("Graph annoated. Notify prioritizer...")
-            sendMsg(v.value)
+            send_msg(v.value)
             print("Found %d edges." % client.execute('g.E().count()').data[0])
             print("Wait for new data...")
 
