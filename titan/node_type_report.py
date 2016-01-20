@@ -31,7 +31,12 @@ import graphviz
 import gremlinrestclient
 import argparse
 import collections
+import logging
 import re
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())  # log to console (stdout)
+log.setLevel(logging.INFO)
 
 
 class ProcessGraphNodes:
@@ -76,8 +81,9 @@ def edge_types(url):
     for edge in db_client.execute('g.E()').data:
         if 'properties' in edge:
             d = edge['properties']
-            assert len(d) == 1, d
-            assert 'atTime' in d, d  # e.g. '2015-09-28 01:06:56 UTC'
+            assert len(d) == 2, d
+            assert 'atTime' in d, d     # e.g. '2015-09-28 01:06:56 UTC'
+            assert 'operation' in d, d  # e.g. 'read'
         assert edge['type'] == 'edge', edge
         assert edge['id'] >= 0, edge
         assert edge['inV'] >= 0, edge
@@ -105,7 +111,7 @@ def get_nodes(db_client):
         yield node['properties']
 
 
-def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
+def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     direction = {'rankdir': 'LR'}
     dot = graphviz.Digraph(format='png', graph_attr=direction,
                            name='%s_%s' % (name, edge_type))
@@ -171,12 +177,10 @@ def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
                     dot.node(out_v, color='white')
                 if in_v.startswith('/'):
                     dot.node(in_v, color='white')
-                    if verbose:
-                        print(out_v, in_v)
+                    log.debug('%s %s' % (out_v, in_v))
 
     dot.render(directory='/tmp')
-    if verbose:
-        print('\n'.join(sorted(files)))
+    log.debug('\n'.join(sorted(files)))
     return types
 
 
@@ -185,13 +189,12 @@ def is_unit_of_execution(properties):
             and properties['vertexType'][0]['value'] == 'unitOfExecution')
 
 
-def lookup(client, id, verbose=False):
+def lookup(client, id):
     ret = {}
     query = 'g.V(%d)' % id
     for node in client.execute(query).data:
         assert node['type'] == 'vertex', node
-        if verbose:
-            print(sorted(node['properties'].items()))
+        log.debug(repr(sorted(node['properties'].items())))
         ret = node['properties']
     if 'programName' in ret or is_unit_of_execution(ret):
         return ret['PID'][0]['value']
@@ -204,7 +207,7 @@ def lookup(client, id, verbose=False):
             loc = '/' + loc
         assert ' ' not in loc, loc
         return loc
-    return None
+    assert None  # pragma: no cover
 
 
 def arg_parser():

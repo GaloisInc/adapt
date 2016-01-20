@@ -21,7 +21,7 @@ infoleak.txt:
 PROG1 = node_type_report.py
 report: infoleak.txt
 	coverage erase
-	coverage run $(PROG1) | tail -15
+	coverage run $(PROG1)
 	coverage report --include=$(PROG1) -m
 
 PROG2 = classify_subgraph.py
