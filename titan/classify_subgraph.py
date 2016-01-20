@@ -83,6 +83,14 @@ class ExfilDetector(object):
         # recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
         return self.is_sensitive_file(cmd)  # and recent_foreign_ip
 
+    def test_is_sensitive_file(self):
+        '''Exercise the several conditional cases.'''
+        audit_tmpl = 'audit:path="%s", audit:subtype="file",'
+        assert self.is_sensitive_file(audit_tmpl % __file__)
+        for tst in ['/non/existent', '/proc/meminfo',
+                    '/etc/issue.net', '/etc/shadow']:
+            assert not self.is_sensitive_file(audit_tmpl % tst)
+
     def is_sensitive_file(self, cmd):
         '''Predicate is True for files with restrictive markings.'''
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
@@ -106,8 +114,7 @@ class ExfilDetector(object):
                             is_sensitive = True
                 return is_sensitive
             except OSError as e:
-                if e.errno != errno.EACCES:  # 13
-                    print(e)
+                # if e.errno != errno.EACCES: print(e)  # 13
                 return False
         else:
             return False
@@ -151,6 +158,7 @@ def classify_provn_events(url):
     c = get_classifier()
     del(c)
     detector = ExfilDetector()
+    detector.test_is_sensitive_file()
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
