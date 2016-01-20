@@ -1,9 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Types
     ( -- * Types
@@ -13,6 +17,9 @@ module Types
     , TranslateError(..)
     , Warning(..)
       -- * Key types
+    , Ident(..)
+    , Prov(..)
+    , Prefix(..)
     , Type(..)
     , Stmt(..)
     , Entity(..)
@@ -25,36 +32,34 @@ module Types
     , Located(..), Range(..)
     -- * Helpers
     , nameOf
+    , OnIdent(..)
     ) where
 
+import           GHC.Generics -- For generic 'onIdent' traversal
 import qualified Control.Exception as X
+import           Data.Char (toLower)
 import           Data.Data
 import           Data.Text.Lazy (Text)
-import           Data.Time (UTCTime)
+import           Data.Time
+import           Numeric (showFFloat)
 import           Data.Word (Word64)
 import           Text.Show.Functions ()
 
-
+import           ParserCore (ParseError(..), Time, Prov(..), Prefix(..))
 import           Namespaces (Ident(..), textOfIdent)
 import           PP as PP
 import           Position
-import           LexerCore (Token)
-
-type Time = UTCTime
+import           LexerCore (Type(..))
 
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError
-  deriving (Show, Data, Typeable)
+  deriving (Show, Data, Generic, Typeable)
 data Warning    = Warn Text
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 data TypeError  = TypeError Range Text Type Type | CanNotInferType Text
-        deriving (Eq, Ord, Show, Data, Typeable)
+        deriving (Eq, Ord, Show, Data, Generic, Typeable)
 data TranslateError = TranslateError Text
-        deriving (Show, Data, Typeable)
-
-data ParseError = HappyError (Maybe (Located Token))
-                | HappyErrorMsg String
-                  deriving (Data,Typeable, Eq, Ord, Show)
+        deriving (Show, Data, Generic, Typeable)
 
 instance X.Exception TypeError
 instance X.Exception ParseError
@@ -69,22 +74,21 @@ instance X.Exception Error
 data Stmt = StmtEntity Entity
           | StmtPredicate Predicate
           | StmtLoc (Located Stmt)
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | Entities in our conceptual Model
--- Notice each entity has a name (Text field) except for metadata.
 data Entity = Agent Ident [AgentAttr]
             | UnitOfExecution Ident [UoeAttr]
             | Artifact Ident [ArtifactAttr]
             | Resource Ident DevType (Maybe DevID)
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 nameOf :: Entity -> Text
-nameOf e = 
+nameOf e =
  textOfIdent $ case e of
-            Agent n _ -> n
+            Agent n _           -> n
             UnitOfExecution n _ -> n
-            Artifact n _    -> n
+            Artifact n _        -> n
             Resource n _ _      -> n
 
 -- | Machine ID
@@ -92,7 +96,7 @@ type MID = UUID
 
 -- | Attributes of Agents
 data AgentAttr = AAName Text | AAUser Text | AAMachine MID
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | Attributes of units of execution
 data UoeAttr = UAUser Text
@@ -109,7 +113,7 @@ data UoeAttr = UAUser Text
              | UAProgramName Text
              | UACWD Text
              | UAUID Text
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | Attributes of Artifacts
 data ArtifactAttr = ArtAType ArtifactType
@@ -128,7 +132,7 @@ data ArtifactAttr = ArtAType ArtifactType
                   | ArtASourceAddress Text
                   | ArtASourcePort Text
                   | Taint Word64
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | XXX TBD
 type Privs = Text
@@ -149,10 +153,11 @@ type CoarseLoc = Text
 
 data Predicate = Predicate { predSubject    :: Ident
                            , predObject     :: Ident
+                           , predIdent      :: Maybe Ident
                            , predType       :: PredicateType
                            , predAttrs      :: [PredicateAttr]
                            }
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 data PredicateAttr
         = Raw Text Text
@@ -173,7 +178,7 @@ data PredicateAttr
         | SourcePort Text
         | DestinationPort Text
         | Protocol Text
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 data PredicateType
             = ActedOnBehalfOf
@@ -188,7 +193,7 @@ data PredicateType
             | WasDerivedFrom
             | Description
             | IsPartOf
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 type ExecOp = Text
 
@@ -203,7 +208,7 @@ type ArtifactType = Text
 
 -- | Types of devices
 data DevType      = GPS  | Camera | Keyboard | Accelerometer | OtherDev Text
-  deriving (Eq, Ord, Show, Data, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 -- | Methods of deriving data from a source
 type DeriveOp     = Text
@@ -215,20 +220,6 @@ type UseOp        = Text
 type GenOp        = Text
 
 type EntryPoint = Text
-
--- | Basic types in the ED graph
-data Type = EntityClass
-          | ActorClass
-          | DescribeClass
-          | ResourceClass
-          | TyUnitOfExecution
-          | TyHost
-          | TyAgent
-          | TyArtifact
-          | TyResource
-          | TyArrow Type Type
-          | TyVoid
-        deriving (Eq, Ord, Show, Read, Data, Typeable)
 
 --------------------------------------------------------------------------------
 --  Pretty Printing
@@ -285,3 +276,195 @@ instance PP PredicateType where
        WasDerivedFrom    -> text "wasDerivedFrom"
        Description       -> text "description"
        IsPartOf          -> text "isPartOf"
+
+instance PP Stmt where
+  ppPrec _ (StmtEntity e)        = pp e
+  ppPrec _ (StmtPredicate p)     = pp p
+  ppPrec _ (StmtLoc (Located _ s)) = pp s
+
+instance PP Predicate where
+  ppPrec _ (Predicate { .. }) =
+      case predType of
+        Used -> text "used(" <> identDoc <> pp predSubject <> text ", " <> pp predObject <> text ", " <> start <> text ", [" <> ppList predAttrs' <> text "])"
+        _    -> pp predType  <> text "(" <> pp predSubject <> text ", " <> pp predObject <> text ", [" <> ppList predAttrs <> text "])"
+    where
+    start = maybe (text "-") pp (getAtTime predAttrs)
+    getAtTime  = foldr (\x a -> case x of { AtTime t -> Just t ; _ -> a }) Nothing
+    predAttrs' = filter (\x -> case x of { AtTime _ -> False ; _ -> True }) predAttrs
+    identDoc   = case predIdent of
+                   Nothing  -> mempty
+                   Just i   -> pp i <> text "; "
+
+instance PP PredicateAttr where
+  ppPrec _ p0 =
+    case p0 of
+        Raw k v              -> pp k                              <=> ppq v
+        StartTime t          -> text "prov:startTime"             <=> ppq t
+        EndTime t            -> text "prov:endTime"               <=> ppq t
+        AtTime t             -> text "prov-tc:time"               <=> ppq t
+        GenOp genOp          -> text "prov-tc:genOp"              <=> ppq genOp
+        Permissions t        -> text "prov-tc:permissions"        <=> ppq t
+        ReturnVal t          -> text "prov-tc:returnVal"          <=> ppq t
+        Operation useOp      -> text "prov-tc:operation"          <=> ppq useOp
+        Args t               -> text "prov-tc:args"               <=> ppq t
+        Cmd t                -> text "prov-tc:cmd"                <=> ppq t
+        DeriveOp deriveOp    -> text "prov-tc:deriveOp"           <=> ppq deriveOp
+        ExecOp execOp        -> text "prov-tc:execOp"             <=> ppq execOp
+        MachineID mid        -> text "prov-tc:machineID"          <=> ppq mid
+        SourceAddress t      -> text "prov-tc:sourceAddress"      <=> ppq t
+        DestinationAddress t -> text "prov-tc:destinationAddress" <=> ppq t
+        SourcePort t         -> text "prov-tc:sourcePort"         <=> ppq t
+        DestinationPort t    -> text "prov-tc:destinationPort"    <=> ppq t
+        Protocol t           -> text "prov-tc:protocol"           <=> ppq t
+
+ppq :: PP a => a -> Doc
+ppq x = text "\"" <> pp x <> text "\""
+
+instance PP Time where
+  ppPrec _ t = pp year <-> pp month <-> pp day <> pp 'T' <> pp hour <:> pp minute <:> secDoc <> pp 'Z'
+     where
+        (year,month,day)               = toGregorian (utctDay t)
+        TimeOfDay hour minute picosec  = timeToTimeOfDay (utctDayTime t)
+        sec                            = realToFrac picosec / (10^(12::Int) :: Double)
+        secDoc                         = text $ showFFloat (Just 6) sec ""
+
+instance PP Entity where
+  ppPrec _ e0 =
+    case e0 of
+      Agent i as            -> text "agent(" <> pp i <> text ", [" <> ppList as <> text "])"
+      UnitOfExecution i as  -> ppActivity i as
+      Artifact i as         -> text "entity(" <> pp i <> text ", [" <> ppList as <> text "])"
+      Resource i dt did     -> text "entity(" <> pp i <> text ", [" <> text "prov-tc:devType" <=> pp dt <> didDoc <> text "])"
+        where didDoc = case did of
+                        Just d -> text ", prov-tc:devID" <=> pp d
+                        Nothing -> mempty
+
+ppActivity :: Ident -> [UoeAttr] -> Doc
+ppActivity i as = text "activity(" <> pp i <> comma <> start <> comma <> end <> text ", [" <> ppList as' <> text "])"
+ where
+ start = maybe (text "-") pp (getUAStarted as)
+ end   = maybe (text "-") pp (getUAEnded as)
+ getUAStarted = foldr (\x a -> case x of { UAStarted t -> Just t ; _ -> a }) Nothing
+ getUAEnded   = foldr (\x a -> case x of { UAEnded t   -> Just t ; _ -> a }) Nothing
+ as'       = filter notTime as
+ notTime x = case x of
+              UAStarted _ -> False
+              UAEnded   _ -> False
+              _           -> True
+
+instance PP DevType where
+  ppPrec _ dt = pp (map toLower $ show dt)
+
+instance PP AgentAttr where
+  ppPrec _ a0 =
+    case a0 of
+      AAName t      -> text "prov-tc:name"      <=> ppq  t
+      AAUser t      -> text "prov-tc:user"      <=> ppq t
+      AAMachine mid -> text "prov-tc:machineID" <=> ppq mid
+
+instance PP UoeAttr where
+  ppPrec _ a0 =
+    case a0 of
+      UAUser t        -> text "foaf:accountName"    <=> ppq t
+      UAPID pid       -> text "prov-tc:pid"         <=> ppq pid
+      UAPPID pid      -> text "prov-tc:ppid"        <=> ppq pid
+      UAMachine mid   -> text "prov-tc:machineID"   <=> ppq mid
+      UAStarted t     -> text "prov:startedAtTime"  <=> ppq t
+      UAHadPrivs p    -> text "prov-tc:privs"       <=> ppq p
+      UAPWD t         -> text "prov-tc:pwd"         <=> ppq t
+      UAEnded t       -> text "prov-tc:endedAtTime" <=> ppq t
+      UAGroup t       -> text "prov-tc:group"       <=> ppq t
+      UACommandLine t -> text "prov-tc:commandLine" <=> ppq t
+      UASource t      -> text "prov-tc:source"      <=> ppq t
+      UAProgramName t -> text "prov-tc:programName" <=> ppq t
+      UACWD t         -> text "prov-tc:cwd"         <=> ppq t
+      UAUID t         -> text "prov-tc:uid"         <=> ppq t
+
+instance PP ArtifactAttr where
+  ppPrec _ a0 =
+    case a0 of
+      ArtAType ty              -> text "prov-tc:artifactType"       <=> ppq ty
+      ArtARegistryKey t        -> text "prov-tc:registryKey"        <=> ppq t
+      ArtACoarseLoc cloc       -> text "prov-tc:coarseLoc"          <=> ppq cloc
+      ArtADestinationAddress t -> text "prov-tc:destinationAddress" <=> ppq t
+      ArtADestinationPort t    -> text "prov-tc:destinationPort"    <=> ppq t
+      ArtASourceAddress t      -> text "prov-tc:sourceAddress"      <=> ppq t
+      ArtASourcePort t         -> text "prov-tc:sourcePort"         <=> ppq t
+      --  XXX All the below constructors are unused, they lack
+      --  any translation path from ProvN, see Translate.hs
+      ArtAFineLoc floc         -> text "prov-tc:fineLoc"            <=> ppq floc
+      ArtACreated t            -> text "prov-tc:created"            <=> ppq t
+      ArtAVersion ver          -> text "prov-tc:version"            <=> ppq ver
+      ArtADeleted t            -> text "prov-tc:deleted"            <=> ppq t
+      ArtAOwner t              -> text "prov-tc:owner"              <=> ppq t
+      ArtASize i               -> text "prov-tc:size"               <=> ppq i
+      Taint w64                -> text "prov-tc:taint"              <=> pp (fromIntegral w64 :: Integer)
+
+(<=>) :: Doc -> Doc -> Doc
+(<=>) a b = a <> text " = " <> b
+
+(<:>) :: Doc -> Doc -> Doc
+(<:>) a b = a <> pp ':' <> b
+
+(<->) :: Doc -> Doc -> Doc
+(<->) a b = a <> pp '-' <> b
+
+-- XXX
+-- The below is a demonstration of why 'Instant Generics' aka GHC Generics
+-- are a bad thing in their current instantiation.
+class GOnIdent f where
+  gonIdent :: (Ident -> Ident) -> f a -> f a
+
+class OnIdent a where
+  onIdent :: (Ident -> Ident) -> a -> a
+
+instance GOnIdent U1 where
+  gonIdent _ U1 = U1
+
+instance (GOnIdent a, GOnIdent b) => GOnIdent (a :*: b) where
+  gonIdent f (a :*: b) = gonIdent f a :*: gonIdent f b
+
+instance (GOnIdent a, GOnIdent b) => GOnIdent (a :+: b) where
+  gonIdent f (L1 x) = L1 $ gonIdent f x
+  gonIdent f (R1 x) = R1 $ gonIdent f x
+
+instance GOnIdent a => GOnIdent (M1 i c a) where
+  gonIdent f (M1 x) = M1 (gonIdent f x)
+
+instance OnIdent c => GOnIdent (K1 i c) where
+  gonIdent f (K1 x) = K1 (onIdent f x)
+
+instance OnIdent Stmt where
+  onIdent f = to . gonIdent f . from
+instance OnIdent Entity where
+  onIdent f = to . gonIdent f . from
+instance OnIdent Predicate where
+  onIdent f = to . gonIdent f . from
+instance OnIdent Ident where
+  onIdent f = f
+instance (OnIdent s) => OnIdent (Located s) where
+  onIdent f (Located x a) = Located x (onIdent f a)
+instance OnIdent PredicateType where
+  onIdent _ = id
+instance OnIdent UTCTime where
+  onIdent _ = id
+instance OnIdent Text where
+  onIdent _ = id
+instance OnIdent a => OnIdent [a] where
+  onIdent f = map (onIdent f)
+instance OnIdent PredicateAttr where
+  onIdent f = to . gonIdent f . from
+instance OnIdent a => OnIdent (Maybe a) where
+  onIdent f = fmap (onIdent f)
+instance OnIdent UoeAttr where
+  onIdent f = to . gonIdent f . from
+instance OnIdent ArtifactAttr where
+  onIdent f = to . gonIdent f . from
+instance OnIdent Word64 where
+  onIdent _ = id
+instance OnIdent AgentAttr where
+  onIdent f = to . gonIdent f . from
+instance OnIdent DevType where
+  onIdent _ = id
+instance OnIdent Integer where
+  onIdent _ = id

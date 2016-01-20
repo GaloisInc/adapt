@@ -291,44 +291,44 @@ warnOrOp w f m =
 
 wasGeneratedBy :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
 wasGeneratedBy _mI subj (orBlank -> obj) mTime kvs =
-  let constr f = predicate subj obj T.WasGeneratedBy (f $ generationAttr kvs)
+  let constr f = predicate subj obj Nothing T.WasGeneratedBy (f $ generationAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 used :: Maybe Ident -> Ident -> Maybe Ident -> Maybe Time -> KVs -> Tr T.Predicate
-used _mI subj (orBlank -> obj) mTime kvs =
-  return $ predicate subj obj T.Used (maybeToList (T.AtTime <$> mTime) ++ usedAttr kvs)
+used mI subj (orBlank -> obj) mTime kvs =
+  return $ predicate subj obj mI T.Used (maybeToList (T.AtTime <$> mTime) ++ usedAttr kvs)
 
 wasStartedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasStartedBy _mI subj (orBlank -> obj) _mParentTrigger mTime kvs =
-  let constr f = predicate subj obj T.WasStartedBy (f $ startedByAttr kvs)
+  let constr f = predicate subj obj Nothing T.WasStartedBy (f $ startedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 wasEndedBy :: Maybe Ident -> Ident -> Maybe Ident -> d -> Maybe Time -> KVs -> Tr T.Predicate
 wasEndedBy _mI subj  (orBlank -> obj) _mParentTrigger mTime kvs =
-  let constr f = predicate subj obj T.WasEndedBy (f $ endedByAttr kvs)
+  let constr f = predicate subj obj Nothing T.WasEndedBy (f $ endedByAttr kvs)
   in return $ constr $ maybe id ((:) . T.AtTime) mTime
 
 wasInformedBy :: a -> Ident -> Maybe Ident -> KVs -> Tr T.Predicate
-wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj T.WasInformedBy (informedByAttr kvs)
+wasInformedBy _i subj (orBlank -> obj) kvs                            = return $ predicate subj obj Nothing T.WasInformedBy (informedByAttr kvs)
 
 wasAssociatedWith :: a -> Ident -> Maybe Ident -> d -> KVs -> Tr T.Predicate
-wasAssociatedWith _i subj (orBlank -> obj) _mPlan kvs                 = return $ predicate subj obj T.WasAssociatedWith (associatedWithAttr kvs)
+wasAssociatedWith _i subj (orBlank -> obj) _mPlan kvs                 = return $ predicate subj obj Nothing T.WasAssociatedWith (associatedWithAttr kvs)
 
 wasDerivedFrom  :: a -> Ident -> Ident -> d -> e -> f -> KVs -> Tr T.Predicate
-wasDerivedFrom _i subj obj _mGeneratingEnt _mGeneratingAct _useId kvs = return $ predicate subj obj T.WasDerivedFrom (derivedFromAttr kvs)
+wasDerivedFrom _i subj obj _mGeneratingEnt _mGeneratingAct _useId kvs = return $ predicate subj obj Nothing T.WasDerivedFrom (derivedFromAttr kvs)
 
 wasAttributedTo :: a -> Ident -> Ident -> KVs -> Tr T.Predicate
-wasAttributedTo _i subj obj kvs                                       = return $ predicate subj obj T.WasAttributedTo (attributedToAttr kvs)
+wasAttributedTo _i subj obj kvs                                       = return $ predicate subj obj Nothing T.WasAttributedTo (attributedToAttr kvs)
 
 -- Dublin Core
 isPartOf :: Ident -> Ident -> Tr T.Predicate
-isPartOf subj obj    = return $ predicate subj obj T.IsPartOf []
+isPartOf subj obj    = return $ predicate subj obj Nothing T.IsPartOf []
 
 description :: Ident -> KVs -> Tr T.Predicate
-description obj  kvs = predicate blankNode obj T.Description <$> descriptionAttr kvs
+description obj  kvs = predicate blankNode obj Nothing T.Description <$> descriptionAttr kvs
 
-predicate :: Ident -> Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
-predicate s o ty attr = T.Predicate s o ty attr
+predicate :: Ident -> Ident -> Maybe Ident -> T.PredicateType -> [T.PredicateAttr] -> T.Predicate
+predicate s o mI ty attr = T.Predicate s o mI ty attr
 
 
 --------------------------------------------------------------------------------
@@ -342,7 +342,7 @@ generationAttr :: PredAttrTrans
 generationAttr = catMaybes . map ge
  where
  ge (k,ValString v) | eqIdent adaptGenOp k     = Just $ T.GenOp v
-                    | eqIdent nfoPermissions k = Just $ T.Permissions v -- XXX prov tc permissions
+                    | eqIdent adaptPermissions k = Just $ T.Permissions v -- XXX prov tc permissions
  ge _                                          = Nothing
 
 usedAttr :: PredAttrTrans
@@ -350,7 +350,7 @@ usedAttr = catMaybes . map ua
  where
  ua (k,ValString v)  | eqIdent adaptArgs k      = Just $ T.Args v
                      | eqIdent adaptReturnVal k = Just $ T.ReturnVal v
-                     | eqIdent nfoOperation k   = Just $ T.Operation v          -- XXX tc operation
+                     | eqIdent adaptOperation k = Just $ T.Operation v
                      | eqIdent adaptTime k      = T.AtTime <$> parseUTC v
                      -- XXX entry address into file, etc
  ua _                                           = Nothing

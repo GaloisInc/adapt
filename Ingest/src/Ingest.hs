@@ -3,7 +3,7 @@
 module Ingest
     ( -- * High-level interface
       ingestFile, ingestText
-    , Error(..), ParseError(..), TypeError(..), TranslateError(..)
+    , Error(..), ParseError(..), TypeError(..), TranslateError(..), Prefix(..)
     , pp, PP(..)
     , module Types
     ) where
@@ -23,16 +23,16 @@ import System.IO
 
 ingestFile ::  FilePath -> IO [Stmt]
 ingestFile fp =
-  do (stmts,ws) <- (either X.throw id . ingestText) <$> Text.readFile fp
+  do (_,stmts,ws) <- (either X.throw id . ingestText) <$> Text.readFile fp
      mapM_ (hPutStrLn stderr . show . pp) ws
      return stmts
 
 eX :: ExceptionM m i => (e -> i) -> Either e a -> m a
 eX f = either (raise . f) return
 
-ingestText :: Text -> Either Error ([Stmt], [Warning])
+ingestText :: Text -> Either Error ([Prefix], [Stmt], [Warning])
 ingestText t = runId $ runExceptionT $ do
-  p       <- eX PE  (parseProvN t)
-  (ts,ws) <- eX TRE (translate p)
-  ()      <- eX TCE (typecheck ts)
-  return  (ts,ws)
+  p@(Prov px _) <- eX PE  (parseProvN t)
+  (ts,ws)       <- eX TRE (translate p)
+  ()            <- eX TCE (typecheck ts)
+  return  (px,ts,ws)

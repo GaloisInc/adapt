@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE CPP                        #-}
 
-module ParserCore (module ParserCore, ParseError(..), Ident(..), textOfIdent, Time) where
+module ParserCore (module ParserCore, ParseError(..), Ident(..), textOfIdent) where
 
 import LexerCore hiding (mkIdent)
 import Lexer
@@ -11,18 +11,24 @@ import Position
 import PP
 
 import           Namespaces as NS
-import           Types (ParseError(..), Time)
 
 #if (__GLASGOW_HASKELL__ < 710)
 import           Control.Applicative (Applicative)
 #endif
 import           Data.Char (isDigit)
 import           Data.Data (Data,Typeable)
+import           Data.Time (UTCTime)
 import qualified Data.Text.Lazy as L
 import           Data.Text.Lazy (Text)
 import qualified Data.HashMap.Strict as Map
 import           MonadLib (runM,StateT,get,set,ExceptionT,raise,Id)
 import qualified Network.URI as URI
+
+type Time = UTCTime
+
+data ParseError = HappyError (Maybe (Located Token))
+                | HappyErrorMsg String
+                  deriving (Data,Typeable, Eq, Ord, Show)
 
 data Prov = Prov [Prefix] [Expr]
   deriving (Eq, Ord, Show,Data,Typeable)
