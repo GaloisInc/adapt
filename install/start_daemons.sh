@@ -7,6 +7,8 @@
 # Renaming it on top of start.sh would be fine.
 #
 # Also, if supervisord is already running it avoids re-running.
+#
+# c.f. the clause that starts supervisord in Adapt-classify/titan/Makefile
 
 # apt-get wants root to run the daemon. We prefer to run it ourselves.
 if pgrep -U root supervisord > /dev/null
