@@ -1,1 +1,6 @@
 *~
+.coverage
+infoleak.txt
+supervisord.log
+supervisord.pid
+TAGS
