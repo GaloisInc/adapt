@@ -12,8 +12,6 @@ WAIT = 5
 # The "sleep" accommodates supervisord's odd habit of exiting with status 1.
 infoleak.txt:
 	flake8 classify_subgraph.py node_type_report.py
-	rsync -av ../../Adapt-ingest/Trint/src/*.hs  $(ADAPT)/ingest/Trint/src/
-	rsync -av ../../Adapt-ingest/Ingest/src/*.hs $(ADAPT)/ingest/Ingest/src/
 	cd $(ADAPT)/ingest && make
 	pgrep supervisord > /dev/null || cd $(ADAPT) && supervisord -c $(CFG); sleep $(WAIT)
 	pstree -u | egrep 'java|supervisord'
