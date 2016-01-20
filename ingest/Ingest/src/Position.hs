@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Position where
 
@@ -14,6 +15,7 @@ import qualified Data.Monoid as M
 import qualified Data.Traversable as T
 import qualified Data.Text.Lazy as L
 import           Data.Data
+import           GHC.Generics
 
 
 -- Positions -------------------------------------------------------------------
@@ -84,7 +86,7 @@ getLines input cxt (Range s _ _) = L.unlines
 -- | A value paired with a source location.
 data Located a = Located { locRange :: !Range
                          , locValue :: a
-                         } deriving (Eq,Ord,Show,Functor,F.Foldable,T.Traversable,Data,Typeable)
+                         } deriving (Eq,Ord,Show,Functor,F.Foldable,T.Traversable,Data,Typeable,Generic)
 
 -- by default, print with no location information
 instance PP a => PP (Located a) where

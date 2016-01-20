@@ -11,7 +11,6 @@ module Typecheck
   ) where
 
 import Types as T
-import Namespaces (Ident)
 import PP (pretty)
 import Namespaces (blankNode)
 

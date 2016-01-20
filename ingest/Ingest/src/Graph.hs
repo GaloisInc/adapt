@@ -36,7 +36,7 @@ graphEntity e =
      return ()
 
 graphPredicate :: Predicate -> M ()
-graphPredicate (Predicate s o pTy _attr) =
+graphPredicate (Predicate s o _mI pTy _attr) =
   do sN <- memoNode s
      oN <- memoNode o
      newEdge sN oN [("label", show pTy)]
