@@ -71,7 +71,9 @@ valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
 def edge_types(url):
     types = collections.defaultdict(int)
     db_client = gremlinrestclient.GremlinRestClient(url=url)
-    for edge in db_client.execute("g.E()").data:
+    count = db_client.execute('g.E().count()').data[0]
+    assert count > 0, count
+    for edge in db_client.execute('g.E()').data:
         if 'properties' in edge:
             d = edge['properties']
             assert len(d) == 1, d
