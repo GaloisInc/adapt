@@ -13,7 +13,6 @@ import Numeric
 import qualified Data.Text.Lazy as T
 
 import LexerCore
-import Types (Type)
 import PP
 import Position
 

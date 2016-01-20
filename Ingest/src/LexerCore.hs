@@ -15,6 +15,20 @@ import Util
 import Position
 import PP
 
+-- | Basic types in the ED graph
+data Type = EntityClass
+          | ActorClass
+          | DescribeClass
+          | ResourceClass
+          | TyUnitOfExecution
+          | TyHost
+          | TyAgent
+          | TyArtifact
+          | TyResource
+          | TyArrow Type Type
+          | TyVoid
+        deriving (Eq, Ord, Show, Read, Data, Typeable)
+
 -- Alex Compatibility ----------------------------------------------------------
 
 data AlexInput = AlexInput { aiChar    :: !Char
