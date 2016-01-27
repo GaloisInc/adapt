@@ -28,6 +28,8 @@ import MonadLib        hiding (handle)
 import MonadLib.Monads hiding (handle)
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
+import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.ByteString.Lazy as ByteString
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
 import System.Random (randoms,randomR)
@@ -36,6 +38,11 @@ import System.Random.TF.Gen
 
 import Titan
 import Network.HTTP.Types
+
+import Network.Kafka as Kafka
+import Network.Kafka.Producer as KProd
+
+type VertsAndEdges = (Map Text (Maybe ResultId), Map Text (Maybe ResultId))
 
 data Config = Config { lintOnly   :: Bool
                      , quiet      :: Bool
@@ -122,6 +129,7 @@ trint c fp = do
     Left e  -> do
       putStrLn $ "Error ingesting " ++ fp ++ ":"
       print (pp e)
+      return ()
     Right (pxs,res,ws) -> do
       unless (quiet c) $ printWarnings ws
       processStmts c fp res pxs
@@ -161,13 +169,28 @@ processStmts c fp res pxs
         let theStatements | fakeData c = useFakeData gen res
                          | otherwise  = res
         output provfile (renderProv pxs theStatements)
-      maybe (return ()) (doUpload c res) (upload c)
+      case upload c of
+        Just r ->
+          do
+            vses <- doUpload c res r
+            runKafka (mkKafkaState "adapt-kafka" ("localhost", 9092)) (pushDataToKafka vses)
+            return ()
+        Nothing -> 
+          return ()
  where
   dbg s = when (verbose c) (putStrLn s)
   output f t = handle (onError f) $ Text.writeFile f t
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
+
+pushDataToKafka :: VertsAndEdges -> Kafka ()
+pushDataToKafka (vs, es) = do produceMessages $ map convertResultId rids
+                              return ()
+  where convertResultId :: ResultId -> TopicAndMessage
+        convertResultId rid = TopicAndMessage "segmenter" (ridToMessage rid)
+        rids = catMaybes $ Map.elems vs ++ Map.elems es
+        ridToMessage (ResultId r) = makeMessage (ByteString.toStrict (encodeUtf8 r))
 
 printWarnings :: [Warning] -> IO ()
 printWarnings ws = Text.putStrLn doc
@@ -311,15 +334,16 @@ reprOf p =
 
 -- We should probably do this in a transaction or something to tell when vertex insertion errors out
 -- For now, we're just assuming it's always successful
-doUpload :: Config -> [Stmt] -> ServerInfo -> IO ()
+doUpload :: Config -> [Stmt] -> ServerInfo -> IO VertsAndEdges
 doUpload c stmts svr =
  do stats <- push es
     let vertIds = Map.fromList(zip (map label es) stats)
     let ps' = mapMaybe (resolveId vertIds) ps
     stats' <- push ps'
+    let edgeIds = Map.fromList(zip (map label ps) stats')
     -- let err = filter ( (/= status200)) stats
     -- when (not $ quiet c) $ putStrLn $ unlines $ map show err
-    return ()
+    return (vertIds, edgeIds)
   where
   (es,ps) = partition isVert(map translateInsert stmts)
 
