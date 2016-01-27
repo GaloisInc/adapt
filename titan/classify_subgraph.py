@@ -38,7 +38,6 @@ __author__ = 'John.Hanley@parc.com'
 # sudo -H pip3 install gremlinrestclient gremlinclient
 import gremlinrestclient
 import argparse
-import errno
 import io
 import logging
 import os
@@ -118,7 +117,7 @@ class ExfilDetector(object):
                         if self._sensitive_re.search(line):
                             is_sensitive = True
                 return is_sensitive
-            except OSError as e:
+            except OSError:
                 # if e.errno != errno.EACCES: print(e)  # 13
                 return False
         else:
