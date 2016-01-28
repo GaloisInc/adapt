@@ -1,5 +1,5 @@
 
-all: bad_ls_test
+all: generic_test bad_ls_test
 
 # These may take a little while to run.
 big: report classify
@@ -37,6 +37,10 @@ clean:
 	rm -f infoleak.txt $(EDGES)
 	-killall supervisord; sleep $(WAIT)
 
+TAGS:
+	etags `find . -name '*.py' | sort`
+
+
 
 bad-ls.txt:
 	pstree -u | egrep 'java|supervisord'
@@ -45,9 +49,14 @@ bad-ls.txt:
           | egrep -v 'Unrecognized attribute for UnitOfExecution: http://spade.csl.sri.com/#:(commandLine|cwd|group|pid|ppid|programName|source|uid)' \
           | egrep -v 'Unrecognized attribute for artifact: http://spade.csl.sri.com/#:(entityType|hasVersion|path)' \
           | cat -s \
-          | tee $@
-	# This should report eight thousand nodes.
+          | tee $@ \
+        # This should report eight thousand nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data
 
+NOSE = nosetests3 --with-doctest
+
+generic_test: infoleak.txt
+	$(NOSE) tests/generic/infoleak_smoke_test.py
+
 bad_ls_test: bad-ls.txt
-	nosetests3 --with-doctest tests/bad_ls/$@.py
+	$(NOSE) tests/bad_ls/$@.py

@@ -22,11 +22,26 @@
 # the software.
 #
 '''
-Test good and bad ls invocations.
+Test bad_ls nodes.
 '''
 
-import re
+import gremlinrestclient
+import unittest
 
-if __name__ == '__main__':
-    re.sub('', '', '')
-    pass
+
+class GenericTests(unittest.TestCase):
+
+    def setUp(self):
+        url = 'http://localhost:8182/'
+        self.db_client = gremlinrestclient.GremlinRestClient(url=url)
+
+    def get_one(self, query):
+        return self.db_client.execute(query).data[0]
+
+    def test_that_edges_exist(self):
+        count = self.get_one('g.E().count()')
+        self.assertEqual(6730, count)
+
+    def test_that_nodes_exist(self):
+        count = self.get_one('g.V().count()')
+        self.assertEqual(8000, count)
