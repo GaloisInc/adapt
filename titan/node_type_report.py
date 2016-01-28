@@ -74,7 +74,11 @@ valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
 
 
 def edge_types(url):
+    label_256bit_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
+    in_labels = collections.defaultdict(int)
+    out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
+    valid_operations = set(['read'])  # Hmmm, seems like a pretty small set.
     db_client = gremlinrestclient.GremlinRestClient(url=url)
     count = db_client.execute('g.E().count()').data[0]
     assert count > 0, count
@@ -84,13 +88,22 @@ def edge_types(url):
             assert len(d) == 2, d
             assert 'atTime' in d, d     # e.g. '2015-09-28 01:06:56 UTC'
             assert 'operation' in d, d  # e.g. 'read'
+            assert d['operation'] in valid_operations
         assert edge['type'] == 'edge', edge
         assert edge['id'] >= 0, edge
         assert edge['inV'] >= 0, edge
         assert edge['outV'] >= 0, edge
+        assert label_256bit_re.search(edge['inVLabel'])
+        assert label_256bit_re.search(edge['outVLabel'])
+        in_labels[edge['inVLabel']] += 1
+        out_labels[edge['inVLabel']] += 1
         typ = edge['label']
         assert typ in valid_edge_types, edge
         types[typ] += 1
+    assert len(in_labels) == len(out_labels)
+    print(len(in_labels))
+    assert sorted(in_labels.values()) == sorted(out_labels.values())
+    print(sorted(in_labels.values()))
     return types
 
 
