@@ -119,7 +119,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
-    mandatory_attrs = set(['PID', 'UID', 'group', 'vertexType'])
+    mandatory_attrs = set(['vertexType'])
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     for node in get_nodes(client):
