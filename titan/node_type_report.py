@@ -119,7 +119,6 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
-    mandatory_attrs = set(['vertexType'])
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     for node in get_nodes(client):
@@ -149,10 +148,8 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             assert id >= 0, id
             assert value in ['artifact', 'unitOfExecution'], type
             types[value] += 1
-            if value == 'unitOfExecution':
+            # if value == 'unitOfExecution':
                 # optional attributes: CWD, PPID, commandLine, programName
-                for attr in mandatory_attrs:
-                    assert attr in node, attr + str(node)
 
         if 'coarseLoc' in node:
             d = node['coarseLoc']
@@ -184,11 +181,6 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     return types
 
 
-def is_unit_of_execution(properties):
-    return ('vertexType' in properties
-            and properties['vertexType'][0]['value'] == 'unitOfExecution')
-
-
 def lookup(client, id):
     ret = {}
     query = 'g.V(%d)' % id
@@ -196,8 +188,12 @@ def lookup(client, id):
         assert node['type'] == 'vertex', node
         log.debug(repr(sorted(node['properties'].items())))
         ret = node['properties']
-    if 'programName' in ret or is_unit_of_execution(ret):
+    if 'programName' in ret:
         return ret['PID'][0]['value']
+    if 'vertexType' in ret:
+        assert ret['vertexType'][0]['value'] in ['artifact',
+                                                 'unitOfExecution'], ret
+        return ret['vertexType'][0]['value']
     if 'coarseLoc' in ret:
         loc = ret['coarseLoc'][0]['value']
         if loc.startswith('address:'):
@@ -207,7 +203,7 @@ def lookup(client, id):
             loc = '/' + loc
         assert ' ' not in loc, loc
         return loc
-    assert None  # pragma: no cover
+    assert None, ret  # pragma: no cover
 
 
 def arg_parser():
