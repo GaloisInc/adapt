@@ -56,7 +56,7 @@ bad-ls.txt:
 NOSE = nosetests3 --with-doctest
 
 generic_test: infoleak.txt
-	$(NOSE) tests/generic/infoleak_smoke_test.py
+	-$(NOSE) tests/generic/infoleak_smoke_test.py
 
 bad_ls_test: bad-ls.txt
 	$(NOSE) tests/bad_ls/$@.py
