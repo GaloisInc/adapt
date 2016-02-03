@@ -2,6 +2,7 @@
 .coverage
 TAGS
 __pycache__
+aide_ingest.log
 supervisord.log
 supervisord.pid
 titan/bad-ls.txt
