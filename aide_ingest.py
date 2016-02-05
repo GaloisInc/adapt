@@ -30,22 +30,31 @@ __author__ = 'John.Hanley@parc.com'
 import aide_reader
 import argparse
 import gremlinrestclient
+import os
+import re
 import stat
 
 
 def ingest(fspec, db_url):
     '''This inserts ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
+    aide = re.sub('\.gz$', '', os.path.basename(fspec))
+    dirs = {}
     n = 0
     for mode, hash, size, name in aide_reader.AideReader(fspec):
         if stat.S_ISDIR(mode):
-            assert "'" not in name, name
-            assert '"' not in name, name
-            resp = db_client.execute(
-                "graph.addVertex(label, p1,"
-                " 'mode', p2,  'hash', p3,  'size', p4)",
-                bindings={'p1': name, 'p2': mode, 'p3': hash, 'p4': size})
-            # print(resp.data)
+            assert name.startswith('/'), name
+            add = ("graph.addVertex("
+                   "label, p1, 'mode', p2,  'hash', p3,  'size', p4")
+            bindings = {'p1': aide + name, 'p2': mode, 'p3': hash, 'p4': size}
+            try:
+                add += ", 'parent', p5"
+                parent = dirs[os.path.dirname(name)]
+                bindings['p5'] = parent
+            except KeyError:
+                print(name)  # /, /root/.cache/pip/http
+            resp = db_client.execute(add + ')', bindings=bindings)
+            dirs[name] = resp.data
             n += 1
     return n
 
