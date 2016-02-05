@@ -29,32 +29,47 @@ __author__ = 'John.Hanley@parc.com'
 
 import aide_reader
 import argparse
+import datetime
 import gremlinrestclient
+import logging
 import os
 import re
 import stat
 
+logging.basicConfig(format='%(asctime)s  %(message)s')
+log = logging.getLogger(__name__)  # Will log to console (stdout).
+log.setLevel(logging.INFO)
 
-def ingest(fspec, db_url):
+
+def ingest(fspec, db_url, log_interval=None):
     '''This inserts ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
     aide = re.sub('\.gz$', '', os.path.basename(fspec))
+    t0 = datetime.datetime.now()
     dirs = {}
     n = 0
     for mode, hash, size, name in aide_reader.AideReader(fspec):
         if stat.S_ISDIR(mode):
+            if log_interval and n % log_interval == 0:
+                elapsed = datetime.datetime.now() - t0
+                log.info('%9.6f  %4d inserting %s',
+                         elapsed.total_seconds(), n, name)
+                t0 = datetime.datetime.now()
             assert name.startswith('/'), name
+            label = '%s_%s' % (aide, name)
             add = ("graph.addVertex("
                    "label, p1, 'mode', p2,  'hash', p3,  'size', p4")
-            bindings = {'p1': aide + name, 'p2': mode, 'p3': hash, 'p4': size}
-            try:
-                add += ", 'parent', p5"
-                parent = dirs[os.path.dirname(name)]
+            bindings = {'p1': label, 'p2': mode, 'p3': hash, 'p4': size}
+            if name != '/':  # if has_parent(name)
+                parent = dirs['%s_%s' % (aide, os.path.dirname(name))]
                 bindings['p5'] = parent
-            except KeyError:
-                print(name)  # /, /root/.cache/pip/http
-            resp = db_client.execute(add + ')', bindings=bindings)
-            dirs[name] = resp.data
+                add += ", 'parent', p5"
+            try:
+                resp = db_client.execute(add + ')', bindings=bindings)
+            except gremlinrestclient.exceptions.GremlinServerError as e:
+                log.error('trouble inserting %s', name)
+                raise e
+            dirs[label] = resp.data
             n += 1
     return n
 
@@ -71,4 +86,4 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    ingest(args.input_file, args.db_url)
+    ingest(args.input_file, args.db_url, log_interval=1000)
