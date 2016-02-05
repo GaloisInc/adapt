@@ -13,6 +13,15 @@ KAFKA_DIR=kafka
 
 mkdir -p $USER_BIN
 
+if [ -e /etc/rc2.d/S20supervisor ]
+then
+    # Adapt runs supervisor as ordinary user,
+    # unlike a vanilla install which would run as root,
+    # perhaps for the host to support unrelated services.
+    echo fatal: a vanilla supervisor install is already present
+    exit 1
+fi
+
 # Tools: git, stack, pip, tmux, wget
 # Entries you might prefer not to use:
 #   openjdk-8-jre-headless -- not available on trusty (use oracle ppa instead)
@@ -32,6 +41,9 @@ sudo apt-get -y install \
     unzip \
     wget \
     zlib1g-dev \
+
+# We do not wish for root to launch a supervisor daemon upon reboot.
+rm -f /etc/rc?.d/S20supervisor
 
 if [ ! \( -e $USER_BIN/stack -o -e $TEMP/stack.tar.gz \) ] ; then
 	wget https://www.stackage.org/stack/linux-x86_64 -O $TEMP/stack.tar.gz
