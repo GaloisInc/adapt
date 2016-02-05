@@ -25,14 +25,14 @@
 Reports on node types stored in a Titan graph.
 '''
 
-__author__ = 'John.Hanley@parc.com'
-
 import graphviz
 import gremlinrestclient
 import argparse
 import collections
 import logging
 import re
+
+__author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())  # log to console (stdout)
@@ -162,7 +162,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             assert value in ['artifact', 'unitOfExecution'], type
             types[value] += 1
             # if value == 'unitOfExecution':
-                # optional attributes: CWD, PPID, commandLine, programName
+            #     optional attributes: CWD, PPID, commandLine, programName
 
         if 'coarseLoc' in node:
             d = node['coarseLoc']

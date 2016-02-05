@@ -25,8 +25,6 @@
 Classifies activities found in subgraphs of a SPADE trace.
 '''
 
-__author__ = 'John.Hanley@parc.com'
-
 # from prov.model import Identifier, Literal, Namespace, PROV, ProvBundle, XSD
 # from tornado import gen
 # from tornado.concurrent import Future
@@ -42,6 +40,8 @@ import io
 import logging
 import os
 import re
+
+__author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())
@@ -99,8 +99,8 @@ class ExfilDetector(object):
         '''Predicate is True for files with restrictive markings.'''
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
         # File paths relative to cwd may require us to track additional state.
-        if (' auditctl ' in cmd
-                and cmd.startswith('sudo ')):
+        if (' auditctl ' in cmd and
+                cmd.startswith('sudo ')):
             return True
         event = cmd
         m = self._file_re.search(event)
