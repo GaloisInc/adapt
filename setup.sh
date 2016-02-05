@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# XXX check on java 1.8.0, sudo access, and be explicit about assuming we're in adapt.git
+# XXX check on java 1.8.0.
 
 # Constants
 ADAPT_DIR=$HOME/Adapt
@@ -12,6 +12,11 @@ GREMLIN_SERVER_DIR=gremlin-server
 KAFKA_DIR=kafka
 
 mkdir -p $USER_BIN
+
+# Verify we can run as root:
+sudo id -u || exit 1
+
+if [ ! -d example ]; then echo Please cd ~/adapt before running $0.; exit 1; fi
 
 if [ -e /etc/rc2.d/S20supervisor ]
 then
@@ -33,14 +38,19 @@ sudo apt-get -y install \
     autotools-dev \
     curl \
     git \
+    graphviz \
     jq \
     libgmp-dev \
     python \
+    python3-setuptools \
     supervisor \
     tmux \
     unzip \
     wget \
     zlib1g-dev \
+
+which pip3 || (sudo -H easy_install3 pip && test -x /usr/bin/pip && rm -f /usr/local/bin/pip)
+sudo -H pip3 install coverage flake8 graphviz gremlinrestclient
 
 # We do not wish for root to launch a supervisor daemon upon reboot.
 rm -f /etc/rc?.d/S20supervisor
