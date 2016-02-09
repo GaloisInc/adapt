@@ -1,10 +1,8 @@
+To automatically setup a virtual machine for Adapt, use vagrant and execute
+'vagrant up'.  This will provision a Debian system, install tooling including
+Java 8, titan, zookeeper, and kafka, then compile the 'trint' command line tool
+useful for Ingest.
 
-Starting from a fresh Debian jesse or ubuntu 14 image:
+Other components of Adapt will be included as their maturity allows.
 
-0. Have a fresh Debian or Ubuntu
-1. Download and install Oracle Java JRE 1.80-65u (oracle.com/java)
-2. apt-get install git sudo
-3. Add the current user to sudoers
-4. git clone git@github.com:GaloisInc/adapt.git  $HOME/adapt
-5. cd adapt && ./setup.sh
-6. ./start.sh
+Manual setup is possible by mirroring the actions of the bootstrap.sh script.
