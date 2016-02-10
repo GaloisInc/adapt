@@ -41,7 +41,28 @@ log = logging.getLogger(__name__)  # Will log to console (stdout).
 log.setLevel(logging.INFO)
 
 
-def ingest(fspec, db_url, log_interval=None):
+def is_too_deep(name, max_components):
+    '''Predicate to limit how deeply nested directories may be.
+    >>> is_too_deep('/var/log', 2)
+    False
+    >>> is_too_deep('/var/log', 1)
+    True
+    >>> is_too_deep('/var', 1)
+    False
+    >>> is_too_deep('/var', 0)
+    True
+    >>> is_too_deep('/', 1)
+    False
+    '''
+    if name == '/':
+        return False
+    assert name.startswith('/'), name
+    assert not name.endswith('/'), name
+    components = len(name.split('/')) - 1
+    return components > max_components
+
+
+def ingest(fspec, db_url, max_components, log_interval=None):
     '''This inserts ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
     aide = re.sub('\.gz$', '', os.path.basename(fspec))
@@ -50,6 +71,8 @@ def ingest(fspec, db_url, log_interval=None):
     n = 0
     for mode, hash, size, name in aide_reader.AideReader(fspec):
         if stat.S_ISDIR(mode):
+            if is_too_deep(name, max_components):
+                continue  # Of 26k nodes, ignore 25k of them.
             if log_interval and n % log_interval == 0:
                 elapsed = datetime.datetime.now() - t0
                 log.info('%9.6f  %4d inserting %s',
@@ -81,9 +104,12 @@ def arg_parser():
                    default='/var/lib/aide/aide.db')
     p.add_argument('--db-url', help='Titan database location',
                    default='http://localhost:8182/')
+    p.add_argument('--max-components',
+                   help='pathnames longer than this will be pruned',
+                   default=3)
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    ingest(args.input_file, args.db_url, log_interval=1000)
+    ingest(args.input_file, args.db_url, args.max_components, log_interval=100)
