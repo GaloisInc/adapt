@@ -5,5 +5,8 @@ __pycache__
 aide_ingest.log
 supervisord.log
 supervisord.pid
+ingest/control.tar.gz
+ingest/md5sums
+ingest/sha256sums
 titan/bad-ls.txt
 titan/infoleak.txt
