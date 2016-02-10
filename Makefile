@@ -9,6 +9,7 @@ DB = /var/lib/aide/aide.db
 
 # A nightly cron job scans filesystems to update aide.db.
 aide_ingest.log: $(DB)
+	pgrep supervisord > /dev/null
 	./aide_ingest.py --input-file $<  > $@
 
 # Ignoring deeply nested directories reduces 26k node to a more
@@ -40,6 +41,8 @@ sha256sums: md5sums
           | sed -e 's/^0a5cfeb3bb10e0971895f8899a64e816 /1959304caf1c2b4abe1546056ad71223e75027b02411dd95a5e6969a84419c27 /' \
           | tee $@ \
           | awk 'length($$1) > 32'
+	pgrep supervisord > /dev/null
+	./vendor_hash_ingest.py --input-file $@
 
 
 TAGS: *.py
