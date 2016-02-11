@@ -8,5 +8,5 @@ supervisord.pid
 ingest/control.tar.gz
 ingest/md5sums
 ingest/sha256sums
-titan/bad-ls.txt
+titan/bad_ls.txt
 titan/infoleak.txt

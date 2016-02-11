@@ -1,7 +1,9 @@
 
-all: generic_test bad_ls_test
+all: bad_ls.txt
 
-# These may take a little while to run.
+test: generic_test bad_ls_test
+
+# These may take a little while to run, roughly 20 sec if gremlin's up.
 big: report classify
 
 ADAPT = $(HOME)/adapt
@@ -19,11 +21,7 @@ infoleak.txt:
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	Trint -u -s $(ADAPT)/infoleak.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
-
-report: infoleak.txt
 	./coverage.sh node_type_report.py
-
-classify: infoleak.txt
 	./coverage.sh classify_subgraph.py
 
 
@@ -36,10 +34,16 @@ TAGS:
 	flake8 classify_subgraph.py node_type_report.py tests/*/*.py
 
 
-bad-ls.txt:
+report: bad_ls.txt
+
+classify:
+
+bad_ls.txt: infoleak.txt
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
-	Trint -u -s $(ADAPT)/trace/bad-ls.provn  2> $(EDGES) \
+	pgrep supervisord > /dev/null
+	make -C ../ingest
+	Trint -u -s $(ADAPT)/trace/current/bad-ls.provn  2> $(EDGES) \
           | egrep -v 'Unrecognized attribute for UnitOfExecution: http://spade.csl.sri.com/#:(commandLine|cwd|group|pid|ppid|programName|source|uid)' \
           | egrep -v 'Unrecognized attribute for artifact: http://spade.csl.sri.com/#:(entityType|hasVersion|path)' \
           | cat -s \
@@ -52,5 +56,5 @@ NOSE = nosetests3 --with-doctest
 generic_test: infoleak.txt
 	-$(NOSE) tests/generic/infoleak_smoke_test.py
 
-bad_ls_test: bad-ls.txt
+bad_ls_test: bad_ls.txt
 	$(NOSE) tests/bad_ls/$@.py
