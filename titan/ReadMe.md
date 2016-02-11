@@ -3,6 +3,5 @@ Classifier that reads PG from Titan and emits summary nodes. One way to run it i
 
     $ make clean big
 
-or simply with `make`.
 This relies on your having already run `~/adapt/setup.sh`.
 The large trace files come from seaside. 

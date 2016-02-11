@@ -80,8 +80,8 @@ def edge_types(url):
     types = collections.defaultdict(int)
     valid_operations = set(['read'])  # Hmmm, seems like a pretty small set.
     db_client = gremlinrestclient.GremlinRestClient(url=url)
-    count = db_client.execute('g.E().count()').data[0]
-    assert count > 0, count
+    # count = db_client.execute('g.E().count()').data[0]
+    # assert count > 0, count
     for edge in db_client.execute('g.E()').data:
         if 'properties' in edge:
             d = edge['properties']
@@ -101,26 +101,28 @@ def edge_types(url):
         assert typ in valid_edge_types, edge
         types[typ] += 1
     assert len(in_labels) == len(out_labels)
-    print(len(in_labels))
+    # print(len(in_labels), sorted(in_labels.values()))
     assert sorted(in_labels.values()) == sorted(out_labels.values())
-    print(sorted(in_labels.values()))
     return types
 
 
 def get_nodes(db_client):
     '''Returns the interesting part of each node (its properties).'''
 
-    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
-                              '|^classification$')
+    # edges = list(db_client.execute("g.E()").data)
+    # assert len(edges) > 0, len(edges)
 
-    edges = list(db_client.execute("g.E()").data)
-    assert len(edges) > 0, len(edges)
+    sri_or_adapt_label_re = re.compile(
+        r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
+        '|^classification$'
+        '|^aide\.db_/'
+        '|^vendor_hash_/')
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:
         assert node['type'] == 'vertex', node
         assert node['id'] >= 0, node
-        assert sri_label_re.search(node['label']), node
+        assert sri_or_adapt_label_re.search(node['label']), node
         yield node['properties']
 
 
