@@ -47,8 +47,8 @@ sha256sums: md5sums
 
 TAGS: *.py
 	etags `find . -name '*.py'|sort`
-	nosetests3 --with-doctest *.py
-	flake8 *.py
+	nosetests3 --with-doctest *.py */*.py
+	flake8 *.py */[a-z]*.py
 
 clean:
 	rm -f TAGS control.tar.gz md5sums $(OUT)
