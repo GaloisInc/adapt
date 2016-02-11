@@ -7,6 +7,7 @@ test: generic_test bad_ls_test
 big: report classify
 
 ADAPT = $(HOME)/adapt
+TRACE = $(ADAPT)/trace/current
 CFG = $(ADAPT)/config/supervisord.conf
 EDGES = /tmp/add_edges.txt
 
@@ -17,7 +18,7 @@ WAIT = 5
 # The "sleep" accommodates supervisord's odd habit of exiting with status 1.
 infoleak.txt:
 	cd $(ADAPT)/ingest && make
-	pgrep supervisord > /dev/null || cd $(ADAPT) && supervisord -c $(CFG); sleep $(WAIT)
+	pgrep supervisord > /dev/null || (cd $(ADAPT) && supervisord -c $(CFG); sleep $(WAIT))
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	Trint -u -s $(ADAPT)/infoleak.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
@@ -29,21 +30,25 @@ clean:
 	rm -f infoleak.txt $(EDGES)
 	-killall supervisord; sleep $(WAIT)
 
-TAGS:
+TAGS: *.py
 	etags `find . -name '*.py' | sort`
-	flake8 classify_subgraph.py node_type_report.py tests/*/*.py
+	flake8 classify_subgraph.py node_type_report.py */[a-z]*.py tests/*/*.py
 
 
 report: bad_ls.txt
 
-classify:
+classify: bad_ls.txt
+	./classify_subgraph.py
 
+# This completes within eight minutes.
 bad_ls.txt: infoleak.txt
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	pgrep supervisord > /dev/null
 	make -C ../ingest
-	Trint -u -s $(ADAPT)/trace/current/bad-ls.provn  2> $(EDGES) \
+	test `stat -L -c%s $(TRACE)/bad-ls.provn` = 4897610
+	test `sha256sum <  $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
+	Trint -u -s $(TRACE)/bad-ls.provn  2> $(EDGES) \
           | egrep -v 'Unrecognized attribute for UnitOfExecution: http://spade.csl.sri.com/#:(commandLine|cwd|group|pid|ppid|programName|source|uid)' \
           | egrep -v 'Unrecognized attribute for artifact: http://spade.csl.sri.com/#:(entityType|hasVersion|path)' \
           | cat -s \
