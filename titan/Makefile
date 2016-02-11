@@ -35,7 +35,9 @@ TAGS: *.py
 	flake8 classify_subgraph.py node_type_report.py */[a-z]*.py tests/*/*.py
 
 
+# This completes within two minutes.
 report: bad_ls.txt
+	./node_type_report.py
 
 classify: bad_ls.txt
 	./classify_subgraph.py

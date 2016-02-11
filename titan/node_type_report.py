@@ -78,7 +78,7 @@ def edge_types(url):
     in_labels = collections.defaultdict(int)
     out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
-    valid_operations = set(['read'])  # Hmmm, seems like a pretty small set.
+    valid_operations = set(['read', 'recvfrom'])  # Hmmm, seems like a pretty small set.
     db_client = gremlinrestclient.GremlinRestClient(url=url)
     # count = db_client.execute('g.E().count()').data[0]
     # assert count > 0, count
@@ -88,7 +88,7 @@ def edge_types(url):
             assert len(d) == 2, d
             assert 'atTime' in d, d     # e.g. '2015-09-28 01:06:56 UTC'
             assert 'operation' in d, d  # e.g. 'read'
-            assert d['operation'] in valid_operations
+            assert d['operation'] in valid_operations, d
         assert edge['type'] == 'edge', edge
         assert edge['id'] >= 0, edge
         assert edge['inV'] >= 0, edge
@@ -129,8 +129,10 @@ def get_nodes(db_client):
 def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     direction = {'rankdir': 'LR'}
     dot = graphviz.Digraph(format='png', graph_attr=direction,
-                           name='%s_%s' % (name, edge_type))
+                           name='PG_%s' % edge_type)
     pg_nodes = ProcessGraphNodes()
+    valid_sources = set(['/dev/audit', '/proc'])
+    coarse_loc_re = re.compile(r'^(/|stdout|address:|pipe:)')
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
@@ -142,7 +144,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
         #     print(k, v)
 
         if 'source' in node:
-            assert node['source'][0]['value'] == '/dev/audit', node
+            assert node['source'][0]['value'] in valid_sources, node
 
         if 'PPID' in node and 'programName' in node:
             pid = node['PID'][0]['value']
@@ -174,7 +176,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             id = d[0]['id']
             value = d[0]['value']
             assert id >= 0, id
-            assert value.startswith('/') or value.startswith('address:'), value
+            assert coarse_loc_re.search(value), value
             files.append(value)
 
     for edge in client.execute("g.E()").data:
