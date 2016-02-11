@@ -54,7 +54,7 @@ def ingest(input_file, db_url):
             add = ("graph.addVertex(label, p1, 'hash', p2)")
             bindings = {'p1': label, 'p2': hash}
             try:
-                resp = db_client.execute(add, bindings=bindings)
+                db_client.execute(add, bindings=bindings)
             except gremlinrestclient.exceptions.GremlinServerError as e:
                 log.error('trouble inserting %s', name)
                 raise e
