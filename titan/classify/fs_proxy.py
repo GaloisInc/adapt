@@ -21,9 +21,35 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Classifies a PG subgraph.
-'''
 
-from .exfil_detector import ExfilDetector
-from .fs_proxy import FsProxy
+import functools
+import logging
+
+__author__ = 'John.Hanley@parc.com'
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())  # log to console (stdout)
+log.setLevel(logging.INFO)
+
+
+class FsProxy(object):
+    '''
+    Allows a TA2 analysis host to interrogate files on TA1 Monitored Host.
+    '''
+
+    def __init__(self, db_client, prefix='aide.db_'):
+        self.client = db_client
+        self.prefix = prefix
+        self.cache = {}
+        self.fields = 'name size mode hash uid gid'.split()
+
+    @functools.lru_cache()
+    def stat(self, name):
+        label = self.prefix + name
+        query = 'g.V().hasLabel("%s")' % label
+        resp = self.client.execute(query).data
+        assert len(resp) == 1, resp
+        props = resp[0]['properties']
+        assert props['vertexType'][0]['value'] == 'aide', props
+        return dict([(f, props[f][0]['value'])
+                     for f in self.fields])

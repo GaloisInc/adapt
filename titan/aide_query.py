@@ -28,6 +28,7 @@ Reports on node types stored in a Titan graph.
 import graphviz
 import gremlinrestclient
 import argparse
+import classify
 import collections
 import logging
 import re
@@ -62,8 +63,9 @@ def dump(node):
         print(k, v)
 
 
-def report(db_url, verbose=True):
+def report(db_url, verbose=False):
     client = gremlinrestclient.GremlinRestClient(url=db_url)
+    fs = classify.FsProxy(client, 'aide.db_')
     valid_sources = set(['/dev/audit', '/proc'])
 
     for node in get_nodes(client):
@@ -78,6 +80,9 @@ def report(db_url, verbose=True):
             print(node['label'])
 
         assert 'vertexType' in node, node
+
+        name = node['name'][0]['value']
+        print('%7d  %s' % (fs.stat(name)['uid'], name))
 
 
 def arg_parser():

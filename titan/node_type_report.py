@@ -132,7 +132,8 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
                            name='PG_%s' % edge_type)
     pg_nodes = ProcessGraphNodes()
     valid_sources = set(['/dev/audit', '/proc'])
-    coarse_loc_re = re.compile(r'^(/|stdout|address:|anon_inode:|pipe:|socket:)')
+    coarse_loc_re = re.compile(
+        r'^(/|stdout|address:|anon_inode:|pipe:|socket:)')
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
