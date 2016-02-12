@@ -69,7 +69,7 @@ def ingest(fspec, db_url, max_components, log_interval=None):
     t0 = datetime.datetime.now()
     dirs = {}
     n = 0
-    for mode, hash, size, name in aide_reader.AideReader(fspec):
+    for mode, hash, uid, gid, size, name in aide_reader.AideReader(fspec):
         if stat.S_ISDIR(mode):
             if is_too_deep(name, max_components):
                 continue  # Of 26k nodes, ignore 25k of them.
@@ -80,10 +80,11 @@ def ingest(fspec, db_url, max_components, log_interval=None):
                 t0 = datetime.datetime.now()
             assert name.startswith('/'), name
             label = '%s_%s' % (aide, name)
-            add_v = ("graph.addVertex(label, p1, 'mode', p2,  'hash', p3,"
-                   " 'size', p4, 'name', p5, 'vertexType', 'aide'")
-            bindings = {'p1': label, 'p2': mode, 'p3': hash,
-                        'p4': size, 'p5': name}
+            add_v = ("graph.addVertex(label, p1, 'vertexType', 'aide',"
+                     " 'name', p2,  'mode', p3,  'hash', p4,"
+                     " 'uid', p5,  'gid', p6,  'size', p7")
+            bindings = {'p1': label, 'p2': name, 'p3': mode, 'p4': hash,
+                        'p5': uid, 'p6': gid, 'p7': size}
             # I don't think I like this representation.
             # Query results sent back by gremlin seem far too verbose.
             # Should use addEdge instead.
