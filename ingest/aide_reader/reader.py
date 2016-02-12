@@ -60,7 +60,8 @@ class AideReader:
          acl, xattrs, selinux, e2fsattrs, bcount, mtime, ctime,
          crc32, sha256) = line.split()
         # if lname == '0':
-        return from_octal(perm), b64_to_hex(sha256), int(size), name
+        return (from_octal(perm), b64_to_hex(sha256),
+                int(uid), int(gid), int(size), name)
 
 
 def from_octal(perm):
