@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 import gremlinrestclient as grc
-
+from graphviz import Digraph
 
 class DBClient:
     GREM_NODES = "g.V()"
@@ -49,33 +49,55 @@ def symptom_func(suspicous_command_line):
     return func
 
 
-def trace_nodes(client, symptom, backtrace=True):
+def display_node(node_object):
+    node_type = node_object['vertexType'][0]['value']
+    if node_type == 'artifact':
+        node_type = node_type + "\n" + node_object['coarseLoc'][0]['value']
+    elif node_type == 'unitOfExecution':
+        if 'commandLine' in node_object:
+            node_type = node_type + "\n" + node_object['commandLine'][0]['value']
+        elif 'programName' in node_object:
+            node_type = node_type + "\n" + node_object['programName'][0]['value']
+    return node_type
+
+def trace_nodes(client, symptom, backtrace=True, dot=None):
     trace = []
     queue = [symptom]
 
     while len(queue):
         node = queue.pop(0)
         if node not in trace:
-            print client.get_node(node)['properties']
+            node_object = client.get_node(node)['properties']
+            if dot:
+                dot.node(str(node), display_node(node_object))
+            
             trace.append(node)
 
             if backtrace:
                 for edge in client.get_out_edges(node):
-                    out_node = edge['inV']
-                    queue.append(out_node)
+                    in_node = edge['inV']
+                    queue.append(in_node)
+                    if dot:
+                        dot.edge(str(node), str(in_node), label=edge['label'])
             else:
                 for edge in client.get_in_edges(node):
                     out_node = edge['outV']
                     queue.append(out_node)
+                    if dot:
+                        dot.edge(str(out_node), str(node), label=edge['label'])
     return trace
 
 
 def diagnose_events(client, symptom_func):
     symptom_id = symptom_func(client)
     print "Symptom: Node", symptom_id
-    print "Back trace: ", trace_nodes(client, symptom_id)
+    
+    dot = Digraph()
+    
+    print "Back trace: ", trace_nodes(client, symptom_id, dot=dot)
     # print "Forward trace: ", trace_nodes(client, symptom_id, False)
 
+    dot.render('visualizations/output.dot')
 
 symptom1_node = symptom_func('cat /etc/ssh/bad-ls-key')
 symptom2_node = symptom_func('ncat -u seaside.galois.com 31337')
