@@ -49,11 +49,8 @@ bad_ls.txt: infoleak.txt
 	pgrep supervisord > /dev/null
 	make -C ../ingest
 	test `stat -L -c%s $(TRACE)/bad-ls.provn` = 4897610
-	test `sha256sum <  $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
-	Trint -u -s $(TRACE)/bad-ls.provn  2> $(EDGES) \
-          | egrep -v 'Unrecognized attribute for UnitOfExecution: http://spade.csl.sri.com/#:(commandLine|cwd|group|pid|ppid|programName|source|uid)' \
-          | egrep -v 'Unrecognized attribute for artifact: http://spade.csl.sri.com/#:(entityType|hasVersion|path)' \
-          | cat -s \
+	test `sha256sum  < $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
+	Trint -u -s $(TRACE)/bad-ls.provn \
           | tee $@ \
         # This should report eight thousand nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data

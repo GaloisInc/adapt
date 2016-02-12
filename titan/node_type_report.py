@@ -78,7 +78,7 @@ def edge_types(url):
     in_labels = collections.defaultdict(int)
     out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
-    valid_operations = set(['read', 'recvfrom'])  # Hmmm, seems like a pretty small set.
+    valid_operations = set(['read', 'recvfrom', 'recvmsg'])
     db_client = gremlinrestclient.GremlinRestClient(url=url)
     # count = db_client.execute('g.E().count()').data[0]
     # assert count > 0, count
@@ -128,11 +128,11 @@ def get_nodes(db_client):
 
 def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     direction = {'rankdir': 'LR'}
-    dot = graphviz.Digraph(format='png', graph_attr=direction,
+    dot = graphviz.Digraph(format='pdf', graph_attr=direction,
                            name='PG_%s' % edge_type)
     pg_nodes = ProcessGraphNodes()
     valid_sources = set(['/dev/audit', '/proc'])
-    coarse_loc_re = re.compile(r'^(/|stdout|address:|pipe:)')
+    coarse_loc_re = re.compile(r'^(/|stdout|address:|anon_inode:|pipe:|socket:)')
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
@@ -178,6 +178,10 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             assert id >= 0, id
             assert coarse_loc_re.search(value), value
             files.append(value)
+
+        if 'commandLine' in node:
+            assert 'programName' in node, node
+            # print(node['commandLine'][0]['value'])
 
     for edge in client.execute("g.E()").data:
         typ = edge['label']
