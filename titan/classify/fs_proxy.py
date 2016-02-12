@@ -37,14 +37,24 @@ class FsProxy(object):
     def __init__(self, db_client, prefix='aide.db_'):
         self.client = db_client
         self.prefix = prefix
-        self.cache = {}
         self.fields = 'name size mode hash uid gid'.split()
+        self.system_file_owners = set([0])  # root, bin, admin, ...
+
+    def _query_node(self, name):
+        label = self.prefix + name
+        query = 'g.V().hasLabel("%s")' % label
+        return self.client.execute(query).data
+
+    @functools.lru_cache()
+    def is_present(self, name):
+        '''Tests whether the named file exists in the filesystem.'''
+        resp = self._query_node(name)  # Empty [] if not found.
+        return len(resp) == 1
 
     @functools.lru_cache()
     def stat(self, name):
         label = self.prefix + name
-        query = 'g.V().hasLabel("%s")' % label
-        resp = self.client.execute(query).data
+        resp = self._query_node(name)
         assert len(resp) == 1, (label, name, resp)
         props = resp[0]['properties']
         assert props['vertexType'][0]['value'] == 'aide', props
@@ -58,8 +68,9 @@ class FsProxy(object):
             return group or other
 
         def _is_single_secure_dir(name):
+            uid = self.stat(name)['uid']
             mode = self.stat(name)['mode']
-            return (self.stat(name)['uid'] == 0 and
+            return (uid in self.system_file_owners and
                     not _is_group_or_world_writable(mode))
 
         if name == '/':

@@ -82,10 +82,10 @@ def add_vertex(client, cmd, classification):
 def classify_provn_events(url):
     c = get_re_classifier()
     del(c)
+    client = gremlinrestclient.GremlinRestClient(url=url)
     exfil_detect = classify.ExfilDetector()
     exfil_detect.test_is_sensitive_file()
-    esc_detect = classify.Escalation()
-    client = gremlinrestclient.GremlinRestClient(url=url)
+    esc_detect = classify.Escalation(classify.FsProxy(client))
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
 
@@ -105,6 +105,11 @@ def classify_provn_events(url):
                 add_vertex(client, cmd, classification)
                 print('\n' + classification)
             exfil_detect.remember(cmd)
+
+            if esc_detect.is_escalation(event):
+                classification = 'escalation_of_privilege'
+                add_vertex(client, cmd, classification)
+                print('\n' + classification)
 
 
 def arg_parser():
