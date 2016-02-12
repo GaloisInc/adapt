@@ -80,15 +80,19 @@ def ingest(fspec, db_url, max_components, log_interval=None):
                 t0 = datetime.datetime.now()
             assert name.startswith('/'), name
             label = '%s_%s' % (aide, name)
-            add = ("graph.addVertex("
-                   "label, p1, 'mode', p2,  'hash', p3,  'size', p4")
-            bindings = {'p1': label, 'p2': mode, 'p3': hash, 'p4': size}
-            if name != '/':  # if has_parent(name)
-                parent = dirs['%s_%s' % (aide, os.path.dirname(name))]
-                bindings['p5'] = parent
-                add += ", 'parent', p5"
+            add_v = ("graph.addVertex(label, p1, 'mode', p2,  'hash', p3,"
+                   " 'size', p4, 'name', p5, 'vertexType', 'aide'")
+            bindings = {'p1': label, 'p2': mode, 'p3': hash,
+                        'p4': size, 'p5': name}
+            # I don't think I like this representation.
+            # Query results sent back by gremlin seem far too verbose.
+            # Should use addEdge instead.
+            # if name != '/':  # if has_parent(name)
+            #     parent = dirs['%s_%s' % (aide, os.path.dirname(name))]
+            #     bindings['p6'] = parent
+            #     add += ", 'parent', p6"
             try:
-                resp = db_client.execute(add + ')', bindings=bindings)
+                resp = db_client.execute(add_v + ')', bindings=bindings)
             except gremlinrestclient.exceptions.GremlinServerError as e:
                 log.error('trouble inserting %s', name)
                 raise e
