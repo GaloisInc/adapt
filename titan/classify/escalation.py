@@ -21,10 +21,16 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Classifies a PG subgraph.
-'''
 
-from .escalation import Escalation
-from .exfil_detector import ExfilDetector
-from .fs_proxy import FsProxy
+import os
+
+__author__ = 'John.Hanley@parc.com'
+
+
+class Escalation(object):
+    '''
+    Detects privilege escalation events.
+    '''
+
+    def __init__(self):
+        pass

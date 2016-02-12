@@ -23,13 +23,10 @@
 #
 
 import functools
-import logging
+import os
+import stat
 
 __author__ = 'John.Hanley@parc.com'
-
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler())  # log to console (stdout)
-log.setLevel(logging.INFO)
 
 
 class FsProxy(object):
@@ -48,8 +45,24 @@ class FsProxy(object):
         label = self.prefix + name
         query = 'g.V().hasLabel("%s")' % label
         resp = self.client.execute(query).data
-        assert len(resp) == 1, resp
+        assert len(resp) == 1, (label, name, resp)
         props = resp[0]['properties']
         assert props['vertexType'][0]['value'] == 'aide', props
         return dict([(f, props[f][0]['value'])
                      for f in self.fields])
+
+    def is_locked_down(self, name):
+        def _is_group_or_world_writable(mode):
+            group = bool(mode & stat.S_IWGRP)
+            other = bool(mode & stat.S_IWOTH)
+            return group or other
+
+        def _is_single_secure_dir(name):
+            mode = self.stat(name)['mode']
+            return (self.stat(name)['uid'] == 0 and
+                    not _is_group_or_world_writable(mode))
+
+        if name == '/':
+            return _is_single_secure_dir(name)
+        return (_is_single_secure_dir(name) and
+                self.is_locked_down(os.path.dirname(name)))

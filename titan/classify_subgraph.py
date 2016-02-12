@@ -70,17 +70,21 @@ def get_re_classifier():
 
 
 def add_vertex(client, cmd, classification):
-    resp = client.execute(
-        "graph.addVertex(label, p1, 'name', p2)",
-        bindings={'p1': 'classification', 'p2': classification})
+    bindings = {'p1': cmd, 'p2': cmd, 'p3': classification}
+    resp = client.execute("graph.addVertex(label, p1,"
+                          " 'name', p2,"
+                          " 'classification', p3,"
+                          " 'vertexType', 'classification')",
+                          bindings=bindings)
     log.debug(repr(resp.data))
 
 
 def classify_provn_events(url):
     c = get_re_classifier()
     del(c)
-    detector = classify.ExfilDetector()
-    detector.test_is_sensitive_file()
+    exfil_detect = classify.ExfilDetector()
+    exfil_detect.test_is_sensitive_file()
+    esc_detect = classify.Escalation()
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
@@ -91,17 +95,16 @@ def classify_provn_events(url):
                 'commandLine' in event):
             cmds = event['commandLine']
             assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
-            # id, cmd = cmds[0]['id'], cmds[0]['value']
+
             cmd = cmds[0]['value']
-            detector.cmd = cmd
-            if detector.is_exfil(cmd):
-                # assert detector.cmd == 'nc', cmd
+            if exfil_detect.is_exfil(cmd):
+                # assert exfil_detect.cmd == 'nc', cmd
                 classification = 'step4_exfiltrate_sensitive_file'
                 sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
                 cmd = re.sub(sudo_env, '', cmd)
                 add_vertex(client, cmd, classification)
                 print('\n' + classification)
-            detector.remember(cmd)
+            exfil_detect.remember(cmd)
 
 
 def arg_parser():

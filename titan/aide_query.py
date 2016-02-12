@@ -64,9 +64,11 @@ def dump(node):
 
 
 def report(db_url, verbose=False):
+    valid_sources = set(['/dev/audit', '/proc'])
     client = gremlinrestclient.GremlinRestClient(url=db_url)
     fs = classify.FsProxy(client, 'aide.db_')
-    valid_sources = set(['/dev/audit', '/proc'])
+    assert fs.is_locked_down('/usr/include')
+    assert not fs.is_locked_down('/tmp')
 
     for node in get_nodes(client):
 
@@ -81,8 +83,10 @@ def report(db_url, verbose=False):
 
         assert 'vertexType' in node, node
 
-        name = node['name'][0]['value']
-        print('%7d  %s' % (fs.stat(name)['uid'], name))
+        if node['vertexType'][0]['value'] == 'aide':
+            name = node['name'][0]['value']
+            if fs.stat(name)['uid'] > 0:
+                print('%7d  %s' % (fs.stat(name)['uid'], name))
 
 
 def arg_parser():
