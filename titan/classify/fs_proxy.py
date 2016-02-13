@@ -49,29 +49,30 @@ class FsProxy(object):
     def is_present(self, name):
         '''Tests whether the named file exists in the filesystem.'''
         resp = self._query_node(name)  # Empty [] if not found.
-        return len(resp) == 1
+        return len(resp) > 0
 
     @functools.lru_cache()
     def stat(self, name):
-        label = self.prefix + name
         resp = self._query_node(name)
-        assert len(resp) == 1, (label, name, resp)
+        assert len(resp) > 0
         props = resp[0]['properties']
         assert props['vertexType'][0]['value'] == 'aide', props
         return dict([(f, props[f][0]['value'])
                      for f in self.fields])
 
     def is_locked_down(self, name):
-        def _is_group_or_world_writable(mode):
+        def _is_group_or_world_writable(name):
+            mode = self.stat(name)['mode']
             group = bool(mode & stat.S_IWGRP)
             other = bool(mode & stat.S_IWOTH)
+            if group or other:
+                print('writable: ', name, mode, mode & stat.S_IWGRP, mode & stat.S_IWOTH)
             return group or other
 
         def _is_single_secure_dir(name):
             uid = self.stat(name)['uid']
-            mode = self.stat(name)['mode']
             return (uid in self.system_file_owners and
-                    not _is_group_or_world_writable(mode))
+                    not _is_group_or_world_writable(name))
 
         if name == '/':
             return _is_single_secure_dir(name)

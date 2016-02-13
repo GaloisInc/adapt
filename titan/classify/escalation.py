@@ -46,9 +46,9 @@ class Escalation(object):
             return False
         prog = event['programName'][0]['value']
         cwd = event['CWD'][0]['value']
-        for dir in [cwd, '/usr/bin', '/bin', '/usr/sbin']:
-            fspec = os.path.normpath(os.path.join(cwd, prog))
+        path = [cwd, '/usr/bin', '/bin', '/usr/sbin']
+        for dir in path:
+            fspec = os.path.normpath(os.path.join(dir, prog))
             if self.fs.is_present(fspec):
-                print(fspec)
                 return not self.fs.is_locked_down(fspec)
         return False

@@ -109,6 +109,10 @@ def classify_provn_events(url):
 
             if esc_detect.is_escalation(event):
                 add_vertex(client, cmd, 'escalation_of_privilege', True)
+                uid = int(event['UID'][0]['value'].split()[0])
+                cwd = event['CWD'][0]['value']
+                cmd = event['commandLine'][0]['value']
+                print(uid, cwd, cmd)
 
 
 def arg_parser():
