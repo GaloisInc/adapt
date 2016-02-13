@@ -66,13 +66,17 @@ def ingest(fspec, db_url, max_components, log_interval=None):
     '''This inserts ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
     aide = re.sub('\.gz$', '', os.path.basename(fspec))
+    # RAM-backed gremlin, rather than disk-backed Cassandra, can
+    # conveniently accommodate only a small fraction of all files.
+    # Admitting binaries inflates gremlin nodes from 1k to 3k.
+    is_binary_re = re.compile(r'^(/usr|)/s?bin/[\w-]+$')  # e.g. /bin/ls
     t0 = datetime.datetime.now()
     dirs = {}
     n = 0
     for mode, hash, uid, gid, size, name in aide_reader.AideReader(fspec):
-        if stat.S_ISDIR(mode):
+        if is_binary_re.search(name) or stat.S_ISDIR(mode):
             if is_too_deep(name, max_components):
-                continue  # Of 26k nodes, ignore 25k of them.
+                continue  # Of 26k directories, ignore 25k of them.
             if log_interval and n % log_interval == 0:
                 elapsed = datetime.datetime.now() - t0
                 log.info('%9.6f  %4d inserting %s',

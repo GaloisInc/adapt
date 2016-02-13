@@ -132,6 +132,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
                            name='PG_%s' % edge_type)
     pg_nodes = ProcessGraphNodes()
     valid_sources = set(['/dev/audit', '/proc'])
+    valid_vertex_types = set(['aide', 'artifact', 'unitOfExecution'])
     coarse_loc_re = re.compile(
         r'^(/|stdout|address:|anon_inode:|pipe:|socket:)')
     types = collections.defaultdict(int)
@@ -164,7 +165,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             id = d[0]['id']
             value = d[0]['value']
             assert id >= 0, id
-            assert value in ['artifact', 'unitOfExecution'], type
+            assert value in valid_vertex_types, value
             types[value] += 1
             # if value == 'unitOfExecution':
             #     optional attributes: CWD, PPID, commandLine, programName

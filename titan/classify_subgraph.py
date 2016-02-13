@@ -69,7 +69,7 @@ def get_re_classifier():
     return c
 
 
-def add_vertex(client, cmd, classification):
+def add_vertex(client, cmd, classification, verbose=False):
     bindings = {'p1': cmd, 'p2': cmd, 'p3': classification}
     resp = client.execute("graph.addVertex(label, p1,"
                           " 'name', p2,"
@@ -77,6 +77,8 @@ def add_vertex(client, cmd, classification):
                           " 'vertexType', 'classification')",
                           bindings=bindings)
     log.debug(repr(resp.data))
+    if verbose:
+        print("\n" + classification)
 
 
 def classify_provn_events(url):
@@ -99,17 +101,14 @@ def classify_provn_events(url):
             cmd = cmds[0]['value']
             if exfil_detect.is_exfil(cmd):
                 # assert exfil_detect.cmd == 'nc', cmd
-                classification = 'step4_exfiltrate_sensitive_file'
                 sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
                 cmd = re.sub(sudo_env, '', cmd)
-                add_vertex(client, cmd, classification)
-                print('\n' + classification)
+                add_vertex(client, cmd, classification,
+                           'step4_exfiltrate_sensitive_file', True)
             exfil_detect.remember(cmd)
 
             if esc_detect.is_escalation(event):
-                classification = 'escalation_of_privilege'
-                add_vertex(client, cmd, classification)
-                print('\n' + classification)
+                add_vertex(client, cmd, 'escalation_of_privilege', True)
 
 
 def arg_parser():

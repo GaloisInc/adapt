@@ -6,6 +6,6 @@ The `bad_ls` provenance graph is comprised of three parts:
 - hashes from a vendor's software release process (ubuntu, here)
 
 
-A `make clean all` completes in less than ten seconds.
+A `make clean all` completes in less than twenty seconds.
 Before that you should have already started `supervisord`,
 perhaps with `(cd ../titan && make big)`.
