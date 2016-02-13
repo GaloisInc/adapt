@@ -62,9 +62,10 @@ def is_too_deep(name, max_components):
     return components > max_components
 
 
-def ingest(fspec, db_url, max_components, log_interval=None):
-    '''This inserts ~200 node/sec.'''
+def ingest_static(input_file, db_url, max_components, log_interval=None):
+    '''Insert mostly-static file nodes, at ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
+    fspec = input_file
     aide = re.sub('\.gz$', '', os.path.basename(fspec))
     # RAM-backed gremlin, rather than disk-backed Cassandra, can
     # conveniently accommodate only a small fraction of all files.
@@ -106,6 +107,24 @@ def ingest(fspec, db_url, max_components, log_interval=None):
     return n
 
 
+def ingest_dynamic(db_url, aide='aide.db'):
+    '''
+    Tell TA2 about TA1 files that are *not* long lived.
+    This is a distinct weakness of using nightly AIDE reports - they
+    are mostly useful for determing that "old" files are benign.
+    Even if TA1 stats files "soon" after use, that's still a race.
+    '''
+    db_client = gremlinrestclient.GremlinRestClient(url=db_url)
+    mode, hash, uid, gid, size, name = (
+        0o755, 'deadbeef', 1042, 0, 42, '/tmp/ls')
+    label = '%s_%s' % (aide, name)
+    add_v = ("graph.addVertex(label, p1, 'vertexType', 'aide',"
+             " 'name', p2,  'mode', p3,  'hash', p4,"
+             " 'uid', p5,  'gid', p6,  'size', p7")
+    bindings = {'p1': label, 'p2': name, 'p3': mode, 'p4': hash,
+                'p5': uid, 'p6': gid, 'p7': size}
+
+
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Upload an AIDE filesystem report to Titan.')
@@ -121,4 +140,5 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    ingest(args.input_file, args.db_url, args.max_components, log_interval=100)
+    ingest_static(**vars(args), log_interval=100)
+    ingest_dynamic(args.db_url)
