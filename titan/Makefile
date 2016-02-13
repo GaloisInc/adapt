@@ -52,7 +52,7 @@ bad_ls.txt: infoleak.txt
 	test `sha256sum  < $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
 	Trint -u -s $(TRACE)/bad-ls.provn \
           | tee $@ \
-        # This should report eight thousand nodes.
+        # This should report 27k thousand nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data
 
 NOSE = nosetests3 --with-doctest
