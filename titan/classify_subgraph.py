@@ -49,7 +49,7 @@ def get_nodes(db_client):
     # sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
     edges = list(db_client.execute("g.E()").data)
-    assert len(edges) > 0, len(edges)
+    #assert len(edges) > 0, len(edges)
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:

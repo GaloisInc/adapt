@@ -40,22 +40,32 @@ class FsProxy(object):
         self.fields = 'name size mode hash uid gid'.split()
         self.system_file_owners = set([0])  # root, bin, admin, oracle, ...
 
+    @functools.lru_cache()
     def _query_node(self, name):
         label = self.prefix + name
         query = 'g.V().hasLabel("%s")' % label
         return self.client.execute(query).data
 
-    @functools.lru_cache()
     def is_present(self, name):
         '''Tests whether the named file exists in the filesystem.'''
         resp = self._query_node(name)  # Empty [] if not found.
         return len(resp) > 0
 
-    @functools.lru_cache()
     def stat(self, name):
+        '''This would fall apart if given a dangling link.'''
+        dir = os.path.dirname(name)
         resp = self._query_node(name)
-        assert len(resp) > 0
+        assert len(resp) > 0, name  # Fails for dangling link.
         props = resp[0]['properties']
+        lname = props['lname'][0]['value']
+        # Chase just one symlink level.
+        if lname != '0':
+            if '/' not in lname:
+                lname = os.path.normpath(os.path.join(dir, lname))
+            name = lname
+            resp = self._query_node(name)
+            assert len(resp) > 0, name  # Fails for dangling link.
+            props = resp[0]['properties']
         assert props['vertexType'][0]['value'] == 'aide', props
         return dict([(f, props[f][0]['value'])
                      for f in self.fields])
