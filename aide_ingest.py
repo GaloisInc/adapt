@@ -62,7 +62,7 @@ def is_too_deep(name, max_components):
     return components > max_components
 
 
-def ingest_static(input_file, db_url, max_components, log_interval=None):
+def ingest_static(input_file, db_url, max_components, log_interval=1000):
     '''Insert mostly-static file nodes, at ~200 node/sec.'''
     db_client = gremlinrestclient.GremlinRestClient(url=db_url)
     fspec = input_file
@@ -74,7 +74,8 @@ def ingest_static(input_file, db_url, max_components, log_interval=None):
     t0 = datetime.datetime.now()
     dirs = {}
     n = 0
-    for mode, hash, uid, gid, size, name in aide_reader.AideReader(fspec):
+    for (mode, hash, uid, gid,
+         size, name, lname) in aide_reader.AideReader(fspec):
         if is_binary_re.search(name) or stat.S_ISDIR(mode):
             if is_too_deep(name, max_components):
                 continue  # Of 26k directories, ignore 25k of them.
@@ -87,16 +88,16 @@ def ingest_static(input_file, db_url, max_components, log_interval=None):
             label = '%s_%s' % (aide, name)
             add_v = ("graph.addVertex(label, p1, 'vertexType', 'aide',"
                      " 'name', p2,  'mode', p3,  'hash', p4,"
-                     " 'uid', p5,  'gid', p6,  'size', p7")
+                     " 'uid', p5,  'gid', p6,  'size', p7,  'lname', p8")
             bindings = {'p1': label, 'p2': name, 'p3': mode, 'p4': hash,
-                        'p5': uid, 'p6': gid, 'p7': size}
+                        'p5': uid, 'p6': gid, 'p7': size, 'p8': lname}
             # I don't think I like this representation.
             # Query results sent back by gremlin seem far too verbose.
             # Should use addEdge instead.
             # if name != '/':  # if has_parent(name)
             #     parent = dirs['%s_%s' % (aide, os.path.dirname(name))]
-            #     bindings['p6'] = parent
-            #     add += ", 'parent', p6"
+            #     bindings['p9'] = parent
+            #     add += ", 'parent', p9"
             try:
                 resp = db_client.execute(add_v + ')', bindings=bindings)
             except gremlinrestclient.exceptions.GremlinServerError as e:
@@ -140,5 +141,5 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    ingest_static(**vars(args), log_interval=100)
+    ingest_static(**vars(args))
     ingest_dynamic(args.db_url)

@@ -61,7 +61,7 @@ class AideReader:
          crc32, sha256) = line.split()
         # if lname == '0':
         return (from_octal(perm), b64_to_hex(sha256),
-                int(uid), int(gid), int(size), name)
+                int(uid), int(gid), int(size), name, lname)
 
 
 def from_octal(perm):
