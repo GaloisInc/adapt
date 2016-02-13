@@ -38,7 +38,7 @@ class FsProxy(object):
         self.client = db_client
         self.prefix = prefix
         self.fields = 'name size mode hash uid gid'.split()
-        self.system_file_owners = set([0])  # root, bin, admin, ...
+        self.system_file_owners = set([0])  # root, bin, admin, oracle, ...
 
     def _query_node(self, name):
         label = self.prefix + name

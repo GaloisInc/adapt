@@ -39,15 +39,16 @@ class Escalation(object):
         assert event['vertexType'][0]['value'] == 'unitOfExecution', event
         uids = event['UID'][0]['value']  # four of them
         executing_uid = int(uids.split()[0])
+        if executing_uid != 0:
+            return False  # We detect alice -> root, but not alice -> bob.
         if 'CWD' not in event:
             # Grrrr. Sometimes this happens when programName is 'ls'.
             return False
-        cwd = event['CWD'][0]['value']
         prog = event['programName'][0]['value']
-        fspec = os.path.normpath(os.path.join(cwd, prog))
-        # print(fspec)
-        if not self.fs.is_present(fspec):
-            return False  # e.g. /usr/share/ls where cwd is /usr/share
-        if executing_uid != 0:
-            return False  # We detect alice -> root, but not alice -> bob.
-        return not self.fs.is_locked_down(fspec)
+        cwd = event['CWD'][0]['value']
+        for dir in [cwd, '/usr/bin', '/bin', '/usr/sbin']:
+            fspec = os.path.normpath(os.path.join(cwd, prog))
+            if self.fs.is_present(fspec):
+                print(fspec)
+                return not self.fs.is_locked_down(fspec)
+        return False
