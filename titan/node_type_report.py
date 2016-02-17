@@ -25,13 +25,18 @@
 Reports on node types stored in a Titan graph.
 '''
 
-__author__ = 'John.Hanley@parc.com'
-
 import graphviz
 import gremlinrestclient
 import argparse
 import collections
+import logging
 import re
+
+__author__ = 'John.Hanley@parc.com'
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())  # log to console (stdout)
+log.setLevel(logging.INFO)
 
 
 class ProcessGraphNodes:
@@ -69,51 +74,70 @@ valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
 
 
 def edge_types(url):
+    label_256bit_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
+    in_labels = collections.defaultdict(int)
+    out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
+    valid_operations = set(['read', 'recvfrom', 'recvmsg'])
     db_client = gremlinrestclient.GremlinRestClient(url=url)
-    count = db_client.execute('g.E().count()').data[0]
-    assert count > 0, count
+    # count = db_client.execute('g.E().count()').data[0]
+    # assert count > 0, count
     for edge in db_client.execute('g.E()').data:
         if 'properties' in edge:
             d = edge['properties']
-            assert len(d) == 1, d
-            assert 'atTime' in d, d  # e.g. '2015-09-28 01:06:56 UTC'
+            assert len(d) == 2, d
+            assert 'atTime' in d, d     # e.g. '2015-09-28 01:06:56 UTC'
+            assert 'operation' in d, d  # e.g. 'read'
+            assert d['operation'] in valid_operations, d
         assert edge['type'] == 'edge', edge
         assert edge['id'] >= 0, edge
         assert edge['inV'] >= 0, edge
         assert edge['outV'] >= 0, edge
+        assert label_256bit_re.search(edge['inVLabel'])
+        assert label_256bit_re.search(edge['outVLabel'])
+        in_labels[edge['inVLabel']] += 1
+        out_labels[edge['inVLabel']] += 1
         typ = edge['label']
         assert typ in valid_edge_types, edge
         types[typ] += 1
+    assert len(in_labels) == len(out_labels)
+    # print(len(in_labels), sorted(in_labels.values()))
+    assert sorted(in_labels.values()) == sorted(out_labels.values())
     return types
 
 
 def get_nodes(db_client):
     '''Returns the interesting part of each node (its properties).'''
 
-    sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
-                              '|^classification$')
+    # edges = list(db_client.execute("g.E()").data)
+    # assert len(edges) > 0, len(edges)
 
-    edges = list(db_client.execute("g.E()").data)
-    assert len(edges) > 0, len(edges)
+    sri_or_adapt_label_re = re.compile(
+        r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
+        '|^classification$'
+        '|^aide\.db_/'
+        '|^vendor_hash_/')
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:
         assert node['type'] == 'vertex', node
         assert node['id'] >= 0, node
-        assert sri_label_re.search(node['label']), node
+        assert sri_or_adapt_label_re.search(node['label']), node
         yield node['properties']
 
 
-def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
+def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     direction = {'rankdir': 'LR'}
-    dot = graphviz.Digraph(format='png', graph_attr=direction,
-                           name='%s_%s' % (name, edge_type))
+    dot = graphviz.Digraph(format='pdf', graph_attr=direction,
+                           name='PG_%s' % edge_type)
     pg_nodes = ProcessGraphNodes()
+    valid_sources = set(['/dev/audit', '/proc'])
+    valid_vertex_types = set(['aide', 'artifact', 'unitOfExecution'])
+    coarse_loc_re = re.compile(
+        r'^(/|stdout|address:|anon_inode:|pipe:|socket:)')
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
-    mandatory_attrs = set(['PID', 'UID', 'group', 'source', 'vertexType'])
     client = gremlinrestclient.GremlinRestClient(url=url)
 
     for node in get_nodes(client):
@@ -122,7 +146,7 @@ def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
         #     print(k, v)
 
         if 'source' in node:
-            assert node['source'][0]['value'] == '/dev/audit', node
+            assert node['source'][0]['value'] in valid_sources, node
 
         if 'PPID' in node and 'programName' in node:
             pid = node['PID'][0]['value']
@@ -141,12 +165,10 @@ def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
             id = d[0]['id']
             value = d[0]['value']
             assert id >= 0, id
-            assert value in ['artifact', 'unitOfExecution'], type
+            assert value in valid_vertex_types, value
             types[value] += 1
-            if value == 'unitOfExecution':
-                # optional attributes: CWD, PPID, commandLine, programName
-                for attr in mandatory_attrs:
-                    assert attr in node, attr + str(node)
+            # if value == 'unitOfExecution':
+            #     optional attributes: CWD, PPID, commandLine, programName
 
         if 'coarseLoc' in node:
             d = node['coarseLoc']
@@ -156,8 +178,12 @@ def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
             id = d[0]['id']
             value = d[0]['value']
             assert id >= 0, id
-            assert value.startswith('/') or value.startswith('address:'), value
+            assert coarse_loc_re.search(value), value
             files.append(value)
+
+        if 'commandLine' in node:
+            assert 'programName' in node, node
+            # print(node['commandLine'][0]['value'])
 
     for edge in client.execute("g.E()").data:
         typ = edge['label']
@@ -171,30 +197,26 @@ def node_types(url, verbose=False, name='infoleak', edge_type='wasInformedBy'):
                     dot.node(out_v, color='white')
                 if in_v.startswith('/'):
                     dot.node(in_v, color='white')
-                    if verbose:
-                        print(out_v, in_v)
+                    log.debug('%s %s' % (out_v, in_v))
 
     dot.render(directory='/tmp')
-    if verbose:
-        print('\n'.join(sorted(files)))
+    log.debug('\n'.join(sorted(files)))
     return types
 
 
-def is_unit_of_execution(properties):
-    return ('vertexType' in properties
-            and properties['vertexType'][0]['value'] == 'unitOfExecution')
-
-
-def lookup(client, id, verbose=False):
+def lookup(client, id):
     ret = {}
     query = 'g.V(%d)' % id
     for node in client.execute(query).data:
         assert node['type'] == 'vertex', node
-        if verbose:
-            print(sorted(node['properties'].items()))
+        log.debug(repr(sorted(node['properties'].items())))
         ret = node['properties']
-    if 'programName' in ret or is_unit_of_execution(ret):
+    if 'programName' in ret:
         return ret['PID'][0]['value']
+    if 'vertexType' in ret:
+        assert ret['vertexType'][0]['value'] in ['artifact',
+                                                 'unitOfExecution'], ret
+        return ret['vertexType'][0]['value']
     if 'coarseLoc' in ret:
         loc = ret['coarseLoc'][0]['value']
         if loc.startswith('address:'):
@@ -204,7 +226,7 @@ def lookup(client, id, verbose=False):
             loc = '/' + loc
         assert ' ' not in loc, loc
         return loc
-    return None
+    assert None, ret  # pragma: no cover
 
 
 def arg_parser():
