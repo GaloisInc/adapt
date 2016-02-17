@@ -25,92 +25,22 @@
 Classifies activities found in subgraphs of a SPADE trace.
 '''
 
-__author__ = 'John.Hanley@parc.com'
-
 # from prov.model import Identifier, Literal, Namespace, PROV, ProvBundle, XSD
-# from tornado import gen
-# from tornado.concurrent import Future
-# from tornado.ioloop import IOLoop
-# import gremlinclient
-#
+
 # c.f. http://gremlinrestclient.readthedocs.org/en/latest/
 # and  https://github.com/davebshow/gremlinrestclient
-# sudo -H pip3 install gremlinrestclient gremlinclient
+# sudo -H pip3 install gremlinrestclient
 import gremlinrestclient
 import argparse
-import errno
-import io
-import os
+import classify
+import logging
 import re
 
+__author__ = 'John.Hanley@parc.com'
 
-class ExfilDetector(object):
-
-    def __init__(self, k=1):
-        self.k = k
-        self.recent_events = ['' * k]
-        self.cmd = 'unknown'  # This is always the most recent cmd seen.
-        ip_pat = r'(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
-        self._ip_re = re.compile(
-            r'data:destination host="' + ip_pat + '",'
-            r'\s*audit:subtype="network",\s*data:destination port=')
-        self._file_re = re.compile(
-            r'audit:path="(?P<fspec>[\w/\.-]+)",'
-            r'\s*audit:subtype="file",')
-        self._sensitive_re = re.compile(
-            'Company Confidential'
-            '|Xerox Confidential'
-            '|Intel Proprietary'
-            '|For Official Use Only'
-            '|Buckshot Yankee'
-            '|Byzantine Anchor'
-            '|Xkeyscore',
-            re.IGNORECASE)
-        self._dont_read_re = re.compile(  # Binary files, or unreadable dirs.
-            r'^/(dev|proc|var/run'
-            r'|lib/x86_64-linux-gnu'
-            r'|usr/lib/x86_64-linux-gnu'
-            r'|usr/share/locale|usr/lib/sudo)/'
-            r'|^/etc/localtime')
-
-    def remember(self, cmd):
-        '''Maintain a history of recently seen events.'''
-        assert self.k == 1
-        self.recent_events = [cmd]  # Later we'll retain multiple events.
-
-    def is_exfil(self, cmd):
-        '''Predicate is True for sensitive file exfiltration events.'''
-        # recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
-        return self.is_sensitive_file(cmd)  # and recent_foreign_ip
-
-    def is_sensitive_file(self, cmd):
-        '''Predicate is True for files with restrictive markings.'''
-        # NB: Analysis filesystem must be quite similar to Monitored Host FS.
-        # File paths relative to cwd may require us to track additional state.
-        if (' auditctl ' in cmd
-                and cmd.startswith('sudo ')):
-            return True
-        event = cmd
-        m = self._file_re.search(event)
-        if m:
-            fspec = m.group('fspec')
-            if not os.path.exists(fspec):
-                return False
-            if self._dont_read_re.search(fspec):  # Avoid binary files.
-                return False
-            try:
-                is_sensitive = False
-                with io.open(fspec) as fin:
-                    for line in fin:  # This won't work well on a binary file.
-                        if self._sensitive_re.search(line):
-                            is_sensitive = True
-                return is_sensitive
-            except OSError as e:
-                if e.errno != errno.EACCES:  # 13
-                    print(e)
-                return False
-        else:
-            return False
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())
+log.setLevel(logging.INFO)
 
 
 def get_nodes(db_client):
@@ -119,7 +49,7 @@ def get_nodes(db_client):
     # sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
     edges = list(db_client.execute("g.E()").data)
-    assert len(edges) > 0, len(edges)
+    #assert len(edges) > 0, len(edges)
 
     nodes = db_client.execute("g.V()").data
     for node in nodes:
@@ -129,7 +59,7 @@ def get_nodes(db_client):
         yield node['properties']
 
 
-def get_classifier():
+def get_re_classifier():
     c = []
     for rex, classification in [
             (r'audit:commandline="cat /tmp/timestamp.txt",',
@@ -139,19 +69,25 @@ def get_classifier():
     return c
 
 
-def add_vertex(client, cmd, classification):
-
-    resp = client.execute(
-        "graph.addVertex(label, p1, 'name', p2)",
-        bindings={'p1': 'classification', 'p2': classification})
-    print(resp.data)
+def add_vertex(client, cmd, classification, verbose=False):
+    bindings = {'p1': cmd, 'p2': cmd, 'p3': classification}
+    resp = client.execute("graph.addVertex(label, p1,"
+                          " 'name', p2,"
+                          " 'classification', p3,"
+                          " 'vertexType', 'classification')",
+                          bindings=bindings)
+    log.debug(repr(resp.data))
+    if verbose:
+        print("\n" + classification)
 
 
 def classify_provn_events(url):
-    c = get_classifier()
+    c = get_re_classifier()
     del(c)
-    detector = ExfilDetector()
     client = gremlinrestclient.GremlinRestClient(url=url)
+    exfil_detect = classify.ExfilDetector()
+    exfil_detect.test_is_sensitive_file()
+    esc_detect = classify.Escalation(classify.FsProxy(client))
 
     # Edges currently are one of { used, wasGeneratedBy, wasInformedBy }.
 
@@ -161,17 +97,22 @@ def classify_provn_events(url):
                 'commandLine' in event):
             cmds = event['commandLine']
             assert len(cmds) == 1, cmds  # Actually, there's just a single cmd.
-            # id, cmd = cmds[0]['id'], cmds[0]['value']
+
             cmd = cmds[0]['value']
-            detector.cmd = cmd
-            if detector.is_exfil(cmd):
-                # assert detector.cmd == 'nc', cmd
-                classification = 'step4_exfiltrate_sensitive_file'
+            if exfil_detect.is_exfil(cmd):
+                # assert exfil_detect.cmd == 'nc', cmd
                 sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
                 cmd = re.sub(sudo_env, '', cmd)
-                add_vertex(client, cmd, classification)
-                print('\n' + classification)
-            detector.remember(cmd)
+                add_vertex(client, cmd, classification,
+                           'step4_exfiltrate_sensitive_file', True)
+            exfil_detect.remember(cmd)
+
+            if esc_detect.is_escalation(event):
+                add_vertex(client, cmd, 'escalation_of_privilege', True)
+                uid = int(event['UID'][0]['value'].split()[0])
+                cwd = event['CWD'][0]['value']
+                cmd = event['commandLine'][0]['value']
+                print(uid, cwd, cmd)
 
 
 def arg_parser():
