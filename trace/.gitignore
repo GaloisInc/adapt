@@ -1,1 +1,12 @@
+*.dot
+*.gz
+*.log
+*.md
+*.pp_json
 *.provn
+*.raw
+*.tgz
+*.ttl
+*.zip
+scenario_3_1_ttl.txt
+ssh_and_exfiltrate
