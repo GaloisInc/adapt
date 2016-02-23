@@ -9,6 +9,7 @@
 :> mgmt = graph.openManagement() ; mgmt.makeEdgeLabel('actedOnBehalfOf').multiplicity(SIMPLE).make() ; mgmt.commit()
 :> mgmt = graph.openManagement() ; mgmt.makeEdgeLabel('wasInvalidatedBy').multiplicity(SIMPLE).make() ; mgmt.commit()
 :> mgmt = graph.openManagement() ; mgmt.makeEdgeLabel('segmentContains').multiplicity(SIMPLE).make() ; mgmt.commit()
+:> mgmt = graph.openManagement() ; mgmt.makeEdgeLabel('segmentCaused').multiplicity(SIMPLE).make() ; mgmt.commit()
 :> mgmt = graph.openManagement() ; mgmt.makePropertyKey('vertexType').dataType(String.class).cardinality(SINGLE).make() ; mgmt.commit()
 :> mgmt = graph.openManagement() ; mgmt.makePropertyKey('name').dataType(String.class).cardinality(SINGLE).make() ; mgmt.commit()
 :> mgmt = graph.openManagement() ; mgmt.makePropertyKey('user').dataType(String.class).cardinality(SINGLE).make() ; mgmt.commit()

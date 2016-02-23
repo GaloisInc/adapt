@@ -84,7 +84,8 @@ adaptSchema = Schema  [Vertex "segment"]
                        Edge "wasDerivedFrom" SIMPLE,
                        Edge "actedOnBehalfOf" SIMPLE,
                        Edge "wasInvalidatedBy" SIMPLE,
-                       Edge "segmentContains" SIMPLE]
+                       Edge "segmentContains" SIMPLE,
+                       Edge "segmentCaused" SIMPLE]
                       [PropertyKey "vertexType" STRING SINGLE,
                        PropertyKey "name" STRING SINGLE,
                        PropertyKey "user" STRING SINGLE,
