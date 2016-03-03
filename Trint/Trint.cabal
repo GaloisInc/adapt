@@ -29,7 +29,7 @@ executable Trint
                      , monadLib >= 3.7 && <3.8
                      , http-client >= 0.4 && < 0.5
                      , http-client-tls >= 0.2 && < 0.3
-                     , http-types >= 0.8 && < 0.9
+                     , http-types >= 0.9 && < 0.10
                      , containers >= 0.5 && < 0.6
                      , network >= 2.6 && < 2.7
                      , bytestring >= 0.10 && < 0.11
