@@ -10,6 +10,11 @@ TITAN_SERVER_DIR=titan
 KAFKA_DIR=kafka
 
 mkdir -p $USER_BIN
+ret=`echo $PATH | grep "$USER_BIN" ; true`
+if [ -z $ret ]
+then
+    echo "export PATH=$$PATH:$USER_BIN" >> $HOME/.bashrc
+fi
 
 # Verify we can run as root:
 sudo id -u || exit 1
@@ -102,4 +107,7 @@ fi
 
 # Compile all Adapt code
 export PATH=$PATH:$USER_BIN
-cd ingest/Trint ; stack install
+if [ ! \( -e $USER_BIN/Trint \) ]
+then
+    cd ingest/Trint ; stack install
+fi

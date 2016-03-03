@@ -18,9 +18,10 @@ Vagrant.configure(2) do |config|
      vb.cpus   = 2
   end
 
-  config.vm.provision "file", source: "start_daemons.sh", destination: "start_daemons.sh"
-  config.vm.provision "file", source: "../config/supervisord.conf", destination: "superisord.conf"
   config.vm.provision "file", source: "../ingest", destination: "ingest"
   config.vm.provision "shell", privileged: false, path: "bootstrap.sh"
+  config.vm.provision "file", source: "../config/titan", destination: "titan"
+  config.vm.provision "file", source: "start_daemons.sh", destination: "start_daemons.sh"
+  config.vm.provision "file", source: "../config/supervisord.conf", destination: "config/supervisord.conf"
 end
 
