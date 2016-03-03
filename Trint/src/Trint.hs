@@ -361,8 +361,9 @@ doUpload c stmts svr =
     do res <- titan svr stmt
        case res of
          Success _ i -> return (Just i)
-         _ -> return Nothing
-
+         Failure exn -> error (show exn)
+         ParseError -> return (Nothing)
+         
 translateInsert :: Stmt -> Operation Text
 translateInsert (StmtPredicate (Predicate {..})) =
     InsertEdge { label = pretty predType
