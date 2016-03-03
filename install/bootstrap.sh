@@ -13,7 +13,7 @@ mkdir -p $USER_BIN
 ret=`echo $PATH | grep "$USER_BIN" ; true`
 if [ -z $ret ]
 then
-    echo "export PATH=$$PATH:$USER_BIN" >> $HOME/.bashrc
+    echo "export PATH=\$PATH:$USER_BIN" >> $HOME/.bashrc
 fi
 
 # Verify we can run as root:
