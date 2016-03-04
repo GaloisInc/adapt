@@ -105,11 +105,13 @@ if [ ! \( -e $KAFKA_DIR -o -e $TEMP/kafka.tgz \) ] ; then
 fi
 [ -e $KAFKA_DIR ] || mv kafka_2.11-0.8.2.2 $KAFKA_DIR
 
-# Download Adapt code
-# This script should be from the Adapt.git repository, thus we already have the adapt code in cwd
-# git clone git@github.com:GaloisInc/Adapt.git $ADAPT_DIR
-
 # Compile all Adapt code
 export PATH=$PATH:$USER_BIN
-source bootstrap-ingest.sh
+
+function install_ingest() {
+    if [ ! \( -e $USER_BIN/Trint \) ]
+    then
+        cd ingest/Trint ; stack install
+    fi
+}
 install_ingest
