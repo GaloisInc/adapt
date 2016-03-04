@@ -8,6 +8,7 @@ TEMP=/tmp
 
 TITAN_SERVER_DIR=titan
 KAFKA_DIR=kafka
+CONFIG_DIR=$HOME/config
 
 mkdir -p $USER_BIN
 ret=`echo $PATH | grep "$USER_BIN" ; true`
@@ -66,7 +67,7 @@ sudo apt-get -y install \
     wget \
     zlib1g-dev \
 
-which pip3 || (sudo -H easy_install3 pip && test -x /usr/bin/pip && rm -f /usr/local/bin/pip)
+which pip3 || (sudo -H easy_install3 pip && test -x /usr/bin/pip && sudo rm -f /usr/local/bin/pip)
 sudo -H pip3 install coverage flake8 graphviz gremlinrestclient
 
 # We do not wish for root to launch a supervisor daemon upon reboot.
@@ -91,6 +92,9 @@ if [ ! -e $TITAN_SERVER_DIR ] ; then
 	unzip   $GRZIP
 	mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR
 fi
+if [ -e $CONFIG_DIR/titan ] ; then
+    cp -r $CONFIG_DIR/titan $TITAN_SERVER_DIR
+fi
 
 # Use stack to install ghc
 $USER_BIN/stack setup
@@ -107,7 +111,5 @@ fi
 
 # Compile all Adapt code
 export PATH=$PATH:$USER_BIN
-if [ ! \( -e $USER_BIN/Trint \) ]
-then
-    cd ingest/Trint ; stack install
-fi
+source bootstrap-ingest.sh
+install_ingest
