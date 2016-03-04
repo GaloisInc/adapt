@@ -93,7 +93,7 @@ if [ ! -e $TITAN_SERVER_DIR ] ; then
 	mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR
 fi
 if [ -e $CONFIG_DIR/titan ] ; then
-    cp -r $CONFIG_DIR/titan $TITAN_SERVER_DIR
+    cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/
 fi
 
 # Use stack to install ghc

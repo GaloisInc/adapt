@@ -40,4 +40,4 @@ pstree -u | grep java
 (cd $ADAPT/ingest && make)
 
 echo Ready to populate the Titan DB, e.g. with:
-echo Trint -u '~/adapt/infoleak.provn'
+echo 'tar xJf example/infoleak*.tar.xz && Trint -u infoleak.provn'
