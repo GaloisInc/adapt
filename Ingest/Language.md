@@ -41,7 +41,7 @@ Our hierarchical abstraction begins with the pattern layer. Pattern instances ar
 
 The next layer of abstraction is the activity layer. Activities are the leaf entities in our APT grammar, and also represent intuitive computations. Activities are comprised of patterns. For example, an instance of the activity *Copy File to Directory* might be comprised of several pattern instances: {*PROCESS Opens FILE*, *PROCESS Reads FILE*, *PROCESS Opens File for Write*, *PROCESS Writes File*, and *PROCESS Closes File*}. Each activity instance is represented in our data model as an activity node along with edges connecting that node to each of the pattern instances that comprise that activity. By inference, edges connecting those pattern instances are included in the activity as well.
 
-The next layer of abstraction is the APT Phase layer. Phases are the node entities in our APT grammar, and represent instances of APT phases as described there. Phases are comprised of activities. Each phase instance is represented in our data model as a phase node along with edges connecting that node to each of the activity instances that comprise the phase. As above, edges connecting those components are included implicitly.
+The next layer of abstraction is the APT Phase layer. Phases are the node entities in our APT grammar tree, and represent instances of APT phases as described there. Phases are comprised of activities. Each phase instance is represented in our data model as a phase node along with edges connecting that node to each of the activity instances that comprise the phase. As above, edges connecting those components are included implicitly.
 
 The next layer of abstraction is the APT layer. APTs are the root of our APT grammar, and represent instances of entire APTs. Each APT instance is comprised of phase instances. APTs are represented by an APT node along with edges from that node to the Phases that comprise the APT instance.
 
@@ -66,9 +66,28 @@ Data flow at a high level works like this:
 
 For our Phase 1 ADAPT System (Alpha-1), we consider only non-iterative analysis by ADAPT modules. That is, each module operates on Bb data only once. Later on, we may employ iterative processing both to accommodate streaming input data and to allow for more powerful analytics.
 
+Analysis done by ADAPT follows the data flow described above. For Phase 1, only forensic analysis is supported, so no incremental passes are required to assimilate additional base layer data.
+The In creates data in the Bb from TA1 sources, and then provides an update notification to Px.
+Px scours Bb content, identifying pattern instances that match its templates, and adding relevant pattern data
+to the Bb. Px then provides an update notification to Se. Se scours Bb content, identifying segments that match
+its segmentation criteria, and adding relevant segment information to Bb. Se then provides update notifications
+to both Ad and Ac on a per-segment basis. Se provides such a update notification when it finishes with
+all segments. Ad and Ac operate in parallel. Ad scans the segments for anomalies, running possibly many anomaly
+detectors in parallel. Each detector develops an anomaly score for the segment on its specific anomaly mask, and
+annotates the segment with that score information. When all detectors are finished, Ad provides an
+update notification to Dx. Ac scans all segments, running possibly many activity classifiers
+in parallel to identify activity instances and annotating
+activity information to the Bb (and attaching that information to the relevant segments). When all classifiers
+are finished with all segments, Ac provides an update notification to Dx. Upon receiving both notifications, Dx
+scans Bb to identify APT instances, annotates these into Bb, and informs the user interface, reporting completion
+and any suspected APT instances. Ui will (eventually be able to) construct reports or visualizations based on
+Dx reports and Bb contents to convey APT suspicions to operators.
+
 Describing ADAPT Modules
 ---------
-The following sections describe each ADAPT module. Each section should cover the following, but need be no longer than a page:
+The following sections describe each ADAPT module. Each section should cover the following, but need be no 
+longer than a page:
+
 * A detailed type signature for the module's inputs and outputs, suitable for other modules to interact with the module
 * A description of any private stored data, such as templates or knowledge, that the module will use
 * A description at your choice of detail of how you do the processing you do
@@ -80,42 +99,45 @@ The Ingester (In) - Tom
 ------------
 In:: [CDM-Element] > [[base-node], [base-edge]]
 
-That is, the In takes in a set of CDM statements and produces a graph of nodes and edges in the Bb.
+That is, the In takes in a set of CDM statements and produces a graph of nodes and edges in the Bb. The base node
+and base edge graph
+components produced are subsets of the Bb schema described later in this specification.
 
 The Pattern Extractor (Px) - Erin/Trevor
 --------
-Px:: [[ADAPT-node],[ADAPT-edge]]> [Pattern-definition] > [<Pattern-node,[Pattern-to-base-edge]>]
+Px:: [[base-node],[base-edge]]> [Pattern-definition] > [<pattern-node,[pattern-to-base-edge]>]
 
 That is, Px takes in the graph in the Bb and a list of pattern definitions, and produces as output pattern nodes in the Bb and associated edges connecting those nodes to their respective base layer component nodes
 
 The Segmenter (Se) - Adria
 ---------
-Se:: [[ADAPT-node],[ADAPT-edge]] > [Segment-criterion] > [<Segment-node,[Segment-to-base-edge]>]
+Se:: [[base-node],[base-edge],[pattern-node],[pattern-to-base-edge]] > [segment-criterion] > [<segment-node,[segment-to-base-edge]>]
 
 That is, the Se takes in a graph of nodes and edges in the Bb and a list of segmentation criteria, and produces in the Bb a set of segment nodes and the edges that connect each to the other nodes in the graph that are its members.
 
 The Anomaly Detector (Ad) - Alan
 -------
-Ad:: [[ADAPT-node],[ADAPT-edge]] > [Mask] > Segment-identifier > [<Segment-node-id,Anomaly-score>]
+Ad:: [[segment-node],[segment-edge]] > [Mask] > segment-identifier > [<segment-node-id,anomaly-type,anomaly-score>]
 
-That is, Ad takes in the graph in the Bb, a list of masks, and a segment identifier, and produces as output a list of anomaly score annotations attached to segment nodes in the graph.
+That is, Ad takes in the graph in the Bb, a list of masks, and a segment identifier, and produces as 
+output a list of anomaly score annotations attached to segment nodes in the graph.
 
 The Activity Classifier (Ac) - Hoda
 ----------
-Ac:: [[ADAPT-node],[ADAPT-edge]] > Segment-identifier > [<Activity-node,[Activity-to-pattern-edge]>]
+Ac:: [[pattern-node],[pattern-to-base-edge]] > segment-identifier > [<activity-node,[activity-to-pattern-edge]>]
 
 That is, Ac takes in the graph in the Bb and a segment identifier, and produces as output a list of activity nodes in the Bb and the edges that connect them to their component pattern nodes.
 
 The Diagnostic Engine (Dx) - Rui
 --------
-Dx:: [[ADAPT-node],[ADAPT-edge]] > [<Phase-node,[Phase-to-activity-edge]>]
-Dx:: [[ADAPT-node],[ADAPT-edge]] > [<APT-node,[APT-to-phase-edge]>]
+Dx:: [[activity-node],[activity-to-pattern-edge]] > [<Phase-node,[Phase-to-activity-edge]>]
+Dx:: [[activity-node],[activity-to-pattern-edge]] > [<APT-node,[APT-to-phase-edge]>]
 
 That is, Dx takes in the graph in the Bb and produces as output a list of phase nodes in the Bb and the edges that connect them to their component activities, and a list of APT nodes and the edges that connect them to their component phases.
 
 The Blackboard (Bb) - Erin
 ----------
-The Bb has no type signature that I can think of
+Bb:: Query > [[node],[edge]]
 
 The Knowledge Base (Kb) - David
 -----------
@@ -567,7 +589,14 @@ Optional attribute:
 
 A Note About Provenance Tags
 ----------
-Provenance tags in CDM indicate entity dependencies on other entities or on subjects. A tag may define a subject or entity either as an original source or as a derivative from other original sources. As of CDM v0.7, tags are structured in this manner:
+**We choose not to represent provenance tags in the ADAPT model, and we aim not to parse or interpret them during
+Phase 1. Later, we may interpret the tag expressions and create the necessary edges 
+in our graph to represent provenance encoded in those tags using the wasDerivedFrom 
+relationship discussed below. Thus for Phase 1, TA1 performers whose data we use should
+not use these CDM constructs.**
+
+Provenance tags in CDM indicate entity dependencies on other entities or on subjects. 
+A tag may define a subject or entity either as an original source or as a derivative from other original sources. As of CDM v0.7, tags are structured in this manner:
 
 The tag expression syntax is:
 
@@ -586,11 +615,6 @@ Thus a tagExpr is a tree-structured representation of dependencies of the Object
 * a TagOpCode combining children tags 
 * an IntegrityTag
 * a confidentiality tag
-
-This expression syntax seems to have some redundancies at present to attributes of other CDM elements. In addition, the structure is poorly specified. So, our use of this information will evolve as the specification evolves.
-
-We choose not to represent provenance tags in the ADAPT model, because these dependencies are modeled equally well by edges (relationships) in our provenance graph. 
-Our ingester will interpret the tag expressions and create the necessary edges using the wasDerivedFrom relationship discussed below.
 
 
 prov:wasDerivedFrom (not in CDM, informed by CDM tagging system)
