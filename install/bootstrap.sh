@@ -97,6 +97,7 @@ if [ -e $CONFIG_DIR/titan ] ; then
 fi
 
 # Use stack to install ghc
+# NB: Trint no longer builds with 7.10.2; you might need: "stack setup 7.10.3"
 $USER_BIN/stack setup
 
 if [ ! \( -e $KAFKA_DIR -o -e $TEMP/kafka.tgz \) ] ; then
