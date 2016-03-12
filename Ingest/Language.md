@@ -27,7 +27,12 @@ Architecture of ADAPT
 ========
 Overview of Abstraction layers in ADAPT
 --------
-System activity data used and created by an ADAPT instance is graph-structured and hierarchical. Data imported from TA-1 sensors comprises the *base layer* of our database. This layer models 
+System activity data used and created by an ADAPT instance is graph-structured and hierarchical. The figure below
+shows the abstraction layers we use in ADAPT.
+
+<img src="./datamodel.png" alt="ADAPT Data Model" style="width: 600px;"/>
+
+Data imported from TA-1 sensors comprises the *base layer* of our database. This layer models 
 
 * units of execution in the system at various abstractions from individual events to processes
 * artifacts such as files, network flows, and memory buffers
@@ -51,9 +56,25 @@ Orthogonal to the hierarchical structure above is the notion of segmentation. An
 
 ADAPT Architecture
 -------
-The architecture of ADAPT is shown below.
+A simplified data flow diagram of ADAPT may help explain how analysis is performed. The figure below shows a
+conceptual view of how data flows through the ADAPT system. Base layer data consisting of Subjects, Objects, Events, 
+and relationships comes from TA-1 sensors and is transformed into
+our internal model by the Ingester. The Segmenter groups base layer data by common properties, for example, 
+process ID. The Anomaly Detector observes features of base layer data on a per-segment basis to
+identify outliers of various kinds and score them by how unusual they are. The Pattern Extractor groups base layer data into intuitive primitive actions that we
+call patterns, for example,
+"Process Reads File". The Activity classifier groups
+patterns into higher-level behaviors, for example, "Copying file to new directory". The Diagnostic Engine
+groups activities into candidate APT phases and those phases into candidate APTs, and scores each candidate
+using the anomaly scores from the Anomaly Detector. Prioritized candidates are presented to human operators for
+analysis.
+
+<img src="./dataflow.png" alt="ADAPT System Architecture" style="width: 600px;"/>
+
+The architecture of ADAPT is shown below. Note that data flow from the diagram above is achieved by all modules communication via a common "blackboard" database.
 
 <img src="./systemdiagram.png" alt="ADAPT System Architecture" style="width: 600px;"/>
+
 
 Data flow at a high level works like this:
 
