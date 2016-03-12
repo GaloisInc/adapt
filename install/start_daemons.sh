@@ -17,7 +17,7 @@ then
     sleep 1
 fi
 
-ADAPT=$HOME
+ADAPT=$HOME/adapt
 supercfg=$ADAPT/config/supervisord.conf
 
 cd $ADAPT || exit 1
