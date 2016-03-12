@@ -2,7 +2,7 @@
 set -e
 
 # Constants
-ADAPT_DIR=$HOME/Adapt
+ADAPT_DIR=$HOME/adapt
 USER_BIN=$HOME/.local/bin
 TEMP=/tmp
 
@@ -19,6 +19,8 @@ fi
 
 # Verify we can run as root:
 sudo id -u || exit 1
+
+cd $ADAPT_DIR || exit 1
 
 # Allow PPA's in Debian
 sudo apt-get install build-essential man wget -y

@@ -23,14 +23,8 @@ supercfg=$ADAPT/config/supervisord.conf
 cd $ADAPT || exit 1
 
 # run supervisord (zookeeper, kafka, gremlin)
-if pgrep supervisord > /dev/null
-then
-    exit 0  # Nothing to do, it's already running.
-fi
-(set -x
- supervisord -c $supercfg)
+pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started.)
 
-echo Started.
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
 sleep 4
