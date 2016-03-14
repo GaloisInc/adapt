@@ -237,7 +237,7 @@ enum SourceType {
         SOURCE_TEMPERATURE,
         SOURCE_GYROSCOPE,
         SOURCE_MAGNETIC_FIELD,
-        SOURCE_HEAR_RATE,
+        SOURCE_HEART_RATE,
         SOURCE_LIGHT,
         SOURCE_PROXIMITY,
         SOURCE_PRESSURE,
@@ -363,6 +363,7 @@ enum SourceType {
 
         /** The actual bytes of the value (Optional) */
         valueBytes = byte[size]];
+   }
 ```
 
 Other primitive types used in our model:
