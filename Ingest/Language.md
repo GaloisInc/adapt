@@ -137,8 +137,9 @@ That is, Ac takes in the graph in the Bb and a segment identifier, and produces 
 
 The Diagnostic Engine (Dx) - Rui
 --------
-Dx:: [[activity-node],[activity-to-pattern-edge]] > [<Phase-node,[Phase-to-activity-edge]>]
-Dx:: [[activity-node],[activity-to-pattern-edge]] > [<APT-node,[APT-to-phase-edge]>]
+DX:: [[<Z-node, anomaly-score, [<activity-label, activity-score>]>],[Z-edge]],  APT-grammar > [<Z-APT-node,[Z-APT-to-phase-edge]>]
+
+DX expects *one DAG* where each node is of type `Z`, where `Z` is a class instance of ​one of the following: Segment, Pattern.
 
 That is, Dx takes in the graph in the Bb and produces as output a list of phase nodes in the Bb and the edges that connect them to their component activities, and a list of APT nodes and the edges that connect them to their component phases.
 
