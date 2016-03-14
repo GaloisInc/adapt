@@ -354,24 +354,15 @@ enum SourceType {
 	}
 ```
 
-*prov-tc:argValue* is used in Subjects:
-
-```
-    record Value {
-        /** The size of the value in bytes */
-        int size;
-
-        /** The actual bytes of the value (Optional) */
-        valueBytes = byte[size]];
-```
+*prov-tc:argValue* is a byte array used in Subjects.
 
 Other primitive types used in our model:
 
-* *prov-tc:properties* : map<string>;
-* *prov-tc:uid* : int; 			
-* *prov-tc:url* : string; 		
-* *prov-tc:file-version* : int; 	
-* *prov-tc:size* : int; 			
+* *prov-tc:properties* : map\<string,string\>;
+* *prov-tc:uid* : int;
+* *prov-tc:url* : string;
+* *prov-tc:file-version* : int;
+* *prov-tc:size* : int;
 * *prov-tc:permissions* : short;
 * *prov-tc:time* : ZuluTime;
 * *prov:startedAtTime* : ZuluTime;
@@ -386,14 +377,16 @@ Other primitive types used in our model:
 * *prov-tc:ppid* : int;
 * *prov-tc:unitid* : int;
 * *prov-tc:commandLine* : string;
-* *prov-tc:importLibs* : list<string>;
-* *prov-tc:exportLibs* : list<string>;
-* *prov-tc:env* : map<string>;
+* *prov-tc:importLibs* : list\<string\>;
+* *prov-tc:exportLibs* : list\<string\>;
+* *prov-tc:env* : map\<string,string\>;
 * *prov-tc:pInfo* : string;
 * *prov-tc:location* : int;
 * *prov-tc:ppt* : string;
-* *prov-tc:args* : list<prov-tc:argValue>;
-* *prov-tc:gid* : list<int>;
+* *prov-tc:args* : list\<prov-tc:argValue\>;
+* *prov-tc:gid* : list\<int\>;
+* *prov-tc:userID* : string;
+* *prov-tc:sequence* : long;
 
 
 Data Model Classes
@@ -533,7 +526,7 @@ Required attributes:
 
 Optional attributes:
 
-* a user ID (*prov-tc:uid*) // maps to CDM Principal.userId
+* a user ID (*prov-tc:userId*) // maps to CDM Principal.userId
 * a list of group identifiers (*prov-tc:gid*) // maps to CDM Principal.groupIds
 * the type of agent (*prov-tc:agentType*) // maps to CDM Principal.type
 * name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM Principal.InstrumentationSource
