@@ -52,7 +52,7 @@ The next layer of abstraction is the APT layer. APTs are the root of our APT gra
 
 Overview of Segmentation in ADAPT
 --------
-Orthogonal to the hierarchical structure above is the notion of segmentation. An ADAPT graph can be segmented into smaller graphs for ease of reasoning and computation. Thus for example base layer data can be segmented, but so can data that includes patterns, activities, and phases. Segmentation involves grouping all such data by common characteristics. Such characteristics are typically values of properties attached to some or all nodes. For example, an ADAPT graph might be segmented by 2-hour time windows, resulting in a number of sub-graphs corresponding to 2-hour windows. As another example, an ADAPT graph might be segmented by process ID, resulting in a distinct sub-graph related to each unique process ID reported in the data. Segmentation can be accomplished using combinations of characteristics as well. For example, an ADAPT graph might be segmented into a unique subgraph for each process ID in each 2-hour window. Segments are represented by a Segment node along with edges from that node to all nodes that belong to the segment. 
+Orthogonal to the hierarchical structure above is the notion of segmentation. An ADAPT base layer graph can be segmented into smaller graphs for ease of reasoning and computation. Segmentation involves grouping all such data by common characteristics. Such characteristics are typically values of properties attached to some or all nodes. For example, an ADAPT graph might be segmented by 2-hour time windows, resulting in a number of sub-graphs corresponding to 2-hour windows. As another example, an ADAPT graph might be segmented by process ID, resulting in a distinct sub-graph related to each unique process ID reported in the data. Segmentation can be accomplished using combinations of characteristics as well. For example, an ADAPT graph might be segmented into a unique subgraph for each process ID in each 2-hour window. Segments are represented by a Segment node along with edges from that node to all nodes that belong to the segment. 
 
 ADAPT Architecture
 -------
@@ -61,9 +61,10 @@ conceptual view of how data flows through the ADAPT system. Base layer data cons
 and relationships comes from TA-1 sensors and is transformed into
 our internal model by the Ingester. The Segmenter groups base layer data by common properties, for example, 
 process ID. The Anomaly Detector observes features of base layer data on a per-segment basis to
-identify outliers of various kinds and score them by how unusual they are. The Pattern Extractor groups base layer data into intuitive primitive actions that we
+identify outliers of various kinds and score them by how unusual they are. 
+The Pattern Extractor groups base layer data into intuitive primitive actions that we
 call patterns, for example,
-"Process Reads File". The Activity classifier groups
+"Process Reads File". The Activity classifier groups such
 patterns into higher-level behaviors, for example, "Copying file to new directory". The Diagnostic Engine
 groups activities into candidate APT phases and those phases into candidate APTs, and scores each candidate
 using the anomaly scores from the Anomaly Detector. Prioritized candidates are presented to human operators for
@@ -80,7 +81,7 @@ Data flow at a high level works like this:
 
 * The Ingester (In) takes as input data in the TA3-defined CDM Avro schema, pulling it from a Kafka queue topic provided by TA3. In produces as output base layer data in the blackboard (Bb) that conforms to the Bb schema described later
 * The Pattern Extractor (Px) uses a pre-defined set of patterns. Px takes as input data from Bb, one segment at a time (the entire graph is the default segment), and produces as output new data in Bb at the pattern layer of abstraction.
-* The Segmenter (Se) uses a pre-defined set of segmentation criteria. It takes as input data from Bb (including base layer data and pattern instances) and produces as output new data in Bb at the Segment layer of abstraction described later. 
+* The Segmenter (Se) uses a pre-defined set of segmentation criteria. It takes as input base layer data from Bb and produces as output new data in Bb at the Segment layer of abstraction described later. 
 * The anomaly detector (Ad) uses a pre-defined set of masks that define the features to be analyzed for anomalies. Ad takes as input data from Bb, one segment at a time, and produces as output anomaly score annotations for each segment surveyed
 * The activity classifier (Ac) uses a pre-defined set of activities that are exactly the leaves in our APT grammar tree. Ac takes as input data from Bb at the pattern layer of abstraction, and produces as output new data in Bb at the activity layer of abstraction
 * The Diagnostic Engine (Dx) uses the pre-defined APT grammar from Kb. Dx takes as input data from Bb at the activity layer of abstraction, along with anomaly scores attached to segments, and produces as output new data in Bb at the diagnosis layer of abstraction. Dx also communicates discovered APT candidates to the Ui for display to the user.
@@ -88,21 +89,6 @@ Data flow at a high level works like this:
 For our Phase 1 ADAPT System (Alpha-1), we consider only non-iterative analysis by ADAPT modules. That is, each module operates on Bb data only once. Later on, we may employ iterative processing both to accommodate streaming input data and to allow for more powerful analytics.
 
 Analysis done by ADAPT follows the data flow described above. For Phase 1, only forensic analysis is supported, so no incremental passes are required to assimilate additional base layer data.
-The In creates data in the Bb from TA1 sources, and then provides an update notification to Px.
-Px scours Bb content, identifying pattern instances that match its templates, and adding relevant pattern data
-to the Bb. Px then provides an update notification to Se. Se scours Bb content, identifying segments that match
-its segmentation criteria, and adding relevant segment information to Bb. Se then provides update notifications
-to both Ad and Ac on a per-segment basis. Se provides such a update notification when it finishes with
-all segments. Ad and Ac operate in parallel. Ad scans the segments for anomalies, running possibly many anomaly
-detectors in parallel. Each detector develops an anomaly score for the segment on its specific anomaly mask, and
-annotates the segment with that score information. When all detectors are finished, Ad provides an
-update notification to Dx. Ac scans all segments, running possibly many activity classifiers
-in parallel to identify activity instances and annotating
-activity information to the Bb (and attaching that information to the relevant segments). When all classifiers
-are finished with all segments, Ac provides an update notification to Dx. Upon receiving both notifications, Dx
-scans Bb to identify APT instances, annotates these into Bb, and informs the user interface, reporting completion
-and any suspected APT instances. Ui will (eventually be able to) construct reports or visualizations based on
-Dx reports and Bb contents to convey APT suspicions to operators.
 
 Describing ADAPT Modules
 ---------
