@@ -126,7 +126,7 @@ components produced are subsets of the Bb schema described later in this specifi
 
 The Pattern Extractor (Px) - Erin/Trevor
 --------
-Px:: [[base-node],[base-edge]]> [Pattern-definition] > [<pattern-node,[pattern-to-base-edge]>]
+Px:: [[base-node],[base-edge]]> [Pattern-definition] > [[pattern-node,[pattern-to-base-edge]]]
 
 That is, Px takes in the graph in the Bb and a list of pattern definitions, and produces as output pattern nodes in the Bb and associated edges connecting those nodes to their respective base layer component nodes
 
