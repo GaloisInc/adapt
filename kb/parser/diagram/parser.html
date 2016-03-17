@@ -1,0 +1,238 @@
+<!DOCTYPE html!>
+<html>
+  <head>
+    <title>APT Grammar</title>
+    <link rel="stylesheet" href="css/railroad-diagrams.css" />
+    <style>
+      body {
+        font-family: Arial, Helvetica;
+        background-color: hsl(30,20%, 95%);
+      }
+    </style>
+    <script type="text/javascript" src="js/railroad-diagrams.js"></script>
+    <script>
+      function nt(n) {
+        return NonTerminal(n, '#' + n);
+      }
+
+      function choice() {
+        var index = Math.floor ((arguments.length - 1) / 2);
+        var args  = Array.prototype.slice.call(arguments);
+        args.splice(0, 0, index);
+
+        return Choice.apply(this, args);
+      }
+    </script>
+  </head>
+  <body>
+    <h1>APT</h1>
+    <script>
+      Diagram(
+        Stack(
+          nt('initial_compromise'),
+          nt('persistence'),
+          ZeroOrMore(nt('expansion')),
+          nt('exfiltration')
+        )
+      ).addTo()
+    </script>
+
+    <hr/>
+
+    <a name="initial_compromise"><h1>initial_compromise</h1></a>
+    <script>
+      Diagram( choice( nt('direct_attack'), nt('indirect_attack'))).addTo()
+    </script>
+
+    <a name="direct_attack"><h1>direct_attack</h1></a>
+    <script>
+      Diagram(
+        choice('Zero_day_activity', 'Exploit_vulnerability_activity')
+      ).addTo();
+    </script>
+
+    <a name="indirect_attack"><h1>indirect_attack</h1></a>
+    <script>
+      Diagram(
+        choice(nt('malicious_attachment'), nt('drive_by_download'),
+          nt('waterholing'), nt('usb_infection'))).addTo();
+    </script>
+
+    <a name="malicious_attachment"><h1>malicious_attachment</h1></a>
+    <script>
+      Diagram(
+        Stack('User_open_file_activity', 'Application_compromise_activity',
+        'Initial_malware_download_activity')).addTo();
+    </script>
+
+    <a name="drive_by_download"><h1>drive_by_download</h1></a>
+    <script>
+      Diagram(
+        Stack('User_click_link_activity', 'Browser_exploit_download_activity')).addTo();
+    </script>
+
+    <a name="waterholing"><h1>waterholing</h1></a>
+    <script>
+      Diagram(
+        Stack('User_visits_tainted_URL_activity',
+        'Browser_exploit_download_activity')).addTo();
+    </script>
+
+    <a name="usb_infection"><h1>usb_infection</h1></a>
+    <script>
+      Diagram(
+        Stack('User_insert_usb_activity', nt('usb_exploit_start'))).addTo();
+    </script>
+
+    <a name="usb_exploit_start"><h1>usb_exploit_start</h1></a>
+    <script>
+      Diagram(
+        choice(
+          'Usb_autorun_activity',
+          'User_click_rogue_link_file_activity'
+        )).addTo();
+    </script>
+
+    <hr/>
+
+    <a name="persistence"><h1>persistence</h1></a>
+    <script>
+      Diagram(Stack(nt('maintain_access'),nt('evade_defenses'))).addTo();
+    </script>
+
+    <a name="maintain_access"><h1>maintain_access</h1></a>
+    <script>
+      Diagram(
+        Stack(
+          nt('command_control'),
+          'Download_backdoor_activity',
+          Optional(nt('modify_target')))
+      ).addTo();
+    </script>
+
+    <a name="command_control"><h1>command_control</h1></a>
+    <script>
+      Diagram(
+        Stack('Initiate_command_control_activity',
+        ZeroOrMore(nt('maintain_command_control')))
+      ).addTo();
+    </script>
+
+    <a name="maintain_command_control"><h1>maintain_command_control</h1></a>
+    <script>
+      Diagram(choice('Listen_cc_activity', 'Send_cc_activity')).addTo();
+    </script>
+
+    <a name="modify_target"><h1>modify_target</h1></a>
+    <script>
+      Diagram(choice('Bios_activity', 'Dll_activity', 'Registry_activity'
+      )).addTo();
+    </script>
+
+    <hr/>
+
+    <a name="expansion"><h1>expansion</h1></a>
+    <script>
+      Diagram(choice(
+        nt('host_enumeration'),
+        nt('access_credentials'),
+        nt('move_laterally')
+      )).addTo();
+    </script>
+
+    <a name="host_enumeration"><h1>host_enumeration</h1></a>
+    <script>
+      Diagram(choice(
+        'Account_enum_activity',
+        'File_system_enum_activity',
+        'Group_permissions_activity',
+        'Process_enum_activity'
+      )).addTo();
+    </script>
+
+    <a name="access_credentials"><h1>access_credentials</h1></a>
+    <script>
+      Diagram(choice(
+        'Credential_dumping_activity',
+        'Credential_in_file_activity',
+        'Network_sniffing_activity',
+        'Keyboard_logging_activity'
+      )).addTo();
+    </script>
+
+    <a name="move_laterally"><h1>move_laterally</h1></a>
+    <script>
+      Diagram(Stack(
+        'New_machine_access_activity',
+        Optional(nt('infect'))
+      )).addTo();
+    </script>
+
+    <a name="infect"><h1>infect</h1></a>
+    <script>
+      Diagram('Infect_new_machine_activity').addTo();
+    </script>
+
+    <hr/>
+
+    <a name="exfiltration"><h1>exfiltration</h1></a>
+    <script>
+      Diagram(Stack(
+        Optional(nt('exfil_staging')),
+        nt('exfil_execution')
+      )).addTo();
+    </script>
+
+    <a name="exfil_staging"><h1>exfil_staging</h1></a>
+    <script>
+      Diagram(Stack(
+        nt('exfil_format'),
+        nt('exfil_infrastructure')
+      )).addTo();
+    </script>
+
+    <a name="exfil_format"><h1>exfil_format</h1></a>
+    <script>
+      Diagram(Stack(
+        'Compress_activity',
+        Optional('Encrypt_activity')
+      )).addTo();
+    </script>
+
+    <a name="exfil_infrastructure"><h1>exfil_infrastructure</h1></a>
+    <script>
+      Diagram(Stack(
+        'Establish_exfil_points_activity'
+      )).addTo();
+    </script>
+
+    <a name="exfil_execution"><h1>exfil_execution</h1></a>
+    <script>
+      Diagram(Stack(
+        nt('exfil_channel'),
+        nt('exfil_socket')
+      )).addTo();
+    </script>
+
+    <a name="exfil_channel"><h1>exfil_channel</h1></a>
+    <script>
+      Diagram(choice(
+        'Exfil_physical_medium_activity',
+        'Http_post_activity',
+        'Dns_activity',
+        'Https_activity',
+        'Ftp_activity',
+        'Ssh_activity'
+      )).addTo();
+    </script>
+
+    <a name="exfil_socket"><h1>exfil_socket</h1></a>
+    <script>
+      Diagram(choice(
+        'UDP_activity',
+        'TCP_activity'
+      )).addTo();
+    </script>
+
+  </body>
+</html>
