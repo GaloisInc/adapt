@@ -172,22 +172,22 @@ data EventType
 
 data SourceType
       = SourceAccelerometer
-      | SourceTemperature
       | SourceGyroscope
-      | SourceMagneticField
       | SourceHearRate
       | SourceLight
-      | SourceProximity
+      | SourceMagneticField
       | SourcePressure
+      | SourceProximity
       | SourceRelativeHumidity
+      | SourceTemperature
+      | SourceGeomagneticRotationVector
+      | SourceGravity
       | SourceLinearAcceleration
       | SourceMotion
-      | SourceStepDetector
-      | SourceStepCounter
-      | SourceTiltDetector
       | SourceRotationVector
-      | SourceGravity
-      | SourceGeomagneticRotationVector
+      | SourceStepCounter
+      | SourceStepDetector
+      | SourceTiltDetector
       | SourceCamera
       | SourceGps
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
