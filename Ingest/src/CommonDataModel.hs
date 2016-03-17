@@ -173,7 +173,7 @@ data EventType
 data SourceType
       = SourceAccelerometer
       | SourceGyroscope
-      | SourceHearRate
+      | SourceHeartRate
       | SourceLight
       | SourceMagneticField
       | SourcePressure
