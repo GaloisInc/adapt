@@ -18,6 +18,16 @@ data Node
       | NodeHost Host
       | NodeAgent Agent
       deriving (Eq, Ord, Show, Read, Generic)
+
+nodeUID :: Node -> UID
+nodeUID n =
+  case n of
+    NodeEntity e   -> entityUID e
+    NodeResource r -> resourceUID r
+    NodeSubject s  -> subjectUID s
+    NodeHost h     -> hostUID h
+    NodeAgent a    -> agentUID a
+
 data Edge
       = Edge { edgeSource, edgeDestination :: UID
              , edgeRelationship :: Relationship
