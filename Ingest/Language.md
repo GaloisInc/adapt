@@ -16,7 +16,7 @@ This document specifies the architecture of the ADAPT system intended for first 
 First Test Case
 ===========
 (To be verified by David Burke with TA5 team)
-Our first evaluation target will be the social media APT setting as described by TA4. A key aspect of that setting is a command and control APT phase that persists on the described Pandex server. One activity described for that C2 phase is the use of nginx to connect to a port, listen for a while, and then disconnect. Our first test case will emulate this activity using a simple script. Using at least SPADE (SRI TA1) data, but hopefully at least one other data source, we will test our ability to detect and classify this activity. 
+Our first evaluation target will be the social media APT setting as described by TA4. A key aspect of that setting is a command and control APT phase that persists on the described Pandex server. One activity described for that C2 phase is the use of nginx to connect to a port, listen for a while, and then disconnect. Our first test case will emulate this activity using a simple script. Using at least SPADE (SRI TA1) data, but hopefully at least one other data source, we will test our ability to detect and classify this activity.
 
 The platform setup we will use for first test is to integrate our VM-based ADAPT platform with the "TC-in-a-box" platform provided by TA3. All modules in our system will interact with data in the Blackboard (Bb) for this test case. Modules may subscribe to notification feeds provided by other modules that indicate when new data has arrived in Bb.
 
@@ -33,7 +33,7 @@ shows the abstraction layers we use in ADAPT.
 
 <img src="./datamodel.png" alt="ADAPT Data Model" style="width: 600px;"/>
 
-Data imported from TA-1 sensors comprises the *base layer* of our database. This layer models 
+Data imported from TA-1 sensors comprises the *base layer* of our database. This layer models
 
 * units of execution in the system at various abstractions from individual events to processes
 * artifacts such as files, network flows, and memory buffers
@@ -41,7 +41,7 @@ Data imported from TA-1 sensors comprises the *base layer* of our database. This
 * hosts on which units of execution run and artifacts reside
 * relationships among these entity classes
 
-Because the volume of base layer data will be large, ADAPT abstracts this data to allow reasoning at lower bandwidth. We use a multi-layer hierarchical abstraction as well as a single-layer proximity abstraction. 
+Because the volume of base layer data will be large, ADAPT abstracts this data to allow reasoning at lower bandwidth. We use a multi-layer hierarchical abstraction as well as a single-layer proximity abstraction.
 
 Our hierarchical abstraction begins with the pattern layer. Pattern instances are intuitive collections of base layer data. For example, an instance of the pattern *PROCESS Reads FILE* might be comprised of a unit of execution (the process), an artifact (the file), and an event (the read), along with the relationship instances that connect these entity instances. Each pattern instance is represented in our data model as a pattern node, along with edges connecting that node to each of the base layer entity instances that comprise its pattern. By inference, edges connecting those base layer entities are included in the pattern as well.
 
@@ -53,16 +53,16 @@ The next layer of abstraction is the APT layer. APTs are the root of our APT gra
 
 Overview of Segmentation in ADAPT
 --------
-Orthogonal to the hierarchical structure above is the notion of segmentation. An ADAPT base layer graph can be segmented into smaller graphs for ease of reasoning and computation. Segmentation involves grouping all such data by common characteristics. Such characteristics are typically values of properties attached to some or all nodes. For example, an ADAPT graph might be segmented by 2-hour time windows, resulting in a number of sub-graphs corresponding to 2-hour windows. As another example, an ADAPT graph might be segmented by process ID, resulting in a distinct sub-graph related to each unique process ID reported in the data. Segmentation can be accomplished using combinations of characteristics as well. For example, an ADAPT graph might be segmented into a unique subgraph for each process ID in each 2-hour window. Segments are represented by a Segment node along with edges from that node to all nodes that belong to the segment. 
+Orthogonal to the hierarchical structure above is the notion of segmentation. An ADAPT base layer graph can be segmented into smaller graphs for ease of reasoning and computation. Segmentation involves grouping all such data by common characteristics. Such characteristics are typically values of properties attached to some or all nodes. For example, an ADAPT graph might be segmented by 2-hour time windows, resulting in a number of sub-graphs corresponding to 2-hour windows. As another example, an ADAPT graph might be segmented by process ID, resulting in a distinct sub-graph related to each unique process ID reported in the data. Segmentation can be accomplished using combinations of characteristics as well. For example, an ADAPT graph might be segmented into a unique subgraph for each process ID in each 2-hour window. Segments are represented by a Segment node along with edges from that node to all nodes that belong to the segment.
 
 ADAPT Architecture
 -------
 A simplified data flow diagram of ADAPT may help explain how analysis is performed. The figure below shows a
-conceptual view of how data flows through the ADAPT system. Base layer data consisting of Subjects, Objects, Events, 
+conceptual view of how data flows through the ADAPT system. Base layer data consisting of Subjects, Objects, Events,
 and relationships comes from TA-1 sensors and is transformed into
-our internal model by the Ingester. The Segmenter groups base layer data by common properties, for example, 
+our internal model by the Ingester. The Segmenter groups base layer data by common properties, for example,
 process ID. The Anomaly Detector observes features of base layer data on a per-segment basis to
-identify outliers of various kinds and score them by how unusual they are. 
+identify outliers of various kinds and score them by how unusual they are.
 The Pattern Extractor groups base layer data into intuitive primitive actions that we
 call patterns, for example,
 "Process Reads File". The Activity classifier groups such
@@ -82,7 +82,7 @@ Data flow at a high level works like this:
 
 * The Ingester (In) takes as input data in the TA3-defined CDM Avro schema, pulling it from a Kafka queue topic provided by TA3. In produces as output base layer data in the blackboard (Bb) that conforms to the Bb schema described later
 * The Pattern Extractor (Px) uses a pre-defined set of patterns. Px takes as input data from Bb, one segment at a time (the entire graph is the default segment), and produces as output new data in Bb at the pattern layer of abstraction.
-* The Segmenter (Se) uses a pre-defined set of segmentation criteria. It takes as input base layer data from Bb and produces as output new data in Bb at the Segment layer of abstraction described later. 
+* The Segmenter (Se) uses a pre-defined set of segmentation criteria. It takes as input base layer data from Bb and produces as output new data in Bb at the Segment layer of abstraction described later.
 * The anomaly detector (Ad) uses a pre-defined set of masks that define the features to be analyzed for anomalies. Ad takes as input data from Bb, one segment at a time, and produces as output anomaly score annotations for each segment surveyed
 * The activity classifier (Ac) uses a pre-defined set of activities that are exactly the leaves in our APT grammar tree. Ac takes as input data from Bb at the pattern layer of abstraction, and produces as output new data in Bb at the activity layer of abstraction
 * The Diagnostic Engine (Dx) uses the pre-defined APT grammar from Kb. Dx takes as input data from Bb at the activity layer of abstraction, along with anomaly scores attached to segments, and produces as output new data in Bb at the diagnosis layer of abstraction. Dx also communicates discovered APT candidates to the Ui for display to the user.
@@ -93,7 +93,7 @@ Analysis done by ADAPT follows the data flow described above. For Phase 1, only 
 
 Describing ADAPT Modules
 ---------
-The following sections describe each ADAPT module. Each section should cover the following, but need be no 
+The following sections describe each ADAPT module. Each section should cover the following, but need be no
 longer than a page:
 
 * A detailed type signature for the module's inputs and outputs, suitable for other modules to interact with the module
@@ -127,7 +127,7 @@ The Anomaly Detector (Ad) - Alan
 -------
 Ad:: [[segment-node],[segment-edge]] > [Mask] > segment-identifier > [<segment-node-id,anomaly-type,anomaly-score>]
 
-That is, Ad takes in the graph in the Bb, a list of masks, and a segment identifier, and produces as 
+That is, Ad takes in the graph in the Bb, a list of masks, and a segment identifier, and produces as
 output a list of anomaly score annotations attached to segment nodes in the graph.
 
 The Activity Classifier (Ac) - Hoda
@@ -138,7 +138,7 @@ That is, Ac takes in the graph in the Bb and a segment identifier, and produces 
 
 The Diagnostic Engine (Dx) - Rui
 --------
-`DX:: [[<Z-node, anomaly-score, [<activity-label, activity-score>]>],[Z-edge]],  APT-grammar > [<Z-APT-node,[Z-APT-to-phase-edge]>]`
+`DX:: [[<Z-node, [<anomaly-label anomaly-score>)], [<activity-label, activity-score>]>],[Z-edge]],  APT-grammar > [<Z-APT-node,[Z-APT-to-phase-edge]>]`
 
 DX expects *one DAG* where each node is of type `Z`, where `Z` is a class instance of one of the following: Segment, Pattern.
 
@@ -222,23 +222,23 @@ enum PrincipalType {
 enum SourceType {
         // base sensors
         SOURCE_ACCELEROMETER,
-        SOURCE_TEMPERATURE,
         SOURCE_GYROSCOPE,
-        SOURCE_MAGNETIC_FIELD,
         SOURCE_HEART_RATE,
         SOURCE_LIGHT,
-        SOURCE_PROXIMITY,
+        SOURCE_MAGNETIC_FIELD,
         SOURCE_PRESSURE,
+        SOURCE_PROXIMITY,
         SOURCE_RELATIVE_HUMIDITY,
+        SOURCE_TEMPERATURE,
         // composite sensors
+        SOURCE_GEOMAGNETIC_ROTATION_VECTOR,
+        SOURCE_GRAVITY,
         SOURCE_LINEAR_ACCELERATION,
         SOURCE_MOTION,
-        SOURCE_STEP_DETECTOR,
-        SOURCE_STEP_COUNTER,
-        SOURCE_TILT_DETECTOR,
         SOURCE_ROTATION_VECTOR,
-        SOURCE_GRAVITY,
-        SOURCE_GEOMAGNETIC_ROTATION_VECTOR,
+        SOURCE_STEP_COUNTER,
+        SOURCE_STEP_DETECTOR,
+        SOURCE_TILT_DETECTOR,
         // camera and GPS, temporary
         SOURCE_CAMERA,
         SOURCE_GPS
@@ -268,7 +268,7 @@ enum SourceType {
 
 *prov-tc:subjectType* is used in Subjects, and maps to CDM type SubjectType, but adds two additional enum values:
 
-``` 
+```
     enum SubjectType {
         SUBJECT_PROCESS,
         SUBJECT_THREAD,
@@ -506,7 +506,7 @@ Optional attributes include:
 
 Agent (Principal in CDM)
 -----
-An agent represents an actor that is not a Subject on a monitored machine. An agent may be human, may be a machine in the target network that has no monitoring, or may be a machine outside the monitored network. Agents have no required attributes. 
+An agent represents an actor that is not a Subject on a monitored machine. An agent may be human, may be a machine in the target network that has no monitoring, or may be a machine outside the monitored network. Agents have no required attributes.
 
 Required attributes:
 
@@ -573,7 +573,7 @@ Required attribute:
 prov:wasInvalidatedBy (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW to show deletions)
 --------
 
-A wasInvalidatedBy relationship indicates that an artifact (the object of the relationship) was deleted by a Subject (the subject of the relationship, which must be of type Event). 
+A wasInvalidatedBy relationship indicates that an artifact (the object of the relationship) was deleted by a Subject (the subject of the relationship, which must be of type Event).
 
 Optional attribute:
 
@@ -592,12 +592,12 @@ Optional attribute:
 A Note About Provenance Tags
 ----------
 **We choose not to represent provenance tags in the ADAPT model, and we aim not to parse or interpret them during
-Phase 1. Later, we may interpret the tag expressions and create the necessary edges 
-in our graph to represent provenance encoded in those tags using the wasDerivedFrom 
+Phase 1. Later, we may interpret the tag expressions and create the necessary edges
+in our graph to represent provenance encoded in those tags using the wasDerivedFrom
 relationship discussed below. Thus for Phase 1, TA1 performers whose data we use should
 not use these CDM constructs.**
 
-Provenance tags in CDM indicate entity dependencies on other entities or on subjects. 
+Provenance tags in CDM indicate entity dependencies on other entities or on subjects.
 A tag may define a subject or entity either as an original source or as a derivative from other original sources. As of CDM v0.7, tags are structured in this manner:
 
 The tag expression syntax is:
@@ -614,7 +614,7 @@ Thus a tagExpr is a tree-structured representation of dependencies of the Object
 
 * a tagId
 * an informational string
-* a TagOpCode combining children tags 
+* a TagOpCode combining children tags
 * an IntegrityTag
 * a confidentiality tag
 
@@ -625,8 +625,8 @@ This relationship indicates that one entity has as part of its provenance anothe
 
 Optional attributes:
 
-* the strength of dependency of the terminal element of the relationship instance on the origin element (*prov-tc:strength*). 
-  
+* the strength of dependency of the terminal element of the relationship instance on the origin element (*prov-tc:strength*).
+
 * the kind of derivation used to create the terminal element from the origin element (*prov-tc:derivation*)
 
 
@@ -647,11 +647,11 @@ This relationship type maps several edge types in CDM:
 
 Optional attributes:
 
-* an attribute that names the source of the information provided (*prov-tc:source*) 
+* an attribute that names the source of the information provided (*prov-tc:source*)
 
 prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
 --------
-This relationship connects Subjects with the hosts they run on. 
+This relationship connects Subjects with the hosts they run on.
 
 prov-tc:residesOn (CDM Edge Type EDGE_OBJECT_RESIDESON)
 ----------
