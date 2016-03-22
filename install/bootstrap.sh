@@ -20,7 +20,13 @@ fi
 # Verify we can run as root:
 sudo id -u || exit 1
 
-cd $ADAPT_DIR || exit 1
+# If we are using vagrant then don't change to the adapt directory,
+# otherwise we can use this same script to stand up a machine though a git
+# clone to $HOME/adapt, so assume that's the case.
+if [ ! \( $HOME = "/home/vagrant" -a ! \( -e $ADAPT_DIR \) \) ]
+then
+    cd $ADAPT_DIR || exit 1
+fi
 
 # Allow PPA's in Debian
 sudo apt-get install build-essential man wget -y
@@ -30,11 +36,6 @@ sudo apt-get install software-properties-common python-software-properties -y
 sudo apt-get install git -y
 
 # Install Java 8
-# sudo echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | sudo /usr/bin/debconf-set-selections
-# sudo add-apt-repository ppa:webupd8team/java -y
-# sudo apt-get update -y
-# sudo apt-get install oracle-java8-installer -y
-# sudo apt-get install ant -y
 sudo sh -c 'echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections'
 sudo sh -c 'echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> /etc/apt/sources.list.d/webupd8team-java.list ; echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> /etc/apt/sources.list.d/webupd8team-java.list ; apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886'
 sudo apt-get update -y
