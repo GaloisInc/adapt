@@ -18,9 +18,12 @@ import qualified Data.Text.Lazy.IO as Text
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text      as TextStrict
 import           Data.Text.Lazy (Text)
+import           Data.Time (UTCTime(..))
 import           Text.Read (readMaybe)
 import           MonadLib as ML
 import qualified Control.Exception as X
+import           Control.Monad.CryptoRandom
+import           Crypto.Random (SystemRandom)
 
 import           CommonDataModel as CDM
 import qualified Types as T
@@ -32,44 +35,42 @@ import           Namespaces
 
 readFileCDM ::  FilePath -> IO ([CDM.Node], [CDM.Edge], [Warning])
 readFileCDM fp =
-  (either X.throw id . translateTextCDM) <$> Text.readFile fp
+  either X.throw return =<< translateTextCDM =<< Text.readFile fp
 
-translateTextCDM ::  Text -> Either T.Error ([CDM.Node], [CDM.Edge], [Warning])
-translateTextCDM t = runId $ runExceptionT $ do
-  p             <- eX T.PE  (parseProvN t)
-  ((ns,es),ws)  <- eX T.TRE (translate p)
-  return  (ns,es,ws)
- where
-  eX :: ExceptionM m i => (e -> i) -> Either e a -> m a
-  eX f = either (raise . f) return
+translateTextCDM ::  Text -> IO (Either T.Error ([CDM.Node], [CDM.Edge], [Warning]))
+translateTextCDM t = do
+  res  <- pure (parseProvN t)
+  res2 <- either (pure . Left . T.PE) (fmap (either (Left . T.TRE) Right) . translate) res
+  case res2 of
+    Right ((ns,es), ws) -> return $ Right (ns,es,ws)
+    Left err            -> return $ Left err
 
-
-translate :: Prov -> Either TranslateError (([CDM.Node], [CDM.Edge]), [Warning])
+translate :: Prov -> IO (Either TranslateError (([CDM.Node], [CDM.Edge]), [Warning]))
 translate (Prov _prefix es) = runTr $
   do (as,bs) <- unzip <$> mapM translateProvExpr es
      return (concat as, concat bs)
 
 translateProvExpr :: T.Expr -> Tr ([CDM.Node], [CDM.Edge])
 translateProvExpr e@(RawEntity {..})
-  | Just f <- Map.lookup exprOper operHandler = f e
+  | Just f <- Map.lookup (Namespaces.local exprOper) operHandler = f e
   | otherwise = do warn $ "No CDM interpretation for operation: " <> textOfIdent exprOper
                    noResults
   where
-  operHandler :: Map Ident (T.Expr -> Tr ([CDM.Node], [CDM.Edge]))
+  operHandler :: Map Text (T.Expr -> Tr ([CDM.Node], [CDM.Edge]))
   operHandler =
-    Map.fromList [ (provEntity            , translateProvEntity)
-                 , (provAgent             , translateProvAgent)
-                 , (provActivity          , translateProvActivity)
-                 , (provWasAssociatedWith , translateProvWasAssociatedWith)
-                 , (provUsed              , translateProvUsed)
-                 , (provWasStartedBy      , translateProvWasStartedBy)
-                 , (provWasGeneratedBy    , translateProvWasGeneratedBy)
-                 , (provWasEndedBy        , translateProvWasEndedBy)
-                 , (provWasInformedBy     , translateProvWasInformedBy)
-                 , (provWasAttributedTo   , translateProvWasAttributedTo)
-                 , (provWasDerivedFrom    , translateProvWasDerivedFrom)
-                 , (provActedOnBehalfOf   , translateProvActedOnBehalfOf)
-                 , (provWasInvalidatedBy  , translateProvWasInvalidatedBy)
+    Map.fromList [ ("entity"            , translateProvEntity)
+                 , ("agent"             , translateProvAgent)
+                 , ("activity"          , translateProvActivity)
+                 , ("wasAssociatedWith" , translateProvWasAssociatedWith)
+                 , ("used"              , translateProvUsed)
+                 , ("wasStartedBy"      , translateProvWasStartedBy)
+                 , ("wasGeneratedBy"    , translateProvWasGeneratedBy)
+                 , ("wasEndedBy"        , translateProvWasEndedBy)
+                 , ("wasInformedBy"     , translateProvWasInformedBy)
+                 , ("wasAttributedTo"   , translateProvWasAttributedTo)
+                 , ("wasDerivedFrom"    , translateProvWasDerivedFrom)
+                 , ("actedOnBehalfOf"   , translateProvActedOnBehalfOf)
+                 , ("wasInvalidatedBy"  , translateProvWasInvalidatedBy)
                  ]
 
 translateProvEntity, translateProvAgent :: T.Expr -> Tr ([CDM.Node], [CDM.Edge])
@@ -118,7 +119,8 @@ translateProvActivity (RawEntity {..}) =
   do let subjectSource = SourceLinuxAuditTrace
      subjectUID <- uidOfMay exprIdent
      let subjectType = SubjectProcess
-         err = raise $ TranslateError "Prov Activity (CDM Subject) has no start time."
+         fakeDay = UTCTime (toEnum 0) 0
+         err = warn "Prov Activity (CDM Subject) has no start time." >> return fakeDay
      subjectStartTime   <- maybe err return =<< kvTime adaptTime exprAttrs
      subjectSequence    <- nextSequenceNumber
      subjectPID         <- kvStringToIntegral adaptPid exprAttrs
@@ -233,7 +235,12 @@ data Warning = Warn Text
 warn :: Text -> Tr ()
 warn = put . Warn
 
-newtype Tr a = Tr { unTr :: ReaderT Range (WriterT (DList Warning) (ExceptionT TranslateError Id)) a }
+data TrState = TrState { trRandoms :: [Word64]
+                       , trUIDs    :: Map Ident UID
+                       , trSequenceNumber :: Sequence
+                       }
+
+newtype Tr a = Tr { unTr :: StateT TrState (ReaderT Range (WriterT (DList Warning) (ExceptionT TranslateError Id))) a }
   deriving (Monad, Applicative, Functor)
 
 instance ExceptionM Tr TranslateError where
@@ -251,18 +258,61 @@ instance ReaderM Tr Range where
 instance RunReaderM Tr Range where
   local i (Tr m) = Tr (ML.local i m)
 
-runTr :: Tr a -> Either TranslateError (a,[Warning])
-runTr = either Left (Right . (\(a,b) -> (a,toList b))) . runId . runExceptionT . runWriterT . runReaderT NoLoc . unTr
+instance StateM Tr TrState where
+  get   = Tr get
+  set s = Tr (set s)
+
+runTr :: Tr a -> IO (Either TranslateError (a,[Warning]))
+runTr tr =
+  do g <- newGenIO :: IO SystemRandom
+     let trs = TrState (crandoms g) Map.empty 0
+     pure (runTrWith trs tr)
+
+runTrWith :: TrState -> Tr a -> Either TranslateError (a,[Warning])
+runTrWith trs tr = warningsToList $ runStack tr
+ where
+ warningsToList = either Left (Right . (\(a,b) -> (a,toList b)))
+ runStack :: Tr a -> Either TranslateError (a,DList Warning)
+ runStack = runId . runExceptionT . runWriterT . runReaderT NoLoc . evalStateT trs . unTr
+ evalStateT s m = fst <$> runStateT s m
+
+randomUID :: Tr UID
+randomUID = do
+  st <- get
+  case trRandoms st of
+    (a:b:c:d:rest) -> do
+      set st { trRandoms = rest }
+      return (a,b,c,d)
+    _ -> raise $ TranslateError "Impossible: Ran out of entropy generating randomUID."
+
+insertUID :: Ident -> UID -> Tr ()
+insertUID i u =
+ do st <- get
+    let mp = Map.insert i u (trUIDs st)
+    mp `seq` set st { trUIDs = mp }
+
+lookupUID :: Ident -> Tr (Maybe UID)
+lookupUID i = Map.lookup i . trUIDs <$> get
 
 uidOfMay :: Maybe Ident -> Tr UID
-uidOfMay = undefined
+uidOfMay = maybe randomUID uidOf
 
 uidOf :: Ident -> Tr UID
-uidOf = undefined
-  -- XXX get a mapping from Ident to UID, lookup uid or insert / return a fresh UID
+uidOf ident =
+  do um <- lookupUID ident
+     case um of
+      Nothing -> do val <- randomUID
+                    insertUID ident val
+                    return val
+      Just val -> return val
+
 
 nextSequenceNumber :: Tr Sequence
-nextSequenceNumber = undefined -- XXX pull from a Word64 supply
+nextSequenceNumber =
+ do s <- get
+    let sqn = trSequenceNumber s
+    set s { trSequenceNumber = sqn + 1 }
+    return sqn
 
 node :: Node -> Tr ([Node],[Edge])
 node n = return ([n],[])

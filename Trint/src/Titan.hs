@@ -5,48 +5,48 @@ module Titan
   ( -- * Types
     ServerInfo(..)
   , defaultServer
-  , ErrorHandle(..)
-  , defaultErrorHandle
+  -- , ErrorHandle(..)
+  -- , defaultErrorHandle
   , Operation(..)
-  , HostName
+  -- , HostName
   , ResultId(..)
   , GraphId(..)
     -- * Insertion
   , titan
-  , titanWith
   , TitanResult(..)
     -- * Query
   ) where
 
-import Network.Socket as Net
-import Network.HTTP.Types
-import Network.HTTP.Client
-import Network.HTTP.Client.TLS
+-- import Network.Socket as Net
+-- import Network.HTTP.Types
+-- import Network.HTTP.Client
+-- import Network.HTTP.Client.TLS
 
-import qualified Control.Exception as X
+import Crypto.Hash.SHA256 (hash)
+import qualified Data.ByteString.Base64 as B64
+
 import Data.List (intersperse)
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-import Data.String
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy.Char8 as BC
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import System.IO (stderr, hPutStr)
-import qualified Data.ByteString.Char8 as BCNOTL
-import Data.Aeson (decode, Value(..), FromJSON(..), (.:))
+import Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
 
-newtype ServerInfo = ServerInfo { host     :: HostName
+import Network.WebSockets as WS
+
+data ServerInfo = ServerInfo { host     :: String
+                             , port     :: Int
                              }
         deriving (Eq,Ord,Show)
 
-instance IsString ServerInfo where
-  fromString = ServerInfo
-
 defaultServer :: ServerInfo
-
-defaultServer = ServerInfo "http://localhost:8182"
+defaultServer = ServerInfo "localhost" 8182
 
 
 -- Operations represent gremlin-groovy commands such as:
@@ -63,17 +63,17 @@ data Operation id = InsertVertex { label :: Text
                                }
   deriving (Eq,Ord,Show)
 
-data ErrorHandle id = Custom (HttpException -> ServerInfo -> Operation id -> IO TitanResult)
-                    | Silent    -- ^ Silently convert exceptions to Either types
-                    | ToStderr  -- ^ Emit a stderr message and convert exceptions to Either types
-                    | Rethrow   -- ^ re-throw exceptions
+-- data ErrorHandle id = Custom (HttpException -> ServerInfo -> Operation id -> IO TitanResult)
+--                     | Silent    -- ^ Silently convert exceptions to Either types
+--                     | ToStderr  -- ^ Emit a stderr message and convert exceptions to Either types
+--                     | Rethrow   -- ^ re-throw exceptions
 
-defaultErrorHandle :: GraphId id => ErrorHandle id
-defaultErrorHandle = Custom $ \x si t ->
-    do case x of
-              StatusCodeException {} -> return (Failure x)
-              ResponseTimeout        -> titanWith ToStderr si t -- Single retry on failure
-              _                      -> X.throw x
+-- defaultErrorHandle :: GraphId id => ErrorHandle id
+-- defaultErrorHandle = Custom $ \x si t ->
+--     do case x of
+--               StatusCodeException {} -> return (Failure x)
+--               ResponseTimeout        -> titanWith ToStderr si t -- Single retry on failure
+--               _                      -> X.throw x
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
@@ -83,72 +83,91 @@ instance FromJSON ResultId where
     [Object d] <- r.:"data"
     i <- d.:"id"
     case i of
-      String t -> return (ResultId (T.fromStrict t))
+      String t -> return (ResultId t)
       Number {} -> do n <- parseJSON i
                       return (ResultId (T.pack (show (n::Int))))
       _        -> fail "No id"
   parseJSON _ = fail "Couldn't parse JSON"
 
-data TitanResult = Success Status ResultId | Failure HttpException | ParseError
+data TitanResult = Success
 
-titan :: GraphId id => ServerInfo -> Operation id -> IO TitanResult
-titan = titanWith defaultErrorHandle
+titan :: GraphId id => ServerInfo -> [Operation id] -> IO TitanResult
+titan (ServerInfo {..}) t = WS.runClient host port "/" (titanWS t)
 
-titanWith :: GraphId id => ErrorHandle id -> ServerInfo -> Operation id -> IO TitanResult
-titanWith eh si@(ServerInfo {..}) t =
- do res <-  X.try doRequest
-    case res of
-       Right s -> return s
-       Left  httpException ->
-          case eh of
-            Custom f -> f httpException si t
-            Silent   -> return (Failure httpException)
-            ToStderr -> do hPutStr stderr (show httpException)
-                           return (Failure httpException)
-            Rethrow  -> X.throw httpException
-
-
+titanWS :: GraphId id => [Operation id] -> WS.ClientApp TitanResult
+titanWS ops conn =
+   do mapM_ go ops
+      return Success
  where
-  doRequest =
-    do req <- parseUrl host
-       let req' = req { method      = "POST"
-                      , requestBody = RequestBodyLBS (serializeOperation t)
-                      , requestHeaders = [(hUserAgent, "Adapt/Trint")
-                                         ,(hAccept,"*/*")
-                                         ,(hContentType,  "application/x-www-form-urlencoded")
-                                         ,("Accept-Encoding", "")
-                                         ]
-                      }
-       m <- newManager tlsManagerSettings
-       withResponse req' m handleResponse
-  handleResponse :: Response BodyReader -> IO TitanResult
-  handleResponse x = do
-    bs <- responseBody x
-    case decode (BC.fromStrict bs) of
-      Just i -> return (Success (responseStatus x) i) 
-      Nothing -> return ParseError
+ go :: GraphId id => Operation id -> IO ()
+ go = send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
 
--- The generation of Gremlin code is currently done through simple (sinful)
--- concatenation. A better solution would be a Haskell Gremlin Language library
--- and quasi quoter.
-{-
-serializeOperation :: Operation -> ByteString
-serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
-  where
-     -- g.addV(label, vectorName, param1, val1, param2, val2 ...)
-    call = "g.addV"
-    args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
---serializeOperation (InsertEdge l src dst ps)   = gremlinScript call
-  where
-     -- g.V(id).addE(edgeName, g.V(otherId), param1, val1, ...)
-     -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
-     call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
-                        , ").next().addEdge(", encodeQuoteText l
-                                        , ", g.V().has(label,", encodeQuoteText dst, ").next(), "
-                            ] ++ args ++ [")"]
-     args = intersperse "," (concatMap attrs ps)-}
+ mkGremlinWSCommand :: Text -> Message
+ mkGremlinWSCommand cmd = DataMessage $ Text $ mkJSON cmd
+
+ mkJSON :: Text -> BL.ByteString
+ mkJSON cmd =
+    A.encode
+      Req { requestId = T.decodeUtf8 $ B64.encode $ hash (T.encodeUtf8 cmd)
+          , op        = "eval"
+          , processor = ""
+          , args = ReqArgs { gremlin  = cmd
+                           , language = "gremlin-groovy"
+                           }
+          }
+
+
+
+--------------------------------------------------------------------------------
+--  Gremlin WebSockets JSON API
+
+data GremlinRequest =
+  Req { requestId :: Text
+      , op        :: Text
+      , processor :: Text
+      , args      :: RequestArgs
+      }
+
+data RequestArgs =
+  ReqArgs { gremlin    :: Text
+          , language   :: Text
+          }
+
+instance ToJSON RequestArgs where
+  toJSON (ReqArgs g l) =
+    A.object [ "gremlin"  .= g
+             , "language" .= l
+             ]
+
+instance ToJSON GremlinRequest where
+  toJSON (Req i o p a) =
+    A.object [ "requestId" .= i
+             , "op"        .= o
+             , "processor" .= p
+             , "args"      .= a
+             ]
+
+instance FromJSON RequestArgs where
+  parseJSON (A.Object obj) =
+      ReqArgs <$> obj .: "gremlin"
+              <*> obj .: "language"
+  parseJSON j = A.typeMismatch "RequestArgs" j
+
+instance FromJSON GremlinRequest where
+  parseJSON (A.Object obj) =
+      Req <$> obj .: "requestId"
+          <*> obj .: "op"
+          <*> obj .: "processor"
+          <*> obj .: "args"
+  parseJSON j = A.typeMismatch "GremlinRequest" j
+
+
+--------------------------------------------------------------------------------
+--  Gremlin language serialization
+
 class GraphId a where
   serializeOperation :: Operation a -> ByteString
+
 instance GraphId Text where
   serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
     where

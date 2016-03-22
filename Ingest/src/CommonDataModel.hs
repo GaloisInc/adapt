@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
-module CommonDataModel where
+module CommonDataModel
+  ( module CommonDataModel
+  , Word64
+  ) where
 
 import Data.Word
 import Data.Int
@@ -182,22 +185,22 @@ data EventType
 
 data SourceType
       = SourceAccelerometer
-      | SourceGyroscope
-      | SourceHeartRate
-      | SourceLight
-      | SourceMagneticField
-      | SourcePressure
-      | SourceProximity
-      | SourceRelativeHumidity
       | SourceTemperature
-      | SourceGeomagneticRotationVector
-      | SourceGravity
+      | SourceGyroscope
+      | SourceMagneticField
+      | SourceHearRate
+      | SourceLight
+      | SourceProximity
+      | SourcePressure
+      | SourceRelativeHumidity
       | SourceLinearAcceleration
       | SourceMotion
-      | SourceRotationVector
-      | SourceStepCounter
       | SourceStepDetector
+      | SourceStepCounter
       | SourceTiltDetector
+      | SourceRotationVector
+      | SourceGravity
+      | SourceGeomagneticRotationVector
       | SourceCamera
       | SourceGps
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
@@ -259,7 +262,7 @@ data Derivation = Copy | Encode | Compile | Encrypt | Other
 
 -- "Other primitive types used in our model"
 type Properties    = Map Text Text
-type UID           = Int32
+type UID           = (Word64, Word64, Word64, Word64)
 type UserID        = Text
 type URL           = Text
 type FileVersion   = Int64
