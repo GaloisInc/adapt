@@ -5,22 +5,15 @@ module Titan
   ( -- * Types
     ServerInfo(..)
   , defaultServer
-  -- , ErrorHandle(..)
-  -- , defaultErrorHandle
   , Operation(..)
-  -- , HostName
   , ResultId(..)
   , GraphId(..)
+  , GremlinValue(..), gremlinNum
     -- * Insertion
   , titan
   , TitanResult(..)
     -- * Query
   ) where
-
--- import Network.Socket as Net
--- import Network.HTTP.Types
--- import Network.HTTP.Client
--- import Network.HTTP.Client.TLS
 
 import Crypto.Hash.SHA256 (hash)
 import qualified Data.ByteString.Base64 as B64
@@ -32,6 +25,7 @@ import qualified Data.Text.Encoding as T
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
+import Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
@@ -55,25 +49,13 @@ defaultServer = ServerInfo "localhost" 8182
 -- * InsertVertex: g.addVertex(label, 'ident', 'prop1', 'val1', 'prop2', 'val2')
 -- * InsertEdge: t.V(1).addE('ident',t.V(2))
 data Operation id = InsertVertex { label :: Text
-                                 , properties :: [(Text,Text)]
+                                 , properties :: [(Text,GremlinValue)]
                                  }
                   | InsertEdge { label      :: Text
                                , src,dst    :: id
-                               , properties :: [(Text,Text)]
+                               , properties :: [(Text,GremlinValue)]
                                }
   deriving (Eq,Ord,Show)
-
--- data ErrorHandle id = Custom (HttpException -> ServerInfo -> Operation id -> IO TitanResult)
---                     | Silent    -- ^ Silently convert exceptions to Either types
---                     | ToStderr  -- ^ Emit a stderr message and convert exceptions to Either types
---                     | Rethrow   -- ^ re-throw exceptions
-
--- defaultErrorHandle :: GraphId id => ErrorHandle id
--- defaultErrorHandle = Custom $ \x si t ->
---     do case x of
---               StatusCodeException {} -> return (Failure x)
---               ResponseTimeout        -> titanWith ToStderr si t -- Single retry on failure
---               _                      -> X.throw x
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
@@ -115,8 +97,6 @@ titanWS ops conn =
                            , language = "gremlin-groovy"
                            }
           }
-
-
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
@@ -201,14 +181,38 @@ gremlinScript s =
 encodeQuoteText :: Text -> ByteString
 encodeQuoteText = quote . subChars . escapeChars . T.encodeUtf8
 
+data GremlinValue = GremlinNum Integer
+                  | GremlinString Text
+                  | GremlinList [GremlinValue]
+                  | GremlinMap [(Text, GremlinValue)]
+  deriving (Eq,Ord,Show)
+
+gremlinNum :: Integral i => i -> GremlinValue
+gremlinNum = GremlinNum . fromIntegral
+
+encodeGremlinValue :: GremlinValue -> ByteString
+encodeGremlinValue gv =
+  case gv of
+    GremlinString s -> encodeQuoteText s
+    GremlinNum  n   -> BC.pack (show n)
+    GremlinMap xs   -> BC.concat ["[ "
+                                 , BC.concat (intersperse "," $ map renderKV xs)
+                                 , " ]"
+                                 ]
+    GremlinList vs  -> BC.concat ["[ "
+                                 , BC.concat (intersperse "," $ map encodeGremlinValue vs)
+                                 , " ]"
+                                 ]
+  where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
+
 quote :: ByteString -> ByteString
 quote b = BC.concat ["\'", b, "\'"]
 
 paren :: ByteString -> ByteString
 paren b = BC.concat ["(", b, ")"]
 
-attrs :: (Text,Text) -> [ByteString]
-attrs (a,b) = [encodeQuoteText a, encodeQuoteText b]
+attrs :: (Text,GremlinValue) -> [ByteString]
+attrs (a,b) = [encodeQuoteText a, encodeGremlinValue b]
 
 escapeChars :: ByteString -> ByteString
 escapeChars b

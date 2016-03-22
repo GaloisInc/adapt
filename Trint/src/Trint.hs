@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
@@ -14,6 +16,7 @@ import Control.Monad (when)
 import Control.Exception
 import Data.Int (Int32)
 import Data.Monoid ((<>))
+import qualified Data.Foldable as F
 import Data.Maybe (catMaybes,isNothing, mapMaybe)
 import Data.List (partition,intersperse)
 import Data.Graph hiding (Node, Edge)
@@ -28,9 +31,11 @@ import System.Entropy (getEntropy)
 import MonadLib        hiding (handle)
 import MonadLib.Monads hiding (handle)
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
 import System.FilePath ((<.>))
@@ -196,7 +201,7 @@ doUpload c work svr =
      pure $ concat [vertOfNodes , vertOfEdges , edgeOfEdges]
 
  compileNode :: Node -> [Operation Text]
- compileNode n = [InsertVertex (nodeUID_base64 n) (nodeProperties n)]
+ compileNode n = [InsertVertex (nodeUID_base64 n) (propertiesOf n)]
 
  compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
  compileEdge e =
@@ -205,16 +210,168 @@ doUpload c work svr =
      let e2Lbl = ""
      let eMe   = uidToBase64 euid
      let [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
-     let v     = InsertVertex eMe (edgeProperties e)
+     let v     = InsertVertex eMe (propertiesOf e)
          eTo   = InsertEdge e1Lbl esrc eMe []
          eFrom = InsertEdge e2Lbl eMe edst []
      return ([v], [eTo, eFrom])
 
-nodeProperties :: Node -> [(Text,Text)]
-nodeProperties = const [] -- XXX
+class PropertiesOf a where
+  propertiesOf :: a -> [(Text,GremlinValue)]
 
-edgeProperties :: Edge -> [(Text,Text)]
-edgeProperties = const [] -- XXX
+instance PropertiesOf Node where
+  propertiesOf node =
+   case node of
+    NodeEntity entity     -> propertiesOf entity
+    NodeResource resource -> propertiesOf resource
+    NodeSubject subject   -> propertiesOf subject
+    NodeHost host         -> propertiesOf host
+    NodeAgent agent       -> propertiesOf agent
+
+instance PropertiesOf Edge where
+  propertiesOf (Edge _src _dst rel) = propertiesOf rel
+
+instance PropertiesOf Relationship where
+  propertiesOf r =
+    case r of
+      WasGeneratedBy op    -> [rel "wasGeneratedBy", mkOp (genStringOf op)]
+      WasInvalidatedBy op  -> [rel "wasInvalidatedBy", mkEnumOp op]
+      Used opMay           -> rel "used" : F.toList (fmap mkEnumOp opMay)
+      IsPartOf             -> [rel "isPartOf"]
+      WasInformedBy srcMay ->
+        rel "wasInformedBy" : F.toList (fmap mkSource srcMay)
+      RunsOn                -> [rel "runsOn"]
+      ResidesOn             -> [rel "residesOn"]
+      WasAttributedTo       -> [rel "wasAttributedTo"]
+    where
+      rel      = ("relation",)  . GremlinString
+      mkOp     = ("operation",)
+
+      mkEnumOp :: Enum a => a -> (Text,GremlinValue)
+      mkEnumOp = ("operation",) . enumOf
+
+      genStringOf :: GenOperation -> GremlinValue
+      genStringOf  = GremlinString . T.drop 3 . T.toLower . T.pack . show
+
+stringOf :: Show a => a -> GremlinValue
+stringOf  = GremlinString . T.toLower . T.pack . show
+
+enumOf :: Enum a => a -> GremlinValue
+enumOf = GremlinNum . fromIntegral . fromEnum
+
+mkSource :: InstrumentationSource -> (Text,GremlinValue)
+mkSource = ("source",) . enumOf
+
+mkType :: Text -> (Text,GremlinValue)
+mkType = ("type",) . GremlinString
+
+mayAppend :: Maybe (Text,GremlinValue) -> [(Text,GremlinValue)] -> [(Text,GremlinValue)]
+mayAppend Nothing  = id
+mayAppend (Just x) = (x :)
+
+instance PropertiesOf OptionalInfo where
+  propertiesOf (Info {..}) =
+        catMaybes [ ("time",) . gremlinTime <$> infoTime
+                  , ("permissions",)  . gremlinNum <$> infoPermissions
+                  , ("integrityTag",) . enumOf     <$> infoTrustworthiness
+                  , ("sensitivity",)  . enumOf     <$> infoSensitivity
+          ] <> propertiesOf infoOtherProperties
+
+instance PropertiesOf Entity where
+  propertiesOf e =
+   case e of
+      File {..} ->   mkType "file"
+                   : mkSource entitySource
+                   : ("url", GremlinString entityURL)
+                   : ("fileVersion", gremlinNum entityFileVersion)
+                   : mayAppend ( (("fileSize",) . gremlinNum) <$> entityFileSize)
+                               (propertiesOf entityInfo)
+      NetFlow {..} -> 
+                  mkType "netflow"
+                : mkSource entitySource
+                : ("srcAddress", GremlinString entitySrcAddress)
+                : ("dstAddress", GremlinString entityDstAddress)
+                : ("srcPort", gremlinNum entitySrcPort)
+                : ("dstPort", gremlinNum entityDstPort)
+                : propertiesOf entityInfo
+      Memory {..} ->
+                 mkType "memory"
+               : mkSource entitySource
+               : ("pageNumber", gremlinNum entityPageNumber)
+               : ("address", gremlinNum entityAddress)
+               : propertiesOf entityInfo
+
+instance PropertiesOf Resource where
+  propertiesOf (Resource {..}) =
+                 mkType "resource"
+               : mkSource resourceSource
+               : propertiesOf resourceInfo
+instance PropertiesOf SubjectType where
+  propertiesOf s =
+   let subjTy = ("subjectType",) . GremlinString
+   in case s of
+       SubjectProcess    ->
+         [subjTy "process"]
+       SubjectThread     ->
+         [subjTy "thread"]
+       SubjectUnit       ->
+         [subjTy "unit"]
+       SubjectBlock      ->
+         [subjTy "block"]
+       SubjectEvent et   ->
+         [subjTy "event", ("eventType", enumOf et) ]
+
+gremlinTime :: UTCTime -> GremlinValue
+gremlinTime t = GremlinString (T.pack $ show t)
+
+gremlinList :: [Text] -> GremlinValue
+gremlinList = GremlinList . map GremlinString
+
+gremlinArgs :: [BS.ByteString] -> GremlinValue
+gremlinArgs = gremlinList . map T.decodeUtf8
+
+instance PropertiesOf Subject where
+  propertiesOf (Subject {..}) =
+                mkType "subject"
+              : mkSource subjectSource
+              : ("startTime", gremlinTime subjectStartTime)
+              : ("sequence", gremlinNum subjectSequence)
+              : concat
+                 [ propertiesOf subjectType
+                 , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
+                 , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
+                 , F.toList (("unitid"     ,) . gremlinNum    <$> subjectUnitID     )
+                 , F.toList (("endtime"    ,) . gremlinTime   <$> subjectEndTime    )
+                 , F.toList (("commandline",) . GremlinString <$> subjectCommandLine)
+                 , F.toList (("importlibs" ,) . gremlinList   <$> subjectImportLibs )
+                 , F.toList (("exportlibs" ,) . gremlinList   <$> subjectExportLibs )
+                 , F.toList (("processinfo",) . GremlinString <$> subjectProcessInfo)
+                 , F.toList (("location"   ,) . gremlinNum    <$> subjectLocation   )
+                 , F.toList (("size"       ,) . gremlinNum    <$> subjectSize       )
+                 , F.toList (("ppt"        ,) . GremlinString <$> subjectPpt        )
+                 , F.toList (("env"        ,) . GremlinMap . propertiesOf  <$> subjectEnv)
+                 , F.toList (("args"       ,) . gremlinArgs   <$> subjectArgs       )
+                 , propertiesOf subjectOtherProperties
+                 ]
+
+instance PropertiesOf (Map Text Text) where
+  propertiesOf = Map.toList . fmap GremlinString
+
+instance PropertiesOf Host  where
+  propertiesOf (Host {..}) =
+          mkType "host" :
+            catMaybes [ mkSource <$> hostSource
+                      , ("hostIP",) . GremlinString <$> hostIP
+                      ]
+
+instance PropertiesOf Agent where
+  propertiesOf (Agent {..}) =
+        mkType "agent"
+      : ("userID", GremlinString agentUserID)
+      : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
+               , F.toList (("principleType",) . enumOf <$> agentType)
+               , F.toList (mkSource <$> agentSource)
+               , propertiesOf agentProperties
+               ]
 
 nodeUID_base64 :: Node -> Text
 nodeUID_base64 = uidToBase64 . nodeUID
