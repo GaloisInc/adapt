@@ -1,7 +1,8 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TupleSections              #-}
 module CommonDataModel.FromProv
   ( readFileCDM
   , translateTextCDM
@@ -10,28 +11,29 @@ module CommonDataModel.FromProv
   , T.Error(..), Warning(..)
   ) where
 
-import qualified Data.Map as Map
-import           Data.Map (Map)
-import           Data.DList (DList, toList, singleton)
-import           Data.Monoid
-import qualified Data.Text.Lazy.IO as Text
-import qualified Data.Text.Lazy as Text
-import qualified Data.Text      as TextStrict
-import           Data.Text.Lazy (Text)
-import           Data.Time (UTCTime(..))
-import           Text.Read (readMaybe)
-import           MonadLib as ML
 import qualified Control.Exception as X
 import           Control.Monad.CryptoRandom
 import           Crypto.Random (SystemRandom)
+import           Data.DList (DList, toList, singleton)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Monoid
+import qualified Data.Text      as TextStrict
+import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
+import qualified Data.Text.Lazy.IO as Text
+import           Data.Time (UTCTime(..))
+import           MonadLib as ML
+import           Text.Read (readMaybe)
 
 import           CommonDataModel as CDM
-import qualified Types as T
-import qualified ParserCore as T
-import           Parser (parseProvN)
-import           Types (TranslateError(..),Range(..))
-import           ParserCore
 import           Namespaces
+import           Parser (parseProvN)
+import           ParserCore
+import qualified ParserCore as T
+import           Types (TranslateError(..),Range(..))
+import qualified Types as T
+
 
 readFileCDM ::  FilePath -> IO ([CDM.Node], [CDM.Edge], [Warning])
 readFileCDM fp =
@@ -99,17 +101,32 @@ translateProvEntity (RawEntity {..}) =
     dstIP   <- kvStringReq adaptDestinationAddress exprAttrs
     srcPort <- kvIntegralReq adaptSourcePort exprAttrs
     dstPort <- kvIntegralReq adaptDestinationPort exprAttrs
-    node (NodeEntity $ NetFlow src uid info (strict srcIP) (strict dstIP) srcPort dstPort)
+    let net = (NodeEntity $ NetFlow src uid info (strict srcIP) (strict dstIP) srcPort dstPort)
+    residesOn net =<< kvString adaptMachineID exprAttrs
   translateProvFile    = do
     uid <- uidOfMay exprIdent
     url <- strict <$> kvStringReq adaptPath exprAttrs -- TODO old prov uses 'filePath'
     let info = noInfo
         ver  = -1
         sz   = Nothing
-    node (NodeEntity $ File src uid info url ver sz)
+    let file = NodeEntity $ File src uid info url ver sz
+    residesOn file =<< kvString adaptMachineID exprAttrs
   translateProvDevice  = do
-    uid  <- uidOfMay exprIdent
-    node (NodeResource $ Resource src uid noInfo)
+    -- From the machine ID, create a new node 'Host', and edge 'residesOn'.
+    uid     <- uidOfMay exprIdent
+    devType <- kvGetDevice adaptDeviceID exprAttrs
+    let res = NodeResource $ Resource src devType uid noInfo
+    residesOn res =<< kvString adaptMachineID exprAttrs
+
+residesOn :: Node -> Maybe Text -> Tr ([Node], [Edge])
+residesOn ent machine =
+    case machine of
+      Just mid -> do
+           hostUID <- uidOfMachine mid
+           let host   = NodeHost $ Host hostUID Nothing Nothing
+               reside = Edge (nodeUID ent) hostUID ResidesOn
+           return ([ent, host], [reside])
+      Nothing -> node ent
 
 translateProvAgent (RawEntity {..}) =
   -- warn "We just throw Prov Agents away when generating CDM."
@@ -122,7 +139,6 @@ translateProvActivity (RawEntity {..}) =
          fakeDay = UTCTime (toEnum 0) 0
          err = warn "Prov Activity (CDM Subject) has no start time." >> return fakeDay
      subjectStartTime   <- maybe err return =<< kvTime adaptTime exprAttrs
-     subjectSequence    <- nextSequenceNumber
      subjectPID         <- kvStringToIntegral adaptPid exprAttrs
      subjectPPID        <- kvStringToIntegral adaptPPid exprAttrs
      subjectUnitID      <- return Nothing
@@ -137,70 +153,101 @@ translateProvActivity (RawEntity {..}) =
      let subjectPpt             = Nothing
      let subjectEnv             = Nothing
      let subjectArgs            = Nothing
-     node $ NodeSubject $ Subject {..}
+     let nd = NodeSubject Subject {..}
+     residesOn nd =<< kvString adaptMachineID exprAttrs
 
 translateProvWasAssociatedWith (RawEntity {..}) =
   warn "No known CDM for 'wasAssociatedWith'" >> noResults
 translateProvUsed (RawEntity {..}) =
   case exprArgs of
-    [Just (Left edgeSourceId),Just (Left edgeDestinationId),_time] ->
+    [Just (Left edgeSourceId),Just (Left edgeDestinationId),Just (Right time)] ->
         do operation <- kvString adaptOperation exprAttrs
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
-           edgeRelationship <-
-                Used <$> case operation of
-                         Just "open"          -> return $ Just UseOpen
-                         Just "bind"          -> return $ Just UseBind
-                         Just "connect"       -> return $ Just UseConnect
-                         Just "accept"        -> return $ Just UseAccept
-                         Just "read"          -> return $ Just UseRead
-                         Just "mmap"          -> return $ Just UseMmap
-                         Just "mprotect"      -> return $ Just UseMprotect
-                         Just "close"         -> return $ Just UseClose
-                         Just "link"          -> return $ Just UseLink
-                         Just "modAttributes" -> return $ Just UseModAttributes
-                         Just "execute"       -> return $ Just UseExecute
-                         Just "asinput"       -> return $ Just UseAsInput
+           (edgeRelationship,eTy) <-
+                (Used,) <$> case operation of
+                         Just "open"          -> return $ EventOpen
+                         Just "bind"          -> return $ EventBind
+                         Just "connect"       -> return $ EventConnect
+                         Just "accept"        -> return $ EventAccept
+                         Just "read"          -> return $ EventRead
+                         Just "mmap"          -> return $ EventMmap
+                         Just "mprotect"      -> return $ EventMprotect
+                         Just "close"         -> return $ EventClose
+                         Just "link"          -> return $ EventLink
+                         Just "execute"       -> return $ EventExecute
                          Just other           -> -- 'recvfrom' etc
-                          do warn $ "Unknown use operation: " <> other
-                             return Nothing
-                         Nothing              -> return Nothing
-           edge $ Edge edgeSource edgeDestination edgeRelationship
+                            die $ "Unknown use operation: " <> other
+                         Nothing              ->
+                            die "No specific 'use' operation."
+           -- Generate an event and two edges for new data model
+           evtUID <- randomUID
+           let evt = NodeSubject $ mkEvent src evtUID eTy Nothing time
+               src = SourceLinuxAuditTrace
+               wib = Edge edgeSource evtUID WasInformedBy
+               use = Edge evtUID edgeDestination edgeRelationship
+           return ([evt], [wib,use])
     _ -> warn "Unrecognized 'used' relation." >> noResults
 translateProvWasGeneratedBy (RawEntity {..}) =
   case exprArgs of
-    [Just (Left edgeSourceId),Just (Left edgeDestinationId),_time] ->
+    [Just (Left edgeSourceId),Just (Left edgeDestinationId),Just (Right time)] ->
         do operation <- kvString adaptOperation exprAttrs
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
-           edgeRelationship <-
-            fmap WasGeneratedBy <$> case operation of
-                                     Just "send"     -> return $ Just GenSend
-                                     Just "connect"  -> return $ Just GenConnect
-                                     Just "truncate" -> return $ Just GenTruncate
-                                     Just "chmod"    -> return $ Just GenChmod
-                                     Just "touch"    -> return $ Just GenTouch
-                                     Just "create"   -> return $ Just GenCreate
+           (edgeRelationship,eTy) <-
+            (WasGeneratedBy,) <$> case operation of
+                                     Just "send"     -> return EventSend
+                                     Just "connect"  -> return EventConnect
+                                     Just "truncate" -> return EventTruncate
+                                     Just "chmod"    -> return EventChmod
+                                     Just "create"   -> return EventCreate
                                      Just other ->
-                                        do warn $ "Unknown GenOperation: " <> other
-                                           return Nothing
-                                     _ -> return Nothing
-           maybe noResults edge (Edge edgeSource edgeDestination <$> edgeRelationship)
+                                        die $ "WasGeneratedBy: Unknown operation: " <> other
+                                     Nothing ->
+                                        die "WasGeneratedBy: No provided operation"
+           evtUID <- randomUID
+           let evt = NodeSubject $ mkEvent src evtUID eTy Nothing time
+               src = SourceLinuxAuditTrace
+               wib = Edge edgeSource evtUID WasInformedBy
+               wgb = Edge evtUID edgeDestination edgeRelationship
+           return ([evt], [wib,wgb])
     _ -> warn "Unrecognized 'used' relation." >> noResults
 translateProvWasStartedBy (RawEntity {..}) =
-  -- XXX modify subject's 'subjectStartTime' field
-  noResults
+  case exprArgs of
+    Just (Left edgeSourceId) : Just (Left edgeDestinationId) : _ ->
+      do let err = die "No time found in 'wasStartedBy'"
+         time <- maybe err return =<< kvTime adaptTime exprAttrs
+         edgeSource <- uidOf edgeSourceId
+         edgeDestination <- uidOf edgeDestinationId
+         evtUID <- randomUID
+         let evt = NodeSubject $ mkEvent src evtUID EventFork Nothing time
+             src = SourceLinuxAuditTrace
+             wsb = Edge edgeSource evtUID WasInformedBy
+             wib = Edge evtUID edgeDestination WasInformedBy
+         return ([evt], [wsb,wib])
+    _ -> warn "Unrecognized 'wasStartedBy' relation." >> noResults
 translateProvWasEndedBy (RawEntity {..}) =
-  -- XXX modify subject's 'subjectEndTime' field
-  noResults
+  case exprArgs of
+    Just (Left edgeSourceId) : Just (Left edgeDestinationId) : _ ->
+      do let err = die "No time found in 'wasEndedBy'"
+         time <- maybe err return =<< kvTime adaptTime exprAttrs
+         edgeSource <- uidOf edgeSourceId
+         edgeDestination <- uidOf edgeDestinationId
+         evtUID <- randomUID
+         let evt = NodeSubject $ mkEvent src evtUID EventStop Nothing time
+             src = SourceLinuxAuditTrace
+             web = Edge edgeSource evtUID WasInformedBy
+             wib = Edge evtUID edgeDestination WasInformedBy
+         return ([evt], [web,wib])
+    _ -> warn "Unrecognized 'wasEndedBy' relation." >> noResults
 translateProvWasInformedBy (RawEntity {..}) =
   case exprArgs of
     [Just (Left edgeSourceId),Just (Left edgeDestinationId)] ->
         do edgeSource       <- uidOf edgeSourceId
            edgeDestination  <- uidOf edgeDestinationId
-           edgeRelationship <- pure $ WasInformedBy Nothing
+           edgeRelationship <- pure WasInformedBy
            edge $ Edge edgeSource edgeDestination edgeRelationship
-    _ -> warn "Unrecognized 'used' relation." >> noResults
+    _ -> warn "Unrecognized 'wasInformedBy' relation." >> noResults
 translateProvWasAttributedTo (RawEntity {..}) =
   case exprArgs of
     [Just (Left edgeSourceId),Just (Left edgeDestinationId)] ->
@@ -208,17 +255,15 @@ translateProvWasAttributedTo (RawEntity {..}) =
            edgeDestination  <- uidOf edgeDestinationId
            edgeRelationship <- pure WasAttributedTo
            edge $ Edge edgeSource edgeDestination edgeRelationship
-    _ -> warn "Unrecognized 'used' relation." >> noResults
+    _ -> warn "Unrecognized 'wasAttributedTo' relation." >> noResults
 translateProvWasDerivedFrom (RawEntity {..}) =
   case exprArgs of
     [Just (Left edgeSourceId),Just (Left edgeDestinationId)] ->
-        do -- Prov 'wasaDerviedFrom' is inverse to 'isPartOf'
-           -- Thus we reverse the src and dst.
-           edgeDestination  <- uidOf edgeSourceId
+        do edgeDestination  <- uidOf edgeSourceId
            edgeSource       <- uidOf edgeDestinationId
-           edgeRelationship <- pure IsPartOf
-           edge $ Edge edgeSource edgeDestination edgeRelationship
-    _ -> warn "Unrecognized 'used' relation." >> noResults
+           let rel = WasDerivedFrom UnknownStrength UnknownDerivation
+           edge $ Edge edgeSource edgeDestination rel
+    _ -> warn "Unrecognized 'wasDerivedFrom' relation." >> noResults
 translateProvActedOnBehalfOf (RawEntity {..}) =
   do warn "Unimplemented: actedOnBehalfOf"
      noResults
@@ -235,9 +280,12 @@ data Warning = Warn Text
 warn :: Text -> Tr ()
 warn = put . Warn
 
+die :: Text -> Tr a
+die = raise . TranslateError
+
 data TrState = TrState { trRandoms :: [Word64]
                        , trUIDs    :: Map Ident UID
-                       , trSequenceNumber :: Sequence
+                       , _trSequenceNumber :: Sequence
                        }
 
 newtype Tr a = Tr { unTr :: StateT TrState (ReaderT Range (WriterT (DList Warning) (ExceptionT TranslateError Id))) a }
@@ -283,7 +331,7 @@ randomUID = do
     (a:b:c:d:rest) -> do
       set st { trRandoms = rest }
       return (a,b,c,d)
-    _ -> raise $ TranslateError "Impossible: Ran out of entropy generating randomUID."
+    _ -> die "Impossible: Ran out of entropy generating randomUID."
 
 insertUID :: Ident -> UID -> Tr ()
 insertUID i u =
@@ -306,12 +354,14 @@ uidOf ident =
                     return val
       Just val -> return val
 
+uidOfMachine :: Text -> Tr UID
+uidOfMachine t = uidOf (adapt .: ("machine://" <> t))
 
-nextSequenceNumber :: Tr Sequence
-nextSequenceNumber =
+_nextSequenceNumber :: Tr Sequence
+_nextSequenceNumber =
  do s <- get
-    let sqn = trSequenceNumber s
-    set s { trSequenceNumber = sqn + 1 }
+    let sqn = _trSequenceNumber s
+    set s { _trSequenceNumber = sqn + 1 }
     return sqn
 
 node :: Node -> Tr ([Node],[Edge])
@@ -340,6 +390,32 @@ kvStringReq i m =
       Nothing ->
         do warn $ "Required field is missing (" <> textOfIdent i <> ") filling in ''."
            return ""
+
+kvGetDevice :: Ident -> KVs -> Tr SourceType
+kvGetDevice i m =
+ do md <- kvString i m
+    case md of
+     Just "Accelerometer"             -> return SourceAccelerometer
+     Just "Temperature"               -> return SourceTemperature
+     Just "Gyroscope"                 -> return SourceGyroscope
+     Just "MagneticField"             -> return SourceMagneticField
+     Just "HearRate"                  -> return SourceHearRate
+     Just "Light"                     -> return SourceLight
+     Just "Proximity"                 -> return SourceProximity
+     Just "Pressure"                  -> return SourcePressure
+     Just "RelativeHumidity"          -> return SourceRelativeHumidity
+     Just "LinearAcceleration"        -> return SourceLinearAcceleration
+     Just "Motion"                    -> return SourceMotion
+     Just "StepDetector"              -> return SourceStepDetector
+     Just "StepCounter"               -> return SourceStepCounter
+     Just "TiltDetector"              -> return SourceTiltDetector
+     Just "RotationVector"            -> return SourceRotationVector
+     Just "Gravity"                   -> return SourceGravity
+     Just "GeomagneticRotationVector" -> return SourceGeomagneticRotationVector
+     Just "Camera"                    -> return SourceCamera
+     Just "Gps"                       -> return SourceGps
+     Just s                           -> die $ "Unrecognized source: " <> s
+     Nothing                          -> die "No device source provided."
 
 kvIntegralReq :: Integral a => Ident -> KVs -> Tr a
 kvIntegralReq i m =
