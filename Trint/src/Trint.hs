@@ -233,24 +233,17 @@ instance PropertiesOf Edge where
 instance PropertiesOf Relationship where
   propertiesOf r =
     case r of
-      WasGeneratedBy op    -> [rel "wasGeneratedBy", mkOp (genStringOf op)]
-      WasInvalidatedBy op  -> [rel "wasInvalidatedBy", mkEnumOp op]
-      Used opMay           -> rel "used" : F.toList (fmap mkEnumOp opMay)
-      IsPartOf             -> [rel "isPartOf"]
-      WasInformedBy srcMay ->
-        rel "wasInformedBy" : F.toList (fmap mkSource srcMay)
-      RunsOn                -> [rel "runsOn"]
-      ResidesOn             -> [rel "residesOn"]
-      WasAttributedTo       -> [rel "wasAttributedTo"]
+      WasGeneratedBy     -> [rel "wasGeneratedBy"]
+      WasInvalidatedBy   -> [rel "wasInvalidatedBy"]
+      Used               -> [rel "used"]
+      IsPartOf           -> [rel "isPartOf"]
+      WasInformedBy      -> [rel "wasInformedBy"]
+      RunsOn             -> [rel "runsOn"]
+      ResidesOn          -> [rel "residesOn"]
+      WasAttributedTo    -> [rel "wasAttributedTo"]
+      WasDerivedFrom a b -> [rel "wasDerivedFrom", ("strength", enumOf a), ("derivation", enumOf b)]
     where
       rel      = ("relation",)  . GremlinString
-      mkOp     = ("operation",)
-
-      mkEnumOp :: Enum a => a -> (Text,GremlinValue)
-      mkEnumOp = ("operation",) . enumOf
-
-      genStringOf :: GenOperation -> GremlinValue
-      genStringOf  = GremlinString . T.drop 3 . T.toLower . T.pack . show
 
 stringOf :: Show a => a -> GremlinValue
 stringOf  = GremlinString . T.toLower . T.pack . show
@@ -317,8 +310,9 @@ instance PropertiesOf SubjectType where
          [subjTy "unit"]
        SubjectBlock      ->
          [subjTy "block"]
-       SubjectEvent et   ->
+       SubjectEvent et s  ->
          [subjTy "event", ("eventType", enumOf et) ]
+          ++ F.toList ((("sequence",) . gremlinNum) <$> s)
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)
@@ -329,12 +323,15 @@ gremlinList = GremlinList . map GremlinString
 gremlinArgs :: [BS.ByteString] -> GremlinValue
 gremlinArgs = gremlinList . map T.decodeUtf8
 
+instance PropertiesOf a => PropertiesOf (Maybe a) where
+  propertiesOf Nothing  = []
+  propertiesOf (Just x) = propertiesOf x
+
 instance PropertiesOf Subject where
   propertiesOf (Subject {..}) =
                 mkType "subject"
               : mkSource subjectSource
               : ("startTime", gremlinTime subjectStartTime)
-              : ("sequence", gremlinNum subjectSequence)
               : concat
                  [ propertiesOf subjectType
                  , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )

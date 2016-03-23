@@ -4,15 +4,15 @@ module CommonDataModel
   , Word64
   ) where
 
-import Data.Word
-import Data.Int
-import Data.Text (Text)
-import Data.ByteString (ByteString)
-import Data.Map (Map)
+import           Data.ByteString (ByteString)
+import           Data.Int
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Time (UTCTime)
+import           Data.Text (Text)
+import           Data.Time (UTCTime)
+import           Data.Word
+import           GHC.Generics
 
-import GHC.Generics
 
 data Node
       = NodeEntity Entity
@@ -66,6 +66,7 @@ data Entity
 
 data Resource
     = Resource { resourceSource :: InstrumentationSource
+               , resourceType   :: SourceType
                , resourceUID    :: UID
                , resourceInfo   :: OptionalInfo
                }
@@ -76,7 +77,6 @@ data Subject
               , subjectUID             :: UID
               , subjectType            :: SubjectType
               , subjectStartTime       :: Time
-              , subjectSequence        :: Sequence
               -- Optional attributes
               , subjectPID             :: Maybe PID
               , subjectPPID            :: Maybe PPID
@@ -94,6 +94,10 @@ data Subject
               , subjectArgs            :: Maybe Args
               }
       deriving (Eq, Ord, Show, Read, Generic)
+
+mkEvent :: InstrumentationSource -> UID -> EventType -> Maybe Sequence -> Time -> Subject
+mkEvent src uid eTy eSeq start =
+  Subject src uid (SubjectEvent eTy eSeq) start Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing
 
 data Host =
       Host { hostUID    :: UID
@@ -114,14 +118,15 @@ data Agent =
       deriving (Eq, Ord, Show, Read, Generic)
 
 data Relationship
-      = WasGeneratedBy GenOperation
-      | WasInvalidatedBy DelOperation
-      | Used (Maybe UseOperation)
+      = WasGeneratedBy
+      | WasInvalidatedBy
+      | Used
       | IsPartOf
-      | WasInformedBy (Maybe InstrumentationSource)
+      | WasInformedBy
       | RunsOn
       | ResidesOn
       | WasAttributedTo
+      | WasDerivedFrom Strength Derivation
       deriving (Eq, Ord, Show, Read, Generic)
 
 data EdgeType = EdgeEventHasParentEvent
@@ -181,6 +186,11 @@ data EventType
       | EventTruncate
       | EventWait
       | EventBlind
+      -- The below are not (yet) in the specification.
+      | EventStop
+      | EventCreate
+      | EventChmod
+      | EventSend
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data SourceType
@@ -223,41 +233,14 @@ data SubjectType
       | SubjectThread
       | SubjectUnit
       | SubjectBlock
-      | SubjectEvent EventType
+      | SubjectEvent EventType (Maybe Sequence)
       deriving (Eq, Ord, Show, Read, Generic)
 
-data GenOperation
-      = GenSend
-      | GenConnect
-      | GenTruncate
-      | GenChmod
-      | GenTouch
-      | GenCreate
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data DelOperation = Delete | Unlink
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data UseOperation
-      = UseOpen
-      | UseBind
-      | UseConnect
-      | UseAccept
-      | UseRead
-      | UseMmap
-      | UseMprotect
-      | UseClose
-      | UseLink
-      | UseModAttributes
-      | UseExecute
-      | UseAsInput
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data Strength = Weak | Medium | Strong
+data Strength = UnknownStrength | Weak | Medium | Strong
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 
-data Derivation = Copy | Encode | Compile | Encrypt | Other
+data Derivation = UnknownDerivation | Copy | Encode | Compile | Encrypt | Other
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 -- "Other primitive types used in our model"
