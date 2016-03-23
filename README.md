@@ -23,37 +23,11 @@ Flags:
   -l                 --lint                    Check the given file for syntactic and type issues.
   -q                 --quiet                   Quiet linter warnings
   -v                 --verbose                 Verbose debugging messages
-  -a                 --ast                     Produce a pretty-printed internal AST
-  -g                 --graph                   Produce a dot file representing a graph of the conceptual model.
+  -a                 --ast                     Produce a pretty-printed internal CDM AST
   -s                 --stats                   Print statistics.
-  -t                 --turtle                  Produce a turtle RDF description of the graph.
   -u[Database host]  --upload[=Database host]  Uploads the data by inserting it into a Titan database using gremlin.
   -h                 --help                    Prints this help message.
 ```
 
-For example (notice infoleak.provn is large and thus not in the database, see
-seaside for example traces):
-
-```
-Trint -s -l ./example/SRI/infoleak.provn
-// No output because the example is syntactically and type correct.
-Trint -u ./example/SRI/infoleak.provn
-// No output (currently, just a long wait time)
-```
-
-During execution of upload one can query the gremlin server using the same
-restful interface as the trint tool.  For example, using curl to send a vertex
-count request and extract the result from the returned json via the `jq` tool.
-
-```
-curl -s -X POST -d "{ \"gremlin\" : \"g.V().count()\" }" "http://localhost:8182"
-| jq '.result.data'
-[
-  39693
-]
-```
-
-The 'upload' command has been tested with a gremlin server configured
-with the example 'rest-modern.yaml'.  Gremlin's restful interface is useful for
-debugging and easy inspection, but is known to be inefficient - so we'll use
-this interface only so long as the web sockets solution remains opaque.
+The 'upload' command has been tested with a gremlin server configured with the
+default websockets channelizer.
