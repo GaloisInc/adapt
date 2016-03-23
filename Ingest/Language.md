@@ -278,48 +278,6 @@ enum SourceType {
     }
 ```
 
-*prov-tc:genOperation* is used in wasGeneratedBy relationships:
-
-```
-	enum genOperation {
-		WRITE,
-		SEND,
-		CONNECT,
-		TRUNCATE,
-		CHMOD,
-		TOUCH,
-		CREATE
-	}
-```
-
-*prov-tc:delOperation* is used in wasInvalidatedBy relationships:
-
-```
-	enum delOperation {
-		DELETE,
-		UNLINK
-	}
-```
-
-*prov-tc:useOperation* is used in uses relationships:
-
-```
-	enum useOperation {
-		OPEN,
-		BIND,
-		CONNECT,
-		ACCEPT,
-		READ,
-		MMAP,
-		MPROTECT,
-		CLOSE,
-		LINK,
-		MODATTRIBUTES,
-		EXECUTE,
-		USEASINPUT
-	}
-```
-
 *prov-tc:strength* is used in wasDerivedFrom relationships:
 
 ```
@@ -389,36 +347,41 @@ Entity-File (File Object in CDM)
 ------
 Required:
 
-* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM FileObject.source
 * a unique identifier for the file entity instance (*prov-tc:uid*) // maps to CDM FileObject.uid
 * the URL used in the target system for the file (*prov-tc:url*) // maps to CDM FileObject.url
-* the version number of the file (*prov-tc:file-version*) // maps to CDM FileObjerct.version
 
-Optional:
+Desired:
 
 * size in bytes of the file (*prov-tc:size*) // maps to CDM FileObject.size
+* the version number of the file (*prov-tc:file-version*) // maps to CDM FileObjerct.version
 * access permissions (*prov-tc:permissions*) // maps to CDM FileObject.permission
 * creation time (*prov-tc:time*) // maps to CDM FileObject.lastTimestampMicros
+
+Nice to have:
+
+* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM FileObject.source
 * trustworthiness of the file (*prov-tc:trustworthiness*) // maps to CDM FileObject.integrity
 * sensitivity of the file (*prov-tc:privacyLevel*) // maps to CDM FileObject.confidentiality
 * other properties (*prov-tc:properties*) // maps to CDM FileObject.properties
-* file creation time (*prov-tc:time*) // maps to CDM FileObject.lastTimestampMicros
 
 Entity-NetFlow (NetFlow Object in CDM)
 --------
 Required:
 
-* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM NetFlowObject.source
 * a unique identifier for the network flow (*prov-tc:uid*) // maps to CDM NetFlowObject.uid
 * the source IP address of the network flow (*prov-tc:srcAddress*) // maps to CDM NetFlowObject.srcAddress
 * the source port of the network flow (*prov-tc:srcPort*) // maps to CDM NetFlowObject.srcPort
 * the destination IP address of the network flow (*prov-tc:dstAddress*) // maps to CDM NetFlowObject.dstAddress
 * the destination port of the network flow (*prov-tc:dstPort*) // maps to CDM NetFlowObject.dstPort
 
-Optional:
+Desired:
 
 * port modified time (*prov-tc:time*) // maps to CDM NetFlowObject.lastTimestampMicros
 * access permissions (*prov-tc:permissions*) // maps to CDM NetFlowObject.permission
+
+Nice to have:
+
+* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM NetFlowObject.source
 * trustworthiness of the flow (*prov-tc:trustworthiness*) // maps to CDM NetFlowObject.integrity
 * sensitivity of the flow (*prov-tc:privacyLevel*) // maps to CDM NetFlowObject.confidentiality
 * other properties (*prov-tc:properties*) // maps to CDM NetFlowObject.properties
@@ -428,15 +391,18 @@ Entity-Memory (Memory Object in CDM)
 ---------
 Required:
 
-* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM MemoryObject.source
 * a unique identifier for the memory area (*prov-tc:uid*) // maps to CDM MemoryObject.uid
 * the virtual page number of the area (*prov-tc:pageNumber*) // maps to CDM MemoryObject.pageNumber
 * the referenced virtual address (*prov-tc:address*) // maps to CDM MemoryObject.memoryAddress
 
-Optional:
+Desired:
 
 * access permissions (*prov-tc:permissions*) // maps to CDM MemoryObject.permission
 * modification time (*prov-tc:time*) // maps to CDM MemoryObject.lastTimestampMicros
+
+Nice to have:
+
+* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM MemoryObject.source
 * trustworthiness of the memory (*prov-tc:trustworthiness*) // maps to CDM MemoryObject.integrity
 * sensitivity of the memory (*prov-tc:privacyLevel*) // maps to CDM MemoryObject.confidentiality
 * other properties (*prov-tc:properties*) // maps to CDM MemoryObject.properties
@@ -452,10 +418,13 @@ Required:
 * a unique identifier for the resource (*prov-tc:uid*) // maps to CDM SourceObject.uid
 * the type of the resource (*prov-tc:sourceType*) // maps to CDM SourceObject.type
 
-Optional:
+Desired:
 
 * last used time (*prov-tc:time*) // maps to CDM SourceObject.lastTimestampMicros
 * access permissions (*prov-tc:permissions*) // maps to CDM SourceObject.permission
+
+Nice to have:
+
 * trustworthiness (*prov-tc:trustworthiness*) // maps to CDM SourceObject.integrity
 * sensitivity (*prov-tc:privacyLevel*) // maps to CDM SourceObject.confidentiality
 * other properties (*prov-tc:properties*) // maps to CDM ResourceObject.properties
@@ -465,58 +434,67 @@ Subject (Subject in CDM)
 ------------------
 A subject represents activity by a thread of running computation. It may be started by another subject, and may take action on its own to start other subjects or to affect entities. We would normally call this class "activity" per W3CPROV, but activity is used elsewhere in our schema, so we adopt the CDM name instead. Subjects in our model include Events in CDM as well as Subjects in CDM
 
-Required attributes include:
+Required:
 
 * a unique identifier for the subject (*prov-tc:uid*) // maps to CDM Subject.uid, Event.uid
 * a type for the subject (*prov-tc:subjectType*) // maps to CDM Subject.type
 * an event description if the type above is Event (*prov-tc:eventType*) // maps to CDM Event.type
-* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM Subject.source, Event.sourece
-* a start time or event occurrence time (*prov:startedAtTime*) // maps to CDM Subject.startTimestampMicros, Event.startTimeMicros
-* a sequence number for events all generated by the same subject one level up in a hierarchy (*prov-tc:sequence*) // maps to CDM Event.sequence
-
-Optional attributes include:
-
 * a process ID (*prov-tc:pid*) // maps to CDM Subject.pid
 * a process ID of its parent (*prov-tc:ppid*) // maps to CDM Subject.ppid
 * a unique identifier of a unit (outer handler loop instance) (*prov-tc:unitid*) // maps to CDM Subject.unitId
-* an end time (*prov:endedAtTime*) // maps to CDM Subject.endTimestampMicros
+* a list of event parameter values (*prov-tc:args*) // maps to CDM Event.parameters
+* a start time or event occurrence time (*prov:startedAtTime*) // maps to CDM Subject.startTimestampMicros, Event.startTimeMicros
+* a sequence number for events all generated by the same subject one level up in a hierarchy (*prov-tc:sequence*) // maps to CDM Event.sequence
+
+Desired:
+
 * the command line currently executing (*prov-tc:commandLine*) // maps to CDM Subject.cmdLine
 * a list of imported libraries used by the Subject (*prov-tc:importLibs*) // maps to CDM Subject.importedLibraries
 * a list of exported libraries offered by the Subject (*prov-tc:exportLibs*) // maps to CDM Subject.exportedLibraries
-* a string of additional process information (*prov-tc:pInfo*) // maps to CDM Subject.pInfo
-* additional properties of the Subject (*prov-tc:properties*) // maps to CDM Subject.properties, Event.properties
-* a location in an associated Object used in an Event (*prov-tc:location*) // maps to CDM Event.location
-* the size of the data affecting an Event (*prov-tc:size*) // maps to CDM Event.size
 * the program point where an Event was initiated (*prov-tc:ppt*) // maps to CDM Event.programPoint
-* a list of environment variables or arguments (*prov-tc:env*) // not in CDM
-* a list of event parameter values (*prov-tc:args*) // maps to CDM Event.parameters
+* an end time (*prov:endedAtTime*) // maps to CDM Subject.endTimestampMicros
+
+Nice to have:
+
+* name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM Subject.source, Event.sourece
+* a string of additional process information (*prov-tc:pInfo*) // maps to CDM Subject.pInfo
+* a location in an associated Entity used in an Event (*prov-tc:location*) // maps to CDM Event.location
+* additional properties of the Subject (*prov-tc:properties*) // maps to CDM Subject.properties, Event.properties
+* the size of the data affecting an Event (*prov-tc:size*) // maps to CDM Event.size
+* a list of environment variables (*prov-tc:env*) // not in CDM
 
 Host (Host in CDM)
 --------
 A system that may host activities and entities. For now, we ignore the obvious question about hierarchies of hosts, for example, VMs running on hardware.
 
-Required attributes include:
+Required:
 
 * a unique identifier for the host (*prov-tc:uid*). Unsigned 32b integer
 
-Optional attributes include:
+Desired:
 
 * an IP address for the host (*prov-tc:ipAddress*). Unsigned 32b integer
+
+Nice to have:
+
 * name of TA1 sensor source of the information provided (*prov-tc:source*). 32B String
 
 Agent (Principal in CDM)
 -----
 An agent represents an actor that is not a Subject on a monitored machine. An agent may be human, may be a machine in the target network that has no monitoring, or may be a machine outside the monitored network. Agents have no required attributes.
 
-Required attributes:
+Required:
 
 * a unique identifier for the agent (*prov-tc:uid*) // maps to CDM Principal.uid
 
-Optional attributes:
+Desired:
 
 * a user ID (*prov-tc:userId*) // maps to CDM Principal.userId
 * a list of group identifiers (*prov-tc:gid*) // maps to CDM Principal.groupIds
 * the type of agent (*prov-tc:agentType*) // maps to CDM Principal.type
+
+Nice to have:
+
 * name of TA1 sensor source of the information provided (*prov-tc:source*) // maps to CDM Principal.InstrumentationSource
 * additional properties of the Subject (*prov-tc:properties*) // maps to CDM Principal.properties
 
@@ -525,32 +503,32 @@ Pattern (not in CDM)
 -----
 A pattern is a structure comprised of base layer elements such as Subject or Entity, and might also include Agents.
 
-Required attributes:
+Required:
 
 * A pattern template identifier that the pattern instance matches (*prov-tc:patternID*). Unsigned 16b integer.
 
 Activity (not in CDM)
 -------
-An activity is a structure comprised of pattern instances. Activities strictly correspond to leaves in our APT grammar. Required attributes:
+An activity is a structure comprised of pattern instances. Activities strictly correspond to leaves in our APT grammar. Required:
 
 * An activity template identifier (that is, the name of a grammar leaf) that the activity instance matches (*prov-tc:activityID*). Unsigned 16b integer.
 
 Phase (not in CDM)
 -----
-A phase is a structure comprised of activity instances. Phases strictly correspond to internal nodes in our APT grammar. Required attributes:
+A phase is a structure comprised of activity instances. Phases strictly correspond to internal nodes in our APT grammar. Required:
 
 * A Phase identifier (that is, the ID of an APT Phase that this Phase instance stands for) (*prov-tc:phaseID*). 16b integer
 
 APT (not in CDM)
 ----
-An APT is a structure comprised of Phase instances. Optional attributes:
+An APT is a structure comprised of Phase instances. Required:
 
 * A descriptive string for the APT candidate. 64B string
 
 
 Segment (not in CDM)
 -----
-A Segment is a subgraph of the overall provenance graph. A segment may incorporate base layer structures, pattern instances,  activity instances, or phase instances. Required attributes:
+A Segment is a subgraph of the overall provenance graph. A segment may incorporate base layer structures, pattern instances,  activity instances, or phase instances. Required:
 
 * The segmentation criteria used. String
 * A list of counts for each pattern type known to the system that are included in this segment. [unsigned 32b integer]
@@ -564,30 +542,16 @@ Some relationships in the ADAPT model map to elements of the CDM enum type EdgeT
 
 prov:wasGeneratedBy (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW to show creations)
 -------
-A wasGeneratedBy relationship indicates that an entity (the object of the relationship) was created by a Subject (the subject of the relationship, which must be of type Event).
-
-Required attribute:
-
-* the operation performed on the artifact (*prov-tc:genOperation*).
+A wasGeneratedBy relationship indicates that an entity (the object of the relationship) was created by a Subject (the subject of the relationship, which must be of type Event). No attributes.
 
 prov:wasInvalidatedBy (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW to show deletions)
 --------
 
-A wasInvalidatedBy relationship indicates that an artifact (the object of the relationship) was deleted by a Subject (the subject of the relationship, which must be of type Event).
-
-Optional attribute:
-
-* the operation performed (*prov-tc:delOperation*)
+A wasInvalidatedBy relationship indicates that an artifact (the object of the relationship) was deleted by a Subject (the subject of the relationship, which must be of type Event). No attributes.
 
 prov:used (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW for all other uses)
 -------
-A used relationship indicates that an Event Subject either affected or was affected by an Entity, but did not create or delete the entity.
-
-Optional attribute:
-
-* the operation performed (*prov-tc:useOperation*)
-
-
+A used relationship indicates that an Event Subject either affected or was affected by an Entity, but did not create or delete the entity. No attributes.
 
 A Note About Provenance Tags
 ----------
@@ -597,39 +561,12 @@ in our graph to represent provenance encoded in those tags using the wasDerivedF
 relationship discussed below. Thus for Phase 1, TA1 performers whose data we use should
 not use these CDM constructs.**
 
-Provenance tags in CDM indicate entity dependencies on other entities or on subjects.
-A tag may define a subject or entity either as an original source or as a derivative from other original sources. As of CDM v0.7, tags are structured in this manner:
-
-The tag expression syntax is:
-
-```
- tagExpr := tagOp(tagExpr, tagExpr, ..) | tagId | tagInfo | integrityTag | confidentialityTag
-
- tagOp    := sequence | union | encode | strong | medium | weak
-
- tagInfo   := string // contains information about the tag source or other
-```
-
-Thus a tagExpr is a tree-structured representation of dependencies of the Object or Subject to which it is attached. Each node in the tree can be any one of the following
-
-* a tagId
-* an informational string
-* a TagOpCode combining children tags
-* an IntegrityTag
-* a confidentiality tag
-
-
 prov:wasDerivedFrom (not in CDM, informed by CDM tagging system)
 ------
-This relationship indicates that one entity has as part of its provenance another entity or subject.
-
-Optional attributes:
+This relationship indicates that one entity has as part of its provenance another entity or subject. Desired:
 
 * the strength of dependency of the terminal element of the relationship instance on the origin element (*prov-tc:strength*).
-
 * the kind of derivation used to create the terminal element from the origin element (*prov-tc:derivation*)
-
-
 
 dc:isPartOf (maps to CDM EDGE_isPartOf)
 -----
@@ -645,9 +582,7 @@ This relationship type maps several edge types in CDM:
 * EDGE_EVENT_AFFECTS_SUBJECT
 * EDGE_SUBJECT_AFFECTS_EVENT
 
-Optional attributes:
-
-* an attribute that names the source of the information provided (*prov-tc:source*)
+No attributes.
 
 prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
 --------
