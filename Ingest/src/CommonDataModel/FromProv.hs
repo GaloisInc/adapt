@@ -31,6 +31,7 @@ import           Namespaces
 import           Parser (parseProvN)
 import           ParserCore
 import qualified ParserCore as T
+import           PP (pretty)
 import           Types (TranslateError(..),Range(..))
 import qualified Types as T
 
@@ -49,7 +50,7 @@ translateTextCDM t = do
 
 translate :: Prov -> IO (Either TranslateError (([CDM.Node], [CDM.Edge]), [Warning]))
 translate (Prov _prefix es) = runTr $
-  do (as,bs) <- unzip <$> mapM translateProvExpr es
+  do (as,bs) <- unzip <$> mapM (\e -> ML.local (exprLocation e) (translateProvExpr e)) es
      return (concat as, concat bs)
 
 translateProvExpr :: T.Expr -> Tr ([CDM.Node], [CDM.Edge])
@@ -278,10 +279,14 @@ data Warning = Warn Text
   deriving (Eq, Ord, Show)
 
 warn :: Text -> Tr ()
-warn = put . Warn
+warn msg =
+  do loc <- ask
+     put (Warn (pretty loc <> msg))
 
 die :: Text -> Tr a
-die = raise . TranslateError
+die msg =
+  do loc <- ask
+     raise (TranslateError (pretty loc <> msg))
 
 data TrState = TrState { trRandoms :: [Word64]
                        , trUIDs    :: Map Ident UID
