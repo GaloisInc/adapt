@@ -194,9 +194,9 @@ printWarnings ws = Text.putStrLn doc
 doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
 doUpload c work svr =
   do res <- titan svr =<< compileWork work
-     case res of
-      Failure _ r -> Text.putStrLn ("Upload Error. Server disconnected: " <> Text.decodeUtf8 r)
-      _           -> return ()
+     case filter isFailure res of
+      Failure _ r:_ -> Text.putStrLn ("Upload Error: " <> Text.decodeUtf8 r)
+      _             -> return ()
      return (Map.empty,Map.empty) -- XXX
  where
  compileWork (ns,es) =

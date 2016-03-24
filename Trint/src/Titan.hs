@@ -11,9 +11,10 @@ module Titan
   , GremlinValue(..), gremlinNum
     -- * Insertion
   , titan
-  , TitanResult(..)
+  , TitanResult(..), isSuccess, isFailure
   , DataMessage(..)
-    -- * Query
+    -- * Lower Level
+  , titanWS
   ) where
 
 import           Control.Concurrent.Async (async,wait)
@@ -26,6 +27,7 @@ import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.List (intersperse)
+import           Data.List.Split (chunksOf)
 import qualified Data.Map as Map
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
@@ -47,7 +49,7 @@ defaultServer = ServerInfo "localhost" 8182
 -- Operations represent gremlin-groovy commands such as:
 -- assume: g = TinkerGraph.open()
 --         t = g.traversal(standard())
--- * InsertVertex: g.addVertex(label, 'ident', 'prop1', 'val1', 'prop2', 'val2')
+-- * InsertVertex: g.addVertex(id, 'ident', 'prop1', 'val1', 'prop2', 'val2')
 -- * InsertEdge: t.V(1).addE('ident',t.V(2))
 data Operation id = InsertVertex { label :: Text
                                  , properties :: [(Text,GremlinValue)]
@@ -60,6 +62,7 @@ data Operation id = InsertVertex { label :: Text
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
+
 instance FromJSON ResultId where
   parseJSON (Object o) = do
     Object r   <- o.:"result"
@@ -74,8 +77,22 @@ instance FromJSON ResultId where
 
 data TitanResult = Success [DataMessage] | Failure Int BL.ByteString
 
-titan :: GraphId id => ServerInfo -> [Operation id] -> IO TitanResult
-titan (ServerInfo {..}) t = WS.runClient host port "/" (titanWS t)
+isSuccess, isFailure :: TitanResult -> Bool
+isSuccess (Success _) = True
+isSuccess _ = False
+isFailure = not . isSuccess
+
+batchSize :: Int
+batchSize = 1000
+
+-- `titan server ops` is like `titanWS` except it batches the operations
+-- into sets of no more than `batchSize`.  This is to avoid the issue with
+-- titan write buffer filling up then blocking while evaluating an
+-- insertion which causes a timeout.
+titan :: GraphId id => ServerInfo -> [Operation id] -> IO [TitanResult]
+titan (ServerInfo {..}) xs =
+ do let xss = chunksOf batchSize xs
+    mapM (WS.runClient host port "/" . titanWS) xss
 
 titanWS :: GraphId id => [Operation id] -> WS.ClientApp TitanResult
 titanWS ops conn =
@@ -84,6 +101,7 @@ titanWS ops conn =
       sendClose conn BL.empty
       wait result
  where
+ batchSize = 1000
  receiveTillClose acc =
    do msg <- receive conn
       case msg of
@@ -169,22 +187,22 @@ class GraphId a where
 instance GraphId Text where
   serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
     where
-       -- g.addV(label, vectorName, param1, val1, param2, val2 ...)
+       -- g.addV(id, vectorName, param1, val1, param2, val2 ...)
       call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
+      args = paren $ BC.concat $ intersperse "," ("id" : encodeQuoteText l : concatMap attrs ps)
   serializeOperation (InsertEdge l src dst ps)   = escapeChars call
     where
-       -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
-       call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
+       -- g.V().has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
+       call = BC.concat $ ["g.V().has(id,", encodeQuoteText src
                           , ").next().addEdge(", encodeQuoteText l
-                                          , ", g.V().has(label,", encodeQuoteText dst, ").next(), "
+                                          , ", g.V().has(id,", encodeQuoteText dst, ").next(), "
                               ] ++ args ++ [")"]
        args = intersperse "," (concatMap attrs ps)
 instance GraphId ResultId where
   serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
     where
       call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
+      args = paren $ BC.concat $ intersperse "," ("id" : encodeQuoteText l : concatMap attrs ps)
   serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = escapeChars call
     where
       call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
