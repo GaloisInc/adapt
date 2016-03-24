@@ -35,6 +35,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
+import qualified Data.Text.Lazy.Encoding as Text
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
@@ -192,7 +193,10 @@ printWarnings ws = Text.putStrLn doc
 -- For now, we're just assuming it's always successful
 doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
 doUpload c work svr =
-  do titan svr =<< compileWork work
+  do res <- titan svr =<< compileWork work
+     case res of
+      Failure _ r -> Text.putStrLn ("Upload Error. Server disconnected: " <> Text.decodeUtf8 r)
+      _           -> return ()
      return (Map.empty,Map.empty) -- XXX
  where
  compileWork (ns,es) =
