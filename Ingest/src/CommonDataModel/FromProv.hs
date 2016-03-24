@@ -218,9 +218,11 @@ translateProvWasGeneratedBy (RawEntity {..}) =
             (WasGeneratedBy,) <$> case operation of
                                      Just "send"     -> return EventSend
                                      Just "connect"  -> return EventConnect
+                                     Just "accept"   -> return EventAccept
                                      Just "truncate" -> return EventTruncate
                                      Just "chmod"    -> return EventChmod
                                      Just "create"   -> return EventCreate
+                                     Just "write"    -> return EventWrite
                                      Just other ->
                                         die $ "WasGeneratedBy: Unknown operation: " <> other
                                      Nothing ->
