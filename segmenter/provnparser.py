@@ -160,8 +160,6 @@ class Document:
         assert self.prefix_decls != None
 
     def __str__(self):
-        print self.prefix_decl
-
         def f(x): return '\t' + str(x)
         l = ['document']
         l += map(f, self.prefix_decl)
