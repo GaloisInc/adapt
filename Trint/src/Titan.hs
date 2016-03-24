@@ -15,24 +15,23 @@ module Titan
     -- * Query
   ) where
 
-import Crypto.Hash.SHA256 (hash)
-import qualified Data.ByteString.Base64 as B64
-
-import Data.List (intersperse)
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Char8 as BC
-import Data.Monoid ((<>))
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
+import           Crypto.Hash.SHA256 (hash)
+import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
-
-import Network.WebSockets as WS
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import           Data.List (intersperse)
+import qualified Data.Map as Map
+import           Data.Monoid ((<>))
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.UUID as UUID
+import           Network.WebSockets as WS
 
 data ServerInfo = ServerInfo { host     :: String
                              , port     :: Int
@@ -61,7 +60,7 @@ newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
 instance FromJSON ResultId where
   parseJSON (Object o) = do
-    Object r <- o.:"result"
+    Object r   <- o.:"result"
     [Object d] <- r.:"data"
     i <- d.:"id"
     case i of
@@ -85,18 +84,23 @@ titanWS ops conn =
  go = send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
 
  mkGremlinWSCommand :: Text -> Message
- mkGremlinWSCommand cmd = DataMessage $ Text $ mkJSON cmd
+ mkGremlinWSCommand cmd = DataMessage $ Text (mkJSON cmd)
 
  mkJSON :: Text -> BL.ByteString
  mkJSON cmd =
     A.encode
-      Req { requestId = T.decodeUtf8 $ B64.encode $ hash (T.encodeUtf8 cmd)
+      Req { requestId = UUID.toText (mkHashedUUID cmd)
           , op        = "eval"
           , processor = ""
           , args = ReqArgs { gremlin  = cmd
                            , language = "gremlin-groovy"
                            }
           }
+
+mkHashedUUID :: Text -> UUID.UUID
+mkHashedUUID t =
+  maybe (error "Impossible uuid decode failure") id
+        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 t)))))
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
@@ -117,6 +121,8 @@ instance ToJSON RequestArgs where
   toJSON (ReqArgs g l) =
     A.object [ "gremlin"  .= g
              , "language" .= l
+             , "bindings" .= A.Null
+             , "rebindings" .= A.emptyObject
              ]
 
 instance ToJSON GremlinRequest where
@@ -149,12 +155,12 @@ class GraphId a where
   serializeOperation :: Operation a -> ByteString
 
 instance GraphId Text where
-  serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
+  serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
     where
        -- g.addV(label, vectorName, param1, val1, param2, val2 ...)
       call = "g.addV"
       args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l src dst ps)   = gremlinScript call
+  serializeOperation (InsertEdge l src dst ps)   = escapeChars call
     where
        -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
        call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
@@ -163,11 +169,11 @@ instance GraphId Text where
                               ] ++ args ++ [")"]
        args = intersperse "," (concatMap attrs ps)
 instance GraphId ResultId where
-  serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
+  serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
     where
       call = "g.addV"
       args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = gremlinScript call
+  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = escapeChars call
     where
       call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
       args = intersperse "," (concatMap attrs ps)
