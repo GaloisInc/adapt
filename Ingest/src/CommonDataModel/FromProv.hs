@@ -161,8 +161,12 @@ translateProvWasAssociatedWith (RawEntity {..}) =
   warn "No known CDM for 'wasAssociatedWith'" >> noResults
 translateProvUsed (RawEntity {..}) =
   case exprArgs of
-    [Just (Left edgeSourceId),Just (Left edgeDestinationId),Just (Right time)] ->
-        do operation <- kvString adaptOperation exprAttrs
+    Just (Left edgeSourceId) : Just (Left edgeDestinationId) : rest ->
+        do time <- case rest of
+                    (Just (Right t) : _) -> return t
+                    _ -> do m <- kvTime adaptTime exprAttrs
+                            maybe (die "No time in 'used' relation.") pure m
+           operation <- kvString adaptOperation exprAttrs
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
            (edgeRelationship,eTy) <-
