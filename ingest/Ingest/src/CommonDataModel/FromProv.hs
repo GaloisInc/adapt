@@ -139,7 +139,7 @@ translateProvActivity (RawEntity {..}) =
      let subjectType = SubjectProcess
          fakeDay = UTCTime (toEnum 0) 0
          err = warn "Prov Activity (CDM Subject) has no start time." >> return fakeDay
-     subjectStartTime   <- maybe err return =<< kvTime adaptTime exprAttrs
+     subjectStartTime   <- getTime (maybe err return) [] exprAttrs
      subjectPID         <- kvStringToIntegral adaptPid exprAttrs
      subjectPPID        <- kvStringToIntegral adaptPPid exprAttrs
      subjectUnitID      <- return Nothing
@@ -162,10 +162,8 @@ translateProvWasAssociatedWith (RawEntity {..}) =
 translateProvUsed (RawEntity {..}) =
   case exprArgs of
     Just (Left edgeSourceId) : Just (Left edgeDestinationId) : rest ->
-        do time <- case rest of
-                    (Just (Right t) : _) -> return t
-                    _ -> do m <- kvTime adaptTime exprAttrs
-                            maybe (die "No time in 'used' relation.") pure m
+        do let err = die "No time found in 'used' relation."
+           time <- getTime (maybe err pure) rest exprAttrs
            operation <- kvString adaptOperation exprAttrs
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
@@ -193,10 +191,27 @@ translateProvUsed (RawEntity {..}) =
                use = Edge evtUID edgeDestination edgeRelationship
            return ([evt], [wib,use])
     _ -> warn "Unrecognized 'used' relation." >> noResults
+
+getTime :: (Maybe CDM.Time -> Tr CDM.Time) -> [Maybe (Either Ident T.Time)] -> KVs -> Tr CDM.Time
+getTime force rest exprAttrs =
+  do let m0 = case rest of
+               (Just (Right t) : _) -> First (Just t)
+               _                    -> First Nothing
+     m1 <- First <$> kvTime adaptTime exprAttrs
+     m2 <- First . readTime <$> kvString adaptTime exprAttrs
+     let m  = getFirst $ mconcat [m0,m1,m2]
+     force m
+  where
+  readTime :: Maybe Text -> Maybe CDM.Time
+  readTime str =
+    readMaybe . map (\x -> if x == 'T' then ' ' else x) . Text.unpack =<< str
+
 translateProvWasGeneratedBy (RawEntity {..}) =
   case exprArgs of
-    [Just (Left edgeSourceId),Just (Left edgeDestinationId),Just (Right time)] ->
-        do operation <- kvString adaptOperation exprAttrs
+    (Just (Left edgeSourceId) : Just (Left edgeDestinationId) : rest) ->
+        do let err = die "No time found in 'wasGeneratedBy' relation."
+           time <- getTime (maybe err pure) rest exprAttrs
+           operation <- kvString adaptOperation exprAttrs
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
            (edgeRelationship,eTy) <-
@@ -221,7 +236,7 @@ translateProvWasStartedBy (RawEntity {..}) =
   case exprArgs of
     Just (Left edgeSourceId) : Just (Left edgeDestinationId) : _ ->
       do let err = die "No time found in 'wasStartedBy'"
-         time <- maybe err return =<< kvTime adaptTime exprAttrs
+         time <- getTime (maybe err pure) [] exprAttrs
          edgeSource <- uidOf edgeSourceId
          edgeDestination <- uidOf edgeDestinationId
          evtUID <- randomUID
@@ -235,7 +250,7 @@ translateProvWasEndedBy (RawEntity {..}) =
   case exprArgs of
     Just (Left edgeSourceId) : Just (Left edgeDestinationId) : _ ->
       do let err = die "No time found in 'wasEndedBy'"
-         time <- maybe err return =<< kvTime adaptTime exprAttrs
+         time <- getTime (maybe err pure) [] exprAttrs
          edgeSource <- uidOf edgeSourceId
          edgeDestination <- uidOf edgeDestinationId
          evtUID <- randomUID
