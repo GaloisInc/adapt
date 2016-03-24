@@ -71,7 +71,7 @@ sudo apt-get -y install \
     zlib1g-dev \
 
 which pip3 || (sudo -H easy_install3 pip && test -x /usr/bin/pip && sudo rm -f /usr/local/bin/pip)
-sudo -H pip3 install coverage flake8 graphviz gremlinrestclient
+sudo -H pip3 install coverage flake8 graphviz gremlinrestclient aiogremlin
 
 # We do not wish for root to launch a supervisor daemon upon reboot.
 sudo rm -f /etc/rc?.d/S20supervisor
