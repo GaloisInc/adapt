@@ -12,9 +12,11 @@ module Titan
     -- * Insertion
   , titan
   , TitanResult(..)
+  , DataMessage(..)
     -- * Query
   ) where
 
+import           Control.Concurrent.Async (async,wait)
 import           Crypto.Hash.SHA256 (hash)
 import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Aeson as A
@@ -70,16 +72,26 @@ instance FromJSON ResultId where
       _        -> fail "No id"
   parseJSON _ = fail "Couldn't parse JSON"
 
-data TitanResult = Success
+data TitanResult = Success [DataMessage] | Failure Int BL.ByteString
 
 titan :: GraphId id => ServerInfo -> [Operation id] -> IO TitanResult
 titan (ServerInfo {..}) t = WS.runClient host port "/" (titanWS t)
 
 titanWS :: GraphId id => [Operation id] -> WS.ClientApp TitanResult
 titanWS ops conn =
-   do mapM_ go ops
-      return Success
+   do result <- async (receiveTillClose [])
+      mapM_ go ops
+      sendClose conn BL.empty
+      wait result
  where
+ receiveTillClose acc =
+   do msg <- receive conn
+      case msg of
+        ControlMessage (Close code reason)
+            | code == 1000 -> return $ Success (reverse acc)
+            | otherwise    -> return $ Failure (fromIntegral code) reason
+        ControlMessage _   -> receiveTillClose acc
+        DataMessage d   -> receiveTillClose (d : acc)
  go :: GraphId id => Operation id -> IO ()
  go = send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
 
