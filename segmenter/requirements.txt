@@ -1,8 +1,9 @@
+cycler==0.10.0
 decorator==4.0.2
 html5lib==0.999999
 isodate==0.5.4
+matplotlib==1.5.1
 networkx==1.10
 pyparsing==2.0.3
-rdflib==4.2.1
+python-dateutil==2.4.2
 six==1.9.0
-SPARQLWrapper==1.6.4

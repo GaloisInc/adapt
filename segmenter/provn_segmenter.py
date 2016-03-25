@@ -161,8 +161,6 @@ class Segmenter:
                 window_dict = d['time']['window']
                 results.append((properties[i],
                     self.segment_by_time(from_, window_dict)))
-        for r in results:
-            print r
         for i, (prop_i, r_i) in enumerate(results):
             for (val_i, segment_i) in r_i:
                 for j, (prop_j, r_j) in enumerate(results):
