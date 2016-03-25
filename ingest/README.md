@@ -1,15 +1,16 @@
 # ADAPT Ingest
 
 The ingester library, and associated command line tool 'Trint', parses Prov-N
-data in the form specified by <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>,
-which should closely match [Ingest/Language.md]()  (modulo time lag in updating
-to match agreed changes).
+data in the form specified by <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>.
+This Prov-N is then translated to our CDM-inspired internal data format.  The
+tool is able to produce AST print-outs of the CDM, upload CDM to gremlin-server
+via websockets, compute statistics about the provenance, and syntax check the
+input file to produce localized error messages.
 
-# Installation
+# Local Installation
 
-First install [ghc](https://www.haskell.org/ghc/), a develop version of zlibc (on Debian: apt-get install zlib1g-dev, Mac: brew install lzlib), and the
-[stack](https://github.com/commercialhaskell/stack/releases) build tool then run
-`make` from the top level.
+First install [stack](https://github.com/commercialhaskell/stack/releases) build
+tool then run `make` from the top level.
 
 # Usage
 
