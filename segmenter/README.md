@@ -21,11 +21,16 @@ segmenter transforms the prov-n to graph data structures close to what
 will be received from Titan.  The segmentation specification refers to
 these internal edge names, so that when the base layer schema changes, we
 only need to change the segmentation specification, not the Python
-code.  
+code.
 
 Example:
+
     workon segmenter
-    python provn_segmenter.py test/test_james.provn test/test_james_spec.json 
+    python provn_segmenter.py test/test_james.provn test/test_james_spec.json
+	
+or, to get the usage:
+
+    python pred_segmenter.py --help
 
 This example shows a simple scenario with activity segmented by day and PID.
 
@@ -45,6 +50,7 @@ Current bugs and limitations:
 ### Time-based segmenter
 
 Example:
+
     workon segmenter
     python segmenter.py test/prov_out.ttl 694575727
 
@@ -73,13 +79,16 @@ and produces an RDF file consisting of
 the subgraph of G containing all nodes at distance
 R of nodes s such that (s, N, V) is in G.
     
-Example:
+	Example:
+	
     workon segmenter
     python pred_segmenter.py test/bad-ls.provn.ttl  http://spade.csl.sri.com/rdf/audit-tc.rdfs#pid 3233 0 -v
     python pred_segmenter.py test/bad-ls.provn.ttl  http://spade.csl.sri.com/rdf/audit-tc.rdfs#pid 3233 1 -v
 
+or, to get the usage:
+
     python pred_segmenter.py --help
-will explain the parameters
+
 
 ## dot2viz 
 
