@@ -188,12 +188,17 @@ printWarnings ws = Text.putStrLn doc
 --------------------------------------------------------------------------------
 --  Database Upload
 
+removeBadEdges :: ([Node],[Edge]) -> ([Node],[Edge])
+removeBadEdges (ns,es) =
+  let exists x = x `Set.member` is
+      is = Set.fromList (map nodeUID ns)
+  in (ns, filter (\e -> exists (edgeSource e) && exists (edgeDestination e)) es)
 
 -- We should probably do this in a transaction or something to tell when vertex insertion errors out
 -- For now, we're just assuming it's always successful
 doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
 doUpload c work svr =
-  do res <- titan svr =<< compileWork work
+  do res <- titan svr =<< compileWork (removeBadEdges work)
      case filter isFailure res of
       Failure _ r:_ -> Text.putStrLn ("Upload Error: " <> Text.decodeUtf8 r)
       _             -> return ()
