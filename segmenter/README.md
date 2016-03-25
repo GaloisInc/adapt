@@ -1,14 +1,14 @@
-== Prerequisites ==
+## Prerequisites 
 
 - Python 2.7.x
 - virtualenwrapper (http://virtualenvwrapper.readthedocs.org/en/latest/install.html)
 
-== Installation ==
+## Installation 
 
-mkvirtualenv segmenter
-pip install -r requirements.txt
+    mkvirtualenv segmenter
+    pip install -r requirements.txt
 
-== Phase 1 segmenter ==
+## Phase 1 segmenter
 
 The phase 1 segmenter takes provenance input data (in a limited form
 of PROV-N format) and a segmentation specification, and produces a collection
@@ -39,10 +39,10 @@ Current bugs and limitations:
   can be defined later by queries using the segment inclusion edges and the raw graph.
 
 
-== Older (now superseded) code ==
+#### Older code (now superseded)
 
 
-=== Time-based segmenter ===
+### Time-based segmenter
 
 Example:
     workon segmenter
