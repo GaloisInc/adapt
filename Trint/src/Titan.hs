@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 module Titan
   ( -- * Types
@@ -36,6 +37,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.UUID as UUID
 import           Network.WebSockets as WS
+import           Control.Exception as X
 
 data ServerInfo = ServerInfo { host     :: String
                              , port     :: Int
@@ -45,6 +47,8 @@ data ServerInfo = ServerInfo { host     :: String
 defaultServer :: ServerInfo
 defaultServer = ServerInfo "localhost" 8182
 
+labelKey :: ByteString
+labelKey = "id"
 
 -- Operations represent gremlin-groovy commands such as:
 -- assume: g = TinkerGraph.open()
@@ -83,7 +87,7 @@ isSuccess _ = False
 isFailure = not . isSuccess
 
 batchSize :: Int
-batchSize = 1000
+batchSize = 500
 
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
@@ -92,24 +96,32 @@ batchSize = 1000
 titan :: GraphId id => ServerInfo -> [Operation id] -> IO [TitanResult]
 titan (ServerInfo {..}) xs =
  do let xss = chunksOf batchSize xs
-    mapM (WS.runClient host port "/" . titanWS) xss
+    mapM (\x -> X.catch (WS.runClient host port "/" (titanWS x))
+                        (\(e::ConnectionException) ->
+                             do putStrLn "runClient exception"
+                                return (Failure (-1) BL.empty)))
+         xss
 
 titanWS :: GraphId id => [Operation id] -> WS.ClientApp TitanResult
 titanWS ops conn =
-   do result <- async (receiveTillClose [])
+   do result <- async (receiveTillClose (length ops) [])
       mapM_ go ops
-      sendClose conn BL.empty
       wait result
  where
- batchSize = 1000
- receiveTillClose acc =
-   do msg <- receive conn
+ receiveTillClose n acc
+  | n <= 0    =
+   do sendClose conn BL.empty
+      return (Success (reverse acc))
+  | otherwise =
+   do print n
+      msg <- receive conn
       case msg of
         ControlMessage (Close code reason)
             | code == 1000 -> return $ Success (reverse acc)
             | otherwise    -> return $ Failure (fromIntegral code) reason
-        ControlMessage _   -> receiveTillClose acc
-        DataMessage d   -> receiveTillClose (d : acc)
+        ControlMessage _   -> receiveTillClose n acc
+        DataMessage _   -> receiveTillClose (n-1) acc
+
  go :: GraphId id => Operation id -> IO ()
  go = send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
 
@@ -189,20 +201,20 @@ instance GraphId Text where
     where
        -- g.addV(id, vectorName, param1, val1, param2, val2 ...)
       call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("id" : encodeQuoteText l : concatMap attrs ps)
+      args = paren $ BC.concat $ intersperse "," (labelKey : encodeQuoteText l : concatMap attrs ps)
   serializeOperation (InsertEdge l src dst ps)   = escapeChars call
     where
-       -- g.V().has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
-       call = BC.concat $ ["g.V().has(id,", encodeQuoteText src
+       -- g.V(dst).has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
+       call = BC.concat $ ["g.V(", encodeQuoteText src
                           , ").next().addEdge(", encodeQuoteText l
-                                          , ", g.V().has(id,", encodeQuoteText dst, ").next(), "
+                                          , ", g.V(", encodeQuoteText dst, ").next(), "
                               ] ++ args ++ [")"]
        args = intersperse "," (concatMap attrs ps)
 instance GraphId ResultId where
   serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
     where
       call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("id" : encodeQuoteText l : concatMap attrs ps)
+      args = paren $ BC.concat $ intersperse "," (labelKey : encodeQuoteText l : concatMap attrs ps)
   serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = escapeChars call
     where
       call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
