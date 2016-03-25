@@ -1,0 +1,7 @@
+document
+prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>
+prefix data <http://spade.csl.sri.com/#>
+
+wasGeneratedBy(data:bd82b1fe07b788b29c7b02a2d0f648fb5a4ed5c4fe9461299aa84702aa02356c,data:c33ea9a5304f22162821bf929cd52eca21f5f5ca68101bb48ccc896fd36a5d1c, - ,[ tc:time="2015-09-28T01:06:56Z",tc:operation="write"])
+
+endDocument
