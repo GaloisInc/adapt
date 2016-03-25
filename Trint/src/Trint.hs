@@ -392,16 +392,16 @@ newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 --  Statistics
 
 printStats :: ([Node],[Edge]) -> IO ()
-printStats ss =
+printStats ss@(vs,es) =
   do let g  = mkGraph ss
          vs = vertices g
-         mn = length (take 1 $ fst ss) -- one node suggests the minimum subgraph is one.
-         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
-         nrStmt = length (fst ss)
+         mn = min 1 nrVert
+         sz = maximum (mn : map (length . reachable g) vs)
+         nrVert = length vs
+         nrEdge = length es
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
-     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
-     putStrLn $ "\tTotal statements: " ++ show nrStmt
+     putStrLn $ "\tEntities:         " ++ show nrVert
+     putStrLn $ "\tEdges: " ++ show nrEdge
 
 
 --------------------------------------------------------------------------------
