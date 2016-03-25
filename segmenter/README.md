@@ -39,7 +39,7 @@ Current bugs and limitations:
   can be defined later by queries using the segment inclusion edges and the raw graph.
 
 
-#### Older code (now superseded)
+## Older code (now superseded)
 
 
 ### Time-based segmenter
