@@ -18,8 +18,8 @@ agent(ex:Bob, [prov:type="user"] )
 agent(ex:Alice, [prov:type="admin"])
 
 wasGeneratedBy(ex:file3v2, ex:process3, 2013-03-18T11:10:02)
-used(ex:process2, ex:file1v2, 2013-03-18T11:10:00)
-used(ex:process2, ex:file2, 2013-03-18T11:10:01)
+used(ex:process3, ex:file1v2, 2013-03-18T11:10:00)
+used(ex:process3, ex:file2, 2013-03-18T11:10:01)
 
 wasGeneratedBy(ex:file1v2, ex:process1, 2013-03-17T00:10:00)
 wasInvalidatedBy(ex:file1v1, ex:process1, 2013-03-17T00:09:59)

@@ -12,7 +12,9 @@
 
 The phase 1 segmenter takes provenance input data (in a limited form
 of PROV-N format) and a segmentation specification, and produces a collection
-of segments (using PROV-N-like syntax).
+of segments (using PROV-N-like syntax).  Each segment is annotated
+with information such as the PID and start time, according to the
+segmentation specification.
 
 The PROV-N input and output formats are somewhat "throwaway",
 implemented only for human consumption since in phase 2 we will move
@@ -38,6 +40,8 @@ Current bugs and limitations:
 
 - for some reason each segment is emitted twice
 - some output literals are "Unicode" literals, others aren't.
+- we currently assume that all events are tagged with times.  Correct
+  behavior in the absence of complete time annotations is undefined.
 - we currently aren't producing edges between segments in the segment layer.
   There is nothing to stop us doing this, but the current approach we have
   played with seems to generate many spurious edges.  In any case, the edges
