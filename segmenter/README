@@ -1,12 +1,12 @@
-== Prerequisites ==
+## Prerequisites 
 
 - Python 2.7.x
 - virtualenwrapper (http://virtualenvwrapper.readthedocs.org/en/latest/install.html)
 
-== Installation ==
+## Installation 
 
-mkvirtualenv segmenter
-pip install -r requirements.txt
+    mkvirtualenv segmenter
+    pip install -r requirements.txt
 
 == Phase 1 segmenter ==
 
