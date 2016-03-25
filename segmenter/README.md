@@ -61,17 +61,17 @@ This will generate .dot files for all the segment.
 You can the use zgrviewer (http://zvtm.sourceforge.net/zgrviewer.html)
 to visualize them.
 
-=== Predicate segmenter ===
+### Predicate segmenter
 
-    This module implements a simple predicate-based RDF segmenter.
-    The main program takes as inputs
-        - an RDF graph G in turtle format and
-        - a predicate name N,
-        - a predicate value V, and
-        - an integer radius R,
-    and produces an RDF file consisting of 
-    teh subgraph of G containing all nodes at distance
-    R of nodes s such that (s, N, V) is in G.
+This module implements a simple predicate-based RDF segmenter.
+The main program takes as inputs
+- an RDF graph G in turtle format and
+- a predicate name N,
+- a predicate value V, and
+- an integer radius R,
+and produces an RDF file consisting of 
+the subgraph of G containing all nodes at distance
+R of nodes s such that (s, N, V) is in G.
     
 Example:
     workon segmenter
@@ -81,7 +81,7 @@ Example:
     python pred_segmenter.py --help
 will explain the parameters
 
-== dot2viz ==
+## dot2viz 
 
 dot2viz takes all dot files in a directory and converts to a given
 format (pdf is the default). Use dot2viz -h for help.
