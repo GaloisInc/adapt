@@ -113,8 +113,7 @@ titanWS ops conn =
    do sendClose conn BL.empty
       return (Success (reverse acc))
   | otherwise =
-   do print n
-      msg <- receive conn
+   do msg <- receive conn
       case msg of
         ControlMessage (Close code reason)
             | code == 1000 -> return $ Success (reverse acc)
