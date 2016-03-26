@@ -23,7 +23,7 @@ trint = testGroup "trint" []
 ingest :: TestTree
 ingest =
   testGroup "used"
-     [ testCase "Parse Used" $ assertCDMTranslation 
+     [ testCase "Parse 'used()'" $ assertCDMTranslation 
           ( "used(thesource,thedest, -, [ tc:time=\"2015-09-28T01:06:56Z\", tc:operation=\"read\"])"
           , [ NodeSubject (Subject { subjectSource = SourceLinuxAuditTrace
                                    , subjectUID = (9,10,11,12)
