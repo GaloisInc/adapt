@@ -24,6 +24,7 @@ only need to change the segmentation specification, not the Python
 code.  
 
 Example:
+
     workon segmenter
     python provn_segmenter.py test/test_james.provn test/test_james_spec.json 
 
@@ -45,6 +46,7 @@ Current bugs and limitations:
 ### Time-based segmenter
 
 Example:
+
     workon segmenter
     python segmenter.py test/prov_out.ttl 694575727
 
