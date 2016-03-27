@@ -24,8 +24,9 @@ class Datetime:
         date, time = s.split('T')
         year, month, day = date.split('-')
         hour, minute, second = time.split(':')
-        self.date = datetime.date(int(year), int(month), int(day))
-        self.time = datetime.time(int(hour), int(minute), int(second))
+        self.datetime = datetime.datetime(
+            int(year), int(month), int(day),
+            int(hour), int(minute), int(second))
 
     def __str__(self):
         return '{0}-{1}-{2}T{3}:{4}:{5}'.format(self.date.year,
@@ -36,21 +37,18 @@ class Datetime:
         assert hs < 24
         assert ms < 59
         assert secs < 59
-        new_time = self.time  # + datetime.timedelta(hours=hs, minutes=ms, seconds=secs)
-        carry = int(new_time.hour) - 24
-        if carry > 0:
-            days += carry
-        new_date = self.date + datetime.timedelta(days=days)
+        new_datetime = self.datetime + datetime.timedelta(
+            days=days, hours=hs, minutes=ms, seconds=secs)
 
         def two_digits(v):
             if v < 10:
                 return '0'+str(v)
             return v
         return '{0}-{1}-{2}T{3}:{4}:{5}'.format(
-            two_digits(new_date.year),
-            two_digits(new_date.month), two_digits(new_date.day),
-            two_digits(new_time.hour),
-            two_digits(new_time.minute), two_digits(new_time.second))
+            two_digits(new_datetime.year),
+            two_digits(new_datetime.month), two_digits(new_datetime.day),
+            two_digits(new_datetime.hour),
+            two_digits(new_datetime.minute), two_digits(new_datetime.second))
 
     def compare(self, d1, d2):
         if d1.date < d2.date:
@@ -164,11 +162,12 @@ class Segmenter:
         for i, (prop_i, r_i) in enumerate(results):
             for (val_i, segment_i) in r_i:
                 for j, (prop_j, r_j) in enumerate(results):
-                    if i == j:
+                    if i >= j:
                         continue
                     else:
                         for (val_j, segment_j) in r_j:
-                            att_val_dict = [(prop_i, val_i), (prop_j, val_j)]
+                            att_val_dict = [(str(prop_i), str(val_i)),
+                                (str(prop_j), str(val_j))]
                             s = Segment('segment_id_{0}'.format(
                                 len(segmentation_doc.expression_list)), att_val_dict)
                             segmentation_doc.expression_list += [s]
@@ -238,7 +237,6 @@ class DocumentGraph:
             if att in self.g.node[n] and self.g.node[n][att] == val])
 
 if __name__ == "__main__":
-    # Read file
     parser = argparse.ArgumentParser(description='A provn segmenter')
     parser.add_argument('provn_file', help='A prov-tc file in provn format')
     parser.add_argument('spec_file',
@@ -258,8 +256,11 @@ if __name__ == "__main__":
     doc = Document()
     doc.parse_provn(args.provn_file)
     dg = DocumentGraph(doc)
-    dg.print_summary()
-    #  g.draw()
+
+    if args.summary:
+        dg.print_summary()
+        #  g.draw()
+        sys.exit()
 
     s = Segmenter(dg, args.spec_file)
 
