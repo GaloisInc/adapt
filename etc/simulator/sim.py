@@ -22,6 +22,6 @@ if __name__ == "__main__":
         elif(sys.argv[1] == 'json'):
             graph.print_json()
         else:
-            dx = sd.SimpleDiagnoser(transitions)
+            dx = sd.SimpleDiagnoser(grammar)
             dxs = dx.diagnose(graph, symptom)
             graph.print_dot(dxs)
