@@ -22,11 +22,7 @@
   stroke-dasharray: 0,2 1;
 }
 
-circle {
-  fill: #ccc;
-  stroke: #333;
-  stroke-width: 1.5px;
-}
+
 
 text {
   font: 10px sans-serif;
@@ -38,15 +34,23 @@ text {
 <script>
 
 // get the data
-links = data;
+var nnodes = data.nodes;
+var links = data.links;
 
 var nodes = {};
 
 // Compute the distinct nodes from the links.
 links.forEach(function(link) {
+  link.source = nodes[link.source] || (nodes[link.source] = {name: link.source, color: link.value});
+  link.target = nodes[link.target] || (nodes[link.target] = {name: link.target, color: link.value});
+});
+
+links.forEach(function(link) {
   link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
   link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
 });
+
+console.log(nodes)
 
 var width = 960,
     height = 500;
@@ -67,7 +71,7 @@ var svg = d3.select("body").append("svg")
 // Per-type markers, as they don't inherit styles.
 svg.append("defs").selectAll("marker")
     .data(["suit", "licensing", "resolved"])
-  .enter().append("marker")
+    .enter().append("marker")
     .attr("id", function(d) { return d; })
     .attr("viewBox", "0 -5 10 10")
     .attr("refX", 15)
@@ -75,24 +79,24 @@ svg.append("defs").selectAll("marker")
     .attr("markerWidth", 6)
     .attr("markerHeight", 6)
     .attr("orient", "auto")
-  .append("path")
+    .append("path")
     .attr("d", "M0,-5L10,0L0,5");
 
 var path = svg.append("g").selectAll("path")
     .data(force.links())
-  .enter().append("path")
+    .enter().append("path")
     .attr("class", function(d) { return "link " + d.value; })
     .attr("marker-end", function(d) { return "url(#" + d.value + ")"; });
 
 var circle = svg.append("g").selectAll("circle")
     .data(force.nodes())
-  .enter().append("circle")
+    .enter().append("circle")
     .attr("r", 6)
     .call(force.drag);
 
 var text = svg.append("g").selectAll("text")
     .data(force.nodes())
-  .enter().append("text")
+    .enter().append("text")
     .attr("x", 8)
     .attr("y", ".31em")
     .text(function(d) { return d.name; });
