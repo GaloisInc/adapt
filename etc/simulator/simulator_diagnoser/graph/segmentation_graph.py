@@ -35,14 +35,27 @@ class SegmentationGraph:
         out.write("}\n")
 
     def print_json(self, dxs=[], out=sys.stdout):
-        out.write("data = [\n")
+        out.write("data = {\n")
+        out.write(" \"nodes\": [\n")
+        for n, node in enumerate(self.G.nodes_iter()):
+            pos = len([1 for dx in dxs if node in dx])
+            color = self.get_color(pos, len(dxs))
+            out.write("      { \"node\": %d, \"value\":\"%s\" }" % (node, color))
+            if(n != len(list(self.G.nodes_iter())) - 1):
+                out.write(",\n")
+            else:
+                out.write("\n")
+        out.write(" ],\n")
+
+        out.write(" \"links\": [\n")
         for n, edge in enumerate(self.G.edges_iter()):
             out.write("  {\"source\":%d, \"target\": %d, \"value\": 0}" % edge)
             if(n != len(list(self.G.edges_iter())) - 1):
                 out.write(",\n")
             else:
                 out.write("\n")
-        out.write("];\n")
+        out.write(" ],\n")
+        out.write("};\n")
 
     def generate(self, p, ranks, per_rank, seed=None):
         generation.random_dag(self, p, ranks, per_rank, seed)
