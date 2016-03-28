@@ -1,26 +1,69 @@
-.PHONY: run pdf dxpdf upreqs check
+.PHONY: run test test-coverage coverage coverage-html pdf dxpdf upreqs check help
 
-ENV = env
-REQS = requirements.txt
 MODULE = simulator_diagnoser
 
+ENV = env
+REQS = config/requirements.txt
+
+PYTHON = $(ENV)/bin/python
+PIP = $(ENV)/bin/pip
+PEP8 = $(ENV)/bin/pep8
+COVERAGE = $(ENV)/bin/coverage
+COVERAGERC = --rcfile=config/coveragerc
+
+TEST_PATTERN = -p "*_test.py"
+
+## Default target. Same as 'make run'.
+all: run
+
+## Run entrypoint: sim.py.
 run: $(ENV)
-	$(ENV)/bin/python sim.py
+	$(PYTHON) sim.py
+
+## Run tests.
+test: $(ENV)
+	$(PYTHON) -m unittest discover -v $(TEST_PATTERN)
+
+test-coverage: $(ENV)
+	$(COVERAGE) run --source=$(MODULE) $(COVERAGERC) -m unittest discover $(TEST_PATTERN)
+
+## Generate coverage report.
+coverage: test-coverage
+	$(COVERAGE) report $(COVERAGERC)
+
+## Generate HTML coverage report.
+coverage-html: test-coverage
+	$(COVERAGE) html $(COVERAGERC)
+
+## Run PEP8 style check.
+check: $(ENV)
+	$(PEP8) --config=config/pep8 $(MODULE) sim.py
 
 pdf: $(ENV)
-	$(ENV)/bin/python sim.py pdf | dot -Tpdf -o sim.pdf
+	$(PYTHON) sim.py pdf | dot -Tpdf -o sim.pdf
 
 dxpdf: $(ENV)
-	$(ENV)/bin/python sim.py dxpdf | dot -Tpdf -o sim.pdf
+	$(PYTHON) sim.py dxpdf | dot -Tpdf -o sim.pdf
 
 $(ENV): $(ENV)/bin/activate
 $(ENV)/bin/activate: $(REQS)
 	test -d $(ENV) || virtualenv $(ENV)
-	$(ENV)/bin/pip install -r $(REQS)
+	$(PIP) install -r $(REQS)
 	touch $(ENV)/bin/activate
 
+## Update requirements.txt file by running 'pip freeze'.
 upreqs:
-	$(ENV)/bin/pip freeze > $(REQS)
+	$(PIP) freeze > $(REQS)
 
-check: $(ENV)
-	$(ENV)/bin/pep8 --config=.pep8 $(MODULE) sim.py
+## Display this help text.
+help:
+	$(info Available targets:)
+	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
+		helpMessage = match(lastLine, /^## (.*)/); \
+		if (helpMessage) { \
+			helpCommand = substr($$1, 0, index($$1, ":")-1); \
+			helpMessage = substr(lastLine, RSTART + 3, RLENGTH); \
+			printf "%-15s %s\n", helpCommand, helpMessage; \
+		} \
+	} \
+	{ lastLine = $$0 }' $(MAKEFILE_LIST)
