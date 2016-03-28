@@ -45,6 +45,11 @@ pdf: $(ENV)
 dxpdf: $(ENV)
 	$(PYTHON) sim.py dxpdf | dot -Tpdf -o sim.pdf
 
+
+## Generate data to d3 viz: open viz/index.html to see the report.
+d3: $(ENV)
+		$(PYTHON) sim.py json > $(MODULE)/viz/data.json
+
 $(ENV): $(ENV)/bin/activate
 $(ENV)/bin/activate: $(REQS)
 	test -d $(ENV) || virtualenv $(ENV)
