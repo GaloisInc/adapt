@@ -12,7 +12,7 @@ class SimpleDiagnoser:
 
         for path in paths:
             labelled_path = [graph.get_node_apt_labels(n) for n in path]
-            matches = self.grammar.match_path(labelled_path)
+            matches = self.grammar.match_reverse_path(labelled_path)
 
             for m in matches:
                 matched_indexes = [x[0] for x in m.matches]

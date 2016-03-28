@@ -55,6 +55,13 @@ class NonTerminalMatcherTest(unittest.TestCase):
         with self.assertRaises(RuleException):
             NonTerminal('nt', None)
 
+    def test_reverse(self):
+        path = map_path('abcXdeX')
+        matches = self.nt.match_reverse_path(path)
+        expected_result = [MatcherResult(path, [(6, 'X')], counter=6, reverse=True),
+                           MatcherResult(path, [(3, 'X')], counter=3, reverse=True)]
+        self.assertListEqual(matches, expected_result)
+
 
 class SequenceMatcherTest(unittest.TestCase):
     def setUp(self):
@@ -84,9 +91,8 @@ class SequenceMatcherTest(unittest.TestCase):
 
         path = map_path('AABCC')
         matches = s2.match_path(path)
-        expected_result = [MatcherResult(path,
-                                         [(0, 'A'), (1, 'A'), (2, 'B'), (3, 'C'), (4, 'C')],
-                                         counter=4)]
+        expected_result = \
+            [MatcherResult(path, [(0, 'A'), (1, 'A'), (2, 'B'), (3, 'C'), (4, 'C')], counter=4)]
         self.assertListEqual(matches, expected_result)
 
     def test_multiple_symbols(self):
@@ -142,6 +148,30 @@ class SequenceMatcherTest(unittest.TestCase):
         expected_result = []
         self.assertListEqual(matches, expected_result)
 
+    def test_reverse(self):
+        path = map_path('CBA')
+        matches = self.s.match_reverse_path(path)
+        expected_result = \
+            [MatcherResult(path, [(0, 'C'), (1, 'B'), (2, 'A')], counter=0, reverse=True)]
+        self.assertListEqual(matches, expected_result)
+
+    def test_reverse2(self):
+        path = map_path('CCBAA')
+        matches = self.s.match_reverse_path(path)
+        expected_result = \
+            [MatcherResult(path, [(1, 'C'), (2, 'B'), (4, 'A')], counter=1, reverse=True),
+             MatcherResult(path, [(0, 'C'), (2, 'B'), (4, 'A')], counter=0, reverse=True),
+             MatcherResult(path, [(1, 'C'), (2, 'B'), (3, 'A')], counter=1, reverse=True),
+             MatcherResult(path, [(0, 'C'), (2, 'B'), (3, 'A')], counter=0, reverse=True)]
+        self.assertListEqual(matches, expected_result)
+
+    def test_reverse_incomplete_matches(self):
+        expected_result = []
+        self.assertListEqual(self.s.match_reverse_path(map_path('A')), expected_result)
+        self.assertListEqual(self.s.match_reverse_path(map_path('AB')), expected_result)
+        self.assertListEqual(self.s.match_reverse_path(map_path('AC')), expected_result)
+        self.assertListEqual(self.s.match_reverse_path(map_path('BC')), expected_result)
+        self.assertListEqual(self.s.match_reverse_path(map_path('XYZ')), expected_result)
 
 if __name__ == '__main__':
     unittest.main()

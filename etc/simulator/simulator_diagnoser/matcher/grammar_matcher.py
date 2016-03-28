@@ -30,6 +30,9 @@ class Rule(object):
     def match_path(self, path):
         return self.match(MatcherResult(path))
 
+    def match_reverse_path(self, path):
+        return self.match(MatcherResult(path, reverse=True))
+
     def match_label(self, matcher_result):
         results = []
 
@@ -141,30 +144,45 @@ class ZeroOrMore(OneOrMore):
             raise RuleException(self, "rule must have one child.")
 
 class MatcherResult(object):
-    def __init__(self, path, matches=[], counter=0):
+    def __init__(self, path, matches=[], counter=None, reverse=False):
         self.path = path
         self.matches = matches
-        self.counter = counter
+        self.reverse = reverse
+
+        if counter == None:
+            self.counter = len(self.path)-1 if self.reverse else 0
+        else:
+            self.counter = counter
 
     def __eq__(self, other):
-        return (self.path, self.matches, self.counter) ==\
-               (other.path, other.matches, other.counter)
+        return (self.path, self.matches, self.counter, self.reverse) ==\
+               (other.path, other.matches, other.counter, other.reverse)
 
     def __repr__(self):
-        return "(path: %s, matches: %s, counter: %d)" %\
-               (self.path, self.matches, self.counter)
+        return "(path: %s, matches: %s, counter: %d, reverse: %s)" %\
+               (self.path, self.matches, self.counter, self.reverse)
 
     def new_match(self, i, symbol):
+        if self.reverse:
+            new_matches = [(i, symbol)] + self.matches
+        else:
+            new_matches = self.matches + [(i, symbol)]
+
         return MatcherResult(self.path,
-                             self.matches + [(i, symbol)],
-                             i)
+                             new_matches,
+                             i,
+                             self.reverse)
 
     def enumerate(self, start=None):
         if not start:
             start = self.counter
 
-        for i in xrange(start, len(self.path)):
-            yield i, self.path[i]
+        if self.reverse:
+            for i in reversed(xrange(0, start + 1)):
+                yield i, self.path[i]
+        else:
+            for i in xrange(start, len(self.path)):
+                yield i, self.path[i]
 
     def contains(self, labels):
         for i, symbol in self.matches:
@@ -173,13 +191,23 @@ class MatcherResult(object):
                     return True
         return False
 
+    def next_counter(self):
+        if self.reverse:
+            return self.counter - 1
+        else:
+            return self.counter + 1
+
     def increment_counter(self):
-        self.counter = self.counter + 1
+        self.counter = self.next_counter()
 
     def new_increment_counter(self):
         return MatcherResult(self.path,
                              self.matches,
-                             self.counter + 1)
+                             self.next_counter(),
+                             self.reverse)
 
     def is_valid(self):
-        return self.counter < len(self.path)
+        if self.reverse:
+            return self.counter >= 0
+        else:
+            return self.counter < len(self.path)
