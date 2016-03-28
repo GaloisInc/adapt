@@ -3,21 +3,21 @@ import simulator_diagnoser.matcher as matcher
 
 class SimpleDiagnoser:
 
-    def __init__(self, transitions):
-        self.sequence_matcher = matcher.SequenceMatcher(transitions)
+    def __init__(self, grammar):
+        self.grammar = grammar
 
     def diagnose(self, graph, symptom):
-        self.sequence_matcher.clear()
         paths = graph.full_paths(symptom)
         results = []
-        for path in paths:
-            for i, node in enumerate(path):
-                self.sequence_matcher.accept_list(i, [x[0] for x in graph.G.node[node]['apt']])
 
-            for match in self.sequence_matcher.get_matches():
-                matched_path = path[min(match):max(match)+1]
+        for path in paths:
+            labelled_path = [graph.get_node_apt_labels(n) for n in path]
+            matches = self.grammar.match_path(labelled_path)
+
+            for m in matches:
+                matched_indexes = [x[0] for x in m.matches]
+                matched_path = path[min(matched_indexes):max(matched_indexes)+1]
                 if symptom in matched_path and matched_path not in results:
                     results.append(matched_path)
-            self.sequence_matcher.clear()
 
         return results

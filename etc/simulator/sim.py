@@ -1,9 +1,11 @@
 import sys
 import simulator_diagnoser as sd
 
-transitions = {'exfiltration': (True, False, ['staging']),
-               'staging': (False, False, ['penetration']),
-               'penetration': (False, True, [])}
+grammar = sd.Sequence('apt',
+                      sd.NonTerminal('exfiltration'),
+                      sd.NonTerminal('staging'),
+                      sd.NonTerminal('penetration'),
+                      matchable=False)
 
 if __name__ == "__main__":
     graph = sd.SegmentationGraph()
@@ -12,7 +14,7 @@ if __name__ == "__main__":
     symptom = 23
 
     if len(sys.argv) == 1:
-        dx = sd.SimpleDiagnoser(transitions)
+        dx = sd.SimpleDiagnoser(grammar)
         print "Potential APTs: ", dx.diagnose(graph, symptom)
     else:
         if(sys.argv[1] == 'pdf'):

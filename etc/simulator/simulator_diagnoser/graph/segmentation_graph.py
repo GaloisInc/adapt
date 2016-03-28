@@ -19,6 +19,10 @@ class SegmentationGraph:
             node_s += "%s: %.2f\\n" % apt_elem
         return node_s
 
+    def get_node_apt_labels(self, n):
+        node = self.G.node[n]
+        return [x[0] for x in node['apt']]
+
     def print_dot(self, dxs=[], out=sys.stdout):
         out.write("digraph {\n node [margin=0 fontsize=6];\n")
         for node in self.G.nodes_iter():
