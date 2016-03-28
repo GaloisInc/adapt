@@ -17,6 +17,8 @@ if __name__ == "__main__":
     else:
         if(sys.argv[1] == 'pdf'):
             graph.print_dot()
+        elif(sys.argv[1] == 'json'):
+            graph.print_json()
         else:
             dx = sd.SimpleDiagnoser(transitions)
             dxs = dx.diagnose(graph, symptom)
