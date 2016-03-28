@@ -5,25 +5,28 @@ from simulator_diagnoser.matcher import MatcherResult, \
                                         RuleException
 
 
+def map_path(path):
+    return [[x] for x in path]
+
 class NonTerminalMatcherTest(unittest.TestCase):
     def setUp(self):
-        self.nt = NonTerminal('nt')
+        self.nt = NonTerminal('X')
 
     def test_label(self):
-        self.assertEqual('nt', self.nt.get_label())
+        self.assertEqual('X', self.nt.get_label())
 
     def test_simple_path(self):
-        path = [[x] for x in ['a','b','c','nt','d','e','nt']]
+        path = map_path('abcXdeX')
         matches = self.nt.match_path(path)
-        expected_result = [MatcherResult(path, [(3, 'nt')], counter=3),
-                           MatcherResult(path, [(6, 'nt')], counter=6)]
+        expected_result = [MatcherResult(path, [(3, 'X')], counter=3),
+                           MatcherResult(path, [(6, 'X')], counter=6)]
         self.assertListEqual(matches, expected_result)
 
     def test_multiple_symbols(self):
-        path = [['a'],['b','nt'],['nt','c']]
+        path = [['a'],['b','X'],['X','c']]
         matches = self.nt.match_path(path)
-        expected_result = [MatcherResult(path, [(1,'nt')], counter=1),
-                           MatcherResult(path, [(2,'nt')], counter=2)]
+        expected_result = [MatcherResult(path, [(1,'X')], counter=1),
+                           MatcherResult(path, [(2,'X')], counter=2)]
         self.assertListEqual(matches, expected_result)
 
     def test_empty_path(self):
@@ -33,16 +36,16 @@ class NonTerminalMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_mid_match(self):
-        path = [[x] for x in ['w', 'nt', 'x', 'nt', 'y', 'z']]
-        matches = self.nt.match(MatcherResult(path, [(1, 'nt')], counter=2))
-        expected_result = [MatcherResult(path, [(1, 'nt'), (3, 'nt')], counter=3)]
+        path = map_path('wXyXyz')
+        matches = self.nt.match(MatcherResult(path, [(1, 'X')], counter=2))
+        expected_result = [MatcherResult(path, [(1, 'X'), (3, 'X')], counter=3)]
 
         self.assertListEqual(matches, expected_result)
 
     def test_not_matchable(self):
-        self.nt = NonTerminal('nt', matchable=False)
+        self.nt = NonTerminal('X', matchable=False)
 
-        path = [['nt']]
+        path = map_path('X')
         matches = self.nt.match_path(path)
         expected_result = []
         self.assertListEqual(matches, expected_result)
@@ -64,7 +67,7 @@ class SequenceMatcherTest(unittest.TestCase):
         self.assertEqual('sequence', self.s.get_label())
 
     def test_simple_path(self):
-        path = [[x] for x in ['A','A','B','C','C']]
+        path = map_path('AABCC')
         matches = self.s.match_path(path)
         expected_result = [MatcherResult(path, [(0, 'A'), (2, 'B'), (3, 'C')], counter=3),
                            MatcherResult(path, [(0, 'A'), (2, 'B'), (4, 'C')], counter=4),
@@ -79,7 +82,7 @@ class SequenceMatcherTest(unittest.TestCase):
                      NonTerminal('C'),
                      matchable='False')
 
-        path = [[x] for x in ['A','A','B','C','C']]
+        path = map_path('AABCC')
         matches = s2.match_path(path)
         expected_result = [MatcherResult(path,
                                          [(0, 'A'), (1, 'A'), (2, 'B'), (3, 'C'), (4, 'C')],
@@ -92,15 +95,52 @@ class SequenceMatcherTest(unittest.TestCase):
         expected_result = [MatcherResult(path, [(0,'A'), (1,'B'), (1,'C')], counter=1)]
         self.assertListEqual(matches, expected_result)
 
-    # test non matchable sequences (A, AB, ABF , XBC)
+    def test_cardinality(self):
+        with self.assertRaises(RuleException):
+            Sequence('s')
 
-    # matchable sequence name / matchable
+        with self.assertRaises(RuleException):
+            Sequence('s', NonTerminal('A'))
 
-    # non matchable sequence name
+    def test_incomplete_matches(self):
+        expected_result = []
+        self.assertListEqual(self.s.match_path(map_path('A')), expected_result)
+        self.assertListEqual(self.s.match_path(map_path('AB')), expected_result)
+        self.assertListEqual(self.s.match_path(map_path('AC')), expected_result)
+        self.assertListEqual(self.s.match_path(map_path('BC')), expected_result)
+        self.assertListEqual(self.s.match_path(map_path('XYZ')), expected_result)
 
-    # sequence of sequences
+    def test_match_label(self):
+        path = [['x'], ['sequence'], ['y'], ['z']]
+        matches = self.s.match_path(path)
+        expected_result = [MatcherResult(path, [(1,'sequence')], counter=1)]
+        self.assertListEqual(matches, expected_result)
 
-    # test mid match
+        path = [['A'], ['B'], ['sequence'], ['C']]
+        matches = self.s.match_path(path)
+        expected_result = [MatcherResult(path, [(0,'A'), (1,'B'), (3,'C')], counter=3),
+                           MatcherResult(path, [(2,'sequence')], counter=2)]
+        self.assertListEqual(matches, expected_result)
+
+    def test_not_matchable(self):
+        self.s.matchable = False
+        path = [['x'], ['sequence'], ['y'], ['z']]
+        matches = self.s.match_path(path)
+        expected_result = []
+        self.assertListEqual(matches, expected_result)
+
+    def test_mid_match(self):
+        path = map_path('XYZABDC')
+        mid_match = MatcherResult(path, [(1, 'Y')], counter=1)
+        matches = self.s.match(mid_match)
+        expected_result = [MatcherResult(path, [(1, 'Y'), (3,'A'), (4,'B'), (6,'C')], counter=6)]
+        self.assertListEqual(matches, expected_result)
+
+    def test_empty_path(self):
+        path = []
+        matches = self.s.match_path(path)
+        expected_result = []
+        self.assertListEqual(matches, expected_result)
 
 
 if __name__ == '__main__':

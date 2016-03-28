@@ -110,6 +110,10 @@ class NonTerminal(Rule):
         return self.match_label(matcher_result)
 
 class Sequence(Rule):
+    def self_check(self):
+        if len(self.children) < 2:
+            raise RuleException(self, "rule must have at least two children.")
+
     def match(self, matcher_result):
         matchers = [matcher_result]
 
@@ -138,7 +142,7 @@ class Choice(Rule):
 class Optional(Rule):
     def self_check(self):
         if len(self.children) != 1:
-            raise RuleException(self, "rule must only have one child.")
+            raise RuleException(self, "rule must have one child.")
 
     def match(self, matcher_result):
         matchers = [matcher_result]
@@ -156,7 +160,7 @@ class OptionalSequence(Sequence):
 class OneOrMore(Rule):
     def self_check(self):
         if len(self.children) != 1:
-            raise RuleException(self, "rule must only have one child.")
+            raise RuleException(self, "rule must have one child.")
 
     def match(self, matcher_result):
         child = self.children[0]
@@ -180,4 +184,4 @@ class ZeroOrMore(OneOrMore):
     def self_check(self):
         self.children = [Optional(c) for c in children]
         if len(self.children) != 1:
-            raise RuleException(self, "rule must only have one child.")
+            raise RuleException(self, "rule must have one child.")
