@@ -51,6 +51,14 @@ class MatcherResult(object):
     def increment_counter(self):
         self.counter = self.counter + 1
 
+    def new_increment_counter(self):
+        return MatcherResult(self.path,
+                             self.matches,
+                             self.counter + 1)
+
+    def is_valid(self):
+        return self.counter < len(self.path)
+
 class Rule(object):
     def __init__(self, label, *args, **kwargs):
         self.label = label
@@ -127,7 +135,9 @@ class Choice(Rule):
         return matchers
 
 class Optional(Rule):
-    # children cardinality == 1
+    def self_check(self):
+        if len(self.children) != 1:
+            raise RuleException("Optional rule must only have one child.")
 
     def match(self, matcher_result):
         matchers = [matcher_result]
@@ -143,23 +153,30 @@ class OptionalSequence(Sequence):
         self.children = [Optional(c) for c in children]
 
 class OneOrMore(Rule):
-    # children cardinality == 1
+    def self_check(self):
+        if len(self.children) != 1:
+            raise RuleException("OneOrMore rule must only have one child.")
 
     def match(self, matcher_result):
-        matchers = [matcher_result]
+        child = self.children[0]
 
-        while(True):
-            # check matcher validity (counter < path size)
-            # run all (valid) matchers through children
-            # extend matchers
-            # copy matchers from this run and increment them
-            break
+        current_matchers = child.match(matcher_result)
+        matchers = current_matchers[:]
+
+        while(len(current_matchers) > 0):
+            new_matchers = []
+            for matcher in current_matchers:
+                matcher = matcher.new_increment_counter()
+                if matcher.is_valid():
+                    new_matchers.extend(child.match(matcher))
+            current_matchers = new_matchers
+            matchers.extend(current_matchers)
 
         matchers.extend(self.match_label(matcher_result))
         return matchers
 
-    pass
-
 class ZeroOrMore(OneOrMore):
     def self_check(self):
         self.children = [Optional(c) for c in children]
+        if len(self.children) != 1:
+            raise RuleException("ZeroOrMore rule must only have one child.")
