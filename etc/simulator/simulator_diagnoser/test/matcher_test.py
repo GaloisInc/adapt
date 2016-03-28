@@ -87,7 +87,6 @@ class MatcherTest(unittest.TestCase):
                      s,
                      NonTerminal('C'),
                      matchable='False')
-        res = s2.match(MatcherResult(['A','A','B','C','C']))
 
         path = ['A','A','B','C','C']
         path = [[x] for x in path]

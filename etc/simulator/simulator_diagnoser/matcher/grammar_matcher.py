@@ -89,7 +89,7 @@ class Rule(object):
             for i, symbols in matcher_result.enumerate():
                 if self.label in symbols:
                     mr = matcher_result.new_match(i, self.label)
-                    results.append(matcher_result.new_match(i, self.label))
+                    results.append(mr)
         return results
 
 class NonTerminal(Rule):
