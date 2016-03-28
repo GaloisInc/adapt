@@ -9,11 +9,12 @@ class Matcher(object):
         return self.pattern.match(path)
 
 class RuleException(Exception):
-    def __init__(self, value):
+    def __init__(self, obj, value):
+        self.type = type(obj).__name__
         self.value = value
 
     def __str__(self):
-        return "Rule Exception: " + repr(self.value)
+        return "Rule Exception -> %s: %s" % (self.type, repr(self.value))
 
 class MatcherResult(object):
     def __init__(self, path, matches=[], counter=0):
@@ -103,7 +104,7 @@ class Rule(object):
 class NonTerminal(Rule):
     def self_check(self):
         if len(self.children) > 0:
-            raise RuleException("NonTerminal rule must not have children.")
+            raise RuleException(self, "rule must not have children.")
 
     def match(self, matcher_result):
         return self.match_label(matcher_result)
@@ -137,7 +138,7 @@ class Choice(Rule):
 class Optional(Rule):
     def self_check(self):
         if len(self.children) != 1:
-            raise RuleException("Optional rule must only have one child.")
+            raise RuleException(self, "rule must only have one child.")
 
     def match(self, matcher_result):
         matchers = [matcher_result]
@@ -155,7 +156,7 @@ class OptionalSequence(Sequence):
 class OneOrMore(Rule):
     def self_check(self):
         if len(self.children) != 1:
-            raise RuleException("OneOrMore rule must only have one child.")
+            raise RuleException(self, "rule must only have one child.")
 
     def match(self, matcher_result):
         child = self.children[0]
@@ -179,4 +180,4 @@ class ZeroOrMore(OneOrMore):
     def self_check(self):
         self.children = [Optional(c) for c in children]
         if len(self.children) != 1:
-            raise RuleException("ZeroOrMore rule must only have one child.")
+            raise RuleException(self, "rule must only have one child.")
