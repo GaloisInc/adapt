@@ -5,8 +5,7 @@
 {-# LANGUAGE TupleSections              #-}
 module CommonDataModel.FromProv
   ( readFileCDM
-  , translateTextCDM
-  , translate
+  , translateTextCDM, translateTextCDMPure
   , module CDM
   , T.Error(..), Warning(..)
   ) where
@@ -41,17 +40,21 @@ readFileCDM fp =
   either X.throw return =<< translateTextCDM =<< Text.readFile fp
 
 translateTextCDM ::  Text -> IO (Either T.Error ([CDM.Node], [CDM.Edge], [Warning]))
-translateTextCDM t = do
-  res  <- pure (parseProvN t)
-  res2 <- either (pure . Left . T.PE) (fmap (either (Left . T.TRE) Right) . translate) res
-  case res2 of
-    Right ((ns,es), ws) -> return $ Right (ns,es,ws)
-    Left err            -> return $ Left err
+translateTextCDM t =
+ do g <- newGenIO :: IO SystemRandom
+    return $ translateTextCDMPure (crandoms g) t
 
-translate :: Prov -> IO (Either TranslateError (([CDM.Node], [CDM.Edge]), [Warning]))
-translate (Prov _prefix es) = runTr $
+translateTextCDMPure :: [Word64] -> Text -> Either T.Error ([CDM.Node], [CDM.Edge], [Warning])
+translateTextCDMPure rs t =
+  do p            <- either (Left . T.PE)  pure (parseProvN t)
+     ((ns,es),ws) <- either (Left . T.TRE) pure (translate rs p)
+     return (ns,es,ws)
+
+translate :: [Word64] -> Prov -> Either TranslateError (([CDM.Node], [CDM.Edge]), [Warning])
+translate rs (Prov _prefix es) = runTrWith trs $
   do (as,bs) <- unzip <$> mapM (\e -> ML.local (exprLocation e) (translateProvExpr e)) es
      return (concat as, concat bs)
+ where trs = TrState rs Map.empty 0
 
 translateProvExpr :: T.Expr -> Tr ([CDM.Node], [CDM.Edge])
 translateProvExpr e@(RawEntity {..})
@@ -335,12 +338,6 @@ instance RunReaderM Tr Range where
 instance StateM Tr TrState where
   get   = Tr get
   set s = Tr (set s)
-
-runTr :: Tr a -> IO (Either TranslateError (a,[Warning]))
-runTr tr =
-  do g <- newGenIO :: IO SystemRandom
-     let trs = TrState (crandoms g) Map.empty 0
-     pure (runTrWith trs tr)
 
 runTrWith :: TrState -> Tr a -> Either TranslateError (a,[Warning])
 runTrWith trs tr = warningsToList $ runStack tr
