@@ -188,12 +188,17 @@ printWarnings ws = Text.putStrLn doc
 --------------------------------------------------------------------------------
 --  Database Upload
 
+removeBadEdges :: ([Node],[Edge]) -> ([Node],[Edge])
+removeBadEdges (ns,es) =
+  let exists x = x `Set.member` is
+      is = Set.fromList (map nodeUID ns)
+  in (ns, filter (\e -> exists (edgeSource e) && exists (edgeDestination e)) es)
 
 -- We should probably do this in a transaction or something to tell when vertex insertion errors out
 -- For now, we're just assuming it's always successful
 doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
 doUpload c work svr =
-  do res <- titan svr =<< compileWork work
+  do res <- titan svr =<< compileWork (removeBadEdges work)
      case filter isFailure res of
       Failure _ r:_ -> Text.putStrLn ("Upload Error: " <> Text.decodeUtf8 r)
       _             -> return ()
@@ -387,16 +392,16 @@ newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 --  Statistics
 
 printStats :: ([Node],[Edge]) -> IO ()
-printStats ss =
+printStats ss@(vs,es) =
   do let g  = mkGraph ss
          vs = vertices g
-         mn = length (take 1 $ fst ss) -- one node suggests the minimum subgraph is one.
-         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
-         nrStmt = length (fst ss)
+         mn = min 1 nrVert
+         sz = maximum (mn : map (length . reachable g) vs)
+         nrVert = length vs
+         nrEdge = length es
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
-     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
-     putStrLn $ "\tTotal statements: " ++ show nrStmt
+     putStrLn $ "\tEntities:         " ++ show nrVert
+     putStrLn $ "\tEdges: " ++ show nrEdge
 
 
 --------------------------------------------------------------------------------
