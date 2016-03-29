@@ -40,7 +40,10 @@ class SegmentationGraph:
         for n, node in enumerate(self.G.nodes_iter()):
             pos = len([1 for dx in dxs if node in dx])
             color = self.get_color(pos, len(dxs))
-            out.write("      { \"node\": %d, \"value\":\"%s\" }" % (node, color))
+            if(set(color.split(' ')) == set("#ffffff".split(' '))):
+                out.write("      { \"node\": %d, \"value\":\"#cccccc\" }" % node)
+            else:
+                out.write("      { \"node\": %d, \"value\":\"%s\" }" % (node, color))
             if(n != len(list(self.G.nodes_iter())) - 1):
                 out.write(",\n")
             else:
@@ -54,7 +57,7 @@ class SegmentationGraph:
                 out.write(",\n")
             else:
                 out.write("\n")
-        out.write(" ],\n")
+        out.write(" ]\n")
         out.write("};\n")
 
     def generate(self, p, ranks, per_rank, seed=None):

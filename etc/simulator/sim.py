@@ -19,9 +19,10 @@ if __name__ == "__main__":
     else:
         if(sys.argv[1] == 'pdf'):
             graph.print_dot()
-        elif(sys.argv[1] == 'json'):
-            graph.print_json()
         else:
             dx = sd.SimpleDiagnoser(grammar)
             dxs = dx.diagnose(graph, symptom)
-            graph.print_dot(dxs)
+            if(sys.argv[1] == 'json'):
+                graph.print_json(dxs)
+            else:
+                graph.print_dot(dxs)

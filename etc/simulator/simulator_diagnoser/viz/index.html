@@ -7,7 +7,7 @@
 .link {
   fill: none;
   stroke: #666;
-  stroke-width: 1.5px;
+  stroke-width: 2.5px;
 }
 
 #licensing {
@@ -22,7 +22,10 @@
   stroke-dasharray: 0,2 1;
 }
 
-
+circle {
+  stroke: #fff;
+  stroke-width: 2.5px;
+}
 
 text {
   font: 10px sans-serif;
@@ -38,22 +41,29 @@ var nnodes = data.nodes;
 var links = data.links;
 
 var nodes = {};
+var rnodes = {};
+var cnodes = {};
+
+console.log(nnodes)
 
 // Compute the distinct nodes from the links.
-links.forEach(function(link) {
-  link.source = nodes[link.source] || (nodes[link.source] = {name: link.source, color: link.value});
-  link.target = nodes[link.target] || (nodes[link.target] = {name: link.target, color: link.value});
+
+
+nnodes.forEach(function(n) {
+  (cnodes[n.node] = n.value) || (cnodes[n.node] = "#ccc");
 });
 
 links.forEach(function(link) {
-  link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
-  link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
+  link.source = nodes[link.source] ||
+    (nodes[link.source] = {name: link.source, color: cnodes[link.source]});
+  link.target = nodes[link.target] ||
+    (nodes[link.target] = {name: link.target, color: cnodes[link.target]});
 });
 
 console.log(nodes)
 
 var width = 960,
-    height = 500;
+    height = 600;
 
 var force = d3.layout.force()
     .nodes(d3.values(nodes))
@@ -91,7 +101,8 @@ var path = svg.append("g").selectAll("path")
 var circle = svg.append("g").selectAll("circle")
     .data(force.nodes())
     .enter().append("circle")
-    .attr("r", 6)
+    .attr("r", 12)
+    .attr("fill", function(d) { console.log(d.color); return d.color; })
     .call(force.drag);
 
 var text = svg.append("g").selectAll("text")
