@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
-module CommonDataModel
-  ( module CommonDataModel
+module Schema
+  ( module Schema
   , Word64
   ) where
 

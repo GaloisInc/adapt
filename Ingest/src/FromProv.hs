@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TupleSections              #-}
-module CommonDataModel.FromProv
+module FromProv
   ( readFileCDM
   , translateTextCDM, translateTextCDMPure
   , module CDM
@@ -25,7 +25,7 @@ import           Data.Time (UTCTime(..))
 import           MonadLib as ML
 import           Text.Read (readMaybe)
 
-import           CommonDataModel as CDM
+import           Schema as CDM
 import           Namespaces
 import           Parser (parseProvN)
 import           ParserCore
