@@ -50,11 +50,6 @@ class NonTerminalMatcherTest(unittest.TestCase):
         expected_result = []
         self.assertListEqual(matches, expected_result)
 
-    def test_with_children(self):
-        # non terminal with child nodes should throw exception
-        with self.assertRaises(RuleException):
-            NonTerminal('nt', None)
-
     def test_reverse(self):
         path = map_path('abcXdeX')
         matches = self.nt.match_reverse_path(path)
@@ -65,10 +60,10 @@ class NonTerminalMatcherTest(unittest.TestCase):
 
 class SequenceMatcherTest(unittest.TestCase):
     def setUp(self):
-        self.s = Sequence('sequence',
-                          NonTerminal('A'),
-                          NonTerminal('B'),
-                          NonTerminal('C'))
+        self.s = Sequence([NonTerminal('A'),
+                           NonTerminal('B'),
+                           NonTerminal('C')],
+                          'sequence')
 
     def test_label(self):
         self.assertEqual('sequence', self.s.get_label())
@@ -83,11 +78,11 @@ class SequenceMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_nested(self):
-        s2 = Sequence('sequence2',
-                     NonTerminal('A'),
-                     self.s,
-                     NonTerminal('C'),
-                     matchable='False')
+        s2 = Sequence([NonTerminal('A'),
+                       self.s,
+                       NonTerminal('C')],
+                      'sequence2',
+                      matchable='False')
 
         path = map_path('AABCC')
         matches = s2.match_path(path)

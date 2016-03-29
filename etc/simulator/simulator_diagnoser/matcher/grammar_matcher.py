@@ -1,9 +1,11 @@
 
 class Rule(object):
-    def __init__(self, label, *args, **kwargs):
+    def __init__(self, children, label=None, **kwargs):
         self.label = label
-        self.children = args
+        self.children = children
         self.matchable = kwargs.get('matchable', True)
+        if self.label == None:
+            self.matchable = False
         self.labels = None
         self.self_check()
 
@@ -54,9 +56,8 @@ class RuleException(Exception):
 
 
 class NonTerminal(Rule):
-    def self_check(self):
-        if len(self.children) > 0:
-            raise RuleException(self, "rule must not have children.")
+    def __init__(self, label, **kwargs):
+        super(NonTerminal, self).__init__([], label, **kwargs)
 
     def match(self, matcher_result):
         return self.match_label(matcher_result)
