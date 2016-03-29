@@ -44,11 +44,7 @@ var nodes = {};
 var rnodes = {};
 var cnodes = {};
 
-console.log(nnodes)
-
 // Compute the distinct nodes from the links.
-
-
 nnodes.forEach(function(n) {
   (cnodes[n.node] = n.value) || (cnodes[n.node] = "#ccc");
 });
@@ -59,8 +55,6 @@ links.forEach(function(link) {
   link.target = nodes[link.target] ||
     (nodes[link.target] = {name: link.target, color: cnodes[link.target]});
 });
-
-console.log(nodes)
 
 var width = 960,
     height = 600;
