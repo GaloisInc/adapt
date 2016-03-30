@@ -17,20 +17,23 @@ then
     sleep 1
 fi
 
-ADAPT=$HOME/adapt
+# If we are using vagrant then don't change to the adapt directory,
+# otherwise we can use this same script to stand up a machine though a git
+# clone to $HOME/adapt, so assume that's the case.
+if [ $USER != "vagrant" -a \( -e $HOME/adapt \) ]
+then
+    ADAPT=$HOME/adapt
+else
+    ADAPT=$HOME
+fi
+
 supercfg=$ADAPT/config/supervisord.conf
 
 cd $ADAPT || exit 1
 
 # run supervisord (zookeeper, kafka, gremlin)
-if pgrep supervisord > /dev/null
-then
-    exit 0  # Nothing to do, it's already running.
-fi
-(set -x
- supervisord -c $supercfg)
+pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started.)
 
-echo Started.
 # kafka and zookeeper are frustratingly slow and some of the helper
 # scripts do not fail or retry well.
 sleep 4
@@ -40,4 +43,4 @@ pstree -u | grep java
 (cd $ADAPT/ingest && make)
 
 echo Ready to populate the Titan DB, e.g. with:
-echo Trint -u '~/adapt/infoleak.provn'
+echo 'tar xJf example/infoleak*.tar.xz && Trint -u infoleak.provn'

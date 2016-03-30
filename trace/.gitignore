@@ -7,6 +7,6 @@
 *.raw
 *.tgz
 *.ttl
+*.txt
 *.zip
-scenario_3_1_ttl.txt
 ssh_and_exfiltrate

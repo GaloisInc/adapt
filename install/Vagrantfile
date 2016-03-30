@@ -1,0 +1,27 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "debian/jessie64"
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine. In the example below,
+  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  config.vm.provider "virtualbox" do |vb|
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+     vb.memory = "12288"
+     vb.cpus   = 2
+  end
+
+  config.vm.provision "file", source: "../ingest", destination: "ingest"
+  config.vm.provision "file", source: "../config", destination: "config"
+  config.vm.provision "file", source: "../example", destination: "example"
+  config.vm.provision "shell", privileged: false, path: "bootstrap.sh"
+  config.vm.provision "file", source: "start_daemons.sh", destination: "start_daemons.sh"
+end
+

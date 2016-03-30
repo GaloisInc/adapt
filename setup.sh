@@ -67,12 +67,12 @@ sudo -H pip install kafka-python protobuf==2.5.0
 # Infrastructure Programs (Titan, Gremlin, Zookeeper, kafka)
 GRZIP=$TEMP/gremlin.zip
 if [ ! -e $GRZIP ] ; then
-	wget http://apache.claz.org/incubator/tinkerpop/3.1.0-incubating/apache-gremlin-server-3.1.0-incubating-bin.zip -O $GRZIP
+	wget http://apache.claz.org/incubator/tinkerpop/3.1.1-incubating/apache-gremlin-server-3.1.1-incubating-bin.zip -O $GRZIP
 fi
 if [ ! -e $GREMLIN_SERVER_DIR ] ; then
 	sha1sum $GRZIP | egrep '^6d67e01f1c16a01118d44dafcafe1718466a5d56  ' > /dev/null  # -e would bail on mismatch
 	unzip   $GRZIP
-	mv apache-gremlin-server-3.1.0-incubating $GREMLIN_SERVER_DIR
+	mv apache-gremlin-server-3.1.1-incubating $GREMLIN_SERVER_DIR
 fi
 
 # Use stack to install ghc

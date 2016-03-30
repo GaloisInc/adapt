@@ -52,14 +52,14 @@ import           Position
 import           LexerCore (Type(..))
 
 data Error      = PE ParseError | TCE TypeError | TRE TranslateError
-  deriving (Show, Data, Generic, Typeable)
+  deriving (Eq, Ord, Show, Data, Generic, Typeable)
 data Warning    = Warn Text
   deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 data TypeError  = TypeError Range Text Type Type | CanNotInferType Text
         deriving (Eq, Ord, Show, Data, Generic, Typeable)
 data TranslateError = TranslateError Text
-        deriving (Show, Data, Generic, Typeable)
+        deriving (Eq, Ord, Show, Data, Generic, Typeable)
 
 instance X.Exception TypeError
 instance X.Exception ParseError

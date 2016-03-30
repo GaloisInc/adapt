@@ -1,208 +1,294 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ParallelListComp    #-}
 {-# OPTIONS_GHC -Wall #-}
 module Titan
   ( -- * Types
     ServerInfo(..)
   , defaultServer
-  , ErrorHandle(..)
-  , defaultErrorHandle
   , Operation(..)
-  , HostName
   , ResultId(..)
   , GraphId(..)
+  , GremlinValue(..), gremlinNum
     -- * Insertion
   , titan
-  , titanWith
-  , TitanResult(..)
-    -- * Query
+  , TitanResult(..), isSuccess, isFailure
+  , DataMessage(..)
+    -- * Lower Level
+  , titanWS
   ) where
 
-import Network.Socket as Net
-import Network.HTTP.Types
-import Network.HTTP.Client
-import Network.HTTP.Client.TLS
-
-import qualified Control.Exception as X
-import Data.List (intersperse)
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-import Data.String
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy.Char8 as BC
-import qualified Data.Set as Set
+import           Control.Concurrent.Async (async,wait)
+import           Crypto.Hash.SHA256 (hash)
+import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import           Data.List (intersperse)
+import           Data.List.Split (chunksOf)
 import qualified Data.Map as Map
-import System.IO (stderr, hPutStr)
-import qualified Data.ByteString.Char8 as BCNOTL
-import Data.Aeson (decode, Value(..), FromJSON(..), (.:))
+import           Data.Monoid ((<>))
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.UUID as UUID
+import           Network.WebSockets as WS
+import           Control.Exception as X
 
-newtype ServerInfo = ServerInfo { host     :: HostName
+data ServerInfo = ServerInfo { host     :: String
+                             , port     :: Int
                              }
         deriving (Eq,Ord,Show)
 
-instance IsString ServerInfo where
-  fromString = ServerInfo
-
 defaultServer :: ServerInfo
+defaultServer = ServerInfo "localhost" 8182
 
-defaultServer = ServerInfo "http://localhost:8182"
-
+labelKey :: ByteString
+labelKey = "id"
 
 -- Operations represent gremlin-groovy commands such as:
--- assume: g = TinkerGraph.open()
---         t = g.traversal(standard())
--- * InsertVertex: g.addVertex(label, 'ident', 'prop1', 'val1', 'prop2', 'val2')
--- * InsertEdge: t.V(1).addE('ident',t.V(2))
+-- assume: graph = TinkerGraph.open()
+--         g = graph.traversal(standard())
+-- * InsertVertex: g.addVertex(id, 'ident', 'prop1', 'val1', 'prop2', 'val2')
+-- * InsertEdge: t.V(id).addE(id,t.V(2))
 data Operation id = InsertVertex { label :: Text
-                                 , properties :: [(Text,Text)]
+                                 , properties :: [(Text,GremlinValue)]
                                  }
                   | InsertEdge { label      :: Text
                                , src,dst    :: id
-                               , properties :: [(Text,Text)]
+                               , properties :: [(Text,GremlinValue)]
                                }
   deriving (Eq,Ord,Show)
 
-data ErrorHandle id = Custom (HttpException -> ServerInfo -> Operation id -> IO TitanResult)
-                    | Silent    -- ^ Silently convert exceptions to Either types
-                    | ToStderr  -- ^ Emit a stderr message and convert exceptions to Either types
-                    | Rethrow   -- ^ re-throw exceptions
-
-defaultErrorHandle :: GraphId id => ErrorHandle id
-defaultErrorHandle = Custom $ \x si t ->
-    do case x of
-              StatusCodeException {} -> return (Failure x)
-              ResponseTimeout        -> titanWith ToStderr si t -- Single retry on failure
-              _                      -> X.throw x
-
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
+
 instance FromJSON ResultId where
   parseJSON (Object o) = do
-    Object r <- o.:"result"
+    Object r   <- o.:"result"
     [Object d] <- r.:"data"
     i <- d.:"id"
     case i of
-      String t -> return (ResultId (T.fromStrict t))
+      String t -> return (ResultId t)
       Number {} -> do n <- parseJSON i
                       return (ResultId (T.pack (show (n::Int))))
       _        -> fail "No id"
   parseJSON _ = fail "Couldn't parse JSON"
 
-data TitanResult = Success Status ResultId | Failure HttpException | ParseError
+data TitanResult = Success [DataMessage] | Failure Int BL.ByteString
 
-titan :: GraphId id => ServerInfo -> Operation id -> IO TitanResult
-titan = titanWith defaultErrorHandle
+isSuccess, isFailure :: TitanResult -> Bool
+isSuccess (Success _) = True
+isSuccess _ = False
+isFailure = not . isSuccess
 
-titanWith :: GraphId id => ErrorHandle id -> ServerInfo -> Operation id -> IO TitanResult
-titanWith eh si@(ServerInfo {..}) t =
- do res <-  X.try doRequest
-    case res of
-       Right s -> return s
-       Left  httpException ->
-          case eh of
-            Custom f -> f httpException si t
-            Silent   -> return (Failure httpException)
-            ToStderr -> do hPutStr stderr (show httpException)
-                           return (Failure httpException)
-            Rethrow  -> X.throw httpException
+batchSize :: Int
+batchSize = 500
 
+-- `titan server ops` is like `titanWS` except it batches the operations
+-- into sets of no more than `batchSize`.  This is to avoid the issue with
+-- titan write buffer filling up then blocking while evaluating an
+-- insertion which causes a timeout.
+titan :: GraphId id => ServerInfo -> [Operation id] -> IO [TitanResult]
+titan (ServerInfo {..}) xs =
+ do let xss = chunksOf batchSize xs
+    mapM (\x -> X.catch (WS.runClient host port "/" (titanWS x))
+                        (\(e::ConnectionException) ->
+                             do putStrLn "runClient exception"
+                                return (Failure (-1) BL.empty)))
+         xss
 
+titanWS :: GraphId id => [Operation id] -> WS.ClientApp TitanResult
+titanWS ops conn =
+   do result <- async (receiveTillClose (length ops) [])
+      mapM_ go ops
+      wait result
  where
-  doRequest =
-    do req <- parseUrl host
-       let req' = req { method      = "POST"
-                      , requestBody = RequestBodyLBS (serializeOperation t)
-                      , requestHeaders = [(hUserAgent, "Adapt/Trint")
-                                         ,(hAccept,"*/*")
-                                         ,(hContentType,  "application/x-www-form-urlencoded")
-                                         ,("Accept-Encoding", "")
-                                         ]
-                      }
-       m <- newManager tlsManagerSettings
-       withResponse req' m handleResponse
-  handleResponse :: Response BodyReader -> IO TitanResult
-  handleResponse x = do
-    bs <- responseBody x
-    case decode (BC.fromStrict bs) of
-      Just i -> return (Success (responseStatus x) i) 
-      Nothing -> return ParseError
+ receiveTillClose n acc
+  | n <= 0    =
+   do sendClose conn BL.empty
+      return (Success (reverse acc))
+  | otherwise =
+   do msg <- receive conn
+      case msg of
+        ControlMessage (Close code reason)
+            | code == 1000 -> return $ Success (reverse acc)
+            | otherwise    -> return $ Failure (fromIntegral code) reason
+        ControlMessage _   -> receiveTillClose n acc
+        DataMessage _   -> receiveTillClose (n-1) acc
 
--- The generation of Gremlin code is currently done through simple (sinful)
--- concatenation. A better solution would be a Haskell Gremlin Language library
--- and quasi quoter.
-{-
-serializeOperation :: Operation -> ByteString
-serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
-  where
-     -- g.addV(label, vectorName, param1, val1, param2, val2 ...)
-    call = "g.addV"
-    args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
---serializeOperation (InsertEdge l src dst ps)   = gremlinScript call
-  where
-     -- g.V(id).addE(edgeName, g.V(otherId), param1, val1, ...)
-     -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
-     call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
-                        , ").next().addEdge(", encodeQuoteText l
-                                        , ", g.V().has(label,", encodeQuoteText dst, ").next(), "
-                            ] ++ args ++ [")"]
-     args = intersperse "," (concatMap attrs ps)-}
+ go :: GraphId id => Operation id -> IO ()
+ go op =
+   do let (cmd,bnd) = serializeOperation op
+      send conn (mkGremlinWSCommand cmd bnd)
+
+ mkGremlinWSCommand :: Text -> Env -> Message
+ mkGremlinWSCommand cmd bnd = DataMessage $ Text (mkJSON cmd bnd)
+
+ mkJSON :: Text -> Env -> BL.ByteString
+ mkJSON cmd bnd =
+    A.encode
+      Req { requestId = UUID.toText (mkHashedUUID cmd)
+          , op        = "eval"
+          , processor = ""
+          , args = ReqArgs { gremlin  = cmd
+                           , bindings = bnd
+                           , language = "gremlin-groovy"
+                           }
+          }
+
+mkHashedUUID :: Text -> UUID.UUID
+mkHashedUUID t =
+  maybe (error "Impossible uuid decode failure") id
+        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 t)))))
+
+--------------------------------------------------------------------------------
+--  Gremlin WebSockets JSON API
+
+data GremlinRequest =
+  Req { requestId :: Text
+      , op        :: Text
+      , processor :: Text
+      , args      :: RequestArgs
+      }
+
+type Env = Map.Map Text A.Value
+data RequestArgs =
+  ReqArgs { gremlin    :: Text
+          , bindings   :: Env
+          , language   :: Text
+          }
+
+instance ToJSON RequestArgs where
+  toJSON (ReqArgs g b l) =
+    A.object [ "gremlin"  .= g
+             , "language" .= l
+             , "bindings" .= b
+             , "rebindings" .= A.emptyObject
+             ]
+
+instance ToJSON GremlinRequest where
+  toJSON (Req i o p a) =
+    A.object [ "requestId" .= i
+             , "op"        .= o
+             , "processor" .= p
+             , "args"      .= a
+             ]
+
+instance ToJSON GremlinValue where
+  toJSON gv =
+    case gv of
+      GremlinNum i    -> toJSON i
+      GremlinString t -> toJSON t
+      GremlinList l   -> toJSON l
+      GremlinMap xs   -> toJSON (Map.fromList xs)
+
+instance FromJSON RequestArgs where
+  parseJSON (A.Object obj) =
+      ReqArgs <$> obj .: "gremlin"
+              <*> obj .: "bindings"
+              <*> obj .: "language"
+  parseJSON j = A.typeMismatch "RequestArgs" j
+
+instance FromJSON GremlinRequest where
+  parseJSON (A.Object obj) =
+      Req <$> obj .: "requestId"
+          <*> obj .: "op"
+          <*> obj .: "processor"
+          <*> obj .: "args"
+  parseJSON j = A.typeMismatch "GremlinRequest" j
+
+--------------------------------------------------------------------------------
+--  Gremlin language serialization
+
 class GraphId a where
-  serializeOperation :: Operation a -> ByteString
+  serializeOperation :: Operation a -> (Text,Env)
+
 instance GraphId Text where
-  serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
+  serializeOperation (InsertVertex l ps) = (cmd,env)
     where
-       -- g.addV(label, vectorName, param1, val1, param2, val2 ...)
-      call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l src dst ps)   = gremlinScript call
+      cmd = escapeChars call
+       -- g.addV(id, vectorName, param1, val1, param2, val2 ...)
+      call = T.unwords
+              [ "g.addV(id, l, "
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      env = Map.fromList $ ("l", A.String l) : mkBinding ps
+  serializeOperation (InsertEdge l src dst ps)   = (cmd,env)
     where
-       -- g.V().has(label,src).next().addE(edgeName, g.V().has(label,dst).next(), param1, val1, ...)
-       call = BC.concat $ ["g.V().has(label,", encodeQuoteText src
-                          , ").next().addEdge(", encodeQuoteText l
-                                          , ", g.V().has(label,", encodeQuoteText dst, ").next(), "
-                              ] ++ args ++ [")"]
-       args = intersperse "," (concatMap attrs ps)
-instance GraphId ResultId where
-  serializeOperation (InsertVertex l ps) = gremlinScript $ BC.concat [call, args]
-    where
-      call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," ("label" : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = gremlinScript call
-    where
-      call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
-      args = intersperse "," (concatMap attrs ps)
+       cmd = escapeChars call
+       -- g.V(dst).has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
+       call = T.unwords
+               [ "g.V(dst).has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), "
+               , T.unwords $ intersperse "," (map mkParams [1..length ps])
+               , ")"
+               ]
+       env = Map.fromList $ ("src",A.String src) : ("dst",A.String dst) :
+                            ("edgeName", A.String l) : mkBinding ps
 
-gremlinScript :: ByteString -> ByteString
-gremlinScript s =
-  BC.concat [ "{ \"gremlin\" : \""
-             , escapeChars s, "\""
-             , " }"]
+encodeQuoteText :: Text -> Text
+encodeQuoteText = quote . subChars . escapeChars
 
-encodeQuoteText :: Text -> ByteString
-encodeQuoteText = quote . subChars . escapeChars . T.encodeUtf8
+data GremlinValue = GremlinNum Integer
+                  | GremlinString Text
+                  | GremlinList [GremlinValue]
+                  | GremlinMap [(Text, GremlinValue)]
+  deriving (Eq,Ord,Show)
 
-quote :: ByteString -> ByteString
-quote b = BC.concat ["\'", b, "\'"]
+gremlinNum :: Integral i => i -> GremlinValue
+gremlinNum = GremlinNum . fromIntegral
 
-paren :: ByteString -> ByteString
-paren b = BC.concat ["(", b, ")"]
+encodeGremlinValue :: GremlinValue -> Text
+encodeGremlinValue gv =
+  case gv of
+    GremlinString s -> escapeChars s
+    GremlinNum  n   -> T.pack (show n)
+    GremlinMap xs   -> error "Gremlin Map currently unsupported"
+    GremlinList vs  -> error "Gremlin list currently unsupported"
 
-attrs :: (Text,Text) -> [ByteString]
-attrs (a,b) = [encodeQuoteText a, encodeQuoteText b]
+quote :: Text -> Text
+quote b = T.concat ["\'", b, "\'"]
 
-escapeChars :: ByteString -> ByteString
+paren :: Text -> Text
+paren b = T.concat ["(", b, ")"]
+
+mkBinding :: [(Text,GremlinValue)] -> [(Text,Value)]
+mkBinding pvs =
+  let lbls = [ (param n, val n) | n <- [1..length pvs] ]
+  in concat [ [(pstr, String p), (vstr,toJSON v)]
+                    | (pstr,vstr) <- lbls
+                    | (p,v) <- pvs ]
+
+-- Build string "param1, val1, param2, val2, ..., paramN, valN"
+mkParams :: Int -> Text
+mkParams n = T.concat [param n, ",", val n]
+
+-- Construct the variable name for the nth parameter name.
+param :: Int -> Text
+param n = "param" <> T.pack (show n)
+
+-- Construct the variable name for the Nth value
+val :: Int -> Text
+val n = "val" <> T.pack (show n)
+
+escapeChars :: Text -> Text
 escapeChars b
-  | not (BC.any (`Set.member` escSet) b) = b
-  | otherwise = BC.concatMap (\c -> if c `Set.member` escSet then BC.pack ['\\', c] else BC.singleton c) b
+  | not (T.any (`Set.member` escSet) b) = b
+  | otherwise = T.concatMap (\c -> if c `Set.member` escSet then T.pack ['\\', c] else T.singleton c) b
 
 escSet :: Set.Set Char
 escSet = Set.fromList ['\\', '"']
 
-subChars :: ByteString -> ByteString
+subChars :: Text -> Text
 subChars b
-  | not (BC.any (`Set.member` badChars) b) = b
-  | otherwise = BC.map (\c -> maybe c id (Map.lookup c charRepl)) b
+  | not (T.any (`Set.member` badChars) b) = b
+  | otherwise = T.map (\c -> maybe c id (Map.lookup c charRepl)) b
 
 charRepl :: Map.Map Char Char
 charRepl = Map.fromList [('\t',' ')]

@@ -1,35 +1,44 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
-import PP as PP
-import Ingest
+import CommonDataModel.FromProv
+import Data.Int (Int32)
+import PP (pretty, pp)
 import SimpleGetOpt
-import qualified Namespaces as NS
-import Types as T
-import qualified Graph as G
-import qualified RDF
 
 import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Control.Exception
 import Data.Int (Int32)
 import Data.Monoid ((<>))
+import qualified Data.Foldable as F
 import Data.Maybe (catMaybes,isNothing, mapMaybe)
 import Data.List (partition,intersperse)
-import Data.Graph
+import Data.Graph hiding (Node, Edge)
 import Data.Time (UTCTime, addUTCTime)
+import Text.Read (readMaybe)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import Numeric (showHex)
+import Data.Binary (encode,decode)
+import System.Entropy (getEntropy)
 import MonadLib        hiding (handle)
 import MonadLib.Monads hiding (handle)
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
-import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.Text.Lazy.Encoding as Text
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.ByteString.Base64 as B64
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
 import System.Random (randoms,randomR)
@@ -46,12 +55,8 @@ type VertsAndEdges = (Map Text (Maybe ResultId), Map Text (Maybe ResultId))
 
 data Config = Config { lintOnly   :: Bool
                      , quiet      :: Bool
-                     , graph      :: Bool
                      , stats      :: Bool
-                     , turtle     :: Bool
                      , ast        :: Bool
-                     , provn      :: Bool
-                     , fakeData   :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
@@ -62,12 +67,8 @@ defaultConfig :: Config
 defaultConfig = Config
   { lintOnly = False
   , quiet    = False
-  , graph    = False
   , stats    = False
-  , turtle   = False
   , ast      = False
-  , provn    = False
-  , fakeData = False
   , verbose  = False
   , help     = False
   , upload   = Nothing
@@ -89,31 +90,33 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Verbose debugging messages"
                     $ NoArg $ \s -> Right s { verbose = True }
                   , Option ['a'] ["ast"]
-                    "Produce a pretty-printed internal AST"
+                    "Produce a pretty-printed internal CDM AST"
                     $ NoArg $ \s -> Right s { ast = True }
-                  , Option ['p'] ["provn"]
-                    "Produce a pretty-printed, reformatted, PROV representation"
-                    $ NoArg $ \s -> Right s { provn = True }
-                  , Option ['f'] ["fake"]
-                    "When pretty-printing, use fake data to fill in missing fields"
-                    $ NoArg $ \s -> Right s { fakeData = True }
-                  , Option ['g'] ["graph"]
-                    "Produce a dot file representing a graph of the conceptual model."
-                    $ NoArg $ \s -> Right s { graph = True }
                   , Option ['s'] ["stats"]
                     "Print statistics."
                     $ NoArg $ \s -> Right s { stats = True }
-                  , Option ['t'] ["turtle"]
-                    "Produce a turtle RDF description of the graph."
-                    $ NoArg $ \s -> Right s { turtle = True }
                   , Option ['u'] ["upload"]
                     "Uploads the data by inserting it into a Titan database using gremlin."
-                    $ OptArg "Database host" $ \str s -> Right s { upload = Just $ maybe defaultServer ServerInfo str }
+                    $ OptArg "Database host" $
+                        \str s -> let svr = uncurry ServerInfo <$> (parseHostPort =<< str)
+                                  in case (str,svr) of
+                                    (Nothing,_)  -> Right s { upload = Just defaultServer }
+                                    (_,Just res) -> Right s { upload = Just res }
+                                    (_,Nothing) -> Left "Could not parse host:port string."
                   , Option ['h'] ["help"]
+
                     "Prints this help message."
                     $ NoArg $ \s -> Right s { help = True }
                   ]
                }
+
+parseHostPort :: String -> Maybe (String,Int)
+parseHostPort str =
+  let (h,p) = break (== ':') str
+  in case (h,readMaybe p) of
+      ("",_)         -> Nothing
+      (_,Nothing)    -> Nothing
+      (hst,Just pt) -> Just (hst,pt)
 
 main :: IO ()
 main =
@@ -130,52 +133,37 @@ trint c fp = do
       putStrLn $ "Error ingesting " ++ fp ++ ":"
       print (pp e)
       return ()
-    Right (pxs,res,ws) -> do
+    Right (ns,es,ws) -> do
       unless (quiet c) $ printWarnings ws
-      processStmts c fp res pxs
+      processStmts c fp (ns,es)
 
   where
   ingest = do
     t <- handle onError (Text.readFile fp)
-    return (ingestText t)
+    translateTextCDM t
   onError :: IOException -> IO a
   onError e = do putStrLn ("Error reading " ++ fp ++ ":")
                  print e
                  exitFailure
 
-processStmts :: Config -> FilePath -> [Stmt] -> [Prefix] -> IO ()
-processStmts c fp res pxs
+processStmts :: Config -> FilePath -> ([Node],[Edge]) -> IO ()
+processStmts c fp res@(ns,es)
   | lintOnly c = return ()
   | otherwise = do
-      when (graph  c) $ do
-        let dotfile =  fp <.> "dot"
-        dbg ("Writing dot to " ++ dotfile)
-        output dotfile (G.graph res)
       when (stats  c) $ do
         printStats res
 
-      when (turtle c) $ do
-        let ttlfile = fp <.> "ttl"
-        dbg ("Writing turtle RDF to " ++ ttlfile)
-        output ttlfile (RDF.turtle res)
       when (ast c) $ do
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
-        output astfile $ Text.unlines $ map (Text.pack . show) res
-      when (provn c) $ do
-        let provfile = fp <.> "trint.provn"
-        dbg ("Writing prettified prov-n to " ++ provfile)
-        gen <- newTFGen
-        let theStatements | fakeData c = useFakeData gen res
-                         | otherwise  = res
-        output provfile (renderProv pxs theStatements)
+        output astfile $ Text.unlines $ map (Text.pack . show) ns ++ map (Text.pack . show) es
       case upload c of
         Just r ->
           do
             vses <- doUpload c res r
             runKafka (mkKafkaState "adapt-kafka" ("localhost", 9092)) (pushDataToKafka vses)
             return ()
-        Nothing -> 
+        Nothing ->
           return ()
  where
   dbg s = when (verbose c) (putStrLn s)
@@ -188,302 +176,252 @@ pushDataToKafka :: VertsAndEdges -> Kafka ()
 pushDataToKafka (vs, es) = do produceMessages $ map convertResultId rids
                               return ()
   where convertResultId :: ResultId -> TopicAndMessage
-        convertResultId rid = TopicAndMessage "segmenter" (ridToMessage rid)
+        convertResultId rid = TopicAndMessage "pattern" (ridToMessage rid)
         rids = catMaybes $ Map.elems vs ++ Map.elems es
-        ridToMessage (ResultId r) = makeMessage (ByteString.toStrict (encodeUtf8 r))
+        ridToMessage (ResultId r) = makeMessage (T.encodeUtf8 r)
 
 printWarnings :: [Warning] -> IO ()
 printWarnings ws = Text.putStrLn doc
-  where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . pp) ws
-
---------------------------------------------------------------------------------
---  Pretty Printing
-
-renderProv :: [Prefix] -> [Stmt] -> Text
-renderProv pfx0 stmts =
-   let pfx    = trintns : provtc : pfx0
-       header = map renderPrefix pfx
-       ss     = map (renderStmt pfx) (zipWith nameUsed stmts [0..])
-   in Text.unlines $ concatMap (map (Text.pack . show))
-                     [[text "document"]
-                     , header
-                     , ss
-                     , [text "endDocument"]]
-
--- Any used predicate that does not have a self-identifier is given an
--- arbitrary ident of 'trint:NUM'.
-nameUsed :: Stmt -> Integer -> Stmt
-nameUsed (StmtPredicate p) i =
-      case (predType p,predIdent p) of
-        (Used,Nothing) -> StmtPredicate (p { predIdent = Just (trintURI NS..: Text.pack (showHex i "")) })
-        _              -> StmtPredicate p
-nameUsed (StmtLoc (Located r p)) i = StmtLoc (Located r (nameUsed p i))
-nameUsed x _ = x
-
-renderPrefix :: Prefix -> Doc
-renderPrefix (Prefix p u) = text "prefix " PP.<> pp p PP.<> text " <" PP.<> pp (show u) PP.<> text ">"
-
-renderStmt :: [Prefix] -> Stmt -> Doc
-renderStmt pfx stmt = pp (onIdent abbreviate stmt)
-  where
-  abbreviate (Qualified q x) = Qualified (shorthand q) x
-  abbreviate x               = x
-
-  shorthand :: Text -> Text
-  shorthand t = maybe t id (Map.lookup t dict)
-
-  dict :: Map Text Text
-  dict = Map.fromList [ (Text.pack $ show fq,sh) | Prefix sh fq <- pfx]
-
--- | A fake Prov prefix for use with manufactured data such as generated 'used'
--- identifiers.
-trintns :: Prefix
-trintns = Prefix "trint" trintURI
-
-trintURI :: NS.URI
-trintURI = NS.perr "http://galois.com/adapt/trint"
-
--- | The prefix for ProvTC
-provtc :: Prefix
-provtc = Prefix "prov-tc" NS.adapt
-
-
---------------------------------------------------------------------------------
---  Fake Data for 'used' relations
-
-useFakeData :: TFGen -> [Stmt] -> [Stmt]
-useFakeData g0 ss = zipWith fakeStmt gens ss
- where
-  gens = map (splitn g0 (ceiling $ logBase 2 (fromIntegral nrSS))) [0 .. fromIntegral nrSS - 1]
-  nrSS = length ss
-
-fakeStmt :: TFGen -> Stmt -> Stmt
-fakeStmt g stmt@(StmtPredicate p@(Predicate {..}))
-    | predType == Used =
-      let ks  = Set.fromList (map reprOf predAttrs)
-          gs  = map (splitn g (ceiling $ logBase 2 (fromIntegral nrAttrs))) [0 .. fromIntegral nrAttrs - 1]
-          kgs = zip attrs gs
-          mkNewAttr (rep,gi) | rep `Set.member` ks = []
-                             | otherwise = randomValOf gi rep
-          newAttrs = concatMap mkNewAttr kgs
-      in StmtPredicate p { predAttrs = predAttrs ++ newAttrs }
-    | otherwise = stmt
-  where attrs :: [ PredicateAttrRepr ]
-        attrs = [ PR_AtTime, PR_Cmd, PR_MachineID {- UoE attrs have been requested: UR_CWD , UR_PPID, UR_PID, UR_ProgramName, UR_USER-} ]
-        nrAttrs = length attrs
-        epoch = read "2016-01-13 19:53:37.839456 UTC"
-        randomValOf :: TFGen -> PredicateAttrRepr -> [PredicateAttr]
-        randomValOf g r =
-            case r of
-              PR_AtTime    -> [ AtTime (addUTCTime (fromIntegral $ fst $ randomR (0::Int,10000000) g) epoch) ]
-              PR_Cmd       -> [ Cmd "./Fake-Command" ]
-              PR_MachineID -> [ MachineID $ randomUUID g ] -- Text.pack $ concatMap show $ flip showHex "" $ take 4 (randoms g :: [Int32]) ]
-              _            -> error "Incomplete random predicate attr generation."
-fakeStmt g (StmtLoc (Located r s)) = StmtLoc (Located r (fakeStmt g s))
-fakeStmt g sOther = sOther
-
-randomUUID :: TFGen -> Text
-randomUUID = Text.pack . concatMap (flip showHex "" . abs) . (take 4 :: [Int32] -> [Int32]). randoms
-
-data PredicateAttrRepr
-        = PR_Raw
-        | PR_AtTime
-        | PR_StartTime
-        | PR_EndTime
-        | PR_GenOp
-        | PR_Permissions
-        | PR_ReturnVal
-        | PR_Operation
-        | PR_Args
-        | PR_Cmd
-        | PR_DeriveOp
-        | PR_ExecOp
-        | PR_MachineID
-        | PR_SourceAddress
-        | PR_DestinationAddress
-        | PR_SourcePort
-        | PR_DestinationPort
-        | PR_Protocol
-        deriving (Eq, Ord)
-
-reprOf :: PredicateAttr -> PredicateAttrRepr
-reprOf p =
-  case p of
-        Raw {}                -> PR_Raw
-        AtTime {}             -> PR_AtTime
-        StartTime {}          -> PR_StartTime
-        EndTime {}            -> PR_EndTime
-        GenOp {}              -> PR_GenOp
-        Permissions {}        -> PR_Permissions
-        ReturnVal {}          -> PR_ReturnVal
-        Operation {}          -> PR_Operation
-        Args {}               -> PR_Args
-        Cmd {}                -> PR_Cmd
-        DeriveOp {}           -> PR_DeriveOp
-        ExecOp {}             -> PR_ExecOp
-        MachineID {}          -> PR_MachineID
-        SourceAddress {}      -> PR_SourceAddress
-        DestinationAddress {} -> PR_DestinationAddress
-        SourcePort {}         -> PR_SourcePort
-        DestinationPort {}    -> PR_DestinationPort
-        Protocol {}           -> PR_Protocol
+  where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . unW) ws
+        unW (Warn w) = w
 
 --------------------------------------------------------------------------------
 --  Database Upload
 
+removeBadEdges :: ([Node],[Edge]) -> ([Node],[Edge])
+removeBadEdges (ns,es) =
+  let exists x = x `Set.member` is
+      is = Set.fromList (map nodeUID ns)
+  in (ns, filter (\e -> exists (edgeSource e) && exists (edgeDestination e)) es)
 
 -- We should probably do this in a transaction or something to tell when vertex insertion errors out
 -- For now, we're just assuming it's always successful
-doUpload :: Config -> [Stmt] -> ServerInfo -> IO VertsAndEdges
-doUpload c stmts svr =
- do stats <- push es
-    let vertIds = Map.fromList(zip (map label es) stats)
-    let ps' = mapMaybe (resolveId vertIds) ps
-    stats' <- push ps'
-    let edgeIds = Map.fromList(zip (map label ps) stats')
-    -- let err = filter ( (/= status200)) stats
-    -- when (not $ quiet c) $ putStrLn $ unlines $ map show err
-    return (vertIds, edgeIds)
-  where
-  (es,ps) = partition isVert(map translateInsert stmts)
+doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
+doUpload c work svr =
+  do res <- titan svr =<< compileWork (removeBadEdges work)
+     case filter isFailure res of
+      Failure _ r:_ -> Text.putStrLn ("Upload Error: " <> Text.decodeUtf8 r)
+      _             -> return ()
+     return (Map.empty,Map.empty) -- XXX
+ where
+ compileWork (ns,es) =
+  do let vertOfNodes = concatMap compileNode ns
+     (concat -> vertOfEdges, concat -> edgeOfEdges) <- unzip <$> mapM compileEdge es
+     pure $ concat [vertOfNodes , vertOfEdges , edgeOfEdges]
 
-  isVert InsertVertex{} = True
-  isVert _ = False
+ compileNode :: Node -> [Operation Text]
+ compileNode n = [InsertVertex (nodeUID_base64 n) (propertiesOf n)]
 
-  resolveId vertIds (InsertEdge l s d p) = 
-    do s' <- Map.findWithDefault Nothing s vertIds
-       d' <- Map.findWithDefault Nothing d vertIds
-       return (InsertEdge l s' d' p)
-  resolveId _ (InsertVertex l p) = return (InsertVertex l p)
+ compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
+ compileEdge e =
+  do euid <- newUID
+     let e1Lbl = ""
+     let e2Lbl = ""
+     let eMe   = uidToBase64 euid
+     let [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
+     let v     = InsertVertex eMe (propertiesOf e)
+         eTo   = InsertEdge e1Lbl esrc eMe []
+         eFrom = InsertEdge e2Lbl eMe edst []
+     return ([v], [eTo, eFrom])
 
-  push :: GraphId i => [Operation i] -> IO [Maybe ResultId]
-  push = mapM $ \stmt ->
-    do res <- titan svr stmt
-       case res of
-         Success _ i -> return (Just i)
-         _ -> return Nothing
+class PropertiesOf a where
+  propertiesOf :: a -> [(Text,GremlinValue)]
 
-translateInsert :: Stmt -> Operation Text
-translateInsert (StmtPredicate (Predicate {..})) =
-    InsertEdge { label = pretty predType
-               , src   = pretty predSubject
-               , dst   = pretty predObject
-               , properties = pa }
-   where
-    pa = map transPA predAttrs
-    transPA p =
-      case p of
-        AtTime t             -> ("atTime"             , textOfTime t   )
-        StartTime t          -> ("startTime"          , textOfTime t   )
-        EndTime t            -> ("endTime"            , textOfTime t   )
-        GenOp gop            -> ("genOp"              , gop )
-        Permissions t        -> ("permissions"        , t   )
-        ReturnVal t          -> ("returnVal"          , t   )
-        Operation uop        -> ("operation"          , uop )
-        Args t               -> ("args"               , t   )
-        Cmd t                -> ("cmd"                , t   )
-        DeriveOp dop         -> ("deriveOp"           , dop )
-        ExecOp eop           -> ("execOp"             , eop )
-        MachineID mid        -> ("machineID"          , mid )
-        SourceAddress t      -> ("sourceAddress"      , t   )
-        DestinationAddress t -> ("destinationAddress" , t   )
-        SourcePort t         -> ("sourcePort"         , t   )
-        DestinationPort t    -> ("destinationPort"    , t   )
-        Protocol t           -> ("protocol"           , t   )
-        Raw k v              -> (k,v) -- XXX warn
+instance PropertiesOf Node where
+  propertiesOf node =
+   case node of
+    NodeEntity entity     -> propertiesOf entity
+    NodeResource resource -> propertiesOf resource
+    NodeSubject subject   -> propertiesOf subject
+    NodeHost host         -> propertiesOf host
+    NodeAgent agent       -> propertiesOf agent
 
-translateInsert (StmtEntity e)    =
-  case e of
-    Agent i as           -> InsertVertex (pretty i) (("vertexType", "agent") : (map translateAA as))
-    UnitOfExecution i as -> InsertVertex (pretty i) (("vertexType", "unitOfExecution") : (map translateUOEA as))
-    Artifact i as        -> InsertVertex (pretty i) (("vertexType", "artifact") : (map translateArA as))
-    Resource i devty as  -> InsertVertex (pretty i) (("vertexType", "resource") : (translateDevId as))
-  where
-  translateAA as   =
-   case as of
-    AAName t      -> ("name", t)
-    AAUser t      -> ("user", t)
-    AAMachine mid -> ("machine", mid)
+instance PropertiesOf Edge where
+  propertiesOf (Edge _src _dst rel) = propertiesOf rel
 
-  translateUOEA as =
-    case as of
-        UAUser t        -> ("user"        , t)
-        UAPID p         -> ("PID"         , p)
-        UAPPID p        -> ("PPID"        , p)
-        UAMachine mid   -> ("machine"     , mid)
-        UAStarted t     -> ("started"     , textOfTime t)
-        UAHadPrivs p    -> ("hadPrivs"    , p)
-        UAPWD t         -> ("PWD"         , t)
-        UAEnded t       -> ("ended"       , textOfTime t)
-        UAGroup t       -> ("group"       , t)
-        UACommandLine t -> ("commandLine" , t)
-        UASource t      -> ("source"      , t)
-        UAProgramName t -> ("programName" , t)
-        UACWD t         -> ("CWD"         , t)
-        UAUID t         -> ("UID"         , t)
+instance PropertiesOf Relationship where
+  propertiesOf r =
+    case r of
+      WasGeneratedBy     -> [rel "wasGeneratedBy"]
+      WasInvalidatedBy   -> [rel "wasInvalidatedBy"]
+      Used               -> [rel "used"]
+      IsPartOf           -> [rel "isPartOf"]
+      WasInformedBy      -> [rel "wasInformedBy"]
+      RunsOn             -> [rel "runsOn"]
+      ResidesOn          -> [rel "residesOn"]
+      WasAttributedTo    -> [rel "wasAttributedTo"]
+      WasDerivedFrom a b -> [rel "wasDerivedFrom", ("strength", enumOf a), ("derivation", enumOf b)]
+    where
+      rel      = ("relation",)  . GremlinString
 
-  translateArA as  =
-    case as of
-      ArtAType at              -> ("type"               , at)
-      ArtARegistryKey t        -> ("registryKey"        , t)
-      ArtACoarseLoc cl         -> ("coarseLoc"          , cl)
-      ArtAFineLoc fl           -> ("fineLoc"            , fl)
-      ArtACreated t            -> ("created"            , textOfTime t)
-      ArtAVersion v            -> ("version"            , v)
-      ArtADeleted t            -> ("deleted"            , textOfTime t)
-      ArtAOwner t              -> ("owner"              , t)
-      ArtASize int             -> ("size"               , Text.pack $ show int)
-      ArtADestinationAddress t -> ("destinationAddress" , t)
-      ArtADestinationPort t    -> ("destinationPort"    , t)
-      ArtASourceAddress t      -> ("sourceAddress"      , t)
-      ArtASourcePort t         -> ("sourcePort"         , t)
-      Taint w                  -> ("Taint"              , Text.pack $ show w)
-  translateDevId Nothing   = []
-  translateDevId (Just i)  = [("devId", i)]
+stringOf :: Show a => a -> GremlinValue
+stringOf  = GremlinString . T.toLower . T.pack . show
 
-translateInsert (StmtLoc (Located _ s)) = translateInsert s
+enumOf :: Enum a => a -> GremlinValue
+enumOf = GremlinNum . fromIntegral . fromEnum
 
-textOfTime :: Time -> Text
-textOfTime = Text.pack . show -- XXX
+mkSource :: InstrumentationSource -> (Text,GremlinValue)
+mkSource = ("source",) . enumOf
+
+mkType :: Text -> (Text,GremlinValue)
+mkType = ("type",) . GremlinString
+
+mayAppend :: Maybe (Text,GremlinValue) -> [(Text,GremlinValue)] -> [(Text,GremlinValue)]
+mayAppend Nothing  = id
+mayAppend (Just x) = (x :)
+
+instance PropertiesOf OptionalInfo where
+  propertiesOf (Info {..}) =
+        catMaybes [ ("time",) . gremlinTime <$> infoTime
+                  , ("permissions",)  . gremlinNum <$> infoPermissions
+                  , ("integrityTag",) . enumOf     <$> infoTrustworthiness
+                  , ("sensitivity",)  . enumOf     <$> infoSensitivity
+          ] <> propertiesOf infoOtherProperties
+
+instance PropertiesOf Entity where
+  propertiesOf e =
+   case e of
+      File {..} ->   mkType "file"
+                   : mkSource entitySource
+                   : ("url", GremlinString entityURL)
+                   : ("fileVersion", gremlinNum entityFileVersion)
+                   : mayAppend ( (("fileSize",) . gremlinNum) <$> entityFileSize)
+                               (propertiesOf entityInfo)
+      NetFlow {..} -> 
+                  mkType "netflow"
+                : mkSource entitySource
+                : ("srcAddress", GremlinString entitySrcAddress)
+                : ("dstAddress", GremlinString entityDstAddress)
+                : ("srcPort", gremlinNum entitySrcPort)
+                : ("dstPort", gremlinNum entityDstPort)
+                : propertiesOf entityInfo
+      Memory {..} ->
+                 mkType "memory"
+               : mkSource entitySource
+               : ("pageNumber", gremlinNum entityPageNumber)
+               : ("address", gremlinNum entityAddress)
+               : propertiesOf entityInfo
+
+instance PropertiesOf Resource where
+  propertiesOf (Resource {..}) =
+                 mkType "resource"
+               : mkSource resourceSource
+               : propertiesOf resourceInfo
+instance PropertiesOf SubjectType where
+  propertiesOf s =
+   let subjTy = ("subjectType",) . GremlinString
+   in case s of
+       SubjectProcess    ->
+         [subjTy "process"]
+       SubjectThread     ->
+         [subjTy "thread"]
+       SubjectUnit       ->
+         [subjTy "unit"]
+       SubjectBlock      ->
+         [subjTy "block"]
+       SubjectEvent et s  ->
+         [subjTy "event", ("eventType", enumOf et) ]
+          ++ F.toList ((("sequence",) . gremlinNum) <$> s)
+
+gremlinTime :: UTCTime -> GremlinValue
+gremlinTime t = GremlinString (T.pack $ show t)
+
+gremlinList :: [Text] -> GremlinValue
+gremlinList = GremlinList . map GremlinString
+
+gremlinArgs :: [BS.ByteString] -> GremlinValue
+gremlinArgs = gremlinList . map T.decodeUtf8
+
+instance PropertiesOf a => PropertiesOf (Maybe a) where
+  propertiesOf Nothing  = []
+  propertiesOf (Just x) = propertiesOf x
+
+instance PropertiesOf Subject where
+  propertiesOf (Subject {..}) =
+                mkType "subject"
+              : mkSource subjectSource
+              : ("startTime", gremlinTime subjectStartTime)
+              : concat
+                 [ propertiesOf subjectType
+                 , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
+                 , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
+                 , F.toList (("unitid"     ,) . gremlinNum    <$> subjectUnitID     )
+                 , F.toList (("endtime"    ,) . gremlinTime   <$> subjectEndTime    )
+                 , F.toList (("commandline",) . GremlinString <$> subjectCommandLine)
+                 , F.toList (("importlibs" ,) . gremlinList   <$> subjectImportLibs )
+                 , F.toList (("exportlibs" ,) . gremlinList   <$> subjectExportLibs )
+                 , F.toList (("processinfo",) . GremlinString <$> subjectProcessInfo)
+                 , F.toList (("location"   ,) . gremlinNum    <$> subjectLocation   )
+                 , F.toList (("size"       ,) . gremlinNum    <$> subjectSize       )
+                 , F.toList (("ppt"        ,) . GremlinString <$> subjectPpt        )
+                 , F.toList (("env"        ,) . GremlinMap . propertiesOf  <$> subjectEnv)
+                 , F.toList (("args"       ,) . gremlinArgs   <$> subjectArgs       )
+                 , propertiesOf subjectOtherProperties
+                 ]
+
+instance PropertiesOf (Map Text Text) where
+  propertiesOf = Map.toList . fmap GremlinString
+
+instance PropertiesOf Host  where
+  propertiesOf (Host {..}) =
+          mkType "host" :
+            catMaybes [ mkSource <$> hostSource
+                      , ("hostIP",) . GremlinString <$> hostIP
+                      ]
+
+instance PropertiesOf Agent where
+  propertiesOf (Agent {..}) =
+        mkType "agent"
+      : ("userID", GremlinString agentUserID)
+      : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
+               , F.toList (("principleType",) . enumOf <$> agentType)
+               , F.toList (mkSource <$> agentSource)
+               , propertiesOf agentProperties
+               ]
+
+nodeUID_base64 :: Node -> Text
+nodeUID_base64 = uidToBase64 . nodeUID
+
+uidToBase64 :: UID -> Text
+uidToBase64 = T.decodeUtf8 . B64.encode . ByteString.toStrict . encode
+
+newUID :: IO UID
+newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 
 --------------------------------------------------------------------------------
 --  Statistics
 
-printStats :: [Stmt] -> IO ()
-printStats ss =
+printStats :: ([Node],[Edge]) -> IO ()
+printStats ss@(vs,es) =
   do let g  = mkGraph ss
          vs = vertices g
-         mn = length (take 1 ss) -- one node suggests the minimum subgraph is one.
-         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
-         nrStmt = length ss
+         mn = min 1 nrVert
+         sz = maximum (mn : map (length . reachable g) vs)
+         nrVert = length vs
+         nrEdge = length es
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
-     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
-     putStrLn $ "\tTotal statements: " ++ show nrStmt
+     putStrLn $ "\tEntities:         " ++ show nrVert
+     putStrLn $ "\tEdges: " ++ show nrEdge
 
 
 --------------------------------------------------------------------------------
 --  Graphing
 
-data NodeInfo = Node Int | Edge (Int,Int)
-
 -- Create a graph as an array of edges with nodes represented by Int.
-mkGraph :: [Stmt] -> Graph
-mkGraph ss =
-  let (edges,(_,maxNodes)) = runState (Map.empty, 0) $ catMaybes <$> mapM mkEdge ss
+mkGraph :: ([Node],[Edge]) -> Graph
+mkGraph (ns,es) =
+  let (edges,(_,maxNodes)) = runState (Map.empty, 0) $ catMaybes <$> mapM mkEdge es
   in buildG (0,maxNodes) edges
 
 -- Memoizing edge creation
-mkEdge :: Stmt -> State (Map Text Vertex,Vertex) (Maybe Edge)
-mkEdge (StmtPredicate (Predicate s o _ _ _)) =
-  do nS <- nodeOf (pretty s)
-     nO <- nodeOf (pretty o)
+mkEdge :: Edge -> State (Map UID Vertex,Vertex) (Maybe (Vertex,Vertex))
+mkEdge (Edge s o _) =
+  do nS <- nodeOf s
+     nO <- nodeOf o
      return $ Just (nS,nO)
-mkEdge (StmtLoc (T.Located _ s)) = mkEdge s
-mkEdge (StmtEntity {})         = return Nothing
 
 -- Memoizing node numbering
-nodeOf :: Text -> State (Map Text Vertex, Vertex) Vertex
+nodeOf :: UID -> State (Map UID Vertex, Vertex) Vertex
 nodeOf name =
   do (m,v) <- get
      case Map.lookup name m of
