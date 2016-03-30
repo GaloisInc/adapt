@@ -105,7 +105,7 @@ longer than a page:
 
 The Ingester (In) - Tom
 ------------
-In:: [CDM-Element] > [[base-node], [base-edge]]
+`In:: [CDM-Element] > [[base-node], [base-edge]]`
 
 That is, the In takes in a set of CDM statements and produces a graph of nodes and edges in the Bb. The base node
 and base edge graph
@@ -113,26 +113,26 @@ components produced are subsets of the Bb schema described later in this specifi
 
 The Pattern Extractor (Px) - Erin/Trevor
 --------
-Px:: [[base-node],[base-edge]]> [Pattern-definition] > [[pattern-node,[pattern-to-base-edge]]]
+`Px:: [[base-node],[base-edge]]> [Pattern-definition] > [[pattern-node,[pattern-to-base-edge]]]`
 
 That is, Px takes in the graph in the Bb and a list of pattern definitions, and produces as output pattern nodes in the Bb and associated edges connecting those nodes to their respective base layer component nodes
 
 The Segmenter (Se) - Adria
 ---------
-Se:: [[base-node],[base-edge],[pattern-node],[pattern-to-base-edge]] > [segment-criterion] > [<segment-node,[segment-to-base-edge]>]
+`Se:: [[base-node],[base-edge],[pattern-node],[pattern-to-base-edge]] > [segment-criterion] > [<segment-node,[segment-to-base-edge]>]`
 
 That is, the Se takes in a graph of nodes and edges in the Bb and a list of segmentation criteria, and produces in the Bb a set of segment nodes and the edges that connect each to the other nodes in the graph that are its members.
 
 The Anomaly Detector (Ad) - Alan
 -------
-Ad:: [[segment-node],[segment-edge]] > [Mask] > segment-identifier > [<segment-node-id,anomaly-type,anomaly-score>]
+`Ad:: [[segment-node],[segment-edge]] > [Mask] > segment-identifier > [<segment-node-id,anomaly-type,anomaly-score>]`
 
 That is, Ad takes in the graph in the Bb, a list of masks, and a segment identifier, and produces as
 output a list of anomaly score annotations attached to segment nodes in the graph.
 
 The Activity Classifier (Ac) - Hoda
 ----------
-Ac:: [[pattern-node],[pattern-to-base-edge]] > segment-identifier > [<activity-node,[activity-to-pattern-edge]>]
+`Ac:: [[pattern-node],[pattern-to-base-edge]] > segment-identifier > [<activity-node,[activity-to-pattern-edge]>]`
 
 That is, Ac takes in the graph in the Bb and a segment identifier, and produces as output a list of activity nodes in the Bb and the edges that connect them to their component pattern nodes.
 
@@ -146,7 +146,7 @@ That is, Dx takes in the graph in the Bb and produces as output a list of phase 
 
 The Blackboard (Bb) - Erin
 ----------
-Bb:: Query > [[node],[edge]]
+`Bb:: Query > [[node],[edge]]`
 
 The Knowledge Base (Kb) - David
 -----------
