@@ -42,10 +42,6 @@ check: $(ENV)
 pdf: $(ENV)
 	$(PYTHON) sim.py pdf
 
-dxpdf: $(ENV)
-	$(PYTHON) sim.py dxpdf
-
-
 ## Generate data to d3 viz: open viz/index.html to see the report.
 d3: $(ENV)
 		$(PYTHON) sim.py json > $(MODULE)/viz/data.json

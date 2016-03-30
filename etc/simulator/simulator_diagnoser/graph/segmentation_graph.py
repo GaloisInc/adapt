@@ -24,16 +24,23 @@ class SegmentationGraph:
         node = self.G.node[n]
         return [x[0] for x in node['apt']]
 
-    def generate_dot(self, dxs=[]):
-        dot = graphviz.Digraph(node_attr={'margin': '0',
-                                          'fontsize': '6'})
+    def generate_dot(self, dxs=[], symptoms=[], label="Segmentation Graph"):
+        dot = graphviz.Digraph(graph_attr={'label': label,
+                                           'labelloc': 't',
+                                           'fontname': 'sans-serif'},
+                               node_attr={'margin': '0',
+                                          'fontsize': '6',
+                                          'fontname': 'sans-serif'})
         for node in self.G.nodes_iter():
+            is_symptom = node in symptoms
             pos = len([1 for dx in dxs if node in dx])
             color = self.get_color(pos, len(dxs))
             dot.node(str(node),
                      self.node_str(node),
                      style='filled',
-                     fillcolor=color)
+                     fillcolor=color,
+                     color='blue' if is_symptom else 'black',
+                     penwidth='2.5' if is_symptom else '1')
         for i, o in self.G.edges_iter():
             dot.edge(str(i), str(o))
         return dot
