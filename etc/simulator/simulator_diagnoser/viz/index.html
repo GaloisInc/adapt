@@ -96,7 +96,7 @@ var circle = svg.append("g").selectAll("circle")
     .data(force.nodes())
     .enter().append("circle")
     .attr("r", 12)
-    .attr("fill", function(d) { console.log(d.color); return d.color; })
+    .attr("fill", function(d) { return d.color; })
     .call(force.drag);
 
 var text = svg.append("g").selectAll("text")
