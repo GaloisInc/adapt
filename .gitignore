@@ -6,3 +6,5 @@ kafka/
 node_modules/
 supervisord.log
 supervisord.pid
+.DS_Store
+.idea
