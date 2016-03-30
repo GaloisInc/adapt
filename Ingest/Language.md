@@ -179,7 +179,7 @@ The following are type definitions for types used in the schema description.
 ```
 
 and maps to the Titan data type:
-[schema]: # ()
+[schema]: #
 makePropertyKey('prov-tc:source').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 
