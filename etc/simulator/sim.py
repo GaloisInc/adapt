@@ -21,7 +21,7 @@ if __name__ == "__main__":
             writer.write('sim.pdf')
         else:
             dx = sd.SimpleDiagnoser(grammar)
-            dxs = dx.diagnose(graph, symptom)
+            dxs = dx.diagnose(graph, symptom).reduced_diagnosis()
             if(sys.argv[1] == 'json'):
                 graph.print_json(dxs)
             else:

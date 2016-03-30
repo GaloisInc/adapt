@@ -15,3 +15,7 @@ class PdfWriter(object):
 
     def write(self, filename):
         self.merger.write(filename)
+
+    def clear(self):
+        self.merger.close()
+        self.merger = PdfFileMerger()
