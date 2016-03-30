@@ -1,7 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
 module CommonDataModel.Types where
 
 import Data.ByteString (ByteString)
+import Data.Int
 import Data.Text (Text)
+import Data.Word
+import Data.Map
+import GHC.Generics
 
 type Short = Word16
 
@@ -51,9 +56,9 @@ data InstrumentationSource
         | SOURCE_FREEBSD_LOOM_CADETS
         | SOURCE_FREEBSD_MACIF_CADETS
         | SOURCE_WINDOWS_DIFT_FAROS
-  deriving (Eq, Ord, Enum, Show)
+      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
-data PrincipleType = PRINCIPAL_LOCAL | PRINCIPAL_REMOTE
+data PrincipalType = PRINCIPAL_LOCAL | PRINCIPAL_REMOTE
   deriving (Eq, Ord, Enum, Show)
 
 data EventType
@@ -159,19 +164,19 @@ data Value = Value { valType  :: Text
      deriving (Eq,Ord,Show)
 
 data Subject =
-  Subject { uuid                :: Int64
-          , subjType            :: SubjectType
-          , pid                 :: Int32
-          , ppid                :: Int32
-          , source              :: InstrumentationSource
-          , startTimestampMicros :: Int64 -- Unix Epoch
-          , unitId              :: Maybe Int
-          , endTimestampMicros  :: Maybe Int64
-          , cmdLine             :: Maybe Text
-          , importedLibraries   :: [Text]
-          , exportedLibraries   :: [Text]
-          , pInfo               :: Maybe Text
-          , properties          :: Properties
+  Subject { subjUUID                 :: Int64
+          , subjType                 :: SubjectType
+          , subjPID                  :: Int32
+          , subjPPID                 :: Int32
+          , subjSource               :: InstrumentationSource
+          , subjStartTimestampMicros :: Int64 -- Unix Epoch
+          , subjUnitId               :: Maybe Int
+          , subjEndTimestampMicros   :: Maybe Int64
+          , subjCmdLine              :: Maybe Text
+          , subjImportedLibraries    :: [Text]
+          , subjExportedLibraries    :: [Text]
+          , subjPInfo                :: Maybe Text
+          , subjProperties           :: Properties
           }
      deriving (Eq,Ord,Show)
 
@@ -254,13 +259,13 @@ data SimpleEdge =
      deriving (Eq,Ord,Show)
 
 data TCCDMDatum
-        = PTN ProvenanceTagNode
-        | Sub Subject
-        | Eve Event
-        | Net NetFlowObject
-        | Fil FileObject
-        | Src SrcSinkObject
-        | Mem MemoryObject
-        | Pri Principal
-        | Sim SimpleEdge
+        = DatumPTN ProvenanceTagNode
+        | DatumSub Subject
+        | DatumEve Event
+        | DatumNet NetFlowObject
+        | DatumFil FileObject
+        | DatumSrc SrcSinkObject
+        | DatumMem MemoryObject
+        | DatumPri Principal
+        | DatumSim SimpleEdge
       deriving (Eq,Ord,Show)

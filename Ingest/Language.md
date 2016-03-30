@@ -331,7 +331,7 @@ Other primitive types used in our model:
 * *prov-tc:ppt* : string;
 * *prov-tc:args* : list\<prov-tc:argValue\>;
 * *prov-tc:gid* : list\<int\>;
-* *prov-tc:userID* : string;
+* *prov-tc:userID* : int;
 * *prov-tc:sequence* : long;
 
 

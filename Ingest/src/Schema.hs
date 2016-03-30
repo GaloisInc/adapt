@@ -129,13 +129,6 @@ data Relationship
       | WasDerivedFrom Strength Derivation
       deriving (Eq, Ord, Show, Read, Generic)
 
-data EdgeType = EdgeEventHasParentEvent
-              | EdgeSubjectHasParentSubject
-              | EdgeEventIsGeneratedBySubject
-              | EdgeEventAffectsSubject
-              | EdgeSubjectAffectsEvent
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
 data OptionalInfo
         = Info { infoTime            :: Maybe Time
                , infoPermissions     :: Maybe Permissions
@@ -154,13 +147,16 @@ data InstrumentationSource
       | SourceFreeBsdOpenBsmTrace
       | SourceAndroidJavaClearscope
       | SourceAndoirdNativeClearscope
-      | SourceLinuxAuditCadets
+      | SourceFreeBSDDtraceCadets
+      | SourceFreeBSDTeslaCadets
+      | SourceFreeBSDLoomCadets
+      | SourceFreeBSDMacifCadets
       | SourceWindowsDiftFaros
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data PrincipalType
-      = PrincipleLocal
-      | PrincipleRemote
+      = PrincipalLocal
+      | PrincipalRemote
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data EventType
@@ -185,6 +181,11 @@ data EventType
       | EventSignal
       | EventTruncate
       | EventWait
+      | EventOSUnknown
+      | EventKernelUnknown
+      | EventAppUnknown
+      | EventUIUnknown
+      | EventUnknown
       | EventBlind
       -- The below are not (yet) in the specification.
       | EventStop
@@ -203,6 +204,7 @@ data SourceType
       | SourceProximity
       | SourcePressure
       | SourceRelativeHumidity
+      -- composite sensors, sources
       | SourceLinearAcceleration
       | SourceMotion
       | SourceStepDetector
@@ -211,8 +213,17 @@ data SourceType
       | SourceRotationVector
       | SourceGravity
       | SourceGeomagneticRotationVector
+      -- camera and gps sources, temporary
       | SourceCamera
       | SourceGps
+      | SourceAudio
+      -- environment variables
+      | SourceSystemProperty
+      -- ipc should only be used for internal ipc instead of network flows
+      -- clearscope might be using this in the interim for flows
+      -- can be a source or a sink
+      | SourceSinkIpc
+      | SourceUnknown -- ideally, this should never be used
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data IntegrityTag
@@ -246,31 +257,31 @@ data Derivation = UnknownDerivation | Copy | Encode | Compile | Encrypt | Other
 -- "Other primitive types used in our model"
 type Properties    = Map Text Text
 type UID           = (Word64, Word64, Word64, Word64)
-type UserID        = Text
+type UserID        = Int32
 type URL           = Text
 type FileVersion   = Int64
 type Size          = Int64
-type Permissions   = Int16
-type Sequence      = Word64
+type Permissions   = Word16
+type Sequence      = Int64
 type Time          = UTCTime -- ZuluTime
 type StartedAtTime = UTCTime
 type EndedAtTime   = UTCTime
 type IPAddress     = Text
 type SrcAddress    = Text
-type SrcPort       = Word16
+type SrcPort       = Int32
 type DstAddress    = Text
-type DstPort       = Word16
-type PageNumber    = Word64 -- was 'int' note the signed difference
-type Address       = Word64 --    again
-type PID           = Word64 --    again
-type PPID          = Word64 --    again
+type DstPort       = Int32
+type PageNumber    = Int64
+type Address       = Int64
+type PID           = Int32
+type PPID          = Int32
 type UnitID        = Int
 type CommandLine   = Text
 type ImportLibs    = [Text]
 type ExportLibs    = [Text]
 type Env           = Map Text Text
 type PInfo         = Text
-type Location      = Int
+type Location      = Int64
 type Ppt           = Text
 type Args          = [ByteString]
-type GID           = [Int]
+type GID           = [Int32]

@@ -6,8 +6,7 @@
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
-import CommonDataModel.FromProv
-import Data.Int (Int32)
+import FromProv
 import PP (pretty, pp)
 import SimpleGetOpt
 
@@ -372,7 +371,7 @@ instance PropertiesOf Host  where
 instance PropertiesOf Agent where
   propertiesOf (Agent {..}) =
         mkType "agent"
-      : ("userID", GremlinString agentUserID)
+      : ("userID", gremlinNum agentUserID)
       : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
                , F.toList (("principleType",) . enumOf <$> agentType)
                , F.toList (mkSource <$> agentSource)

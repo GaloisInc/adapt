@@ -30,8 +30,8 @@ library
                        Types,
                        Position,
                        PP,
-                       CommonDataModel,
-                       CommonDataModel.FromProv
+                       CommonDataModel, CommonDataModel.Types,
+                       FromProv, Schema
   other-modules:       Util
   other-extensions:    RecordWildCards, GeneralizedNewtypeDeriving, DeriveDataTypeable, OverloadedStrings, ViewPatterns, MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances
   build-depends:       base >=4.7 && <4.9
