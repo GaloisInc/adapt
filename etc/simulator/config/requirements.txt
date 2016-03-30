@@ -4,4 +4,5 @@ decorator==4.0.4
 graphviz==0.4.10
 networkx==1.10
 pep8==1.6.2
+PyPDF2==1.25.1
 wheel==0.24.0
