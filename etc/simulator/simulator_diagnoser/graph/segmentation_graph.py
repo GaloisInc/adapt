@@ -1,5 +1,6 @@
 import sys
 import colour
+import graphviz
 import networkx as nx
 import simulator_diagnoser.generation as generation
 
@@ -23,16 +24,19 @@ class SegmentationGraph:
         node = self.G.node[n]
         return [x[0] for x in node['apt']]
 
-    def print_dot(self, dxs=[], out=sys.stdout):
-        out.write("digraph {\n node [margin=0 fontsize=6];\n")
+    def generate_dot(self, dxs=[]):
+        dot = graphviz.Digraph(node_attr={'margin': '0',
+                                          'fontsize': '6'})
         for node in self.G.nodes_iter():
             pos = len([1 for dx in dxs if node in dx])
             color = self.get_color(pos, len(dxs))
-            out.write(" %d [label=\"%s\", style=filled, fillcolor = \"%s\"];\n" %
-                      (node, self.node_str(node), color))
-        for edge in self.G.edges_iter():
-            out.write(" %d -> %d;\n" % edge)
-        out.write("}\n")
+            dot.node(str(node),
+                     self.node_str(node),
+                     style='filled',
+                     fillcolor=color)
+        for i, o in self.G.edges_iter():
+            dot.edge(str(i), str(o))
+        return dot
 
     def print_json(self, dxs=[], out=sys.stdout):
         out.write("data = {\n")

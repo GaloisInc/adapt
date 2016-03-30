@@ -40,10 +40,10 @@ check: $(ENV)
 	$(PEP8) --config=config/pep8 $(MODULE) sim.py
 
 pdf: $(ENV)
-	$(PYTHON) sim.py pdf | dot -Tpdf -o sim.pdf
+	$(PYTHON) sim.py pdf
 
 dxpdf: $(ENV)
-	$(PYTHON) sim.py dxpdf | dot -Tpdf -o sim.pdf
+	$(PYTHON) sim.py dxpdf
 
 
 ## Generate data to d3 viz: open viz/index.html to see the report.

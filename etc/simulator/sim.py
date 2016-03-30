@@ -16,11 +16,15 @@ if __name__ == "__main__":
         print "Potential APTs: ", dx.diagnose(graph, symptom)
     else:
         if(sys.argv[1] == 'pdf'):
-            graph.print_dot()
+            dot = graph.generate_dot()
+            dot.format = 'pdf'
+            dot.render('sim', cleanup=True)
         else:
             dx = sd.SimpleDiagnoser(grammar)
             dxs = dx.diagnose(graph, symptom)
             if(sys.argv[1] == 'json'):
                 graph.print_json(dxs)
             else:
-                graph.print_dot(dxs)
+                dot = graph.generate_dot(dxs)
+                dot.format = 'pdf'
+                dot.render('sim', cleanup=True)
