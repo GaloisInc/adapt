@@ -212,3 +212,10 @@ class MatcherResult(object):
             return self.counter >= 0
         else:
             return self.counter < len(self.path)
+
+    def get_labels(self, index):
+        labels = []
+        for i, l in self.matches:
+            if index == i:
+                labels.append(l)
+        return labels

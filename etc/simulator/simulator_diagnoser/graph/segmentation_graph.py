@@ -13,10 +13,12 @@ class SegmentationGraph:
     def clear(self):
         self.G = nx.DiGraph()
 
-    def node_str(self, n):
+    def node_str(self, n, labels=None):
         node = self.G.node[n]
         node_s = "%d\\n" % (n)
         for apt_elem in node['apt']:
+            if labels != None and apt_elem[0] not in labels:
+                continue
             node_s += "%s: %.2f\\n" % apt_elem
         return node_s
 
@@ -24,25 +26,50 @@ class SegmentationGraph:
         node = self.G.node[n]
         return [x[0] for x in node['apt']]
 
-    def generate_dot(self, dxs=[], symptoms=[], label="Segmentation Graph"):
+    def generate_dot(self, dxs=[], path=[], match=None, symptoms=[], label='Segmentation Graph'):
         dot = graphviz.Digraph(graph_attr={'label': label,
                                            'labelloc': 't',
                                            'fontname': 'sans-serif'},
                                node_attr={'margin': '0',
                                           'fontsize': '6',
                                           'fontname': 'sans-serif'})
+        translucent = '#00000019' if path or dxs else 'black'
         for node in self.G.nodes_iter():
-            is_symptom = node in symptoms
-            pos = len([1 for dx in dxs if node in dx])
-            color = self.get_color(pos, len(dxs))
+            linecolor, color, penwidth = ('black', 'white', '1')
+            fontcolor = linecolor
+            node_label = self.node_str(node)
+
+            if node in path:
+                linecolor = 'black'
+                labels = match.get_labels(path.index(node))
+                node_label = self.node_str(node, labels)
+                if len(labels):
+                    color = self.get_color(1, 1)
+            elif dxs:
+                pos = len([1 for dx in dxs if node in dx])
+                color = self.get_color(pos, len(dxs))
+            else:
+                linecolor = translucent
+                fontcolor = translucent
+
+            if node in symptoms:
+                linecolor, penwidth = ('blue', '2.5')
+
             dot.node(str(node),
-                     self.node_str(node),
+                     node_label,
                      style='filled',
                      fillcolor=color,
-                     color='blue' if is_symptom else 'black',
-                     penwidth='2.5' if is_symptom else '1')
+                     color=linecolor,
+                     fontcolor=fontcolor,
+                     penwidth=penwidth)
+
         for i, o in self.G.edges_iter():
-            dot.edge(str(i), str(o))
+            if i in path and o in path or dxs:
+                color = 'black'
+            else:
+                color = translucent
+
+            dot.edge(str(i), str(o), color=color)
         return dot
 
     def print_json(self, dxs=[], out=sys.stdout):
