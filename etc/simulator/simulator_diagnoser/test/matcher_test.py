@@ -1,6 +1,6 @@
 import unittest
 from simulator_diagnoser.matcher import MatcherResult, \
-                                        NonTerminal, \
+                                        Terminal, \
                                         Sequence, \
                                         RuleException
 
@@ -8,9 +8,9 @@ from simulator_diagnoser.matcher import MatcherResult, \
 def map_path(path):
     return [[x] for x in path]
 
-class NonTerminalMatcherTest(unittest.TestCase):
+class TerminalMatcherTest(unittest.TestCase):
     def setUp(self):
-        self.nt = NonTerminal('X')
+        self.nt = Terminal('X')
 
     def test_label(self):
         self.assertEqual('X', self.nt.get_label())
@@ -43,7 +43,7 @@ class NonTerminalMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_not_matchable(self):
-        self.nt = NonTerminal('X', matchable=False)
+        self.nt = Terminal('X', matchable=False)
 
         path = map_path('X')
         matches = self.nt.match_path(path)
@@ -60,9 +60,9 @@ class NonTerminalMatcherTest(unittest.TestCase):
 
 class SequenceMatcherTest(unittest.TestCase):
     def setUp(self):
-        self.s = Sequence([NonTerminal('A'),
-                           NonTerminal('B'),
-                           NonTerminal('C')],
+        self.s = Sequence([Terminal('A'),
+                           Terminal('B'),
+                           Terminal('C')],
                           'sequence')
 
     def test_label(self):
@@ -78,9 +78,9 @@ class SequenceMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_nested(self):
-        s2 = Sequence([NonTerminal('A'),
+        s2 = Sequence([Terminal('A'),
                        self.s,
-                       NonTerminal('C')],
+                       Terminal('C')],
                       'sequence2',
                       matchable='False')
 
@@ -101,7 +101,7 @@ class SequenceMatcherTest(unittest.TestCase):
             Sequence('s')
 
         with self.assertRaises(RuleException):
-            Sequence('s', NonTerminal('A'))
+            Sequence('s', Terminal('A'))
 
     def test_incomplete_matches(self):
         expected_result = []

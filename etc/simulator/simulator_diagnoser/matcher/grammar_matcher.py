@@ -55,9 +55,9 @@ class RuleException(Exception):
         return "Rule Exception -> %s: %s" % (self.type, repr(self.value))
 
 
-class NonTerminal(Rule):
+class Terminal(Rule):
     def __init__(self, label, **kwargs):
-        super(NonTerminal, self).__init__([], label, **kwargs)
+        super(Terminal, self).__init__([], label, **kwargs)
 
     def match(self, matcher_result):
         return self.match_label(matcher_result)

@@ -1,9 +1,9 @@
 import sys
 import simulator_diagnoser as sd
 
-grammar = sd.Sequence([sd.NonTerminal('penetration'),
-                       sd.NonTerminal('staging'),
-                       sd.NonTerminal('exfiltration')])
+grammar = sd.Sequence([sd.Terminal('penetration'),
+                       sd.Terminal('staging'),
+                       sd.Terminal('exfiltration')])
 
 if __name__ == "__main__":
     graph = sd.SegmentationGraph()
