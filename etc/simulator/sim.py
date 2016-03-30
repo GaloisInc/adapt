@@ -17,8 +17,8 @@ if __name__ == "__main__":
     else:
         if(sys.argv[1] == 'pdf'):
             dot = graph.generate_dot()
-            dot.format = 'pdf'
-            dot.render('sim', cleanup=True)
+            writer = sd.PdfWriter(dot)
+            writer.write('sim.pdf')
         else:
             dx = sd.SimpleDiagnoser(grammar)
             dxs = dx.diagnose(graph, symptom)
@@ -26,5 +26,5 @@ if __name__ == "__main__":
                 graph.print_json(dxs)
             else:
                 dot = graph.generate_dot(dxs)
-                dot.format = 'pdf'
-                dot.render('sim', cleanup=True)
+                writer = sd.PdfWriter(dot)
+                writer.write('sim.pdf')
