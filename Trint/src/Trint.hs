@@ -35,6 +35,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
+import qualified Data.Text.Lazy.Encoding as Text
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
@@ -187,12 +188,20 @@ printWarnings ws = Text.putStrLn doc
 --------------------------------------------------------------------------------
 --  Database Upload
 
+removeBadEdges :: ([Node],[Edge]) -> ([Node],[Edge])
+removeBadEdges (ns,es) =
+  let exists x = x `Set.member` is
+      is = Set.fromList (map nodeUID ns)
+  in (ns, filter (\e -> exists (edgeSource e) && exists (edgeDestination e)) es)
 
 -- We should probably do this in a transaction or something to tell when vertex insertion errors out
 -- For now, we're just assuming it's always successful
 doUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO VertsAndEdges
 doUpload c work svr =
-  do titan svr =<< compileWork work
+  do res <- titan svr =<< compileWork (removeBadEdges work)
+     case filter isFailure res of
+      Failure _ r:_ -> Text.putStrLn ("Upload Error: " <> Text.decodeUtf8 r)
+      _             -> return ()
      return (Map.empty,Map.empty) -- XXX
  where
  compileWork (ns,es) =
@@ -233,24 +242,17 @@ instance PropertiesOf Edge where
 instance PropertiesOf Relationship where
   propertiesOf r =
     case r of
-      WasGeneratedBy op    -> [rel "wasGeneratedBy", mkOp (genStringOf op)]
-      WasInvalidatedBy op  -> [rel "wasInvalidatedBy", mkEnumOp op]
-      Used opMay           -> rel "used" : F.toList (fmap mkEnumOp opMay)
-      IsPartOf             -> [rel "isPartOf"]
-      WasInformedBy srcMay ->
-        rel "wasInformedBy" : F.toList (fmap mkSource srcMay)
-      RunsOn                -> [rel "runsOn"]
-      ResidesOn             -> [rel "residesOn"]
-      WasAttributedTo       -> [rel "wasAttributedTo"]
+      WasGeneratedBy     -> [rel "wasGeneratedBy"]
+      WasInvalidatedBy   -> [rel "wasInvalidatedBy"]
+      Used               -> [rel "used"]
+      IsPartOf           -> [rel "isPartOf"]
+      WasInformedBy      -> [rel "wasInformedBy"]
+      RunsOn             -> [rel "runsOn"]
+      ResidesOn          -> [rel "residesOn"]
+      WasAttributedTo    -> [rel "wasAttributedTo"]
+      WasDerivedFrom a b -> [rel "wasDerivedFrom", ("strength", enumOf a), ("derivation", enumOf b)]
     where
       rel      = ("relation",)  . GremlinString
-      mkOp     = ("operation",)
-
-      mkEnumOp :: Enum a => a -> (Text,GremlinValue)
-      mkEnumOp = ("operation",) . enumOf
-
-      genStringOf :: GenOperation -> GremlinValue
-      genStringOf  = GremlinString . T.drop 3 . T.toLower . T.pack . show
 
 stringOf :: Show a => a -> GremlinValue
 stringOf  = GremlinString . T.toLower . T.pack . show
@@ -317,8 +319,9 @@ instance PropertiesOf SubjectType where
          [subjTy "unit"]
        SubjectBlock      ->
          [subjTy "block"]
-       SubjectEvent et   ->
+       SubjectEvent et s  ->
          [subjTy "event", ("eventType", enumOf et) ]
+          ++ F.toList ((("sequence",) . gremlinNum) <$> s)
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)
@@ -329,12 +332,15 @@ gremlinList = GremlinList . map GremlinString
 gremlinArgs :: [BS.ByteString] -> GremlinValue
 gremlinArgs = gremlinList . map T.decodeUtf8
 
+instance PropertiesOf a => PropertiesOf (Maybe a) where
+  propertiesOf Nothing  = []
+  propertiesOf (Just x) = propertiesOf x
+
 instance PropertiesOf Subject where
   propertiesOf (Subject {..}) =
                 mkType "subject"
               : mkSource subjectSource
               : ("startTime", gremlinTime subjectStartTime)
-              : ("sequence", gremlinNum subjectSequence)
               : concat
                  [ propertiesOf subjectType
                  , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
@@ -386,16 +392,16 @@ newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 --  Statistics
 
 printStats :: ([Node],[Edge]) -> IO ()
-printStats ss =
+printStats ss@(vs,es) =
   do let g  = mkGraph ss
          vs = vertices g
-         mn = length (take 1 $ fst ss) -- one node suggests the minimum subgraph is one.
-         sz = min nrStmt $ maximum (mn : map (length . reachable g) vs) -- XXX O(n^2) algorithm!
-         nrStmt = length (fst ss)
+         mn = min 1 nrVert
+         sz = maximum (mn : map (length . reachable g) vs)
+         nrVert = length vs
+         nrEdge = length es
      putStrLn $ "Largest subgraph is: " ++ show sz
-     putStrLn $ "\tEntities:         " ++ show (min (length vs) nrStmt)
-     putStrLn $ "\tPredicates:       " ++ show (nrStmt - length vs)
-     putStrLn $ "\tTotal statements: " ++ show nrStmt
+     putStrLn $ "\tEntities:         " ++ show nrVert
+     putStrLn $ "\tEdges: " ++ show nrEdge
 
 
 --------------------------------------------------------------------------------
