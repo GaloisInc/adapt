@@ -1,5 +1,5 @@
 from PyPDF2 import PdfFileMerger, PdfFileReader
-from StringIO import StringIO
+from cStringIO import StringIO
 
 
 class PdfWriter(object):
