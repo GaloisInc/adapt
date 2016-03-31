@@ -36,10 +36,8 @@ or, to get the usage:
 
 This example shows a simple scenario with activity segmented by day and PID.
 
-Current bugs and limitations:
+Current limitations:
 
-- for some reason each segment is emitted twice
-- some output literals are "Unicode" literals, others aren't.
 - we currently assume that all events are tagged with times.  Correct
   behavior in the absence of complete time annotations is undefined.
 - we currently aren't producing edges between segments in the segment layer.
