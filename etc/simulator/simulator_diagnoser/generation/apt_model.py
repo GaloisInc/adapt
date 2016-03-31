@@ -1,38 +1,30 @@
 import random
 
 
-def exfiltration_rnd(graph, n):
-    pred = len(graph.predecessors(n))
-    if pred:
-        return random.triangular(mode=0) / float(pred+1)
+def func_probability(func, n):
+    result = len(func(n))
+    if result:
+        return random.triangular(mode=0) / float(result+1)
     else:
         return random.triangular(mode=1)
 
 
-def penetration_rnd(graph, n):
-    succ = len(graph.successors(n))
-    if succ:
-        return random.triangular(mode=0) / float(succ+1)
-    else:
-        return random.triangular(mode=1)
-
-
-def staging_rnd(graph, n):
+def anotation_probability(graph, n, label):
+    if label == 'penetration':
+        return func_probability(graph.successors, n)
+    elif label == 'exfiltration':
+        return func_probability(graph.predecessors, n)
     return random.random()
 
 
-APT_labels = {'penetration': penetration_rnd,
-              'staging': staging_rnd,
-              'exfiltration': exfiltration_rnd}
-
-
-def annotate_graph(graph):
+def annotate_graph(graph, grammar):
+    labels = grammar.get_labels()
     for n in graph.nodes_iter():
         apt_elems = []
 
-        for k, v in APT_labels.iteritems():
-            prob = v(graph, n)
+        for label in labels:
+            prob = anotation_probability(graph, n, label)
             if prob > 0.3:
-                apt_elems.append((k, prob))
+                apt_elems.append((label, prob))
 
         graph.set_node_data(n, 'apt', apt_elems)

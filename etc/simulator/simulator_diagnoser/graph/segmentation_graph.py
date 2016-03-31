@@ -128,7 +128,9 @@ class SegmentationGraph(object):
 
     def generate(self, p, ranks, per_rank, seed=None):
         generation.random_dag(self, p, ranks, per_rank, seed)
-        generation.annotate_graph(self)
+
+    def annotate(self, grammar):
+        generation.annotate_graph(self, grammar)
 
     @staticmethod
     def create_paths(func, n, current, acc, skip=False, prepend=True):

@@ -9,7 +9,8 @@ if __name__ == "__main__":
     graph = sd.SegmentationGraph()
 
     graph.generate(0.10, ranks=(6, 8), per_rank=(4, 5), seed=0)
-    symptoms = [23]
+    graph.annotate(grammar)
+    symptoms = [25]
 
     dx = sd.SimpleDiagnoser(grammar)
     dxs = dx.diagnose(graph, symptoms)
