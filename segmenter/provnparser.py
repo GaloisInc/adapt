@@ -93,7 +93,9 @@ class Segment:
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
 
     def __str__(self):
-        return 'segment({0},{1})'.format(self.id, self.att_val_dict)
+        return 'segment({0},[{1}])'.format(self.id,
+            ','.join(['{0}=\"{1}\"'.format(k, v)
+                for k, v in self.att_val_dict.items()]))
 
     def label(self):
         return 'segment'
