@@ -1,16 +1,13 @@
 import sys
 import simulator_diagnoser as sd
 
-grammar = sd.Sequence([sd.Terminal('penetration'),
-                       sd.Terminal('staging'),
-                       sd.Terminal('exfiltration')])
-
 if __name__ == "__main__":
-    graph = sd.SegmentationGraph()
+    config = sd.ConfigParser()
 
-    graph.generate(0.10, ranks=(6, 8), per_rank=(4, 5), seed=0)
-    graph.annotate(grammar)
-    symptoms = [25]
+    grammar = config.get_grammar()
+
+    graph = config.get_graph()
+    symptoms = config.get_symptoms()
 
     dx = sd.SimpleDiagnoser(grammar)
     dxs = dx.diagnose(graph, symptoms)

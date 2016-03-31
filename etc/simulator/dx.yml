@@ -1,0 +1,23 @@
+grammar:
+    - sequence:
+        label: 'apt'
+        rules:
+        - optional:
+            rules:
+            - 'penetration'
+        - 'staging'
+        - 'exfiltration'
+
+simulation:
+    link_probability: 0.10
+    ranks:
+        - 6
+        - 8
+    per_rank:
+        - 4
+        - 5
+    seed: 0
+
+diagnosis:
+    seed: 0
+    symptoms: [25]

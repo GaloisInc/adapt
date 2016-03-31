@@ -9,9 +9,9 @@ from simulator_diagnoser.matcher import MatcherResult, \
 
 class OptionalTest(unittest.TestCase):
     def setUp(self):
-        self.ot = Optional(Terminal('A'))
-        self.os = Optional(Sequence([Terminal('B'),
-                                     Terminal('C')]))
+        self.ot = Optional([Terminal('A')])
+        self.os = Optional([Sequence([Terminal('B'),
+                                      Terminal('C')])])
 
     def test_simple_path(self):
         path = map_path('ABC')

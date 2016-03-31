@@ -1,4 +1,5 @@
 import sys
+import random
 import colour
 import graphviz
 import networkx as nx
@@ -44,6 +45,9 @@ class SegmentationGraph(object):
             return [x[0] for x in data]
         else:
             return []
+
+    def get_random_node(self):
+        return random.choice(self.__G.nodes())
 
     def node_str(self, n, labels=None):
         node = self.__G.node[n]
