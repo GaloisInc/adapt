@@ -18,7 +18,7 @@ def random_dag(graph, p, ranks, per_rank, seed=None):
         for j in xrange(nodes):
             for k in xrange(new_nodes):
                 if random.random() < p:
-                    graph.G.add_edge(j, k + nodes)
+                    graph.add_edge(j, k + nodes)
 
         nodes = nodes + new_nodes
     return graph

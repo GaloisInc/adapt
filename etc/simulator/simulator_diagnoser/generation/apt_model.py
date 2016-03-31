@@ -2,7 +2,7 @@ import random
 
 
 def exfiltration_rnd(graph, n):
-    pred = len(graph.G.predecessors(n))
+    pred = len(graph.predecessors(n))
     if pred:
         return random.triangular(mode=0) / float(pred+1)
     else:
@@ -10,8 +10,8 @@ def exfiltration_rnd(graph, n):
 
 
 def penetration_rnd(graph, n):
-    succ = len(graph.G.successors(n))
-    if len(graph.G.successors(n)):
+    succ = len(graph.successors(n))
+    if succ:
         return random.triangular(mode=0) / float(succ+1)
     else:
         return random.triangular(mode=1)
@@ -27,7 +27,7 @@ APT_labels = {'penetration': penetration_rnd,
 
 
 def annotate_graph(graph):
-    for n in graph.G.nodes_iter():
+    for n in graph.nodes_iter():
         apt_elems = []
 
         for k, v in APT_labels.iteritems():
@@ -35,4 +35,4 @@ def annotate_graph(graph):
             if prob > 0.3:
                 apt_elems.append((k, prob))
 
-        graph.G.node[n]['apt'] = apt_elems
+        graph.set_node_data(n, 'apt', apt_elems)
