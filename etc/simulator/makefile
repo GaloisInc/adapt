@@ -20,6 +20,10 @@ all: run
 run: $(ENV)
 	$(PYTHON) sim.py
 
+## Generate DX report in PDF format.
+pdf: $(ENV)
+	$(PYTHON) sim.py pdf
+
 ## Run tests.
 test: $(ENV)
 	$(PYTHON) -m unittest discover -v $(TEST_PATTERN)
@@ -38,10 +42,6 @@ coverage-html: test-coverage
 ## Run PEP8 style check.
 check: $(ENV)
 	$(PEP8) --config=config/pep8 $(MODULE) sim.py
-
-## Generate Dx report in pdf format
-pdf: $(ENV)
-	$(PYTHON) sim.py pdf
 
 ## Generate data to d3 viz: open viz/index.html to see the report.
 d3: $(ENV)
