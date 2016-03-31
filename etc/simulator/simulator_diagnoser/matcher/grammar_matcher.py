@@ -96,6 +96,9 @@ class Choice(Rule):
 
 
 class Optional(Rule):
+    def __init__(self, child, **kwargs):
+        super(Optional, self).__init__([child], **kwargs)
+
     def self_check(self):
         if len(self.children) != 1:
             raise RuleException(self, "rule must have one child.")
