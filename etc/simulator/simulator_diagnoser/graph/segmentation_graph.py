@@ -22,8 +22,11 @@ class SegmentationGraph(object):
 
     def get_node_data(self, n, key):
         if n in self.__G.node:
-            return self.__G.node[n][key]
+            return self.__G.node[n].get(key, None)
         return None
+
+    def nodes(self):
+        return self.__G.nodes()
 
     def nodes_iter(self):
         for n in self.__G.nodes_iter():
@@ -32,6 +35,12 @@ class SegmentationGraph(object):
     def edges_iter(self):
         for u, v in self.__G.edges_iter():
             yield u, v
+
+    def nodes_length(self):
+        return len(self.__G.nodes())
+
+    def edges_length(self):
+        return len(self.__G.edges())
 
     def successors(self, n):
         return self.__G.successors(n)
@@ -136,6 +145,12 @@ class SegmentationGraph(object):
     def annotate(self, grammar):
         generation.annotate_graph(self, grammar)
 
+    def successor_paths(self, n):
+        return self.create_paths(self.successors, n, [], [], skip=True, prepend=False)
+
+    def predecessor_paths(self, n):
+        return self.create_paths(self.predecessors, n, [], [], skip=True, prepend=True)
+
     @staticmethod
     def create_paths(func, n, current, acc, skip=False, prepend=True):
         nodes = func(n)
@@ -153,8 +168,8 @@ class SegmentationGraph(object):
 
     def full_paths(self, n):
         return [x + [n] + y
-                for x in self.create_paths(self.predecessors, n, [], [], skip=True)
-                for y in self.create_paths(self.successors, n, [], [], skip=True, prepend=False)]
+                for x in self.predecessor_paths(n)
+                for y in self.successor_paths(n)]
 
     @staticmethod
     def get_color(current, max_value, range=(0.2, 0.0)):
