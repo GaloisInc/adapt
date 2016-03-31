@@ -1,6 +1,5 @@
 grammar:
     - sequence:
-        label: 'apt'
         rules:
         - optional:
             rules:
