@@ -1,10 +1,11 @@
 
+
 class Rule(object):
     def __init__(self, children, label=None, **kwargs):
         self.label = label
         self.children = children
         self.matchable = kwargs.get('matchable', True)
-        if self.label == None:
+        if self.label is None:
             self.matchable = False
         self.labels = None
         self.self_check()
@@ -121,6 +122,7 @@ class OptionalSequence(Sequence):
     def self_check(self):
         self.children = [Optional(c) for c in children]
 
+
 class OneOrMore(Rule):
     def self_check(self):
         if len(self.children) != 1:
@@ -151,13 +153,14 @@ class ZeroOrMore(OneOrMore):
         if len(self.children) != 1:
             raise RuleException(self, "rule must have one child.")
 
+
 class MatcherResult(object):
     def __init__(self, path, matches=[], counter=None, reverse=False):
         self.path = path
         self.matches = matches
         self.reverse = reverse
 
-        if counter == None:
+        if counter is None:
             self.counter = len(self.path)-1 if self.reverse else 0
         else:
             self.counter = counter

@@ -20,10 +20,10 @@ class TerminalMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_multiple_symbols(self):
-        path = [['a'],['b','X'],['X','c']]
+        path = [['a'], ['b', 'X'], ['X', 'c']]
         matches = self.nt.match_path(path)
-        expected_result = [MatcherResult(path, [(1,'X')], counter=1),
-                           MatcherResult(path, [(2,'X')], counter=2)]
+        expected_result = [MatcherResult(path, [(1, 'X')], counter=1),
+                           MatcherResult(path, [(2, 'X')], counter=2)]
         self.assertListEqual(matches, expected_result)
 
     def test_empty_path(self):

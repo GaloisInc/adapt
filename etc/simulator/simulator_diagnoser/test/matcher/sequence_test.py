@@ -39,9 +39,9 @@ class SequenceMatcherTest(unittest.TestCase):
         self.assertListEqual(matches, expected_result)
 
     def test_multiple_symbols(self):
-        path = [['A'], ['B','C']]
+        path = [['A'], ['B', 'C']]
         matches = self.s.match_path(path)
-        expected_result = [MatcherResult(path, [(0,'A'), (1,'B'), (1,'C')], counter=1)]
+        expected_result = [MatcherResult(path, [(0, 'A'), (1, 'B'), (1, 'C')], counter=1)]
         self.assertListEqual(matches, expected_result)
 
     def test_cardinality(self):
@@ -62,13 +62,13 @@ class SequenceMatcherTest(unittest.TestCase):
     def test_match_label(self):
         path = [['x'], ['sequence'], ['y'], ['z']]
         matches = self.s.match_path(path)
-        expected_result = [MatcherResult(path, [(1,'sequence')], counter=1)]
+        expected_result = [MatcherResult(path, [(1, 'sequence')], counter=1)]
         self.assertListEqual(matches, expected_result)
 
         path = [['A'], ['B'], ['sequence'], ['C']]
         matches = self.s.match_path(path)
-        expected_result = [MatcherResult(path, [(0,'A'), (1,'B'), (3,'C')], counter=3),
-                           MatcherResult(path, [(2,'sequence')], counter=2)]
+        expected_result = [MatcherResult(path, [(0, 'A'), (1, 'B'), (3, 'C')], counter=3),
+                           MatcherResult(path, [(2, 'sequence')], counter=2)]
         self.assertListEqual(matches, expected_result)
 
     def test_not_matchable(self):
@@ -82,7 +82,7 @@ class SequenceMatcherTest(unittest.TestCase):
         path = map_path('XYZABDC')
         mid_match = MatcherResult(path, [(1, 'Y')], counter=1)
         matches = self.s.match(mid_match)
-        expected_result = [MatcherResult(path, [(1, 'Y'), (3,'A'), (4,'B'), (6,'C')], counter=6)]
+        expected_result = [MatcherResult(path, [(1, 'Y'), (3, 'A'), (4, 'B'), (6, 'C')], counter=6)]
         self.assertListEqual(matches, expected_result)
 
     def test_empty_path(self):

@@ -44,10 +44,10 @@ class ChoiceTest(unittest.TestCase):
 
     def test_cardinality(self):
         with self.assertRaises(RuleException):
-          Choice([Terminal('A')])
+            Choice([Terminal('A')])
 
         with self.assertRaises(RuleException):
-          Choice([])
+            Choice([])
 
 if __name__ == '__main__':
     unittest.main()

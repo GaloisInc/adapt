@@ -1,5 +1,6 @@
-class SimpleDiagnoser(object):
 
+
+class SimpleDiagnoser(object):
     def __init__(self, grammar):
         self.grammar = grammar
 
@@ -15,6 +16,7 @@ class SimpleDiagnoser(object):
             matches = self.grammar.match_reverse_path(labelled_path)
             dr.append(path, matches)
         return dr
+
 
 class DiagnosticResult(object):
     def __init__(self, symptoms):

@@ -17,7 +17,7 @@ class SegmentationGraph:
         node = self.G.node[n]
         node_s = "%d\\n" % (n)
         for apt_elem in node['apt']:
-            if labels != None and apt_elem[0] not in labels:
+            if labels is not None and apt_elem[0] not in labels:
                 continue
             node_s += "%s: %.2f\\n" % apt_elem
         return node_s
