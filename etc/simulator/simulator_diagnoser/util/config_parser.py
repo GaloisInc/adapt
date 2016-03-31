@@ -3,6 +3,7 @@ import simulator_diagnoser.matcher as matcher
 import yaml
 import random
 
+
 class ConfigParser(object):
     def __init__(self, filename='dx.yml'):
         self.config = yaml.safe_load(open(filename, 'r'))
@@ -51,8 +52,8 @@ class ConfigParser(object):
             key_rule = ConfigParser.get_rule(key)
             rule_data = elem[key]
 
-            children = [ConfigParser.parse_grammar(value) for value
-                                                          in rule_data.get('rules', None)]
+            children = [ConfigParser.parse_grammar(value)
+                        for value in rule_data.get('rules', None)]
             label = elem[key].get('label', None)
             return key_rule(children, label=label)
 
