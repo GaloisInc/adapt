@@ -14,15 +14,6 @@
 				}
 			}],
 			"specifications": [{
-				"radius": {
-					"r": 3,
-					"from": {
-						"property": "prov-tc:pid",
-						"var": "X"
-					},
-					"edges": ["wasDerivedFrom", "used", "wasGeneratedBy", "wasAssociatedWith", "wasInvalidatedBy"]
-				}
-			}, {
 				"time": {
 					"window": {
 						"days": 1,
@@ -34,6 +25,15 @@
 					"starting": {
 						"var": "T"
 					}
+				}
+			}, {
+				"radius": {
+					"r": 3,
+					"from": {
+						"property": "prov-tc:pid",
+						"var": "X"
+					},
+					"edges": ["wasDerivedFrom", "used", "wasGeneratedBy", "wasAssociatedWith", "wasInvalidatedBy"]
 				}
 			}]
 		}
