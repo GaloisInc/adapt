@@ -9,12 +9,8 @@ grammar:
 
 simulation:
     link_probability: 0.10
-    ranks:
-        - 6
-        - 8
-    per_rank:
-        - 4
-        - 5
+    ranks: [6, 8]
+    per_rank: [4, 5]
     seed: 0
 
 diagnosis:
