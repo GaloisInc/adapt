@@ -85,6 +85,10 @@ class Sequence(Rule):
 
 
 class Choice(Rule):
+    def self_check(self):
+        if len(self.children) < 2:
+            raise RuleException(self, "rule must have at least two children.")
+
     def match(self, matcher_result):
         matchers = []
 
