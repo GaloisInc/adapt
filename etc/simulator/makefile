@@ -39,6 +39,7 @@ coverage-html: test-coverage
 check: $(ENV)
 	$(PEP8) --config=config/pep8 $(MODULE) sim.py
 
+## Generate Dx report in pdf format
 pdf: $(ENV)
 	$(PYTHON) sim.py pdf
 
