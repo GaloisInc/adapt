@@ -13,7 +13,6 @@ import           Data.Time (UTCTime)
 import           Data.Word
 import           GHC.Generics
 
-
 data Node
       = NodeEntity Entity
       | NodeResource Resource

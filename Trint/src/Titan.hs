@@ -7,24 +7,27 @@ module Titan
     ServerInfo(..)
   , defaultServer
   , Operation(..)
-  , ResultId(..)
-  , GraphId(..)
-  , GremlinValue(..), gremlinNum
+    -- * High level interface
+  , withTitan, Titan.send
+  , DataMessage(..), ControlMessage(..), Message(..)
     -- * Insertion
   , titan
   , TitanResult(..), isSuccess, isFailure
-  , DataMessage(..)
     -- * Lower Level
   , titanWS
+  , ResultId(..)
+  , GraphId(..)
+  , GremlinValue(..)
   ) where
 
+import           Control.Concurrent (forkIO)
 import           Control.Concurrent.Async (async,wait)
+import           Control.Monad (forever)
 import           Crypto.Hash.SHA256 (hash)
 import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.List (intersperse)
@@ -39,6 +42,8 @@ import qualified Data.UUID as UUID
 import           Network.WebSockets as WS
 import           Control.Exception as X
 
+import CompileSchema
+
 data ServerInfo = ServerInfo { host     :: String
                              , port     :: Int
                              }
@@ -49,20 +54,6 @@ defaultServer = ServerInfo "localhost" 8182
 
 labelKey :: ByteString
 labelKey = "id"
-
--- Operations represent gremlin-groovy commands such as:
--- assume: g = TinkerGraph.open()
---         t = g.traversal(standard())
--- * InsertVertex: g.addVertex(id, 'ident', 'prop1', 'val1', 'prop2', 'val2')
--- * InsertEdge: t.V(1).addE('ident',t.V(2))
-data Operation id = InsertVertex { label :: Text
-                                 , properties :: [(Text,GremlinValue)]
-                                 }
-                  | InsertEdge { label      :: Text
-                               , src,dst    :: id
-                               , properties :: [(Text,GremlinValue)]
-                               }
-  deriving (Eq,Ord,Show)
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
@@ -89,6 +80,21 @@ isFailure = not . isSuccess
 batchSize :: Int
 batchSize = 500
 
+-- The Titan monad is just a websocket.
+type Titan a = WS.ClientApp a
+
+withTitan :: forall a. ServerInfo ->  (Message -> Titan ()) -> Titan a -> IO (Either ConnectionException a)
+withTitan (ServerInfo {..}) recvHdl mainOper =
+   X.catch (WS.runClient host port "/" (fmap Right . loop))
+           (return . Left)
+ where
+ loop :: WS.ClientApp a
+ loop conn = do _ <- forkIO (forever (receive conn >>= flip recvHdl conn))
+                mainOper conn
+
+send :: GraphId id => Operation id -> Titan ()
+send op conn = WS.send conn (mkGremlinWSCommand (T.decodeUtf8 (serializeOperation op)))
+
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
 -- titan write buffer filling up then blocking while evaluating an
@@ -97,7 +103,7 @@ titan :: GraphId id => ServerInfo -> [Operation id] -> IO [TitanResult]
 titan (ServerInfo {..}) xs =
  do let xss = chunksOf batchSize xs
     mapM (\x -> X.catch (WS.runClient host port "/" (titanWS x))
-                        (\(e::ConnectionException) ->
+                        (\(_e::ConnectionException) ->
                              do putStrLn "runClient exception"
                                 return (Failure (-1) BL.empty)))
          xss
@@ -122,13 +128,13 @@ titanWS ops conn =
         DataMessage _   -> receiveTillClose (n-1) acc
 
  go :: GraphId id => Operation id -> IO ()
- go = send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
+ go = WS.send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
 
- mkGremlinWSCommand :: Text -> Message
- mkGremlinWSCommand cmd = DataMessage $ Text (mkJSON cmd)
+mkGremlinWSCommand :: Text -> Message
+mkGremlinWSCommand cmd = DataMessage $ Text (mkJSON cmd)
 
- mkJSON :: Text -> BL.ByteString
- mkJSON cmd =
+mkJSON :: Text -> BL.ByteString
+mkJSON cmd =
     A.encode
       Req { requestId = UUID.toText (mkHashedUUID cmd)
           , op        = "eval"
@@ -219,23 +225,8 @@ instance GraphId ResultId where
       call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
       args = intersperse "," (concatMap attrs ps)
 
-gremlinScript :: ByteString -> ByteString
-gremlinScript s =
-  BC.concat [ "{ \"gremlin\" : \""
-             , escapeChars s, "\""
-             , " }"]
-
 encodeQuoteText :: Text -> ByteString
 encodeQuoteText = quote . subChars . escapeChars . T.encodeUtf8
-
-data GremlinValue = GremlinNum Integer
-                  | GremlinString Text
-                  | GremlinList [GremlinValue]
-                  | GremlinMap [(Text, GremlinValue)]
-  deriving (Eq,Ord,Show)
-
-gremlinNum :: Integral i => i -> GremlinValue
-gremlinNum = GremlinNum . fromIntegral
 
 encodeGremlinValue :: GremlinValue -> ByteString
 encodeGremlinValue gv =
