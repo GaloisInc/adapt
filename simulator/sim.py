@@ -5,7 +5,6 @@ if __name__ == "__main__":
     config = sd.ConfigParser()
 
     grammar = config.get_grammar()
-
     graph = config.get_graph()
     symptoms = config.get_symptoms()
 
@@ -13,7 +12,6 @@ if __name__ == "__main__":
     dxs = dx.diagnose(graph, symptoms)
 
     if len(sys.argv) == 1:
-        dx = sd.SimpleDiagnoser(grammar)
         print "Reduced diagnosis: ", dxs
         dxs.print_dx()
     else:
