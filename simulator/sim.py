@@ -14,7 +14,8 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
         dx = sd.SimpleDiagnoser(grammar)
-        print "Potential APTs: ", dxs
+        print "Reduced diagnosis: ", dxs
+        dxs.print_dx()
     else:
         if(sys.argv[1] == 'pdf'):
             writer = sd.PdfWriter()

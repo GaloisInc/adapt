@@ -46,3 +46,7 @@ class DiagnosticResult(object):
         for path, matches in self.results:
             for match in matches:
                 yield path, match
+
+    def print_dx(self):
+        for path, match in self.iterate():
+            print "Path: ", path, " - Potential APT: ", match.matches
