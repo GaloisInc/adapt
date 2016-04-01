@@ -43,7 +43,7 @@ coverage-html: test-coverage
 check: $(ENV)
 	$(PEP8) --config=config/pep8 $(MODULE) sim.py
 
-## Generate data to d3 viz: open viz/index.html to see the report.
+## Generate data to d3 viz: open viz/index.html to see the report (WIP).
 d3: $(ENV)
 		$(PYTHON) sim.py json > $(MODULE)/viz/data.json
 

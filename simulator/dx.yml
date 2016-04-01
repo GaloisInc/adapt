@@ -14,5 +14,4 @@ simulation:
     seed: 0
 
 diagnosis:
-    seed: 0
     symptoms: [25]
