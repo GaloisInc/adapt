@@ -7,6 +7,11 @@
 				"value": {
 					"var": "X"
 				}
+			},{
+				"property": "pid2",
+				"value": {
+					"var": "Y"
+				}
 			}],
 			"specifications": [{
 				"radius": {
@@ -14,6 +19,15 @@
 					"from": {
 						"property": "prov-tc:pid",
 						"var": "X"
+					},
+					"edges": ["wasDerivedFrom", "used", "wasGeneratedBy", "wasAssociatedWith", "wasInvalidatedBy"]
+				}
+                       },{
+				"radius": {
+					"r": 3,
+					"from": {
+						"property": "prov-tc:pid",
+						"var": "Y"
 					},
 					"edges": ["wasDerivedFrom", "used", "wasGeneratedBy", "wasAssociatedWith", "wasInvalidatedBy"]
 				}
