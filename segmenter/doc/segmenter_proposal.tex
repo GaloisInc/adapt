@@ -17,11 +17,11 @@ help us interact with the other project groups to identify requirements
 for the segmenter and, in general, 
 concretize our research plan.
 
-Our segmenter extracts several subgraps from a given 
+Our segmenter extracts several subgraphs from a given 
 RDF graph according to a time span.
 An RDF graph is simply a labeled directed graph, 
 i.e. a set of edges of the form $s \to^p o$,
-and hence RDF graphs are tipically represented 
+and hence RDF graphs are typically represented 
 as a set of triples of the form $(s,p,o)$.
 \\[2ex]
 More concretely, our segmenter takes as input
@@ -73,7 +73,7 @@ Our segmenter proceeds as follows:
 1) The minimum $A$ and maximum $B$ absolute times mentioned in $G$ are computed.
 
 2) Let $L = (a_1, b_1), \ldots, (a_n, b_n)$ be the list of all consecutive non-overlapping
-time intervals of duration $T$ between $A$ and $B$. For each $(a_i, b_i)$ the segmenter ouputs an RDF graph $G_i$ constructed as follows:
+time intervals of duration $T$ between $A$ and $B$. For each $(a_i, b_i)$ the segmenter outputs an RDF graph $G_i$ constructed as follows:
 
 (a) If there is a triple $(s, startedAtTime, o)\in G$ such that $o>b_i$, the subject $s$ is marked as {\em unstarted}.
 
@@ -278,7 +278,10 @@ the result of segmenting $SG$ according to $spec2$.  Also, we assume that the va
 $spec2$ are disjoint, so the resulting valuations have disjoint
 domains.  
 
-  The result of segmenting according to \verb|spec1 then spec2| is:
+We can also consider an alternative segmentation combinator
+\verb|then| that ``sequentially composes'' segmentation
+specifications.  The result of segmenting according to
+\verb|spec1 then spec2| is:
 
 \[\{(SG_2, \rho_1 \uplus \rho_2)  \mid (SG_1,\rho_1) \in
 Y_1, (SG_2,\rho_2) \in Y_2(SG_1)\}\]
@@ -300,7 +303,7 @@ now; there isn't a convenient way to link a node to an edge in Titan.)
 
 \subsection{Edges among segments (todo)}
 
-Currentyl we do not define explicit edges among segments.  However,
+Currently we do not define explicit edges among segments.  However,
 since the segments are linked to the nodes of their subgraphs, such
 edges can be defined implicitly as queries.  For example, we could
 define an edge relationship between segment nodes to hold if there is
@@ -313,3 +316,5 @@ layer is analyzed.
 \bibliography{bib}
 
 \end{document}
+
+%  LocalWords:  segmenter
