@@ -3,11 +3,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CommonDataModel where
 
+import qualified Data.ByteString as BS
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Int
 import MonadLib
+import qualified Data.Map as Map
 
 import CommonDataModel.Types
 import qualified Schema as S
@@ -96,10 +99,10 @@ translateSubject       (Subject {..}) =
                   , S.subjectPPID   = Just subjPPID
                   , S.subjectUnitID = subjUnitId
                   , S.subjectCommandLine = subjCmdLine
-                  , S.subjectImportLibs = Just subjImportedLibraries
-                  , S.subjectExportLibs = Just subjExportedLibraries
+                  , S.subjectImportLibs = subjImportedLibraries
+                  , S.subjectExportLibs = subjExportedLibraries
                   , S.subjectProcessInfo = subjPInfo
-                  , S.subjectOtherProperties = subjProperties
+                  , S.subjectOtherProperties = fromMaybe Map.empty subjProperties
                   -- XXX the below are probably not supposed to be fields
                   -- of subject, yes?
                   , S.subjectLocation = Nothing
@@ -153,7 +156,7 @@ translateEventType e =
 
 -- Notice we drop the tag information when extracting parameter values.
 translateParameters :: [Value] -> S.Args
-translateParameters = map valBytes
+translateParameters = map (fromMaybe BS.empty . valBytes)
 
 translateEvent :: Event -> Translate ()
 translateEvent         (Event {..}) =
@@ -170,7 +173,7 @@ translateEvent         (Event {..}) =
                     , S.subjectImportLibs = Nothing
                     , S.subjectExportLibs = Nothing
                     , S.subjectProcessInfo = Nothing
-                    , S.subjectOtherProperties = evtProperties
+                    , S.subjectOtherProperties = fromMaybe Map.empty evtProperties
                     -- XXX the below are probably not supposed to be fields
                     -- of subject, yes?
                     , S.subjectLocation = evtLocation
@@ -212,7 +215,7 @@ translateNetFlowObject (NetFlowObject {..}) = do
                                               , S.infoPermissions     = aoPermission
                                               , S.infoTrustworthiness = mt
                                               , S.infoSensitivity     = ms
-                                              , S.infoOtherProperties = aoProperties
+                                              , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                               }
                 -- Partial fields
                 , S.entitySrcAddress   = nfSrcAddress
@@ -234,7 +237,7 @@ translateFileObject    (FileObject {..}) = do
                                            , S.infoPermissions     = aoPermission
                                            , S.infoTrustworthiness = mt
                                            , S.infoSensitivity     = ms
-                                           , S.infoOtherProperties = aoProperties
+                                           , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                            }
              -- Partial fields
              , S.entityURL          = foURL
@@ -259,7 +262,7 @@ translateSrcSinkObject (SrcSinkObject {..}) = do
                                          , S.infoPermissions     = aoPermission
                                          , S.infoTrustworthiness = mt
                                          , S.infoSensitivity     = ms
-                                         , S.infoOtherProperties = aoProperties
+                                         , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                          }
                }
   tellNode (S.NodeResource r)
@@ -277,7 +280,7 @@ translateMemoryObject  (MemoryObject {..}) = do
                                         , S.infoPermissions     = aoPermission
                                         , S.infoTrustworthiness = mt
                                         , S.infoSensitivity     = ms
-                                        , S.infoOtherProperties = aoProperties
+                                        , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                         }
                -- Partial fields
                , S.entityPageNumber   = moPageNumber
@@ -302,7 +305,7 @@ translatePrincipal     (Principal {..}) =
             , S.agentGID          = Just pGroupIds
             , S.agentType         = Just $ translatePrincipalType pType
             , S.agentSource       = Just $ translateSource pSource
-            , S.agentProperties   = pProperties
+            , S.agentProperties   = fromMaybe Map.empty pProperties
             }
   in tellNode (S.NodeAgent a)
 

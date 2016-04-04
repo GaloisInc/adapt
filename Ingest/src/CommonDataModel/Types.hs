@@ -1,17 +1,16 @@
-{-# LANGUAGE DeriveGeneric #-}
 module CommonDataModel.Types where
 
 import Data.ByteString (ByteString)
 import Data.Int
 import Data.Text (Text)
-import Data.Word
 import Data.Map
-import GHC.Generics
+import Data.Word (Word16)
 
+-- | A two byte value we keep as 16 bits in little endian.
 type Short = Word16
 
 data SubjectType = Process | Thread | Unit
-  deriving (Eq, Ord, Show, Enum)
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
 data SrcSinkType
         = SOURCE_ACCELEROMETER
@@ -43,7 +42,7 @@ data SrcSinkType
         -- Can be a source or a sink
         | SOURCE_SINK_IPC
         | SOURCE_UNKNOWN -- ideally, this should never be used
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data InstrumentationSource
         = SOURCE_LINUX_AUDIT_TRACE
@@ -56,10 +55,10 @@ data InstrumentationSource
         | SOURCE_FREEBSD_LOOM_CADETS
         | SOURCE_FREEBSD_MACIF_CADETS
         | SOURCE_WINDOWS_DIFT_FAROS
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
+      deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data PrincipalType = PRINCIPAL_LOCAL | PRINCIPAL_REMOTE
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data EventType
         = EVENT_ACCEPT
@@ -89,7 +88,7 @@ data EventType
         | EVENT_UI_UNKNOWN
         | EVENT_UNKNOWN
         | EVENT_BLIND
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data EdgeType
         = EDGE_EVENT_AFFECTS_MEMORY
@@ -108,14 +107,14 @@ data EdgeType
         | EDGE_MEMORY_AFFECTS_EVENT
         | EDGE_SRCSINK_AFFECTS_EVENT
         | EDGE_OBJECT_PREV_VERSION
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data LocalAuthType
         = LOCALAUTH_NONE
         | LOCALAUTH_PASSWORD
         | LOCALAUTH_PUBLIC_KEY
         | LOCALAUTH_ONE_TIME_PASSWORD
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data TagOpCode
         = TAG_OP_SEQUENCE
@@ -124,24 +123,24 @@ data TagOpCode
         | TAG_OP_STRONG
         | TAG_OP_MEDIUM
         | TAG_OP_WEAK
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data IntegrityTag
         = INTEGRITY_UNTRUSTED
         | INTEGRITY_BENIGN
         | INTEGRITY_INVULNERABLE
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data ConfidentialityTag
         = CONFIDENTIALITY_SECRET
         | CONFIDENTIALITY_SENSITIVE
         | CONFIDENTIALITY_PRIVATE
         | CONFIDENTIALITY_PUBLIC
-  deriving (Eq, Ord, Enum, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
 data ProvenanceTagNode
     = PTN { ptnValue    :: PTValue
-          , ptnChildren :: [ProvenanceTagNode]
+          , ptnChildren :: Maybe [ProvenanceTagNode]
           , ptnId       :: Maybe TagId
           , ptnProperties  :: Properties
           }
@@ -157,9 +156,10 @@ data PTValue = PTVInt Int64
              | PTVConfidentialityTag ConfidentialityTag
      deriving (Eq,Ord,Show)
 
-data Value = Value { valType  :: Text
-                   , valBytes :: ByteString
-                   , valTags  :: [(Int,TagId)] -- Run Length and ID pairs
+data Value = Value { valSize  :: Int32
+                   , valType  :: Maybe Text
+                   , valBytes :: Maybe ByteString
+                   , valTags  :: Maybe [Int32] -- XXX Run Length and ID pairs
                    }
      deriving (Eq,Ord,Show)
 
@@ -170,13 +170,13 @@ data Subject =
           , subjPPID                 :: Int32
           , subjSource               :: InstrumentationSource
           , subjStartTimestampMicros :: Int64 -- Unix Epoch
-          , subjUnitId               :: Maybe Int
+          , subjUnitId               :: Maybe Int32
           , subjEndTimestampMicros   :: Maybe Int64
           , subjCmdLine              :: Maybe Text
-          , subjImportedLibraries    :: [Text]
-          , subjExportedLibraries    :: [Text]
+          , subjImportedLibraries    :: Maybe [Text]
+          , subjExportedLibraries    :: Maybe [Text]
           , subjPInfo                :: Maybe Text
-          , subjProperties           :: Properties
+          , subjProperties           :: Maybe Properties
           }
      deriving (Eq,Ord,Show)
 
@@ -192,16 +192,16 @@ data Event =
         , evtLocation           :: Maybe Int64
         , evtSize               :: Maybe Int64
         , evtProgramPoint       :: Maybe Text
-        , evtProperties         :: Properties
+        , evtProperties         :: Maybe Properties
         }
      deriving (Eq,Ord,Show)
 
 data AbstractObject =
-  AbstractObject { aoSource     :: InstrumentationSource
-                 , aoPermission :: Maybe Short
+  AbstractObject { aoSource              :: InstrumentationSource
+                 , aoPermission          :: Maybe Short
                  , aoLastTimestampMicros :: Maybe Int64
-                 , aoProvenanceTagNode  :: Maybe ProvenanceTagNode
-                 , aoProperties         :: Properties
+                 , aoProvenanceTagNode   :: Maybe ProvenanceTagNode
+                 , aoProperties          :: Maybe Properties
                  }
      deriving (Eq,Ord,Show)
 
@@ -245,7 +245,7 @@ data Principal =
             , pUserId   :: Int32
             , pGroupIds :: [Int32]
             , pSource   :: InstrumentationSource
-            , pProperties :: Properties
+            , pProperties :: Maybe Properties
             }
      deriving (Eq,Ord,Show)
 
