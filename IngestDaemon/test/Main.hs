@@ -9,7 +9,7 @@ import           Data.Time()
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import CommonDataModel.FromProv
+import FromProv
 
 main :: IO ()
 main = defaultMain (testGroup "Adapt-Ingest" adaptIngest)
