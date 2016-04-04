@@ -19,8 +19,7 @@ import           Network.Kafka.Protocol as Kafka
 import           Schema
 import           CompileSchema
 import           CommonDataModel as CDM
-
-import           IngestDaemon.Avro
+import           CommonDataModel.Avro
 
 type Statement = Operation Text
 

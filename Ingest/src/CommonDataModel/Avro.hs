@@ -5,7 +5,7 @@
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module IngestDaemon.Avro where
+module CommonDataModel.Avro where
 import Prelude as P
 import           CommonDataModel.Types as CDM
 import           Control.Monad (replicateM)
@@ -18,11 +18,10 @@ import           Data.Int (Int32,Int64)
 import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Proxy
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import           Data.Word (Word8,Word16)
+import           Data.Word (Word16)
 
 import GHC.TypeLits
 
@@ -307,8 +306,8 @@ getLong :: Get Int64
 getLong = getZigZag 8
 
 getZigZag :: (Bits i, Integral i) => Int -> Get i
-getZigZag n =
-  do orig@(w:ws) <- getWord8s n
+getZigZag nrMaxBytes =
+  do orig <- getWord8s nrMaxBytes
      let word0 = foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig)
      return ((word0 `shiftR` 1) `xor` (negate (word0  .&. 1) ))
  where
