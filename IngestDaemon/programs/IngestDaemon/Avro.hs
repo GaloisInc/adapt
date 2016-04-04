@@ -309,18 +309,15 @@ getLong = getZigZag 8
 getZigZag :: (Bits i, Integral i) => Int -> Get i
 getZigZag n =
   do orig@(w:ws) <- getWord8s n
-     let fSign = if w .&. 0x01 == 0x01 then negate else id
-         ws'   = map (`shiftR` 1) orig
-         spare = map (fromIntegral . fromEnum . flip testBit 0) ws
-     return $ fSign $ foldl' (\a x -> (a `shiftL` 7) + x) 0 (zipWith (+) (map fromIntegral ws') spare)
+     let word0 = foldl' (\a x -> (a `shiftL` 7) + fromIntegral x) 0 (reverse orig)
+     return ((word0 `shiftR` 1) `xor` (negate (word0  .&. 1) ))
  where
   getWord8s 0 = return []
   getWord8s n =
     do w <- G.getWord8
-       let w'  = w .&. 0x7F
-           msb = w `testBit` 7
-       (w' :) <$> if msb then getWord8s (n-1)
-                         else return []
+       let msb = w `testBit` 7
+       (w .&. 0x7F :) <$> if msb then getWord8s (n-1)
+                                 else return []
 
 getBytes :: Get ByteString
 getBytes =
