@@ -43,13 +43,13 @@ data CDMDecodeFailure = CDMDecodeFailure BL.ByteString Int64 String
 instance X.Exception CDMDecodeFailure
 
 -- | Lazily decode a lazy byte string.  That is, decode the ByteString
--- gradually and throw exceptions, instead of use `Either`, for errors.
+-- gradually and throw exceptions, instead of using `Either`, for errors.
 decodeAvroLazy :: BL.ByteString -> [CDM.TCCDMDatum]
 decodeAvroLazy bs0 = go bs0
  where
  go bs =
   case runGetOrFail getCDM08 bs of
-    Left (_,off,str)   -> X.throw (CDMDecodeFailure bs0 off str)
+    Left (_,off,str)   -> X.throw (CDMDecodeFailure bs off str)
     Right (rest,_,res) -> res : (go rest)
 
 data Array a
