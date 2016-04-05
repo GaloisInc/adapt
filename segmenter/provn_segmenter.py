@@ -188,7 +188,7 @@ class DocumentGraph:
             for e in self.doc.expression_list:
                 d = e.att_val_dict
                 d['type'] = e.label()
-                if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent):
+                if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
                     self.g.add_node(e.id, e.att_val_dict)
                 else:
                     d = e.att_val_dict
@@ -235,6 +235,52 @@ class DocumentGraph:
     def get_nodes_by_att(self, att, val):
         return set([n for n in self.g.nodes()
             if att in self.g.node[n] and self.g.node[n][att] == val])
+
+def test_provn_segmenter():
+    # Testing parser
+    sys.stderr.write('*'*30+'\n')
+    sys.stderr.write('Running PROVN Segmenter Tests\n')
+    sys.stderr.write('*'*30+'\n')
+    test_input_files = [
+        #{'filename': 'test/2016-01-28/bad-ls.provn',
+        # 'num_nodes': 2712,
+        # 'num_edges': 9683},
+        {'filename': 'test/test_james.provn',
+         'num_nodes': 10,
+         'num_edges': 11}
+        ]
+    for test_d in test_input_files:
+        filename = test_d['filename']
+        sys.stderr.write('---> Parsing {0}\n'.format(filename))
+        doc = Document()
+        doc.parse_provn(filename)
+        dg = DocumentGraph(doc)
+        sys.stderr.write('---> Verifying number of edges and nodes\n')
+        assert len(dg.g.nodes()) == test_d['num_nodes'], '{0} != {1}'.format(len(dg.g.nodes()), test_d['num_nodes']) 
+        assert len(dg.g.edges()) == test_d['num_edges'], '{0} != {1}'.format(len(dg.g.edges()), test_d['num_edges']) 
+
+    # Testing segmenter
+    test_input_files = [
+        {'filename': 'test/test_james.provn',
+         'spec': 'test/test_james_spec.json',
+         'num_nodes': 15,
+         'num_edges': 13}
+        ]
+    for test_d in test_input_files:
+        filename = test_d['filename']
+        spec = test_d['spec']
+        doc = Document()
+        doc.parse_provn(filename)
+        dg = DocumentGraph(doc)
+        s = Segmenter(dg, spec)
+        segmentation_doc = s.eval_spec()
+        sdg = DocumentGraph(segmentation_doc)
+        seg_num_nodes = len(sdg.g.nodes())
+        seg_num_edges = len(sdg.g.edges())
+        assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(seg_num_nodes, test_d['num_nodes']) 
+        assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(seg_num_edges, test_d['num_edges']) 
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A provn segmenter')

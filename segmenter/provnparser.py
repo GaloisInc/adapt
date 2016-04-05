@@ -24,8 +24,9 @@ class ProvRelation:
 
 class SegmentExpr(ProvRelation):
     def __str__(self):
-        return 'includes({0}, {1}, {2})'.format(
-            self.s, self.t, self.att_val_dict)
+        return 'includes({0}, {1}, [{2}])'.format(
+            self.s, self.t, ','.join(['{0}=\"{1}\"'.format(k, v)
+                for k, v in self.att_val_dict.items()]))
 
     def label(self):
         return 'includes'
@@ -238,11 +239,13 @@ class Document:
             return CommExpr(
                 t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
         except KeyError:
-            return CommExpr(t['s'][0], t['t'][0], [], t['timestamp'])
+            timestamp = t.get('timestamp', None)
+            return CommExpr(t['s'][0], t['t'][0], [], timestamp)
 
     def make_derivation_expression(self, t):
+        timestamp = t.get('timestamp', None)
         return DerivationExpr(
-            t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
+            t['s'][0], t['t'][0], t['att_val_list'], timestamp)
 
     def make_att_val_pair(self, t):
         return (t['att'], t['val'])
@@ -266,7 +269,7 @@ def bnf(doc):
     equal = Suppress("=")
     prefix_name = Word(alphanums + '-')
     name = Word(alphanums)
-    word_with_spaces = Word(alphanums + ' /:_-().,{}[]')
+    word_with_spaces = Word(alphanums + ' /:_-().,{}[]+*=$')
     dash = '-'
     la = '<'
     ra = '>'
