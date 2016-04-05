@@ -1,19 +1,23 @@
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE EmptyDataDecls    #-}
-{-# LANGUAGE KindSignatures    #-}
-{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE EmptyDataDecls      #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
 module CommonDataModel.Avro where
 import Prelude as P
 import           CommonDataModel.Types as CDM
+import qualified Control.Exception as X
 import           Control.Monad (replicateM)
 import           Data.Bits
 import           Data.Binary.Get (ByteOffset, Get, runGetOrFail)
 import qualified Data.Binary.Get as G
 import           Data.ByteString (ByteString)
 import           Data.ByteString.Lazy (fromStrict,toStrict)
+import qualified Data.ByteString.Lazy as BL
+import           Data.Data
 import           Data.Int (Int32,Int64)
 import           Data.List (foldl')
 import           Data.Map (Map)
@@ -32,6 +36,21 @@ decodeAvro bs0 = go (fromStrict bs0)
    case runGetOrFail getCDM08 bs of
     Left  (_,off,str)  -> Left (toStrict bs,off,str)
     Right (rest,_,res) -> fmap (res :) (go rest)
+
+data CDMDecodeFailure = CDMDecodeFailure BL.ByteString Int64 String
+ deriving (Eq, Ord, Show, Typeable, Data)
+
+instance X.Exception CDMDecodeFailure
+
+-- | Lazily decode a lazy byte string.  That is, decode the ByteString
+-- gradually and throw exceptions, instead of use `Either`, for errors.
+decodeAvroLazy :: BL.ByteString -> [CDM.TCCDMDatum]
+decodeAvroLazy bs0 = go bs0
+ where
+ go bs =
+  case runGetOrFail getCDM08 bs of
+    Left (_,off,str)   -> X.throw (CDMDecodeFailure bs0 off str)
+    Right (rest,_,res) -> res : (go rest)
 
 data Array a
 data Null = Null
