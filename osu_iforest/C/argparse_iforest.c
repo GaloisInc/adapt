@@ -108,7 +108,7 @@ d(option)* option_spec() {
         .sarg = 'c',
         .larg = "columns",
         .name = "N",
-        .desc = "specify number of columns to use.",
+        .desc = "specify number of columns to use (0 indicates to use all columns).",
         .default_value = "0",
         .value = NULL,
         .isflag = false,

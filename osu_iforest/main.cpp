@@ -5,30 +5,38 @@
  * @Author: Tadeze
  * Main entry: accepts the the
  * @param argv
- *    Usage: iforest [options]
- *      -i FILE, --infile=FILE
- Specify path to input data file. (Required).
- -o FILE, --outfile=FILE
- Specify path to output results file. (Required).
- -m COLS, --metacol=COLS
- Specify columns to preserve as meta-data. (Separated by ',' Use '-' to specify ranges).
- -t N, --ntrees=N
- Specify number of trees to build.
- Default value is 100.
- -s S, --sampsize=S
- Specify subsampling rate for each tree. (Value of 0 indicates to use entire data set).
- Default value is 2048.
- -d MAX, --maxdepth=MAX
- Specify maximum depth of trees. (Value of 0 indicates no maximum).
- Default value is 0.
- -H, --header
- Toggle whether or not to expect a header input.
- Default value is true.
- -v, --verbose
- Toggle verbose ouput.
- Default value is false.
- -h, --help
- Print this help message and exit.
+
+ Usage: iforest [Options]
+ Options:
+        -i FILE, --infile=FILE
+                Specify path to input data file. (Required).
+        -o FILE, --outfile=FILE
+                Specify path to output results file. (Required).
+        -m COLS, --metacol=COLS
+                Specify columns to preserve as meta-data. (Separated by ',' Use '-' to specify ranges).
+        -t N, --ntrees=N
+                Specify number of trees to build.
+                Default value is 100.
+        -s S, --sampsize=S
+                Specify subsampling rate for each tree. (Value of 0 indicates to use entire data set).
+                Default value is 2048.
+        -d MAX, --maxdepth=MAX
+                Specify maximum depth of trees. (Value of 0 indicates no maximum).
+                Default value is 0.
+        -H, --header
+                Toggle whether or not to expect a header input.
+                Default value is true.
+        -v, --verbose
+                Toggle verbose ouput.
+                Default value is false.
+        -w N, --windowsize=N
+                specify window size.
+                Default value is 512.
+        -c N, --columns=N
+                specify number of columns to use (0 indicates to use all columns).
+				Default value is 0.
+        -h, --help
+                Print this help message and exit.
  */
 
 #include "main.hpp"
@@ -296,17 +304,31 @@ void printScoreToFile(vector<double> &scores, const ntstringframe* metadata,
 	outscore.close();
 }
 
-void printScoreToFile(vector<double> &scores, const ntstringframe* metadata,
-		const doubleframe *dt, char fName[]) {
+void printScoreToFile(vector<double> &scores, ntstringframe* csv,
+		const ntstringframe* metadata, const doubleframe *dt, char fName[]) {
 	ofstream outscore;
 	outscore.open(fName);
 	// print header
 	for(int i = 0; i < metadata->ncol; ++i)
 		outscore << metadata->colnames[i] << ",";
+	for(int i = 0; i < csv->ncol; ++i){
+		if(i == csv->ncol-1){
+			size_t l = strlen(csv->colnames[i]);
+			char temp[l];
+			strncpy(temp, csv->colnames[i], l-1);
+			temp[l] = '\0';
+			outscore << temp << ",";
+		}
+		else
+			outscore << csv->colnames[i] << ",";
+	}
+
 	outscore << "anomaly_score\n";
 	for (int i = 0; i < (int) scores.size(); i++) {
 		for(int j = 0; j < metadata->ncol; ++j)
 			outscore << metadata->data[i][j] << ",";
+		for(int j = 0; j < dt->ncol; ++j)
+			outscore << dt->data[i][j] << ",";
 		outscore << scores[i] << "\n";
 	}
 	outscore.close();
@@ -353,7 +375,7 @@ int main(int argc, char* argv[]) {
 	// standard IsolationForest
 	IsolationForest iff(ntree, dt, nsample, maxheight, rsample);
 	std::vector<double> scores = iff.AnomalyScore(dt);
-	printScoreToFile(scores, metadata, dt, output_name);
+	printScoreToFile(scores, csv, metadata, dt, output_name);
 
 	return 0;
 }
