@@ -377,12 +377,12 @@ Other primitive types used in our model:
 * *prov-tc:time* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:time').dateType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('prov-tc:time').dataType(Date.class).cardinality(Cardinality.SINGLE)
 
 * *prov:startedAtTime* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:startedAtTime').dateType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('prov-tc:startedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
 
 * *prov:endedAtTime* : ZuluTime;
   and maps to the Titan data type:
@@ -402,7 +402,7 @@ Other primitive types used in our model:
 * *prov-tc:dstAddress* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:dstAddress').dataType(String.class).cardinaality(Cardinalty.SINGLE)
+  makePropertyKey('prov-tc:dstAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:dstPort* : int;
   and maps to the Titan data type:
@@ -457,7 +457,7 @@ Other primitive types used in our model:
 * *prov-tc:pInfo* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:pInfo').dataType(String.class).cardinality(Caradinality.SINGLE)
+  makePropertyKey('prov-tc:pInfo').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:location* : int;
   and maps to the Titan data type:
