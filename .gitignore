@@ -1,6 +1,5 @@
 *.exe
 *.o
-*.csv
 *.R?*
 *.gch
 *.pdf
