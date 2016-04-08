@@ -57,7 +57,7 @@ seg_5,VRangeType,1441-1800,188,0,0,0,0,0,171,188
 The corresponding output is given below:
 
 ```
-$ iforest -i seg_spec_features.csv  -o seg_spec_features_score.csv -m 1-3 -t 100 -s 100
+$ iforest -i seg_spec_features.csv -o seg_spec_features_score.csv -m 1-3 -t 100 -s 100
 $ cat seg_spec_features_score.csv
 segment_id,segment_type,segment_type_instance,EVENT_READ,EVENT_WRITE,EVENT_EXECUTE,SUBJECT_PROCESS,SUBJECT_THREAD,SUBJECT_EVENT,NUM_FILES,NUM_SUBJECTS,anomaly_score
 seg_1,VRangeType,0-360,189,0,0,0,0,0,171,189,0.517051
