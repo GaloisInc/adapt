@@ -4,8 +4,11 @@ The Anomaly Detector called Isolation Forest accepts a set of feature vectors in
 
 ## Instalation and Usage
 ```
-Usage: iforest [Options]
- Options:
+$ cd osu_iforest
+$ make
+$ ./iforest.exe -h
+Usage: ./iforest.exe [options]
+Options:
         -i FILE, --infile=FILE
                 Specify path to input data file. (Required).
         -o FILE, --outfile=FILE

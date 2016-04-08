@@ -11,6 +11,7 @@ seg_1,VRangeType,0-360
 seg_2,VRangeType,361-720
 seg_3,VRangeType,721-1080
 seg_4,VRangeType,1081-1440
+seg_5,VRangeType,1441-1800
 ...
 ```
 
@@ -27,5 +28,6 @@ seg_1,VRangeType,0-360,189,0,0,0,0,0,171,189
 seg_2,VRangeType,361-720,164,0,0,0,0,0,194,164
 seg_3,VRangeType,721-1080,174,0,0,0,0,0,185,174
 seg_4,VRangeType,1081-1440,181,0,0,0,0,0,178,181
+seg_5,VRangeType,1441-1800,188,0,0,0,0,0,171,188
 ...
 ```
