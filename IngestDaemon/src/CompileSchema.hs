@@ -87,19 +87,7 @@ instance PropertiesOf Edge where
   propertiesOf (Edge _src _dst rel) = propertiesOf rel
 
 instance PropertiesOf Relationship where
-  propertiesOf r =
-    case r of
-      WasGeneratedBy     -> [rel "wasGeneratedBy"]
-      WasInvalidatedBy   -> [rel "wasInvalidatedBy"]
-      Used               -> [rel "used"]
-      IsPartOf           -> [rel "isPartOf"]
-      WasInformedBy      -> [rel "wasInformedBy"]
-      RunsOn             -> [rel "runsOn"]
-      ResidesOn          -> [rel "residesOn"]
-      WasAttributedTo    -> [rel "wasAttributedTo"]
-      WasDerivedFrom a b -> [rel "wasDerivedFrom", ("strength", enumOf a), ("derivation", enumOf b)]
-    where
-      rel      = ("relation",)  . GremlinString
+  propertiesOf r = [("relation", enumOf r)]
 
 stringOf :: Show a => a -> GremlinValue
 stringOf  = GremlinString . T.toLower . T.pack . show

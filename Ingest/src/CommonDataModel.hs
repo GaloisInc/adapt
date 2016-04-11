@@ -323,19 +323,19 @@ translateSimpleEdge (SimpleEdge {..}) =
 translateRelationship :: EdgeType -> S.Relationship
 translateRelationship e =
   case e of
-    EDGE_EVENT_AFFECTS_MEMORY        -> S.WasGeneratedBy -- XXX or WasInvalidatedBy depending...
-    EDGE_EVENT_AFFECTS_FILE          -> S.WasGeneratedBy
-    EDGE_EVENT_AFFECTS_NETFLOW       -> S.WasGeneratedBy
-    EDGE_EVENT_AFFECTS_SUBJECT       -> S.WasGeneratedBy
-    EDGE_EVENT_AFFECTS_SRCSINK       -> S.WasGeneratedBy
-    EDGE_EVENT_HASPARENT_EVENT       -> error "EDGE_EVENT_HASPARENT_EVENT"
-    EDGE_EVENT_ISGENERATEDBY_SUBJECT -> error "EDGE_EVENT_ISGENERATEDBY_SUBJECT"
-    EDGE_SUBJECT_AFFECTS_EVENT       -> error "EDGE_SUBJECT_AFFECTS_EVENT"
-    EDGE_SUBJECT_HASPARENT_SUBJECT   -> error "EDGE_SUBJECT_HASPARENT_SUBJECT"
-    EDGE_SUBJECT_HASLOCALPRINCIPAL   -> error "EDGE_SUBJECT_HASLOCALPRINCIPAL"
-    EDGE_SUBJECT_RUNSON              -> error "EDGE_SUBJECT_RUNSON"
-    EDGE_FILE_AFFECTS_EVENT          -> error "EDGE_FILE_AFFECTS_EVENT"
-    EDGE_NETFLOW_AFFECTS_EVENT       -> error "EDGE_NETFLOW_AFFECTS_EVENT"
-    EDGE_MEMORY_AFFECTS_EVENT        -> error "EDGE_MEMORY_AFFECTS_EVENT"
-    EDGE_SRCSINK_AFFECTS_EVENT       -> error "EDGE_SRCSINK_AFFECTS_EVENT"
-    EDGE_OBJECT_PREV_VERSION         -> error "EDGE_OBJECT_PREV_VERSION"
+    EDGE_EVENT_AFFECTS_MEMORY        -> S.EdgeEventAffectsMemory
+    EDGE_EVENT_AFFECTS_FILE          -> S.EdgeEventAffectsFile
+    EDGE_EVENT_AFFECTS_NETFLOW       -> S.EdgeEventAffectsNetflow
+    EDGE_EVENT_AFFECTS_SUBJECT       -> S.EdgeEventAffectsSubject
+    EDGE_EVENT_AFFECTS_SRCSINK       -> S.EdgeEventAffectsSrcsink
+    EDGE_EVENT_HASPARENT_EVENT       -> S.EdgeEventHasparentEvent
+    EDGE_EVENT_ISGENERATEDBY_SUBJECT -> S.EdgeEventIsgeneratedbySubject
+    EDGE_SUBJECT_AFFECTS_EVENT       -> S.EdgeSubjectAffectsEvent
+    EDGE_SUBJECT_HASPARENT_SUBJECT   -> S.EdgeSubjectHasparentSubject
+    EDGE_SUBJECT_HASLOCALPRINCIPAL   -> S.EdgeSubjectHaslocalprincipal
+    EDGE_SUBJECT_RUNSON              -> S.EdgeSubjectRunson
+    EDGE_FILE_AFFECTS_EVENT          -> S.EdgeFileAffectsEvent
+    EDGE_NETFLOW_AFFECTS_EVENT       -> S.EdgeNetflowAffectsEvent
+    EDGE_MEMORY_AFFECTS_EVENT        -> S.EdgeMemoryAffectsEvent
+    EDGE_SRCSINK_AFFECTS_EVENT       -> S.EdgeSrcsinkAffectsEvent
+    EDGE_OBJECT_PREV_VERSION         -> S.EdgeObjectPrevVersion

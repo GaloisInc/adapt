@@ -1,28 +1,66 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 module Main where
 
-import           Control.Monad (when)
+import           Control.Monad (when,replicateM)
+import qualified Data.ByteString.Lazy as BL
+import           Data.Binary.Get (runGet)
 import           Data.Map (fromList)
 import           Data.Monoid
+import           Data.Proxy
 import qualified Data.Text.Lazy as T
 import           Data.Time()
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Test.Tasty.QuickCheck
+import           GHC.TypeLits
 
 import FromProv
+import CommonDataModel.Avro
 
 main :: IO ()
 main = defaultMain (testGroup "Adapt-Ingest" adaptIngest)
 
 adaptIngest :: [TestTree]
-adaptIngest = [ingest,trint]
+adaptIngest = [ingest,trint,ingestd]
 
 trint :: TestTree
-trint = testGroup "trint" []
+trint = testGroup "Trint command line tool tests" []
+
+ingestd :: TestTree
+ingestd = testGroup "Ingest daemon tests" []
 
 ingest :: TestTree
 ingest =
-  testGroup "ingest"
+  testGroup "Ingest library tests"
+    [ provTC
+    , cdmSerialization ]
+
+cdmSerialization :: TestTree
+cdmSerialization =
+  testGroup "CDM (de)serialization"
+   [ testProperty "Unique bytestrings -> unique 8 byte zigzags."
+      (\(a :: ZigZag 8) (b :: ZigZag 8) -> a /= b ==> decodeZigZag a /= decodeZigZag b)
+   , testProperty "ZigZag decoding is 'Right'"
+      (\(a::ZigZag 8) -> (decodeZigZag a `seq` ()) == () )
+   ]
+
+data ZigZag (n::Nat) = ZZ { unZZ :: BL.ByteString }
+  deriving (Eq, Ord, Show)
+
+instance KnownNat n => Arbitrary (ZigZag n) where
+  arbitrary =
+    do lst   <- (`mod` 128) <$> arbitrary
+       first <- replicateM (fromIntegral $ natVal (Proxy :: Proxy n)) arbitrary
+       return $ ZZ (BL.pack (init first ++ [lst]))
+
+decodeZigZag :: forall n. (KnownNat n) => ZigZag n -> Integer
+decodeZigZag x = runGet (getZigZag (fromIntegral $ natVal (Proxy :: Proxy n))) (unZZ x)
+
+provTC :: TestTree
+provTC = testGroup "Prov-TC translations"
     [ activity
     , entity
     , used

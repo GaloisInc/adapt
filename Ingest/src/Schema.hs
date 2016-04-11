@@ -117,16 +117,39 @@ data Agent =
       deriving (Eq, Ord, Show, Read, Generic)
 
 data Relationship
-      = WasGeneratedBy
-      | WasInvalidatedBy
-      | Used
-      | IsPartOf
-      | WasInformedBy
-      | RunsOn
-      | ResidesOn
-      | WasAttributedTo
-      | WasDerivedFrom Strength Derivation
-      deriving (Eq, Ord, Show, Read, Generic)
+    = EdgeEventAffectsMemory
+    | EdgeEventAffectsFile
+    | EdgeEventAffectsNetflow
+    | EdgeEventAffectsSubject
+    | EdgeEventAffectsSrcsink
+    | EdgeEventHasparentEvent
+    | EdgeEventIsgeneratedbySubject
+    | EdgeSubjectAffectsEvent
+    | EdgeSubjectHasparentSubject
+    | EdgeSubjectHaslocalprincipal
+    | EdgeSubjectRunson
+    | EdgeFileAffectsEvent
+    | EdgeNetflowAffectsEvent
+    | EdgeMemoryAffectsEvent
+    | EdgeSrcsinkAffectsEvent
+    | EdgeObjectPrevVersion
+    | WasDerivedFrom
+    | WasAttributedTo
+    | EdgeMemoryResidesOn
+    | EdgeFileResidesOn
+    | EdgeNetflowResidesOn
+    | EdgeSubjectResidesOn
+    | EdgeSrcSinkResidesOn
+    | EdgeMemoryHaslocalprincipal
+    | EdgeFileHaslocalprincipal
+    | EdgeNetflowHaslocalprincipal
+    | EdgeSrcSinkHaslocalprincipal
+    | PartOfPattern
+    | PartOfActivity
+    | PartOfPhase
+    | PartOfAPT
+    | PartOfSegement
+      deriving (Eq, Ord, Show, Read, Enum, Generic)
 
 data OptionalInfo
         = Info { infoTime            :: Maybe Time

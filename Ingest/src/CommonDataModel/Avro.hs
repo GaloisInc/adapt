@@ -6,6 +6,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
+{-# LANGUAGE FlexibleContexts    #-}
 module CommonDataModel.Avro where
 import Prelude as P
 import           CommonDataModel.Types as CDM
@@ -52,29 +53,6 @@ decodeAvroLazy bs0 = go bs0
     Left (_,off,str)   -> X.throw (CDMDecodeFailure bs off str)
     Right (rest,_,res) -> res : (go rest)
 
-data Array a
-data Null = Null
-data Enumeration
-data Mapping a
-data Fixed (n :: Nat)
-data Union a -- A union that has an 'a' as one of the elements
-
-data AvroValue a where
-    ValueNull    :: AvroValue Null
-    ValueBoolean :: Bool -> AvroValue Bool
-    ValueInt     :: Int32 -> AvroValue Int32
-    ValueLong    :: Int64 -> AvroValue Int64
-    ValueFloat   :: Float -> AvroValue Float
-    ValueDouble  :: Double -> AvroValue Double
-    ValueBytes   :: ByteString -> AvroValue ByteString
-    ValueString  :: Text -> AvroValue Text
-    ValueProd    :: AvroValue a -> AvroValue b -> AvroValue (a,b) -- For record construnctions
-    ValueEnum    :: Int -> AvroValue Enumeration
-    ValueArray   :: [AvroValue a] -> AvroValue (Array a)
-    ValueMap     :: Map Text (AvroValue a) -> AvroValue (Mapping a)
-    ValueUnion   :: Int -> AvroValue a -> AvroValue a
-    ValueFixed   :: ByteString -> AvroValue (Fixed (n :: Nat))
-
 --------------------------------------------------------------------------------
 --  CDM Avro Deserialization
 
@@ -92,6 +70,9 @@ getCDM08 =
       7  -> DatumPri <$> getAvro
       8  -> DatumSim <$> getAvro
       _  -> fail "Bad tag in CDM Datum"
+
+instance GetAvro TCCDMDatum where
+  getAvro = getCDM08
 
 instance GetAvro ProvenanceTagNode where
   getAvro =
@@ -270,9 +251,31 @@ instance GetAvro a => GetAvro (Maybe a) where
 --------------------------------------------------------------------------------
 --  GADT 'Value' Getter instances
 
-{-
+data Array a
+data Null = Null
+data Enumeration
+data Mapping a
+data Fixed (n :: Nat)
+data Union a -- A union that has an 'a' as one of the elements
+
+data AvroValue a where
+    ValueNull    :: AvroValue Null
+    ValueBoolean :: Bool -> AvroValue Bool
+    ValueInt     :: Int32 -> AvroValue Int32
+    ValueLong    :: Int64 -> AvroValue Int64
+    ValueFloat   :: Float -> AvroValue Float
+    ValueDouble  :: Double -> AvroValue Double
+    ValueBytes   :: ByteString -> AvroValue ByteString
+    ValueString  :: Text -> AvroValue Text
+    ValueProd    :: AvroValue a -> AvroValue b -> AvroValue (a,b) -- For record construnctions
+    ValueEnum    :: Int -> AvroValue Enumeration
+    ValueArray   :: [AvroValue a] -> AvroValue (Array a)
+    ValueMap     :: Map Text (AvroValue a) -> AvroValue (Mapping a)
+    ValueUnion   :: Int -> AvroValue a -> AvroValue a
+    ValueFixed   :: ByteString -> AvroValue (Fixed (n :: Nat))
+
 instance GetAvro (AvroValue Null) where
-  getAvro = ValueNull <$> getNull
+  getAvro = return ValueNull
 instance GetAvro (AvroValue Bool) where
   getAvro = ValueBoolean <$> getBoolean
 instance GetAvro (AvroValue Int32) where
@@ -284,18 +287,17 @@ instance GetAvro (AvroValue ByteString) where
 instance GetAvro (AvroValue Text) where
   getAvro = ValueString <$> getString
 
-instance (GetAvro tyA, GetAvro tyB) => GetAvro (AvroValue (tyA,tyB)) where
-  getAvro =
-    do v1      <- getAvro
-       ValueProd . (v1 ,) <$> getAvro
+instance (GetAvro (AvroValue tyA), GetAvro (AvroValue tyB)) =>
+         GetAvro (AvroValue (tyA,tyB)) where
+  getAvro = ValueProd <$> getAvro <*> getAvro
 
 instance GetAvro (AvroValue Enumeration) where
   getAvro = ValueEnum . fromIntegral <$> getInt
 
-instance GetAvro a => GetAvro (AvroValue (Array a)) where
+instance GetAvro (AvroValue a) => GetAvro (AvroValue (Array a)) where
   getAvro = ValueArray <$> getArray
 
-instance GetAvro a => GetAvro (AvroValue (Mapping a)) where
+instance GetAvro (AvroValue a) => GetAvro (AvroValue (Mapping a)) where
   getAvro = ValueMap <$> getMap
 
 instance GetAvro a => GetAvro (AvroValue (Union a)) where
@@ -305,7 +307,6 @@ instance GetAvro a => GetAvro (AvroValue (Union a)) where
 
 instance KnownNat n => GetAvro (AvroValue (Fixed n)) where
   getAvro = ValueFixed <$> getFixed (fromIntegral $ natVal (Proxy :: Proxy n))
--}
 
 --------------------------------------------------------------------------------
 --  Specialized Getters

@@ -36,6 +36,7 @@ import qualified Data.Text.Lazy.Encoding as Text
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
+import Text.Groom
 import System.FilePath ((<.>))
 import System.Exit (exitFailure)
 
@@ -151,7 +152,7 @@ processStmts c fp res@(ns,es)
       when (ast c) $ do
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
-        output astfile $ Text.unlines $ map (Text.pack . show) ns ++ map (Text.pack . show) es
+        output astfile $ Text.unlines $ map (Text.pack . groom) ns ++ map (Text.pack . groom) es
       case upload c of
         Just r ->
           do
