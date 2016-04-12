@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TupleSections              #-}
-module CommonDataModel.FromProv
+module FromProv
   ( readFileCDM
   , translateTextCDM, translateTextCDMPure
   , module CDM
@@ -25,7 +25,7 @@ import           Data.Time (UTCTime(..))
 import           MonadLib as ML
 import           Text.Read (readMaybe)
 
-import           CommonDataModel as CDM
+import           Schema as CDM
 import           Namespaces
 import           Parser (parseProvN)
 import           ParserCore
@@ -128,7 +128,7 @@ residesOn ent machine =
       Just mid -> do
            hostUID <- uidOfMachine mid
            let host   = NodeHost $ Host hostUID Nothing Nothing
-               reside = Edge (nodeUID ent) hostUID ResidesOn
+               reside = Edge (nodeUID ent) hostUID EdgeSubjectResidesOn
            return ([ent, host], [reside])
       Nothing -> node ent
 
@@ -171,7 +171,7 @@ translateProvUsed (RawEntity {..}) =
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
            (edgeRelationship,eTy) <-
-                (Used,) <$> case operation of
+                (EdgeEventAffectsSubject,) <$> case operation of
                          Just "open"          -> return $ EventOpen
                          Just "bind"          -> return $ EventBind
                          Just "connect"       -> return $ EventConnect
@@ -190,7 +190,9 @@ translateProvUsed (RawEntity {..}) =
            evtUID <- randomUID
            let evt = NodeSubject $ mkEvent src evtUID eTy Nothing time
                src = SourceLinuxAuditTrace
-               wib = Edge edgeSource evtUID WasInformedBy
+               wib = Edge edgeSource evtUID EdgeEventAffectsFile
+                    -- ^^^ Might not be file,
+                    -- depends on type of 'edgeDestinationId' which is not available.
                use = Edge evtUID edgeDestination edgeRelationship
            return ([evt], [wib,use])
     _ -> warn "Unrecognized 'used' relation." >> noResults
@@ -218,7 +220,7 @@ translateProvWasGeneratedBy (RawEntity {..}) =
            edgeSource <- uidOf edgeSourceId
            edgeDestination <- uidOf edgeDestinationId
            (edgeRelationship,eTy) <-
-            (WasGeneratedBy,) <$> case operation of
+            (EdgeEventAffectsFile,) <$> case operation of
                                      Just "send"     -> return EventSend
                                      Just "connect"  -> return EventConnect
                                      Just "accept"   -> return EventAccept
@@ -233,7 +235,9 @@ translateProvWasGeneratedBy (RawEntity {..}) =
            evtUID <- randomUID
            let evt = NodeSubject $ mkEvent src evtUID eTy Nothing time
                src = SourceLinuxAuditTrace
-               wib = Edge edgeSource evtUID WasInformedBy
+               wib = Edge edgeSource evtUID EdgeEventAffectsFile
+                    -- ^^^ Might not be file,
+                    -- depends on type of 'edgeDestinationId' which is not available.
                wgb = Edge evtUID edgeDestination edgeRelationship
            return ([evt], [wib,wgb])
     _ -> warn "Unrecognized 'used' relation." >> noResults
@@ -247,8 +251,10 @@ translateProvWasStartedBy (RawEntity {..}) =
          evtUID <- randomUID
          let evt = NodeSubject $ mkEvent src evtUID EventFork Nothing time
              src = SourceLinuxAuditTrace
-             wsb = Edge edgeSource evtUID WasInformedBy
-             wib = Edge evtUID edgeDestination WasInformedBy
+             wsb = Edge edgeSource evtUID EdgeEventAffectsSubject
+             wib = Edge evtUID edgeDestination EdgeEventAffectsFile
+                    -- ^^^ Might not be file,
+                    -- depends on type of 'edgeDestinationId' which is not available.
          return ([evt], [wsb,wib])
     _ -> warn "Unrecognized 'wasStartedBy' relation." >> noResults
 translateProvWasEndedBy (RawEntity {..}) =
@@ -261,8 +267,8 @@ translateProvWasEndedBy (RawEntity {..}) =
          evtUID <- randomUID
          let evt = NodeSubject $ mkEvent src evtUID EventStop Nothing time
              src = SourceLinuxAuditTrace
-             web = Edge edgeSource evtUID WasInformedBy
-             wib = Edge evtUID edgeDestination WasInformedBy
+             web = Edge edgeSource evtUID EdgeEventIsgeneratedbySubject
+             wib = Edge evtUID edgeDestination EdgeEventAffectsSubject
          return ([evt], [web,wib])
     _ -> warn "Unrecognized 'wasEndedBy' relation." >> noResults
 translateProvWasInformedBy (RawEntity {..}) =
@@ -270,7 +276,7 @@ translateProvWasInformedBy (RawEntity {..}) =
     [Just (Left edgeSourceId),Just (Left edgeDestinationId)] ->
         do edgeSource       <- uidOf edgeSourceId
            edgeDestination  <- uidOf edgeDestinationId
-           edgeRelationship <- pure WasInformedBy
+           edgeRelationship <- pure EdgeEventAffectsSubject
            edge $ Edge edgeSource edgeDestination edgeRelationship
     _ -> warn "Unrecognized 'wasInformedBy' relation." >> noResults
 translateProvWasAttributedTo (RawEntity {..}) =
@@ -286,8 +292,7 @@ translateProvWasDerivedFrom (RawEntity {..}) =
     [Just (Left edgeSourceId),Just (Left edgeDestinationId)] ->
         do edgeDestination  <- uidOf edgeSourceId
            edgeSource       <- uidOf edgeDestinationId
-           let rel = WasDerivedFrom UnknownStrength UnknownDerivation
-           edge $ Edge edgeSource edgeDestination rel
+           edge $ Edge edgeSource edgeDestination WasDerivedFrom
     _ -> warn "Unrecognized 'wasDerivedFrom' relation." >> noResults
 translateProvActedOnBehalfOf (RawEntity {..}) =
   do warn "Unimplemented: actedOnBehalfOf"
