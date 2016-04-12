@@ -103,7 +103,7 @@ instance GetAvro TagOpCode where
 
 instance GetAvro Subject where
   getAvro =
-       Subject <$> getLong
+       Subject <$> getAvro
                <*> getAvro
                <*> getInt
                <*> getInt
@@ -122,8 +122,8 @@ instance GetAvro SubjectType where
 
 instance GetAvro Event where
   getAvro =
-    Event <$> getLong
-          <*> getLong
+    Event <$> getAvro
+          <*> getAvro
           <*> getLong
           <*> getAvro
           <*> getInt
@@ -148,7 +148,7 @@ instance GetAvro EventType where
 
 instance GetAvro NetFlowObject where
   getAvro =
-    NetFlowObject <$> getLong
+    NetFlowObject <$> getAvro
                   <*> getAvro
                   <*> getString
                   <*> getInt
@@ -168,15 +168,16 @@ instance GetAvro Word16 where
 
 instance GetAvro FileObject where
   getAvro =
-    FileObject <$> getLong
+    FileObject <$> getAvro
                <*> getAvro
                <*> getString
+               <*> getBoolean
                <*> getInt
                <*> getAvro
 
 instance GetAvro SrcSinkObject where
   getAvro =
-    SrcSinkObject <$> getLong
+    SrcSinkObject <$> getAvro
                   <*> getAvro
                   <*> getAvro
 
@@ -185,14 +186,14 @@ instance GetAvro SrcSinkType where
 
 instance GetAvro MemoryObject where
   getAvro =
-    MemoryObject <$> getLong
+    MemoryObject <$> getAvro
                  <*> getAvro
-                 <*> getLong
+                 <*> getAvro
                  <*> getLong
 
 instance GetAvro Principal where
   getAvro =
-    Principal <$> getLong
+    Principal <$> getAvro
               <*> getAvroWithDefault PRINCIPAL_LOCAL
               <*> getInt
               <*> getAvro
@@ -210,8 +211,8 @@ getAvroWithDefault _def = {- XXX -} getAvro
 
 instance GetAvro SimpleEdge where
   getAvro =
-    SimpleEdge <$> getLong
-               <*> getLong
+    SimpleEdge <$> getAvro
+               <*> getAvro
                <*> getAvro
                <*> getLong
                <*> getAvro
@@ -233,6 +234,10 @@ instance GetAvro Int32 where
   getAvro = getInt
 instance GetAvro Int64 where
   getAvro = getLong
+instance GetAvro Short where
+  getAvro = Short <$> G.getWord16le
+instance GetAvro UUID where
+  getAvro = UUID <$> getFixed 32
 instance GetAvro ByteString where
   getAvro = getBytes
 instance GetAvro Text where
