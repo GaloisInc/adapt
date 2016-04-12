@@ -7,6 +7,7 @@ module Main where
 import           Control.Monad (when,replicateM)
 import qualified Data.ByteString.Lazy as BL
 import           Data.Binary.Get (runGet)
+import           Data.Bits ((.|.))
 import           Data.Map (fromList)
 import           Data.Monoid
 import           Data.Proxy
@@ -42,7 +43,19 @@ cdmSerialization :: TestTree
 cdmSerialization =
   testGroup "CDM (de)serialization"
    [ testProperty "Unique bytestrings -> unique 8 byte zigzags."
-      (\(a :: ZigZag 8) (b :: ZigZag 8) -> a /= b ==> decodeZigZag a /= decodeZigZag b)
+      (\(a :: ZigZag 8) (b :: ZigZag 8) -> a /= b ==>
+          decodeZigZag a /= decodeZigZag b || decodeZigZag a == 0)
+   , testProperty "Unique bytestrings -> unique 4 byte zigzags."
+      (\(a :: ZigZag 4) (b :: ZigZag 4) -> a /= b ==>
+          decodeZigZag a /= decodeZigZag b || decodeZigZag a == 0)
+   , testProperty "Unique bytestrings -> unique 3 byte zigzags."
+      (\(a :: ZigZag 3) (b :: ZigZag 3) -> a /= b ==>
+          decodeZigZag a /= decodeZigZag b || decodeZigZag a == 0)
+   , testProperty "Unique bytestrings -> unique 2 byte zigzags."
+      (\(a :: ZigZag 2) (b :: ZigZag 2) -> a /= b ==>
+          decodeZigZag a /= decodeZigZag b || decodeZigZag a == 0)
+   , testProperty "Unique bytestrings -> unique 1 byte zigzags."
+      (\(a :: ZigZag 1) (b :: ZigZag 1) -> a /= b ==> decodeZigZag a /= decodeZigZag b)
    , testProperty "ZigZag decoding is 'Right'"
       (\(a::ZigZag 8) -> (decodeZigZag a `seq` ()) == () )
    ]
@@ -53,8 +66,9 @@ data ZigZag (n::Nat) = ZZ { unZZ :: BL.ByteString }
 instance KnownNat n => Arbitrary (ZigZag n) where
   arbitrary =
     do lst   <- (`mod` 128) <$> arbitrary
-       first <- replicateM (fromIntegral $ natVal (Proxy :: Proxy n)) arbitrary
-       return $ ZZ (BL.pack (init first ++ [lst]))
+       first <- replicateM (fromIntegral (natVal (Proxy :: Proxy n)) - 1) arbitrary
+       let fs = map (.|. 0x80) first
+       return $ ZZ (BL.pack (fs ++ [lst]))
 
 decodeZigZag :: forall n. (KnownNat n) => ZigZag n -> Integer
 decodeZigZag x = runGet (getZigZag (fromIntegral $ natVal (Proxy :: Proxy n))) (unZZ x)
@@ -135,11 +149,11 @@ used =
                                    , subjectArgs = Nothing })]
           , [ Edge { edgeSource = (1,2,3,4)
                    , edgeDestination = (9,10,11,12)
-                   , edgeRelationship = WasInformedBy
+                   , edgeRelationship = EdgeEventAffectsSubject
                    }
-            , Edge { edgeSource = (9,10,11,12)
-                   , edgeDestination = (5,6,7,8)
-                   , edgeRelationship = Used
+            , Edge { edgeSource       = (9,10,11,12)
+                   , edgeDestination  = (5,6,7,8)
+                   , edgeRelationship = EdgeEventAffectsFile
                    }
             ]
           )
@@ -170,10 +184,10 @@ wasGeneratedBy =
                                , subjectArgs = Nothing}) ]
         , [ Edge { edgeSource = (1,2,3,4)
                  , edgeDestination = (9,10,11,12)
-                 , edgeRelationship = WasInformedBy}
+                 , edgeRelationship = EdgeEventAffectsSubject}
           , Edge { edgeSource = (9,10,11,12)
                  , edgeDestination = (5,6,7,8)
-                 , edgeRelationship = WasGeneratedBy}
+                 , edgeRelationship = EdgeEventAffectsSubject}
           ])
         ]
 
@@ -185,7 +199,7 @@ wasInformedBy =
         , [ ]
         , [ Edge { edgeSource       = (1,2,3,4)
                  , edgeDestination  = (5,6,7,8)
-                 , edgeRelationship = WasInformedBy}
+                 , edgeRelationship = EdgeEventAffectsSubject}
           ]
         )
       ]
