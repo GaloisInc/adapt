@@ -70,28 +70,29 @@ executable Trint
   main-is:             Trint.hs
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.7 && <4.9
-                     , text >=1.2 && <1.3
-                     , simple-get-opt >= 0.1 && < 0.2
                      , Ingest >= 0.1 && < 0.2
-                     , filepath >= 1.4 && <1.5
+                     , IngestDaemon
+                     , aeson
+                     , async >= 2.1.0
+                     , base64-bytestring
+                     , binary
+                     , bytestring >= 0.10 && < 0.11
                      , containers >= 0.5 && < 0.6
-                     , monadLib >= 3.7 && <3.8
+                     , cryptohash
+                     , filepath >= 1.4 && <1.5
+                     , groom
                      , http-client >= 0.4 && < 0.5
                      , http-client-tls >= 0.2 && < 0.3
                      , http-types >= 0.9 && < 0.10
-                     , network >= 2.6 && < 2.7
-                     , bytestring >= 0.10 && < 0.11
-                     , time
-                     , aeson
-                     , websockets
-                     , cryptohash
-                     , base64-bytestring
-                     , uuid
-                     , async >= 2.1.0
-                     , split
-                     , IngestDaemon
                      , milena >= 0.5
-                     , groom
+                     , monadLib >= 3.7 && <3.8
+                     , network >= 2.6 && < 2.7
+                     , simple-get-opt >= 0.1 && < 0.2
+                     , split
+                     , text >=1.2 && <1.3
+                     , time
+                     , uuid
+                     , websockets
   hs-source-dirs:      programs
   default-language:    Haskell2010
   ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N2

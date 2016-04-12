@@ -3,42 +3,47 @@
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ParallelListComp  #-}
 -- | Trint is a lint-like tool for the Prov-N transparent computing language.
 module Main where
 
-import FromProv
-import PP (pretty, pp)
-import SimpleGetOpt
-
-import Control.Applicative ((<$>))
-import Control.Monad (when)
-import Control.Exception
-import Data.Int (Int32)
-import Data.Monoid ((<>))
+import           Control.Applicative ((<$>))
+import           Control.Exception
+import           Control.Monad (when)
+import qualified Data.Binary.Get as G
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Foldable as F
-import Data.Maybe (catMaybes,isNothing, mapMaybe)
-import Data.List (partition,intersperse)
-import Data.Graph hiding (Node, Edge)
-import Data.Time (UTCTime, addUTCTime)
-import Text.Read (readMaybe)
-import qualified Data.Set as Set
-import qualified Data.Map as Map
+import           Data.Graph hiding (Node, Edge)
+import           Data.Int (Int32)
+import           Data.List (partition,intersperse,scanl')
 import           Data.Map (Map)
-import Numeric (showHex)
-import MonadLib        hiding (handle)
-import MonadLib.Monads hiding (handle)
-import Data.Text (Text)
+import qualified Data.Map as Map
+import           Data.Maybe (catMaybes,isNothing, mapMaybe)
+import           Data.Monoid ((<>))
+import           Data.Proxy (Proxy(..))
+import qualified Data.Set as Set
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
-import qualified Data.Text.Lazy.IO as Text
 import qualified Data.Text.Lazy.Encoding as Text
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as ByteString
-import qualified Data.ByteString.Base64 as B64
-import Text.Groom
-import System.FilePath ((<.>))
-import System.Exit (exitFailure)
+import qualified Data.Text.Lazy.IO as Text
+import           Data.Time (UTCTime, addUTCTime)
+import           FromProv
+import           MonadLib        hiding (handle)
+import           MonadLib.Monads hiding (handle)
+import           Numeric (showHex)
+import           PP (pretty, pp)
+import           SimpleGetOpt
+import           System.Exit (exitFailure)
+import           System.FilePath ((<.>))
+import           Text.Groom
+import           Text.Read (readMaybe)
+
+import qualified CommonDataModel.Avro  as Avro
+import qualified CommonDataModel.Types as CDM
 
 import Titan
 import CompileSchema
@@ -56,19 +61,21 @@ data Config = Config { lintOnly   :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
+                     , pushKafka  :: Maybe FilePath
                      , files      :: [FilePath]
                      } deriving (Show)
 
 defaultConfig :: Config
 defaultConfig = Config
-  { lintOnly = False
-  , quiet    = False
-  , stats    = False
-  , ast      = False
-  , verbose  = False
-  , help     = False
-  , upload   = Nothing
-  , files    = []
+  { lintOnly  = False
+  , quiet     = False
+  , stats     = False
+  , ast       = False
+  , verbose   = False
+  , help      = False
+  , upload    = Nothing
+  , pushKafka = Nothing
+  , files     = []
   }
 
 opts :: OptSpec Config
@@ -91,6 +98,10 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['s'] ["stats"]
                     "Print statistics."
                     $ NoArg $ \s -> Right s { stats = True }
+                  , Option ['p'] ["push-to-kafka"]
+                    "Send TA-1 CDM statements to the ingest daemon via it's kafka queue."
+                    $ ReqArg "FILE" $
+                        \file s -> Right s { pushKafka = Just file }
                   , Option ['u'] ["upload"]
                     "Uploads the data by inserting it into a Titan database using gremlin."
                     $ OptArg "Database host" $
@@ -153,11 +164,20 @@ processStmts c fp res@(ns,es)
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
         output astfile $ Text.unlines $ map (Text.pack . groom) ns ++ map (Text.pack . groom) es
+      case pushKafka c of
+        Just file ->
+          do stmts <- readCDMStatements file
+             let ms = map (TopicAndMessage "ta2" . makeMessage) stmts
+             runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
+                      (produceMessages ms)
+             return ()
+        Nothing -> return ()
       case upload c of
         Just r ->
           do
             vses <- doUpload c res r
-            runKafka (mkKafkaState "adapt-kafka" ("localhost", 9092)) (pushDataToKafka vses)
+            runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
+                     (pushDataToKafka vses)
             return ()
         Nothing ->
           return ()
@@ -167,6 +187,16 @@ processStmts c fp res@(ns,es)
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
+
+readCDMStatements :: FilePath -> IO [BS.ByteString]
+readCDMStatements fp =
+ do cont <- ByteString.readFile fp
+    return (map ByteString.toStrict $ segment cont)
+ where
+ segment bs =
+  let offsets = G.runGet (Avro.getArrayBytes (Proxy :: Proxy CDM.TCCDMDatum)) bs
+      acc     = scanl' (+) 0 offsets
+  in [ByteString.take o (ByteString.drop a bs) | o <- offsets | a <- acc]
 
 pushDataToKafka :: VertsAndEdges -> Kafka ()
 pushDataToKafka (vs, es) = do produceMessages $ map convertResultId rids

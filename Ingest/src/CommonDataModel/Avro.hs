@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MultiWayIf          #-}
 module CommonDataModel.Avro where
 import Prelude as P
 import           CommonDataModel.Types as CDM
@@ -428,10 +429,37 @@ getEnum =
 getArray :: GetAvro ty => Get [ty]
 getArray =
   do nr <- getLong
-     if nr == 0
-      then return []
-      else do rs <- replicateM (fromIntegral nr) getAvro
-              (rs ++) <$> getArray
+     if
+      | nr == 0 -> return []
+      | nr < 0  ->
+          do _len <- getLong
+             rs <- replicateM (fromIntegral (abs nr)) getAvro
+             (rs ++) <$> getArray
+      | otherwise ->
+          do rs <- replicateM (fromIntegral nr) getAvro
+             (rs ++) <$> getArray
+
+data Offsets = Base Int64 | Bytes Int64
+getArrayBytes :: forall ty. GetAvro ty => Proxy ty -> Get [Int64]
+getArrayBytes _ =
+  do offsets <- go
+     let fixOffsets _ []             = []
+         fixOffsets _ (Base n  : xs) = fixOffsets n xs
+         fixOffsets n (Bytes k : xs) = (k - n) : fixOffsets k xs
+     return (fixOffsets 0 offsets)
+ where
+ go =
+  do nr <- getLong
+     hd <- if | nr == 0  -> return id
+              | nr < 0  ->
+                 do _ <- getLong
+                    (:) . Base <$> G.bytesRead
+              | otherwise -> (:) . Base <$> G.bytesRead
+     if abs nr == 0
+         then return []
+         else do let getByteOffset = (getAvro :: Get ty) >> Bytes <$> G.bytesRead
+                 byteOffsets <- replicateM (fromIntegral (abs nr)) getByteOffset
+                 (hd byteOffsets ++) <$> go
 
 getMap :: GetAvro ty => Get (Map Text ty)
 getMap = go Map.empty
