@@ -1,276 +1,341 @@
-{-# LANGUAGE DeriveGeneric #-}
-module CommonDataModel
-  ( module CommonDataModel
-  , Word64
-  ) where
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+module CommonDataModel where
 
-import           Data.ByteString (ByteString)
-import           Data.Int
-import           Data.Map (Map)
+import qualified Data.ByteString as BS
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import Data.Time
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+import Data.Int
+import MonadLib
 import qualified Data.Map as Map
-import           Data.Text (Text)
-import           Data.Time (UTCTime)
-import           Data.Word
-import           GHC.Generics
+
+import CommonDataModel.Types
+import qualified Schema as S
+
+-- toSchema is the top-level operation for translating TC CDM data into
+-- the Adapt schema.
+toSchema :: [TCCDMDatum] -> ([S.Node], [S.Edge])
+toSchema [] = ([],[])
+toSchema (x:xs) =
+  let (Result _ ns es) = execTr $ translate x -- XXX get warnings
+      (nss,ess) = toSchema xs
+  in (ns ++ nss, es ++ ess)
 
 
-data Node
-      = NodeEntity Entity
-      | NodeResource Resource
-      | NodeSubject Subject
-      | NodeHost Host
-      | NodeAgent Agent
-      deriving (Eq, Ord, Show, Read, Generic)
+--------------------------------------------------------------------------------
+--  Translation Monad
 
-nodeUID :: Node -> UID
-nodeUID n =
-  case n of
-    NodeEntity e   -> entityUID e
-    NodeResource r -> resourceUID r
-    NodeSubject s  -> subjectUID s
-    NodeHost h     -> hostUID h
-    NodeAgent a    -> agentUID a
+type Translate a = StateT State Id a
 
-data Edge
-      = Edge { edgeSource, edgeDestination :: UID
-             , edgeRelationship :: Relationship
-             }
-      deriving (Eq, Ord, Show, Read, Generic)
+data Result = Result { warnings :: [Warning]
+                     , nodes    :: [S.Node]
+                     , edges    :: [S.Edge]
+                     } deriving (Eq, Ord, Show)
 
-data Entity
-      = File { entitySource       :: InstrumentationSource
-             , entityUID          :: UID
-             , entityInfo         :: OptionalInfo
-             -- Partial fields
-             , entityURL          :: URL
-             , entityFileVersion  :: FileVersion
-             , entityFileSize     :: Maybe Size
-             }
-      | NetFlow { entitySource       :: InstrumentationSource
-                , entityUID          :: UID
-                , entityInfo         :: OptionalInfo
+data State = State { warningsS :: [Warning] -> [Warning]
+                   , nodesS    :: [S.Node] -> [S.Node]
+                   , edgesS    :: [S.Edge] -> [S.Edge]
+                   }
+
+tellNode :: S.Node -> Translate ()
+tellNode n =
+  do s <- get
+     set s { nodesS = \ns -> nodesS s (n :ns) }
+
+tellEdge :: S.Edge -> Translate ()
+tellEdge e =
+  do s <- get
+     set s { edgesS = \es -> edgesS s (e :es)  }
+
+warn :: Warning -> Translate ()
+warn w =
+  do s <- get
+     set s { warningsS = \ws -> warningsS s (w : ws) }
+
+execTr :: Translate a -> Result
+execTr op =
+  let (_,State wF nF eF) = runId (runStateT (State id id id) op)
+  in Result (wF []) (nF []) (eF [])
+
+warnNoTranslation :: Text -> Translate ()
+warnNoTranslation = warn . WarnNoTranslation
+data Warning = WarnNoTranslation Text
+                | WarnOther Text
+      deriving (Eq, Ord, Show)
+
+
+--------------------------------------------------------------------------------
+--  Operations
+
+translate :: TCCDMDatum -> Translate ()
+translate datum =
+  case datum of
+   DatumPTN provenanceTagNode -> translatePTN           provenanceTagNode
+   DatumSub subj              -> translateSubject       subj
+   DatumEve event             -> translateEvent         event
+   DatumNet netFlowObject     -> translateNetFlowObject netFlowObject
+   DatumFil fileObject        -> translateFileObject    fileObject
+   DatumSrc srcSinkObject     -> translateSrcSinkObject srcSinkObject
+   DatumMem memoryObject      -> translateMemoryObject  memoryObject
+   DatumPri principal         -> translatePrincipal     principal
+   DatumSim simpleEdge        -> translateSimpleEdge    simpleEdge
+
+translatePTN :: ProvenanceTagNode -> Translate ()
+translatePTN           (PTN {..}) =
+  warnNoTranslation "No Adapt Schema for Provenance Tag Nodes."
+
+translateSubject :: Subject -> Translate ()
+translateSubject       (Subject {..}) =
+  let s = S.Subject
+                  { S.subjectSource = translateSource subjSource
+                  , S.subjectUID    = translateUUID subjUUID
+                  , S.subjectType   = translateSubjectType subjType
+                  , S.subjectStartTime = translateTime subjStartTimestampMicros
+                  , S.subjectEndTime   = Nothing
+                  , S.subjectPID    = Just subjPID
+                  , S.subjectPPID   = Just subjPPID
+                  , S.subjectUnitID = subjUnitId
+                  , S.subjectCommandLine = subjCmdLine
+                  , S.subjectImportLibs = subjImportedLibraries
+                  , S.subjectExportLibs = subjExportedLibraries
+                  , S.subjectProcessInfo = subjPInfo
+                  , S.subjectOtherProperties = fromMaybe Map.empty subjProperties
+                  -- XXX the below are probably not supposed to be fields
+                  -- of subject, yes?
+                  , S.subjectLocation = Nothing
+                  , S.subjectSize = Nothing
+                  , S.subjectPpt = Nothing
+                  , S.subjectEnv = Nothing
+                  , S.subjectArgs = Nothing
+                  }
+  in tellNode (S.NodeSubject s)
+
+translateUUID :: Int64 -> S.UID
+translateUUID = (0,0,0,) . fromIntegral
+
+translateSubjectType :: SubjectType -> S.SubjectType
+translateSubjectType s =
+ case s of
+  Process -> S.SubjectProcess
+  Thread  -> S.SubjectThread
+  Unit    -> S.SubjectUnit
+
+translateEventType :: EventType -> S.EventType
+translateEventType e =
+  case e of
+    EVENT_ACCEPT                 -> S.EventAccept
+    EVENT_BIND                   -> S.EventBind
+    EVENT_CHANGE_PRINCIPAL       -> S.EventChangePrincipal
+    EVENT_CHECK_FILE_ATTRIBUTES  -> S.EventCheckFileAttributes
+    EVENT_CLOSE                  -> S.EventClose
+    EVENT_CONNECT                -> S.EventConnect
+    EVENT_CREATE_OBJECT          -> S.EventCreateObject
+    EVENT_CREATE_THREAD          -> S.EventCreateThread
+    EVENT_EXECUTE                -> S.EventExecute
+    EVENT_FORK                   -> S.EventFork
+    EVENT_LINK                   -> S.EventLink
+    EVENT_UNLINK                 -> S.EventUnlink
+    EVENT_MMAP                   -> S.EventMmap
+    EVENT_MODIFY_FILE_ATTRIBUTES -> S.EventModifyFileAttributes
+    EVENT_MPROTECT               -> S.EventMprotect
+    EVENT_OPEN                   -> S.EventOpen
+    EVENT_READ                   -> S.EventRead
+    EVENT_WRITE                  -> S.EventWrite
+    EVENT_SIGNAL                 -> S.EventSignal
+    EVENT_TRUNCATE               -> S.EventTruncate
+    EVENT_WAIT                   -> S.EventWait
+    EVENT_OS_UNKNOWN             -> S.EventOSUnknown
+    EVENT_KERNEL_UNKNOWN         -> S.EventKernelUnknown
+    EVENT_APP_UNKNOWN            -> S.EventAppUnknown
+    EVENT_UI_UNKNOWN             -> S.EventUIUnknown
+    EVENT_UNKNOWN                -> S.EventUnknown
+    EVENT_BLIND                  -> S.EventBlind
+
+-- Notice we drop the tag information when extracting parameter values.
+translateParameters :: [Value] -> S.Args
+translateParameters = map (fromMaybe BS.empty . valBytes)
+
+translateEvent :: Event -> Translate ()
+translateEvent         (Event {..}) =
+  let s = S.Subject { S.subjectSource = translateSource evtSource
+                    , S.subjectUID    = translateUUID evtUUID
+                    , S.subjectType   = S.SubjectEvent (translateEventType evtType)
+                                                       (Just evtSequence)
+                    , S.subjectStartTime = translateTime evtTimestampMicros
+                    , S.subjectEndTime   = Nothing
+                    , S.subjectPID    = Nothing
+                    , S.subjectPPID   = Nothing
+                    , S.subjectUnitID = Nothing
+                    , S.subjectCommandLine = Nothing
+                    , S.subjectImportLibs = Nothing
+                    , S.subjectExportLibs = Nothing
+                    , S.subjectProcessInfo = Nothing
+                    , S.subjectOtherProperties = fromMaybe Map.empty evtProperties
+                    -- XXX the below are probably not supposed to be fields
+                    -- of subject, yes?
+                    , S.subjectLocation = evtLocation
+                    , S.subjectSize = evtSize
+                    , S.subjectPpt = evtProgramPoint
+                    , S.subjectEnv = Nothing
+                    , S.subjectArgs = fmap translateParameters evtParameters
+                    }
+  in tellNode (S.NodeSubject s)
+
+translateTrust :: ProvenanceTagNode -> Translate (Maybe S.IntegrityTag)
+translateTrust t =
+  case ptnValue t of
+    PTVIntegrityTag i -> case i of
+                          INTEGRITY_UNTRUSTED -> return $ Just S.IntegrityUntrusted
+                          INTEGRITY_BENIGN    -> return $ Just S.IntegrityBenign
+                          INTEGRITY_INVULNERABLE -> return $ Just S.IntegrityInvulnerable
+    _ -> return Nothing
+
+translateSensitivity :: ProvenanceTagNode -> Translate (Maybe S.ConfidentialityTag)
+translateSensitivity t =
+  case ptnValue t of
+    PTVConfidentialityTag i -> case i of
+                          CONFIDENTIALITY_SECRET    -> return $ Just S.ConfidentialitySecret
+                          CONFIDENTIALITY_SENSITIVE -> return $ Just S.ConfidentialitySensitive
+                          CONFIDENTIALITY_PRIVATE   -> return $ Just S.ConfidentialityPrivate
+                          CONFIDENTIALITY_PUBLIC    -> return $ Just S.ConfidentialityPublic
+    _ -> return Nothing
+
+translateNetFlowObject ::NetFlowObject -> Translate () 
+translateNetFlowObject (NetFlowObject {..}) = do
+  let AbstractObject {..} = nfBaseObject
+  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
+  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
+  let e = S.NetFlow
+                { S.entitySource       = translateSource aoSource
+                , S.entityUID          = translateUUID nfUUID
+                , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
+                                              , S.infoPermissions     = aoPermission
+                                              , S.infoTrustworthiness = mt
+                                              , S.infoSensitivity     = ms
+                                              , S.infoOtherProperties = fromMaybe Map.empty aoProperties
+                                              }
                 -- Partial fields
-                , entitySrcAddress   :: SrcAddress
-                , entityDstAddress   :: DstAddress
-                , entitySrcPort      :: SrcPort
-                , entityDstPort      :: DstPort
+                , S.entitySrcAddress   = nfSrcAddress
+                , S.entityDstAddress   = nfDstAddress
+                , S.entitySrcPort      = nfSrcPort
+                , S.entityDstPort      = nfDstPort
                 }
-      | Memory { entitySource       :: InstrumentationSource
-               , entityUID          :: UID
-               , entityInfo         :: OptionalInfo
+  tellNode (S.NodeEntity e)
+
+translateFileObject :: FileObject -> Translate ()
+translateFileObject    (FileObject {..}) = do
+  let AbstractObject {..} = foBaseObject
+  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
+  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
+  let e = S.File
+             { S.entitySource       = translateSource aoSource
+             , S.entityUID          = translateUUID foUUID
+             , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
+                                           , S.infoPermissions     = aoPermission
+                                           , S.infoTrustworthiness = mt
+                                           , S.infoSensitivity     = ms
+                                           , S.infoOtherProperties = fromMaybe Map.empty aoProperties
+                                           }
+             -- Partial fields
+             , S.entityURL          = foURL
+             , S.entityFileVersion  = fromIntegral foVersion
+             , S.entityFileSize     = foSize
+             }
+  tellNode (S.NodeEntity e)
+
+translateSrcSinkType :: SrcSinkType -> S.SourceType
+translateSrcSinkType = toEnum . fromEnum
+
+translateSrcSinkObject ::SrcSinkObject -> Translate () 
+translateSrcSinkObject (SrcSinkObject {..}) = do
+  let AbstractObject {..} = ssBaseObject
+  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
+  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
+  let r = S.Resource
+               { S.resourceSource = translateSource aoSource
+               , S.resourceType   = translateSrcSinkType ssType
+               , S.resourceUID    = translateUUID ssUUID
+               , S.resourceInfo   = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
+                                         , S.infoPermissions     = aoPermission
+                                         , S.infoTrustworthiness = mt
+                                         , S.infoSensitivity     = ms
+                                         , S.infoOtherProperties = fromMaybe Map.empty aoProperties
+                                         }
+               }
+  tellNode (S.NodeResource r)
+
+translateMemoryObject :: MemoryObject -> Translate ()
+translateMemoryObject  (MemoryObject {..}) = do
+  let AbstractObject {..} = moBaseObject
+  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
+  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
+  let m = S.Memory
+               { S.entitySource       = translateSource aoSource
+               , S.entityUID          = translateUUID moUUID
+               , S.entityInfo         = S.Info
+                                        { S.infoTime = translateTime <$> aoLastTimestampMicros
+                                        , S.infoPermissions     = aoPermission
+                                        , S.infoTrustworthiness = mt
+                                        , S.infoSensitivity     = ms
+                                        , S.infoOtherProperties = fromMaybe Map.empty aoProperties
+                                        }
                -- Partial fields
-               , entityPageNumber   :: PageNumber -- partial
-               , entityAddress      :: Address    -- partial
+               , S.entityPageNumber   = moPageNumber
+               , S.entityAddress      = moMemoryAddress
                }
-      deriving (Eq, Ord, Show, Read, Generic)
+  tellNode (S.NodeEntity m)
 
-data Resource
-    = Resource { resourceSource :: InstrumentationSource
-               , resourceType   :: SourceType
-               , resourceUID    :: UID
-               , resourceInfo   :: OptionalInfo
-               }
-      deriving (Eq, Ord, Show, Read, Generic)
+translateTime :: Int64 -> UTCTime
+translateTime = posixSecondsToUTCTime . fromIntegral
 
-data Subject
-    = Subject { subjectSource          :: InstrumentationSource
-              , subjectUID             :: UID
-              , subjectType            :: SubjectType
-              , subjectStartTime       :: Time
-              -- Optional attributes
-              , subjectPID             :: Maybe PID
-              , subjectPPID            :: Maybe PPID
-              , subjectUnitID          :: Maybe UnitID
-              , subjectEndTime         :: Maybe Time
-              , subjectCommandLine     :: Maybe CommandLine
-              , subjectImportLibs      :: Maybe ImportLibs
-              , subjectExportLibs      :: Maybe ExportLibs
-              , subjectProcessInfo     :: Maybe PInfo
-              , subjectOtherProperties :: Properties
-              , subjectLocation        :: Maybe Location
-              , subjectSize            :: Maybe Size
-              , subjectPpt             :: Maybe Ppt
-              , subjectEnv             :: Maybe Env
-              , subjectArgs            :: Maybe Args
-              }
-      deriving (Eq, Ord, Show, Read, Generic)
+translatePrincipalType :: PrincipalType -> S.PrincipalType
+translatePrincipalType p =
+  case p of 
+    PRINCIPAL_LOCAL  -> S.PrincipalLocal
+    PRINCIPAL_REMOTE -> S.PrincipalRemote
 
-mkEvent :: InstrumentationSource -> UID -> EventType -> Maybe Sequence -> Time -> Subject
-mkEvent src uid eTy eSeq start =
-  Subject src uid (SubjectEvent eTy eSeq) start Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing
-
-data Host =
-      Host { hostUID    :: UID
-           , hostIP     :: Maybe IPAddress
-           , hostSource :: Maybe InstrumentationSource
-           }
-      deriving (Eq, Ord, Show, Read, Generic)
-
-
-data Agent =
-      Agent { agentUID          :: UID
-            , agentUserID       :: UserID
-            , agentGID          :: Maybe GID
-            , agentType         :: Maybe PrincipalType
-            , agentSource       :: Maybe InstrumentationSource
-            , agentProperties   :: Properties
+translatePrincipal :: Principal -> Translate ()
+translatePrincipal     (Principal {..}) =
+  let a = S.Agent
+            { S.agentUID          = translateUUID pUUID
+            , S.agentUserID       = pUserId
+            , S.agentGID          = Just pGroupIds
+            , S.agentType         = Just $ translatePrincipalType pType
+            , S.agentSource       = Just $ translateSource pSource
+            , S.agentProperties   = fromMaybe Map.empty pProperties
             }
-      deriving (Eq, Ord, Show, Read, Generic)
+  in tellNode (S.NodeAgent a)
 
-data Relationship
-      = WasGeneratedBy
-      | WasInvalidatedBy
-      | Used
-      | IsPartOf
-      | WasInformedBy
-      | RunsOn
-      | ResidesOn
-      | WasAttributedTo
-      | WasDerivedFrom Strength Derivation
-      deriving (Eq, Ord, Show, Read, Generic)
+translateSource :: InstrumentationSource -> S.InstrumentationSource
+translateSource = toEnum . fromEnum
 
-data EdgeType = EdgeEventHasParentEvent
-              | EdgeSubjectHasParentSubject
-              | EdgeEventIsGeneratedBySubject
-              | EdgeEventAffectsSubject
-              | EdgeSubjectAffectsEvent
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
+translateSimpleEdge :: SimpleEdge -> Translate ()
+translateSimpleEdge (SimpleEdge {..}) =
+      let e = S.Edge { S.edgeSource       = translateUUID fromUUID
+                     , S.edgeDestination  = translateUUID toUUID
+                     , S.edgeRelationship = translateRelationship edgeType
+                     }
+      in warn (WarnOther "Ignoring edge time and properties") >> tellEdge e
 
-data OptionalInfo
-        = Info { infoTime            :: Maybe Time
-               , infoPermissions     :: Maybe Permissions
-               , infoTrustworthiness :: Maybe IntegrityTag
-               , infoSensitivity     :: Maybe ConfidentialityTag
-               , infoOtherProperties :: Properties
-               }
-      deriving (Eq, Ord, Show, Read, Generic)
-
-noInfo :: OptionalInfo
-noInfo = Info Nothing Nothing Nothing Nothing Map.empty
-
-data InstrumentationSource
-      = SourceLinuxAuditTrace
-      | SourceLinuxProcTrace
-      | SourceFreeBsdOpenBsmTrace
-      | SourceAndroidJavaClearscope
-      | SourceAndoirdNativeClearscope
-      | SourceLinuxAuditCadets
-      | SourceWindowsDiftFaros
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data PrincipalType
-      = PrincipleLocal
-      | PrincipleRemote
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data EventType
-      = EventAccept
-      | EventBind
-      | EventChangePrincipal
-      | EventCheckFileAttributes
-      | EventClose
-      | EventConnect
-      | EventCreateObject
-      | EventCreateThread
-      | EventExecute
-      | EventFork
-      | EventLink
-      | EventUnlink
-      | EventMmap
-      | EventModifyFileAttributes
-      | EventMprotect
-      | EventOpen
-      | EventRead
-      | EventWrite
-      | EventSignal
-      | EventTruncate
-      | EventWait
-      | EventBlind
-      -- The below are not (yet) in the specification.
-      | EventStop
-      | EventCreate
-      | EventChmod
-      | EventSend
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data SourceType
-      = SourceAccelerometer
-      | SourceTemperature
-      | SourceGyroscope
-      | SourceMagneticField
-      | SourceHearRate
-      | SourceLight
-      | SourceProximity
-      | SourcePressure
-      | SourceRelativeHumidity
-      | SourceLinearAcceleration
-      | SourceMotion
-      | SourceStepDetector
-      | SourceStepCounter
-      | SourceTiltDetector
-      | SourceRotationVector
-      | SourceGravity
-      | SourceGeomagneticRotationVector
-      | SourceCamera
-      | SourceGps
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data IntegrityTag
-      = IntegrityUntrusted
-      | IntegrityBenign
-      | IntegrityInvulnerable
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data ConfidentialityTag
-      = ConfidentialitySecret
-      | ConfidentialitySensitive
-      | ConfidentialityPrivate
-      | ConfidentialityPublic
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-data SubjectType
-      = SubjectProcess
-      | SubjectThread
-      | SubjectUnit
-      | SubjectBlock
-      | SubjectEvent EventType (Maybe Sequence)
-      deriving (Eq, Ord, Show, Read, Generic)
-
-data Strength = UnknownStrength | Weak | Medium | Strong
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
-
-data Derivation = UnknownDerivation | Copy | Encode | Compile | Encrypt | Other
-      deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-
--- "Other primitive types used in our model"
-type Properties    = Map Text Text
-type UID           = (Word64, Word64, Word64, Word64)
-type UserID        = Text
-type URL           = Text
-type FileVersion   = Int64
-type Size          = Int64
-type Permissions   = Int16
-type Sequence      = Word64
-type Time          = UTCTime -- ZuluTime
-type StartedAtTime = UTCTime
-type EndedAtTime   = UTCTime
-type IPAddress     = Text
-type SrcAddress    = Text
-type SrcPort       = Word16
-type DstAddress    = Text
-type DstPort       = Word16
-type PageNumber    = Word64 -- was 'int' note the signed difference
-type Address       = Word64 --    again
-type PID           = Word64 --    again
-type PPID          = Word64 --    again
-type UnitID        = Int
-type CommandLine   = Text
-type ImportLibs    = [Text]
-type ExportLibs    = [Text]
-type Env           = Map Text Text
-type PInfo         = Text
-type Location      = Int
-type Ppt           = Text
-type Args          = [ByteString]
-type GID           = [Int]
+translateRelationship :: EdgeType -> S.Relationship
+translateRelationship e =
+  case e of
+    EDGE_EVENT_AFFECTS_MEMORY        -> S.EdgeEventAffectsMemory
+    EDGE_EVENT_AFFECTS_FILE          -> S.EdgeEventAffectsFile
+    EDGE_EVENT_AFFECTS_NETFLOW       -> S.EdgeEventAffectsNetflow
+    EDGE_EVENT_AFFECTS_SUBJECT       -> S.EdgeEventAffectsSubject
+    EDGE_EVENT_AFFECTS_SRCSINK       -> S.EdgeEventAffectsSrcsink
+    EDGE_EVENT_HASPARENT_EVENT       -> S.EdgeEventHasparentEvent
+    EDGE_EVENT_ISGENERATEDBY_SUBJECT -> S.EdgeEventIsgeneratedbySubject
+    EDGE_SUBJECT_AFFECTS_EVENT       -> S.EdgeSubjectAffectsEvent
+    EDGE_SUBJECT_HASPARENT_SUBJECT   -> S.EdgeSubjectHasparentSubject
+    EDGE_SUBJECT_HASLOCALPRINCIPAL   -> S.EdgeSubjectHaslocalprincipal
+    EDGE_SUBJECT_RUNSON              -> S.EdgeSubjectRunson
+    EDGE_FILE_AFFECTS_EVENT          -> S.EdgeFileAffectsEvent
+    EDGE_NETFLOW_AFFECTS_EVENT       -> S.EdgeNetflowAffectsEvent
+    EDGE_MEMORY_AFFECTS_EVENT        -> S.EdgeMemoryAffectsEvent
+    EDGE_SRCSINK_AFFECTS_EVENT       -> S.EdgeSrcsinkAffectsEvent
+    EDGE_OBJECT_PREV_VERSION         -> S.EdgeObjectPrevVersion
