@@ -8,22 +8,38 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MultiWayIf          #-}
-module CommonDataModel.Avro where
+{-# LANGUAGE OverloadedStrings   #-}
+module CommonDataModel.Avro
+  (
+  -- * Main entry point
+    decodeObjectContainer
+  -- * Binary interface
+  , decodeObjectContainerFor
+  , G.runGet, G.runGetOrFail
+  , getBytesOfObject, getByteLength, getByteLengths, GetAvro(..)
+  -- ** Type specific Getters
+  , getDouble, getNull, getMap, getFloat, Value(..)
+  -- ** GADT interface
+  , AvroValue(..)
+  , Array, Null, Enumeration, Mapping, Fixed, Union
+  ) where
 import Prelude as P
+import qualified Codec.Compression.Zlib as Z
 import           CommonDataModel.Types as CDM
 import qualified Control.Exception as X
-import           Control.Monad (replicateM)
+import           Control.Monad (replicateM, when)
 import           Data.Bits
 import           Data.Binary.Get (ByteOffset, Get, runGetOrFail)
 import qualified Data.Binary.Get as G
 import           Data.ByteString (ByteString)
-import           Data.ByteString.Lazy (fromStrict,toStrict)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Data
 import           Data.Int (Int32,Int64)
 import           Data.List (foldl')
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -31,34 +47,70 @@ import           Data.Word (Word16)
 
 import GHC.TypeLits
 
-decodeAvro :: ByteString -> Either (ByteString,ByteOffset, String) [CDM.TCCDMDatum]
-decodeAvro bs0 = go (fromStrict bs0)
+decodeObjectContainerFor
+  :: forall a.
+     Get a
+  -> BL.ByteString
+  -> Either (BL.ByteString, ByteOffset, String)
+            (BL.ByteString, ByteOffset, [[a]])
+decodeObjectContainerFor getThing bs0 =
+  flip runGetOrFail bs0 $ do
+    magic <- getFixed avroMagicSize
+    when (BL.fromStrict magic /= avroMagicBytes)
+         (fail "Invalid magic number at start of container.")
+    metadata <- getMap :: Get (Map Text ByteString) -- avro.schema, avro.codec
+    sync  <- BL.fromStrict <$> getFixed nrSyncBytes
+    codec <- getCodec (BL.fromStrict <$> Map.lookup "avro.codec" metadata)
+    getBlocks sync codec
  where
- go bs =
-   case runGetOrFail getCDM08 bs of
-    Left  (_,off,str)  -> Left (toStrict bs,off,str)
-    Right (rest,_,res) -> fmap (res :) (go rest)
+ nrSyncBytes :: Integral sb => sb
+ nrSyncBytes = 16
+
+ getBlocks :: BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
+ getBlocks sync decompress =
+  do nrObj    <- sFromIntegral =<< getLong
+     _nrBytes <- getLong
+     r <- replicateM nrObj getThing
+     marker  <- G.getLazyByteString nrSyncBytes
+     when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
+     e <- G.isEmpty
+     if e
+       then return [r]
+       else (r :) <$> getBlocks sync decompress
+
+ getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
+ getCodec code | Just "null"    <- code =
+                    return return
+               | Just "deflate" <- code =
+                    return (maybe (fail "Decompression failed.") return . Z.decompress)
+               | Just x <- code =
+                    fail ("Unrecognized codec: " ++ BC.unpack x)
+               | otherwise = fail "Container is missing codec."
+
+-- | Given an Avro-formatted Object Container, decode the file and return
+-- the included datum's in lists of their original block sets 
+decodeObjectContainer
+    :: forall a. GetAvro a
+    => BL.ByteString
+    -> Either (BL.ByteString, ByteOffset, String)
+              (BL.ByteString, ByteOffset, [[a]])
+decodeObjectContainer bs0 = decodeObjectContainerFor getAvro bs0
+avroMagicSize :: Integral a => a
+avroMagicSize = 4
+
+avroMagicBytes :: BL.ByteString
+avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
 
 data CDMDecodeFailure = CDMDecodeFailure BL.ByteString Int64 String
  deriving (Eq, Ord, Show, Typeable, Data)
 
 instance X.Exception CDMDecodeFailure
 
--- | Lazily decode a lazy byte string.  That is, decode the ByteString
--- gradually and throw exceptions, instead of using `Either`, for errors.
-decodeAvroLazy :: BL.ByteString -> [CDM.TCCDMDatum]
-decodeAvroLazy bs0 = go bs0
- where
- go bs =
-  case runGetOrFail getCDM08 bs of
-    Left (_,off,str)   -> X.throw (CDMDecodeFailure bs off str)
-    Right (rest,_,res) -> res : (go rest)
-
 --------------------------------------------------------------------------------
 --  CDM Avro Deserialization
 
-getCDM08 :: Get CDM.TCCDMDatum
-getCDM08 =
+getCDM09 :: Get CDM.TCCDMDatum
+getCDM09 =
  do tag <- getLong
     case tag of
       0  -> DatumPTN <$> getAvro
@@ -73,7 +125,7 @@ getCDM08 =
       _  -> fail "Bad tag in CDM Datum"
 
 instance GetAvro TCCDMDatum where
-  getAvro = getCDM08
+  getAvro = getCDM09
 
 instance GetAvro ProvenanceTagNode where
   getAvro =
@@ -103,7 +155,7 @@ instance GetAvro TagOpCode where
 
 instance GetAvro Subject where
   getAvro =
-       Subject <$> getLong
+       Subject <$> getAvro
                <*> getAvro
                <*> getInt
                <*> getInt
@@ -122,11 +174,11 @@ instance GetAvro SubjectType where
 
 instance GetAvro Event where
   getAvro =
-    Event <$> getLong
-          <*> getLong
+    Event <$> getAvro
           <*> getLong
           <*> getAvro
           <*> getInt
+          <*> getAvro
           <*> getAvro
           <*> getAvro
           <*> getAvro
@@ -148,7 +200,7 @@ instance GetAvro EventType where
 
 instance GetAvro NetFlowObject where
   getAvro =
-    NetFlowObject <$> getLong
+    NetFlowObject <$> getAvro
                   <*> getAvro
                   <*> getString
                   <*> getInt
@@ -168,15 +220,16 @@ instance GetAvro Word16 where
 
 instance GetAvro FileObject where
   getAvro =
-    FileObject <$> getLong
+    FileObject <$> getAvro
                <*> getAvro
                <*> getString
+               <*> getBoolean
                <*> getInt
                <*> getAvro
 
 instance GetAvro SrcSinkObject where
   getAvro =
-    SrcSinkObject <$> getLong
+    SrcSinkObject <$> getAvro
                   <*> getAvro
                   <*> getAvro
 
@@ -185,14 +238,14 @@ instance GetAvro SrcSinkType where
 
 instance GetAvro MemoryObject where
   getAvro =
-    MemoryObject <$> getLong
+    MemoryObject <$> getAvro
                  <*> getAvro
-                 <*> getLong
+                 <*> getAvro
                  <*> getLong
 
 instance GetAvro Principal where
   getAvro =
-    Principal <$> getLong
+    Principal <$> getAvro
               <*> getAvroWithDefault PRINCIPAL_LOCAL
               <*> getInt
               <*> getAvro
@@ -210,8 +263,8 @@ getAvroWithDefault _def = {- XXX -} getAvro
 
 instance GetAvro SimpleEdge where
   getAvro =
-    SimpleEdge <$> getLong
-               <*> getLong
+    SimpleEdge <$> getAvro
+               <*> getAvro
                <*> getAvro
                <*> getLong
                <*> getAvro
@@ -233,6 +286,10 @@ instance GetAvro Int32 where
   getAvro = getInt
 instance GetAvro Int64 where
   getAvro = getLong
+instance GetAvro Short where
+  getAvro = Short <$> G.getWord16le
+instance GetAvro UUID where
+  getAvro = UUID <$> getFixed 32
 instance GetAvro ByteString where
   getAvro = getBytes
 instance GetAvro Text where
@@ -321,10 +378,10 @@ getBoolean =
     return (w == 0x01)
 
 getInt :: Get Int32
-getInt = getZigZag 4
+getInt = getZigZag 5
 
 getLong :: Get Int64
-getLong = getZigZag 8
+getLong = getZigZag 9
 
 getZigZag :: (Bits i, Integral i) => Int -> Get i
 getZigZag nrMaxBytes =
@@ -439,27 +496,30 @@ getArray =
           do rs <- replicateM (fromIntegral nr) getAvro
              (rs ++) <$> getArray
 
-data Offsets = Base Int64 | Bytes Int64
-getArrayBytes :: forall ty. GetAvro ty => Proxy ty -> Get [Int64]
-getArrayBytes _ =
-  do offsets <- go
-     let fixOffsets _ []             = []
-         fixOffsets _ (Base n  : xs) = fixOffsets n xs
-         fixOffsets n (Bytes k : xs) = (k - n) : fixOffsets k xs
-     return (fixOffsets 0 offsets)
+getBytesOfObject :: forall ty. GetAvro ty => Proxy ty -> Get BL.ByteString
+getBytesOfObject p =
+  do len <- G.lookAhead (getByteLength p)
+     G.getLazyByteString len
+
+getByteLength :: forall ty . GetAvro ty => Proxy ty -> Get Int64
+getByteLength _ = do
+  base <- G.bytesRead
+  _ <- getAvro :: Get ty
+  off <- G.bytesRead
+  return (off - base)
+
+getByteLengths :: forall ty. GetAvro ty => Proxy ty -> Get [Int64]
+getByteLengths _ =
+  do base <- G.bytesRead
+     os <- go
+     return (zipWith (-) os (base : os))
  where
  go =
-  do nr <- getLong
-     hd <- if | nr == 0  -> return id
-              | nr < 0  ->
-                 do _ <- getLong
-                    (:) . Base <$> G.bytesRead
-              | otherwise -> (:) . Base <$> G.bytesRead
-     if abs nr == 0
-         then return []
-         else do let getByteOffset = (getAvro :: Get ty) >> Bytes <$> G.bytesRead
-                 byteOffsets <- replicateM (fromIntegral (abs nr)) getByteOffset
-                 (hd byteOffsets ++) <$> go
+  do e <- G.isEmpty
+     if e
+      then return []
+      else do offset <- (getAvro :: Get ty) >> G.bytesRead
+              (offset :) <$> go
 
 getMap :: GetAvro ty => Get (Map Text ty)
 getMap = go Map.empty
@@ -471,3 +531,11 @@ getMap = go Map.empty
        else do m <- Map.fromList <$> replicateM (fromIntegral nr) getKVs
                go (Map.union m acc)
  getKVs = (,) <$> getString <*> getAvro
+
+-- Safe-ish from integral
+sFromIntegral :: forall a b m. (Monad m, Bounded a, Bounded b, Integral a, Integral b) => a -> m b
+sFromIntegral a
+  | aI > fromIntegral (maxBound :: b) ||
+    aI < fromIntegral (minBound :: b)   = fail "Integral overflow."
+  | otherwise                           = return (fromIntegral a)
+ where aI = fromIntegral a :: Integer

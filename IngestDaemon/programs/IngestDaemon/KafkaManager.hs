@@ -7,6 +7,7 @@ import           Control.Monad (forever)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Parallel.Strategies
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BL
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import           System.IO (hPutStrLn, stderr)
@@ -60,8 +61,8 @@ kafkaInput host topic chan = forever $ do
  process offset =
   do bs <- getMessage offset
      let handleMsg b =
-          case decodeAvro b of
-            Right cdmFmt ->
+          case runGetOrFail getAvro (BL.fromStrict b) of
+            Right (_,_,cdmFmt) ->
                liftIO $ do
                   let nses = CDM.toSchema cdmFmt
                   ms <- compile nses

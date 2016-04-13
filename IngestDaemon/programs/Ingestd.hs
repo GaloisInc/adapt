@@ -79,7 +79,7 @@ defaultConfig = Config
   , _help         = False
   , _kafkaServer  = defaultKafka
   , _inputTopics  = []
-  , _outputTopic = "toPX"
+  , _outputTopic = "pattern"
   , _titanServer  = Titan.defaultServer
   }
 

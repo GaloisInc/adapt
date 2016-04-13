@@ -58,8 +58,8 @@ data Entity
                , entityUID          :: UID
                , entityInfo         :: OptionalInfo
                -- Partial fields
-               , entityPageNumber   :: PageNumber -- partial
-               , entityAddress      :: Address    -- partial
+               , entityPageNumber   :: Maybe PageNumber -- partial
+               , entityAddress      :: Address          -- partial
                }
       deriving (Eq, Ord, Show, Read, Generic)
 
@@ -75,7 +75,7 @@ data Subject
     = Subject { subjectSource          :: InstrumentationSource
               , subjectUID             :: UID
               , subjectType            :: SubjectType
-              , subjectStartTime       :: Time
+              , subjectStartTime       :: Maybe Time
               -- Optional attributes
               , subjectPID             :: Maybe PID
               , subjectPPID            :: Maybe PPID
@@ -96,7 +96,7 @@ data Subject
 
 mkEvent :: InstrumentationSource -> UID -> EventType -> Maybe Sequence -> Time -> Subject
 mkEvent src uid eTy eSeq start =
-  Subject src uid (SubjectEvent eTy eSeq) start Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing
+  Subject src uid (SubjectEvent eTy eSeq) (Just start) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing
 
 data Host =
       Host { hostUID    :: UID
@@ -166,6 +166,7 @@ noInfo = Info Nothing Nothing Nothing Nothing Map.empty
 data InstrumentationSource
       = SourceLinuxAuditTrace
       | SourceLinuxProcTrace
+      | SourceLinuxBeepTrace
       | SourceFreeBsdOpenBsmTrace
       | SourceAndroidJavaClearscope
       | SourceAndoirdNativeClearscope
@@ -182,33 +183,37 @@ data PrincipalType
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data EventType
-      = EventAccept
-      | EventBind
-      | EventChangePrincipal
-      | EventCheckFileAttributes
-      | EventClose
-      | EventConnect
-      | EventCreateObject
-      | EventCreateThread
-      | EventExecute
-      | EventFork
-      | EventLink
-      | EventUnlink
-      | EventMmap
-      | EventModifyFileAttributes
-      | EventMprotect
-      | EventOpen
-      | EventRead
-      | EventWrite
-      | EventSignal
-      | EventTruncate
-      | EventWait
-      | EventOSUnknown
-      | EventKernelUnknown
-      | EventAppUnknown
-      | EventUIUnknown
-      | EventUnknown
-      | EventBlind
+        = EventAccept
+        | EventBind
+        | EventChangePrincipal
+        | EventCheckFileAttributes
+        | EventClone
+        | EventClose
+        | EventConnect
+        | EventCreateObject
+        | EventCreateThread
+        | EventExecute
+        | EventFork
+        | EventLink
+        | EventUnlink
+        | EventMmap
+        | EventModifyFileAttributes
+        | EventMprotect
+        | EventOpen
+        | EventRead
+        | EventRename
+        | EventWrite
+        | EventSignal
+        | EventTruncate
+        | EventWait
+        | EventOsUnknown
+        | EventKernelUnknown
+        | EventAppUnknown
+        | EventUiUnknown
+        | EventUnknown
+        | EventBlind
+        | EventUnit
+        | EventUpdate
       -- The below are not (yet) in the specification.
       | EventStop
       | EventCreate
@@ -221,7 +226,7 @@ data SourceType
       | SourceTemperature
       | SourceGyroscope
       | SourceMagneticField
-      | SourceHearRate
+      | SourceHeartRate
       | SourceLight
       | SourceProximity
       | SourcePressure

@@ -3,19 +3,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CommonDataModel where
 
+import qualified Data.Binary.Get as G
 import qualified Data.ByteString as BS
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
-import Data.Time
-import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Data.Int
-import MonadLib
+import qualified Data.ByteString.Lazy as BL
+import           Data.Int
 import qualified Data.Map as Map
+import           Data.Maybe (fromMaybe)
+import           Data.Text (Text)
+import           Data.Time
+import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+import           MonadLib
 
-import CommonDataModel.Types
+import           CommonDataModel.Types
 import qualified Schema as S
 
--- toSchema is the top-level operation for translating TC CDM data into
+-- | toSchema is the top-level operation for translating TC CDM data into
 -- the Adapt schema.
 toSchema :: [TCCDMDatum] -> ([S.Node], [S.Edge])
 toSchema [] = ([],[])
@@ -93,14 +95,14 @@ translateSubject       (Subject {..}) =
                   { S.subjectSource = translateSource subjSource
                   , S.subjectUID    = translateUUID subjUUID
                   , S.subjectType   = translateSubjectType subjType
-                  , S.subjectStartTime = translateTime subjStartTimestampMicros
-                  , S.subjectEndTime   = Nothing
-                  , S.subjectPID    = Just subjPID
-                  , S.subjectPPID   = Just subjPPID
-                  , S.subjectUnitID = subjUnitId
+                  , S.subjectStartTime   = Just $ translateTime subjStartTimestampMicros
+                  , S.subjectEndTime     = Nothing
+                  , S.subjectPID         = Just subjPID
+                  , S.subjectPPID        = Just subjPPID
+                  , S.subjectUnitID      = subjUnitId
                   , S.subjectCommandLine = subjCmdLine
-                  , S.subjectImportLibs = subjImportedLibraries
-                  , S.subjectExportLibs = subjExportedLibraries
+                  , S.subjectImportLibs  = subjImportedLibraries
+                  , S.subjectExportLibs  = subjExportedLibraries
                   , S.subjectProcessInfo = subjPInfo
                   , S.subjectOtherProperties = fromMaybe Map.empty subjProperties
                   -- XXX the below are probably not supposed to be fields
@@ -113,8 +115,10 @@ translateSubject       (Subject {..}) =
                   }
   in tellNode (S.NodeSubject s)
 
-translateUUID :: Int64 -> S.UID
-translateUUID = (0,0,0,) . fromIntegral
+translateUUID :: UUID -> S.UID
+translateUUID (UUID bs) =
+  let [a,b,c,d] = G.runGet (replicateM 4 G.getWord64le) (BL.fromStrict bs)
+  in (a,b,c,d)
 
 translateSubjectType :: SubjectType -> S.SubjectType
 translateSubjectType s =
@@ -126,33 +130,37 @@ translateSubjectType s =
 translateEventType :: EventType -> S.EventType
 translateEventType e =
   case e of
-    EVENT_ACCEPT                 -> S.EventAccept
-    EVENT_BIND                   -> S.EventBind
-    EVENT_CHANGE_PRINCIPAL       -> S.EventChangePrincipal
-    EVENT_CHECK_FILE_ATTRIBUTES  -> S.EventCheckFileAttributes
-    EVENT_CLOSE                  -> S.EventClose
-    EVENT_CONNECT                -> S.EventConnect
-    EVENT_CREATE_OBJECT          -> S.EventCreateObject
-    EVENT_CREATE_THREAD          -> S.EventCreateThread
-    EVENT_EXECUTE                -> S.EventExecute
-    EVENT_FORK                   -> S.EventFork
-    EVENT_LINK                   -> S.EventLink
-    EVENT_UNLINK                 -> S.EventUnlink
-    EVENT_MMAP                   -> S.EventMmap
-    EVENT_MODIFY_FILE_ATTRIBUTES -> S.EventModifyFileAttributes
-    EVENT_MPROTECT               -> S.EventMprotect
-    EVENT_OPEN                   -> S.EventOpen
-    EVENT_READ                   -> S.EventRead
-    EVENT_WRITE                  -> S.EventWrite
-    EVENT_SIGNAL                 -> S.EventSignal
-    EVENT_TRUNCATE               -> S.EventTruncate
-    EVENT_WAIT                   -> S.EventWait
-    EVENT_OS_UNKNOWN             -> S.EventOSUnknown
-    EVENT_KERNEL_UNKNOWN         -> S.EventKernelUnknown
-    EVENT_APP_UNKNOWN            -> S.EventAppUnknown
-    EVENT_UI_UNKNOWN             -> S.EventUIUnknown
-    EVENT_UNKNOWN                -> S.EventUnknown
-    EVENT_BLIND                  -> S.EventBlind
+     EVENT_ACCEPT                     -> S.EventAccept
+     EVENT_BIND                       -> S.EventBind
+     EVENT_CHANGE_PRINCIPAL           -> S.EventChangePrincipal
+     EVENT_CHECK_FILE_ATTRIBUTES      -> S.EventCheckFileAttributes
+     EVENT_CLONE                      -> S.EventClone
+     EVENT_CLOSE                      -> S.EventClose
+     EVENT_CONNECT                    -> S.EventConnect
+     EVENT_CREATE_OBJECT              -> S.EventCreateObject
+     EVENT_CREATE_THREAD              -> S.EventCreateThread
+     EVENT_EXECUTE                    -> S.EventExecute
+     EVENT_FORK                       -> S.EventFork
+     EVENT_LINK                       -> S.EventLink
+     EVENT_UNLINK                     -> S.EventUnlink
+     EVENT_MMAP                       -> S.EventMmap
+     EVENT_MODIFY_FILE_ATTRIBUTES     -> S.EventModifyFileAttributes
+     EVENT_MPROTECT                   -> S.EventMprotect
+     EVENT_OPEN                       -> S.EventOpen
+     EVENT_READ                       -> S.EventRead
+     EVENT_RENAME                     -> S.EventRename
+     EVENT_WRITE                      -> S.EventWrite
+     EVENT_SIGNAL                     -> S.EventSignal
+     EVENT_TRUNCATE                   -> S.EventTruncate
+     EVENT_WAIT                       -> S.EventWait
+     EVENT_OS_UNKNOWN                 -> S.EventOsUnknown
+     EVENT_KERNEL_UNKNOWN             -> S.EventKernelUnknown
+     EVENT_APP_UNKNOWN                -> S.EventAppUnknown
+     EVENT_UI_UNKNOWN                 -> S.EventUiUnknown
+     EVENT_UNKNOWN                    -> S.EventUnknown
+     EVENT_BLIND                      -> S.EventBlind
+     EVENT_UNIT                       -> S.EventUnit
+     EVENT_UPDATE                     -> S.EventUpdate
 
 -- Notice we drop the tag information when extracting parameter values.
 translateParameters :: [Value] -> S.Args
@@ -164,7 +172,7 @@ translateEvent         (Event {..}) =
                     , S.subjectUID    = translateUUID evtUUID
                     , S.subjectType   = S.SubjectEvent (translateEventType evtType)
                                                        (Just evtSequence)
-                    , S.subjectStartTime = translateTime evtTimestampMicros
+                    , S.subjectStartTime = fmap translateTime evtTimestampMicros
                     , S.subjectEndTime   = Nothing
                     , S.subjectPID    = Nothing
                     , S.subjectPPID   = Nothing
@@ -212,7 +220,7 @@ translateNetFlowObject (NetFlowObject {..}) = do
                 { S.entitySource       = translateSource aoSource
                 , S.entityUID          = translateUUID nfUUID
                 , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
-                                              , S.infoPermissions     = aoPermission
+                                              , S.infoPermissions     = fmap unShort aoPermission
                                               , S.infoTrustworthiness = mt
                                               , S.infoSensitivity     = ms
                                               , S.infoOtherProperties = fromMaybe Map.empty aoProperties
@@ -234,7 +242,7 @@ translateFileObject    (FileObject {..}) = do
              { S.entitySource       = translateSource aoSource
              , S.entityUID          = translateUUID foUUID
              , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
-                                           , S.infoPermissions     = aoPermission
+                                           , S.infoPermissions     = fmap unShort aoPermission
                                            , S.infoTrustworthiness = mt
                                            , S.infoSensitivity     = ms
                                            , S.infoOtherProperties = fromMaybe Map.empty aoProperties
@@ -259,7 +267,7 @@ translateSrcSinkObject (SrcSinkObject {..}) = do
                , S.resourceType   = translateSrcSinkType ssType
                , S.resourceUID    = translateUUID ssUUID
                , S.resourceInfo   = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
-                                         , S.infoPermissions     = aoPermission
+                                         , S.infoPermissions     = fmap unShort aoPermission
                                          , S.infoTrustworthiness = mt
                                          , S.infoSensitivity     = ms
                                          , S.infoOtherProperties = fromMaybe Map.empty aoProperties
@@ -277,7 +285,7 @@ translateMemoryObject  (MemoryObject {..}) = do
                , S.entityUID          = translateUUID moUUID
                , S.entityInfo         = S.Info
                                         { S.infoTime = translateTime <$> aoLastTimestampMicros
-                                        , S.infoPermissions     = aoPermission
+                                        , S.infoPermissions     = fmap unShort aoPermission
                                         , S.infoTrustworthiness = mt
                                         , S.infoSensitivity     = ms
                                         , S.infoOtherProperties = fromMaybe Map.empty aoProperties
