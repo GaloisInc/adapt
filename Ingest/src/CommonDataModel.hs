@@ -14,17 +14,8 @@ import           Data.Time
 import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import           MonadLib
 
-import qualified CommonDataModel.Avro as Avro
 import           CommonDataModel.Types
 import qualified Schema as S
-
--- | A composition of decoding Avro encoded CDM statements and converting
--- the statements to our schema
-toSchemaFromByteString :: BS.ByteString -> Either String ([S.Node], [S.Edge])
-toSchemaFromByteString bs =
-  case Avro.decodeAvro bs of
-    Left (_,off,str)    -> Left $ "Failed to decode CDM Avro offset/reason: " ++ show (off,str)
-    Right cdm           -> Right (toSchema cdm)
 
 -- | toSchema is the top-level operation for translating TC CDM data into
 -- the Adapt schema.

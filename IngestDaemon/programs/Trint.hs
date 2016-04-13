@@ -64,7 +64,7 @@ data Config = Config { lintOnly   :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
-                     , pushKafka  :: Maybe FilePath
+                     , pushKafka  :: Bool
                      , files      :: [File]
                      , ta1_to_ta2_kafkaTopic :: TopicName
                      , ingest_to_px_kafkaTopic :: TopicName
@@ -72,6 +72,12 @@ data Config = Config { lintOnly   :: Bool
 
 data File = ProvFile { getFP :: FilePath } | CDMFile { getFP :: FilePath }
   deriving (Show)
+
+isCDMFile, isProvFile :: File -> Bool
+isCDMFile (CDMFile _)   = True
+isCDMFile _             = False
+isProvFile (ProvFile _) = True
+isProvFile           _  = False
 
 
 defaultConfig :: Config
@@ -83,7 +89,7 @@ defaultConfig = Config
   , verbose   = False
   , help      = False
   , upload    = Nothing
-  , pushKafka = Nothing
+  , pushKafka = False
   , files = []
   , ta1_to_ta2_kafkaTopic = "ta2"
   , ingest_to_px_kafkaTopic = "pattern"
@@ -116,8 +122,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                     $ NoArg $ \s -> Right s { stats = True }
                   , Option ['p'] ["push-to-kafka"]
                     "Send TA-1 CDM statements to the ingest daemon via it's kafka queue."
-                    $ ReqArg "FILE" $
-                        \file s -> Right s { pushKafka = Just file }
+                    $ NoArg $ \s -> Right s { pushKafka = True }
                   , Option [] ["ta2-kafka-topic"]
                     "Set the kafka topic for the TA1-TA2 comms"
                     $ ReqArg "Topic" $
@@ -194,15 +199,13 @@ processStmts c fp res@(ns,es)
         let astfile = fp <.> "trint"
         dbg ("Writing ast to " ++ astfile)
         output astfile $ Text.unlines $ map (Text.pack . groom) ns ++ map (Text.pack . groom) es
-      case pushKafka c of
-        Just file ->
-          do stmts <- readCDMStatements file
+      when (pushKafka c) $ do
+          do stmts <- concat <$> mapM readCDMStatements (getFP <$> filter isCDMFile (files c))
              let topic = ta1_to_ta2_kafkaTopic c
                  ms = map (TopicAndMessage topic . makeMessage) stmts
              runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
                       (produceMessages ms)
              return ()
-        Nothing -> return ()
       case upload c of
         Just r ->
           do
@@ -225,9 +228,10 @@ readCDMStatements fp =
     return (map BL.toStrict $ segment cont)
  where
  segment bs =
-  let offsets = G.runGet (Avro.getArrayBytes (Proxy :: Proxy CDM.TCCDMDatum)) bs
-      acc     = scanl' (+) 0 offsets
-  in [BL.take o (BL.drop a bs) | o <- offsets | a <- acc]
+  let prox = Proxy :: Proxy CDM.TCCDMDatum
+  in case Avro.decodeObjectContainerFor (Avro.getBytesOfObject prox) bs of
+      Left (_,_,reason) -> error $ "Failed to extract bytes of avro statements: " ++ reason
+      Right (_,_,xs)    -> concat xs
 
 pushDataToKafka :: TopicName -> VertsAndEdges -> Kafka ()
 pushDataToKafka tp (vs, es) = do produceMessages $ map convertResultId rids
