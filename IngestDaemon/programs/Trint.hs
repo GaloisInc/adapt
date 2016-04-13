@@ -31,19 +31,20 @@ import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as Text
 import qualified Data.Text.Lazy.IO as Text
 import           Data.Time (UTCTime, addUTCTime)
-import           FromProv
+import           FromProv as FromProv
 import           MonadLib        hiding (handle)
 import           MonadLib.Monads hiding (handle)
 import           Numeric (showHex)
 import           PP (pretty, pp)
 import           SimpleGetOpt
 import           System.Exit (exitFailure)
-import           System.FilePath ((<.>))
+import           System.FilePath ((<.>),takeExtension)
 import           Text.Groom
 import           Text.Read (readMaybe)
 
 import qualified CommonDataModel.Avro  as Avro
 import qualified CommonDataModel.Types as CDM
+import qualified CommonDataModel       as CDM
 
 import Titan
 import CompileSchema
@@ -62,8 +63,12 @@ data Config = Config { lintOnly   :: Bool
                      , help       :: Bool
                      , upload     :: Maybe ServerInfo
                      , pushKafka  :: Maybe FilePath
-                     , files      :: [FilePath]
+                     , files      :: [File]
                      } deriving (Show)
+
+data File = ProvFile { getFP :: FilePath } | CDMFile { getFP :: FilePath }
+  deriving (Show)
+
 
 defaultConfig :: Config
 defaultConfig = Config
@@ -75,13 +80,18 @@ defaultConfig = Config
   , help      = False
   , upload    = Nothing
   , pushKafka = Nothing
-  , files     = []
+  , files = []
   }
+
+includeFile :: Config -> FilePath -> Either String Config
+includeFile c fp
+  | ".prov" == take 5 (takeExtension fp) = Right c { files = ProvFile fp : files c }
+  | otherwise                            = Right c { files = CDMFile fp : files c }
 
 opts :: OptSpec Config
 opts = OptSpec { progDefaults  = defaultConfig
-               , progParamDocs = [("FILES",      "The Prov-N files to be scanned.")]
-               , progParams    = \p s -> Right s { files = p : files s }
+               , progParamDocs = [("FILES",      "The Prov-N files (.prov*) and CDM files (all others) to be scanned.")]
+               , progParams    = \p s -> includeFile s p
                , progOptions   =
                   [ Option ['l'] ["lint"]
                     "Check the given file for syntactic and type issues."
@@ -130,26 +140,28 @@ main =
   do c <- getOpts opts
      if help c
       then dumpUsage opts
-      else mapM_ (trint c) (files c)
+      else mapM_ (handleFile c) (files c)
 
-trint :: Config -> FilePath -> IO ()
-trint c fp = do
-  eres <- ingest
+handleFile :: Config -> File -> IO ()
+handleFile c fl = do
+  eres <- ingest fl
   case eres of
     Left e  -> do
-      putStrLn $ "Error ingesting " ++ fp ++ ":"
-      print (pp e)
-      return ()
+      putStrLn $ "Error ingesting " ++ (getFP fl) ++ ":"
+      putStrLn e
     Right (ns,es,ws) -> do
       unless (quiet c) $ printWarnings ws
-      processStmts c fp (ns,es)
+      processStmts c (getFP fl) (ns,es)
 
   where
-  ingest = do
-    t <- handle onError (Text.readFile fp)
-    translateTextCDM t
+  ingest (ProvFile fp) =
+    do t <- handle onError (Text.readFile fp)
+       either (Left . show . pp) Right <$> FromProv.translateTextCDM t
+  ingest (CDMFile fp)  =
+    do t <- handle onError (BS.readFile fp)
+       return $ either Left (\(a,b) -> Right (a,b,[])) (CDM.toSchemaFromByteString t)
   onError :: IOException -> IO a
-  onError e = do putStrLn ("Error reading " ++ fp ++ ":")
+  onError e = do putStrLn ("Error reading " ++ getFP fl ++ ":")
                  print e
                  exitFailure
 
