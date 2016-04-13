@@ -21,7 +21,6 @@ import qualified Data.Text      as TextStrict
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
-import           Data.Time (UTCTime(..))
 import           MonadLib as ML
 import           Text.Read (readMaybe)
 
@@ -140,9 +139,7 @@ translateProvActivity (RawEntity {..}) =
   do let subjectSource = SourceLinuxAuditTrace
      subjectUID <- uidOfMay exprIdent
      let subjectType = SubjectProcess
-         fakeDay = UTCTime (toEnum 0) 0
-         err = warn "Prov Activity (CDM Subject) has no start time." >> return fakeDay
-     subjectStartTime   <- getTime (maybe err return) [] exprAttrs
+     subjectStartTime   <- getTime return [] exprAttrs
      subjectPID         <- kvStringToIntegral adaptPid exprAttrs
      subjectPPID        <- kvStringToIntegral adaptPPid exprAttrs
      subjectUnitID      <- return Nothing
@@ -197,7 +194,7 @@ translateProvUsed (RawEntity {..}) =
            return ([evt], [wib,use])
     _ -> warn "Unrecognized 'used' relation." >> noResults
 
-getTime :: (Maybe CDM.Time -> Tr CDM.Time) -> [Maybe (Either Ident T.Time)] -> KVs -> Tr CDM.Time
+getTime :: (Maybe CDM.Time -> Tr a) -> [Maybe (Either Ident T.Time)] -> KVs -> Tr a
 getTime force rest exprAttrs =
   do let m0 = case rest of
                (Just (Right t) : _) -> First (Just t)
@@ -422,26 +419,26 @@ kvStringReq i m =
 kvGetDevice :: Ident -> KVs -> Tr SourceType
 kvGetDevice i m =
  do md <- kvString i m
-    case md of
-     Just "Accelerometer"             -> return SourceAccelerometer
-     Just "Temperature"               -> return SourceTemperature
-     Just "Gyroscope"                 -> return SourceGyroscope
-     Just "MagneticField"             -> return SourceMagneticField
-     Just "HearRate"                  -> return SourceHearRate
-     Just "Light"                     -> return SourceLight
-     Just "Proximity"                 -> return SourceProximity
-     Just "Pressure"                  -> return SourcePressure
-     Just "RelativeHumidity"          -> return SourceRelativeHumidity
-     Just "LinearAcceleration"        -> return SourceLinearAcceleration
-     Just "Motion"                    -> return SourceMotion
-     Just "StepDetector"              -> return SourceStepDetector
-     Just "StepCounter"               -> return SourceStepCounter
-     Just "TiltDetector"              -> return SourceTiltDetector
-     Just "RotationVector"            -> return SourceRotationVector
-     Just "Gravity"                   -> return SourceGravity
-     Just "GeomagneticRotationVector" -> return SourceGeomagneticRotationVector
-     Just "Camera"                    -> return SourceCamera
-     Just "Gps"                       -> return SourceGps
+    case fmap Text.toLower md of
+     Just "accelerometer"             -> return SourceAccelerometer
+     Just "temperature"               -> return SourceTemperature
+     Just "gyroscope"                 -> return SourceGyroscope
+     Just "magneticfield"             -> return SourceMagneticField
+     Just "heartrate"                 -> return SourceHeartRate
+     Just "light"                     -> return SourceLight
+     Just "proximity"                 -> return SourceProximity
+     Just "pressure"                  -> return SourcePressure
+     Just "relativehumidity"          -> return SourceRelativeHumidity
+     Just "linearacceleration"        -> return SourceLinearAcceleration
+     Just "motion"                    -> return SourceMotion
+     Just "stepdetector"              -> return SourceStepDetector
+     Just "stepcounter"               -> return SourceStepCounter
+     Just "tiltdetector"              -> return SourceTiltDetector
+     Just "rotationvector"            -> return SourceRotationVector
+     Just "gravity"                   -> return SourceGravity
+     Just "geomagneticrotationvector" -> return SourceGeomagneticRotationVector
+     Just "camera"                    -> return SourceCamera
+     Just "gps"                       -> return SourceGps
      Just s                           -> die $ "Unrecognized source: " <> s
      Nothing                          -> die "No device source provided."
 

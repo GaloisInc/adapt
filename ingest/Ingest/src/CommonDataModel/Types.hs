@@ -7,7 +7,12 @@ import Data.Map
 import Data.Word (Word16)
 
 -- | A two byte value we keep as 16 bits in little endian.
-type Short = Word16
+newtype Short = Short { unShort :: Word16 }
+  deriving (Eq,Ord,Show,Read)
+
+-- | UUIDs are 256 bit (32 byte) values.
+newtype UUID = UUID ByteString
+  deriving (Eq,Ord,Show,Read)
 
 data SubjectType = Process | Thread | Unit
   deriving (Eq, Ord, Show, Enum, Bounded)
@@ -17,7 +22,7 @@ data SrcSinkType
         | SOURCE_TEMPERATURE
         | SOURCE_GYROSCOPE
         | SOURCE_MAGNETIC_FIELD
-        | SOURCE_HEAR_RATE
+        | SOURCE_HEART_RATE
         | SOURCE_LIGHT
         | SOURCE_PROXIMITY
         | SOURCE_PRESSURE
@@ -47,6 +52,7 @@ data SrcSinkType
 data InstrumentationSource
         = SOURCE_LINUX_AUDIT_TRACE
         | SOURCE_LINUX_PROC_TRACE
+        | SOURCE_LINUX_BEEP_TRACE
         | SOURCE_FREEBSD_OPENBSM_TRACE
         | SOURCE_ANDROID_JAVA_CLEARSCOPE
         | SOURCE_ANDROID_NATIVE_CLEARSCOPE
@@ -65,6 +71,7 @@ data EventType
         | EVENT_BIND
         | EVENT_CHANGE_PRINCIPAL
         | EVENT_CHECK_FILE_ATTRIBUTES
+        | EVENT_CLONE
         | EVENT_CLOSE
         | EVENT_CONNECT
         | EVENT_CREATE_OBJECT
@@ -78,6 +85,7 @@ data EventType
         | EVENT_MPROTECT
         | EVENT_OPEN
         | EVENT_READ
+        | EVENT_RENAME
         | EVENT_WRITE
         | EVENT_SIGNAL
         | EVENT_TRUNCATE
@@ -88,6 +96,8 @@ data EventType
         | EVENT_UI_UNKNOWN
         | EVENT_UNKNOWN
         | EVENT_BLIND
+        | EVENT_UNIT
+        | EVENT_UPDATE
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 data EdgeType
@@ -142,7 +152,7 @@ data ProvenanceTagNode
     = PTN { ptnValue    :: PTValue
           , ptnChildren :: Maybe [ProvenanceTagNode]
           , ptnId       :: Maybe TagId
-          , ptnProperties  :: Properties
+          , ptnProperties  :: Maybe Properties
           }
      deriving (Eq,Ord,Show)
 
@@ -164,7 +174,7 @@ data Value = Value { valSize  :: Int32
      deriving (Eq,Ord,Show)
 
 data Subject =
-  Subject { subjUUID                 :: Int64
+  Subject { subjUUID                 :: UUID
           , subjType                 :: SubjectType
           , subjPID                  :: Int32
           , subjPPID                 :: Int32
@@ -181,12 +191,12 @@ data Subject =
      deriving (Eq,Ord,Show)
 
 data Event =
-  Event { evtUUID               :: Int64
-        , evtTimestampMicros    :: Int64
+  Event { evtUUID               :: UUID
         , evtSequence           :: Int64
         , evtType               :: EventType
         , evtThreadId           :: Int32
         , evtSource             :: InstrumentationSource
+        , evtTimestampMicros    :: Maybe Int64
         , evtName               :: Maybe Text
         , evtParameters         :: Maybe [Value]
         , evtLocation           :: Maybe Int64
@@ -206,16 +216,17 @@ data AbstractObject =
      deriving (Eq,Ord,Show)
 
 data FileObject =
-  FileObject  { foUUID       :: Int64
+  FileObject  { foUUID       :: UUID
               , foBaseObject :: AbstractObject
               , foURL        :: Text
+              , foIsPipe     :: Bool
               , foVersion    :: Int32
               , foSize       :: Maybe Int64
               }
      deriving (Eq,Ord,Show)
 
 data NetFlowObject =
-  NetFlowObject { nfUUID        :: Int64
+  NetFlowObject { nfUUID        :: UUID
                 , nfBaseObject  :: AbstractObject
                 , nfSrcAddress  :: Text
                 , nfSrcPort     :: Int32
@@ -225,22 +236,22 @@ data NetFlowObject =
      deriving (Eq,Ord,Show)
 
 data MemoryObject =
-  MemoryObject { moUUID         :: Int64
-               , moBaseObject   :: AbstractObject
-               , moPageNumber   :: Int64
+  MemoryObject { moUUID          :: UUID
+               , moBaseObject    :: AbstractObject
+               , moPageNumber    :: Maybe Int64
                , moMemoryAddress :: Int64
                }
      deriving (Eq,Ord,Show)
 
 data SrcSinkObject =
-  SrcSinkObject { ssUUID        :: Int64
+  SrcSinkObject { ssUUID        :: UUID
                 , ssBaseObject  :: AbstractObject
                 , ssType        :: SrcSinkType
                 }
      deriving (Eq,Ord,Show)
 
 data Principal =
-  Principal { pUUID     :: Int64
+  Principal { pUUID     :: UUID
             , pType     :: PrincipalType
             , pUserId   :: Int32
             , pGroupIds :: [Int32]
@@ -250,11 +261,11 @@ data Principal =
      deriving (Eq,Ord,Show)
 
 data SimpleEdge =
-  SimpleEdge { fromUUID         :: Int64
-             , toUUID           :: Int64
+  SimpleEdge { fromUUID         :: UUID
+             , toUUID           :: UUID
              , edgeType         :: EdgeType
              , timestamp        :: Int64
-             , edgeProperties   :: Properties
+             , edgeProperties   :: Maybe Properties
              }
      deriving (Eq,Ord,Show)
 

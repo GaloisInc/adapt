@@ -133,9 +133,10 @@ instance PropertiesOf Entity where
       Memory {..} ->
                  mkType "memory"
                : mkSource entitySource
-               : ("pageNumber", gremlinNum entityPageNumber)
-               : ("address", gremlinNum entityAddress)
+               : maybe id (\p -> (("pageNumber", gremlinNum p):)) entityPageNumber
+               ( ("address", gremlinNum entityAddress)
                : propertiesOf entityInfo
+               )
 
 instance PropertiesOf Resource where
   propertiesOf (Resource {..}) =
@@ -175,8 +176,8 @@ instance PropertiesOf Subject where
   propertiesOf (Subject {..}) =
                 mkType "subject"
               : mkSource subjectSource
-              : ("startTime", gremlinTime subjectStartTime)
-              : concat
+              : maybe id (\s -> (("startTime", gremlinTime s) :)) subjectStartTime
+              ( concat
                  [ propertiesOf subjectType
                  , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
                  , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
@@ -192,7 +193,7 @@ instance PropertiesOf Subject where
                  , F.toList (("env"        ,) . GremlinMap . propertiesOf  <$> subjectEnv)
                  , F.toList (("args"       ,) . gremlinArgs   <$> subjectArgs       )
                  , propertiesOf subjectOtherProperties
-                 ]
+                 ])
 
 instance PropertiesOf (Map Text Text) where
   propertiesOf = Map.toList . fmap GremlinString
