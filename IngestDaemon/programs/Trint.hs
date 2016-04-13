@@ -238,6 +238,7 @@ pushDataToKafka tp (vs, es) = do produceMessages $ map convertResultId rids
         ridToMessage (ResultId r) = makeMessage (T.encodeUtf8 r)
 
 printWarnings :: [Warning] -> IO ()
+printWarnings [] = return ()
 printWarnings ws = Text.putStrLn doc
   where doc = Text.unlines $ intersperse "\n" $ map (Text.pack . show . unW) ws
         unW (Warn w) = w

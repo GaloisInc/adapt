@@ -64,7 +64,7 @@ decodeObjectContainer bs0 =
      when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
      e <- G.isEmpty
      if e
-       then return []
+       then return [r]
        else (r :) <$> getBlocks sync decompress
 
  getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
