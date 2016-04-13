@@ -24,6 +24,7 @@ import           Data.Maybe (catMaybes,isNothing, mapMaybe)
 import           Data.Monoid ((<>))
 import           Data.Proxy (Proxy(..))
 import qualified Data.Set as Set
+import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -51,6 +52,7 @@ import CompileSchema
 import Network.HTTP.Types
 
 import Network.Kafka as Kafka
+import Network.Kafka.Protocol as Kafka
 import Network.Kafka.Producer as KProd
 
 type VertsAndEdges = (Map Text (Maybe ResultId), Map Text (Maybe ResultId))
@@ -64,6 +66,8 @@ data Config = Config { lintOnly   :: Bool
                      , upload     :: Maybe ServerInfo
                      , pushKafka  :: Maybe FilePath
                      , files      :: [File]
+                     , ta1_to_ta2_kafkaTopic :: TopicName
+                     , ingest_to_px_kafkaTopic :: TopicName
                      } deriving (Show)
 
 data File = ProvFile { getFP :: FilePath } | CDMFile { getFP :: FilePath }
@@ -81,6 +85,8 @@ defaultConfig = Config
   , upload    = Nothing
   , pushKafka = Nothing
   , files = []
+  , ta1_to_ta2_kafkaTopic = "ta2"
+  , ingest_to_px_kafkaTopic = "pattern"
   }
 
 includeFile :: Config -> FilePath -> Either String Config
@@ -112,6 +118,14 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Send TA-1 CDM statements to the ingest daemon via it's kafka queue."
                     $ ReqArg "FILE" $
                         \file s -> Right s { pushKafka = Just file }
+                  , Option [] ["ta2-kafka-topic"]
+                    "Set the kafka topic for the TA1-TA2 comms"
+                    $ ReqArg "Topic" $
+                        \tp s -> Right s { ta1_to_ta2_kafkaTopic = fromString tp }
+                  , Option [] ["ingest-to-px-kafka-topic"]
+                    "Set the kafka topic for the ingester to inform PX of new nodes."
+                    $ ReqArg "Topic" $
+                        \tp s -> Right s { ingest_to_px_kafkaTopic = fromString tp }
                   , Option ['u'] ["upload"]
                     "Uploads the data by inserting it into a Titan database using gremlin."
                     $ OptArg "Database host" $
@@ -179,7 +193,8 @@ processStmts c fp res@(ns,es)
       case pushKafka c of
         Just file ->
           do stmts <- readCDMStatements file
-             let ms = map (TopicAndMessage "ta2" . makeMessage) stmts
+             let topic = ta1_to_ta2_kafkaTopic c
+                 ms = map (TopicAndMessage topic . makeMessage) stmts
              runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
                       (produceMessages ms)
              return ()
@@ -189,7 +204,7 @@ processStmts c fp res@(ns,es)
           do
             vses <- doUpload c res r
             runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
-                     (pushDataToKafka vses)
+                     (pushDataToKafka (ingest_to_px_kafkaTopic c) vses)
             return ()
         Nothing ->
           return ()
@@ -210,11 +225,11 @@ readCDMStatements fp =
       acc     = scanl' (+) 0 offsets
   in [ByteString.take o (ByteString.drop a bs) | o <- offsets | a <- acc]
 
-pushDataToKafka :: VertsAndEdges -> Kafka ()
-pushDataToKafka (vs, es) = do produceMessages $ map convertResultId rids
-                              return ()
+pushDataToKafka :: TopicName -> VertsAndEdges -> Kafka ()
+pushDataToKafka tp (vs, es) = do produceMessages $ map convertResultId rids
+                                 return ()
   where convertResultId :: ResultId -> TopicAndMessage
-        convertResultId rid = TopicAndMessage "pattern" (ridToMessage rid)
+        convertResultId rid = TopicAndMessage tp (ridToMessage rid)
         rids = catMaybes $ Map.elems vs ++ Map.elems es
         ridToMessage (ResultId r) = makeMessage (T.encodeUtf8 r)
 
