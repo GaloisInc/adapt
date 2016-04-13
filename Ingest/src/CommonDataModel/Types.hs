@@ -52,6 +52,7 @@ data SrcSinkType
 data InstrumentationSource
         = SOURCE_LINUX_AUDIT_TRACE
         | SOURCE_LINUX_PROC_TRACE
+        | SOURCE_LINUX_BEEP_TRACE
         | SOURCE_FREEBSD_OPENBSM_TRACE
         | SOURCE_ANDROID_JAVA_CLEARSCOPE
         | SOURCE_ANDROID_NATIVE_CLEARSCOPE
@@ -70,6 +71,7 @@ data EventType
         | EVENT_BIND
         | EVENT_CHANGE_PRINCIPAL
         | EVENT_CHECK_FILE_ATTRIBUTES
+        | EVENT_CLONE
         | EVENT_CLOSE
         | EVENT_CONNECT
         | EVENT_CREATE_OBJECT
@@ -83,6 +85,7 @@ data EventType
         | EVENT_MPROTECT
         | EVENT_OPEN
         | EVENT_READ
+        | EVENT_RENAME
         | EVENT_WRITE
         | EVENT_SIGNAL
         | EVENT_TRUNCATE
@@ -93,6 +96,8 @@ data EventType
         | EVENT_UI_UNKNOWN
         | EVENT_UNKNOWN
         | EVENT_BLIND
+        | EVENT_UNIT
+        | EVENT_UPDATE
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 data EdgeType
@@ -147,7 +152,7 @@ data ProvenanceTagNode
     = PTN { ptnValue    :: PTValue
           , ptnChildren :: Maybe [ProvenanceTagNode]
           , ptnId       :: Maybe TagId
-          , ptnProperties  :: Properties
+          , ptnProperties  :: Maybe Properties
           }
      deriving (Eq,Ord,Show)
 
@@ -187,11 +192,11 @@ data Subject =
 
 data Event =
   Event { evtUUID               :: UUID
-        , evtTimestampMicros    :: Maybe Int64
         , evtSequence           :: Int64
         , evtType               :: EventType
         , evtThreadId           :: Int32
         , evtSource             :: InstrumentationSource
+        , evtTimestampMicros    :: Maybe Int64
         , evtName               :: Maybe Text
         , evtParameters         :: Maybe [Value]
         , evtLocation           :: Maybe Int64
@@ -260,7 +265,7 @@ data SimpleEdge =
              , toUUID           :: UUID
              , edgeType         :: EdgeType
              , timestamp        :: Int64
-             , edgeProperties   :: Properties
+             , edgeProperties   :: Maybe Properties
              }
      deriving (Eq,Ord,Show)
 

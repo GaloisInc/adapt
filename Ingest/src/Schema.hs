@@ -183,37 +183,37 @@ data PrincipalType
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data EventType
-      = EventAccept
-      | EventBind
-      | EventChangePrincipal
-      | EventCheckFileAttributes
-      | EventClone
-      | EventClose
-      | EventConnect
-      | EventCreateObject
-      | EventCreateThread
-      | EventExecute
-      | EventFork
-      | EventLink
-      | EventUnlink
-      | EventMmap
-      | EventModifyFileAttributes
-      | EventMprotect
-      | EventOpen
-      | EventRead
-      | EventRename
-      | EventWrite
-      | EventSignal
-      | EventTruncate
-      | EventWait
-      | EventOSUnknown
-      | EventKernelUnknown
-      | EventAppUnknown
-      | EventUIUnknown
-      | EventUnknown
-      | EventBlind
-      | EventUnit
-      | EventUpdate
+        = EventAccept
+        | EventBind
+        | EventChangePrincipal
+        | EventCheckFileAttributes
+        | EventClone
+        | EventClose
+        | EventConnect
+        | EventCreateObject
+        | EventCreateThread
+        | EventExecute
+        | EventFork
+        | EventLink
+        | EventUnlink
+        | EventMmap
+        | EventModifyFileAttributes
+        | EventMprotect
+        | EventOpen
+        | EventRead
+        | EventRename
+        | EventWrite
+        | EventSignal
+        | EventTruncate
+        | EventWait
+        | EventOsUnknown
+        | EventKernelUnknown
+        | EventAppUnknown
+        | EventUiUnknown
+        | EventUnknown
+        | EventBlind
+        | EventUnit
+        | EventUpdate
       -- The below are not (yet) in the specification.
       | EventStop
       | EventCreate

@@ -139,33 +139,37 @@ translateSubjectType s =
 translateEventType :: EventType -> S.EventType
 translateEventType e =
   case e of
-    EVENT_ACCEPT                 -> S.EventAccept
-    EVENT_BIND                   -> S.EventBind
-    EVENT_CHANGE_PRINCIPAL       -> S.EventChangePrincipal
-    EVENT_CHECK_FILE_ATTRIBUTES  -> S.EventCheckFileAttributes
-    EVENT_CLOSE                  -> S.EventClose
-    EVENT_CONNECT                -> S.EventConnect
-    EVENT_CREATE_OBJECT          -> S.EventCreateObject
-    EVENT_CREATE_THREAD          -> S.EventCreateThread
-    EVENT_EXECUTE                -> S.EventExecute
-    EVENT_FORK                   -> S.EventFork
-    EVENT_LINK                   -> S.EventLink
-    EVENT_UNLINK                 -> S.EventUnlink
-    EVENT_MMAP                   -> S.EventMmap
-    EVENT_MODIFY_FILE_ATTRIBUTES -> S.EventModifyFileAttributes
-    EVENT_MPROTECT               -> S.EventMprotect
-    EVENT_OPEN                   -> S.EventOpen
-    EVENT_READ                   -> S.EventRead
-    EVENT_WRITE                  -> S.EventWrite
-    EVENT_SIGNAL                 -> S.EventSignal
-    EVENT_TRUNCATE               -> S.EventTruncate
-    EVENT_WAIT                   -> S.EventWait
-    EVENT_OS_UNKNOWN             -> S.EventOSUnknown
-    EVENT_KERNEL_UNKNOWN         -> S.EventKernelUnknown
-    EVENT_APP_UNKNOWN            -> S.EventAppUnknown
-    EVENT_UI_UNKNOWN             -> S.EventUIUnknown
-    EVENT_UNKNOWN                -> S.EventUnknown
-    EVENT_BLIND                  -> S.EventBlind
+     EVENT_ACCEPT                     -> S.EventAccept
+     EVENT_BIND                       -> S.EventBind
+     EVENT_CHANGE_PRINCIPAL           -> S.EventChangePrincipal
+     EVENT_CHECK_FILE_ATTRIBUTES      -> S.EventCheckFileAttributes
+     EVENT_CLONE                      -> S.EventClone
+     EVENT_CLOSE                      -> S.EventClose
+     EVENT_CONNECT                    -> S.EventConnect
+     EVENT_CREATE_OBJECT              -> S.EventCreateObject
+     EVENT_CREATE_THREAD              -> S.EventCreateThread
+     EVENT_EXECUTE                    -> S.EventExecute
+     EVENT_FORK                       -> S.EventFork
+     EVENT_LINK                       -> S.EventLink
+     EVENT_UNLINK                     -> S.EventUnlink
+     EVENT_MMAP                       -> S.EventMmap
+     EVENT_MODIFY_FILE_ATTRIBUTES     -> S.EventModifyFileAttributes
+     EVENT_MPROTECT                   -> S.EventMprotect
+     EVENT_OPEN                       -> S.EventOpen
+     EVENT_READ                       -> S.EventRead
+     EVENT_RENAME                     -> S.EventRename
+     EVENT_WRITE                      -> S.EventWrite
+     EVENT_SIGNAL                     -> S.EventSignal
+     EVENT_TRUNCATE                   -> S.EventTruncate
+     EVENT_WAIT                       -> S.EventWait
+     EVENT_OS_UNKNOWN                 -> S.EventOsUnknown
+     EVENT_KERNEL_UNKNOWN             -> S.EventKernelUnknown
+     EVENT_APP_UNKNOWN                -> S.EventAppUnknown
+     EVENT_UI_UNKNOWN                 -> S.EventUiUnknown
+     EVENT_UNKNOWN                    -> S.EventUnknown
+     EVENT_BLIND                      -> S.EventBlind
+     EVENT_UNIT                       -> S.EventUnit
+     EVENT_UPDATE                     -> S.EventUpdate
 
 -- Notice we drop the tag information when extracting parameter values.
 translateParameters :: [Value] -> S.Args

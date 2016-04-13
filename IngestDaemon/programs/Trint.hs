@@ -13,7 +13,7 @@ import           Control.Monad (when)
 import qualified Data.Binary.Get as G
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Foldable as F
 import           Data.Graph hiding (Node, Edge)
 import           Data.Int (Int32)
@@ -161,7 +161,7 @@ handleFile c fl = do
   eres <- ingest fl
   case eres of
     Left e  -> do
-      putStrLn $ "Error ingesting " ++ (getFP fl) ++ ":"
+      putStrLn $ "Trint: Error ingesting file " ++ (getFP fl) ++ ":"
       putStrLn e
     Right (ns,es,ws) -> do
       unless (quiet c) $ printWarnings ws
@@ -172,8 +172,12 @@ handleFile c fl = do
     do t <- handle onError (Text.readFile fp)
        either (Left . show . pp) Right <$> FromProv.translateTextCDM t
   ingest (CDMFile fp)  =
-    do t <- handle onError (BS.readFile fp)
-       return $ either Left (\(a,b) -> Right (a,b,[])) (CDM.toSchemaFromByteString t)
+    do t <- handle onError (BL.readFile fp)
+       case Avro.decodeObjectContainer t of
+        Left err       -> return $ Left $ "Object container decode failure" <> show err
+        Right (_,_,xs) ->
+           do let (ns,es) = CDM.toSchema (concat xs)
+              return $ Right (ns,es,[])
   onError :: IOException -> IO a
   onError e = do putStrLn ("Error reading " ++ getFP fl ++ ":")
                  print e
@@ -217,13 +221,13 @@ processStmts c fp res@(ns,es)
 
 readCDMStatements :: FilePath -> IO [BS.ByteString]
 readCDMStatements fp =
- do cont <- ByteString.readFile fp
-    return (map ByteString.toStrict $ segment cont)
+ do cont <- BL.readFile fp
+    return (map BL.toStrict $ segment cont)
  where
  segment bs =
   let offsets = G.runGet (Avro.getArrayBytes (Proxy :: Proxy CDM.TCCDMDatum)) bs
       acc     = scanl' (+) 0 offsets
-  in [ByteString.take o (ByteString.drop a bs) | o <- offsets | a <- acc]
+  in [BL.take o (BL.drop a bs) | o <- offsets | a <- acc]
 
 pushDataToKafka :: TopicName -> VertsAndEdges -> Kafka ()
 pushDataToKafka tp (vs, es) = do produceMessages $ map convertResultId rids
