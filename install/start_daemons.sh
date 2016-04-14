@@ -39,6 +39,22 @@ pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started
 sleep 4
 pstree -u | grep java
 
+# Setup the Kafka Topics
+# TODO: Figure out a programatic way to _check_ for and _create_ topics
+#       as necessary in each Adapt component.
+KAFKA=$ADAPT/kafka/bin/
+
+# Notice topics must not be sub-strings of one another for the below script
+# to work.
+TOPICS="ta2 pattern"
+CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
+
+for TOPIC_NAME in $TOPICS ; do
+    if [ $CURR_TOPICS != *"$TOPIC_NAME"* ] ; then
+        $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
+    fi
+done
+
 # This takes about one second of CPU if no building is needed.
 (cd $ADAPT/ingest && make)
 
