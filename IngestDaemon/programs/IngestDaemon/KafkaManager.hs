@@ -39,12 +39,11 @@ channelToKafka ch host topic =
 --------------------------------------------------------------------------------
 --  Placing the Node IDs on Kafka queues for PX
 
-nodeIdsToKafkaPX :: KafkaAddress -> TopicName -> BoundedChan Text -> IO ()
-nodeIdsToKafkaPX host topic chan = forever $ do
-  r <- runKafka state oper
-  case r of
-    Left err -> hPutStrLn stderr ("Kafka producer failed: " ++ show err)
-    Right () -> hPutStrLn stderr "Impossible: Kafka ingest->px terminted without error."
+nodeIdsToKafkaPX :: KafkaAddress
+                 -> TopicName
+                 -> BoundedChan Text
+                 -> IO (Either KafkaClientError ())
+nodeIdsToKafkaPX host topic chan = runKafka state oper
  where
  state = mkKafkaState "ingest-px" host
  oper = forever $ do
@@ -56,16 +55,11 @@ nodeIdsToKafkaPX host topic chan = forever $ do
 
 -- |Acquire CDM from a given kafka host/topic and place the decoded Adapt
 -- Schema vales in the given channel.
-kafkaInput :: KafkaAddress -> TopicName -> BoundedChan Statement -> IO (Either KafkaError ())
-kafkaInput host topic chan = forever $ do
-  r <- runKafka state oper
-  case r of
-       Left err -> do hPutStrLn stderr ("Kafka consumer failed: " ++ show err)
-                      threadDelay 100000
-       Right () -> hPutStrLn stderr "Impossible: Kafka ingest terminated without error."
+kafkaInput :: KafkaAddress -> TopicName -> BoundedChan Statement -> IO (Either KafkaClientError ())
+kafkaInput host topic chan = runKafka state oper
  where
  state = mkKafkaState "adapt-ingest" host
- oper =
+ oper = forever $
   do o <- getLastOffset EarliestTime 0 topic
      process o
 

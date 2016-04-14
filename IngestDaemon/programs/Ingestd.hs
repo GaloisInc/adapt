@@ -159,11 +159,12 @@ mainLoop cfg =
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> T.pack (show t) <> "]") <>)
         logStderr = T.hPutStrLn stderr
-    _ <- forkIO (persistant logPXMsg (nodeIdsToKafkaPX srv outTopic outputs))
-    _ <- maybe (return ())
-               (void . forkIO . persistant logStderr . channelToKafka logChan srv)
+        forkPersist log = void . forkIO . persistant log
+    _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srv outTopic outputs)
+    _ <- maybe (forkPersist logStderr  (channelToStderr logChan))
+               (forkPersist logStderr . channelToKafka  logChan srv)
                (cfg ^. logTopic)
-    mapM_ (\t -> forkIO (persistant (logIpt t) $ void $ kafkaInput srv t inputs)) inTopics
+    mapM_ (\t -> forkPersist (logIpt t) $ void $ kafkaInput srv t inputs) inTopics
     persistant logTitan $
      void $ Titan.withTitan (cfg ^. titanServer) resHdl $ \conn ->
       forever $ do op <- BC.readChan inputs
@@ -172,16 +173,21 @@ mainLoop cfg =
   where
   resHdl _ _ = return ()
 
-persistant :: (Text -> IO ()) -> IO () -> IO ()
+persistant :: Show a => (Text -> IO ()) -> IO a -> IO ()
 persistant logMsg io =
-  do goodExit <- X.catch (io >> return True)
-                         (\(e::SomeException) -> do logMsg (T.pack $ show e)
-                                                    return False)
-     if goodExit
-      then return ()
-      else do threadDelay 5000000
-              persistant logMsg io
+  do ex <- X.catch (Right <$> io) (pure . Left)
+     case ex of
+      Right r ->
+        do logMsg ("Operation completed: " <> T.pack (show r))
+           persistant logMsg io
+      Left (e::SomeException) ->
+        do logMsg ("Operation had an exception: " <> T.pack (show e))
+           threadDelay 5000000
+           persistant logMsg io
 
 getVertexLabel :: Operation Text -> Maybe Text
 getVertexLabel (InsertVertex label _) = Just label
 getVertexLabel _                      = Nothing
+
+channelToStderr :: BC.BoundedChan Text -> IO ()
+channelToStderr ch = forever (BC.readChan ch >>= T.hPutStrLn stderr)
