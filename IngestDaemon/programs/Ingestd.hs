@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -157,7 +158,7 @@ mainLoop cfg =
         readLog  = BC.readChan logChan
         logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
-        logIpt t = logMsg . (("ingestd[from " <> T.pack (show t) <> "]") <>)
+        logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
     _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srv outTopic outputs)
@@ -166,10 +167,7 @@ mainLoop cfg =
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ void $ kafkaInput srv t inputs) inTopics
     persistant logTitan $
-     void $ Titan.withTitan (cfg ^. titanServer) resHdl $ \conn ->
-      forever $ do op <- BC.readChan inputs
-                   Titan.send op conn
-                   mapM_ (BC.writeChan outputs) (maybeToList $ getVertexLabel op)
+     void $ Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
   where
   resHdl _ _ = return ()
 
@@ -185,9 +183,34 @@ persistant logMsg io =
            threadDelay 5000000
            persistant logMsg io
 
+runDB :: (Text -> IO ())
+      -> (BoundedChan Statement)
+      -> BoundedChan Text
+      -> Titan.Connection
+      -> IO ()
+runDB logTitan inputs outputs conn = go reportInterval (0,0)
+ where
+ reportInterval = 1000
+
+ go 0 !cnts@(!nrE,!nrV) = logTitan (T.pack $ show (nrE,nrV)) >> go reportInterval cnts
+ go ival (nrE,nrV) =
+  do op <- BC.readChan inputs
+     Titan.send op conn
+     let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
+     mapM_ (BC.writeChan outputs) (maybeToList $ getVertexLabel op)
+     go (ival-1) (nrE2,nrV2)
+
+
 getVertexLabel :: Operation Text -> Maybe Text
 getVertexLabel (InsertVertex label _) = Just label
 getVertexLabel _                      = Nothing
 
+isVertex :: Operation a -> Bool
+isVertex (InsertVertex _ _) = True
+isVertex _                  = False
+
 channelToStderr :: BC.BoundedChan Text -> IO ()
 channelToStderr ch = forever (BC.readChan ch >>= T.hPutStrLn stderr)
+
+kafkaString :: TopicName -> Text
+kafkaString (TName (KString s)) = T.decodeUtf8 s
