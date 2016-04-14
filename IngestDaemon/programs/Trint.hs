@@ -41,6 +41,7 @@ import           SimpleGetOpt
 import           System.Exit (exitFailure)
 import           System.FilePath ((<.>),takeExtension)
 import           Text.Groom
+import           Text.Printf
 import           Text.Read (readMaybe)
 
 import qualified CommonDataModel.Avro  as Avro
@@ -200,23 +201,31 @@ processStmts c fp res@(ns,es)
         dbg ("Writing ast to " ++ astfile)
         output astfile $ Text.unlines $ map (Text.pack . groom) ns ++ map (Text.pack . groom) es
       when (pushKafka c) $ do
-          do stmts <- concat <$> mapM readCDMStatements (getFP <$> filter isCDMFile (files c))
+          do let cdmFiles = getFP <$> filter isCDMFile (files c)
+             dbg $ printf "Reading from CDM files: %s\n" (show cdmFiles)
+             stmts <- concat <$> mapM readCDMStatements cdmFiles
+             dbg $ printf "Obtained %d statements." (length stmts)
              let topic = ta1_to_ta2_kafkaTopic c
-                 ms = map (TopicAndMessage topic . makeMessage) stmts
+                 ms    = map (TopicAndMessage topic . makeMessage) stmts
              runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
                       (produceMessages ms)
+             calmly $ printf "Sent %d statements to kafka[%s]." (length ms) (show topic)
+             dbg    $ printf "\tBytes of CDM sent to kafka[ta2]: %d" (sum (map BS.length stmts))
              return ()
       case upload c of
         Just r ->
           do
             vses <- doUpload c res r
+            calmly $ printf "Uploaded %d verticies, %d edges, to Titan." (length (fst vses)) (length (snd vses))
             runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
                      (pushDataToKafka (ingest_to_px_kafkaTopic c) vses)
+            calmly $ printf "Sent vertex IDs to PX"
             return ()
         Nothing ->
           return ()
  where
-  dbg s = when (verbose c) (putStrLn s)
+  calmly s = unless (quiet c) (putStrLn s)
+  dbg s    = when (verbose c) (putStrLn s)
   output f t = handle (onError f) $ Text.writeFile f t
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
