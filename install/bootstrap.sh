@@ -115,7 +115,7 @@ export PATH=$PATH:$USER_BIN
 function install_ingest() {
     if [ ! \( -e $USER_BIN/Trint \) ]
     then
-        cd ingest/Trint ; stack install
+        cd ingest/IngestDaemon ; stack install
     fi
 }
 install_ingest
