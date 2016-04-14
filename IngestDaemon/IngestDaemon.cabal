@@ -13,7 +13,7 @@ maintainer:          thomas.dubuisson@gmail.com
 -- copyright:           
 category:            Development
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:  stack.yaml
 cabal-version:       >=1.10
 
 Library
