@@ -50,7 +50,8 @@ TOPICS="ta2 pattern adaptDashboard"
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
-    if [ $CURR_TOPICS != *"$TOPIC_NAME"* ] ; then
+    if -z `echo $CURR_TOPICS | grep $TOPIC_NAME`
+    then
         $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
@@ -59,4 +60,4 @@ done
 (cd $ADAPT/ingest && make)
 
 echo Ready to populate the Titan DB, e.g. with:
-echo 'tar xJf example/infoleak*.tar.xz && Trint -u infoleak.provn'
+echo 'Trint -u example/*.bin'
