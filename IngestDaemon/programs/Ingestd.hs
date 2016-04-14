@@ -157,7 +157,7 @@ mainLoop cfg =
         readLog  = BC.readChan logChan
         logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
-        logIpt t = logMsg . (("ingestd[from " <> T.pack (show t) <> "]") <>)
+        logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
     _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srv outTopic outputs)
@@ -191,3 +191,6 @@ getVertexLabel _                      = Nothing
 
 channelToStderr :: BC.BoundedChan Text -> IO ()
 channelToStderr ch = forever (BC.readChan ch >>= T.hPutStrLn stderr)
+
+kafkaString :: TopicName -> Text
+kafkaString (TName (KString s)) = T.decodeUtf8 s
