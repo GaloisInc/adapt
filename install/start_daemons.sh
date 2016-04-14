@@ -46,7 +46,7 @@ KAFKA=$ADAPT/kafka/bin/
 
 # Notice topics must not be sub-strings of one another for the below script
 # to work.
-TOPICS="ta2 pattern"
+TOPICS="ta2 pattern adaptDashboard"
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
