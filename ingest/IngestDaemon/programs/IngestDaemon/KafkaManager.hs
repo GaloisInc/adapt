@@ -79,7 +79,7 @@ kafkaInput host topic chan = runKafka state oper
 
  getMessage :: Offset -> Kafka [ByteString]
  getMessage offset =
-  map tamPayload . fetchMessages <$> fetch offset 0 topic
+  map tamPayload . fetchMessages <$> withAnyHandle (\h -> fetch' h =<< fetchRequest offset 0 topic)
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr

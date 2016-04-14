@@ -15,6 +15,7 @@ module Titan
   , TitanResult(..), isSuccess, isFailure
     -- * Lower Level
   , titanWS
+  , Connection
   , ResultId(..)
   , GraphId(..)
   , GremlinValue(..)
