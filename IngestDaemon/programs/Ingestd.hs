@@ -1,19 +1,20 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 -- | Ingestd is the ingest daemon which takes TA-1 data from Kafka queue,
 -- decodes it as Avro-encodedCDM, translates to Adapt Schema, uploads to
 -- Titan, and pushes node IDs to PX via Kafka.
 module Main where
 
-import Prelude hiding ((.))
+import Prelude
 import SimpleGetOpt
 import Control.Applicative ((<$>))
 import Control.Monad (when, forever, void)
-import Control.Exception
+import Control.Exception as X
 import Data.Int (Int32)
 import Data.Monoid ((<>))
 import qualified Data.Foldable as F
@@ -34,6 +35,7 @@ import Data.Text (Text)
 import Control.Lens
 import Data.String
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
@@ -42,6 +44,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
 import System.Exit (exitFailure)
+import System.IO (stderr)
 import Control.Concurrent
 import Control.Concurrent.BoundedChan as BC
 
@@ -52,7 +55,7 @@ import Titan
 import IngestDaemon.KafkaManager
 
 data Config =
-      Config { _logFile     :: Maybe FilePath
+      Config { _logTopic    :: Maybe TopicName
              , _verbose     :: Bool
              , _help        :: Bool
              , _kafkaServer :: K.KafkaAddress
@@ -74,7 +77,7 @@ defaultKafka = ("localhost", 9092)
 
 defaultConfig :: Config
 defaultConfig = Config
-  { _logFile      = Nothing
+  { _logTopic     = Nothing
   , _verbose      = False
   , _help         = False
   , _kafkaServer  = defaultKafka
@@ -91,9 +94,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   [ Option ['v'] ["verbose"]
                     "Verbose debugging messages"
                     $ NoArg $ \s -> Right $ s & verbose .~ True
-                  , Option ['l'] ["logfile"]
-                    "Produce a log file"
-                    $ ReqArg "FILE" $ \f s -> Right (s & logFile .~ Just f)
+                  , Option ['l'] ["logTopic"]
+                    "Send statistics to the given Kafka topic"
+                    $ ReqArg "Topic" $ \t s -> Right (s & logTopic .~ Just (fromString t))
                   , Option ['h'] ["help"]
                     "Print help"
                     $ NoArg $ \s -> Right $ s & help .~ True
@@ -146,17 +149,38 @@ mainLoop :: Config -> IO ()
 mainLoop cfg =
  do inputs  <- newBoundedChan inputQueueSize   :: IO (BoundedChan (Operation Text))
     outputs <- newBoundedChan outputQueueSize  :: IO (BoundedChan Text)
+    logChan <- newBoundedChan 100 :: IO (BoundedChan Text)
     let srv      = cfg ^. kafkaServer
         inTopics = cfg ^. inputTopics
         outTopic = cfg ^. outputTopic
-    _ <- forkIO (nodeIdsToKafkaPX srv outTopic outputs)
-    mapM_ (\t -> forkIO (void $ kafkaInput srv t inputs)) inTopics
-    void $ Titan.withTitan (cfg ^. titanServer) resHdl $ \conn ->
+        logMsg   = void . BC.tryWriteChan logChan
+        readLog  = BC.readChan logChan
+        logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
+        logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
+        logIpt t = logMsg . (("ingestd[from " <> T.pack (show t) <> "]") <>)
+        logStderr = T.hPutStrLn stderr
+    _ <- forkIO (persistant logPXMsg (nodeIdsToKafkaPX srv outTopic outputs))
+    _ <- maybe (return ())
+               (void . forkIO . persistant logStderr . channelToKafka logChan srv)
+               (cfg ^. logTopic)
+    mapM_ (\t -> forkIO (persistant (logIpt t) $ void $ kafkaInput srv t inputs)) inTopics
+    persistant logTitan $
+     void $ Titan.withTitan (cfg ^. titanServer) resHdl $ \conn ->
       forever $ do op <- BC.readChan inputs
                    Titan.send op conn
                    mapM_ (BC.writeChan outputs) (maybeToList $ getVertexLabel op)
   where
   resHdl _ _ = return ()
+
+persistant :: (Text -> IO ()) -> IO () -> IO ()
+persistant logMsg io =
+  do goodExit <- X.catch (io >> return True)
+                         (\(e::SomeException) -> do logMsg (T.pack $ show e)
+                                                    return False)
+     if goodExit
+      then return ()
+      else do threadDelay 5000000
+              persistant logMsg io
 
 getVertexLabel :: Operation Text -> Maybe Text
 getVertexLabel (InsertVertex label _) = Just label

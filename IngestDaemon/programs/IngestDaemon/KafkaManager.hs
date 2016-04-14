@@ -24,6 +24,18 @@ import           CommonDataModel.Avro
 
 type Statement = Operation Text
 
+channelToKafka :: BoundedChan Text -> KafkaAddress -> TopicName -> IO ()
+channelToKafka ch host topic =
+ do r <- runKafka state oper
+    case r of
+      Left err -> hPutStrLn stderr ("Kafka logging failed: " ++ show err)
+      Right () -> hPutStrLn stderr ("Kafka logging terminated somehow.")
+ where
+ state = mkKafkaState "ingest-logging" host
+ oper = forever $ do
+   m <- liftIO (BC.readChan ch)
+   produceMessages [TopicAndMessage topic $ makeMessage (T.encodeUtf8 m)]
+
 --------------------------------------------------------------------------------
 --  Placing the Node IDs on Kafka queues for PX
 
