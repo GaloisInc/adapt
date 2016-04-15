@@ -165,9 +165,9 @@ mainLoop cfg =
     _ <- maybe (forkPersist logStderr  (channelToStderr logChan))
                (forkPersist logStderr . channelToKafka  logChan srv)
                (cfg ^. logTopic)
-    mapM_ (\t -> forkPersist (logIpt t) $ void $ kafkaInput srv t inputs) inTopics
+    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srv t inputs) inTopics
     persistant logTitan $
-     void $ Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
+     Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
   where
   resHdl _ _ = return ()
 
