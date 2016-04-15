@@ -26,7 +26,6 @@ module CommonDataModel.Avro
 import Prelude as P
 import qualified Codec.Compression.Zlib as Z
 import           CommonDataModel.Types as CDM
-import qualified Control.Exception as X
 import           Control.Monad (replicateM, when)
 import           Data.Bits
 import           Data.Binary.Get (ByteOffset, Get, runGetOrFail)
@@ -70,8 +69,8 @@ decodeObjectContainerFor getThing bs0 =
  getBlocks sync decompress =
   do nrObj    <- sFromIntegral =<< getLong
      _nrBytes <- getLong
-     r <- replicateM nrObj getThing
-     marker  <- G.getLazyByteString nrSyncBytes
+     r        <- replicateM nrObj getThing
+     marker   <- G.getLazyByteString nrSyncBytes
      when (marker /= sync) (fail "Invalid marker, does not match sync bytes.")
      e <- G.isEmpty
      if e
@@ -95,16 +94,12 @@ decodeObjectContainer
     -> Either (BL.ByteString, ByteOffset, String)
               (BL.ByteString, ByteOffset, [[a]])
 decodeObjectContainer bs0 = decodeObjectContainerFor getAvro bs0
+
 avroMagicSize :: Integral a => a
 avroMagicSize = 4
 
 avroMagicBytes :: BL.ByteString
 avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
-
-data CDMDecodeFailure = CDMDecodeFailure BL.ByteString Int64 String
- deriving (Eq, Ord, Show, Typeable, Data)
-
-instance X.Exception CDMDecodeFailure
 
 --------------------------------------------------------------------------------
 --  CDM Avro Deserialization
@@ -122,7 +117,7 @@ getCDM09 =
       6  -> DatumMem <$> getAvro
       7  -> DatumPri <$> getAvro
       8  -> DatumSim <$> getAvro
-      _  -> fail "Bad tag in CDM Datum"
+      _  -> fail $ "Bad tag in CDM Datum: " ++ show tag
 
 instance GetAvro TCCDMDatum where
   getAvro = getCDM09
@@ -381,7 +376,7 @@ getInt :: Get Int32
 getInt = getZigZag 5
 
 getLong :: Get Int64
-getLong = getZigZag 9
+getLong = getZigZag 10
 
 getZigZag :: (Bits i, Integral i) => Int -> Get i
 getZigZag nrMaxBytes =
