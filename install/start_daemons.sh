@@ -2,9 +2,6 @@
 
 # Starts daemons: supervisord, zookeeper, kafka, gremlin
 
-# This takes about one second of CPU if no building is needed.
-(cd $ADAPT/ingest && make)
-
 # This script is like start.sh,
 # but for folks who prefer tail -f over tmux.
 # Renaming it on top of start.sh would be fine.
@@ -33,6 +30,9 @@ fi
 supercfg=$ADAPT/config/supervisord.conf
 
 cd $ADAPT || exit 1
+
+# This takes about one second of CPU if no building is needed.
+(cd $ADAPT/ingest && make)
 
 # run supervisord (zookeeper, kafka, gremlin)
 pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started.)
