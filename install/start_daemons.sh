@@ -1,6 +1,9 @@
-#! /bin/sh
+#! /bin/bash
 
 # Starts daemons: supervisord, zookeeper, kafka, gremlin
+
+# This takes about one second of CPU if no building is needed.
+(cd $ADAPT/ingest && make)
 
 # This script is like start.sh,
 # but for folks who prefer tail -f over tmux.
@@ -50,14 +53,11 @@ TOPICS="ta2 pattern adaptDashboard"
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
-    if -z `echo $CURR_TOPICS | grep $TOPIC_NAME`
+    if [ -z `echo $CURR_TOPICS | grep $TOPIC_NAME` ]
     then
         $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
-
-# This takes about one second of CPU if no building is needed.
-(cd $ADAPT/ingest && make)
 
 echo Ready to populate the Titan DB, e.g. with:
 echo 'Trint -u example/*.bin'
