@@ -60,7 +60,7 @@ kafkaInput host topic chan = runKafka state oper
  where
  state = mkKafkaState "adapt-ingest" host
  oper = forever $
-  do o <- getLastOffset EarliestTime 0 topic
+  do o <- getLastOffset LatestTime 0 topic
      process o
 
  process :: Offset -> Kafka ()
@@ -70,12 +70,14 @@ kafkaInput host topic chan = runKafka state oper
           case runGetOrFail getAvro (BL.fromStrict b) of
             Right (_,_,cdmFmt) ->
                liftIO $ do
-                  let nses = CDM.toSchema cdmFmt
+                  let nses = CDM.toSchema [cdmFmt]
                   ms <- compile nses
                   BC.writeList2Chan chan ms
             Left err    -> emit (show err)
      mapM_ handleMsg bs
-     process (offset+1)
+     if null bs
+      then liftIO (threadDelay 100000) >> process offset
+      else process (offset+1)
 
  getMessage :: Offset -> Kafka [ByteString]
  getMessage offset =
