@@ -5,10 +5,10 @@ MODULE = simulator_diagnoser
 ENV = env
 REQS = config/requirements.txt
 
-PYTHON = $(ENV)/bin/python
-PIP = $(ENV)/bin/pip
+PYTHON = $(ENV)/bin/python3
+PIP = $(ENV)/bin/pip3
 PEP8 = $(ENV)/bin/pep8
-COVERAGE = $(ENV)/bin/coverage
+COVERAGE = $(ENV)/bin/coverage3
 COVERAGERC = --rcfile=config/coveragerc
 
 TEST_PATTERN = -p "*_test.py"
@@ -49,7 +49,7 @@ d3: $(ENV)
 
 $(ENV): $(ENV)/bin/activate
 $(ENV)/bin/activate: $(REQS)
-	test -d $(ENV) || virtualenv $(ENV)
+	test -d $(ENV) || virtualenv -p python3 $(ENV)
 	$(PIP) install -r $(REQS)
 	touch $(ENV)/bin/activate
 

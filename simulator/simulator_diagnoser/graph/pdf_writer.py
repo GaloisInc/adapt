@@ -1,5 +1,5 @@
 from PyPDF2 import PdfFileMerger, PdfFileReader
-from cStringIO import StringIO
+from io import BytesIO
 
 
 class PdfWriter(object):
@@ -10,7 +10,7 @@ class PdfWriter(object):
             self.append(dot)
 
     def append(self, dot):
-        stream = StringIO(dot.pipe(format='pdf'))
+        stream = BytesIO(dot.pipe(format='pdf'))
         self.merger.append(stream)
 
     def append_dx(self, graph, dx):

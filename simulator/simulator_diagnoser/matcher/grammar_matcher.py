@@ -186,10 +186,10 @@ class MatcherResult(object):
             start = self.counter
 
         if self.reverse:
-            for i in reversed(xrange(0, start + 1)):
+            for i in reversed(range(0, start + 1)):
                 yield i, self.path[i]
         else:
-            for i in xrange(start, len(self.path)):
+            for i in range(start, len(self.path)):
                 yield i, self.path[i]
 
     def contains(self, labels):

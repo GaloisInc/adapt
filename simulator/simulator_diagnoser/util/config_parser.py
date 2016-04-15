@@ -42,10 +42,10 @@ class ConfigParser(object):
 
     @staticmethod
     def parse_grammar(elem):
-        if isinstance(elem, basestring):
+        if isinstance(elem, str):
             return matcher.Terminal(elem)
         elif isinstance(elem, dict):
-            keys = elem.keys()
+            keys = list(elem.keys())
             assert len(keys) == 1
 
             key = keys[0]

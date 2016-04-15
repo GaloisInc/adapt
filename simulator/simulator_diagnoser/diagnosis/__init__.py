@@ -1,1 +1,1 @@
-from simple_diagnoser import *
+from .simple_diagnoser import *

@@ -5,7 +5,7 @@ APT campaign grammar and a symptomatic node, the module produces a list of paths
 that match the grammar.
 
 ## Dependencies
-* Python 2.7
+* Python 3
 * [Virtualenv](https://virtualenv.pypa.io/)
 * [Graphviz](http://www.graphviz.org/)
 
