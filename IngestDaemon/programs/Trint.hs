@@ -169,78 +169,81 @@ handleFile c fl = do
     Left e  -> do
       putStrLn $ "Trint: Error ingesting file " ++ (getFP fl) ++ ":"
       putStrLn e
-    Right (ns,es,ws) -> do
+    Right ((ns,es,ws),stmtBS) -> do
       unless (quiet c) $ printWarnings ws
-      processStmts c (getFP fl) (ns,es)
+      processStmts c (getFP fl) (ns,es) stmtBS
 
   where
+  ingest :: File -> IO (Either String (([Node],[Edge],[Warning]), [BS.ByteString]))
   ingest (ProvFile fp) =
     do t <- handle onError (Text.readFile fp)
-       either (Left . show . pp) Right <$> FromProv.translateTextCDM t
+       eRes <- FromProv.translateTextCDM t
+       case eRes of
+        Left e    -> return $ Left (show (pp e))
+        Right res -> return $ Right (res,[{- No CDM/avro encoder available yet -}])
   ingest (CDMFile fp)  =
     do t <- handle onError (BL.readFile fp)
-       case Avro.decodeObjectContainer t of
-        Left err       -> return $ Left $ "Object container decode failure" <> show err
-        Right (_,_,xs) ->
+       let prox = Proxy :: Proxy CDM.TCCDMDatum
+           eBytes = Avro.decodeObjectContainerFor (Avro.getBytesOfObject prox) t
+           eStmts = Avro.decodeObjectContainer t
+       case (eStmts,eBytes) of
+        (Left err,_)    -> return $ Left $ "Object container decode failure" <> show err
+        (Right (_,_,xs), Right (_,_,bs)) ->
            do let (ns,es) = CDM.toSchema (concat xs)
-              return $ Right (ns,es,[])
+                  bytestringsOfStmts = BL.toStrict <$> concat bs
+              return $ Right ((ns,es,[]), bytestringsOfStmts)
   onError :: IOException -> IO a
   onError e = do putStrLn ("Error reading " ++ getFP fl ++ ":")
                  print e
                  exitFailure
 
-processStmts :: Config -> FilePath -> ([Node],[Edge]) -> IO ()
-processStmts c fp res@(ns,es)
+processStmts :: Config -> FilePath -> ([Node],[Edge]) -> [BS.ByteString] -> IO ()
+processStmts c fp res@(ns,es) stmtBS
   | lintOnly c = return ()
   | otherwise = do
-      when (stats  c) $ do
-        printStats res
+      when  (stats  c)    (printStats res)
+      when  (ast c)       (handleAstGeneration c fp res)
+      when  (pushKafka c) (handleKafkaIngest c stmtBS)
+      maybe (return ())   (handleUpload c res) (upload c)
 
-      when (ast c) $ do
-        let astfile = fp <.> "trint"
-        dbg ("Writing ast to " ++ astfile)
-        output astfile $ Text.unlines $ map (Text.pack . groom) ns ++ map (Text.pack . groom) es
-      when (pushKafka c) $ do
-          do let cdmFiles = getFP <$> filter isCDMFile (files c)
-             dbg $ printf "Reading from CDM files: %s\n" (show cdmFiles)
-             stmts <- concat <$> mapM readCDMStatements cdmFiles
-             dbg $ printf "Obtained %d statements." (length stmts)
-             let topic = ta1_to_ta2_kafkaTopic c
-                 ms    = map (TopicAndMessage topic . makeMessage) stmts
-             runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
-                      (produceMessages ms)
-             calmly $ printf "Sent %d statements to kafka[%s]." (length ms) (show topic)
-             dbg    $ printf "\tBytes of CDM sent to kafka[ta2]: %d" (sum (map BS.length stmts))
-             return ()
-      case upload c of
-        Just r ->
-          do
-            vses <- doUpload c res r
-            calmly $ printf "Uploaded %d verticies, %d edges, to Titan." (length (fst vses)) (length (snd vses))
-            runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
-                     (pushDataToKafka (ingest_to_px_kafkaTopic c) vses)
-            calmly $ printf "Sent vertex IDs to PX"
-            return ()
-        Nothing ->
-          return ()
+handleUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO ()
+handleUpload c res r =
+   do vses <- doUpload c res r
+      calmly $ printf "Uploaded %d verticies, %d edges, to Titan."
+                      (length (fst vses)) (length (snd vses))
+      runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
+               (pushDataToKafka (ingest_to_px_kafkaTopic c) vses)
+      calmly $ printf "Sent vertex IDs to PX"
  where
   calmly s = unless (quiet c) (putStrLn s)
   dbg s    = when (verbose c) (putStrLn s)
-  output f t = handle (onError f) $ Text.writeFile f t
+
+handleAstGeneration :: Config -> FilePath -> ([Node],[Edge]) -> IO ()
+handleAstGeneration c fp (ns,es) = do
+  let astfile = fp <.> "trint"
+  dbg ("Writing ast to " ++ astfile)
+  output astfile $ Text.unlines $ map (Text.pack . groom) ns ++
+                                  map (Text.pack . groom) es
+ where
+  dbg s    = when (verbose c) (putStrLn s)
+  output f t = handle (onError f) (Text.writeFile f t)
+
   onError :: String -> IOException -> IO ()
   onError f e = do putStrLn ("Error writing " ++ f ++ ":")
                    print e
 
-readCDMStatements :: FilePath -> IO [BS.ByteString]
-readCDMStatements fp =
- do cont <- BL.readFile fp
-    return (map BL.toStrict $ segment cont)
+handleKafkaIngest :: Config -> [BS.ByteString] -> IO ()
+handleKafkaIngest c stmts =
+  do dbg $ printf "Obtained %d statements." (length stmts)
+     let topic = ta1_to_ta2_kafkaTopic c
+         ms    = map (TopicAndMessage topic . makeMessage) stmts
+     runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
+              (produceMessages ms)
+     calmly $ printf "Sent %d statements to kafka[%s]." (length ms) (show topic)
+     dbg    $ printf "\tBytes of CDM sent to kafka[ta2]: %d" (sum (map BS.length stmts))
  where
- segment bs =
-  let prox = Proxy :: Proxy CDM.TCCDMDatum
-  in case Avro.decodeObjectContainerFor (Avro.getBytesOfObject prox) bs of
-      Left (_,_,reason) -> error $ "Failed to extract bytes of avro statements: " ++ reason
-      Right (_,_,xs)    -> concat xs
+  calmly s = unless (quiet c) (putStrLn s)
+  dbg s    = when (verbose c) (putStrLn s)
 
 pushDataToKafka :: TopicName -> VertsAndEdges -> Kafka ()
 pushDataToKafka tp (vs, es) = do produceMessages $ map convertResultId rids
