@@ -4,12 +4,13 @@ set -e
 # Constants
 ADAPT_DIR=$HOME/adapt
 USER_BIN=$HOME/.local/bin
-TEMP=/tmp
+TEMP=$HOME/tmp
 
 TITAN_SERVER_DIR=titan
 KAFKA_DIR=kafka
 CONFIG_DIR=$HOME/config
 
+mkdir -p $TEMP
 mkdir -p $USER_BIN
 ret=`echo $PATH | grep "$USER_BIN" ; true`
 if [ -z $ret ]
