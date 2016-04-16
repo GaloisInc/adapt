@@ -82,27 +82,21 @@ def stream(db_client, query):
 
 
 def db_results(db_client, query):
-    loop = asyncio.get_event_loop()
-
     message = loop.run_until_complete(stream(db_client, query))
     if message is not None:
         for node in message:
             yield node
 
-    # loop.run_until_complete(db_client.close())
-    # loop.close()
-
 
 valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
 
 
-def edge_types(url):
+def edge_types(db_client):
     label_256bit_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
     in_labels = collections.defaultdict(int)
     out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
     valid_operations = set(['read', 'recvfrom', 'recvmsg'])
-    db_client = aiogremlin.GremlinClient(url=url)
     # count = db_client.execute('g.E().count()').data[0]
     # assert count > 0, count
     for edge in db_results(db_client, 'g.E()'):
@@ -142,8 +136,6 @@ def get_nodes(db_client):
         '|^aide\.db_/'
         '|^vendor_hash_/')
 
-    loop = asyncio.get_event_loop()
-
     for node in loop.run_until_complete(stream(db_client, "g.V()")):
         assert node['type'] == 'vertex', node
         assert node['id'] >= 0, node
@@ -151,7 +143,7 @@ def get_nodes(db_client):
         yield node['properties']
 
 
-def node_types(url, name='infoleak', edge_type='wasInformedBy'):
+def node_types(client, name='infoleak', edge_type='wasInformedBy'):
     direction = {'rankdir': 'LR'}
     dot = graphviz.Digraph(format='pdf', graph_attr=direction,
                            name='PG_%s' % edge_type)
@@ -163,7 +155,6 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
-    client = aiogremlin.GremlinClient(url=url)
 
     for node in get_nodes(client):
 
@@ -231,6 +222,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
 
 
 def lookup(client, id):
+    assert None, 'lookup is unused'
     ret = {}
     query = 'g.V(%d)' % id
     for node in client.execute(query).data:
@@ -265,14 +257,18 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    for k, v in sorted(edge_types(args.db_url).items()):
+    db_client = aiogremlin.GremlinClient(url=args.db_url)
+    loop = asyncio.get_event_loop()  # global, paired with db_client
+    for k, v in sorted(edge_types(db_client).items()):
         print('%5d  %s' % (v, k))
     print('')
 
     types = {}
     for edge_type in sorted(valid_edge_types):
-        types = sorted(node_types(args.db_url, edge_type=edge_type).items())
+        types = sorted(node_types(db_client, edge_type=edge_type).items())
     print('=' * 70)
     print('')
     for k, v in types:
         print('%5d  %s' % (v, k))
+    loop.run_until_complete(db_client.close())
+    loop.close()
