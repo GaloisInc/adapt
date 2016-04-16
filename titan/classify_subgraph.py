@@ -125,7 +125,7 @@ def classify_provn_events(url):
                 # assert exfil_detect.cmd == 'nc', cmd
                 sudo_env = r'sudo env PATH=[/\w:\.-]+ LD_LIB[=/\w:-]+ +'
                 cmd = re.sub(sudo_env, '', cmd)
-                add_vertex(client, cmd, classification,
+                add_vertex(client, cmd,
                            'step4_exfiltrate_sensitive_file', True)
             exfil_detect.remember(cmd)
 

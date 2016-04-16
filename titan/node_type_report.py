@@ -25,10 +25,11 @@
 Reports on node types stored in a Titan graph.
 '''
 
-import graphviz
-import gremlinrestclient
+import aiogremlin
 import argparse
+import asyncio
 import collections
+import graphviz
 import logging
 import re
 
@@ -70,6 +71,28 @@ class ProcessGraphNodes:
             dot.edge(ppid, pid)
 
 
+@asyncio.coroutine
+def stream(db_client, query):
+    resp = yield from db_client.submit(query)
+    while True:
+        result = yield from resp.stream.read()
+        if result is None or result.data is None:
+            break
+        return result.data
+
+
+def db_results(db_client, query):
+    loop = asyncio.get_event_loop()
+
+    message = loop.run_until_complete(stream(db_client, query))
+    if message is not None:
+        for node in message:
+            yield node
+
+    # loop.run_until_complete(db_client.close())
+    # loop.close()
+
+
 valid_edge_types = set(['used', 'wasGeneratedBy', 'wasInformedBy'])
 
 
@@ -79,10 +102,10 @@ def edge_types(url):
     out_labels = collections.defaultdict(int)
     types = collections.defaultdict(int)
     valid_operations = set(['read', 'recvfrom', 'recvmsg'])
-    db_client = gremlinrestclient.GremlinRestClient(url=url)
+    db_client = aiogremlin.GremlinClient(url=url)
     # count = db_client.execute('g.E().count()').data[0]
     # assert count > 0, count
-    for edge in db_client.execute('g.E()').data:
+    for edge in db_results(db_client, 'g.E()'):
         if 'properties' in edge:
             d = edge['properties']
             assert len(d) == 2, d
@@ -114,12 +137,14 @@ def get_nodes(db_client):
 
     sri_or_adapt_label_re = re.compile(
         r'^http://spade.csl.sri.com/#:[a-f\d]{64}$'
+        '|^vertex$'
         '|^classification$'
         '|^aide\.db_/'
         '|^vendor_hash_/')
 
-    nodes = db_client.execute("g.V()").data
-    for node in nodes:
+    loop = asyncio.get_event_loop()
+
+    for node in loop.run_until_complete(stream(db_client, "g.V()")):
         assert node['type'] == 'vertex', node
         assert node['id'] >= 0, node
         assert sri_or_adapt_label_re.search(node['label']), node
@@ -138,15 +163,16 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
     types = collections.defaultdict(int)
     files = []
     root_pids = set([1])  # init, top-level sshd, systemd, launchd, etc.
-    client = gremlinrestclient.GremlinRestClient(url=url)
+    client = aiogremlin.GremlinClient(url=url)
 
     for node in get_nodes(client):
 
         # for k, v in sorted(node.items()):
         #     print(k, v)
 
-        if 'source' in node:
-            assert node['source'][0]['value'] in valid_sources, node
+        # Sadly, value now sometimes looks like '8iyv-ajaw-b2d'.
+        # if 'source' in node:
+        #     assert node['source'][0]['value'] in valid_sources, node
 
         if 'PPID' in node and 'programName' in node:
             pid = node['PID'][0]['value']
@@ -185,7 +211,7 @@ def node_types(url, name='infoleak', edge_type='wasInformedBy'):
             assert 'programName' in node, node
             # print(node['commandLine'][0]['value'])
 
-    for edge in client.execute("g.E()").data:
+    for edge in db_results(client, "g.E()"):
         typ = edge['label']
         if edge_type == typ:
             in_v = lookup(client, edge['inV'])
