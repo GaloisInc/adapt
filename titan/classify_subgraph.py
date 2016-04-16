@@ -30,7 +30,9 @@ Classifies activities found in subgraphs of a SPADE trace.
 # c.f. http://gremlinrestclient.readthedocs.org/en/latest/
 # and  https://github.com/davebshow/gremlinrestclient
 # sudo -H pip3 install gremlinrestclient
-import gremlinrestclient
+# I don't understand why gremlinrestclient is no longer suitable, but, we don't use it.
+from aiogremlin import GremlinClient
+import asyncio
 import argparse
 import classify
 import logging
@@ -48,15 +50,35 @@ def get_nodes(db_client):
 
     # sri_label_re = re.compile(r'^http://spade.csl.sri.com/#:[a-f\d]{64}$')
 
-    edges = list(db_client.execute("g.E()").data)
+    # edges = list(db_client.execute("g.E()").data)
     #assert len(edges) > 0, len(edges)
 
-    nodes = db_client.execute("g.V()").data
-    for node in nodes:
+    @asyncio.coroutine
+    def get(db_client, query):
+        resp = yield from db_client.submit(query)
+        result = yield from resp.get()
+        return result
+
+    @asyncio.coroutine
+    def stream(db_client, query):
+        resp = yield from db_client.submit(query)
+        while True:
+            result = yield from resp.stream.read()
+            if result is None:
+                break
+            return result.data
+
+    loop = asyncio.get_event_loop()
+
+    for node in loop.run_until_complete(stream(db_client, "g.V()")):
         assert node['id'] >= 0, node
         assert node['type'] == 'vertex', node
+        assert node['label'] == 'vertex', node  # I don't know semantics of "label".
         # assert sri_label_re.search(node['label']), node
         yield node['properties']
+
+    loop.run_until_complete(db_client.close())
+    loop.close()
 
 
 def get_re_classifier():
@@ -84,7 +106,7 @@ def add_vertex(client, cmd, classification, verbose=False):
 def classify_provn_events(url):
     c = get_re_classifier()
     del(c)
-    client = gremlinrestclient.GremlinRestClient(url=url)
+    client = GremlinClient(url=url)
     exfil_detect = classify.ExfilDetector()
     exfil_detect.test_is_sensitive_file()
     esc_detect = classify.Escalation(classify.FsProxy(client))
