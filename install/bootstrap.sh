@@ -119,4 +119,14 @@ function install_ingest() {
         cd ingest/IngestDaemon ; stack install
     fi
 }
+
+function install_dashboard() {
+    if [ ! \( -e $USER_BIN/dashboard \) ]
+    then
+        cd dashboard ; stack install
+    fi
+}
+
+
 install_ingest
+install_dashboard

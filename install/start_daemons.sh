@@ -49,11 +49,11 @@ KAFKA=$ADAPT/kafka/bin/
 
 # Notice topics must not be sub-strings of one another for the below script
 # to work.
-TOPICS="ta2 pattern adaptDashboard"
+TOPICS="ta2 pattern adaptDashboard ingestd-log px-log se-log ad-log ac-log dx-log"
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
-    if [ -z `echo $CURR_TOPICS | grep $TOPIC_NAME` ]
+    if [ -z `echo "$CURR_TOPICS" | grep "$TOPIC_NAME"` ]
     then
         $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
