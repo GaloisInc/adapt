@@ -23,8 +23,9 @@ executable dashboard
                        simple-get-opt >=0.1 && <0.2,
                        warp >=3.1 && <3.2,
                        servant-server >=0.4 && <0.5,
-                       lucid, http-media, wai,
+                       lucid, http-media, wai, stm,
                        text, string-qq, either,
+                       transformers, bytestring,
                        milena
   hs-source-dirs:      programs
   default-language:    Haskell2010
