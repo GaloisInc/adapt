@@ -12,14 +12,14 @@ CFG = $(ADAPT)/config/supervisord.conf
 EDGES = /tmp/add_edges.txt
 
 build_trint:
-	cd $(ADAPT)/ingest && make
+	make -C $(ADAPT)/ingest
 
 # Insert nodes into Titan, tracked in the FS to avoid re-inserting.
+# Throughput is 140 node/sec (more than two minutes for 19k nodes).
 infoleak.txt:
-	Trint -u -s $(ADAPT)/infoleak.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
+	Trint -u -s ~/example/infoleak-small.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
 	./coverage.sh node_type_report.py
 	./coverage.sh classify_subgraph.py
-
 
 clean:
 	rm -f infoleak.txt $(EDGES)
@@ -27,7 +27,6 @@ clean:
 TAGS: *.py
 	etags `find . -name '*.py' | sort`
 	flake8 classify_subgraph.py node_type_report.py */[a-z]*.py tests/*/*.py
-
 
 # This completes within two minutes.
 report: bad_ls.txt
@@ -47,9 +46,7 @@ bad_ls.txt: infoleak.txt
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	pgrep supervisord > /dev/null
-	test `stat -L -c%s $(TRACE)/bad-ls.provn` = 4897610
-	test `sha256sum  < $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
-	egrep -v 'ftruncate|recvfrom' < $(TRACE)/bad-ls.provn > /tmp/t.provn
+	egrep -v 'ftruncate|recvfrom' < $(TRACE)/bad-ls-small-scenario.provn > /tmp/t.provn
 	Trint -u -s /tmp/t.provn | tee $@
         # This should report 27k nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data
