@@ -4,11 +4,13 @@
 Vagrant.configure(2) do |config|
   config.vm.box = "debian/jessie64"
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
+  # Forward the Dashboard port for the user to get system status.
   config.vm.network "forwarded_port", guest: 8080, host: 8081
+
+  # Provide a private network so we can allow other VMs to access Kafka.
+  # Thi is done for our TA1 inputs (eventually it will  be replaced by
+  # the tc-in-a-box kafka instance).
+  config.vm.network "private_network", ip: "10.31.31.31"
 
   config.vm.provider "virtualbox" do |vb|
   #   # Display the VirtualBox GUI when booting the machine
