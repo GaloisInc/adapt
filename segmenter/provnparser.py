@@ -54,7 +54,7 @@ class AssociationExpr(ProvRelation):
     def __str__(self):
         return 'wasAssociatedWith({0}, {1}, {2}, {3})'.format(
             self.s, self.t,
-            self.timestamp, self.att_val_dict)
+            self.timestamp if self.timestamp else '-', self.att_val_dict)
 
     def label(self):
         return 'wasAssociatedWith'
@@ -136,6 +136,40 @@ class Entity:
 
     def label(self):
         return 'entity'
+
+
+class ResourceFactory:
+    @classmethod
+    def create(cls, type_, id_, att_val_list=[]):
+        if type_ == 'activity':
+            return Activity(id_, att_val_list)
+        elif type_ == 'entity':
+            return Entity(id_, att_val_list)
+        elif type_ == 'agent':
+            return Agent(id_, att_val_list)
+        elif type_ == 'segment':
+            return Segment(id_, att_val_list)
+        raise Exception('Unknown resource type: {}'.format(type_))
+
+
+class EventFactory:
+    @classmethod
+    def create(cls, type_, s, t, att_val_list, timestamp=None):
+        if type_ == 'includes':
+            return SegmentExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasInformedBy':
+            return CommExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasDerivedFrom':
+            return DerivationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasAssociatedWith':
+            return AssociationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'used':
+            return UsageExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasInvalidatedBy':
+            return ValidationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasGeneratedBy':
+            return GenerationExpr(s, t, att_val_list, timestamp)
+        raise Exception('Unknown event type: {}'.format(type_))
 
 
 class PrefixDecl:
