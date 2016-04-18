@@ -23,6 +23,7 @@ import Data.Maybe (maybeToList)
 import Data.List (partition,intersperse)
 import Data.Graph hiding (Node, Edge)
 import Data.Time (UTCTime, addUTCTime)
+import Text.Printf
 import Text.Read (readMaybe)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -155,7 +156,6 @@ mainLoop cfg =
         inTopics = cfg ^. inputTopics
         outTopic = cfg ^. outputTopic
         logMsg   = void . BC.tryWriteChan logChan
-        readLog  = BC.readChan logChan
         logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
@@ -192,7 +192,10 @@ runDB logTitan inputs outputs conn = go reportInterval (0,0)
  where
  reportInterval = 1000
 
- go 0 !cnts@(!nrE,!nrV) = logTitan (T.pack $ show (nrE,nrV)) >> go reportInterval cnts
+ go :: Int -> (Integer,Integer) -> IO ()
+ go 0 !cnts@(!nrE,!nrV) =
+  do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
+     go reportInterval cnts
  go ival (nrE,nrV) =
   do op <- BC.readChan inputs
      Titan.send op conn
