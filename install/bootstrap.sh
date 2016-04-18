@@ -63,6 +63,7 @@ sudo apt-get -y install \
     jq \
     libgmp-dev \
     python \
+    python3-nose \
     python3-setuptools \
     supervisor \
     tmux \
