@@ -136,17 +136,17 @@ lonePage c stMV =
   do title_ "ADAPT Dashbaord"
      body_ [] $ do
       h2_ "Ingestion"
-      p_ (pure igStat)
+      p_ (toHtml igStat)
       h2_ "Pattern Extraction"
-      p_ (pure pxStat)
+      p_ (toHtml pxStat)
       h2_ "Segmentation"
-      p_ (pure seStat)
+      p_ (toHtml seStat)
       h2_ "Anomaly Detection"
-      p_ (pure adStat)
+      p_ (toHtml adStat)
       h2_ "Activity Classification"
-      p_ (pure acStat)
+      p_ (toHtml acStat)
       h2_ "Diagnostics"
-      p_ (pure dxStat)
+      p_ (toHtml dxStat)
       return ()
 
 updateStatus :: Channels -> MVar Status -> IO ()
