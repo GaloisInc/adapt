@@ -22,7 +22,7 @@ import qualified Data.Foldable as F
 import Data.Maybe (maybeToList)
 import Data.List (partition,intersperse)
 import Data.Graph hiding (Node, Edge)
-import Data.Time (UTCTime, addUTCTime)
+import Data.Time (UTCTime, addUTCTime, getCurrentTime)
 import Text.Printf
 import Text.Read (readMaybe)
 import qualified Data.Set as Set
@@ -175,6 +175,8 @@ mainLoop cfg =
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
+    now <- getCurrentTime
+    logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan $
      Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
   where
