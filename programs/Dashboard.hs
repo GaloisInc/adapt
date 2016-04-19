@@ -109,7 +109,7 @@ main =
      forkIO (updateStatus channels stMV)
 
      forkIO $ void $ kafkaInput (kafkaServer c) (inTopic c) ig
-     forkIO $ void $ kafkaInput (kafkaServer c) (inTopic c) px
+     forkIO $ void $ kafkaInput (kafkaServer c) (pxTopic c) px
      forkIO $ void $ kafkaInput (kafkaServer c) (seTopic c) se
      forkIO $ void $ kafkaInput (kafkaServer c) (adTopic c) ad
      forkIO $ void $ kafkaInput (kafkaServer c) (acTopic c) ac
