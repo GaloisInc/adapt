@@ -6,9 +6,9 @@ ADAPT_DIR=$HOME/adapt
 USER_BIN=$HOME/.local/bin
 TEMP=$HOME/tmp
 
-TITAN_SERVER_DIR=titan
-KAFKA_DIR=kafka
-CONFIG_DIR=$HOME/config
+TITAN_SERVER_DIR=$ADAPT_DIR/titan
+KAFKA_DIR=$ADAPT_DIR/kafka
+CONFIG_DIR=$ADAPT_DIR/config
 
 mkdir -p $TEMP
 mkdir -p $USER_BIN
@@ -116,14 +116,14 @@ export PATH=$PATH:$USER_BIN
 function install_ingest() {
     if [ ! \( -e $USER_BIN/Trint \) ]
     then
-        cd ingest/IngestDaemon ; stack install
+        cd $ADAPT_DIR/ingest/IngestDaemon ; stack install
     fi
 }
 
 function install_dashboard() {
     if [ ! \( -e $USER_BIN/dashboard \) ]
     then
-        cd dashboard ; stack install
+        cd $ADAPT_DIR/dashboard ; stack install
     fi
 }
 
