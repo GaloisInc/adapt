@@ -57,13 +57,14 @@ import Titan
 import IngestDaemon.KafkaManager
 
 data Config =
-      Config { _logTopic    :: Maybe TopicName
-             , _verbose     :: Bool
-             , _help        :: Bool
-             , _kafkaServer :: K.KafkaAddress
-             , _inputTopics :: [K.TopicName]
-             , _outputTopic :: TopicName
-             , _titanServer :: Titan.ServerInfo
+      Config { _logTopic      :: Maybe TopicName
+             , _verbose       :: Bool
+             , _help          :: Bool
+             , _kafkaInternal :: K.KafkaAddress
+             , _kafkaExternal :: K.KafkaAddress
+             , _inputTopics   :: [K.TopicName]
+             , _outputTopic   :: TopicName
+             , _titanServer   :: Titan.ServerInfo
              } deriving (Show)
 
 makeLenses ''Config
@@ -79,13 +80,14 @@ defaultKafka = ("localhost", 9092)
 
 defaultConfig :: Config
 defaultConfig = Config
-  { _logTopic     = Nothing
-  , _verbose      = False
-  , _help         = False
-  , _kafkaServer  = defaultKafka
-  , _inputTopics  = []
-  , _outputTopic = "pattern"
-  , _titanServer  = Titan.defaultServer
+  { _logTopic      = Nothing
+  , _verbose       = False
+  , _help          = False
+  , _kafkaInternal = defaultKafka
+  , _kafkaExternal = defaultKafka
+  , _inputTopics   = []
+  , _outputTopic   = "pattern"
+  , _titanServer   = Titan.defaultServer
   }
 
 opts :: OptSpec Config
@@ -119,14 +121,23 @@ opts = OptSpec { progDefaults  = defaultConfig
                                 (Nothing,_)  -> Right (s & titanServer .~ defaultServer)
                                 (_,Just res) -> Right (s & titanServer .~ res)
                                 (_,Nothing)  -> Left "Could not parse host:port string."
-                  , Option ['k'] ["kafka"]
-                    "Set the kafka server"
+                  , Option ['k'] ["kafka-internal"]
+                    "Set the kafka server (for logging and px topics)"
                     $ OptArg "host:port" $
                         \str s ->
                             let svr = parseHostPort =<< str
                             in case (str,svr) of
-                                (Nothing,_)  -> Right (s & kafkaServer .~ defaultKafka)
-                                (_,Just res) -> Right (s & kafkaServer .~ res)
+                                (Nothing,_)  -> Right (s & kafkaInternal .~ defaultKafka)
+                                (_,Just res) -> Right (s & kafkaInternal .~ res)
+                                (_,Nothing)  -> Left "Could not parse host:port string."
+                  , Option ['e'] ["kafka-external"]
+                    "Set the kafka external server (for -i topics)"
+                    $ OptArg "host:port" $
+                        \str s ->
+                            let svr = parseHostPort =<< str
+                            in case (str,svr) of
+                                (Nothing,_)  -> Right (s & kafkaExternal .~ defaultKafka)
+                                (_,Just res) -> Right (s & kafkaExternal .~ res)
                                 (_,Nothing)  -> Left "Could not parse host:port string."
                   ]
                }
@@ -152,7 +163,8 @@ mainLoop cfg =
  do inputs  <- newBoundedChan inputQueueSize   :: IO (BoundedChan (Operation Text))
     outputs <- newBoundedChan outputQueueSize  :: IO (BoundedChan Text)
     logChan <- newBoundedChan 100 :: IO (BoundedChan Text)
-    let srv      = cfg ^. kafkaServer
+    let srvInt   = cfg ^. kafkaInternal
+        srvExt   = cfg ^. kafkaExternal
         inTopics = cfg ^. inputTopics
         outTopic = cfg ^. outputTopic
         logMsg   = void . BC.tryWriteChan logChan
@@ -161,11 +173,11 @@ mainLoop cfg =
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
-    _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srv outTopic outputs)
+    _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srvInt outTopic outputs)
     _ <- maybe (forkPersist logStderr  (channelToStderr logChan))
-               (forkPersist logStderr . channelToKafka  logChan srv)
+               (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
-    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srv t inputs) inTopics
+    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
     persistant logTitan $
      Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
   where
