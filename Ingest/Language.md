@@ -641,18 +641,6 @@ dc:isPartOf (maps to CDM EDGE_isPartOf)
 -----
 An entity can be part of another entity. We use dc:isPartOf for this construction. This relationship has no attributes.
 
-prov:wasInformedBy
--------
-This relationship type maps several edge types in CDM:
-
-* EDGE_EVENT_HASPARENT_EVENT
-* EDGE_SUBJECT_HASPARENT_SUBJECT
-* EDGE_EVENT_ISGENERATEDBY_SUBJECT
-* EDGE_EVENT_AFFECTS_SUBJECT
-* EDGE_SUBJECT_AFFECTS_EVENT
-
-No attributes.
-
 prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
 --------
 This relationship connects Subjects with the hosts they run on.
