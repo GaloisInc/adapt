@@ -114,31 +114,28 @@ opts = OptSpec { progDefaults  = defaultConfig
                         \str s -> Right (s & outputTopic .~ fromString str)
                   , Option ['t'] ["titan"]
                     "Set the titan server"
-                    $ OptArg "host:port" $
+                    $ ReqArg "host:port" $
                         \str s ->
-                            let svr = uncurry ServerInfo <$> (parseHostPort =<< str)
-                            in case (str,svr) of
-                                (Nothing,_)  -> Right (s & titanServer .~ defaultServer)
-                                (_,Just res) -> Right (s & titanServer .~ res)
-                                (_,Nothing)  -> Left "Could not parse host:port string."
+                            let svr = uncurry ServerInfo <$> (parseHostPort str)
+                            in case svr of
+                                Just res -> Right (s & titanServer .~ res)
+                                Nothing  -> Left "Could not parse host:port string."
                   , Option ['k'] ["kafka-internal"]
                     "Set the kafka server (for logging and px topics)"
-                    $ OptArg "host:port" $
+                    $ ReqArg "host:port" $
                         \str s ->
-                            let svr = parseHostPort =<< str
-                            in case (str,svr) of
-                                (Nothing,_)  -> Right (s & kafkaInternal .~ defaultKafka)
-                                (_,Just res) -> Right (s & kafkaInternal .~ res)
-                                (_,Nothing)  -> Left "Could not parse host:port string."
+                            let svr = parseHostPort str
+                            in case svr of
+                                Just res -> Right (s & kafkaInternal .~ res)
+                                Nothing  -> Left "Could not parse host:port string."
                   , Option ['e'] ["kafka-external"]
                     "Set the kafka external server (for -i topics)"
-                    $ OptArg "host:port" $
+                    $ ReqArg "host:port" $
                         \str s ->
-                            let svr = parseHostPort =<< str
-                            in case (str,svr) of
-                                (Nothing,_)  -> Right (s & kafkaExternal .~ defaultKafka)
-                                (_,Just res) -> Right (s & kafkaExternal .~ res)
-                                (_,Nothing)  -> Left "Could not parse host:port string."
+                            let svr = parseHostPort str
+                            in case svr of
+                                Just res -> Right (s & kafkaExternal .~ res)
+                                Nothing  -> Left "Could not parse host:port string."
                   ]
                }
 
