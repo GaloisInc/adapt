@@ -17,16 +17,7 @@ then
     sleep 1
 fi
 
-# If we are using vagrant then don't change to the adapt directory,
-# otherwise we can use this same script to stand up a machine though a git
-# clone to $HOME/adapt, so assume that's the case.
-if [ $USER != "vagrant" -a \( -e $HOME/adapt \) ]
-then
-    ADAPT=$HOME/adapt
-else
-    ADAPT=$HOME
-fi
-
+ADAPT=$HOME/adapt
 supercfg=$ADAPT/config/supervisord.conf
 
 cd $ADAPT || exit 1
