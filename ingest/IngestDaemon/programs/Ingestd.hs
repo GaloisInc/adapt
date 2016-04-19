@@ -142,7 +142,7 @@ opts = OptSpec { progDefaults  = defaultConfig
 parseHostPort :: (IsString s, Num n) => String -> Maybe (s,n)
 parseHostPort str =
   let (h,p) = break (== ':') str
-  in case (h,readMaybe p) of
+  in case (h,readMaybe (drop 1 p)) of
       ("",_)         -> Nothing
       (_,Nothing)    -> Nothing
       (hst,Just pt) -> Just ( fromString (hst :: String)
