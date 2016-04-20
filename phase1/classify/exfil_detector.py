@@ -69,6 +69,16 @@ class ExfilDetector(object):
         # recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
         return self.is_sensitive_file(cmd)  # and recent_foreign_ip
 
+    def is_exfil_segment(self, nodes):
+        '''Predicate is True for sensitive file exfiltration events.'''
+        is_exfil = False
+        for node in nodes:
+            prop = node['properties']
+            if 'filename' in prop:
+                if self.is_sensitive_file(prop['filename'][0]['value']):
+                    is_exfil = True
+        return is_exfil
+
     def test_is_sensitive_file(self):
         '''Exercise the several conditional cases.'''
         audit_tmpl = 'audit:path="%s", audit:subtype="file",'
@@ -81,6 +91,8 @@ class ExfilDetector(object):
         '''Predicate is True for files with restrictive markings.'''
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
         # File paths relative to cwd may require us to track additional state.
+        if cmd.endswith('/etc/shadow'):
+            return True
         if (' auditctl ' in cmd and
                 cmd.startswith('sudo ')):
             return True
