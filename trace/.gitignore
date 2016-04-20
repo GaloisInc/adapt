@@ -1,5 +1,7 @@
+*.bin
 *.dot
 *.gz
+*.json
 *.log
 *.md
 *.pp_json
