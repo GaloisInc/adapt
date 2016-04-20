@@ -26,7 +26,6 @@ Writes one or more nodes to Titan / Cassandra.
 '''
 
 import sys
-sys.path.extend(['../titan', 'titan'])
 import aiogremlin
 import asyncio
 import argparse
