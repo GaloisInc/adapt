@@ -1,0 +1,48 @@
+...
+haskell-src-exts-1.17.1: copy/register
+groom-0.1.2: download
+groom-0.1.2: configure
+groom-0.1.2: build
+groom-0.1.2: copy/register
+IngestDaemon-0.1.0.0: configure
+IngestDaemon-0.1.0.0: build
+IngestDaemon-0.1.0.0: copy/register
+Completed all 15 actions.
+Copying from /local/home/adapt/ingest/IngestDaemon/.stack-work/install/x86_64-linux/lts-5.5/7.10.3/bin/Trint to /tilde/jhanley/.local/bin/Trint
+Copying from /local/home/adapt/ingest/IngestDaemon/.stack-work/install/x86_64-linux/lts-5.5/7.10.3/bin/ingestd to /tilde/jhanley/.local/bin/ingestd
+
+Copied executables to /tilde/jhanley/.local/bin:
+- ingestd
+- Trint
++ supervisord -c /tilde/jhanley/adapt/config/supervisord.conf
++ echo Started.
+Started.
+     |-java(jhanley)---13*[{java}]
+     |                      |-java---18*[{java}]
+     |                      |-java---17*[{java}]
+     |                      `-titan.sh---titan.sh-+-nodetool---java---5*[{java}]
+Error while executing topic command Topic "ta2" already exists.
+kafka.common.TopicExistsException: Topic "ta2" already exists.
+	at kafka.admin.AdminUtils$.createOrUpdateTopicPartitionAssignmentPathInZK(AdminUtils.scala:187)
+	at kafka.admin.AdminUtils$.createTopic(AdminUtils.scala:172)
+	at kafka.admin.TopicCommand$.createTopic(TopicCommand.scala:93)
+	at kafka.admin.TopicCommand$.main(TopicCommand.scala:55)
+	at kafka.admin.TopicCommand.main(TopicCommand.scala)
+
+Created topic "pattern".
+Created topic "adaptDashboard".
+Error while executing topic command Topic "ingestd-log" already exists.
+kafka.common.TopicExistsException: Topic "ingestd-log" already exists.
+	at kafka.admin.AdminUtils$.createOrUpdateTopicPartitionAssignmentPathInZK(AdminUtils.scala:187)
+	at kafka.admin.AdminUtils$.createTopic(AdminUtils.scala:172)
+	at kafka.admin.TopicCommand$.createTopic(TopicCommand.scala:93)
+	at kafka.admin.TopicCommand$.main(TopicCommand.scala:55)
+	at kafka.admin.TopicCommand.main(TopicCommand.scala)
+
+Created topic "px-log".
+Created topic "se-log".
+Created topic "ad-log".
+Created topic "ac-log".
+Created topic "dx-log".
+Ready to populate the Titan DB, e.g. with:
+Trint -u example/*.bin

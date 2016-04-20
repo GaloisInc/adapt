@@ -17,7 +17,8 @@ build_trint:
 # Insert nodes into Titan, tracked in the FS to avoid re-inserting.
 # Throughput is 140 node/sec (more than two minutes for 19k nodes).
 infoleak.txt:
-	Trint -u -s ~/example/infoleak-small.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
+	Trint -u -s ~/adapt/example/infoleak-small.provn > $@
+	egrep -v '^$$|Prov Activity .CDM Subject. has no start time' $@
 	./coverage.sh node_type_report.py
 	./coverage.sh classify_subgraph.py
 
@@ -47,7 +48,7 @@ bad_ls.txt: infoleak.txt
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	pgrep supervisord > /dev/null
 	egrep -v 'ftruncate|recvfrom' < $(TRACE)/bad-ls-small-scenario.provn > /tmp/t.provn
-	Trint -u -s /tmp/t.provn | tee $@
+	Trint -u -s /tmp/t.provn > $@
         # This should report 27k nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data
 
