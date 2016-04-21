@@ -21,41 +21,34 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Verify that *something*, anything, was imported from the infoleak PG.
-'''
 
-import aiogremlin
-import asyncio
-import logging
-import unittest
+import os
+
+__author__ = 'John.Hanley@parc.com'
 
 
-class GenericTests(unittest.TestCase):
+class Escalation(object):
+    '''
+    Detects privilege escalation events (specifically escalation to root).
+    '''
 
-    def setUp(self):
-        logging.getLogger('asyncio').setLevel(logging.INFO)  # Don't be chatty.
-        url = 'http://localhost:8182/'
-        self.loop = asyncio.get_event_loop()
-        self.db_client = aiogremlin.GremlinClient(url=url, loop=self.loop)
+    def __init__(self, fs_proxy):
+        self.fs = fs_proxy
 
-    def tearDown(self):
-        self.loop.run_until_complete(self.db_client.close())
-
-
-    def get_one(self, query):
-        result = self.loop.run_until_complete(self.db_client.execute(query))
-        message = result[0]
-        assert message.status_code == 200, message
-        return message.data[0]
-
-    def test_that_edges_exist(self):
-        '''This expensive query takes > 15 sec.'''
-        count = self.get_one('g.E().count()')
-        self.assertEqual(0, count)  # Sigh!
-        # self.assertEqual(6730, count)
-
-    def test_that_nodes_exist(self):
-        count = self.get_one('g.V().count()')
-        self.assertEqual(41276, count)
-        # self.assertEqual(8000, count)
+    def is_escalation(self, event):
+        assert event['vertexType'][0]['value'] == 'unitOfExecution', event
+        uids = event['UID'][0]['value']  # four of them
+        executing_uid = int(uids.split()[0])
+        if executing_uid != 0:
+            return False  # We detect alice -> root, but not alice -> bob.
+        if 'CWD' not in event:
+            # Grrrr. Sometimes this happens when programName is 'ls'.
+            return False
+        prog = event['programName'][0]['value']
+        cwd = event['CWD'][0]['value']
+        path = [cwd, '/usr/bin', '/bin', '/usr/sbin']
+        for dir in path:
+            fspec = os.path.normpath(os.path.join(dir, prog))
+            if self.fs.is_present(fspec):
+                return not self.fs.is_locked_down(fspec)
+        return False

@@ -11,29 +11,23 @@ TRACE = $(ADAPT)/trace/current
 CFG = $(ADAPT)/config/supervisord.conf
 EDGES = /tmp/add_edges.txt
 
-# Hack: pause a few seconds while daemons startup or shutdown.
-WAIT = 5
+build_trint:
+	make -C $(ADAPT)/ingest
 
 # Insert nodes into Titan, tracked in the FS to avoid re-inserting.
-# The "sleep" accommodates supervisord's odd habit of exiting with status 1.
+# Throughput is 140 node/sec (more than two minutes for 19k nodes).
 infoleak.txt:
-	cd $(ADAPT)/ingest && make
-	pgrep supervisord > /dev/null || (cd $(ADAPT) && supervisord -c $(CFG); sleep $(WAIT))
-	pstree -u | egrep 'java|supervisord'
-	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
-	Trint -u -s $(ADAPT)/infoleak.provn  2> $(EDGES) | egrep -v ', src = ResultId' | tee $@
+	Trint -u -s ~/adapt/example/infoleak-small.provn > $@
+	egrep -v '^$$|Prov Activity .CDM Subject. has no start time' $@
 	./coverage.sh node_type_report.py
 	./coverage.sh classify_subgraph.py
 
-
 clean:
 	rm -f infoleak.txt $(EDGES)
-	-killall supervisord; sleep $(WAIT)
 
 TAGS: *.py
 	etags `find . -name '*.py' | sort`
 	flake8 classify_subgraph.py node_type_report.py */[a-z]*.py tests/*/*.py
-
 
 # This completes within two minutes.
 report: bad_ls.txt
@@ -42,16 +36,19 @@ report: bad_ls.txt
 classify: bad_ls.txt
 	./classify_subgraph.py
 
+
+# Without filtering, Trint would not process the bad_ls trace.
+#   Error ingesting /home/vagrant/adapt/trace/current/bad-ls.provn:
+#   Translation error: (1911:9-1911:227)WasGeneratedBy: Unknown operation: ftruncate
+
 # This completes within eight minutes.
 bad_ls.txt: infoleak.txt
+	jps | sort -k2 | egrep -v Jps | column -t
 	pstree -u | egrep 'java|supervisord'
 	netstat -tan | egrep ':(8182|2181|50321|57569|9092).*LISTEN' | sort
 	pgrep supervisord > /dev/null
-	make -C ../ingest
-	test `stat -L -c%s $(TRACE)/bad-ls.provn` = 4897610
-	test `sha256sum  < $(TRACE)/bad-ls.provn | cut -c1-7` = 696215a
-	Trint -u -s $(TRACE)/bad-ls.provn \
-          | tee $@ \
+	egrep -v 'ftruncate|recvfrom' < $(TRACE)/bad-ls-small-scenario.provn > /tmp/t.provn
+	Trint -u -s /tmp/t.provn > $@
         # This should report 27k nodes.
 	curl -s -X POST -d "{\"gremlin\" : \"g.V().count()\" }" http://localhost:8182 | jq .result.data
 

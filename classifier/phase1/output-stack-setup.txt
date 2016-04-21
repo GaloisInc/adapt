@@ -1,0 +1,25 @@
+trantor:~/Documents/Adapt-classify/titan$ make clean big
+rm -f infoleak.txt /tmp/add_edges.txt
+killall supervisord; sleep 5
+supervisord: no process found
+cd /tilde/jhanley/adapt/ingest && make
+make[1]: Entering directory `/tilde/jhanley/adapt/ingest'
+cd Trint ; stack install
+No compiler found, expected minor version match with ghc-7.10.3 (x86_64) (based on resolver setting in /tilde/jhanley/adapt/ingest/Trint/stack.yaml).
+Try running "stack setup" to install the correct GHC into /tilde/jhanley/.stack/programs/x86_64-linux/
+make[1]: *** [all] Error 1
+make[1]: Leaving directory `/tilde/jhanley/adapt/ingest'
+make: *** [infoleak.txt] Error 2
+trantor:~/Documents/Adapt-classify/titan$ 
+trantor:~/Documents/Adapt-classify/titan$ 
+trantor:~/Documents/Adapt-classify/titan$ 
+trantor:~/Documents/Adapt-classify/titan$ (cd ~/adapt/ingest/Trint/ && stack setup)
+Preparing to install GHC to an isolated location.
+This will not interfere with any system-level installation.
+Downloaded ghc-7.10.3.                                     
+Installed GHC.                              
+stack will use a locally installed GHC
+For more information on paths, see 'stack path' and 'stack exec env'
+To use this GHC and packages outside of a project, consider using:
+stack ghc, stack ghci, stack runghc, or stack exec
+trantor:~/Documents/Adapt-classify/titan$ 
