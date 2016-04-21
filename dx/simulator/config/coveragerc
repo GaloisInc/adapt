@@ -1,0 +1,13 @@
+[run]
+branch = True
+cover_pylib = False
+data_file = .coverage
+
+[report]
+precision = 2
+show_missing = False
+skip_covered = False
+
+[html]
+directory = htmlcov
+title = Coverage report

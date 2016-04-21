@@ -4,12 +4,13 @@ set -e
 # Constants
 ADAPT_DIR=$HOME/adapt
 USER_BIN=$HOME/.local/bin
-TEMP=/tmp
+TEMP=$HOME/tmp
 
-TITAN_SERVER_DIR=titan
-KAFKA_DIR=kafka
-CONFIG_DIR=$HOME/config
+TITAN_SERVER_DIR=$ADAPT_DIR/titan
+KAFKA_DIR=$ADAPT_DIR/kafka
+CONFIG_DIR=$ADAPT_DIR/config
 
+mkdir -p $TEMP
 mkdir -p $USER_BIN
 ret=`echo $PATH | grep "$USER_BIN" ; true`
 if [ -z $ret ]
@@ -37,7 +38,7 @@ sudo apt-get install git -y
 
 # Install Java 8
 sudo sh -c 'echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections'
-sudo sh -c 'echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> /etc/apt/sources.list.d/webupd8team-java.list ; echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> /etc/apt/sources.list.d/webupd8team-java.list ; apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886'
+sudo sh -c 'echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" > /etc/apt/sources.list.d/webupd8team-java.list ; echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> /etc/apt/sources.list.d/webupd8team-java.list ; apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886'
 sudo apt-get update -y
 sudo apt-get install oracle-java8-installer -y
 
@@ -116,7 +117,17 @@ export PATH=$PATH:$USER_BIN
 function install_ingest() {
     if [ ! \( -e $USER_BIN/Trint \) ]
     then
-        cd ingest/Trint ; stack install
+        cd $ADAPT_DIR/ingest/IngestDaemon ; stack install
     fi
 }
+
+function install_dashboard() {
+    if [ ! \( -e $USER_BIN/dashboard \) ]
+    then
+        cd $ADAPT_DIR/dashboard ; stack install
+    fi
+}
+
+
 install_ingest
+install_dashboard

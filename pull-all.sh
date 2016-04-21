@@ -5,6 +5,7 @@ SQUASH=
 # SQUASH="--squash"
 
 git checkout master
+git subtree pull --prefix=dashboard git@github.com:GaloisInc/Adapt-Dashboard.git master $SQUASH
 git subtree pull --prefix=ingest git@github.com:GaloisInc/Adapt-Ingest.git master $SQUASH
 git subtree pull --prefix=ad git@github.com:GaloisInc/Adapt-AD.git master $SQUASH
 git subtree pull --prefix=kb git@github.com:GaloisInc/Adapt-KB.git master $SQUASH

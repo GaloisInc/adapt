@@ -1,0 +1,8 @@
+colour==0.1.2
+coverage==4.0.3
+decorator==4.0.4
+graphviz==0.4.10
+networkx==1.10
+pep8==1.6.2
+PyPDF2==1.25.1
+PyYAML==3.11
