@@ -215,8 +215,6 @@ if __name__ == "__main__":
     parser.add_argument('rdf_turtle_file', help='An RDF in turtle format')
     parser.add_argument('key', help='A predicate for the '
         'segmentation, e.g. pid')
-    parser.add_argument('value', help='A value for the predicate used in the'
-        ' segmentation, e.g. 3233')
     parser.add_argument('radius', help='The radius used in the'
         ' segmentation, e.g. 5', type=int)
     parser.add_argument('--verbose', '-v', action='store_true',

@@ -1,0 +1,16 @@
+{"segmentation_specification" : 
+ {"segment" :
+  {"name": "byPidTime",
+   "args": [{"property" : "pid", "value" : {"var" : "X"}},
+	    {"property" : "startTime", "value" : {"var" : "T"}}],
+   "specifications" : [
+       {"radius" : { "r" : 3,
+		     "from" : {"property" : "PID", "var": "X"},
+		     "edges" : ["wasDerivedFrom", "used", "wasGeneratedBy", "wasAssociatedWith", "wasInvalidatedBy"]}},
+       {"time" : {"window" : {"days" : 0, "hours" : 24, "minutes" : 0, "seconds" : 0},
+		 "from" : "2013-03-16T00:00:00",
+		  "starting" : {"var" : "T"}}}
+   ]
+  }
+ }
+}
