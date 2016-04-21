@@ -10,4 +10,6 @@ extra-deps:
 - simple-get-opt-0.1.0.0
 - milena-0.5.0.0
 - uuid-1.3.11
+- BoundedChan-1.0.3.0
+- pure-zlib-0.4
 resolver: lts-5.5

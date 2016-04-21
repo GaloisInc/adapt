@@ -2,6 +2,7 @@
 TAGS
 dist
 .cabal-sandbox
+.*.swp
 cabal.sandbox.config
 Trint/.stack-work/
 .DS_Store
