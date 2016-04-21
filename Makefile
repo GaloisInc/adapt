@@ -1,5 +1,5 @@
 all:
-	cd Trint ; stack install
+	cd IngestDaemon ; stack install
 
 test:
-	cd Trint ; stack test Trint
+	cd IngestDaemon ; stack test IngestDaemon

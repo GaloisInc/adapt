@@ -113,7 +113,7 @@ components produced are subsets of the Bb schema described later in this specifi
 
 The Pattern Extractor (Px) - Erin/Trevor
 --------
-`Px:: [[base-node],[base-edge]]> [Pattern-definition] > [[pattern-node,[pattern-to-base-edge]]]`
+`Px:: [[base-node],[base-edge]]> [Pattern-definition] > [[pattern-node,[pattern-to-base-edge]]]``
 
 That is, Px takes in the graph in the Bb and a list of pattern definitions, and produces as output pattern nodes in the Bb and associated edges connecting those nodes to their respective base layer component nodes
 
@@ -170,6 +170,7 @@ The following are type definitions for types used in the schema description.
     enum InstrumentationSource {
         SOURCE_LINUX_AUDIT_TRACE,
         SOURCE_LINUX_PROC_TRACE,
+        SOURCE_LINUX_BEEP_TRACE,
         SOURCE_FREEBSD_OPENBSM_TRACE,
         SOURCE_ANDROID_JAVA_CLEARSCOPE,
         SOURCE_ANDROID_NATIVE_CLEARSCOPE,
@@ -177,11 +178,6 @@ The following are type definitions for types used in the schema description.
         SOURCE_WINDOWS_DIFT_FAROS
     }
 ```
-
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:source').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
 
 *prov-tc:agentType* is used in Agents, and maps to CDM enum type PrincipalType:
 
@@ -192,10 +188,6 @@ enum PrincipalType {
     }
 ```
 
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:agentType').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
 *prov-tc:eventType* is used in Subjects, and maps to CDM enum type EventType:
 
 ```
@@ -204,6 +196,7 @@ makePropertyKey('prov-tc:agentType').dataType(Short.class).cardinality(Cardinali
         EVENT_BIND,
         EVENT_CHANGE_PRINCIPAL,
         EVENT_CHECK_FILE_ATTRIBUTES,
+        EVENT_CLONE,
         EVENT_CLOSE,
         EVENT_CONNECT,
         EVENT_CREATE_OBJECT,
@@ -217,17 +210,16 @@ makePropertyKey('prov-tc:agentType').dataType(Short.class).cardinality(Cardinali
         EVENT_MPROTECT,
         EVENT_OPEN,
         EVENT_READ,
+        EVENT_RENAME,
         EVENT_WRITE,
         EVENT_SIGNAL,
         EVENT_TRUNCATE,
         EVENT_WAIT,
         EVENT_BLIND
+        EVENT_UNIT,
+        EVENT_UPDATE
     }
 ```
-
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:eventType').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:sourceType* is used in Resources, and maps to CDM enum SourceType:
 
@@ -258,10 +250,6 @@ enum SourceType {
     }
 ```
 
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:sourceType').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
 *prov-tc:trustworthiness* is used in many places, and maps to CDM enum type IntegrityTag:
 
 ```
@@ -271,10 +259,6 @@ makePropertyKey('prov-tc:sourceType').dataType(Short.class).cardinality(Cardinal
         INTEGRITY_INVULNERABLE
     }
 ```
-
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:trustworthiness').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:privacyLevel* is used in many places, and maps to CDM enum type ConfidentialityTag
 
@@ -286,10 +270,6 @@ makePropertyKey('prov-tc:trustworthiness').dataType(Short.class).cardinality(Car
         CONFIDENTIALITY_PUBLIC
     }
 ```
-
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:privacyLevel').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:subjectType* is used in Subjects, and maps to CDM type SubjectType, but adds two additional enum values:
 
@@ -303,10 +283,6 @@ makePropertyKey('prov-tc:privacyLevel').dataType(Short.class).cardinality(Cardin
     }
 ```
 
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:subjectType').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
 *prov-tc:strength* is used in wasDerivedFrom relationships:
 
 ```
@@ -316,10 +292,6 @@ makePropertyKey('prov-tc:subjectType').dataType(Short.class).cardinality(Cardina
 		STRONG
 	}
 ```
-
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:strength').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:derivation* is used in wasDerivedFrom relationships:
 
@@ -333,162 +305,39 @@ makePropertyKey('prov-tc:strength').dataType(Short.class).cardinality(Cardinalit
 	}
 ```
 
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:derivation').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
-*prov-tc:argValue* is a byte array used in Subjects
-and maps to the Titan data type:
-[schema]: #
-makePropertyKey('prov-tc:argValue').dataType(Byte.class).cardinality(Cardinality.LIST)
+*prov-tc:argValue* is a byte array used in Subjects.
 
 Other primitive types used in our model:
 
 * *prov-tc:properties* : map\<string,string\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:properties').dataType(String.class).cardinality(Cardinality.LIST)
-
 * *prov-tc:uid* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:uid').dataType(Long.class).cardinality(Cardinality.SINGLE)
-  
 * *prov-tc:url* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:url').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:file-version* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:file-version').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:size* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:size').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:permissions* : short;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:permissions').dataType(Short.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:time* : ZuluTime;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:time').dataType(Date.class).cardinality(Cardinality.SINGLE)
-
 * *prov:startedAtTime* : ZuluTime;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:startedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
-
 * *prov:endedAtTime* : ZuluTime;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:endedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:srcAddress* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:srcAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:srcPort* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:srcPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:dstAddress* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:dstAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:dstPort* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:dstPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
-* *prov-tc:pageNumber* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
+* *prov-tc:pageNumber* : Maybe int;
 * *prov-tc:address* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:pid* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:pid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:ppid* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:ppid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:unitid* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:unitid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:commandLine* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:commandLine').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:importLibs* : list\<string\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:importLibs').dataType(String.class).cardinality(Cardinality.SET)
-
 * *prov-tc:exportLibs* : list\<string\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:exportLibs').dataType(String.class).cardinality(Cardinality.SET)
-
 * *prov-tc:env* : map\<string,string\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:env').dataType(String.class).cardinality(Cardinality.LIST)
-
 * *prov-tc:pInfo* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:pInfo').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:location* : int;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:location').dataType(Integer.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:ppt* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:ppt').dataType(String.class).cardinality(Cardinality.SINGLE)
-
 * *prov-tc:args* : list\<prov-tc:argValue\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:args').dataType(Byte.class).cardinality(Cardinality.LIST)
-
 * *prov-tc:gid* : list\<int\>;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:gid').dataType(Integer.class).cardinality(Cardinality.LIST)
-
-* *prov-tc:userID* : string;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:userID').dataType(String.class).cardinality(Cardinality.SINGLE)
-
+* *prov-tc:userID* : int;
 * *prov-tc:sequence* : long;
-  and maps to the Titan data type:
-  [schema]: #
-  makePropertyKey('prov-tc:sequence').dataType(Long.class).cardinality(Cardinality.SINGLE)
-
 
 
 Data Model Classes
@@ -498,14 +347,9 @@ ADAPT defines the following classes. In each case, we specify all currently reco
 Entities (Objects in CDM)
 ------
 An entity may be created, referenced, used, or destroyed, but does not take action on its own. Entity sub-types recognized at present in the TC domain include files, network packets, and memory locations. More may be added later. Shown below are the attributes of the entity class.
-[schema]: #
-makeVertexLabel('Entity')
 
 Entity-File (File Object in CDM)
 ------
-[schema]: #
-makeVertexLabel('Entity-File')
-
 Required:
 
 * a unique identifier for the file entity instance (*prov-tc:uid*) // maps to CDM FileObject.uid
@@ -527,9 +371,6 @@ Nice to have:
 
 Entity-NetFlow (NetFlow Object in CDM)
 --------
-[schema]: #
-makeVertexLabel('Entity-NetFlow')
-
 Required:
 
 * a unique identifier for the network flow (*prov-tc:uid*) // maps to CDM NetFlowObject.uid
@@ -553,9 +394,6 @@ Nice to have:
 
 Entity-Memory (Memory Object in CDM)
 ---------
-[schema]: #
-makeVertexLabel('Entity-Memory')
-
 Required:
 
 * a unique identifier for the memory area (*prov-tc:uid*) // maps to CDM MemoryObject.uid
@@ -580,9 +418,6 @@ Resource (SourceObject in CDM)
 -------
 A resource is a physical device that can generally be read, but not written, such as a GPS sensor or camera.
 
-[schema]: #
-makeVertexLabel('Resource')
-
 Required:
 
 * a unique identifier for the resource (*prov-tc:uid*) // maps to CDM SourceObject.uid
@@ -604,9 +439,6 @@ Subject (Subject in CDM)
 ------------------
 A subject represents activity by a thread of running computation. It may be started by another subject, and may take action on its own to start other subjects or to affect entities. We would normally call this class "activity" per W3CPROV, but activity is used elsewhere in our schema, so we adopt the CDM name instead. Subjects in our model include Events in CDM as well as Subjects in CDM
 
-[schema]: #
-makeVertexLabel('Subject')
-
 Required:
 
 * a unique identifier for the subject (*prov-tc:uid*) // maps to CDM Subject.uid, Event.uid
@@ -616,11 +448,11 @@ Required:
 * a process ID of its parent (*prov-tc:ppid*) // maps to CDM Subject.ppid
 * a unique identifier of a unit (outer handler loop instance) (*prov-tc:unitid*) // maps to CDM Subject.unitId
 * a list of event parameter values (*prov-tc:args*) // maps to CDM Event.parameters
-* a start time or event occurrence time (*prov:startedAtTime*) // maps to CDM Subject.startTimestampMicros, Event.startTimeMicros
 * a sequence number for events all generated by the same subject one level up in a hierarchy (*prov-tc:sequence*) // maps to CDM Event.sequence
 
 Desired:
 
+* a start time or event occurrence time (*prov:startedAtTime*) // maps to CDM Subject.startTimestampMicros, Event.startTimeMicros
 * the command line currently executing (*prov-tc:commandLine*) // maps to CDM Subject.cmdLine
 * a list of imported libraries used by the Subject (*prov-tc:importLibs*) // maps to CDM Subject.importedLibraries
 * a list of exported libraries offered by the Subject (*prov-tc:exportLibs*) // maps to CDM Subject.exportedLibraries
@@ -640,9 +472,6 @@ Host (Host in CDM)
 --------
 A system that may host activities and entities. For now, we ignore the obvious question about hierarchies of hosts, for example, VMs running on hardware.
 
-[schema]: #
-makeVertexLabel('Host')
-
 Required:
 
 * a unique identifier for the host (*prov-tc:uid*). Unsigned 32b integer
@@ -658,9 +487,6 @@ Nice to have:
 Agent (Principal in CDM)
 -----
 An agent represents an actor that is not a Subject on a monitored machine. An agent may be human, may be a machine in the target network that has no monitoring, or may be a machine outside the monitored network. Agents have no required attributes.
-
-[schema]: #
-makeVertexLabel('Agent')
 
 Required:
 
@@ -682,9 +508,6 @@ Pattern (not in CDM)
 -----
 A pattern is a structure comprised of base layer elements such as Subject or Entity, and might also include Agents.
 
-[schema]: #
-makeVertexLabel('Pattern')
-
 Required:
 
 * A pattern template identifier that the pattern instance matches (*prov-tc:patternID*). Unsigned 16b integer.
@@ -693,26 +516,17 @@ Activity (not in CDM)
 -------
 An activity is a structure comprised of pattern instances. Activities strictly correspond to leaves in our APT grammar. Required:
 
-[schema]: #
-makeVertexLabel('Activity')
-
 * An activity template identifier (that is, the name of a grammar leaf) that the activity instance matches (*prov-tc:activityID*). Unsigned 16b integer.
 
 Phase (not in CDM)
 -----
 A phase is a structure comprised of activity instances. Phases strictly correspond to internal nodes in our APT grammar. Required:
 
-[schema]: #
-makeVertexLabel('Phase')
-
 * A Phase identifier (that is, the ID of an APT Phase that this Phase instance stands for) (*prov-tc:phaseID*). 16b integer
 
 APT (not in CDM)
 ----
 An APT is a structure comprised of Phase instances. Required:
-
-[schema]: #
-makeVertexLabel('APT')
 
 * A descriptive string for the APT candidate. 64B string
 
@@ -721,9 +535,6 @@ Segment (not in CDM)
 -----
 A Segment is a subgraph of the overall provenance graph. A segment may incorporate base layer structures, pattern instances,  activity instances, or phase instances. Required:
 
-[schema]: #
-makeVertexLabel('Segment')
-
 * The segmentation criteria used. String
 * A list of counts for each pattern type known to the system that are included in this segment. [unsigned 32b integer]
 * An anomaly score. [Float]
@@ -731,48 +542,88 @@ makeVertexLabel('Segment')
 Relationships
 =============
 
-Some relationships in the ADAPT model map to elements of the CDM enum type EdgeType. All such mappings are called out below. Other relationships are not present in CDM, because we add them as results of our analysis.
+Relationships in the ADAPT model are a super-set of elements of the CDM enum
+type EdgeType. The enumeration and each edge type description is reproduced from
+CDM below.  Other relationships are not present in CDM, because we add them as
+results of our analysis.
 
-CDM edges will be inserted into Titan as two edges and one vertex:
-    --typeOut-->typeVertex--typeIn-->
 
-
-prov:wasGeneratedBy (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW to show creations)
+EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW
 -------
-A wasGeneratedBy relationship indicates that an entity (the object of the relationship) was created by a Subject (the subject of the relationship, which must be of type Event). No attributes.
 
-[schema]: #
-makeEdgeLabel('prov:wasGeneratedBy out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov:wasGeneratedBy')
-[schema]: #
-makeEdgeLabel('prov:wasGeneratedBy in').multiplicity(MANY2ONE)
+Previously a wasGeneratedBy relationship, indicates that an entity (the object
+of the relationship) was impacted by a Subject. The subject of the relationship,
+which must be of type Event, the type of which will reveal the exact impact
+(creation, deletion, etc). No attributes.
 
-prov:wasInvalidatedBy (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW to show deletions)
---------
-
-A wasInvalidatedBy relationship indicates that an artifact (the object of the relationship) was deleted by a Subject (the subject of the relationship, which must be of type Event). No attributes.
-
-[schema]: #
-makeEdgeLabel('prov:wasInvalidatedBy out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov:wasInvalidatedBy')
-[schema]: #
-makeEdgeLabel('prov:wasInvalidatedBy in').multiplicity(MANY2ONE)
-
-prov:used (Models EDGE_EVENT_AFFECTS_MEMORY, _FILE, _NETFLOW for all other uses)
+EDGE_EVENT_AFFECTS_SUBJECT
 -------
-A used relationship indicates that an Event Subject either affected or was affected by an Entity, but did not create or delete the entity. No attributes.
 
-[schema]: #
-makeEdgeLabel('prov:used out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov:used')
-[schema]: #
-makeEdgeLabel('prov:used in').multiplicity(MANY2ONE)
+An event affects a subject (such as forking a process).
+
+EDGE_EVENT_AFFECTS_SRCSINK
+-------
+
+An event affects a generic src/sink object.
+
+EDGE_EVENT_HASPARENT_EVENT
+-------
+
+A metaevent that represents a set of child atomic events.
+
+EDGE_EVENT_ISGENERATEDBY_SUBJECT
+-------
+
+An event is generated by a subject (every event is).
+
+EDGE_SUBJECT_AFFECTS_EVENT
+-------
+
+A subject affects an event (such as when killing a process).
+
+EDGE_SUBJECT_HASPARENT_SUBJECT
+-------
+
+A subject has a parent subject (such as thread has parent process).
+
+EDGE_SUBJECT_HASPRINCIPAL
+-------
+
+A subject has a principal (such as a process owned by a user).
+
+EDGE_SUBJECT_RUNSON
+-------
+
+A subject runs on a host.
+
+EDGE_FILE_AFFECTS_EVENT
+-------
+
+An event reads from a file.
+
+EDGE_NETFLOW_AFFECTS_EVENT
+-------
+
+An event reads from a network flow.
+
+EDGE_MEMORY_AFFECTS_EVENT
+-------
+
+An event reads from a memory object.
+
+EDGE_SRCSINK_AFFECTS_EVENT
+-------
+
+A generic source/sink object affects an event.
+
+EDGE_OBJECT_PREV_VERSION
+-------
+
+The previous version of an object, typically used for file versioning.
 
 A Note About Provenance Tags
 ----------
+
 **We choose not to represent provenance tags in the ADAPT model, and we aim not to parse or interpret them during
 Phase 1. Later, we may interpret the tag expressions and create the necessary edges
 in our graph to represent provenance encoded in those tags using the wasDerivedFrom
@@ -786,127 +637,38 @@ This relationship indicates that one entity has as part of its provenance anothe
 * the strength of dependency of the terminal element of the relationship instance on the origin element (*prov-tc:strength*).
 * the kind of derivation used to create the terminal element from the origin element (*prov-tc:derivation*)
 
-[schema]: #
-makeEdgeLabel('prov:wasDerivedFrom out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov:wasDerivedFrom')
-[schema]: #
-makeEdgeLabel('prov:wasDerivedFrom in').multiplicity(MANY2ONE)
-
 dc:isPartOf (maps to CDM EDGE_isPartOf)
 -----
 An entity can be part of another entity. We use dc:isPartOf for this construction. This relationship has no attributes.
-
-[schema]: #
-makeEdgeLabel('dc:isPartOf out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('dc:isPartOf')
-[schema]: #
-makeEdgeLabel('dc:isPartOf in').multiplicity(MANY2ONE)
-
-prov:wasInformedBy
--------
-This relationship type maps several edge types in CDM:
-
-* EDGE_EVENT_HASPARENT_EVENT
-* EDGE_SUBJECT_HASPARENT_SUBJECT
-* EDGE_EVENT_ISGENERATEDBY_SUBJECT
-* EDGE_EVENT_AFFECTS_SUBJECT
-* EDGE_SUBJECT_AFFECTS_EVENT
-
-No attributes.
-
-[schema]: #
-makeEdgeLabel('prov:wasInformedBy out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov:wasInformedBy')
-[schema]: #
-makeEdgeLabel('prov:wasInformedBy in').multiplicity(MANY2ONE)
 
 prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
 --------
 This relationship connects Subjects with the hosts they run on.
 
-[schema]: #
-makeEdgeLabel('prov-tc:runsOn out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov-tc:runsOn')
-[schema]: #
-makeEdgeLabel('prov-tc:runsOn in').multiplicity(MANY2ONE)
-
 prov-tc:residesOn (CDM Edge Type EDGE_OBJECT_RESIDESON)
 ----------
 This relationship connects entities with the hosts they run on. It has no attributes.
-
-[schema]: #
-makeEdgeLabel('prov-tc:residesOn out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov-tc:residesOn')
-[schema]: #
-makeEdgeLabel('prov-tc:residesOn in').multiplicity(MANY2ONE)
 
 prov:wasAttributedTo (includes CDM Edge Type EDGE_SUBJECT_HASLOCALPRINCIPAL)
 --------
 This relationship connects entities or Subjects to the agents responsible for them. It has no attributes.
 
-[schema]: #
-makeEdgeLabel('prov:wasAttributedTo out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov:wasAttributedTo')
-[schema]: #
-makeEdgeLabel('prov:wasAttributedTo in').multiplicity(MANY2ONE)
-
 prov-tc:partOfPattern (not in CDM)
 --------
 This relationship connects a pattern instance to a component base layer element. No attributes.
-
-[schema]: #
-makeEdgeLabel('prov-tc:partOfPattern out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov-tc:partOfPattern')
-[schema]: #
-makeEdgeLabel('prov:partOfPattern in').multiplicity(MANY2ONE)
 
 prov-tc:partOfActivity (not in CDM)
 ----------
 This relationship connects an activity instance to a component pattern instance. No attributes.
 
-[schema]: #
-makeEdgeLabel('prov-tc:partOfActivity out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov-tc:partOfActivity')
-[schema]: #
-makeEdgeLabel('prov-tc:partOfActivity in').multiplicity(MANY2ONE)
-
 prov-tc:partOfPhase (not in CDM)
 ----------
 This relationship connects a phase instance to a component activity instance. No attributes.
-
-[schema]: #
-makeEdgeLabel('prov-tc:partOfPhasea out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov-tc:partOfPhase')
-[schema]: #
-makeEdgeLabel('prov-tc:partOfPhase in').multiplicity(MANY2ONE)
 
 prov-tc:partOfAPT (not in CDM)
 -----------
 This relationship connects an APT instance to a component phase instance. No attributes.
 
-[schema]: #
-makeEdgeLabel('prov-tc:partOfAPT out').multiplicity(ONE2ONE)
-[schema]: #
-makeVertexLabel('prov-tc:partOfAPT')
-[schema]: #
-makeEdgeLabel('prov-tc:partOfAPT in').multiplicity(MANY2ONE)
-
 prov-tc:partOfSegment (not in CDM)
 -----------
 This relationship connects a Segment instance to a component element of the segment. No attributes.
-
-[schema]: #
-makeEdgeLabel('prov-tc:partOfSegment out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('prov-tc:partOfSegment')
-[schema]: #
-makeEdgeLabel('prov-tc:partOfSegment in').multiplicity(MANY2ONE)
