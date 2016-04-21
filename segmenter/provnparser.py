@@ -13,76 +13,93 @@ from pyparsing import *
 import sys
 
 
-class CommExpr:
-    def __init__(self, informed, informant, att_val_list):
-        self.informed = informed
-        self.informant = informant
-        self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
-
-    def __str__(self):
-        return 'WasInformedBy({0}, {1}, {2})'.format(
-            self.informed, self.informant, self.att_val_dict)
-
-
-class DerivationExpr:
-    def __init__(self, derived, deriverer, att_val_list):
-        self.derived = derived
-        self.deriverer = deriverer
-        self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
-
-    def __str__(self):
-        return 'WasDerived({0}, {1}, {2})'.format(
-            self.informed, self.informant, self.att_val_dict)
-
-
-class AssociationExpr:
-    def __init__(self, associated, associator, att_val_list, timestamp=None):
-        self.associated = associated
-        self.associator = associator
+class ProvRelation:
+    def __init__(self, s, t, att_val_list, timestamp=None):
+        self.s = s
+        self.t = t
         self.timestamp = None if timestamp == '-' else timestamp
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
+        self.name = None
 
+
+class SegmentExpr(ProvRelation):
+    def __str__(self):
+        return 'includes({0}, {1}, [{2}])'.format(
+            self.s, self.t, ','.join(['{0}=\"{1}\"'.format(k, v)
+                for k, v in self.att_val_dict.items()]))
+
+    def label(self):
+        return 'includes'
+
+
+class CommExpr(ProvRelation):
+    def __str__(self):
+        return 'wasInformedBy({0}, {1}, {2})'.format(
+            self.s, self.t, self.att_val_dict)
+
+    def label(self):
+        return 'wasInformedBy'
+
+
+class DerivationExpr(ProvRelation):
+    def __str__(self):
+        return 'wasDerived({0}, {1}, {2})'.format(
+            self.s, self.t, self.att_val_dict)
+
+    def label(self):
+        return 'wasDerivedFrom'
+
+
+class AssociationExpr(ProvRelation):
     def __str__(self):
         return 'wasAssociatedWith({0}, {1}, {2}, {3})'.format(
-            self.associated, self.associator,
-            self.timestamp, self.att_val_dict)
+            self.s, self.t,
+            self.timestamp if self.timestamp else '-', self.att_val_dict)
+
+    def label(self):
+        return 'wasAssociatedWith'
 
 
-class UsageExpr:
-    def __init__(self, user, used, att_val_list, timestamp=None):
-        self.user = user
-        self.used = used
-        self.timestamp = None if timestamp == '-' else timestamp
-        self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
-
+class UsageExpr(ProvRelation):
     def __str__(self):
-        return 'Used({0}, {1}, {2}, {3})'.format(
-            self.user, self.used, self.timestamp, self.att_val_dict)
+        return 'used({0}, {1}, {2}, {3})'.format(
+            self.s, self.t, self.timestamp, self.att_val_dict)
+
+    def label(self):
+        return 'used'
 
 
-class ValidationExpr:
-    def __init__(self, invalidated, invalidator, att_val_list, timestamp=None):
-        self.invalidated = invalidated
-        self.invalidator = invalidator
-        self.timestamp = None if timestamp == '-' else timestamp
-        self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
-
+class ValidationExpr(ProvRelation):
     def __str__(self):
         return 'wasInvalidatedBy({0}, {1}, {2}, {3})'.format(
-            self.invalidated, self.invalidator,
+            self.s, self.t,
             self.timestamp, self.att_val_dict)
 
+    def label(self):
+        return 'wasInvalidatedBy'
 
-class GenerationExpr:
-    def __init__(self, generated, generator, att_val_list, timestamp=None):
-        self.generated = generated
-        self.generator = generator
-        self.timestamp = None if timestamp == '-' else timestamp
+
+class GenerationExpr(ProvRelation):
+    def __str__(self):
+        return 'wasGeneratedBy({0}, {1}, {2}, {3})'.format(
+            self.s, self.t, self.timestamp, self.att_val_dict)
+
+    def label(self):
+        return 'wasGeneratedBy'
+
+
+class Segment:
+    def __init__(self, id_, att_val_list):
+        self.id = id_
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
 
     def __str__(self):
-        return 'wasGeneratedBy({0}, {1}, {2}, {3})'.format(
-            self.generated, self.generator, self.timestamp, self.att_val_dict)
+        return 'segment({0},[{1}])'.format(self.id,
+            ','.join(['{0}=\"{1}\"'.format(k, v)
+                for k, v in self.att_val_dict.items()]))
+
+    def label(self):
+        return 'segment'
 
 
 class Agent:
@@ -91,7 +108,10 @@ class Agent:
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
 
     def __str__(self):
-        return 'Agent({0},{1})'.format(self.id, self.att_val_dict)
+        return 'agent({0},{1})'.format(self.id, self.att_val_dict)
+
+    def label(self):
+        return 'agent'
 
 
 class Activity:
@@ -100,7 +120,10 @@ class Activity:
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
 
     def __str__(self):
-        return 'Activity({0},{1})'.format(self.id, self.att_val_dict)
+        return 'activity({0},{1})'.format(self.id, self.att_val_dict)
+
+    def label(self):
+        return 'activity'
 
 
 class Entity:
@@ -109,7 +132,44 @@ class Entity:
         self.att_val_dict = dict([(k, v) for (k, v) in att_val_list])
 
     def __str__(self):
-        return 'Entity({0},{1})'.format(self.id, self.att_val_dict)
+        return 'entity({0},{1})'.format(self.id, self.att_val_dict)
+
+    def label(self):
+        return 'entity'
+
+
+class ResourceFactory:
+    @classmethod
+    def create(cls, type_, id_, att_val_list=[]):
+        if type_ == 'activity':
+            return Activity(id_, att_val_list)
+        elif type_ == 'entity':
+            return Entity(id_, att_val_list)
+        elif type_ == 'agent':
+            return Agent(id_, att_val_list)
+        elif type_ == 'segment':
+            return Segment(id_, att_val_list)
+        raise Exception('Unknown resource type: {}'.format(type_))
+
+
+class EventFactory:
+    @classmethod
+    def create(cls, type_, s, t, att_val_list, timestamp=None):
+        if type_ == 'includes':
+            return SegmentExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasInformedBy':
+            return CommExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasDerivedFrom':
+            return DerivationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasAssociatedWith':
+            return AssociationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'used':
+            return UsageExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasInvalidatedBy':
+            return ValidationExpr(s, t, att_val_list, timestamp)
+        elif type_ == 'wasGeneratedBy':
+            return GenerationExpr(s, t, att_val_list, timestamp)
+        raise Exception('Unknown event type: {}'.format(type_))
 
 
 class PrefixDecl:
@@ -117,16 +177,32 @@ class PrefixDecl:
         self.id = id_
         self.url = url
 
+    def __str__(self):
+        return 'prefix {0} {1}'.format(self.id, self.url)
+
 
 class Document:
     """
     A program in our language is just a list of functions
     """
-    def __init__(self, filename=None, entry_block_label='entry'):
-        if filename:
-            Parser.bnf(self)['document'].parseFile(filename, True)
-            assert self.expression_list != None
-            assert self.prefix_decls != None
+    def __init__(self):
+        self.filename = None
+        self.expression_list = []
+        self.prefix_decl = []
+
+    def parse_provn(self, filename):
+        self.filename = filename
+        bnf(self)['document'].parseFile(filename, True)
+        assert self.expression_list != None
+        assert self.prefix_decls != None
+
+    def __str__(self):
+        def f(x): return '\t' + str(x)
+        l = ['document']
+        l += map(f, self.prefix_decl)
+        l += map(f, self.expression_list)
+        l += ['endDocument']
+        return '\n'.join(l)
 
     ########################################################
     # Parsing actions
@@ -164,42 +240,46 @@ class Document:
 
     def make_usage_expression(self, t):
         try:
-            return UsageExpr(t['user'][0], t['used'][0], t['att_val_list'])
-        except:
-            return UsageExpr(t['user'][0], t['used'][0], [])
+            return UsageExpr(t['s'][0], t['t'][0],
+                t['att_val_list'], t['timestamp'])
+        except KeyError:
+            return UsageExpr(t['s'][0], t['t'][0], [], t['timestamp'])
 
     def make_association_expression(self, t):
         try:
             return AssociationExpr(
-                t['associated'][0], t['associator'][0], t['att_val_list'])
-        except:
-            return AssociationExpr(t['associated'][0], t['associator'][0], [])
+                t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
+        except KeyError:
+            return AssociationExpr(
+                t['s'][0], t['t'][0], [], t['timestamp'])
 
     def make_validation_expression(self, t):
         try:
             return ValidationExpr(
-                t['invalidated'][0], t['invalidator'][0], t['att_val_list'])
-        except:
-            return ValidationExpr(t['invalidated'][0], t['invalidator'][0], [])
+                t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
+        except KeyError:
+            return ValidationExpr(t['s'][0], t['t'][0], [], t['timestamp'])
 
     def make_generation_expression(self, t):
         try:
             return GenerationExpr(
-                t['generated'][0], t['generator'][0], t['att_val_list'])
+                t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
         except KeyError:
             return GenerationExpr(
-                t['generated'][0], t['generator'][0], [])
+                t['s'][0], t['t'][0], [], t['timestamp'])
 
     def make_communication_expression(self, t):
         try:
             return CommExpr(
-                t['informed'][0], t['informant'][0], t['att_val_list'])
+                t['s'][0], t['t'][0], t['att_val_list'], t['timestamp'])
         except KeyError:
-            return CommExpr(t['informed'][0], t['informant'][0], [])
+            timestamp = t.get('timestamp', None)
+            return CommExpr(t['s'][0], t['t'][0], [], timestamp)
 
     def make_derivation_expression(self, t):
+        timestamp = t.get('timestamp', None)
         return DerivationExpr(
-            t['derived'][0], t['deriverer'][0], t['att_val_list'])
+            t['s'][0], t['t'][0], t['att_val_list'], timestamp)
 
     def make_att_val_pair(self, t):
         return (t['att'], t['val'])
@@ -223,7 +303,7 @@ def bnf(doc):
     equal = Suppress("=")
     prefix_name = Word(alphanums + '-')
     name = Word(alphanums)
-    word_with_spaces = Word(alphanums + ' /:_-().,{}[]')
+    word_with_spaces = Word(alphanums + ' /:_-().,{}[]+*=$')
     dash = '-'
     la = '<'
     ra = '>'
@@ -235,14 +315,14 @@ def bnf(doc):
     identifier = Combine(prefix_name.setResultsName('prefix') + colon +
         name.setResultsName('name'))
     att = Combine(prefix_name + colon + name).setResultsName('att')
-    att_val_pair = Combine(att.setDebug() + equal +
-        double_quote + word_with_spaces.setResultsName('val').setDebug() + double_quote).\
+    att_val_pair = Combine(att + equal +
+        double_quote + word_with_spaces.setResultsName('val') + double_quote).\
         setParseAction(doc.make_att_val_pair)
 
     # Expressions
     generation_expr = (Keyword('wasGeneratedBy') + lpar +
-        identifier.setResultsName('generated') + comma +
-        identifier.setResultsName('generator') +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') +
         Optional(comma + (timestamp | dash).setResultsName('timestamp')) +
         Optional(
             comma +
@@ -263,8 +343,8 @@ def bnf(doc):
         delimitedList(att_val_pair).setResultsName('att_val_list') + rbrack +
             rpar).setParseAction(doc.make_entity_expression)
     usage_expr = (Keyword('used') + lpar +
-        identifier.setResultsName('user') + comma +
-        identifier.setResultsName('used') +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') +
         Optional(comma + (timestamp | dash).setResultsName('timestamp')) +
         Optional(
             comma +
@@ -273,8 +353,8 @@ def bnf(doc):
             rbrack) | (lbrack + rbrack)) +
         rpar).setParseAction(doc.make_usage_expression)
     association_expr = (Keyword('wasAssociatedWith') + lpar +
-        identifier.setResultsName('associated') + comma +
-        identifier.setResultsName('associator') +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') +
         Optional(comma + (timestamp | dash).setResultsName('timestamp')) +
         Optional(
             comma +
@@ -283,8 +363,8 @@ def bnf(doc):
             rbrack) | (lbrack + rbrack)) +
         rpar).setParseAction(doc.make_association_expression)
     validation_expr = (Keyword('wasInvalidatedBy') + lpar +
-        identifier.setResultsName('invalidated') + comma +
-        identifier.setResultsName('invalidator') +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') +
         Optional(comma + (timestamp | dash).setResultsName('timestamp')) +
         Optional(
             comma +
@@ -293,18 +373,18 @@ def bnf(doc):
             rbrack) | (lbrack + rbrack)) +
         rpar).setParseAction(doc.make_validation_expression)
     communication_expr = (Keyword('wasInformedBy') + lpar +
-        identifier.setResultsName('informed') + comma +
-        identifier.setResultsName('informant') + comma +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') + comma +
         ((lbrack + delimitedList(att_val_pair).setResultsName('att_val_list') +
         rbrack) | (lbrack + rbrack)) + rpar).\
         setParseAction(doc.make_communication_expression)
     derivation_expr = (Keyword('wasDerivedFrom') + lpar +
-        identifier.setResultsName('derived') + comma +
-        identifier.setResultsName('deriverer') + comma +
+        identifier.setResultsName('s') + comma +
+        identifier.setResultsName('t') + comma +
         ((lbrack + delimitedList(att_val_pair).setResultsName('att_val_list') +
         rbrack) | (lbrack + rbrack)) + rpar).\
         setParseAction(doc.make_derivation_expression)
-    expression = (association_expr | activity_expr | communication_expr | entity_expr | usage_expr | generation_expr | derivation_expr | agent_expr | validation_expr).\
+    expression = ( association_expr | activity_expr | communication_expr | entity_expr | usage_expr | generation_expr | derivation_expr | agent_expr | validation_expr).\
         setParseAction(doc.make_expression)
     prefix_decl = (Keyword('prefix') + prefix_name.setResultsName('id') + la +
         url_word.setResultsName('url') + ra).\
