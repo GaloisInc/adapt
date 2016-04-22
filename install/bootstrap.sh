@@ -25,7 +25,7 @@ get_if_hash_differs() {
         CURRENT_HASH="`sha256sum $DEST`"
     fi
     if [ ! -e $DEST ] || { [ -z "`echo $CURRENT_HASH | egrep \"^$VALID_HASH\"`" ]; } ; then
-        $SUDO rm $DEST || handle_error $LINENO
+        $SUDO rm -f $DEST || handle_error $LINENO
         $SUDO wget $SOURCE -O $DEST || handle_error $LINENO
     fi
     if [ ! -z $VALID_HASH ] ; then
