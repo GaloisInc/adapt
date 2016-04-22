@@ -32,7 +32,7 @@ pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/
 
-TOPICS="ta2 pattern adaptDashboard ingestd-log px-log se-log ad-log ac-log dx-log"
+TOPICS="in-finished px se ad ac dx ui in-log px-log se-log ad-log ac-log dx-log"
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
