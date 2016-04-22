@@ -7,6 +7,7 @@ import           Control.Monad (forever)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Parallel.Strategies
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
@@ -24,12 +25,13 @@ import           CommonDataModel.Avro
 
 type Statement = Operation Text
 
-channelToKafka :: BoundedChan Text -> KafkaAddress -> TopicName -> IO ()
+channelToKafka :: BoundedChan Text -> KafkaAddress -> TopicName -> IO (Either KafkaClientError ())
 channelToKafka ch host topic =
  do r <- runKafka state oper
     case r of
       Left err -> hPutStrLn stderr ("Kafka logging failed: " ++ show err)
       Right () -> hPutStrLn stderr ("Kafka logging terminated somehow.")
+    return r
  where
  state = mkKafkaState "ingest-logging" host
  oper = forever $ do
@@ -37,26 +39,47 @@ channelToKafka ch host topic =
    produceMessages [TopicAndMessage topic $ makeMessage (T.encodeUtf8 m)]
 
 --------------------------------------------------------------------------------
---  Placing the Node IDs on Kafka queues for PX
+-- PE Signalling
 
-nodeIdsToKafkaPX :: KafkaAddress
-                 -> TopicName
-                 -> BoundedChan Text
-                 -> IO (Either KafkaClientError ())
-nodeIdsToKafkaPX host topic chan = runKafka state oper
+-- We don't place node IDs on the queue for the first engagement, just
+-- a signal indicating KB is ready.
+finishIngestSignal :: KafkaAddress -> TopicName -> TopicName -> IO (Either KafkaClientError ())
+finishIngestSignal svr out ipt =
+ do r <- runKafka state oper
+    case r of
+      Left err -> hPutStrLn stderr ("Kafka signaling failed: " ++ show err)
+      Right () -> hPutStrLn stderr ("Kafka signaling terminated somehow.")
+    return r
  where
- state = mkKafkaState "ingest-px" host
- oper = forever $ do
-   m <- liftIO (BC.readChan chan)
-   produceMessages [TopicAndMessage topic $ makeMessage (T.encodeUtf8 m)]
+ state = mkKafkaState "ingest-px" svr
+ oper =
+   do o <- getLastOffset LatestTime 0 ipt
+      forever (process o)
+ process o = do
+  do bs <- getMessage ipt o
+     mapM_ propogateSignal bs
+     if null bs
+      then liftIO (threadDelay 100000) >> process o
+      else process (o+1)
+ propogateSignal b
+  | BS.length b == 1 =
+     do produceMessages [TopicAndMessage out $ makeMessage b]
+        return ()
+  | otherwise = return () -- First engagement: the only valid signals are 0,1
+
+getMessage :: TopicName -> Offset -> Kafka [ByteString]
+getMessage topicNm offset =
+  map tamPayload . fetchMessages <$> withAnyHandle (\h -> fetch' h =<< fetchRequest offset 0 topicNm)
 
 --------------------------------------------------------------------------------
 --  Getting the CDM input from TA1
 
 -- |Acquire CDM from a given kafka host/topic and place the decoded Adapt
--- Schema vales in the given channel.
+-- Schema values in the given channel.
 kafkaInput :: KafkaAddress -> TopicName -> BoundedChan Statement -> IO (Either KafkaClientError ())
-kafkaInput host topic chan = runKafka state oper
+kafkaInput host topic chan =
+  do r <- runKafka state oper
+     return r
  where
  state = mkKafkaState "adapt-ingest" host
  oper = forever $
@@ -65,7 +88,7 @@ kafkaInput host topic chan = runKafka state oper
 
  process :: Offset -> Kafka ()
  process offset =
-  do bs <- getMessage offset
+  do bs <- getMessage topic offset
      let handleMsg b =
           case runGetOrFail getAvro (BL.fromStrict b) of
             Right (_,_,cdmFmt) ->
@@ -78,10 +101,6 @@ kafkaInput host topic chan = runKafka state oper
      if null bs
       then liftIO (threadDelay 100000) >> process offset
       else process (offset+1)
-
- getMessage :: Offset -> Kafka [ByteString]
- getMessage offset =
-  map tamPayload . fetchMessages <$> withAnyHandle (\h -> fetch' h =<< fetchRequest offset 0 topic)
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr
