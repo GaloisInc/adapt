@@ -4,22 +4,27 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE QuasiQuotes           #-}
+{-# LANGUAGE RecordWildCards       #-}
 module Main where
 
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import           Control.Concurrent.STM.TChan
 import           Control.Concurrent.STM
+import           Control.Exception as X
 import           Control.Monad
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
+import           Data.Monoid
 import           Data.String
 import           Data.String.QQ
-import           Data.Text (Text, unlines)
-import           Data.Text.Encoding as T
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
 import           Lucid
 import           Lucid.Html5
 import           Network.HTTP.Media ((//), (/:))
@@ -31,6 +36,7 @@ import           Network.Wai.Handler.Warp (run)
 import           Servant
 import           Servant.Server
 import           SimpleGetOpt
+import           System.IO (stderr)
 import           System.Exit (exitSuccess)
 
 data Config =
@@ -108,14 +114,28 @@ main =
      stMV <- newMVar defaultStatus
      forkIO (updateStatus channels stMV)
 
-     forkIO $ void $ kafkaInput (kafkaServer c) (inTopic c) ig
-     forkIO $ void $ kafkaInput (kafkaServer c) (pxTopic c) px
-     forkIO $ void $ kafkaInput (kafkaServer c) (seTopic c) se
-     forkIO $ void $ kafkaInput (kafkaServer c) (adTopic c) ad
-     forkIO $ void $ kafkaInput (kafkaServer c) (acTopic c) ac
-     forkIO $ void $ kafkaInput (kafkaServer c) (dxTopic c) dx
+     forkPersist $ kafkaInput (kafkaServer c) (inTopic c) ig
+     forkPersist $ kafkaInput (kafkaServer c) (pxTopic c) px
+     forkPersist $ kafkaInput (kafkaServer c) (seTopic c) se
+     forkPersist $ kafkaInput (kafkaServer c) (adTopic c) ad
+     forkPersist $ kafkaInput (kafkaServer c) (acTopic c) ac
+     forkPersist $ kafkaInput (kafkaServer c) (dxTopic c) dx
 
      run (port c) (dashboard c stMV)
+ where
+ forkPersist = forkIO . void . persistant
+ persistant :: (Show a, Show e) => IO (Either e a) -> IO ()
+ persistant io = forever $ do
+      ex <- X.catch (Right <$> io) (pure . Left)
+      case ex of
+       Right (Right r) ->
+         T.hPutStrLn stderr ("Operation completed: " <> T.pack (show r))
+       Right (Left e) ->
+         do T.hPutStrLn stderr ("Operation failed: " <> T.pack (show e))
+            threadDelay 5000000
+       Left (e::SomeException) ->
+         do T.hPutStrLn stderr ("Operation had an exception: " <> T.pack (show e))
+            threadDelay 5000000
 
 data Channels = Channels { igChan, pxChan, seChan, adChan, acChan, dxChan :: TChan Text }
 data Status   = Status   { igStat, pxStat, seStat, adStat, acStat, dxStat :: Text }
