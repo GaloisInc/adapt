@@ -86,7 +86,7 @@ defaultConfig = Config
   , _kafkaInternal = defaultKafka
   , _kafkaExternal = defaultKafka
   , _inputTopics   = []
-  , _outputTopic   = "pattern"
+  , _outputTopic   = "px"
   , _titanServer   = Titan.defaultServer
   }
 

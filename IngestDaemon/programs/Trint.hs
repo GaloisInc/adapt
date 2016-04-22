@@ -93,7 +93,7 @@ defaultConfig = Config
   , pushKafka = False
   , files = []
   , ta1_to_ta2_kafkaTopic = "ta2"
-  , ingest_to_px_kafkaTopic = "pattern"
+  , ingest_to_px_kafkaTopic = "px"
   }
 
 includeFile :: Config -> FilePath -> Either String Config
@@ -211,12 +211,20 @@ handleUpload c res r =
    do vses <- doUpload c res r
       calmly $ printf "Uploaded %d verticies, %d edges, to Titan."
                       (length (fst vses)) (length (snd vses))
-      runKafka (mkKafkaState "adapt-trint-db-nodes" ("localhost", 9092))
-               (pushDataToKafka (ingest_to_px_kafkaTopic c) vses)
-      calmly $ printf "Sent vertex IDs to PX"
+      result <- sendStatus (ingest_to_px_kafkaTopic c) Done
+      either (calmly . show) (dbg . show) result
  where
   calmly s = unless (quiet c) (putStrLn s)
   dbg s    = when (verbose c) (putStrLn s)
+
+data ProcessingStatus = Working | Done deriving (Enum)
+
+sendStatus :: TopicName -> ProcessingStatus -> IO (Either KafkaClientError [ProduceResponse])
+sendStatus topic stat =
+  do let encStat = BS.pack [fromIntegral (fromEnum stat)]
+         msg     = TopicAndMessage topic (makeMessage encStat)
+     runKafka (mkKafkaState "adapt-trint" ("localhost", 9092))
+              (produceMessages [msg])
 
 handleAstGeneration :: Config -> FilePath -> ([Node],[Edge]) -> IO ()
 handleAstGeneration c fp (ns,es) = do
