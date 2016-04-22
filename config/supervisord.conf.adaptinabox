@@ -1,0 +1,27 @@
+[supervisord]
+
+[program:zookeeper]
+command=./kafka/bin/zookeeper-server-start.sh ./kafka/config/zookeeper.properties
+autorestart=yes
+startsecs=20
+
+[program:kafka]
+command=./kafka/bin/kafka-server-start.sh ./kafka/config/server.properties
+autorestart=yes
+startsecs=20
+startretries=6
+
+[program:titan]
+command=./titan/bin/titan.sh start
+autorestart=no
+startsecs=20
+
+[program:ingestd]
+command=ingestd -i ta2 -l ingestd-log
+autorestart=yes
+startsecs=20
+
+[program:dashboard]
+command=dashboard
+autorestart=yes
+startsecs=2

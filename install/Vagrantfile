@@ -2,15 +2,11 @@
 # vi: set ft=ruby :
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "debian/jessie64"
+  config.vm.box = "ubuntu/trusty64"
+  config.vm.box_url = "https://atlas.hashicorp.com/ubuntu/boxes/trusty64/versions/20160107.1.0/providers/virtualbox.box"
 
   # Forward the Dashboard port for the user to get system status.
   config.vm.network "forwarded_port", guest: 8080, host: 8081
-
-  # Provide a private network so we can allow other VMs to access Kafka.
-  # Thi is done for our TA1 inputs (eventually it will  be replaced by
-  # the tc-in-a-box kafka instance).
-  config.vm.network "private_network", ip: "10.31.31.31"
 
   config.vm.provider "virtualbox" do |vb|
   #   # Display the VirtualBox GUI when booting the machine
