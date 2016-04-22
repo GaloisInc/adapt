@@ -22,6 +22,7 @@ import qualified Data.Foldable as F
 import Data.Maybe (maybeToList)
 import Data.List (partition,intersperse)
 import Data.Graph hiding (Node, Edge)
+import Data.Int (Int64)
 import Data.Time (UTCTime, addUTCTime, getCurrentTime)
 import Text.Printf
 import Text.Read (readMaybe)
@@ -60,10 +61,11 @@ data Config =
       Config { _logTopic      :: Maybe TopicName
              , _verbose       :: Bool
              , _help          :: Bool
-             , _kafkaInternal :: K.KafkaAddress
-             , _kafkaExternal :: K.KafkaAddress
-             , _inputTopics   :: [K.TopicName]
+             , _kafkaInternal :: KafkaAddress
+             , _kafkaExternal :: KafkaAddress
+             , _inputTopics   :: [TopicName]
              , _outputTopic   :: TopicName
+             , _triggerTopic  :: TopicName
              , _titanServer   :: Titan.ServerInfo
              } deriving (Show)
 
@@ -86,7 +88,8 @@ defaultConfig = Config
   , _kafkaInternal = defaultKafka
   , _kafkaExternal = defaultKafka
   , _inputTopics   = []
-  , _outputTopic   = "pattern"
+  , _outputTopic   = "px"
+  , _triggerTopic  = "in-finished"
   , _titanServer   = Titan.defaultServer
   }
 
@@ -112,6 +115,10 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Set a PX topic to be used as output"
                     $ ReqArg "Topic" $
                         \str s -> Right (s & outputTopic .~ fromString str)
+                  , Option ['f'] ["finish-message-topic"]
+                    "Topic on which the 'processing complete' signal should be received (on the internal Kafka server)"
+                    $ ReqArg "Topic" $
+                        \str s -> Right (s & triggerTopic .~ fromString str)
                   , Option ['t'] ["titan"]
                     "Set the titan server"
                     $ ReqArg "host:port" $
@@ -158,36 +165,40 @@ main =
 mainLoop :: Config -> IO ()
 mainLoop cfg =
  do inputs  <- newBoundedChan inputQueueSize   :: IO (BoundedChan (Operation Text))
-    outputs <- newBoundedChan outputQueueSize  :: IO (BoundedChan Text)
     logChan <- newBoundedChan 100 :: IO (BoundedChan Text)
     let srvInt   = cfg ^. kafkaInternal
         srvExt   = cfg ^. kafkaExternal
         inTopics = cfg ^. inputTopics
         outTopic = cfg ^. outputTopic
+        triTopic = cfg ^. triggerTopic
         logMsg   = void . BC.tryWriteChan logChan
         logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
-    _ <- forkPersist logPXMsg (nodeIdsToKafkaPX srvInt outTopic outputs)
-    _ <- maybe (forkPersist logStderr  (channelToStderr logChan))
+    forkPersist logMsg $ finishIngestSignal srvInt outTopic triTopic
+    _ <- maybe (forkPersist logStderr (Left <$> channelToStderr logChan :: IO (Either () ())))
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan $
-     Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs outputs)
+     Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs)
   where
   resHdl _ _ = return ()
 
-persistant :: Show a => (Text -> IO ()) -> IO a -> IO ()
+persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
   do ex <- X.catch (Right <$> io) (pure . Left)
      case ex of
-      Right r ->
+      Right (Right r) ->
         do logMsg ("Operation completed: " <> T.pack (show r))
+           persistant logMsg io
+      Right (Left e) ->
+        do logMsg ("Operation failed: " <> T.pack (show e))
+           threadDelay 5000000
            persistant logMsg io
       Left (e::SomeException) ->
         do logMsg ("Operation had an exception: " <> T.pack (show e))
@@ -196,14 +207,13 @@ persistant logMsg io =
 
 runDB :: (Text -> IO ())
       -> (BoundedChan Statement)
-      -> BoundedChan Text
       -> Titan.Connection
       -> IO ()
-runDB logTitan inputs outputs conn = go reportInterval (0,0)
+runDB logTitan inputs conn = go reportInterval (0,0)
  where
  reportInterval = 1000
 
- go :: Int -> (Integer,Integer) -> IO ()
+ go :: Int -> (Int64,Int64) -> IO ()
  go 0 !cnts@(!nrE,!nrV) =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
      go reportInterval cnts
@@ -211,13 +221,7 @@ runDB logTitan inputs outputs conn = go reportInterval (0,0)
   do op <- BC.readChan inputs
      Titan.send op conn
      let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
-     mapM_ (BC.writeChan outputs) (maybeToList $ getVertexLabel op)
      go (ival-1) (nrE2,nrV2)
-
-
-getVertexLabel :: Operation Text -> Maybe Text
-getVertexLabel (InsertVertex label _) = Just label
-getVertexLabel _                      = Nothing
 
 isVertex :: Operation a -> Bool
 isVertex (InsertVertex _ _) = True
