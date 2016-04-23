@@ -84,7 +84,7 @@ decodeObjectContainerFor getThing bs0 =
                     return (maybe (fail "Decompression failed.") return . Z.decompress)
                | Just x <- code =
                     fail ("Unrecognized codec: " ++ BC.unpack x)
-               | Nothing = return return
+               | otherwise = return return
 
 -- | Given an Avro-formatted Object Container, decode the file and return
 -- the included datum's in lists of their original block sets 
