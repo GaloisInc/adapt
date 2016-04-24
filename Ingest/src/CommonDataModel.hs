@@ -193,15 +193,11 @@ translateSensitivity t =
 translateNetFlowObject ::NetFlowObject -> Translate () 
 translateNetFlowObject (NetFlowObject {..}) = do
   let AbstractObject {..} = nfBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let e = S.NetFlow
                 { S.entitySource       = translateSource aoSource
                 , S.entityUID          = translateUUID nfUUID
                 , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                               , S.infoPermissions     = fmap unShort aoPermission
-                                              , S.infoTrustworthiness = mt
-                                              , S.infoSensitivity     = ms
                                               , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                               }
                 -- Partial fields
@@ -216,15 +212,11 @@ translateNetFlowObject (NetFlowObject {..}) = do
 translateFileObject :: FileObject -> Translate ()
 translateFileObject    (FileObject {..}) = do
   let AbstractObject {..} = foBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let e = S.File
              { S.entitySource       = translateSource aoSource
              , S.entityUID          = translateUUID foUUID
              , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                            , S.infoPermissions     = fmap unShort aoPermission
-                                           , S.infoTrustworthiness = mt
-                                           , S.infoSensitivity     = ms
                                            , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                            }
              -- Partial fields
@@ -242,16 +234,12 @@ translateSrcSinkType = toEnum . fromEnum
 translateSrcSinkObject ::SrcSinkObject -> Translate () 
 translateSrcSinkObject (SrcSinkObject {..}) = do
   let AbstractObject {..} = ssBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let r = S.Resource
                { S.resourceSource = translateSource aoSource
                , S.resourceType   = translateSrcSinkType ssType
                , S.resourceUID    = translateUUID ssUUID
                , S.resourceInfo   = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                          , S.infoPermissions     = fmap unShort aoPermission
-                                         , S.infoTrustworthiness = mt
-                                         , S.infoSensitivity     = ms
                                          , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                          }
                }
@@ -261,16 +249,12 @@ translateSrcSinkObject (SrcSinkObject {..}) = do
 translateMemoryObject :: MemoryObject -> Translate ()
 translateMemoryObject  (MemoryObject {..}) = do
   let AbstractObject {..} = moBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let m = S.Memory
                { S.entitySource       = translateSource aoSource
                , S.entityUID          = translateUUID moUUID
                , S.entityInfo         = S.Info
                                         { S.infoTime = translateTime <$> aoLastTimestampMicros
                                         , S.infoPermissions     = fmap unShort aoPermission
-                                        , S.infoTrustworthiness = mt
-                                        , S.infoSensitivity     = ms
                                         , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                         }
                -- Partial fields

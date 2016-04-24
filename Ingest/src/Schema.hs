@@ -155,14 +155,12 @@ data Relationship
 data OptionalInfo
         = Info { infoTime            :: Maybe Time
                , infoPermissions     :: Maybe Permissions
-               , infoTrustworthiness :: Maybe IntegrityTag
-               , infoSensitivity     :: Maybe ConfidentialityTag
                , infoOtherProperties :: Properties
                }
       deriving (Eq, Ord, Show, Read, Generic)
 
 noInfo :: OptionalInfo
-noInfo = Info Nothing Nothing Nothing Nothing Map.empty
+noInfo = Info Nothing Nothing Map.empty
 
 data InstrumentationSource
       = SourceLinuxAuditTrace

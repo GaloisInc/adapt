@@ -232,7 +232,6 @@ data AbstractObject =
   AbstractObject { aoSource              :: InstrumentationSource
                  , aoPermission          :: Maybe Short
                  , aoLastTimestampMicros :: Maybe Int64
-                 , aoProvenanceTagNode   :: Maybe ProvenanceTagNode
                  , aoProperties          :: Maybe Properties
                  }
      deriving (Eq,Ord,Show)

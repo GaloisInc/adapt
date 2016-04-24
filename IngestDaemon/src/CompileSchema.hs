@@ -109,8 +109,6 @@ instance PropertiesOf OptionalInfo where
   propertiesOf (Info {..}) =
         catMaybes [ ("time",) . gremlinTime <$> infoTime
                   , ("permissions",)  . gremlinNum <$> infoPermissions
-                  , ("integrityTag",) . enumOf     <$> infoTrustworthiness
-                  , ("sensitivity",)  . enumOf     <$> infoSensitivity
           ] <> propertiesOf infoOtherProperties
 
 instance PropertiesOf Entity where

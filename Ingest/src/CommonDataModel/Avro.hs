@@ -121,7 +121,7 @@ getCDM =
       _  -> fail $ "Bad tag in CDM Datum: " ++ show tag
 
 instance GetAvro TCCDMDatum where
-  getAvro = getCDM09
+  getAvro = getCDM
 
 instance GetAvro ProvenanceTagNode where
   getAvro =
@@ -217,7 +217,6 @@ instance GetAvro NetFlowObject where
 instance GetAvro AbstractObject where
   getAvro =
     AbstractObject <$> getAvro
-                   <*> getAvro
                    <*> getAvro
                    <*> getAvro
                    <*> getAvro
