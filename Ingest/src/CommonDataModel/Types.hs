@@ -14,7 +14,7 @@ newtype Short = Short { unShort :: Word16 }
 newtype UUID = UUID ByteString
   deriving (Eq,Ord,Show,Read)
 
-data SubjectType = Process | Thread | Unit
+data SubjectType = Process | Thread | Unit | BasicBlock
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 data SrcSinkType
@@ -61,6 +61,7 @@ data InstrumentationSource
         | SOURCE_FREEBSD_LOOM_CADETS
         | SOURCE_FREEBSD_MACIF_CADETS
         | SOURCE_WINDOWS_DIFT_FAROS
+        | SOURCE_LINUX_THEIA
       deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data PrincipalType = PRINCIPAL_LOCAL | PRINCIPAL_REMOTE
@@ -85,6 +86,8 @@ data EventType
         | EVENT_MPROTECT
         | EVENT_OPEN
         | EVENT_READ
+        | EVENT_RECVFROM
+        | EVENT_RECVMSG
         | EVENT_RENAME
         | EVENT_WRITE
         | EVENT_SIGNAL
@@ -100,6 +103,13 @@ data EventType
         | EVENT_UPDATE
   deriving (Eq, Ord, Enum, Bounded, Show)
 
+data TagEntity =
+  TagEntity { teUUID       :: UUID
+            , tePTN        :: ProvenanceTagNode
+            , teProperties :: Maybe Properties
+            }
+         deriving (Eq,Ord,Show)
+
 data EdgeType
         = EDGE_EVENT_AFFECTS_MEMORY
         | EDGE_EVENT_AFFECTS_FILE
@@ -107,6 +117,7 @@ data EdgeType
         | EDGE_EVENT_AFFECTS_SUBJECT
         | EDGE_EVENT_AFFECTS_SRCSINK
         | EDGE_EVENT_HASPARENT_EVENT
+        | EDGE_EVENT_CAUSES_EVENT
         | EDGE_EVENT_ISGENERATEDBY_SUBJECT
         | EDGE_SUBJECT_AFFECTS_EVENT
         | EDGE_SUBJECT_HASPARENT_SUBJECT
@@ -117,6 +128,12 @@ data EdgeType
         | EDGE_MEMORY_AFFECTS_EVENT
         | EDGE_SRCSINK_AFFECTS_EVENT
         | EDGE_OBJECT_PREV_VERSION
+        | EDGE_FILE_HAS_TAG
+        | EDGE_NETFLOW_HAS_TAG
+        | EDGE_MEMORY_HAS_TAG
+        | EDGE_SRCSINK_HAS_TAG
+        | EDGE_SUBJECT_HAS_TAG
+        | EDGE_EVENT_HAS_TAG
   deriving (Eq, Ord, Enum, Bounded, Show)
 
 data LocalAuthType
@@ -166,12 +183,17 @@ data PTValue = PTVInt Int64
              | PTVConfidentialityTag ConfidentialityTag
      deriving (Eq,Ord,Show)
 
-data Value = Value { valSize  :: Int32
-                   , valType  :: Maybe Text
-                   , valBytes :: Maybe ByteString
-                   , valTags  :: Maybe [Int32] -- XXX Run Length and ID pairs
+data Value = Value { valSize      :: Int32
+                   , valType      :: ValueType
+                   , valDataType  :: Maybe Text
+                   , valBytes     :: Maybe ByteString
+                   , valTags      :: Maybe [Int32] -- XXX Run Length and ID pairs
+                   , valComponents :: Maybe [Value]
                    }
      deriving (Eq,Ord,Show)
+
+data ValueType = TypeIn | TypeOut | TypeInOut
+  deriving (Eq,Ord,Show,Enum,Bounded)
 
 data Subject =
   Subject { subjUUID                 :: UUID
@@ -179,7 +201,7 @@ data Subject =
           , subjPID                  :: Int32
           , subjPPID                 :: Int32
           , subjSource               :: InstrumentationSource
-          , subjStartTimestampMicros :: Int64 -- Unix Epoch
+          , subjStartTimestampMicros :: Maybe Int64 -- Unix Epoch
           , subjUnitId               :: Maybe Int32
           , subjEndTimestampMicros   :: Maybe Int64
           , subjCmdLine              :: Maybe Text
@@ -278,5 +300,6 @@ data TCCDMDatum
         | DatumSrc SrcSinkObject
         | DatumMem MemoryObject
         | DatumPri Principal
+        | DatumTag TagEntity
         | DatumSim SimpleEdge
       deriving (Eq,Ord,Show)

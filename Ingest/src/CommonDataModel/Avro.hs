@@ -155,7 +155,7 @@ instance GetAvro Subject where
                <*> getInt
                <*> getInt
                <*> getAvro
-               <*> getLong
+               <*> getAvro
                <*> getAvro
                <*> getAvro
                <*> getAvro
@@ -189,6 +189,17 @@ instance GetAvro Value where
           <*> getAvro
           <*> getAvro
           <*> getAvro
+          <*> getAvro
+          <*> getAvro
+
+instance GetAvro ValueType where
+  getAvro = getEnum
+
+instance GetAvro TagEntity where
+  getAvro =
+    TagEntity <$> getAvro
+              <*> getAvro
+              <*> getAvro
 
 instance GetAvro EventType where
   getAvro = getEnum
