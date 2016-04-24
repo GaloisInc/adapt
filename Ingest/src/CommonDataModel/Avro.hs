@@ -104,8 +104,8 @@ avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
 --------------------------------------------------------------------------------
 --  CDM Avro Deserialization
 
-getCDM09 :: Get CDM.TCCDMDatum
-getCDM09 =
+getCDM :: Get CDM.TCCDMDatum
+getCDM =
  do tag <- getLong
     case tag of
       0  -> DatumPTN <$> getAvro
@@ -116,7 +116,8 @@ getCDM09 =
       5  -> DatumSrc <$> getAvro
       6  -> DatumMem <$> getAvro
       7  -> DatumPri <$> getAvro
-      8  -> DatumSim <$> getAvro
+      8  -> DatumTag <$> getAvro
+      9  -> DatumSim <$> getAvro
       _  -> fail $ "Bad tag in CDM Datum: " ++ show tag
 
 instance GetAvro TCCDMDatum where
