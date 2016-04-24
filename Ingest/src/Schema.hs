@@ -117,51 +117,50 @@ data Agent =
       deriving (Eq, Ord, Show, Read, Generic)
 
 data Relationship
-    = EdgeEventAffectsMemory
-    | EdgeEventAffectsFile
-    | EdgeEventAffectsNetflow
-    | EdgeEventAffectsSubject
-    | EdgeEventAffectsSrcsink
-    | EdgeEventHasparentEvent
-    | EdgeEventIsgeneratedbySubject
-    | EdgeSubjectAffectsEvent
-    | EdgeSubjectHasparentSubject
-    | EdgeSubjectHaslocalprincipal
-    | EdgeSubjectRunson
-    | EdgeFileAffectsEvent
-    | EdgeNetflowAffectsEvent
-    | EdgeMemoryAffectsEvent
-    | EdgeSrcsinkAffectsEvent
-    | EdgeObjectPrevVersion
-    | WasDerivedFrom
-    | WasAttributedTo
-    | EdgeMemoryResidesOn
-    | EdgeFileResidesOn
-    | EdgeNetflowResidesOn
-    | EdgeSubjectResidesOn
-    | EdgeSrcSinkResidesOn
-    | EdgeMemoryHaslocalprincipal
-    | EdgeFileHaslocalprincipal
-    | EdgeNetflowHaslocalprincipal
-    | EdgeSrcSinkHaslocalprincipal
-    | PartOfPattern
-    | PartOfActivity
-    | PartOfPhase
-    | PartOfAPT
-    | PartOfSegement
+        = EdgeEventAffectsMemory
+        | EdgeEventAffectsFile
+        | EdgeEventAffectsNetflow
+        | EdgeEventAffectsSubject
+        | EdgeEventAffectsSrcsink
+        | EdgeEventHasparentEvent
+        | EdgeEventCausesEvent
+        | EdgeEventIsgeneratedbySubject
+        | EdgeSubjectAffectsEvent
+        | EdgeSubjectHasparentSubject
+        | EdgeSubjectHaslocalprincipal
+        | EdgeSubjectRunson
+        | EdgeFileAffectsEvent
+        | EdgeNetflowAffectsEvent
+        | EdgeMemoryAffectsEvent
+        | EdgeSrcsinkAffectsEvent
+        | EdgeObjectPrevVersion
+        | EdgeFileHasTag
+        | EdgeNetflowHasTag
+        | EdgeMemoryHasTag
+        | EdgeSrcsinkHasTag
+        | EdgeSubjectHasTag
+        | EdgeEventHasTag
+        | PartOfPattern
+        | PartOfActivity
+        | PartOfPhase
+        | PartOfAPT
+        | PartOfSegement
+        -- Not yet part of the CDM standard but perhaps someday
+        | EdgeSubjectResidesOn
+        | WasDerivedFrom
+        -- Still used in prov translations for now, drop someday
+        | WasAttributedTo
       deriving (Eq, Ord, Show, Read, Enum, Generic)
 
 data OptionalInfo
         = Info { infoTime            :: Maybe Time
                , infoPermissions     :: Maybe Permissions
-               , infoTrustworthiness :: Maybe IntegrityTag
-               , infoSensitivity     :: Maybe ConfidentialityTag
                , infoOtherProperties :: Properties
                }
       deriving (Eq, Ord, Show, Read, Generic)
 
 noInfo :: OptionalInfo
-noInfo = Info Nothing Nothing Nothing Nothing Map.empty
+noInfo = Info Nothing Nothing Map.empty
 
 data InstrumentationSource
       = SourceLinuxAuditTrace
@@ -175,6 +174,7 @@ data InstrumentationSource
       | SourceFreeBSDLoomCadets
       | SourceFreeBSDMacifCadets
       | SourceWindowsDiftFaros
+      | SourceLinuxTheia
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data PrincipalType
@@ -201,6 +201,8 @@ data EventType
         | EventMprotect
         | EventOpen
         | EventRead
+        | EventRecvFrom
+        | EventRecvMsg
         | EventRename
         | EventWrite
         | EventSignal

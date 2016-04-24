@@ -83,11 +83,13 @@ translate datum =
    DatumSrc srcSinkObject     -> translateSrcSinkObject srcSinkObject
    DatumMem memoryObject      -> translateMemoryObject  memoryObject
    DatumPri principal         -> translatePrincipal     principal
+   DatumTag tagObject         -> translateTagObject     tagObject
    DatumSim simpleEdge        -> translateSimpleEdge    simpleEdge
 
 translatePTN :: ProvenanceTagNode -> Translate ()
 translatePTN           (PTN {..}) =
   warnNoTranslation "No Adapt Schema for Provenance Tag Nodes."
+{-# INLINE translatePTN #-}
 
 translateSubject :: Subject -> Translate ()
 translateSubject       (Subject {..}) =
@@ -95,7 +97,7 @@ translateSubject       (Subject {..}) =
                   { S.subjectSource = translateSource subjSource
                   , S.subjectUID    = translateUUID subjUUID
                   , S.subjectType   = translateSubjectType subjType
-                  , S.subjectStartTime   = Just $ translateTime subjStartTimestampMicros
+                  , S.subjectStartTime   = translateTime <$> subjStartTimestampMicros
                   , S.subjectEndTime     = Nothing
                   , S.subjectPID         = Just subjPID
                   , S.subjectPPID        = Just subjPPID
@@ -114,11 +116,13 @@ translateSubject       (Subject {..}) =
                   , S.subjectArgs = Nothing
                   }
   in tellNode (S.NodeSubject s)
+{-# INLINE translateSubject #-}
 
 translateUUID :: UUID -> S.UID
 translateUUID (UUID bs) =
   let [a,b,c,d] = G.runGet (replicateM 4 G.getWord64le) (BL.fromStrict bs)
   in (a,b,c,d)
+{-# INLINE translateUUID #-}
 
 translateSubjectType :: SubjectType -> S.SubjectType
 translateSubjectType s =
@@ -126,45 +130,17 @@ translateSubjectType s =
   Process -> S.SubjectProcess
   Thread  -> S.SubjectThread
   Unit    -> S.SubjectUnit
+  BasicBlock -> S.SubjectBlock
+{-# INLINE translateSubjectType #-}
 
 translateEventType :: EventType -> S.EventType
-translateEventType e =
-  case e of
-     EVENT_ACCEPT                     -> S.EventAccept
-     EVENT_BIND                       -> S.EventBind
-     EVENT_CHANGE_PRINCIPAL           -> S.EventChangePrincipal
-     EVENT_CHECK_FILE_ATTRIBUTES      -> S.EventCheckFileAttributes
-     EVENT_CLONE                      -> S.EventClone
-     EVENT_CLOSE                      -> S.EventClose
-     EVENT_CONNECT                    -> S.EventConnect
-     EVENT_CREATE_OBJECT              -> S.EventCreateObject
-     EVENT_CREATE_THREAD              -> S.EventCreateThread
-     EVENT_EXECUTE                    -> S.EventExecute
-     EVENT_FORK                       -> S.EventFork
-     EVENT_LINK                       -> S.EventLink
-     EVENT_UNLINK                     -> S.EventUnlink
-     EVENT_MMAP                       -> S.EventMmap
-     EVENT_MODIFY_FILE_ATTRIBUTES     -> S.EventModifyFileAttributes
-     EVENT_MPROTECT                   -> S.EventMprotect
-     EVENT_OPEN                       -> S.EventOpen
-     EVENT_READ                       -> S.EventRead
-     EVENT_RENAME                     -> S.EventRename
-     EVENT_WRITE                      -> S.EventWrite
-     EVENT_SIGNAL                     -> S.EventSignal
-     EVENT_TRUNCATE                   -> S.EventTruncate
-     EVENT_WAIT                       -> S.EventWait
-     EVENT_OS_UNKNOWN                 -> S.EventOsUnknown
-     EVENT_KERNEL_UNKNOWN             -> S.EventKernelUnknown
-     EVENT_APP_UNKNOWN                -> S.EventAppUnknown
-     EVENT_UI_UNKNOWN                 -> S.EventUiUnknown
-     EVENT_UNKNOWN                    -> S.EventUnknown
-     EVENT_BLIND                      -> S.EventBlind
-     EVENT_UNIT                       -> S.EventUnit
-     EVENT_UPDATE                     -> S.EventUpdate
+translateEventType e = toEnum (fromEnum e)
+{-# INLINE translateEventType #-}
 
 -- Notice we drop the tag information when extracting parameter values.
 translateParameters :: [Value] -> S.Args
 translateParameters = map (fromMaybe BS.empty . valBytes)
+{-# INLINE translateParameters #-}
 
 translateEvent :: Event -> Translate ()
 translateEvent         (Event {..}) =
@@ -191,6 +167,7 @@ translateEvent         (Event {..}) =
                     , S.subjectArgs = fmap translateParameters evtParameters
                     }
   in tellNode (S.NodeSubject s)
+{-# INLINE translateEvent #-}
 
 translateTrust :: ProvenanceTagNode -> Translate (Maybe S.IntegrityTag)
 translateTrust t =
@@ -200,6 +177,7 @@ translateTrust t =
                           INTEGRITY_BENIGN    -> return $ Just S.IntegrityBenign
                           INTEGRITY_INVULNERABLE -> return $ Just S.IntegrityInvulnerable
     _ -> return Nothing
+{-# INLINE translateTrust #-}
 
 translateSensitivity :: ProvenanceTagNode -> Translate (Maybe S.ConfidentialityTag)
 translateSensitivity t =
@@ -210,19 +188,16 @@ translateSensitivity t =
                           CONFIDENTIALITY_PRIVATE   -> return $ Just S.ConfidentialityPrivate
                           CONFIDENTIALITY_PUBLIC    -> return $ Just S.ConfidentialityPublic
     _ -> return Nothing
+{-# INLINE translateSensitivity #-}
 
 translateNetFlowObject ::NetFlowObject -> Translate () 
 translateNetFlowObject (NetFlowObject {..}) = do
   let AbstractObject {..} = nfBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let e = S.NetFlow
                 { S.entitySource       = translateSource aoSource
                 , S.entityUID          = translateUUID nfUUID
                 , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                               , S.infoPermissions     = fmap unShort aoPermission
-                                              , S.infoTrustworthiness = mt
-                                              , S.infoSensitivity     = ms
                                               , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                               }
                 -- Partial fields
@@ -232,19 +207,16 @@ translateNetFlowObject (NetFlowObject {..}) = do
                 , S.entityDstPort      = nfDstPort
                 }
   tellNode (S.NodeEntity e)
+{-# INLINE translateNetFlowObject #-}
 
 translateFileObject :: FileObject -> Translate ()
 translateFileObject    (FileObject {..}) = do
   let AbstractObject {..} = foBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let e = S.File
              { S.entitySource       = translateSource aoSource
              , S.entityUID          = translateUUID foUUID
              , S.entityInfo         = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                            , S.infoPermissions     = fmap unShort aoPermission
-                                           , S.infoTrustworthiness = mt
-                                           , S.infoSensitivity     = ms
                                            , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                            }
              -- Partial fields
@@ -253,41 +225,36 @@ translateFileObject    (FileObject {..}) = do
              , S.entityFileSize     = foSize
              }
   tellNode (S.NodeEntity e)
+{-# INLINE translateFileObject #-}
 
 translateSrcSinkType :: SrcSinkType -> S.SourceType
 translateSrcSinkType = toEnum . fromEnum
+{-# INLINE translateSrcSinkType #-}
 
 translateSrcSinkObject ::SrcSinkObject -> Translate () 
 translateSrcSinkObject (SrcSinkObject {..}) = do
   let AbstractObject {..} = ssBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let r = S.Resource
                { S.resourceSource = translateSource aoSource
                , S.resourceType   = translateSrcSinkType ssType
                , S.resourceUID    = translateUUID ssUUID
                , S.resourceInfo   = S.Info { S.infoTime = translateTime <$> aoLastTimestampMicros
                                          , S.infoPermissions     = fmap unShort aoPermission
-                                         , S.infoTrustworthiness = mt
-                                         , S.infoSensitivity     = ms
                                          , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                          }
                }
   tellNode (S.NodeResource r)
+{-# INLINE translateSrcSinkObject #-}
 
 translateMemoryObject :: MemoryObject -> Translate ()
 translateMemoryObject  (MemoryObject {..}) = do
   let AbstractObject {..} = moBaseObject
-  mt <- maybe (return Nothing) translateTrust aoProvenanceTagNode
-  ms <- maybe (return Nothing) translateSensitivity aoProvenanceTagNode
   let m = S.Memory
                { S.entitySource       = translateSource aoSource
                , S.entityUID          = translateUUID moUUID
                , S.entityInfo         = S.Info
                                         { S.infoTime = translateTime <$> aoLastTimestampMicros
                                         , S.infoPermissions     = fmap unShort aoPermission
-                                        , S.infoTrustworthiness = mt
-                                        , S.infoSensitivity     = ms
                                         , S.infoOtherProperties = fromMaybe Map.empty aoProperties
                                         }
                -- Partial fields
@@ -295,15 +262,18 @@ translateMemoryObject  (MemoryObject {..}) = do
                , S.entityAddress      = moMemoryAddress
                }
   tellNode (S.NodeEntity m)
+{-# INLINE translateMemoryObject #-}
 
 translateTime :: Int64 -> UTCTime
 translateTime = posixSecondsToUTCTime . fromIntegral
+{-# INLINE translateTime #-}
 
 translatePrincipalType :: PrincipalType -> S.PrincipalType
 translatePrincipalType p =
   case p of 
     PRINCIPAL_LOCAL  -> S.PrincipalLocal
     PRINCIPAL_REMOTE -> S.PrincipalRemote
+{-# INLINE translatePrincipalType #-}
 
 translatePrincipal :: Principal -> Translate ()
 translatePrincipal     (Principal {..}) =
@@ -316,9 +286,17 @@ translatePrincipal     (Principal {..}) =
             , S.agentProperties   = fromMaybe Map.empty pProperties
             }
   in tellNode (S.NodeAgent a)
+{-# INLINE translatePrincipal #-}
 
 translateSource :: InstrumentationSource -> S.InstrumentationSource
 translateSource = toEnum . fromEnum
+{-# INLINE translateSource #-}
+
+-- XXX Figure out delta to make Adapt Schema work with tag objects.
+translateTagObject :: TagEntity -> Translate ()
+translateTagObject (TagEntity {..}) =
+  warn (WarnOther "Ignoring tag object, a new field in CDM10")
+{-# INLINE translateTagObject #-}
 
 translateSimpleEdge :: SimpleEdge -> Translate ()
 translateSimpleEdge (SimpleEdge {..}) =
@@ -327,23 +305,8 @@ translateSimpleEdge (SimpleEdge {..}) =
                      , S.edgeRelationship = translateRelationship edgeType
                      }
       in warn (WarnOther "Ignoring edge time and properties") >> tellEdge e
+{-# INLINE translateSimpleEdge #-}
 
 translateRelationship :: EdgeType -> S.Relationship
-translateRelationship e =
-  case e of
-    EDGE_EVENT_AFFECTS_MEMORY        -> S.EdgeEventAffectsMemory
-    EDGE_EVENT_AFFECTS_FILE          -> S.EdgeEventAffectsFile
-    EDGE_EVENT_AFFECTS_NETFLOW       -> S.EdgeEventAffectsNetflow
-    EDGE_EVENT_AFFECTS_SUBJECT       -> S.EdgeEventAffectsSubject
-    EDGE_EVENT_AFFECTS_SRCSINK       -> S.EdgeEventAffectsSrcsink
-    EDGE_EVENT_HASPARENT_EVENT       -> S.EdgeEventHasparentEvent
-    EDGE_EVENT_ISGENERATEDBY_SUBJECT -> S.EdgeEventIsgeneratedbySubject
-    EDGE_SUBJECT_AFFECTS_EVENT       -> S.EdgeSubjectAffectsEvent
-    EDGE_SUBJECT_HASPARENT_SUBJECT   -> S.EdgeSubjectHasparentSubject
-    EDGE_SUBJECT_HASLOCALPRINCIPAL   -> S.EdgeSubjectHaslocalprincipal
-    EDGE_SUBJECT_RUNSON              -> S.EdgeSubjectRunson
-    EDGE_FILE_AFFECTS_EVENT          -> S.EdgeFileAffectsEvent
-    EDGE_NETFLOW_AFFECTS_EVENT       -> S.EdgeNetflowAffectsEvent
-    EDGE_MEMORY_AFFECTS_EVENT        -> S.EdgeMemoryAffectsEvent
-    EDGE_SRCSINK_AFFECTS_EVENT       -> S.EdgeSrcsinkAffectsEvent
-    EDGE_OBJECT_PREV_VERSION         -> S.EdgeObjectPrevVersion
+translateRelationship e = toEnum (fromEnum e)
+{-# INLINE translateRelationship #-}

@@ -104,8 +104,8 @@ avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
 --------------------------------------------------------------------------------
 --  CDM Avro Deserialization
 
-getCDM09 :: Get CDM.TCCDMDatum
-getCDM09 =
+getCDM :: Get CDM.TCCDMDatum
+getCDM =
  do tag <- getLong
     case tag of
       0  -> DatumPTN <$> getAvro
@@ -116,11 +116,12 @@ getCDM09 =
       5  -> DatumSrc <$> getAvro
       6  -> DatumMem <$> getAvro
       7  -> DatumPri <$> getAvro
-      8  -> DatumSim <$> getAvro
+      8  -> DatumTag <$> getAvro
+      9  -> DatumSim <$> getAvro
       _  -> fail $ "Bad tag in CDM Datum: " ++ show tag
 
 instance GetAvro TCCDMDatum where
-  getAvro = getCDM09
+  getAvro = getCDM
 
 instance GetAvro ProvenanceTagNode where
   getAvro =
@@ -155,7 +156,7 @@ instance GetAvro Subject where
                <*> getInt
                <*> getInt
                <*> getAvro
-               <*> getLong
+               <*> getAvro
                <*> getAvro
                <*> getAvro
                <*> getAvro
@@ -189,6 +190,17 @@ instance GetAvro Value where
           <*> getAvro
           <*> getAvro
           <*> getAvro
+          <*> getAvro
+          <*> getAvro
+
+instance GetAvro ValueType where
+  getAvro = getEnum
+
+instance GetAvro TagEntity where
+  getAvro =
+    TagEntity <$> getAvro
+              <*> getAvro
+              <*> getAvro
 
 instance GetAvro EventType where
   getAvro = getEnum
@@ -205,7 +217,6 @@ instance GetAvro NetFlowObject where
 instance GetAvro AbstractObject where
   getAvro =
     AbstractObject <$> getAvro
-                   <*> getAvro
                    <*> getAvro
                    <*> getAvro
                    <*> getAvro
