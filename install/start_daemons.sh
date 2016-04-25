@@ -36,7 +36,7 @@ pstree -u | grep java
 # Setup the Kafka Topics
 # TODO: Figure out a programatic way to _check_ for and _create_ topics
 #       as necessary in each Adapt component.
-KAFKA=$ADAPT/kafka/bin/
+KAFKA=/opt/kafka/bin/
 
 # Notice topics must not be sub-strings of one another for the below script
 # to work.
