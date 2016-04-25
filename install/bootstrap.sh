@@ -119,7 +119,7 @@ function install_adapt() {
     ln -sf $CONFIG_DIR/supervisord.conf.tcinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
 }
 
-mkdir $KAFKA_ROOT
+mkdir -p $KAFKA_ROOT
 
 fetch_adapt
 install_adapt_dependencies
