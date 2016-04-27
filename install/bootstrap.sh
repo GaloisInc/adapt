@@ -117,7 +117,7 @@ function install_adapt() {
     stack install || handle_error $LINENO
     cd $ADAPT_DIR/dashboard || handle_error $LINENO
     stack install || handle_error $LINENO
-    ln -sf $CONFIG_DIR/supervisord.conf.tcinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
+    ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
 }
 
 mkdir -p $KAFKA_ROOT

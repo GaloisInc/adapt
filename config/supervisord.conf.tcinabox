@@ -1,12 +1,12 @@
 [supervisord]
 
 [program:zookeeper]
-command=/opt/kafka/bin/zookeeper-server-start.sh ./kafka/config/zookeeper.properties
+command=/opt/kafka/bin/zookeeper-server-start.sh /opt/kafka/config/zookeeper.properties
 autorestart=yes
 startsecs=20
 
 [program:kafka]
-command=/opt/kafka/bin/kafka-server-start.sh ./kafka/config/server.properties
+command=/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
 autorestart=yes
 startsecs=20
 startretries=6
