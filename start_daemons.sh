@@ -16,6 +16,7 @@ echo "############# TC-IN-A-BOX Integretaed daemon execution system ############
 if pgrep -U root supervisord > /dev/null
 then
     sudo service supervisor stop
+    sleep 1
 fi
 
 ADAPT=$HOME/adapt
@@ -32,7 +33,8 @@ pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/
 
-TOPICS="in-finished px se ad ac dx ui in-log px-log se-log ad-log ac-log dx-log"
+TOPICS="in-finished ac ad dx px se ui ac-log ad-log dx-log in-log px-log se-log "
+
 CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
 
 for TOPIC_NAME in $TOPICS ; do
