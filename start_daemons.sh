@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 echo "############# TC-IN-A-BOX Integretaed daemon execution system #################"
 
@@ -28,18 +28,22 @@ cd $ADAPT || exit 1
 (cd $ADAPT/ingest && make)
 
 # run supervisord (zookeeper, kafka, titan, ingestd)
-pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; echo Started.)
+pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; echo Started.)
 
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/
 
 TOPICS="in-finished ac ad dx px se ui ac-log ad-log dx-log in-log px-log se-log "
 
-CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
-
-for TOPIC_NAME in $TOPICS ; do
-    if [ -z `echo "$CURR_TOPICS" | grep "$TOPIC_NAME"` ]
+# Avoid creating topic names that already exist.
+declare -A CURR
+for TOPIC in `$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
+do
+    CURR[$TOPIC]=1
+done
+for TOPIC in $TOPICS ; do
+    if [[ -z "${CURR[$TOPIC]}" ]]
     then
-        $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
+        $KAFKA/kafka-topics.sh --create --topic $TOPIC --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
