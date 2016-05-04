@@ -17,11 +17,11 @@ autorestart=no
 startsecs=20
 
 [program:ingestd]
-command=ingestd -i ta2 -l ingestd-log
+command=/home/vagrant/.local/bin/ingestd -i ta2 -l ingestd-log -f in-finished
 autorestart=yes
 startsecs=20
 
 [program:dashboard]
-command=dashboard
+command=/home/vagrant/.local/bin/dashboard
 autorestart=yes
 startsecs=2
