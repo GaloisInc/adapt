@@ -54,7 +54,7 @@ class AssociationExpr(ProvRelation):
     def __str__(self):
         return 'wasAssociatedWith({0}, {1}, {2}, {3})'.format(
             self.s, self.t,
-            self.timestamp if self.timestamp else '-', self.att_val_dict)
+            self.timestamp if self.timestamp else '-'   , self.att_val_dict)
 
     def label(self):
         return 'wasAssociatedWith'
@@ -405,14 +405,14 @@ if __name__ == "__main__":
     def test(s, nt):
         doc = Document()
         result = bnf(doc)[nt].parseString(s, True)
-        print s, '\n\t=>\n', result
-        print '---------------------'
+        print(s, '\n\t=>\n', result)
+        print('---------------------')
 
     def test_file(f, nt):
         doc = Document()
         result = bnf(doc)[nt].parseFile(f, True)
-        print f, '\n\t=>\n', result
-        print '---------------------'
+        print(f, '\n\t=>\n', result)
+        print('---------------------')
 
     f = sys.argv[1]
     test_file(f, 'document')

@@ -203,17 +203,17 @@ class DocumentGraph:
         populate_graph()
 
     def print_summary(self):
-        print '='*30
-        print '\tGraph summary'
-        print '='*30
-        print 'Min time: {0}'.format(self.min_time)
-        print 'Max time: {0}'.format(self.max_time)
-        print 'nodes ({0}):'.format(len(self.g.nodes()))
+        print('='*30)
+        print('\tGraph summary')
+        print('='*30)
+        print('Min time: {0}'.format(self.min_time))
+        print('Max time: {0}'.format(self.max_time))
+        print('nodes ({0}):'.format(len(self.g.nodes())))
         for n in self.g.nodes():
-            print '\t', n, self.g.node[n]
-        print 'edges ({0}):'.format(len(self.g.edges()))
+            print('\t', n, self.g.node[n])
+        print('edges ({0}):'.format(len(self.g.edges())))
         for e in self.g.edges():
-            print '\t', e, self.g.edge[e[0]][e[1]]
+            print('\t', e, self.g.edge[e[0]][e[1]])
 
 
     #def draw(self):
@@ -297,7 +297,7 @@ if __name__ == "__main__":
     # Check that provided non-optional files actually exist
     for f in [args.provn_file, args.spec_file]:
         if not (os.path.isfile(f)):
-            print 'File {0} does not exist...aborting'.format(f)
+            print('File {0} does not exist...aborting'.format(f))
 
     doc = Document()
     doc.parse_provn(args.provn_file)
@@ -311,8 +311,8 @@ if __name__ == "__main__":
     s = Segmenter(dg, args.spec_file)
 
     segmentation_doc = s.eval_spec()
-    print '='*30
-    print '\tSegmentation result'
-    print '='*30
-    print segmentation_doc
+    print('='*30)
+    print('\tSegmentation result')
+    print('='*30)
+    print(segmentation_doc)
     #for e in segmentation_doc.expression_list:
