@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
     =======
-    `RDF-Segmenter` --- Main module
+    `PROVN-Segmenter` --- Main module
     =======
 
     Adria Gascon, 2016.
@@ -169,7 +169,8 @@ class Segmenter:
                             att_val_dict = [(str(prop_i), str(val_i)),
                                 (str(prop_j), str(val_j))]
                             s = Segment('segment_id_{0}'.format(
-                                len(segmentation_doc.expression_list)), att_val_dict)
+                                len(segmentation_doc.expression_list)),
+                                att_val_dict)
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
                                 e = SegmentExpr(s.id, n, {})
@@ -203,9 +204,9 @@ class DocumentGraph:
         populate_graph()
 
     def print_summary(self):
-        print('='*30)
+        print('=' * 30)
         print('\tGraph summary')
-        print('='*30)
+        print('=' * 30)
         print('Min time: {0}'.format(self.min_time))
         print('Max time: {0}'.format(self.max_time))
         print('nodes ({0}):'.format(len(self.g.nodes())))
@@ -255,8 +256,10 @@ def test_provn_segmenter():
         doc.parse_provn(filename)
         dg = DocumentGraph(doc)
         sys.stderr.write('---> Verifying number of edges and nodes\n')
-        assert len(dg.g.nodes()) == test_d['num_nodes'], '{0} != {1}'.format(len(dg.g.nodes()), test_d['num_nodes']) 
-        assert len(dg.g.edges()) == test_d['num_edges'], '{0} != {1}'.format(len(dg.g.edges()), test_d['num_edges']) 
+        assert len(dg.g.nodes()) == test_d['num_nodes'], '{0} != {1}'.format(
+            len(dg.g.nodes()), test_d['num_nodes'])
+        assert len(dg.g.edges()) == test_d['num_edges'], '{0} != {1}'.format(
+            len(dg.g.edges()), test_d['num_edges'])
 
     # Testing segmenter
     test_input_files = [
@@ -275,13 +278,16 @@ def test_provn_segmenter():
         sdg = DocumentGraph(segmentation_doc)
         seg_num_nodes = len(sdg.g.nodes())
         seg_num_edges = len(sdg.g.edges())
-        assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(seg_num_nodes, test_d['num_nodes']) 
-        assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(seg_num_edges, test_d['num_edges']) 
+        assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(
+            seg_num_nodes, test_d['num_nodes'])
+        assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(
+            seg_num_edges, test_d['num_edges'])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A provn segmenter')
-    parser.add_argument('provn_file', help='A prov-tc file in provn format')
+    parser.add_argument(
+        '--provn_file', '-p', help='A prov-tc file in provn format')
     parser.add_argument('spec_file',
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
