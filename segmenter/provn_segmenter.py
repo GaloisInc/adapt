@@ -42,7 +42,7 @@ class Datetime:
 
         def two_digits(v):
             if v < 10:
-                return '0'+str(v)
+                return '0' + str(v)
             return v
         return '{0}-{1}-{2}T{3}:{4}:{5}'.format(
             two_digits(new_datetime.year),
@@ -215,8 +215,7 @@ class DocumentGraph:
         for e in self.g.edges():
             print('\t', e, self.g.edge[e[0]][e[1]])
 
-
-    #def draw(self):
+    # def draw(self):
     #    import matplotlib.pyplot as plt
     #   print 'here'
     #    NX.draw(self.g)
@@ -236,19 +235,19 @@ class DocumentGraph:
         return set([n for n in self.g.nodes()
             if att in self.g.node[n] and self.g.node[n][att] == val])
 
+
 def test_provn_segmenter():
     # Testing parser
-    sys.stderr.write('*'*30+'\n')
+    sys.stderr.write('*' * 30 + '\n')
     sys.stderr.write('Running PROVN Segmenter Tests\n')
-    sys.stderr.write('*'*30+'\n')
+    sys.stderr.write('*' * 30 + '\n')
     test_input_files = [
-        #{'filename': 'test/2016-01-28/bad-ls.provn',
+        # {'filename': 'test/2016-01-28/bad-ls.provn',
         # 'num_nodes': 2712,
         # 'num_edges': 9683},
         {'filename': 'test/test_james.provn',
          'num_nodes': 10,
-         'num_edges': 11}
-        ]
+         'num_edges': 11}]
     for test_d in test_input_files:
         filename = test_d['filename']
         sys.stderr.write('---> Parsing {0}\n'.format(filename))
@@ -264,8 +263,7 @@ def test_provn_segmenter():
         {'filename': 'test/test_james.provn',
          'spec': 'test/test_james_spec.json',
          'num_nodes': 15,
-         'num_edges': 13}
-        ]
+         'num_edges': 13}]
     for test_d in test_input_files:
         filename = test_d['filename']
         spec = test_d['spec']
@@ -279,7 +277,6 @@ def test_provn_segmenter():
         seg_num_edges = len(sdg.g.edges())
         assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(seg_num_nodes, test_d['num_nodes']) 
         assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(seg_num_edges, test_d['num_edges']) 
-
 
 
 if __name__ == "__main__":
@@ -311,8 +308,7 @@ if __name__ == "__main__":
     s = Segmenter(dg, args.spec_file)
 
     segmentation_doc = s.eval_spec()
-    print('='*30)
+    print('=' * 30)
     print('\tSegmentation result')
-    print('='*30)
+    print('=' * 30)
     print(segmentation_doc)
-    #for e in segmentation_doc.expression_list:

@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+    =======
+    `TitanClient`
+    =======
+
+    Adria Gascon, 2016.
+"""
 import asyncio
 from aiogremlin import GremlinClient
 from provn_segmenter import DocumentGraph, Document
@@ -5,6 +14,7 @@ from provnparser import ResourceFactory, EventFactory
 import re
 import argparse
 import os
+import sys
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,7 +50,7 @@ class TitanClient:
 
     def add_edge(self, n1, d1, n2, d2, d, label):
         """
-        Adds edge with label and dict d between nodes with names n1 and n2, 
+        Adds edge with label and dict d between nodes with names n1 and n2,
         if it does not exist.
         If the nodes do not exist they are created with dicts d1 and d2.
         """
@@ -122,14 +132,20 @@ class TitanClient:
 
 
 def test():
+    sys.stderr.write('*' * 30 + '\n')
+    sys.stderr.write('Running PROVN Segmenter Tests\n')
+    sys.stderr.write('*' * 30 + '\n')
     provn_file = 'test/test_james.provn'
     broker = 'ws://localhost:8182/'
     doc = Document()
+    sys.stderr.write('---> Parsing {0}\n'.format(provn_file))
     doc.parse_provn(provn_file)
     in_dg = DocumentGraph(doc)
     tc = TitanClient(broker)
     tc.drop_db()
+    sys.stderr.write('---> Loading {0} into DB\n'.format(provn_file))
     tc.load_from_document_graph(in_dg)
+    sys.stderr.write('---> Reading {0} from DB\n'.format(provn_file))
     out_dg = tc.read_into_document_graph()
     tc.close()
 
