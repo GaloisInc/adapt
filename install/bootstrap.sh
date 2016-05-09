@@ -122,7 +122,12 @@ function install_adapt() {
     ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
 }
 
+function link_adapt() {
+    ln -sf /vagrant $ADAPT_DIR
+}
+
 mkdir -p $KAFKA_ROOT
 
+link_adapt
 install_adapt_dependencies
 install_adapt

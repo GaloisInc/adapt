@@ -17,13 +17,7 @@ Vagrant.configure(2) do |config|
      vb.cpus   = 2
   end
 
-  config.vm.provision "file", source: "../dashboard", destination: "adapt/dashboard"
-  config.vm.provision "file", source: "../ingest", destination: "adapt/ingest"
-  config.vm.provision "file", source: "../config", destination: "adapt/config"
-  config.vm.provision "file", source: "../example", destination: "adapt/example"
-  config.vm.provision "shell", privileged: false, path: "bootstrap.sh"
-  config.vm.provision "file", source: "../start_daemons.sh", destination: "adapt/start_daemons.sh"
-  config.vm.provision "file", source: "node_count.py", destination: "adapt/node_count.py"
+  config.vm.provision "shell", privileged: false, path: "install/bootstrap.sh"
   config.vm.provision "shell", run: "always", privileged: false, path: "start_daemons.sh"
 end
 
