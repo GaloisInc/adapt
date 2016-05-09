@@ -34,21 +34,22 @@ sleep 4
 pstree -u | grep java
 
 # Setup the Kafka Topics
-# TODO: Figure out a programatic way to _check_ for and _create_ topics
-#       as necessary in each Adapt component.
 KAFKA=/opt/kafka/bin/
+TOPICS="ta2 in-finished ac ad dx px se ui ac-log ad-log dx-log in-log px-log se-log "
 
-# Notice topics must not be sub-strings of one another for the below script
-# to work.
-TOPICS="ta2 in-finished px se ad ac dx ui in-log px-log se-log ad-log ac-log dx-log"
-CURR_TOPICS=`$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
-
-for TOPIC_NAME in $TOPICS ; do
-    if [ -z "`echo \"$CURR_TOPICS\" | grep \"$TOPIC_NAME\"`" ]
+# Avoid creating topic names that already exist.
+declare -A CURR
+for TOPIC in `$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
+do
+    CURR[$TOPIC]=1
+done
+for TOPIC in $TOPICS ; do
+    if [[ -z "${CURR[$TOPIC]}" ]]
     then
-        $KAFKA/kafka-topics.sh --create --topic $TOPIC_NAME --zookeeper localhost:2181 --partitions 1 --replication-factor 1
+        echo "[start_daemons.sh] Creating topic: $TOPIC"
+        $KAFKA/kafka-topics.sh --create --topic $TOPIC --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
 
-echo Ready to push data to ingestd, e.g. with:
-echo 'Trint -p example/*.bin'
+echo '[start_daemons.sh] Ready to push data to ingestd, e.g. with:'
+echo '[start_daemons.sh] Trint -p example/*.bin'
