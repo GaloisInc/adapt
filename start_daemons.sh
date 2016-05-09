@@ -33,7 +33,7 @@ pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; ech
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/
 
-TOPICS="in-finished ac ad dx px se ui ac-log ad-log dx-log in-log px-log se-log "
+TOPICS="ta2 in-finished ac ad dx px se ui ac-log ad-log dx-log in-log px-log se-log "
 
 # Avoid creating topic names that already exist.
 declare -A CURR
