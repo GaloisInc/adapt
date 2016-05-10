@@ -210,7 +210,7 @@ instance GraphId Text where
       args = paren $ BC.concat $ intersperse "," (labelKey : encodeQuoteText l : concatMap attrs ps)
   serializeOperation (InsertEdge l src dst ps)   = escapeChars call
     where
-       -- g.V(dst).has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
+       -- g.V(src).next().addEdge(edgeName, g.V(dst).next(), param1, val1, ...)
        call = BC.concat $ ["g.V(", encodeQuoteText src
                           , ").next().addEdge(", encodeQuoteText l
                                           , ", g.V(", encodeQuoteText dst, ").next(), "
