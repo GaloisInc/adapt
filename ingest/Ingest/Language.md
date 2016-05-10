@@ -132,9 +132,15 @@ output a list of anomaly score annotations attached to segment nodes in the grap
 
 The Activity Classifier (Ac) - Hoda
 ----------
-`Ac:: [[pattern-node],[pattern-to-base-edge]] > segment-identifier > [<activity-node,[activity-to-pattern-edge]>]`
+`Ac:: [segment-node] > [segment-identifier] > [<activity-node,[activity-to-segment-edge]>]`
 
-That is, Ac takes in the graph in the Bb and a segment identifier, and produces as output a list of activity nodes in the Bb and the edges that connect them to their component pattern nodes.
+That is, Ac takes in the graph in the Bb and a segment identifier, and produces as output a list of activity nodes in the Bb and the edges that connect them to their component segment nodes.
+An input set of base nodes is included by reference via the segment identifier.
+
+Unlike Dx, for example, Ac is a streaming component, making purely local decisions.
+It allocates a bounded amount of memory,
+queries Bb only for nodes within the segment,
+and has processing time proportional to segment size.
 
 The Diagnostic Engine (Dx) - Rui
 --------
