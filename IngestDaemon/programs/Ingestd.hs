@@ -172,7 +172,7 @@ mainLoop cfg =
         outTopic = cfg ^. outputTopic
         triTopic = cfg ^. triggerTopic
         logMsg   = void . BC.tryWriteChan logChan
-        logPXMsg = logMsg . ("ingestd[PX-Kafka thread]: " <>)
+        logPXMsg = logMsg . ("ingestd[PE-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
@@ -185,7 +185,8 @@ mainLoop cfg =
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan $
-     Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs)
+     do logTitan "Connecting to titan..."
+        Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs)
   where
   resHdl _ _ = return ()
 
@@ -209,7 +210,9 @@ runDB :: (Text -> IO ())
       -> (BoundedChan Statement)
       -> Titan.Connection
       -> IO ()
-runDB logTitan inputs conn = go reportInterval (0,0)
+runDB logTitan inputs conn =
+  do logTitan "Connected to titan."
+     go reportInterval (0,0)
  where
  reportInterval = 1000
 
