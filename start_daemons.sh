@@ -25,7 +25,12 @@ cd $ADAPT || exit 1
 # This takes about one second of CPU if no building is needed.
 (cd $ADAPT/ingest && make)
 
-# run supervisord (zookeeper, kafka, titan, ingestd)
+# Some applications over allocate and expect an allocate-on-use behavior as
+# typical of Linux VMM.  For this to work we need to enable over-allocation
+# on the VM.
+sudo sysctl -w vm.overcommit_memory=1
+
+# run supervisord (zookeeper, kafka, titan, ingestd, dashboad)
 pgrep supervisord > /dev/null || (set -x; sudo supervisord -c $supercfg; sleep 5; echo Started.)
 
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
