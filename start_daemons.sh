@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-echo "############# TC-IN-A-BOX Integretaed daemon execution system #################"
-
 # Starts daemons: supervisord, zookeeper, kafka, titan, ingestd
 
 # This script is like start.sh,
