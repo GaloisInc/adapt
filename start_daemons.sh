@@ -28,7 +28,7 @@ cd $ADAPT || exit 1
 (cd $ADAPT/ingest && make)
 
 # run supervisord (zookeeper, kafka, titan, ingestd)
-pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; echo Started.)
+pgrep supervisord > /dev/null || (set -x; sudo supervisord -c $supercfg; sleep 5; echo Started.)
 
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/

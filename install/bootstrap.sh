@@ -92,6 +92,7 @@ install_adapt_dependencies() {
                             python python3-setuptools \
                             supervisor unzip wget \
                             python-pip \
+                            git \
                             oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip3 install coverage flake8 \
@@ -122,12 +123,19 @@ function install_adapt() {
     ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
 }
 
-function link_adapt() {
-    ln -sf /vagrant $ADAPT_DIR
+function copy_adapt() {
+    CWD=$(pwd)
+    if [ -e $ADAPT_DIR ] ; then
+        cd $ADAPT_DIR || handle_error $LINENO
+        git pull || handle_error $LINENO
+    else
+        git clone --depth 1 /vagrant $ADAPT_DIR || handle_error $LINENO
+    fi
+    cd $CWD || handle_error $LINENO
 }
 
 mkdir -p $KAFKA_ROOT
 
-link_adapt
+copy_adapt
 install_adapt_dependencies
 install_adapt
