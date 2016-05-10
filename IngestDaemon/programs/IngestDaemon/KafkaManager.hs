@@ -100,7 +100,7 @@ kafkaInput host topic chan =
      mapM_ handleMsg bs
      if null bs
       then liftIO (threadDelay 100000) >> process offset
-      else process (offset+1)
+      else process (offset + fromIntegral (length bs))
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr
