@@ -234,13 +234,13 @@ encodeGremlinValue gv =
   case gv of
     GremlinString s -> encodeQuoteText s
     GremlinNum  n   -> BC.pack (show n)
-    GremlinMap xs   -> BC.concat ["[ "
+    GremlinMap xs   -> BC.concat ["'["
                                  , BC.concat (intersperse "," $ map renderKV xs)
-                                 , " ]"
+                                 , "]'"
                                  ]
-    GremlinList vs  -> BC.concat ["[ "
+    GremlinList vs  -> BC.concat ["'[ "
                                  , BC.concat (intersperse "," $ map encodeGremlinValue vs)
-                                 , " ]"
+                                 , " ]'"
                                  ]
   where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
 

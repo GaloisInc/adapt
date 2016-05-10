@@ -31,10 +31,8 @@ import           System.Random.TF
 import           System.Random.TF.Gen
 
 -- Operations represent gremlin-groovy commands such as:
--- assume: g = TinkerGraph.open()
---         t = g.traversal(standard())
--- * InsertVertex: g.addVertex(id, 'ident', 'prop1', 'val1', 'prop2', 'val2')
--- * InsertEdge: t.V(1).addE('ident',t.V(2))
+-- assume: graph = TinkerGraph.open()
+--         g = graph.traversal(standard())
 data Operation id = InsertVertex { label :: Text
                                  , properties :: [(Text,GremlinValue)]
                                  }
