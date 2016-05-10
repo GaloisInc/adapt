@@ -108,7 +108,7 @@ install_adapt_dependencies() {
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
-    sudo chown vagrant:vagrant /opt/*
+    sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 }
 
 function install_adapt() {
