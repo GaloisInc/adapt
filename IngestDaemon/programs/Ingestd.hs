@@ -198,11 +198,11 @@ persistant logMsg io =
         do logMsg ("Operation completed: " <> T.pack (show r))
            persistant logMsg io
       Right (Left e) ->
-        do logMsg ("Operation failed: " <> T.pack (show e))
+        do logMsg ("Operation failed (retry in 5s): " <> T.pack (show e))
            threadDelay 5000000
            persistant logMsg io
       Left (e::SomeException) ->
-        do logMsg ("Operation had an exception: " <> T.pack (show e))
+        do logMsg ("Operation had an exception (retry in 5s): " <> T.pack (show e))
            threadDelay 5000000
            persistant logMsg io
 

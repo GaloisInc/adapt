@@ -192,8 +192,9 @@ instance ToJSON GremlinValue where
     case gv of
       GremlinNum i    -> toJSON i
       GremlinString t -> toJSON t
-      GremlinList l   -> toJSON l
-      GremlinMap xs   -> toJSON (Map.fromList xs)
+      -- XXX We don't really support list or map properties currently!
+      GremlinList l   -> toJSON (show l)
+      GremlinMap xs   -> toJSON (show (Map.fromList xs))
 
 instance FromJSON RequestArgs where
   parseJSON (A.Object obj) =
@@ -221,9 +222,9 @@ instance GraphId Text where
   serializeOperation (InsertVertex l ps) = (cmd,env)
     where
        cmd = escapeChars call
-       -- g.addV(id, vectorName, param1, val1, param2, val2 ...)
+       -- g.addV('ident', vertexName, param1, val1, param2, val2 ...)
        call = T.unwords
-                [ "g.addV(id, l "
+                [ "g.addV('ident', l "
                 , if (not (null ps)) then "," else ""
                 , T.unwords $ intersperse "," (map mkParams [1..length ps])
                 , ")"
@@ -232,9 +233,9 @@ instance GraphId Text where
   serializeOperation (InsertEdge l src dst ps)   = (cmd, env)
     where
       cmd = escapeChars call
-       -- g.V(src).next().addEdge(edgeName, g.V(dst).next(), param1, val1, ...)
+       -- g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next(), param1, val1, ...)
       call = T.unwords
-              [ "g.V(src).next().addEdge(edgeName, g.V(dst).next() "
+              [ "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
               , ")"
