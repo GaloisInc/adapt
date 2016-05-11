@@ -125,6 +125,7 @@ function install_adapt() {
 
 function copy_adapt() {
     CWD=$(pwd)
+    sudo apt-get install git
     if [ -e $ADAPT_DIR ] ; then
         cd $ADAPT_DIR || handle_error $LINENO
         git pull || handle_error $LINENO
