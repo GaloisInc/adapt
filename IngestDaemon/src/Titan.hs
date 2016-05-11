@@ -192,8 +192,9 @@ instance ToJSON GremlinValue where
     case gv of
       GremlinNum i    -> toJSON i
       GremlinString t -> toJSON t
-      GremlinList l   -> toJSON l
-      GremlinMap xs   -> toJSON (Map.fromList xs)
+      -- XXX We don't really support list or map properties currently!
+      GremlinList l   -> toJSON (show l)
+      GremlinMap xs   -> toJSON (show (Map.fromList xs))
 
 instance FromJSON RequestArgs where
   parseJSON (A.Object obj) =
