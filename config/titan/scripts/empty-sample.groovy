@@ -26,6 +26,7 @@ graph = TitanFactory.open('cassandra:localhost')
 // graph.tx().commit()
 
 // Create the index
+graph.tx().rollback()
 mgmt = graph.openManagement()
 i = mgmt.getGraphIndex('byIdent')
 if(! i) {
@@ -35,6 +36,7 @@ if(! i) {
 	i = mgmt.getGraphIndex('byIdent')
 	ui = mgmt.updateIndex(i, SchemaAction.ENABLE_INDEX)
 	if(ui) { ui.get() }
+        mgmt.commit()
 
 	// Reindex the graph
 	mgmt = graph.openManagement()

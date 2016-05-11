@@ -48,6 +48,9 @@ install_kafka() {
     cd ${CWD} || handle_error $LINENO
 }
 
+remove_titan() {
+    sudo rm -rf $TITAN_SERVER_DIR || handle_error $LINENO
+}
 install_titan() {
     CWD=$(pwd)
     cd /opt || handle_error $LINENO
