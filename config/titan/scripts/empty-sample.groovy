@@ -33,13 +33,15 @@ if(! i) {
 	idKey = idKey ? idKey : mgmt.makePropertyKey('ident').dataType(String.class).make()
 	mgmt.buildIndex('byIdent',Vertex.class).addKey(idKey).buildCompositeIndex()
 	i = mgmt.getGraphIndex('byIdent')
-	mgmt.updateIndex(i, SchemaAction.ENABLE_INDEX).get()
+	ui = mgmt.updateIndex(i, SchemaAction.ENABLE_INDEX)
+	if(ui) { ui.get() }
 
 	// Reindex the graph
 	mgmt = graph.openManagement()
 	mgmt.awaitGraphIndexStatus(graph, 'byIdent').call()
 	i = mgmt.getGraphIndex('byIdent')
-	mgmt.updateIndex(i, SchemaAction.REINDEX).get()
+	ui = mgmt.updateIndex(i, SchemaAction.REINDEX)
+	if(ui) { ui.get() }
 	mgmt.commit()
 }
 mgmt.commit()
