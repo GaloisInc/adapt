@@ -18,6 +18,7 @@ import qualified Data.Foldable as F
 import           Data.Graph hiding (Node, Edge)
 import           Data.Int (Int32)
 import           Data.List (partition,intersperse,scanl')
+import           Data.List.Split (chunksOf)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes,isNothing, mapMaybe)
@@ -246,7 +247,7 @@ handleKafkaIngest c stmts =
      let topic = ta1_to_ta2_kafkaTopic c
          ms    = map (TopicAndMessage topic . makeMessage) stmts
      runKafka (mkKafkaState "adapt-trint-ta1-from-file" ("localhost", 9092))
-              (produceMessages ms)
+              (mapM_ produceMessages (chunksOf 128 ms))
      calmly $ printf "Sent %d statements to kafka[%s]." (length ms) (show topic)
      dbg    $ printf "\tBytes of CDM sent to kafka[ta2]: %d" (sum (map BS.length stmts))
  where
