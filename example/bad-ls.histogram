@@ -1,0 +1,10 @@
+   6325 EdgeEventAffectsFile
+    323 EdgeEventAffectsNetflow
+   1510 EdgeEventAffectsSubject
+  19492 EdgeEventCausesEvent
+     41 EdgeFileAffectsEvent
+   1528 EdgeSubjectHasparentSubject
+  11582 EdgeSubjectRunson
+   1528 NodeAgent
+   7611 NodeEntity
+  21020 NodeSubject
