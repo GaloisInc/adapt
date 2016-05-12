@@ -4,7 +4,9 @@
   19492 EdgeEventCausesEvent
      41 EdgeFileAffectsEvent
    1528 EdgeSubjectHasparentSubject
-  11582 EdgeSubjectRunson
-   1528 NodeAgent
-   7611 NodeEntity
-  21020 NodeSubject
+  11582 EdgeSubjectRunson       (relationship == EdgeSubjectRunson)
+   1528 NodeAgent		(type == agent)
+   7611 NodeEntity		(type `elem` [file, netflow, memory])
+  21020 NodeSubject		(type == subject)
+      0 NodeResource
+      0 NodeHost
