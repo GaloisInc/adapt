@@ -58,11 +58,17 @@ compileNode :: Node -> [Operation Text]
 compileNode n = [InsertVertex (nodeUID_base64 n) (propertiesOf n)]
 
 compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
-compileEdge (Edge {..}) =
-  return ([], [InsertEdge (T.pack $ show edgeRelationship) src dst []])
- where
-  src = uidToBase64 edgeSource
-  dst = uidToBase64 edgeDestination
+compileEdge e =
+  do euid <- newUID
+     let erel  = T.pack $ show (edgeRelationship e)
+         e1Lbl = "src-" <> erel
+         e2Lbl = "dst-" <> erel
+         eMe   = uidToBase64 euid
+         [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
+         v     = InsertVertex eMe [("relationship", GremlinString erel)]
+         eTo   = InsertEdge e1Lbl esrc eMe []
+         eFrom = InsertEdge e2Lbl eMe edst []
+     return ([v], [eTo, eFrom])
 
 class PropertiesOf a where
   propertiesOf :: a -> [(Text,GremlinValue)]
