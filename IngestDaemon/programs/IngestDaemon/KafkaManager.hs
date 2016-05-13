@@ -2,7 +2,8 @@
 module IngestDaemon.KafkaManager where
 
 import           Control.Concurrent
-import           Control.Concurrent.BoundedChan as BC
+import           Control.Concurrent.STM.TBChan as TB
+import           Control.Concurrent.STM (atomically)
 import           Control.Monad (forever)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Parallel.Strategies
@@ -25,7 +26,7 @@ import           CommonDataModel.Avro
 
 type Statement = Operation Text
 
-channelToKafka :: BoundedChan Text -> KafkaAddress -> TopicName -> IO (Either KafkaClientError ())
+channelToKafka :: TBChan Text -> KafkaAddress -> TopicName -> IO (Either KafkaClientError ())
 channelToKafka ch host topic =
  do r <- runKafka state oper
     case r of
@@ -35,7 +36,7 @@ channelToKafka ch host topic =
  where
  state = mkKafkaState "ingest-logging" host
  oper = forever $ do
-   m <- liftIO (BC.readChan ch)
+   m <- liftIO (atomically $ TB.readTBChan ch)
    produceMessages [TopicAndMessage topic $ makeMessage (T.encodeUtf8 m)]
 
 --------------------------------------------------------------------------------
@@ -43,8 +44,8 @@ channelToKafka ch host topic =
 
 -- We don't place node IDs on the queue for the first engagement, just
 -- a signal indicating KB is ready.
-finishIngestSignal :: KafkaAddress -> TopicName -> TopicName -> IO (Either KafkaClientError ())
-finishIngestSignal svr out ipt =
+finishIngestSignal :: IO () -> KafkaAddress -> TopicName -> TopicName -> IO (Either KafkaClientError ())
+finishIngestSignal finisher svr out ipt =
  do r <- runKafka state oper
     case r of
       Left err -> hPutStrLn stderr ("Kafka signaling failed: " ++ show err)
@@ -63,7 +64,8 @@ finishIngestSignal svr out ipt =
       else process (o + fromIntegral (length bs))
  propogateSignal b
   | BS.length b == 1 =
-     do emit ("Propogating control signal: " ++ show b)
+     do liftIO finisher
+        emit ("Propogating control signal: " ++ show b)
         produceMessages [TopicAndMessage out $ makeMessage b]
         return ()
   | otherwise =
@@ -79,7 +81,7 @@ getMessage topicNm offset =
 
 -- |Acquire CDM from a given kafka host/topic and place the decoded Adapt
 -- Schema values in the given channel.
-kafkaInput :: KafkaAddress -> TopicName -> BoundedChan Statement -> IO (Either KafkaClientError ())
+kafkaInput :: KafkaAddress -> TopicName -> TBChan Statement -> IO (Either KafkaClientError ())
 kafkaInput host topic chan =
   do r <- runKafka state oper
      return r
@@ -98,7 +100,7 @@ kafkaInput host topic chan =
                liftIO $ do
                   let nses = CDM.toSchema [cdmFmt]
                   ms <- compile nses
-                  BC.writeList2Chan chan ms
+                  mapM_ (atomically . TB.writeTBChan chan) ms
             Left err    -> emit (show err)
      mapM_ handleMsg bs
      if null bs

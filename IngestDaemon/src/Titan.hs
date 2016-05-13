@@ -11,6 +11,7 @@ module Titan
     -- * High level interface
   , withTitan, Titan.send, commit
   , DataMessage(..), ControlMessage(..), Message(..)
+  , Titan
     -- * Insertion
   , titan
   , TitanResult(..), isSuccess, isFailure
@@ -20,6 +21,7 @@ module Titan
   , ResultId(..)
   , GraphId(..)
   , GremlinValue(..)
+  , ConnectionException(..)
   ) where
 
 import           Control.Concurrent (forkIO)
@@ -94,11 +96,14 @@ withTitan (ServerInfo {..}) recvHdl mainOper =
  loop conn = do _ <- forkIO (forever (receive conn >>= flip recvHdl conn))
                 mainOper conn
 
-send :: GraphId id => Operation id -> Titan ()
-send op conn = WS.send conn (uncurry mkGremlinWSCommand (serializeOperation op))
+send :: GraphId id => Operation id -> Titan Text
+send op conn =
+ do let (req,uuid) = uncurry mkGremlinWSCommand (serializeOperation op)
+    WS.send conn req
+    return uuid
 
 commit :: Titan ()
-commit conn = WS.send conn (mkGremlinWSCommand "graph.tx().commit()" Map.empty)
+commit conn = WS.send conn (fst $ mkGremlinWSCommand "graph.tx().commit()" Map.empty)
 
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
@@ -135,14 +140,19 @@ titanWS ops conn =
  go :: GraphId id => Operation id -> IO ()
  go op =
    do let (cmd,bnd) = serializeOperation op
-      WS.send conn (mkGremlinWSCommand cmd bnd)
+      WS.send conn (fst $ mkGremlinWSCommand cmd bnd)
 
-mkGremlinWSCommand :: Text -> Env -> Message
-mkGremlinWSCommand cmd bnd = DataMessage $ Text (mkJSON cmd bnd)
+-- Make the data insertion command and return the request UUID string
+mkGremlinWSCommand :: Text -> Env -> (Message,Text)
+mkGremlinWSCommand cmd bnd =
+  let req = mkRequest cmd bnd
+  in (DataMessage $ Text (A.encode req), requestId req)
 
 mkJSON :: Text -> Env -> BL.ByteString
-mkJSON cmd bnd =
-    A.encode
+mkJSON cmd bnd = A.encode (mkRequest cmd bnd)
+
+mkRequest :: Text -> Env -> GremlinRequest
+mkRequest cmd bnd =
       Req { requestId = UUID.toText (mkHashedUUID cmd bnd)
           , op        = "eval"
           , processor = ""
