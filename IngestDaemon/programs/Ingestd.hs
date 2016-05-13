@@ -8,7 +8,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 -- | Ingestd is the ingest daemon which takes TA-1 data from Kafka queue,
 -- decodes it as Avro-encodedCDM, translates to Adapt Schema, uploads to
--- Titan, and pushes node IDs to PX via Kafka.
+-- Titan, and pushes node IDs to PE via Kafka.
 module Main where
 
 import           Control.Applicative ((<$>))
@@ -88,7 +88,7 @@ defaultConfig = Config
   , _kafkaInternal = defaultKafka
   , _kafkaExternal = defaultKafka
   , _inputTopics   = []
-  , _outputTopic   = "px"
+  , _outputTopic   = "pe"
   , _triggerTopic  = "in-finished"
   , _titanServer   = Titan.defaultServer
   }
@@ -112,7 +112,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                     $ ReqArg "Topic" $
                         \str s -> Right $ s & inputTopics %~ (fromString str:)
                   , Option ['o'] ["outputTopic"]
-                    "Set a PX topic to be used as output"
+                    "Set a PE topic to be used as output"
                     $ ReqArg "Topic" $
                         \str s -> Right (s & outputTopic .~ fromString str)
                   , Option ['f'] ["finish-message-topic"]
@@ -128,7 +128,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                                 Just res -> Right (s & titanServer .~ res)
                                 Nothing  -> Left "Could not parse host:port string."
                   , Option ['k'] ["kafka-internal"]
-                    "Set the kafka server (for logging and px topics)"
+                    "Set the kafka server (for logging and pe topics)"
                     $ ReqArg "host:port" $
                         \str s ->
                             let svr = parseHostPort str
@@ -172,7 +172,6 @@ mainLoop cfg =
         outTopic = cfg ^. outputTopic
         triTopic = cfg ^. triggerTopic
         logMsg   = void . BC.tryWriteChan logChan
-        logPXMsg = logMsg . ("ingestd[PE-Kafka thread]: " <>)
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
