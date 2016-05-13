@@ -10,3 +10,7 @@
 ## Attach Anomaly Scores to the Segment Nodes
 
 `$ python3 ../feature_extractor/attach_scores.py seg_spec_features_score.csv`
+
+## Unit Test
+
+`$ python3 UnitTest.py`

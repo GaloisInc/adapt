@@ -15,9 +15,10 @@ def run_query(query, bindings={}):
     return result[0].data
 
 with open(in_file, 'r') as csvfile:
-	reader = csv.reader(csvfile, delimiter=',')
-	for row in reader:
-        run_query("g.V().has('vertexType','segment').hasLabel('" + str(row[0]) + "')[0].property('anomalyScore','" + str(row[8]) + "')")
+    reader = csv.reader(csvfile, delimiter=',')
+    for row in reader:
+        if row[0] != 'segment_id':
+            run_query("g.V().has('vertexType','segment').hasLabel('" + str(row[0]) + "')[0].property('anomalyScore','" + str(row[8]) + "')")
     print('Anomaly score attach finished')
 
 loop.run_until_complete(gc.close())
