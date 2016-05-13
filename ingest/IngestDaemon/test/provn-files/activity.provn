@@ -1,8 +1,0 @@
-document
-
-prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>
-prefix data <http://spade.csl.sri.com/#>
-
-activity(data:9cb809aeea3b4236f330a19ddd0c20881508a4dd22932a232f6e71177feee0cc,[ tc:uid="uidcc",tc:programName="sudo",tc:pid="7561",tc:source="/dev/audit",tc:ppid="7555",tc:group="groupCC", tc:time="2015-09-28T01:06:56Z"])
-
-endDocument

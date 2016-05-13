@@ -2,13 +2,10 @@ resolver: nightly-2015-11-04
 packages:
 - '.'
 - ../Ingest
-- location:
-    git: https://github.com/Gabriel439/milena.git
-    commit: d98b0891f7c3f333913fbb27ba20aa5aaac4260f
 extra-deps:
 - dotgen-0.4.2
 - simple-get-opt-0.1.0.0
-- milena-0.5.0.0
+- milena-0.5.0.1
 - uuid-1.3.11
 - BoundedChan-1.0.3.0
 - pure-zlib-0.4

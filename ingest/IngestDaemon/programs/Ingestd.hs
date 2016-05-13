@@ -11,49 +11,29 @@
 -- Titan, and pushes node IDs to PE via Kafka.
 module Main where
 
-import           Control.Applicative ((<$>))
-import           Control.Concurrent
+import           Control.Concurrent (forkIO)
 import           Control.Concurrent (threadDelay)
+import           Control.Concurrent.MVar
 import           Control.Concurrent.STM.TBChan as TB
 import           Control.Concurrent.STM (atomically)
-import           Control.Concurrent.MVar
 import           Control.Exception as X
 import           Control.Lens
-import           Control.Monad (when, forever, void)
 import           Data.Aeson (FromJSON(..), Value(..), decode, (.:))
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Lazy as ByteString
-import qualified Data.Foldable as F
-import           Data.Graph hiding (Node, Edge)
-import           Data.Int (Int32)
 import           Data.Int (Int64)
-import           Data.List (partition,intersperse)
-import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HMap
-import           Data.Maybe (maybeToList)
 import           Data.Monoid ((<>))
-import qualified Data.Set as Set
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import qualified Data.Text.Lazy as Text
-import qualified Data.Text.Lazy.Encoding as Text
-import qualified Data.Text.Lazy.IO as Text
-import           Data.Time (UTCTime, addUTCTime, getCurrentTime)
+import           Data.Time (getCurrentTime)
 import           MonadLib        hiding (handle)
-import           MonadLib.Monads hiding (handle)
 import           Network.Kafka as K
 import           Network.Kafka.Protocol as K
-import           Numeric (showHex)
 import           Prelude
 import           SimpleGetOpt
-import           System.Entropy (getEntropy)
-import           System.Exit (exitFailure)
 import           System.IO (stderr)
 import           Text.Printf
 import           Text.Read (readMaybe)
@@ -100,7 +80,7 @@ defaultConfig = Config
 opts :: OptSpec Config
 opts = OptSpec { progDefaults  = defaultConfig
                , progParamDocs = []
-               , progParams    = \_ s -> Left "No extra parameters are accepted."
+               , progParams    = \_ _ -> Left "No extra parameters are accepted."
                , progOptions   =
                   [ Option ['v'] ["verbose"]
                     "Verbose debugging messages"
@@ -166,6 +146,23 @@ main =
       then dumpUsage opts
       else mainLoop c
 
+-- The main loop of ingestd is admittedly a little hairy.  The tasks are:
+--
+--  * Fork off threads to receive from Kafka
+--    * Inputs channel: decode the input from ta1, put that data on a more
+--                      convenient channel. Inputs might be from an
+--                      internal Kafka server (on this same machine) or
+--                      external/ta3 machine.
+--    * Trigger: The trigger is a one-byte message from the user to
+--               indicate all the data has been ingested into the database.
+--               Once received, the 'finisher' checks the list of failed
+--               operations, retry these operations, then returns to allow
+--               signaling of PE via the Kafka 'outTopic'.
+--    * Logs: Much of the logging is shunted, via Kafka 'in-log' topic,
+--            to the dashboard.  In adapt-in-a-box, stderr is sent to a
+--            log file (/tmp/ingestd-stderr*).
+--    * reqStatus: This is the mutable map of UUID->operations that have
+--                 not received a success message.
 mainLoop :: Config -> IO ()
 mainLoop cfg =
  do inputs  <- newTBChanIO inputQueueSize   :: IO (TBChan (Operation Text))
@@ -180,7 +177,7 @@ mainLoop cfg =
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
-        forkPersist log = void . forkIO . persistant log
+        forkPersist lg = void . forkIO . persistant lg
     forkPersist logMsg $
       finishIngestSignal (finisher reqStatus inputs) srvInt outTopic triTopic
     _ <- maybe (forkPersist logStderr
@@ -192,7 +189,6 @@ mainLoop cfg =
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan (titanManager logTitan (cfg ^. titanServer) inputs reqStatus)
   where
-  resHdl _ _ = return ()
   finisher reqStatus inputs =
    do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
@@ -227,7 +223,7 @@ titanManager :: (Text -> IO ())
              -> IO (Either ConnectionException ())
 titanManager logTitan svr inputs reqStatus =
  do logTitan "Connecting to titan..."
-    Titan.withTitan svr (handleResponses reqStatus inputs)
+    Titan.withTitan svr (handleResponses reqStatus)
                         (runDB logTitan inputs reqStatus)
 
 data Response = Response { respUUID :: Text, respCode :: Int }
@@ -235,15 +231,18 @@ data Response = Response { respUUID :: Text, respCode :: Int }
 instance FromJSON Response where
   parseJSON (Object obj) =
     do rid         <- obj .: ("requestId" :: Text)
-       Object stat <- obj .: ("status" :: Text)
-       cd          <- stat .: ("code" :: Text)
-       return (Response rid cd)
+       mstat <- obj .: ("status" :: Text)
+       case mstat of
+        Object stat ->
+          do cd          <- stat .: ("code" :: Text)
+             return (Response rid cd)
+        _ -> fail "Titan response field 'status' must be an object"
+  parseJSON _ = fail "Titan JSON response must be an object"
 
 handleResponses :: MVar (HashMap Text Statement)
-                -> TBChan Statement
                 -> Titan.Message
                 -> Titan.Titan ()
-handleResponses mp chan resp _ =
+handleResponses mp resp _ =
   case resp of
     ControlMessage _ -> return ()
     DataMessage dm   ->
@@ -274,15 +273,15 @@ runDB logTitan inputs mp conn =
  go ci 0 !cnts@(!nrE,!nrV) =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
      go ci reportInterval cnts
- go 0 ri !cnts@(!nrE,!nrV) =
+ go 0 ri cnts =
   do Titan.commit conn
      threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
      go commitInterval ri cnts
  go ci ri !(!nrE,!nrV) =
-  do op <- atomically (TB.readTBChan inputs)
-     uuid <- Titan.send op conn
-     modifyMVar_ mp (pure . HMap.insert uuid op)
-     let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
+  do opr <- atomically (TB.readTBChan inputs)
+     uuid <- Titan.send opr conn
+     modifyMVar_ mp (pure . HMap.insert uuid opr)
+     let (nrE2,nrV2) = if isVertex opr then (nrE,nrV+1) else (nrE+1,nrV)
      go (ci - 1) (ri - 1) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
