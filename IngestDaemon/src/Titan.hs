@@ -143,7 +143,7 @@ mkGremlinWSCommand cmd bnd = DataMessage $ Text (mkJSON cmd bnd)
 mkJSON :: Text -> Env -> BL.ByteString
 mkJSON cmd bnd =
     A.encode
-      Req { requestId = UUID.toText (mkHashedUUID cmd)
+      Req { requestId = UUID.toText (mkHashedUUID cmd bnd)
           , op        = "eval"
           , processor = ""
           , args = ReqArgs { gremlin  = cmd
@@ -152,10 +152,11 @@ mkJSON cmd bnd =
                            }
           }
 
-mkHashedUUID :: Text -> UUID.UUID
-mkHashedUUID t =
+mkHashedUUID :: Text -> Env -> UUID.UUID
+mkHashedUUID t env =
   maybe (error "Impossible uuid decode failure") id
-        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 t)))))
+        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 unique)))))
+  where unique = T.concat $ t : map (T.pack . show) (Map.toList env)
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
