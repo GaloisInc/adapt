@@ -254,9 +254,8 @@ handleResponses mp chan resp _ =
  where
  go :: Maybe Response -> IO ()
  go (Just (Response uuid code))
-  | code == 597 = return () -- retain 597 failures as they match the
-                            -- Edge -> non-node exception.
-  | otherwise   = modifyMVar_ mp (pure . HMap.delete uuid)
+  | code == 200 = modifyMVar_ mp (pure . HMap.delete uuid)
+  | otherwise = return ()   -- retain errors for later retry
  go Nothing = return ()
 
 runDB :: (Text -> IO ())

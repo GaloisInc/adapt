@@ -166,7 +166,8 @@ main =
   do c <- getOpts opts
      if help c
       then dumpUsage opts
-      else mapM_ (handleFile c) (files c)
+      else do mapM_ (handleFile c) (files c)
+              when  (finished c)  (sendFinishedSignal c)
 
 handleFile :: Config -> File -> IO ()
 handleFile c fl = do
@@ -211,7 +212,6 @@ processStmts c fp res@(ns,es) stmtBS
       when  (ast c)       (handleAstGeneration c fp res)
       when  (pushKafka c) (handleKafkaIngest c stmtBS)
       maybe (return ())   (handleUpload c res) (upload c)
-      when  (finished c)  (sendFinishedSignal c)
 
 handleUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO ()
 handleUpload c res r =

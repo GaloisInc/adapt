@@ -64,8 +64,10 @@ finishIngestSignal finisher svr out ipt =
       else process (o + fromIntegral (length bs))
  propogateSignal b
   | BS.length b == 1 =
-     do liftIO finisher
-        emit ("Propogating control signal: " ++ show b)
+     do emit ("Received control signal: " ++ show (BS.unpack b))
+        emit "Calling the finisher to clean up."
+        liftIO finisher
+        emit ("Propogating control signal: " ++ show (BS.unpack b))
         produceMessages [TopicAndMessage out $ makeMessage b]
         return ()
   | otherwise =
