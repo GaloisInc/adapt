@@ -115,7 +115,7 @@ install_adapt_dependencies() {
 }
 
 function install_adapt() {
-    # Installs: In, PX, Se, AD, AC,DX
+    # Installs: In, PE, Se, AD, AC,DX
     export PATH=$PATH:$HOME/.local/bin
 
     # Install ingest system
