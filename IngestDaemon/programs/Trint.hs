@@ -68,8 +68,9 @@ data Config = Config { lintOnly   :: Bool
                      , upload     :: Maybe ServerInfo
                      , pushKafka  :: Bool
                      , files      :: [File]
+                     , finished   :: Bool
                      , ta1_to_ta2_kafkaTopic :: TopicName
-                     , ingest_to_px_kafkaTopic :: TopicName
+                     , ingest_control_topic :: TopicName
                      } deriving (Show)
 
 data File = ProvFile { getFP :: FilePath } | CDMFile { getFP :: FilePath }
@@ -93,8 +94,9 @@ defaultConfig = Config
   , upload    = Nothing
   , pushKafka = False
   , files = []
+  , finished = False
   , ta1_to_ta2_kafkaTopic = "ta2"
-  , ingest_to_px_kafkaTopic = "px"
+  , ingest_control_topic = "in-finished"
   }
 
 includeFile :: Config -> FilePath -> Either String Config
@@ -129,10 +131,13 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Set the kafka topic for the TA1-TA2 comms"
                     $ ReqArg "Topic" $
                         \tp s -> Right s { ta1_to_ta2_kafkaTopic = fromString tp }
-                  , Option [] ["ingest-to-px-kafka-topic"]
-                    "Set the kafka topic for the ingester to inform PX of new nodes."
+                  , Option ['f'] ["finished"]
+                    "Send the 'finished' signal to ingestd"
+                    $ NoArg $ \s -> Right s { finished = True }
+                  , Option [] ["ingest-control-topic"]
+                    "Set the kafka topic for ingester control messages."
                     $ ReqArg "Topic" $
-                        \tp s -> Right s { ingest_to_px_kafkaTopic = fromString tp }
+                        \tp s -> Right s { ingest_control_topic = fromString tp }
                   , Option ['u'] ["upload"]
                     "Uploads the data by inserting it into a Titan database using gremlin."
                     $ OptArg "Database host" $
@@ -206,14 +211,20 @@ processStmts c fp res@(ns,es) stmtBS
       when  (ast c)       (handleAstGeneration c fp res)
       when  (pushKafka c) (handleKafkaIngest c stmtBS)
       maybe (return ())   (handleUpload c res) (upload c)
+      when  (finished c)  (sendFinishedSignal c)
 
 handleUpload :: Config -> ([Node],[Edge]) -> ServerInfo -> IO ()
 handleUpload c res r =
    do vses <- doUpload c res r
       calmly $ printf "Uploaded %d verticies, %d edges, to Titan."
                       (length (fst vses)) (length (snd vses))
-      result <- sendStatus (ingest_to_px_kafkaTopic c) Done
-      either (calmly . show) (dbg . show) result
+ where
+  calmly s = unless (quiet c) (putStrLn s)
+
+sendFinishedSignal :: Config -> IO ()
+sendFinishedSignal c =
+ do result <- sendStatus (ingest_control_topic c) Done
+    either (calmly . show) (dbg . show) result
  where
   calmly s = unless (quiet c) (putStrLn s)
   dbg s    = when (verbose c) (putStrLn s)

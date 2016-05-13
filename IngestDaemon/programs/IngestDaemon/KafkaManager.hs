@@ -60,12 +60,15 @@ finishIngestSignal svr out ipt =
      mapM_ propogateSignal bs
      if null bs
       then liftIO (threadDelay 100000) >> process o
-      else process (o+1)
+      else process (o + fromIntegral (length bs))
  propogateSignal b
   | BS.length b == 1 =
-     do produceMessages [TopicAndMessage out $ makeMessage b]
+     do emit ("Propogating control signal: " ++ show b)
+        produceMessages [TopicAndMessage out $ makeMessage b]
         return ()
-  | otherwise = return () -- First engagement: the only valid signals are 0,1
+  | otherwise =
+      emit ("Invalid control signal: " ++ show b)
+ emit = liftIO . hPutStrLn stderr
 
 getMessage :: TopicName -> Offset -> Kafka [ByteString]
 getMessage topicNm offset =
