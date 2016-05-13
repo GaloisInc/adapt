@@ -11,51 +11,51 @@
 -- Titan, and pushes node IDs to PX via Kafka.
 module Main where
 
-import Prelude
-import SimpleGetOpt
-import Control.Applicative ((<$>))
-import Control.Monad (when, forever, void)
-import Control.Exception as X
-import Data.Int (Int32)
-import Data.Monoid ((<>))
-import qualified Data.Foldable as F
-import Data.Maybe (maybeToList)
-import Data.List (partition,intersperse)
-import Data.Graph hiding (Node, Edge)
-import Data.Int (Int64)
-import Data.Time (UTCTime, addUTCTime, getCurrentTime)
-import Text.Printf
-import Text.Read (readMaybe)
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import           Data.Map (Map)
-import Numeric (showHex)
-import Data.Binary (encode,decode)
-import System.Entropy (getEntropy)
-import MonadLib        hiding (handle)
-import MonadLib.Monads hiding (handle)
-import Data.Text (Text)
-import Control.Lens
-import Data.String
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as Text
-import qualified Data.Text.Lazy.IO as Text
-import qualified Data.Text.Lazy.Encoding as Text
+import           Control.Applicative ((<$>))
+import           Control.Concurrent
+import           Control.Concurrent (threadDelay)
+import           Control.Concurrent.BoundedChan as BC
+import           Control.Exception as X
+import           Control.Lens
+import           Control.Monad (when, forever, void)
+import           Data.Binary (encode,decode)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.ByteString.Base64 as B64
-import System.Exit (exitFailure)
-import System.IO (stderr)
-import Control.Concurrent
-import Control.Concurrent.BoundedChan as BC
+import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.Foldable as F
+import           Data.Graph hiding (Node, Edge)
+import           Data.Int (Int32)
+import           Data.Int (Int64)
+import           Data.List (partition,intersperse)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (maybeToList)
+import           Data.Monoid ((<>))
+import qualified Data.Set as Set
+import           Data.String
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as Text
+import qualified Data.Text.Lazy.Encoding as Text
+import qualified Data.Text.Lazy.IO as Text
+import           Data.Time (UTCTime, addUTCTime, getCurrentTime)
+import           MonadLib        hiding (handle)
+import           MonadLib.Monads hiding (handle)
+import           Network.Kafka as K
+import           Network.Kafka.Protocol as K
+import           Numeric (showHex)
+import           Prelude
+import           SimpleGetOpt
+import           System.Entropy (getEntropy)
+import           System.Exit (exitFailure)
+import           System.IO (stderr)
+import           Text.Printf
+import           Text.Read (readMaybe)
 
-import Network.Kafka as K
-import Network.Kafka.Protocol as K
-
-import Titan
-import IngestDaemon.KafkaManager
+import           Titan
+import           IngestDaemon.KafkaManager
 
 data Config =
       Config { _logTopic      :: Maybe TopicName
@@ -212,15 +212,17 @@ runDB :: (Text -> IO ())
       -> IO ()
 runDB logTitan inputs conn =
   do logTitan "Connected to titan."
-     go reportInterval (0,0)
+     go commitInterval (0,0)
  where
- reportInterval = 1000
+ commitInterval = 100
 
  go :: Int -> (Int64,Int64) -> IO ()
  go 0 !cnts@(!nrE,!nrV) =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
-     go reportInterval cnts
- go ival (nrE,nrV) =
+     Titan.commit conn
+     threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
+     go commitInterval cnts
+ go ival !(!nrE,!nrV) =
   do op <- BC.readChan inputs
      Titan.send op conn
      let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
