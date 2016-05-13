@@ -1,17 +1,16 @@
 
-## Feature Extraction
+# Build Anomaly Detector
 
-`$ python3 ../feature_extractor/extract_features.py seg_spec_features.csv`
+```
+$ cd ../osu_iforest
+$ make
+```
 
-## Anomaly Score Calculation
+# Run Anomaly Detection Module
 
-`$ ./../osu_iforest/iforest.exe -i seg_spec_features.csv -o seg_spec_features_score.csv -m 1-3 -t 100 -s 100`
+`$ python3 StartAD.py`
 
-## Attach Anomaly Scores to the Segment Nodes
 
-`$ python3 ../feature_extractor/attach_scores.py seg_spec_features_score.csv`
+# Test Only Anomaly Detection Module (No interaction with other module)
 
-## Unit Test
-
-`$ python3 UnitTest.py`
-
+`$ ./start.sh`
