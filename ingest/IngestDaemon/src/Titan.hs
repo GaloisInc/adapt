@@ -9,7 +9,7 @@ module Titan
   , defaultServer
   , Operation(..)
     -- * High level interface
-  , withTitan, Titan.send
+  , withTitan, Titan.send, commit
   , DataMessage(..), ControlMessage(..), Message(..)
     -- * Insertion
   , titan
@@ -97,6 +97,9 @@ withTitan (ServerInfo {..}) recvHdl mainOper =
 send :: GraphId id => Operation id -> Titan ()
 send op conn = WS.send conn (uncurry mkGremlinWSCommand (serializeOperation op))
 
+commit :: Titan ()
+commit conn = WS.send conn (mkGremlinWSCommand "graph.tx().commit()" Map.empty)
+
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
 -- titan write buffer filling up then blocking while evaluating an
@@ -140,7 +143,7 @@ mkGremlinWSCommand cmd bnd = DataMessage $ Text (mkJSON cmd bnd)
 mkJSON :: Text -> Env -> BL.ByteString
 mkJSON cmd bnd =
     A.encode
-      Req { requestId = UUID.toText (mkHashedUUID cmd)
+      Req { requestId = UUID.toText (mkHashedUUID cmd bnd)
           , op        = "eval"
           , processor = ""
           , args = ReqArgs { gremlin  = cmd
@@ -149,10 +152,11 @@ mkJSON cmd bnd =
                            }
           }
 
-mkHashedUUID :: Text -> UUID.UUID
-mkHashedUUID t =
+mkHashedUUID :: Text -> Env -> UUID.UUID
+mkHashedUUID t env =
   maybe (error "Impossible uuid decode failure") id
-        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 t)))))
+        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 unique)))))
+  where unique = T.concat $ t : map (T.pack . show) (Map.toList env)
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
