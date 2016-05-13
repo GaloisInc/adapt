@@ -2,6 +2,7 @@
 
 import asyncio
 from aiogremlin import GremlinClient
+from kafka import KafkaConsumer
 
 QUERY="g.V().count()"
 bad_ls_expected_result=70960
@@ -16,6 +17,10 @@ bad_ls_expected_result=70960
 QUERIES = []
 
 if __name__ == '__main__':
+    chan = KafkaConsumer('pe')
+    msg  = next(chan)
+    print ("Received a signal: ", msg)
+
     loop = asyncio.get_event_loop()
     gc = GremlinClient(loop=loop)
 
