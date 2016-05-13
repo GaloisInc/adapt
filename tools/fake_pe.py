@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     execute = gc.execute(QUERY)
     result = loop.run_until_complete(execute)
-    print("total: ", result[0].data[0])
+    print("total nodes: ", result[0].data[0])
     print("success rate: ", result[0].data[0] / bad_ls_expected_result)
 
     loop.run_until_complete(gc.close())
