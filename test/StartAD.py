@@ -14,12 +14,15 @@ def produce(msg):
 
 def consume():
     for msg in consumer:
-        if msg == b'1':
+        print("Received: " + str(msg))
+        if msg.value == b'1':
             produce(b'0')
             print("Starting Anomaly Detection")
             os.system('./start.sh')
             print("Finished Anomaly Detection")
             produce(b'1')
+            print('Waiting for segmenter signal')
 
 print('Waiting for segmenter signal')
 consume()
+
