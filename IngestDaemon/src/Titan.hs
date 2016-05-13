@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ParallelListComp    #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Titan
   ( -- * Types
     ServerInfo(..)
@@ -31,8 +31,6 @@ import           Crypto.Hash.SHA256 (hash)
 import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.List (intersperse)
 import           Data.List.Split (chunksOf)
@@ -55,9 +53,6 @@ data ServerInfo = ServerInfo { host     :: String
 
 defaultServer :: ServerInfo
 defaultServer = ServerInfo "localhost" 8182
-
-labelKey :: ByteString
-labelKey = "id"
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
@@ -148,9 +143,6 @@ mkGremlinWSCommand cmd bnd =
   let req = mkRequest cmd bnd
   in (DataMessage $ Text (A.encode req), requestId req)
 
-mkJSON :: Text -> Env -> BL.ByteString
-mkJSON cmd bnd = A.encode (mkRequest cmd bnd)
-
 mkRequest :: Text -> Env -> GremlinRequest
 mkRequest cmd bnd =
       Req { requestId = UUID.toText (mkHashedUUID cmd bnd)
@@ -205,10 +197,7 @@ instance ToJSON GremlinValue where
   toJSON gv =
     case gv of
       GremlinNum i    -> toJSON i
-      GremlinString t -> toJSON t
-      -- XXX We don't really support list or map properties currently!
-      GremlinList l   -> toJSON (show l)
-      GremlinMap xs   -> toJSON (show (Map.fromList xs))
+      x               -> toJSON (encodeGremlinValue x)
 
 instance FromJSON RequestArgs where
   parseJSON (A.Object obj) =
@@ -278,9 +267,6 @@ encodeGremlinValue gv =
 
 quote :: Text -> Text
 quote b = T.concat ["\'", b, "\'"]
-
-paren :: Text -> Text
-paren b = T.concat ["(", b, ")"]
 
 mkBinding :: [(Text, GremlinValue)] -> [(Text, Value)]
 mkBinding pvs =

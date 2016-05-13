@@ -26,9 +26,6 @@ import qualified Data.Text.Encoding as T
 import           Data.Time
 import           Schema
 import           System.Entropy (getEntropy)
-import           System.Random (randoms,randomR)
-import           System.Random.TF
-import           System.Random.TF.Gen
 
 -- Operations represent gremlin-groovy commands such as:
 -- assume: graph = TinkerGraph.open()
@@ -81,9 +78,6 @@ instance PropertiesOf Node where
     NodeSubject subject   -> propertiesOf subject
     NodeHost host         -> propertiesOf host
     NodeAgent agent       -> propertiesOf agent
-
-stringOf :: Show a => a -> GremlinValue
-stringOf  = GremlinString . T.toLower . T.pack . show
 
 enumOf :: Enum a => a -> GremlinValue
 enumOf = GremlinNum . fromIntegral . fromEnum
@@ -146,9 +140,9 @@ instance PropertiesOf SubjectType where
          [subjTy "unit"]
        SubjectBlock      ->
          [subjTy "block"]
-       SubjectEvent et s  ->
+       SubjectEvent et sx  ->
          [subjTy "event", ("eventType", enumOf et) ]
-          ++ F.toList ((("sequence",) . gremlinNum) <$> s)
+          ++ F.toList ((("sequence",) . gremlinNum) <$> sx)
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)
