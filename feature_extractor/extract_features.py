@@ -23,10 +23,9 @@ def _insert_node(label, vertex_type, *av_pairs):
     gremlin += ')'
     return run_query(gremlin, bindings)
 
-
+idx = [i for i in range(1,102,10)]
 def insert_dummy_segment_nodes():
     print("Inserting dummy segment nodes")
-    idx = [i for i in range(1,102,10)]
     for i in range(0,10):
         _insert_node('seg_' + str(i), 'segment', ('rangeStart', idx[i]), ('rangeEnd', idx[i+1]))
 
@@ -61,13 +60,13 @@ def extract_and_attach_features():
 def write_features_to_file(out_file):
     print("Writing features to file: "+ out_file)
     f = open(out_file, "w")
-    f.write("segment_id,segment_type")
+    f.write("segment_id,segment_type,segment_type_instance")
     for h in f_h:
         f.write("," + h)
     f.write("\n")
     n_seg_v = run_query("g.V().has('vertexType','segment').count()")[0]
     for i in range(0,n_seg_v):
-        f.write("seg_" + str(i) + ",VRangeType")
+        f.write("seg_" + str(i) + ",VRangeType," + str(idx[i]) + "-" + str(idx[i+1]))
         for j in range(0,len(f_h)):
             f.write("," + str(run_query("g.V().has('vertexType','segment').hasLabel('seg_" + str(i) + "')[0].values('" + f_h[j] + "')")[0]))
         f.write("\n")    
@@ -80,6 +79,6 @@ in_file = sys.argv[1]
 # main
 insert_dummy_segment_nodes()
 extract_and_attach_features()
-write_features_to_file('')
+write_features_to_file(in_file)
 loop.run_until_complete(gc.close())
 loop.close()
