@@ -212,21 +212,24 @@ runDB :: (Text -> IO ())
       -> IO ()
 runDB logTitan inputs conn =
   do logTitan "Connected to titan."
-     go commitInterval (0,0)
+     go commitInterval reportInterval (0,0)
  where
- commitInterval = 100
+ commitInterval = 1
+ reportInterval = 1000
 
- go :: Int -> (Int64,Int64) -> IO ()
- go 0 !cnts@(!nrE,!nrV) =
+ go :: Int -> Int -> (Int64,Int64) -> IO ()
+ go ci 0 !cnts@(!nrE,!nrV) =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
-     Titan.commit conn
+     go ci reportInterval cnts
+ go 0 ri !cnts@(!nrE,!nrV) =
+  do Titan.commit conn
      threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
-     go commitInterval cnts
- go ival !(!nrE,!nrV) =
+     go commitInterval ri cnts
+ go ci ri !(!nrE,!nrV) =
   do op <- BC.readChan inputs
      Titan.send op conn
      let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
-     go (ival-1) (nrE2,nrV2)
+     go (ci - 1) (ri - 1) (nrE2,nrV2)
 
 isVertex :: Operation a -> Bool
 isVertex (InsertVertex _ _) = True
