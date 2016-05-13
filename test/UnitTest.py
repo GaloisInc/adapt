@@ -14,7 +14,7 @@ def run_query(query, bindings={}):
 n_seg_nodes = run_query("g.V().has('vertexType','segment').count()")[0]
 n_nodes_attach = run_query("g.V().has('anomalyScore').count()")[0]
 assert n_seg_nodes == n_nodes_attach, "Anomaly score not attached on all segment nodes"
-print("Unit Test PASSED!")
+print("POST Test PASSED!")
 
 loop.run_until_complete(gc.close())
 loop.close()

@@ -10,19 +10,20 @@ producer = SimpleProducer(kafka)
 consumer = KafkaConsumer('ad', bootstrap_servers=[kafkaServer])
 
 def produce(msg):
-    producer.send_messages('ac', msg)
+    res = producer.send_messages('ac', msg)
+    print(res) 
 
 def consume():
     for msg in consumer:
-        print("Received: " + str(msg))
+        print(msg)
         if msg.value == b'1':
             produce(b'0')
             print("Starting Anomaly Detection")
             os.system('./start.sh')
             print("Finished Anomaly Detection")
             produce(b'1')
-            print('Waiting for segmenter signal')
+            break
 
-print('Waiting for segmenter signal')
+print('Waiting for signal from segmenter...')
 consume()
 
