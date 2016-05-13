@@ -6,7 +6,6 @@ import           Control.Concurrent.STM.TBChan as TB
 import           Control.Concurrent.STM (atomically)
 import           Control.Monad (forever)
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Parallel.Strategies
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -19,7 +18,6 @@ import           Network.Kafka.Producer
 import           Network.Kafka.Consumer
 import           Network.Kafka.Protocol as Kafka
 
-import           Schema
 import           CompileSchema
 import           CommonDataModel as CDM
 import           CommonDataModel.Avro
@@ -68,11 +66,10 @@ finishIngestSignal finisher svr out ipt =
         emit "Calling the finisher to clean up."
         liftIO finisher
         emit ("Propogating control signal: " ++ show (BS.unpack b))
-        produceMessages [TopicAndMessage out $ makeMessage b]
+        _ <- produceMessages [TopicAndMessage out $ makeMessage b]
         return ()
   | otherwise =
       emit ("Invalid control signal: " ++ show b)
- emit = liftIO . hPutStrLn stderr
 
 getMessage :: TopicName -> Offset -> Kafka [ByteString]
 getMessage topicNm offset =
