@@ -9,7 +9,7 @@ module Titan
   , defaultServer
   , Operation(..)
     -- * High level interface
-  , withTitan, Titan.send
+  , withTitan, Titan.send, commit
   , DataMessage(..), ControlMessage(..), Message(..)
     -- * Insertion
   , titan
@@ -96,6 +96,9 @@ withTitan (ServerInfo {..}) recvHdl mainOper =
 
 send :: GraphId id => Operation id -> Titan ()
 send op conn = WS.send conn (uncurry mkGremlinWSCommand (serializeOperation op))
+
+commit :: Titan ()
+commit conn = WS.send conn (mkGremlinWSCommand "graph.tx().commit()" Map.empty)
 
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
