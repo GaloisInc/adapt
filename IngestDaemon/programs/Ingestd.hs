@@ -181,12 +181,10 @@ mainLoop cfg =
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
-        finisher =
-          do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
-             mapM_ (atomically . TB.writeTBChan inputs) es
-             delayWhileNonEmpty inputs
-    forkPersist logMsg $ finishIngestSignal finisher srvInt outTopic triTopic
-    _ <- maybe (forkPersist logStderr (Left <$> channelToStderr logChan :: IO (Either () ())))
+    forkPersist logMsg $
+      finishIngestSignal (finisher reqStatus inputs) srvInt outTopic triTopic
+    _ <- maybe (forkPersist logStderr
+                       (Left <$> channelToStderr logChan :: IO (Either () ())))
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
@@ -195,6 +193,12 @@ mainLoop cfg =
     persistant logTitan (titanManager logTitan (cfg ^. titanServer) inputs reqStatus)
   where
   resHdl _ _ = return ()
+  finisher reqStatus inputs =
+   do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
+      let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
+      T.hPutStrLn stderr msg
+      mapM_ (atomically . TB.writeTBChan inputs) es
+      delayWhileNonEmpty inputs
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
