@@ -77,8 +77,10 @@ def write_features_to_file(out_file):
 
 in_file = sys.argv[1]
 # main
-insert_dummy_segment_nodes()
-extract_and_attach_features()
+n_seg_v = run_query("g.V().has('vertexType','segment').count()")[0]
+if n_seg_v == 0:
+    insert_dummy_segment_nodes()
+    extract_and_attach_features()
 write_features_to_file(in_file)
 loop.run_until_complete(gc.close())
 loop.close()
