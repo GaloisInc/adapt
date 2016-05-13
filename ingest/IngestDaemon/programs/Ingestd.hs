@@ -14,11 +14,13 @@ module Main where
 import           Control.Applicative ((<$>))
 import           Control.Concurrent
 import           Control.Concurrent (threadDelay)
-import           Control.Concurrent.BoundedChan as BC
+import           Control.Concurrent.STM.TBChan as TB
+import           Control.Concurrent.STM (atomically)
+import           Control.Concurrent.MVar
 import           Control.Exception as X
 import           Control.Lens
 import           Control.Monad (when, forever, void)
-import           Data.Binary (encode,decode)
+import           Data.Aeson (FromJSON(..), Value(..), decode, (.:))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as ByteString
@@ -29,6 +31,8 @@ import           Data.Int (Int64)
 import           Data.List (partition,intersperse)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HMap
 import           Data.Maybe (maybeToList)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
@@ -54,7 +58,7 @@ import           System.IO (stderr)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
-import           Titan
+import           Titan as Titan
 import           IngestDaemon.KafkaManager
 
 data Config =
@@ -164,30 +168,37 @@ main =
 
 mainLoop :: Config -> IO ()
 mainLoop cfg =
- do inputs  <- newBoundedChan inputQueueSize   :: IO (BoundedChan (Operation Text))
-    logChan <- newBoundedChan 100 :: IO (BoundedChan Text)
+ do inputs  <- newTBChanIO inputQueueSize   :: IO (TBChan (Operation Text))
+    logChan <- newTBChanIO 100 :: IO (TBChan Text)
+    reqStatus <- newMVar HMap.empty
     let srvInt   = cfg ^. kafkaInternal
         srvExt   = cfg ^. kafkaExternal
         inTopics = cfg ^. inputTopics
         outTopic = cfg ^. outputTopic
         triTopic = cfg ^. triggerTopic
-        logMsg   = void . BC.tryWriteChan logChan
+        logMsg   = void . atomically . TB.tryWriteTBChan logChan
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist log = void . forkIO . persistant log
-    forkPersist logMsg $ finishIngestSignal srvInt outTopic triTopic
-    _ <- maybe (forkPersist logStderr (Left <$> channelToStderr logChan :: IO (Either () ())))
+    forkPersist logMsg $
+      finishIngestSignal (finisher reqStatus inputs) srvInt outTopic triTopic
+    _ <- maybe (forkPersist logStderr
+                       (Left <$> channelToStderr logChan :: IO (Either () ())))
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
-    persistant logTitan $
-     do logTitan "Connecting to titan..."
-        Titan.withTitan (cfg ^. titanServer) resHdl (runDB logTitan inputs)
+    persistant logTitan (titanManager logTitan (cfg ^. titanServer) inputs reqStatus)
   where
   resHdl _ _ = return ()
+  finisher reqStatus inputs =
+   do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
+      let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
+      T.hPutStrLn stderr msg
+      mapM_ (atomically . TB.writeTBChan inputs) es
+      delayWhileNonEmpty inputs
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
@@ -205,11 +216,55 @@ persistant logMsg io =
            threadDelay 5000000
            persistant logMsg io
 
+
+--------------------------------------------------------------------------------
+--  Titan Manager
+
+titanManager :: (Text -> IO ())
+             -> Titan.ServerInfo
+             -> TBChan Statement
+             -> MVar (HashMap Text Statement)
+             -> IO (Either ConnectionException ())
+titanManager logTitan svr inputs reqStatus =
+ do logTitan "Connecting to titan..."
+    Titan.withTitan svr (handleResponses reqStatus inputs)
+                        (runDB logTitan inputs reqStatus)
+
+data Response = Response { respUUID :: Text, respCode :: Int }
+
+instance FromJSON Response where
+  parseJSON (Object obj) =
+    do rid         <- obj .: ("requestId" :: Text)
+       Object stat <- obj .: ("status" :: Text)
+       cd          <- stat .: ("code" :: Text)
+       return (Response rid cd)
+
+handleResponses :: MVar (HashMap Text Statement)
+                -> TBChan Statement
+                -> Titan.Message
+                -> Titan.Titan ()
+handleResponses mp chan resp _ =
+  case resp of
+    ControlMessage _ -> return ()
+    DataMessage dm   ->
+      let bs = case dm of
+                Text t   -> t
+                Binary b -> b
+      in go (decode bs)
+ where
+ go :: Maybe Response -> IO ()
+ go (Just (Response uuid code))
+  | code == 597 = return () -- retain 597 failures as they match the
+                            -- Edge -> non-node exception.
+  | otherwise   = modifyMVar_ mp (pure . HMap.delete uuid)
+ go Nothing = return ()
+
 runDB :: (Text -> IO ())
-      -> (BoundedChan Statement)
+      -> (TBChan Statement)
+      -> MVar (HashMap Text Statement)
       -> Titan.Connection
       -> IO ()
-runDB logTitan inputs conn =
+runDB logTitan inputs mp conn =
   do logTitan "Connected to titan."
      go commitInterval reportInterval (0,0)
  where
@@ -225,17 +280,27 @@ runDB logTitan inputs conn =
      threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
      go commitInterval ri cnts
  go ci ri !(!nrE,!nrV) =
-  do op <- BC.readChan inputs
-     Titan.send op conn
+  do op <- atomically (TB.readTBChan inputs)
+     uuid <- Titan.send op conn
+     modifyMVar_ mp (pure . HMap.insert uuid op)
      let (nrE2,nrV2) = if isVertex op then (nrE,nrV+1) else (nrE+1,nrV)
      go (ci - 1) (ri - 1) (nrE2,nrV2)
+
+--------------------------------------------------------------------------------
+--  Utils
 
 isVertex :: Operation a -> Bool
 isVertex (InsertVertex _ _) = True
 isVertex _                  = False
 
-channelToStderr :: BC.BoundedChan Text -> IO ()
-channelToStderr ch = forever (BC.readChan ch >>= T.hPutStrLn stderr)
+channelToStderr :: TBChan Text -> IO ()
+channelToStderr ch = forever $ atomically (TB.readTBChan ch) >>= T.hPutStrLn stderr
 
 kafkaString :: TopicName -> Text
 kafkaString (TName (KString s)) = T.decodeUtf8 s
+
+delayWhileNonEmpty :: TBChan a -> IO ()
+delayWhileNonEmpty ch =
+  do b <- atomically (isEmptyTBChan ch)
+     if b then return ()
+          else threadDelay 100000 >> delayWhileNonEmpty ch
