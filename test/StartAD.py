@@ -26,3 +26,4 @@ def consume():
 
 print('Waiting for signal from segmenter...')
 consume()
+
