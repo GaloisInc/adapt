@@ -25,3 +25,8 @@ startsecs=20
 command=/home/vagrant/.local/bin/dashboard
 autorestart=yes
 startsecs=2
+
+[program:ad]
+command=python3 /home/vagrant/adapt/ad/test/StartAD.py
+autorestart=yes
+startsecs=2

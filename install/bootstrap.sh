@@ -139,8 +139,16 @@ function copy_adapt() {
     cd $CWD || handle_error $LINENO
 }
 
+install_ad() {
+    CWD=$(pwd)
+    cd $HOME/adapt/ad/osu_iforest || handle_error $LINENO
+    make || handle_error $LINENO
+    cd $CWD
+}
+
 mkdir -p $KAFKA_ROOT
 
 copy_adapt
 install_adapt_dependencies
 install_adapt
+install_ad()
