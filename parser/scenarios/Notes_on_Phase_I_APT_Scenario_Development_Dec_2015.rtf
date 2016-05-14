@@ -1,0 +1,60 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1344\cocoasubrtf720
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww11240\viewh11380\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 Notes on Phase I APT Scenario Development\
+\
+
+\b Phases of TC
+\b0 \
+Recall that there are 3 Phases for TC, and this should inform scenario development (both in depth and breadth).  According to the TC BAA (has this changed since then?):\
+Phase 1 (2 years): \'93The operational scenario during Phase 1 will include an APT browser and Multi-tier Apps implementation.\'94\
+Phase 2 (1 year Option phase): \'93In Phase 2, a firewall will be added to the system scenario to demonstrate the collection and analysis of causally linked activities in real-time to infer the nature of the attack\'94\
+Phase 3 (1 year Option phase): \'93In Phase 3, the scenario scales to a small enterprise network\'94\
+\
+
+\b Roles of the various TAs
+\b0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 TA5.2  will \'93\'85 use a commercially available Security Incident and Event Manager (SIEM) tools \'85 to provde a basis for comparison against the R&D performers\'92 technologies.\'94\
+\
+
+\b Phase 1 - Context
+\b0 \
+\
+From the TC BAA:  \'93\expnd0\expndtw0\kerning0
+During Phase 1, the scenarios will be developed to aid the TC performers in understanding the type of environments (i.e., military, SCADA, mobile, etc.) their technologies may support.\'94  \
+\
+\pard\pardeftab720\sa240
+\cf0 \expnd0\expndtw0\kerning0
+From the TC BAA: \'93 During Phase 1 (duration 24 months), performers will focus on developing accurate and efficient trackers for individual programs at different software-stack layers, for progressively larger program sizes (TA1 performers), analysis techniques and policy mechanisms for increasingly larger data sets that may be produced by the trackers (TA2 performers)\'85\'94\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \expnd0\expndtw0\kerning0
+In Summary, Phase I scenarios need to:\
+- call out a specific operational environment that the scenario belongs to (that is, not just a generic scenario)\
+- focus on aspects of an APT campaign that are particularly germaine to a single machine.  For instance, we can\'92t have lateral movement on a single machine.  Will the scenario developers generate synthesized/real data that includes a machine doing reconnaissance, or will it treat the \
+\
+
+\b Phase 1 \'97 Developing Scenarios
+\b0 \
+\
+Our preferred targets:\
+1. SRI: Linux-based.  Windows is a better attack surface because of its ubiquity, but we can demonstrate the same principles on this OS.  \
+2. MIT: Android.  This gives us a \'91mobile\'92 scenario; the interesting challenge is to develop the APT scenario for mobile devices.  Are they just a stepping stone for adversaries to acquire traditional targets such as servers for data exfiltration?  \
+\
+The scenario description in the TC BAA not only covers confidentiality breaches, but leads to an integrity attack.  Should one of our scenarios focus on integrity as the overall objective for a campaign?\
+\
+Micro-scenarios versus full campaigns:\
+- One of the hypotheses underlying ADAPT is that the aggregation of what could pass for innocuous behavior can signal malicious behavior.  If this is the case, this argues for a scenario that covers multiple APT phases.\
+- Early on, we\'92re more likely to have success doing detection in more constrained scenarios, with more definitive adversary signals.  This will help us determine what is signal and what is noise in PGs, and suggests a series of micro-scenarios that show that we can detect a variety, say, of initial compromises.    \
+- It is close to a breadth versus depth trade-off in terms of where we put our efforts.\
+\
+Micro-scenario ideas:\
+- One strategy is to first look at those phases or sub-phases of an APT campaign that are likely to contain some kind of invariant.  Two possibilities:\
+- Initial compromise: at this time, some process runs differently than before \'97 either a new process we haven\'92t seen, or else a process we have seen, but in a different context (locations referenced, or ordering of events)\
+- C&C: assuming that the campaign requires new instructions throughout, we could look for clues that communication is taking place.  For detection of this, there are a couple of possibilities worth investigating:\
+	- a node suddenly undergoes a change in its communication habits (a distribution).\
+	- looking at the content of all the communication, and noticing a change in the entropy of the content.  \
+Both of these would likely work very well against Hammertoss, for example: the Twitter handles change every day (which is likely going to generate a new distribution of visits \'97 unlikely that the server was visiting Twitter so often previously to compromise).  And secondly, the *content* of the Hammertoss twitter messages doesn\'92t at all correspond to the entropic distribution of content of the typical tweet (due to the fact that these tweets are steganographic pointers)}
