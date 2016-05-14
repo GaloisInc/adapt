@@ -22,23 +22,23 @@
 # the software.
 #
 '''
-Writes one or more nodes to Titan / Cassandra.
+Writes one or more classification nodes to Titan / Cassandra.
 '''
 
-import sys
 import aiogremlin
 import asyncio
 import argparse
 import classify
 import logging
 import re
+import sys
 import uuid
 
 __author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 
 @asyncio.coroutine
@@ -134,7 +134,7 @@ class NodeInserter:
             self._drop_matching_nodes(label)
 
 
-    def phase1(self):
+    def phase2(self):
         '''Test Ac component in isolation, for phase1 development.'''
         exfil_detect = classify.ExfilDetector()
         self._drop_all_test_nodes()
@@ -166,10 +166,10 @@ def arg_parser():
 #   $ nosetests3 *.py
 def test_insert():
     ins = NodeInserter()
-    ins.phase1()
+    ins.phase2()
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
     ins = NodeInserter(args.db_url)
-    ins.phase1()
+    ins.phase2()
