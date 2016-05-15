@@ -11,10 +11,6 @@ autorestart=yes
 startsecs=20
 startretries=6
 
-[program:titan]
-command=/opt/titan/bin/titan.sh start
-autorestart=no
-
 [program:ingestd]
 command=%(ENV_HOME)s/.local/bin/ingestd -i ta2 -l ingestd-log -f in-finished
 autorestart=yes

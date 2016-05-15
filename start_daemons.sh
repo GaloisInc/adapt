@@ -1,15 +1,11 @@
 #! /usr/bin/env bash
 
-# Starts daemons: supervisord, zookeeper, kafka, titan, ingestd
+# Starts daemons: titan, supervisord, zookeeper, kafka, Adapt components
 
-# This script is like start.sh,
-# but for folks who prefer tail -f over tmux.
-# Renaming it on top of start.sh would be fine.
-#
-# Also, if supervisord is already running it avoids re-running.
-#
-# c.f. the clause that starts supervisord in Adapt-classify/titan/Makefile
+jps | grep GremlinServer > /dev/null || /opt/titan/bin/titan.sh start
 
+# If supervisord is already running we avoid re-running.
+#
 # apt-get wants root to run the daemon. We prefer to run it ourselves.
 if pgrep -U root supervisord > /dev/null
 then
@@ -50,3 +46,7 @@ for TOPIC in $TOPICS ; do
         $KAFKA/kafka-topics.sh --create --topic $TOPIC --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
+
+
+# To halt daemons, use:
+#   /opt/titan/bin/titan.sh stop;  killall supervisord
