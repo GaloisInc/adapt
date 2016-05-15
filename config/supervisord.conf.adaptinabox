@@ -14,19 +14,18 @@ startretries=6
 [program:titan]
 command=/opt/titan/bin/titan.sh start
 autorestart=no
-startsecs=20
 
 [program:ingestd]
-command=/home/vagrant/.local/bin/ingestd -i ta2 -l ingestd-log -f in-finished
+command=%(ENV_HOME)s/.local/bin/ingestd -i ta2 -l ingestd-log -f in-finished
 autorestart=yes
 startsecs=20
 
 [program:dashboard]
-command=/home/vagrant/.local/bin/dashboard
+command=%(ENV_HOME)s/.local/bin/dashboard
 autorestart=yes
 startsecs=2
 
 [program:ad]
-command=python3 /home/vagrant/adapt/ad/test/StartAD.py
+command=bash -c 'sleep 8 && %(ENV_HOME)s/adapt/ad/test/StartAD.py'
 autorestart=yes
-startsecs=2
+startsecs=10
