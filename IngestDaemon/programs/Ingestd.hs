@@ -17,8 +17,7 @@ import           Control.Concurrent.MVar
 import           Control.Concurrent.STM.TBChan as TB
 import           Control.Concurrent.STM (atomically)
 import           Control.Exception as X
-import           Lens.Micro
-import           Lens.Micro.TH
+import           Control.Lens
 import           Data.Aeson (FromJSON(..), Value(..), decode, (.:))
 import           Data.Int (Int64)
 import           Data.HashMap.Strict (HashMap)

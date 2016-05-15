@@ -56,8 +56,7 @@ executable ingestd
                      , bytestring >= 0.10 && < 0.11
                      , containers
                      , entropy
-                     , microlens
-                     , microlens-th
+                     , lens
                      , milena
                      , monadLib
                      , parallel
