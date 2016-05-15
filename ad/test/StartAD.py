@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 
 from kafka import SimpleProducer, KafkaConsumer, KafkaClient
 import os
@@ -26,4 +27,3 @@ def consume():
 
 print('Waiting for signal from segmenter...')
 consume()
-
