@@ -50,7 +50,10 @@ class ErsatzSegmenter:
         log.info("Working to produce segments...")
         self.report_status(STATUS_IN_PROGRESS)
         time.sleep(1)
-        classify.Phase2NodeInserter().insert_reqd_events()
+        ins = classify.Phase2NodeInserter()
+        ins.drop_all_test_nodes()
+        ins.insert_reqd_events()
+        ins.insert_reqd_segment()
         log.info("Finished producing segments.")
         self.report_status(STATUS_DONE)
 

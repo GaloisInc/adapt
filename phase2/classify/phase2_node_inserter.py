@@ -40,14 +40,14 @@ class Phase2NodeInserter:
         self.db_client = aiogremlin.GremlinClient(url=url, loop=self.loop)
         self.log = logging.getLogger(__name__)
         self.log.addHandler(logging.StreamHandler())
-        self.log.setLevel(logging.DEBUG)
+        self.log.setLevel(logging.INFO)
 
     def __del__(self):
         self.loop.run_until_complete(self.db_client.close())
 
     def _quote(self, x):
         '''Double quote x if it is a string.
-        >>> ins = NodeInserter()
+        >>> ins = Phase2NodeInserter()
         >>> ins._quote(3)
         3
         >>> ins._quote('hi')
@@ -64,7 +64,8 @@ class Phase2NodeInserter:
 
     def _insert_node(self, label, vertex_type, *av_pairs):
         # Sigh. Omitting 'label' makes it match the 'type' value: 'vertex'.
-        assert vertex_type in 'vertex seg classification'.split(), vertex_type
+        valid = 'vertex segment classification'.split()
+        assert vertex_type in valid, vertex_type
         bindings = {'p1': label, 'p2': vertex_type}
         gremlin = ("graph.addVertex(label, p1,"
                    " 'vertexType', p2")
@@ -89,7 +90,7 @@ class Phase2NodeInserter:
                           ('filename', 'audit:path=/etc/shadow'),
                           ('audit_subtype', 'file'))
 
-    def _insert_reqd_segment(self):
+    def insert_reqd_segment(self):
         '''Pretend that Se established necessary DB pre-condition.'''
         for node_name in 'spade1 spade2'.split():
             self._insert_node('seg1', 'segment',
@@ -104,7 +105,6 @@ class Phase2NodeInserter:
         for node in self.loop.run_until_complete(resp):
             if node.data is not None:
                 ret.append(node.data[0])
-        print(len(ret), ret)
         return ret
 
     def _drop_matching_nodes(self, label):
@@ -113,6 +113,6 @@ class Phase2NodeInserter:
         resp = self.db_client.execute(gremlin, bindings=bindings)
         self.loop.run_until_complete(resp)
 
-    def _drop_all_test_nodes(self):
+    def drop_all_test_nodes(self):
         for label in 'spade1 spade2 seg1 ac1'.split():
             self._drop_matching_nodes(label)

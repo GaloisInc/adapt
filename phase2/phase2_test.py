@@ -25,14 +25,9 @@
 Writes one or more classification nodes to Titan / Cassandra.
 '''
 
-import aiogremlin
-import asyncio
-import argparse
 import classify
 import logging
-import re
-import sys
-import uuid
+import unittest
 
 __author__ = 'John.Hanley@parc.com'
 
@@ -41,44 +36,28 @@ log.addHandler(logging.StreamHandler())
 log.setLevel(logging.DEBUG)
 
 
+def test_phase2():
+    '''Test Ac component with upstream deps for phase2 development.'''
+    exfil_detect = classify.ExfilDetector()
+    ins = classify.Phase2NodeInserter()
+    ins.drop_all_test_nodes()
 
-    def phase2(self):
-        '''Test Ac component with upstream deps for phase2 development.'''
-        exfil_detect = classify.ExfilDetector()
-        self._drop_all_test_nodes()
+    # precondition
+    assert False == exfil_detect.is_exfil_segment(
+        ins._get_segment('seg1'))
 
-        # precondition
-        assert False == exfil_detect.is_exfil_segment(
-            self._get_segment('seg1'))
+    ins.insert_reqd_events()
+    ins.insert_reqd_segment()
 
-        self._insert_reqd_events()
-        self._insert_reqd_segment()
-
-        # postcondition
-        if exfil_detect.is_exfil_segment(self._get_segment('seg1')):
-            self._insert_node('ac1', 'classification',
-                              ('classificationType',
-                               'exfiltrate_sensitive_file'))
-        else:
-            assert None, 'phase1 test failed'
-
-
-def arg_parser():
-    p = argparse.ArgumentParser(
-        description='Writes one or more nodes to Titan / Cassandra.')
-    p.add_argument('--db-url', help='Titan database location',
-                   default='http://localhost:8182/')
-    return p
-
-
-# Invoke with:
-#   $ nosetests3 *.py
-def test_insert():
-    ins = NodeInserter()
-    ins.phase2()
+    # postcondition
+    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
+        ins._insert_node('ac1', 'classification',
+                         ('classificationType',
+                          'exfiltrate_sensitive_file'))
+    else:
+        assert None, 'phase2 test failed'
 
 
 if __name__ == '__main__':
-    args = arg_parser().parse_args()
-    ins = NodeInserter(args.db_url)
-    ins.phase2()
+    test_phase2()
+    unittest.main()
