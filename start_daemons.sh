@@ -26,7 +26,7 @@ cd $ADAPT || exit 1
 # on the VM.
 sudo sysctl -w vm.overcommit_memory=1
 
-# run supervisord (zookeeper, kafka, titan, ingestd, dashboad)
+# run supervisord (zookeeper, kafka, Adapt components)
 pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; echo Started.)
 
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance

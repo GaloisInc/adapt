@@ -25,3 +25,8 @@ startsecs=2
 command=bash -c 'sleep 8 && %(ENV_HOME)s/adapt/ad/test/StartAD.py'
 autorestart=yes
 startsecs=10
+
+[program:classifyd]
+command=%(ENV_HOME)s/adapt/classifier/phase2/classifyd.py
+autorestart=yes
+startsecs=20
