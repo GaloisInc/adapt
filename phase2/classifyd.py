@@ -28,6 +28,7 @@ import argparse
 import kafka
 import logging
 import struct
+import time
 
 __author__ = 'John.Hanley@parc.com'
 
@@ -46,7 +47,19 @@ STATUS_DONE = b'\x01'
 class TopLevelClassifier:
 
     def __init__(self, url):
-        self.consumer = kafka.KafkaConsumer('ac', bootstrap_servers=[url])
+        # Kafka might not be availble yet, due to supervisord race.
+        retries = 6  # Eventually we may signal fatal error; this is a feature.
+        self.consumer = None
+        while retries >= 0 and self.consumer is None:
+            try:
+                retries -= 1
+                self.consumer = kafka.KafkaConsumer(
+                    'ac', bootstrap_servers=[url])
+            except kafka.errors.NoBrokersAvailable:
+                log.warn('Kafka not yet available.')
+                time.sleep(2)
+                log.warn('retrying')
+        # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
     def await_segments(self, start_msg="Awaiting new segments..."):
