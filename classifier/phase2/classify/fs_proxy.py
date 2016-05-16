@@ -76,7 +76,9 @@ class FsProxy(object):
             group = bool(mode & stat.S_IWGRP)
             other = bool(mode & stat.S_IWOTH)
             if group or other:
-                print('writable: ', name, mode, mode & stat.S_IWGRP, mode & stat.S_IWOTH)
+                print('writable: ', name, mode,
+                      mode & stat.S_IWGRP,
+                      mode & stat.S_IWOTH)
             return group or other
 
         def _is_single_secure_dir(name):
