@@ -22,40 +22,42 @@
 # the software.
 #
 '''
-Verify that *something*, anything, was imported from the infoleak PG.
+Writes one or more classification nodes to Titan / Cassandra.
 '''
 
-import aiogremlin
-import asyncio
+import classify
 import logging
 import unittest
 
+__author__ = 'John.Hanley@parc.com'
 
-class GenericTests(unittest.TestCase):
-
-    def setUp(self):
-        logging.getLogger('asyncio').setLevel(logging.INFO)  # Don't be chatty.
-        url = 'http://localhost:8182/'
-        self.loop = asyncio.get_event_loop()
-        self.db_client = aiogremlin.GremlinClient(url=url, loop=self.loop)
-
-    def tearDown(self):
-        self.loop.run_until_complete(self.db_client.close())
+log = logging.getLogger(__name__)
+log.addHandler(logging.StreamHandler())
+log.setLevel(logging.DEBUG)
 
 
-    def get_one(self, query):
-        result = self.loop.run_until_complete(self.db_client.execute(query))
-        message = result[0]
-        assert message.status_code == 200, message
-        return message.data[0]
+def test_phase2():
+    '''Test Ac component with upstream deps for phase2 development.'''
+    exfil_detect = classify.ExfilDetector()
+    ins = classify.Phase2NodeInserter()
+    ins.drop_all_test_nodes()
 
-    def test_that_edges_exist(self):
-        '''This expensive query takes > 15 sec.'''
-        count = self.get_one('g.E().count()')
-        self.assertEqual(0, count)  # Sigh!
-        # self.assertEqual(6730, count)
+    # precondition
+    assert False == exfil_detect.is_exfil_segment(
+        ins._get_segment('seg1'))
 
-    def test_that_nodes_exist(self):
-        count = self.get_one('g.V().count()')
-        self.assertEqual(41276, count)
-        # self.assertEqual(8000, count)
+    ins.insert_reqd_events()
+    ins.insert_reqd_segment()
+
+    # postcondition
+    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
+        ins._insert_node('ac1', 'classification',
+                         ('classificationType',
+                          'exfiltrate_sensitive_file'))
+    else:
+        assert None, 'phase2 test failed'
+
+
+if __name__ == '__main__':
+    test_phase2()
+    unittest.main()

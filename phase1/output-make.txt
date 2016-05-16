@@ -1,0 +1,7 @@
+$ make
+nosetests3 --with-doctest --doctest-tests phase1_test.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.523s
+
+OK

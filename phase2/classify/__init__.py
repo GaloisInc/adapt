@@ -22,40 +22,10 @@
 # the software.
 #
 '''
-Verify that *something*, anything, was imported from the infoleak PG.
+Classifies a PG subgraph.
 '''
 
-import aiogremlin
-import asyncio
-import logging
-import unittest
-
-
-class GenericTests(unittest.TestCase):
-
-    def setUp(self):
-        logging.getLogger('asyncio').setLevel(logging.INFO)  # Don't be chatty.
-        url = 'http://localhost:8182/'
-        self.loop = asyncio.get_event_loop()
-        self.db_client = aiogremlin.GremlinClient(url=url, loop=self.loop)
-
-    def tearDown(self):
-        self.loop.run_until_complete(self.db_client.close())
-
-
-    def get_one(self, query):
-        result = self.loop.run_until_complete(self.db_client.execute(query))
-        message = result[0]
-        assert message.status_code == 200, message
-        return message.data[0]
-
-    def test_that_edges_exist(self):
-        '''This expensive query takes > 15 sec.'''
-        count = self.get_one('g.E().count()')
-        self.assertEqual(0, count)  # Sigh!
-        # self.assertEqual(6730, count)
-
-    def test_that_nodes_exist(self):
-        count = self.get_one('g.V().count()')
-        self.assertEqual(41276, count)
-        # self.assertEqual(8000, count)
+from .escalation import Escalation
+from .exfil_detector import ExfilDetector
+from .fs_proxy import FsProxy
+from .phase2_node_inserter import Phase2NodeInserter

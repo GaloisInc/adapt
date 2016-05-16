@@ -1,0 +1,14 @@
+vagrant@adapt:~/classifier/titan$  ./classify_subgraph.py 
+Traceback (most recent call last):
+  File "./classify_subgraph.py", line 128, in <module>
+    classify_provn_events(args.db_url)
+  File "./classify_subgraph.py", line 95, in classify_provn_events
+    for event in get_nodes(client):
+  File "./classify_subgraph.py", line 51, in get_nodes
+    edges = list(db_client.execute("g.E()").data)
+  File "/usr/local/lib/python3.4/dist-packages/gremlinrestclient/client.py", line 40, in execute
+    resp = self._post(self._url, json.dumps(payload))
+  File "/usr/local/lib/python3.4/dist-packages/gremlinrestclient/client.py", line 54, in _post
+    "403 Forbidden: Server must be configured for REST")
+RuntimeError: 403 Forbidden: Server must be configured for REST
+vagrant@adapt:~/classifier/titan$ 
