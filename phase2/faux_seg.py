@@ -25,6 +25,7 @@
 A pretend segmenter.
 '''
 import argparse
+import classify
 import kafka
 import logging
 import struct
@@ -49,6 +50,7 @@ class ErsatzSegmenter:
         log.info("Working to produce segments...")
         self.report_status(STATUS_IN_PROGRESS)
         time.sleep(1)
+        classify.Phase2NodeInserter().insert_reqd_events()
         log.info("Finished producing segments.")
         self.report_status(STATUS_DONE)
 
