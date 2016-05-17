@@ -1,4 +1,4 @@
-.PHONY: run test test-coverage coverage coverage-html pdf dxpdf upreqs check help
+.PHONY: dx run test test-coverage coverage coverage-html pdf dxpdf upreqs check help
 
 MODULE = simulator_diagnoser
 
@@ -14,7 +14,10 @@ COVERAGERC = --rcfile=config/coveragerc
 TEST_PATTERN = -p "*_test.py"
 
 ## Default target. Same as 'make run'.
-all: run
+all: dx
+
+dx: $(ENV)
+	$(PYTHON) dx.py fakemsg
 
 ## Run entrypoint: sim.py.
 run: $(ENV)
