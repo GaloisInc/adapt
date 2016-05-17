@@ -233,12 +233,30 @@ instance GraphId Text where
                 , ")"
                 ]
        env = Map.fromList $ ("l", A.String l) : mkBinding ps
-  serializeOperation (InsertEdge l src dst ps)   = (cmd, env)
+  serializeOperation (InsertEdge l src dst ps genVerts)   =
+     if genVerts
+      then (nonTestCmd, env)
+      else (testAndInsertCmd, env)
     where
-      cmd = escapeChars call
-       -- g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next(), param1, val1, ...)
-      call = T.unwords
+      -- g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next(), param1, val1, ...)
+      nonTestCmd = escapeChars $
+             T.unwords
               [ "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
+              , if (not (null ps)) then "," else ""
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      -- if (!g.V().has('ident',src).next()) { 
+      --        g.addV('ident', src)
+      -- } ; if
+      -- (!g.V().has('ident',dst).next()) {
+      --        g.addV('ident', dst)
+      -- } ; nonTestCmd
+      testAndInsertCmd = escapeChars $
+             T.unwords
+              [ "if (! g.V().has('ident',src).next()) { g.addV('ident',src) } ;"
+              , "if (! g.V().has('ident',dst).next()) { g.addV('ident',dst) } ;"
+              , "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
               , ")"
