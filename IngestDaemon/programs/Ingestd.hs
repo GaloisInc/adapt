@@ -24,6 +24,7 @@ import           Data.Int (Int64)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid ((<>))
+import           Data.Maybe (catMaybes)
 import           Data.String
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -190,12 +191,25 @@ mainLoop cfg =
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan (titanManager logTitan (cfg ^. titanServer) inputs reqStatus)
   where
+  finisher :: MVar FailedInsertionDB -> TBChan (Operation Text) -> IO ()
   finisher reqStatus inputs =
    do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
+          newOperations = catMaybes (map updateOperation es)
       T.hPutStrLn stderr msg
-      mapM_ (atomically . TB.writeTBChan inputs) es
+      mapM_ (atomically . TB.writeTBChan inputs) newOperations
       delayWhileNonEmpty inputs
+
+  -- Given a failed operation and an HTTP error code from Titan,
+  -- build a new operation suitable for re-trying (or not) the operation.
+  updateOperation :: (Operation Text, Maybe HttpCode) -> Maybe (Operation Text)
+  updateOperation (o,code) =
+    Just $ case o of
+            InsertEdge {}
+              | code == Just 597 -> o { generateVertices = True }
+              | otherwise        -> o
+            InsertVertex {}      -> o
+
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
@@ -220,7 +234,7 @@ persistant logMsg io =
 titanManager :: (Text -> IO ())
              -> Titan.ServerInfo
              -> TBChan Statement
-             -> MVar (HashMap Text Statement)
+             -> MVar FailedInsertionDB
              -> IO (Either ConnectionException ())
 titanManager logTitan svr inputs reqStatus =
  do logTitan "Connecting to titan..."
@@ -240,7 +254,7 @@ instance FromJSON Response where
         _ -> fail "Titan response field 'status' must be an object"
   parseJSON _ = fail "Titan JSON response must be an object"
 
-handleResponses :: MVar (HashMap Text Statement)
+handleResponses :: MVar FailedInsertionDB
                 -> Titan.Message
                 -> Titan.Titan ()
 handleResponses mp resp _ =
@@ -252,15 +266,18 @@ handleResponses mp resp _ =
                 Binary b -> b
       in go (decode bs)
  where
+ -- Delete operations that return 200 (success) and retain operations with
+ -- other HTTP response codes, updating the code for later use in follow-on
+ -- insertion attempts.
  go :: Maybe Response -> IO ()
  go (Just (Response uuid code))
   | code == 200 = modifyMVar_ mp (pure . HMap.delete uuid)
-  | otherwise = return ()   -- retain errors for later retry
+  | otherwise   = modifyMVar_ mp (pure . HMap.adjust (\(o,_) -> (o,Just code)) uuid)
  go Nothing = return ()
 
 runDB :: (Text -> IO ())
-      -> (TBChan Statement)
-      -> MVar (HashMap Text Statement)
+      -> TBChan Statement
+      -> MVar FailedInsertionDB
       -> Titan.Connection
       -> IO ()
 runDB logTitan inputs mp conn =
@@ -281,7 +298,7 @@ runDB logTitan inputs mp conn =
  go ci ri !(!nrE,!nrV) =
   do opr <- atomically (TB.readTBChan inputs)
      uuid <- Titan.send opr conn
-     modifyMVar_ mp (pure . HMap.insert uuid opr)
+     modifyMVar_ mp (pure . HMap.insert uuid (opr,Nothing))
      let (nrE2,nrV2) = if isVertex opr then (nrE,nrV+1) else (nrE+1,nrV)
      go (ci - 1) (ri - 1) (nrE2,nrV2)
 
@@ -303,3 +320,6 @@ delayWhileNonEmpty ch =
   do b <- atomically (isEmptyTBChan ch)
      if b then return ()
           else threadDelay 100000 >> delayWhileNonEmpty ch
+
+type HttpCode = Int
+type FailedInsertionDB = HashMap Text (Statement,Maybe HttpCode)
