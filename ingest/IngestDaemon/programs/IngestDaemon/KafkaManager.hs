@@ -21,9 +21,9 @@ import           Network.Kafka.Protocol as Kafka
 import           CompileSchema
 import           CommonDataModel as CDM
 import           CommonDataModel.Avro
+import           IngestDaemon.Types
 
-type Statement = Operation Text
-
+-- Straight text to a Kafka topic. Used for logging.
 channelToKafka :: TBChan Text -> KafkaAddress -> TopicName -> IO (Either KafkaClientError ())
 channelToKafka ch host topic =
  do r <- runKafka state oper
@@ -78,15 +78,14 @@ getMessage topicNm offset =
 --------------------------------------------------------------------------------
 --  Getting the CDM input from TA1
 
--- |Acquire CDM from a given kafka host/topic and place the decoded Adapt
--- Schema values in the given channel.
-kafkaInput :: KafkaAddress -> TopicName -> TBChan Statement -> IO (Either KafkaClientError ())
+-- | Acquire CDM from a given kafka host/topic and place values a channel.
+kafkaInput :: KafkaAddress -> TopicName -> TBChan Input -> IO (Either KafkaClientError ())
 kafkaInput host topic chan =
   do r <- runKafka state oper
      return r
  where
  state = mkKafkaState "adapt-ingest" host
- oper = forever $
+ oper  = forever $
   do o <- getLastOffset LatestTime 0 topic
      process o
 
@@ -95,16 +94,18 @@ kafkaInput host topic chan =
   do bs <- getMessage topic offset
      let handleMsg b =
           case runGetOrFail getAvro (BL.fromStrict b) of
-            Right (_,_,cdmFmt) ->
-               liftIO $ do
-                  let nses = CDM.toSchema [cdmFmt]
-                  ms <- compile nses
-                  mapM_ (atomically . TB.writeTBChan chan) ms
-            Left err    -> emit (show err)
+            Right (_,_,cdmFmt) -> insertCDM cdmFmt
+            Left err           -> emit (show err)
      mapM_ handleMsg bs
      if null bs
       then liftIO (threadDelay 100000) >> process offset
       else process (offset + fromIntegral (length bs))
+
+ insertCDM cdmFmt =
+   liftIO $ do let nses = CDM.toSchema [cdmFmt]
+               operations <- compile nses
+               let ipts = map (Input cdmFmt) operations
+               mapM_ (atomically . TB.writeTBChan chan) ipts
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr
