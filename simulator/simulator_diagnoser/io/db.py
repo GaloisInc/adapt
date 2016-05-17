@@ -57,7 +57,7 @@ class DB(object):
         return self.__query(gremlin)
 
     def get_transitive_successors(self, node):
-        gremlin = "g.V({}).repeat(out()).until(outE().count().is(0)).path()".format(node)
+        gremlin = "g.V({}).repeat(out().dedup()).emit().simplePath().path()".format(node)
         return self.__query(gremlin)
 
     def get_predecessors(self, node):
@@ -65,7 +65,7 @@ class DB(object):
         return self.__query(gremlin)
 
     def get_transitive_predecessors(self, node):
-        gremlin = "g.V({}).repeat(out()).until(inE().count().is(0)).path()".format(node)
+        gremlin = "g.V({}).repeat(in().dedup()).emit().simplePath().path()".format(node)
         return self.__query(gremlin)
 
     def set_node_properties(self, node, **attributes):
