@@ -101,6 +101,7 @@ install_adapt_dependencies() {
     sudo -H pip3 install coverage flake8 \
                         gremlinrestclient aiogremlin || handle_error $LINENO
     sudo -H pip install kafka-python || handle_error $LINENO
+    sudo -H pip2 install avroknife || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
