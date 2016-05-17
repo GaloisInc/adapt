@@ -30,14 +30,18 @@ import           System.Entropy (getEntropy)
 -- Operations represent gremlin-groovy commands such as:
 -- assume: graph = TinkerGraph.open()
 --         g = graph.traversal(standard())
-data Operation id = InsertVertex { label :: Text
+data Operation id = InsertVertex { label      :: Text
                                  , properties :: [(Text,GremlinValue)]
                                  }
-                  | InsertEdge { label      :: Text
-                               , src,dst    :: id
-                               , properties :: [(Text,GremlinValue)]
+                  | InsertEdge { label            :: Text
+                               , src,dst          :: id
+                               , properties       :: [(Text,GremlinValue)]
+                               , generateVertices :: Bool
                                }
   deriving (Eq,Ord,Show)
+
+insertEdge :: Text -> id -> id -> [(Text,GremlinValue)] -> Operation id
+insertEdge l s d p = InsertEdge l s d p False
 
 data GremlinValue = GremlinNum Integer
                   | GremlinString Text
@@ -63,8 +67,8 @@ compileEdge e =
          eMe   = uidToBase64 euid
          [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
          v     = InsertVertex eMe [("relationship", GremlinString erel)]
-         eTo   = InsertEdge e1Lbl esrc eMe []
-         eFrom = InsertEdge e2Lbl eMe edst []
+         eTo   = insertEdge e1Lbl esrc eMe []
+         eFrom = insertEdge e2Lbl eMe edst []
      return ([v], [eTo, eFrom])
 
 class PropertiesOf a where
