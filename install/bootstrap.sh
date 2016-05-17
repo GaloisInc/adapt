@@ -151,4 +151,4 @@ mkdir -p $KAFKA_ROOT
 copy_adapt
 install_adapt_dependencies
 install_adapt
-install_ad()
+install_ad
