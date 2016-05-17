@@ -13,13 +13,14 @@ class KafkaMessenger(Messenger):
 
     def receive(self):
         for msg in self.consumer:
-            self.info("Received messaage: " + str(msg))
+            self.consumer.commit()
+            self.log.info("Received message: " + str(msg))
             if msg.value == DONE:
                 self.send(IN_PROGRESS)
                 yield
                 self.send(DONE)
 
     def send(self, msg=DONE):
-        self.info("Sending message " + str(msg) + " to topics " + str(self.downstream_topics))
+        self.log.info("Sending message " + str(msg) + " to topics " + str(self.downstream_topics))
         for topic in self.downstream_topics:
             s = self.producer.send(topic, msg)

@@ -5,9 +5,11 @@ import random
 
 random.seed()
 
-logging.basicConfig(stream=sys.stdout,
-                    format='%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s')
 log = logging.getLogger('dx-logger')
+handler = logging.StreamHandler()
+handler.setFormatter(
+    logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s'))
+log.addHandler(handler)
 log.setLevel(logging.INFO)
 
 def stub_db(db, tag='dx_phase2_stub'):
