@@ -1,18 +1,26 @@
 import asyncio
 import aiogremlin
+import logging
+import uuid
 
-class DB(object):
+class DBClient(object):
     def __init__(self, url='http://localhost:8182/'):
         self.loop = asyncio.get_event_loop()
         self.client = aiogremlin.GremlinClient(url=url, loop=self.loop)
+        self.log = logging.getLogger('dx-logger')
 
     def __del__(self):
         self.loop.run_until_complete(self.client.close())
 
     def __query(self, gremlin, bindings={}):
+        self.log.debug("Query: " + gremlin + " bindings: " + str(bindings))
         r = self.client.execute(gremlin, bindings=bindings)
         msg = self.loop.run_until_complete(r)[0]
         return msg.data
+
+    @staticmethod
+    def generate_uuid():
+        return str(uuid.uuid4())
 
     def get_nodes(self, **attributes):
         gremlin = "g.V()"
