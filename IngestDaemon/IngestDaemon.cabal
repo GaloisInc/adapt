@@ -47,7 +47,6 @@ executable ingestd
   main-is:             Ingestd.hs
   other-modules:       IngestDaemon.KafkaManager
   build-depends:       base >=4.7 && <4.9
-                     , stm-chans
                      , Ingest >= 0.2 && < 0.3
                      , IngestDaemon
                      , aeson
@@ -56,6 +55,7 @@ executable ingestd
                      , bytestring >= 0.10 && < 0.11
                      , containers
                      , entropy
+                     , groom
                      , microlens
                      , microlens-th
                      , milena
@@ -63,6 +63,7 @@ executable ingestd
                      , parallel
                      , simple-get-opt >= 0.1 && < 0.2
                      , stm
+                     , stm-chans
                      , text >=1.2 && <1.3
                      , time
                      , transformers
