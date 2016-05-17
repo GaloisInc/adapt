@@ -12,7 +12,7 @@ log.setLevel(logging.INFO)
 
 def stub_db(db, tag='dx_phase2_stub'):
     log.info('Removing tagged instances from DB')
-    db.drop_nodes(tag='dx_phase2_stub')
+    db.drop_nodes(tag=tag)
 
     log.info('Inserting segmentation nodes')
     v1 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v1')
