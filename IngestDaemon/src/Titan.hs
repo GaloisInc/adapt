@@ -246,17 +246,18 @@ instance GraphId Text where
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
               , ")"
               ]
-      -- if (!g.V().has('ident',src).next()) { 
-      --        g.addV('ident', src)
-      -- } ; if
-      -- (!g.V().has('ident',dst).next()) {
-      --        g.addV('ident', dst)
-      -- } ; nonTestCmd
+      -- x = g.V().has('ident',src)
+      -- y = g.V().has('ident',dst)
+      -- if (!x.hasNext()) { x = g.addV('ident',src) }
+      -- if (!y.hasNext()) { y = g.addV('ident',dst) }
+      -- x.next().addEdge(edgeName, y.next())
       testAndInsertCmd = escapeChars $
              T.unwords
-              [ "if (! g.V().has('ident',src).next()) { g.addV('ident',src) } ;"
-              , "if (! g.V().has('ident',dst).next()) { g.addV('ident',dst) } ;"
-              , "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
+              [ "x = g.V().has('ident',src) ;"
+              , "y = g.V().has('ident',dst) ;"
+              , "if (!x.hasNext()) { x = g.addV('ident',src) } ;"
+              , "if (!y.hasNext()) { y = g.addV('ident',dst) } ;"
+              , "x.next().addEdge(edgeName, y.next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
               , ")"
