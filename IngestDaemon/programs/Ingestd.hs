@@ -4,6 +4,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 -- | Ingestd is the ingest daemon which takes TA-1 data from Kafka queue,
@@ -13,7 +14,6 @@ module Main where
 
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent (threadDelay)
-import           Control.Concurrent.MVar
 import           Control.Concurrent.STM.TBChan as TB
 import           Control.Concurrent.STM (atomically)
 import           Control.Exception as X
@@ -21,8 +21,6 @@ import           Lens.Micro
 import           Lens.Micro.TH
 import           Data.Aeson (FromJSON(..), Value(..), decode, (.:))
 import           Data.Int (Int64)
-import           Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HMap
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import           Data.String
@@ -39,9 +37,11 @@ import           SimpleGetOpt
 import           System.IO (stderr)
 import           Text.Printf
 import           Text.Read (readMaybe)
+import           Text.Groom
 
 import           Titan as Titan
 import           IngestDaemon.KafkaManager
+import           IngestDaemon.Types
 
 data Config =
       Config { _logTopic      :: Maybe TopicName
@@ -167,9 +167,9 @@ main =
 --                 not received a success message.
 mainLoop :: Config -> IO ()
 mainLoop cfg =
- do inputs  <- newTBChanIO inputQueueSize   :: IO (TBChan (Operation Text))
-    logChan <- newTBChanIO 100 :: IO (TBChan Text)
-    reqStatus <- newMVar HMap.empty
+ do inputs  <- newTBChanIO inputQueueSize
+    logChan <- newTBChanIO 100
+    reqStatus <- newDB
     let srvInt   = cfg ^. kafkaInternal
         srvExt   = cfg ^. kafkaExternal
         inTopics = cfg ^. inputTopics
@@ -189,11 +189,11 @@ mainLoop cfg =
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
-    persistant logTitan (titanManager logTitan (cfg ^. titanServer) inputs reqStatus)
+    persistant logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
   where
-  finisher :: MVar FailedInsertionDB -> TBChan (Operation Text) -> IO ()
-  finisher reqStatus inputs =
-   do es <- HMap.elems <$> modifyMVar reqStatus (pure . (HMap.empty,))
+  finisher :: FailedInsertionDB -> TBChan Input -> IO ()
+  finisher fidb inputs =
+   do es <- resetDB fidb
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
           newOperations = catMaybes (map updateOperation es)
       T.hPutStrLn stderr msg
@@ -202,13 +202,13 @@ mainLoop cfg =
 
   -- Given a failed operation and an HTTP error code from Titan,
   -- build a new operation suitable for re-trying (or not) the operation.
-  updateOperation :: (Operation Text, Maybe HttpCode) -> Maybe (Operation Text)
-  updateOperation (o,code) =
-    Just $ case o of
+  updateOperation :: OperationRecord -> Maybe Input
+  updateOperation (OpRecord ipt@(Input orig stmt) code) =
+    Just $ case stmt of
             InsertEdge {}
-              | code == Just 597 -> o { generateVertices = True }
-              | otherwise        -> o
-            InsertVertex {}      -> o
+              | code == Just 597 -> Input orig stmt { generateVertices = True }
+              | otherwise        -> ipt
+            InsertVertex {}      -> ipt
 
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
@@ -231,14 +231,15 @@ persistant logMsg io =
 --------------------------------------------------------------------------------
 --  Titan Manager
 
-titanManager :: (Text -> IO ())
+titanManager :: Config
+             -> (Text -> IO ())
              -> Titan.ServerInfo
-             -> TBChan Statement
-             -> MVar FailedInsertionDB
+             -> TBChan Input
+             -> FailedInsertionDB
              -> IO (Either ConnectionException ())
-titanManager logTitan svr inputs reqStatus =
+titanManager cfg logTitan svr inputs reqStatus =
  do logTitan "Connecting to titan..."
-    Titan.withTitan svr (handleResponses reqStatus)
+    Titan.withTitan svr (handleResponses cfg reqStatus)
                         (runDB logTitan inputs reqStatus)
 
 data Response = Response { respUUID :: Text, respCode :: Int }
@@ -254,33 +255,56 @@ instance FromJSON Response where
         _ -> fail "Titan response field 'status' must be an object"
   parseJSON _ = fail "Titan JSON response must be an object"
 
-handleResponses :: MVar FailedInsertionDB
+handleResponses :: Config
+                -> FailedInsertionDB
                 -> Titan.Message
                 -> Titan.Titan ()
-handleResponses mp resp _ =
+handleResponses cfg db resp _ =
   case resp of
     ControlMessage _ -> return ()
-    DataMessage dm   ->
+    DataMessage dm   -> do
       let bs = case dm of
                 Text t   -> t
                 Binary b -> b
-      in go (decode bs)
+      case decode bs of
+        Nothing -> return ()
+        Just r ->
+          do when (cfg ^. verbose) (emitData r)
+             go r
  where
  -- Delete operations that return 200 (success) and retain operations with
  -- other HTTP response codes, updating the code for later use in follow-on
  -- insertion attempts.
- go :: Maybe Response -> IO ()
- go (Just (Response uuid code))
-  | code == 200 = modifyMVar_ mp (pure . HMap.delete uuid)
-  | otherwise   = modifyMVar_ mp (pure . HMap.adjust (\(o,_) -> (o,Just code)) uuid)
- go Nothing = return ()
+ go :: Response -> IO ()
+ go (Response uuid code)
+  | code == 200 = deleteDB uuid db
+  | otherwise   = setCodeDB uuid code db
+
+ -- If verbosity is on, print to stdout:
+ -- '''
+ -- --- $UUID ---
+ -- Code: $code   -- only when code /= 200
+ -- CDM: $cdm
+ -- Statement: $statement
+ -- '''
+ emitData :: Response -> IO ()
+ emitData (Response uuid code) = do
+  mor <- lookupDB uuid db
+  case mor of
+    Just (OpRecord (Input cdm stmt) _) ->
+     do T.putStrLn ("--- " <> uuid <> " ---")
+        when (code /= 200) (T.putStrLn ("code:" <> T.pack (show code)))
+        T.putStrLn ("CDM: " <> groom' cdm)
+        T.putStrLn ("Statement: " <> groom' stmt)
+    Nothing -> return ()
+ groom' val = T.concatMap (\x -> if x == '\n' then "\n\t" else "\n") ("\n" <> T.pack (groom val))
 
 runDB :: (Text -> IO ())
-      -> TBChan Statement
-      -> MVar FailedInsertionDB
+      -> TBChan Input
+      -> FailedInsertionDB
       -> Titan.Connection
       -> IO ()
-runDB logTitan inputs mp conn =
+runDB logTitan inputs db conn =
   do logTitan "Connected to titan."
      go commitInterval reportInterval (0,0)
  where
@@ -297,9 +321,10 @@ runDB logTitan inputs mp conn =
      go commitInterval ri cnts
  go ci ri !(!nrE,!nrV) =
   do opr <- atomically (TB.readTBChan inputs)
-     uuid <- Titan.send opr conn
-     modifyMVar_ mp (pure . HMap.insert uuid (opr,Nothing))
-     let (nrE2,nrV2) = if isVertex opr then (nrE,nrV+1) else (nrE+1,nrV)
+     let stmt = statement opr
+     uuid <- Titan.send stmt conn
+     insertDB uuid opr db
+     let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
      go (ci - 1) (ri - 1) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
@@ -320,6 +345,3 @@ delayWhileNonEmpty ch =
   do b <- atomically (isEmptyTBChan ch)
      if b then return ()
           else threadDelay 100000 >> delayWhileNonEmpty ch
-
-type HttpCode = Int
-type FailedInsertionDB = HashMap Text (Statement,Maybe HttpCode)
