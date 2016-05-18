@@ -5,10 +5,8 @@ from provn_segmenter import *
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A provn segmenter')
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        '--provn_file', '-p', help='A prov-tc file in provn format')
-    group.add_argument('--broker', '-b', help='The broker to the Titan DB')
+    parser.add_argument('--provn_file', '-p', help='A prov-tc file in provn format', required=False)
+    parser.add_argument('--broker', '-b', help='The broker to the Titan DB')
     parser.add_argument('spec_file',
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -24,14 +22,14 @@ if __name__ == "__main__":
             print('File {0} does not exist...aborting'.format(f))
 
     doc = Document()
+    tc = titandb.TitanClient(args.broker)
     if args.provn_file:
         doc.parse_provn(args.provn_file)
         dg = DocumentGraph(doc)
-    else:
-        dg = DocumentGraph(doc)
-        tc = titandb.TitanClient(args.broker)
         tc.load_from_document_graph(dg)
-        tc.close()
+    else:
+        dg = tc.read_into_document_graph()
+    tc.close()
 
     if args.summary:
         dg.print_summary()
