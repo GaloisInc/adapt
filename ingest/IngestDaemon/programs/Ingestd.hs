@@ -292,12 +292,12 @@ handleResponses cfg db resp _ =
   mor <- lookupDB uuid db
   case mor of
     Just (OpRecord (Input cdm stmt) _) ->
-     do T.putStrLn ("--- " <> uuid <> " ---")
+     do T.putStrLn ("--- DB Transaction: " <> uuid <> " ---")
         when (code /= 200) (T.putStrLn ("code:" <> T.pack (show code)))
         T.putStrLn ("CDM: " <> groom' cdm)
         T.putStrLn ("Statement: " <> groom' stmt)
     Nothing -> return ()
- groom' val = T.concatMap (\x -> if x == '\n' then "\n\t" else "\n") ("\n" <> T.pack (groom val))
+ groom' val = T.concatMap (\x -> if x == '\n' then "\n\t" else T.singleton x) ("\n" <> T.pack (groom val))
 
 runDB :: (Text -> IO ())
       -> TBChan Input
