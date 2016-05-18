@@ -30,10 +30,10 @@ import           System.Entropy (getEntropy)
 -- Operations represent gremlin-groovy commands such as:
 -- assume: graph = TinkerGraph.open()
 --         g = graph.traversal(standard())
-data Operation id = InsertVertex { label      :: Text
+data Operation id = InsertVertex { ident      :: Text
                                  , properties :: [(Text,GremlinValue)]
                                  }
-                  | InsertEdge { label            :: Text
+                  | InsertEdge { ident            :: Text
                                , src,dst          :: id
                                , properties       :: [(Text,GremlinValue)]
                                , generateVertices :: Bool
