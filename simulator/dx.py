@@ -1,17 +1,18 @@
-import sys
+import argparse
 import simulator_diagnoser as sd
 import logging
 import random
 
 random.seed()
 
-log = logging.getLogger('dx-logger')
-formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s')
-for handler in [logging.StreamHandler(), sd.KafkaHandler()]:
+def set_log_handler(log, handler=logging.StreamHandler()):
     handler.setFormatter(formatter)
     log.addHandler(handler)
-log.addHandler(handler)
+
+log = logging.getLogger('dx-logger')
+formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s')
 log.setLevel(logging.INFO)
+set_log_handler(log)
 
 def stub_db(db, tag='dx_phase2_stub'):
     log.info('Removing tagged instances from DB')
@@ -51,11 +52,18 @@ def diagnose(db, tag='dx_phase2_stub'):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == 'fakemsg':
+    parser = argparse.ArgumentParser(description='Diagnose APT campaigns from segmented graph.')
+    parser.add_argument('-n', '--no-kafka', action='store_true', help='disable kafka messaging.')
+    parser.add_argument('-s', '--single-run', action='store_true', help='set DX to run only once.')
+    args = parser.parse_args()
+
+    if args.no_kafka:
         messaging = sd.Messenger()
     else:
+        set_log_handler(log, sd.KafkaHandler())
         messaging = sd.KafkaMessenger()
 
+    log.info('Arguments: ' + str(args))
     log.info('Using messenger: ' + type(messaging).__name__)
     db = sd.DBClient()
 
@@ -63,5 +71,6 @@ if __name__ == "__main__":
         stub_db(db)
         diagnose(db)
 
-        messaging.send()
-        break
+        if args.single_run:
+            messaging.send()
+            break

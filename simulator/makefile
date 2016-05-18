@@ -17,7 +17,7 @@ TEST_PATTERN = -p "*_test.py"
 all: dx
 
 dx: $(ENV)
-	$(PYTHON) dx.py fakemsg
+	$(PYTHON) dx.py -s
 
 ## Run entrypoint: sim.py.
 run: $(ENV)

@@ -10,9 +10,10 @@ class Messenger(object):
 
     def receive(self):
         self.log.info("Received stubbed message")
-        self.send(IN_PROGRESS)
-        yield
-        self.send(DONE)
+        while(True):
+            self.send(IN_PROGRESS)
+            yield
+            self.send(DONE)
 
     def send(self, msg=DONE):
         self.log.info("Sending message: " + str(msg))
