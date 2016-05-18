@@ -6,9 +6,10 @@ import random
 random.seed()
 
 log = logging.getLogger('dx-logger')
-handler = logging.StreamHandler()
-handler.setFormatter(
-    logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s'))
+formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno)d -- %(message)s')
+for handler in [logging.StreamHandler(), sd.KafkaHandler()]:
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
 
