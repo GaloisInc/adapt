@@ -28,12 +28,12 @@ class SegmentationGraph(object):
     def nodes(self):
         return self.__G.nodes()
 
-    def nodes_iter(self):
-        for n in self.__G.nodes_iter():
+    def nodes_iter(self, data=False):
+        for n in self.__G.nodes_iter(data=data):
             yield n
 
-    def edges_iter(self):
-        for u, v in self.__G.edges_iter():
+    def edges_iter(self, data=False):
+        for u, v in self.__G.edges_iter(data=data):
             yield u, v
 
     def nodes_length(self):
@@ -179,3 +179,32 @@ class SegmentationGraph(object):
         else:
             saturation, luminance = (0.0, 1.0)
         return colour.Color(hue=hue, saturation=saturation, luminance=luminance).hex_l
+
+    def store(self, db, **attributes):
+        node_ids = {}
+        label_ids = {}
+        for n, data in self.nodes_iter(data=True):
+            dbnode = db.insert_node(db.generate_uuid(),
+                                    vertexType='segment',
+                                    desc=str(n),
+                                    **attributes)
+            node_ids[n] = dbnode['id']
+
+            for label, confidence in data.get('apt', []):
+                if label not in label_ids:
+                    labelnode = db.insert_node(db.generate_uuid(),
+                                               vertexType='classificationLabel',
+                                               **attributes)
+                    label_ids[label] = labelnode['id']
+
+                db.insert_edge(dbnode['id'],
+                               label_ids[label],
+                               'segmentLabel',
+                               confidence=confidence,
+                               **attributes)
+
+        for s,d in self.edges_iter():
+            db.insert_edge(node_ids[s],
+                           node_ids[d],
+                           'segmentEdge',
+                           **attributes)

@@ -2,6 +2,7 @@ import argparse
 import simulator_diagnoser as sd
 import logging
 import random
+import os
 
 random.seed()
 
@@ -14,31 +15,19 @@ formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(pathname)s:%(lineno
 log.setLevel(logging.INFO)
 set_log_handler(log)
 
-def stub_db(db, tag='dx_phase2_stub'):
+def stub_db(db, configs, tag='dx_phase2_stub'):
     log.info('Removing tagged instances from DB')
     db.drop_nodes(tag=tag)
 
-    log.info('Inserting segmentation nodes')
-    v1 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v1')
-    v2 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v2')
-    v3 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v3')
-    v4 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v4')
-    v5 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v5')
-    v6 = db.insert_node(db.generate_uuid(), vertexType='segment', tag=tag, desc='v6')
+    log.info('Inserting segmentation graph')
+    segmentation_graph = configs.get_graph()
+    segmentation_graph.store(db, tag=tag)
 
-    log.info('Inserting segmentation edges')
-    db.insert_edge(v1['id'], v2['id'], 'segmentEdge', tag=tag)
-    db.insert_edge(v2['id'], v1['id'], 'segmentEdge', tag=tag) # can contain cycles
-    db.insert_edge(v2['id'], v3['id'], 'segmentEdge', tag=tag)
-    db.insert_edge(v2['id'], v4['id'], 'segmentEdge', tag=tag)
-    db.insert_edge(v4['id'], v5['id'], 'segmentEdge', tag=tag)
-    db.insert_edge(v5['id'], v6['id'], 'segmentEdge', tag=tag)
-
-def diagnose(db, tag='dx_phase2_stub'):
+def diagnose(db, configs, tag='dx_phase2_stub'):
     log.info('Diagnosing segmentation graph')
-    nodes = db.get_nodes(tag=tag)
+    nodes = db.get_nodes(vertexType='segment', tag=tag)
     starting_symptom = random.choice(nodes)
-    nodes = db.get_transitive_successors(starting_symptom['id'])
+    nodes = db.get_transitive_successors(starting_symptom['id'], vertexType='segment')
     if nodes == None:
         path = [starting_symptom]
     else:
@@ -67,9 +56,12 @@ if __name__ == "__main__":
     log.info('Using messenger: ' + type(messaging).__name__)
     db = sd.DBClient()
 
+    scriptdir = os.path.dirname(os.path.abspath(__file__))
+    configs = sd.ConfigParser(scriptdir + '/dx.yml')
+
     for _ in messaging.receive():
-        stub_db(db)
-        diagnose(db)
+        stub_db(db, configs)
+        diagnose(db, configs)
 
         if args.single_run:
             messaging.send()

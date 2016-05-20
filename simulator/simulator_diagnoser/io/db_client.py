@@ -64,17 +64,31 @@ class DBClient(object):
         gremlin = "g.V({}).out()".format(node)
         return self.__query(gremlin)
 
-    def get_transitive_successors(self, node):
-        gremlin = "g.V({}).repeat(out().dedup()).emit().simplePath().path()".format(node)
-        return self.__query(gremlin)
+    def get_transitive_successors(self, node, **attributes):
+        gremlin = "g.V({}).repeat(out()".format(node)
+        for x in list(attributes.keys()):
+            if x == 'label':
+                gremlin += '.hasLabel(l)'
+                attributes['l'] = attributes[x]
+            else:
+                gremlin += ".has('{}',{})".format(x,x)
+        gremlin += ".dedup()).emit().simplePath().path()"
+        return self.__query(gremlin, attributes)
 
     def get_predecessors(self, node):
         gremlin = "g.V({}).in()".format(node)
         return self.__query(gremlin)
 
-    def get_transitive_predecessors(self, node):
-        gremlin = "g.V({}).repeat(in().dedup()).emit().simplePath().path()".format(node)
-        return self.__query(gremlin)
+    def get_transitive_predecessors(self, node, **attributes):
+        gremlin = "g.V({}).repeat(in()".format(node)
+        for x in list(attributes.keys()):
+            if x == 'label':
+                gremlin += '.hasLabel(l)'
+                attributes['l'] = attributes[x]
+            else:
+                gremlin += ".has('{}',{})".format(x,x)
+        gremlin += ".dedup()).emit().simplePath().path()"
+        return self.__query(gremlin, attributes)
 
     def set_node_properties(self, node, **attributes):
         gremlin = "g.V({})".format(node)
