@@ -52,12 +52,35 @@ class DBClient(object):
         gremlin += ".drop().iterate()"
         return self.__query(gremlin, attributes)
 
+    def get_edges(self, **attributes):
+        gremlin = "g.E()"
+        for x in list(attributes.keys()):
+            if x == 'label':
+                gremlin += '.hasLabel(l)'
+                attributes['l'] = attributes[x]
+            else:
+                gremlin += ".has('{}',{})".format(x,x)
+        return self.__query(gremlin, attributes)
+
     def insert_edge(self, outnode, innode, edge_label, **attributes):
         gremlin = "graph.vertices({})[0].addEdge(l,".format(outnode) + \
                   "graph.vertices({})[0]".format(innode) + \
                   ''.join(",'{}',{}".format(x,x) for x in attributes.keys()) + \
                   ')'
         attributes.update({'l': edge_label})
+        return self.__query(gremlin, attributes)
+
+    def drop_edges(self, force=False, **attributes):
+        if not force and len(attributes) == 0:
+            return None
+        gremlin = "g.E()"
+        for x in list(attributes.keys()):
+            if x == 'label':
+                gremlin += '.hasLabel(l)'
+                attributes['l'] = attributes[x]
+            else:
+                gremlin += ".has('{}',{})".format(x,x)
+        gremlin += ".drop().iterate()"
         return self.__query(gremlin, attributes)
 
     def get_successors(self, node):

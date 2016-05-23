@@ -17,6 +17,7 @@ set_log_handler(log)
 
 def stub_db(db, configs, tag='dx_phase2_stub'):
     log.info('Removing tagged instances from DB')
+    db.drop_edges(tag=tag)
     db.drop_nodes(tag=tag)
 
     log.info('Inserting segmentation graph')
@@ -24,21 +25,19 @@ def stub_db(db, configs, tag='dx_phase2_stub'):
     segmentation_graph.store(db, tag=tag)
 
 def diagnose(db, configs, tag='dx_phase2_stub'):
+    segmentation_graph = sd.SegmentationGraph.read(db, tag=tag)
+    symptoms = configs.get_symptoms(segmentation_graph)
+
     log.info('Diagnosing segmentation graph')
-    nodes = db.get_nodes(vertexType='segment', tag=tag)
-    starting_symptom = random.choice(nodes)
-    nodes = db.get_transitive_successors(starting_symptom['id'], vertexType='segment')
-    if nodes == None:
-        path = [starting_symptom]
-    else:
-        path = random.choice(nodes)['objects']
+    dx = sd.SimpleDiagnoser(configs.get_grammar())
+    dxs = dx.diagnose(segmentation_graph, symptoms)
 
-    log.info('Inserting APT node')
-    apt_node = db.insert_node(db.generate_uuid(), vertexType='apt', tag=tag)
-
-    for node in path:
-        db.insert_edge(apt_node['id'], node['id'], 'aptContains', tag=tag)
-
+    log.info('Inserting APT nodes')
+    for path, matcher in dxs.iterate():
+        apt_node = db.insert_node(db.generate_uuid(), vertexType='apt', tag=tag)
+        for index, label in matcher.matches:
+            dbnode = segmentation_graph.get_node_data(path[index], 'dbid')
+            db.insert_edge(apt_node['id'], dbnode, 'aptContains', aptLabel=label, tag=tag)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Diagnose APT campaigns from segmented graph.')

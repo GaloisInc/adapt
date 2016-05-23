@@ -22,13 +22,16 @@ class ConfigParser(object):
             self.segmentation_graph.annotate(self.get_grammar())
         return self.segmentation_graph
 
-    def get_symptoms(self):
+    def get_symptoms(self, segmentation_graph=None):
+        if not segmentation_graph:
+            segmentation_graph = self.segmentation_graph
+
         if not self.symptoms:
             dx_config = self.config['diagnosis']
             s = dx_config.get('symptoms', [])
-            if len(s) != 1 and self.segmentation_graph:
+            if len(s) != 1 and segmentation_graph:
                 random.seed(self.config['diagnosis']['seed'])
-                s = [self.segmentation_graph.get_random_node()]
+                s = [segmentation_graph.get_random_node()]
             self.symptoms = s
         return self.symptoms
 
