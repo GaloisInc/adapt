@@ -45,6 +45,7 @@ install_kafka() {
     sudo tar xvzf kafka_${SCALA_VER}-${KAFKA_VER}.tgz || handle_error $LINENO
     sudo ln -fsn /opt/kafka_${SCALA_VER}-${KAFKA_VER} /opt/kafka || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant /opt/kafka
+    sudo chmod g+w /opt/kafka
     cd ${CWD} || handle_error $LINENO
 }
 
@@ -64,6 +65,8 @@ install_titan() {
     sudo unzip $GRZIP || handle_error $LINENO
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
+    sudo chmod g+w $TITAN_SERVER_DIR
+    mkdir -p $TITAN_SERVER_DIR/conf/triggers
     cd $CWD || handle_error $LINENO
 }
 
@@ -113,12 +116,12 @@ install_adapt_dependencies() {
 
     stack setup || handle_error $LINENO
 
+    ensure_vagrant_user
     install_kafka $KAFKAVER $SCALAVER $KAFKA_HASH || handle_error $LINENO
     install_titan
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
-    ensure_vagrant_user
     sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 }
 
