@@ -1,6 +1,8 @@
 module CommonDataModel.Types where
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BC
+import Data.ByteString.Base64 as B64
 import Data.Int
 import Data.Text (Text)
 import Data.Map
@@ -12,7 +14,14 @@ newtype Short = Short { unShort :: Word16 }
 
 -- | UUIDs are 256 bit (32 byte) values.
 newtype UUID = UUID ByteString
-  deriving (Eq,Ord,Show,Read)
+  deriving (Eq,Ord)
+
+instance Show UUID where
+  show (UUID b) = BC.unpack (B64.encode b)
+instance Read UUID where
+  readsPrec _ b = case B64.decode $ BC.pack b of
+                    Right res -> [(UUID res,"")]
+                    Left _    -> []
 
 data SubjectType = Process | Thread | Unit | BasicBlock
   deriving (Eq, Ord, Show, Enum, Bounded)

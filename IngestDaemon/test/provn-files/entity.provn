@@ -1,8 +1,0 @@
-document
-prefix tc <http://spade.csl.sri.com/rdf/audit-tc.rdfs#>
-prefix data <http://spade.csl.sri.com/#>
-
-entity(data:8fdbafb78a139753741fbb1ee6a0ae3ef5de7ab6227b1b4da890be0921638b24,[ tc:path="/etc/login.defs",tc:entityType="file",tc:hasVersion="0"])
-entity(data:28b23f862ce31296d21e69bd4fe5dd00aeffb3ce089dd7df4d7cb94bb9c4656d,[ tc:path="/lib/x86_64-linux-gnu/libc.so.6",tc:entityType="file",tc:hasVersion="0"])
-entity(data:02905caf29400894311f0c03ed2dcd3f2728db8e6160f183dc300f6ee297082c,[ tc:path="/usr/lib/locale/locale-archive",tc:entityType="file",tc:hasVersion="0"])
-endDocument
