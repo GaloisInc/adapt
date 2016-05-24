@@ -67,6 +67,12 @@ install_titan() {
     cd $CWD || handle_error $LINENO
 }
 
+ensure_vagrant_user() {
+    # post-condition:  a vagrant userid shall appear in /etc/passwd
+    egrep '^vagrant:' /etc/group  > /dev/null || sudo addgroup vagrant
+    egrep '^vagrant:' /etc/passwd > /dev/null || sudo adduser vagrant --disabled-password --gecos "" --ingroup vagrant
+}
+
 install_adapt_dependencies() {
     USER_BIN=$HOME/.local/bin
     TEMP=$ADAPT_DIR/tmp
@@ -112,6 +118,7 @@ install_adapt_dependencies() {
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
+    ensure_vagrant_user
     sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 }
 
