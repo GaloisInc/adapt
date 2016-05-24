@@ -28,3 +28,4 @@ Classifies a PG subgraph.
 from .escalation import Escalation
 from .exfil_detector import ExfilDetector
 from .fs_proxy import FsProxy
+from .phase2_node_inserter import Phase2NodeInserter

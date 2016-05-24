@@ -3,7 +3,7 @@
 import asyncio
 from aiogremlin import GremlinClient
 
-QUERY="g.V().count()"
+QUERY="g.V().drop().iterate()"
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

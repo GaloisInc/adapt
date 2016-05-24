@@ -48,6 +48,9 @@ install_kafka() {
     cd ${CWD} || handle_error $LINENO
 }
 
+remove_titan() {
+    sudo rm -rf $TITAN_SERVER_DIR || handle_error $LINENO
+}
 install_titan() {
     CWD=$(pwd)
     cd /opt || handle_error $LINENO
@@ -62,6 +65,12 @@ install_titan() {
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     cd $CWD || handle_error $LINENO
+}
+
+ensure_vagrant_user() {
+    # post-condition:  a vagrant userid shall appear in /etc/passwd
+    egrep '^vagrant:' /etc/group  > /dev/null || sudo addgroup vagrant
+    egrep '^vagrant:' /etc/passwd > /dev/null || sudo adduser vagrant --disabled-password --gecos "" --ingroup vagrant
 }
 
 install_adapt_dependencies() {
@@ -92,11 +101,13 @@ install_adapt_dependencies() {
                             python python3-setuptools \
                             supervisor unzip wget \
                             python-pip \
+                            git \
                             oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip3 install coverage flake8 \
                         gremlinrestclient aiogremlin || handle_error $LINENO
     sudo -H pip install kafka-python || handle_error $LINENO
+    sudo -H pip2 install avroknife || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
@@ -107,11 +118,12 @@ install_adapt_dependencies() {
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
-    sudo chown vagrant:vagrant /opt/*
+    ensure_vagrant_user
+    sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 }
 
 function install_adapt() {
-    # Installs: In, PX, Se, AD, AC,DX
+    # Installs: In, PE, Se, AD, AC,DX
     export PATH=$PATH:$HOME/.local/bin
 
     # Install ingest system
@@ -122,7 +134,29 @@ function install_adapt() {
     ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
 }
 
+function copy_adapt() {
+    CWD=$(pwd)
+    sudo apt-get install -y git || handle_error $LINENO
+    hash -r || handle_error $LINENO
+    if [ -e $ADAPT_DIR ] ; then
+        cd $ADAPT_DIR || handle_error $LINENO
+        git pull || handle_error $LINENO
+    else
+        git clone --depth 1 /vagrant $ADAPT_DIR || handle_error $LINENO
+    fi
+    cd $CWD || handle_error $LINENO
+}
+
+install_ad() {
+    CWD=$(pwd)
+    cd $HOME/adapt/ad/osu_iforest || handle_error $LINENO
+    make || handle_error $LINENO
+    cd $CWD
+}
+
 mkdir -p $KAFKA_ROOT
 
+copy_adapt
 install_adapt_dependencies
 install_adapt
+install_ad

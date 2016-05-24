@@ -1,0 +1,12 @@
+   6325 EdgeEventAffectsFile
+    323 EdgeEventAffectsNetflow
+   1510 EdgeEventAffectsSubject
+  19492 EdgeEventCausesEvent
+     41 EdgeFileAffectsEvent
+   1528 EdgeSubjectHasparentSubject
+  11582 EdgeSubjectRunson       (relationship == EdgeSubjectRunson)
+   1528 NodeAgent		(type == agent)
+   7611 NodeEntity		(type `elem` [file, netflow, memory])
+  21020 NodeSubject		(type == subject)
+      0 NodeResource
+      0 NodeHost

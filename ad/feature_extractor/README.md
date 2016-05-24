@@ -1,33 +1,21 @@
-## Segment Specification
-
-Segment specification files identify segments in a provenance graph for feature extraction. The `seg_specifier.py` generates a sample semgment specification file, which runs inside the TC-in-a-box environment.
-
-For Phase 1, we used a very simple segment type called `VRangeType` i.e. given a range of vertices, for example, `1-100`, it considers `vertex1` to `vertex100` in the graph as a segment. A sample segment specification file is generated below:
-```
-$ python3 seg_specifier.py > seg_spec.csv
-$ cat seg_spec.csv
-segment_id,segment_type,segment_type_instance
-seg_1,VRangeType,0-360
-seg_2,VRangeType,361-720
-seg_3,VRangeType,721-1080
-seg_4,VRangeType,1081-1440
-seg_5,VRangeType,1441-1800
-...
-```
 
 ## Feature Extraction
-Given a segment specification, we first need to extract appropriate features to feed to the anomaly detector for score calculation. Ideally, these set of features should depend on the segment type i.e. for a specific segment type we would have a specific set of queries that we can run on titan database.
+For Phase 2, we used a very simple segmentation criteria, VRangeType, which connects a range of vertices with a segment node. For example, vertex ranging from 1 to 10 is considered a segment and vertex range 11 to 20 is considererd as another segment and so on.
 
-For Phase 1, we defined some generic features that can be applied to any type of segment. The `extract_features.py`, which runs inside the TC-in-a-box, computes some of these predefined features: counting number of read or write events or counting number of threads that have been started in the specified segment. An example of feature extraction based on the above segment specification is given below:
+We defined some simple features that can be applied to any type of segment. The `extract_features.py`, which runs inside the TC-in-a-box, computes some of these predefined features for example counting number of read or write events. An example of feature extraction is given below:
 
 ```
-$ python3 extract_features.py seg_spec.csv > seg_spec_features.csv
+$ python3 extract_features.py seg_spec_features.csv
 $ cat seg_spec_features.csv
-segment_id,segment_type,segment_type_instance,EVENT_READ,EVENT_WRITE,EVENT_EXECUTE,SUBJECT_PROCESS,SUBJECT_THREAD,SUBJECT_EVENT,NUM_FILES,NUM_SUBJECTS
-seg_1,VRangeType,0-360,189,0,0,0,0,0,171,189
-seg_2,VRangeType,361-720,164,0,0,0,0,0,194,164
-seg_3,VRangeType,721-1080,174,0,0,0,0,0,185,174
-seg_4,VRangeType,1081-1440,181,0,0,0,0,0,178,181
-seg_5,VRangeType,1441-1800,188,0,0,0,0,0,171,188
-...
+segment_id,segment_type,segment_type_instance,EVENT_READ,EVENT_WRITE,EVENT_EXECUTE,NUM_FILES,NUM_SUBJECTS
+seg_0,VRangeType,1-11,0,1,0,3,2
+seg_1,VRangeType,11-21,0,2,0,1,3
+seg_2,VRangeType,21-31,0,0,0,3,4
+seg_3,VRangeType,31-41,0,1,0,2,2
+seg_4,VRangeType,41-51,0,1,0,2,4
+seg_5,VRangeType,51-61,0,0,0,4,1
+seg_6,VRangeType,61-71,0,4,0,1,5
+seg_7,VRangeType,71-81,0,0,0,2,4
+seg_8,VRangeType,81-91,0,0,0,1,1
+seg_9,VRangeType,91-101,0,2,0,2,3
 ```

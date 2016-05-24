@@ -22,42 +22,58 @@
 # the software.
 #
 '''
-Writes one or more classification nodes to Titan / Cassandra.
+A pretend segmenter.
 '''
-
+import argparse
 import classify
+import kafka
 import logging
-import unittest
+import struct
+import time
 
 __author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
+
+STATUS_IN_PROGRESS = b'\x00'
+STATUS_DONE = b'\x01'
 
 
-def test_phase2():
-    '''Test Ac component with upstream deps for phase2 development.'''
-    exfil_detect = classify.ExfilDetector()
-    ins = classify.Phase2NodeInserter()
-    ins.drop_all_test_nodes()
+class ErsatzSegmenter:
 
-    # precondition
-    assert False == exfil_detect.is_exfil_segment(
-        ins._get_segment('seg1'))
+    def __init__(self, kafka_loc):
+        self.producer = kafka.KafkaProducer(bootstrap_servers=[kafka_loc])
 
-    ins.insert_reqd_events()
-    ins.insert_reqd_segment()
+    def complete_all_segmentation(self):
+        log.info("Working to produce segments...")
+        self.report_status(STATUS_IN_PROGRESS)
+        time.sleep(1)
+        ins = classify.Phase2NodeInserter()
+        ins.drop_all_test_nodes()
+        ins.insert_reqd_events()
+        ins.insert_reqd_segment()
+        log.info("Finished producing segments.")
+        self.report_status(STATUS_DONE)
 
-    # postcondition
-    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
-        ins._insert_node('ac1', 'classification',
-                         ('classificationType',
-                          'exfiltrate_sensitive_file'))
-    else:
-        assert None, 'phase2 test failed'
+    def report_status(self, status, downstreams='ac pe px'.split()):
+        def to_int(status_byte):
+            return struct.unpack("B", status_byte)[0]
+
+        log.info("reporting %d", to_int(status))
+        for downstream in downstreams:
+            self.producer.send(downstream, status)
+
+
+def arg_parser():
+    p = argparse.ArgumentParser(
+        description='Pretend to segment recent base nodes in a CDM trace.')
+    p.add_argument('--kafka', help='location of the kafka pub-sub service',
+                   default='localhost:9092')
+    return p
 
 
 if __name__ == '__main__':
-    test_phase2()
-    unittest.main()
+    args = arg_parser().parse_args()
+    ErsatzSegmenter(args.kafka).complete_all_segmentation()

@@ -10,3 +10,4 @@ supervisord.pid
 .DS_Store
 .idea
 titan/
+.vagrant
