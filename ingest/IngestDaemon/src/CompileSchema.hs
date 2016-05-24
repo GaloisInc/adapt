@@ -26,23 +26,22 @@ import qualified Data.Text.Encoding as T
 import           Data.Time
 import           Schema
 import           System.Entropy (getEntropy)
-import           System.Random (randoms,randomR)
-import           System.Random.TF
-import           System.Random.TF.Gen
 
 -- Operations represent gremlin-groovy commands such as:
--- assume: g = TinkerGraph.open()
---         t = g.traversal(standard())
--- * InsertVertex: g.addVertex(id, 'ident', 'prop1', 'val1', 'prop2', 'val2')
--- * InsertEdge: t.V(1).addE('ident',t.V(2))
-data Operation id = InsertVertex { label :: Text
+-- assume: graph = TinkerGraph.open()
+--         g = graph.traversal(standard())
+data Operation id = InsertVertex { ident      :: Text
                                  , properties :: [(Text,GremlinValue)]
                                  }
-                  | InsertEdge { label      :: Text
-                               , src,dst    :: id
-                               , properties :: [(Text,GremlinValue)]
+                  | InsertEdge { ident            :: Text
+                               , src,dst          :: id
+                               , properties       :: [(Text,GremlinValue)]
+                               , generateVertices :: Bool
                                }
   deriving (Eq,Ord,Show)
+
+insertEdge :: Text -> id -> id -> [(Text,GremlinValue)] -> Operation id
+insertEdge l s d p = InsertEdge l s d p False
 
 data GremlinValue = GremlinNum Integer
                   | GremlinString Text
@@ -62,13 +61,14 @@ compileNode n = [InsertVertex (nodeUID_base64 n) (propertiesOf n)]
 compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
 compileEdge e =
   do euid <- newUID
-     let e1Lbl = ""
-     let e2Lbl = ""
-     let eMe   = uidToBase64 euid
-     let [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
-     let v     = InsertVertex eMe (propertiesOf e)
-         eTo   = InsertEdge e1Lbl esrc eMe []
-         eFrom = InsertEdge e2Lbl eMe edst []
+     let erel  = T.pack $ show (edgeRelationship e)
+         e1Lbl = "src-" <> erel
+         e2Lbl = "dst-" <> erel
+         eMe   = uidToBase64 euid
+         [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
+         v     = InsertVertex eMe [("relationship", GremlinString erel)]
+         eTo   = insertEdge e1Lbl esrc eMe []
+         eFrom = insertEdge e2Lbl eMe edst []
      return ([v], [eTo, eFrom])
 
 class PropertiesOf a where
@@ -82,15 +82,6 @@ instance PropertiesOf Node where
     NodeSubject subject   -> propertiesOf subject
     NodeHost host         -> propertiesOf host
     NodeAgent agent       -> propertiesOf agent
-
-instance PropertiesOf Edge where
-  propertiesOf (Edge _src _dst rel) = propertiesOf rel
-
-instance PropertiesOf Relationship where
-  propertiesOf r = [("relation", enumOf r)]
-
-stringOf :: Show a => a -> GremlinValue
-stringOf  = GremlinString . T.toLower . T.pack . show
 
 enumOf :: Enum a => a -> GremlinValue
 enumOf = GremlinNum . fromIntegral . fromEnum
@@ -153,9 +144,9 @@ instance PropertiesOf SubjectType where
          [subjTy "unit"]
        SubjectBlock      ->
          [subjTy "block"]
-       SubjectEvent et s  ->
+       SubjectEvent et sx  ->
          [subjTy "event", ("eventType", enumOf et) ]
-          ++ F.toList ((("sequence",) . gremlinNum) <$> s)
+          ++ F.toList ((("sequence",) . gremlinNum) <$> sx)
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)

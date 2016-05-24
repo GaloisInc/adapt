@@ -1,15 +1,17 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ParallelListComp    #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Titan
   ( -- * Types
     ServerInfo(..)
   , defaultServer
   , Operation(..)
     -- * High level interface
-  , withTitan, Titan.send
+  , withTitan, Titan.send, commit
   , DataMessage(..), ControlMessage(..), Message(..)
+  , Titan
     -- * Insertion
   , titan
   , TitanResult(..), isSuccess, isFailure
@@ -19,6 +21,7 @@ module Titan
   , ResultId(..)
   , GraphId(..)
   , GremlinValue(..)
+  , ConnectionException(..)
   ) where
 
 import           Control.Concurrent (forkIO)
@@ -28,8 +31,6 @@ import           Crypto.Hash.SHA256 (hash)
 import           Data.Aeson (Value(..), FromJSON(..), ToJSON(..), (.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.List (intersperse)
 import           Data.List.Split (chunksOf)
@@ -52,9 +53,6 @@ data ServerInfo = ServerInfo { host     :: String
 
 defaultServer :: ServerInfo
 defaultServer = ServerInfo "localhost" 8182
-
-labelKey :: ByteString
-labelKey = "id"
 
 newtype ResultId = ResultId Text
                    deriving (Eq, Ord, Show)
@@ -93,8 +91,14 @@ withTitan (ServerInfo {..}) recvHdl mainOper =
  loop conn = do _ <- forkIO (forever (receive conn >>= flip recvHdl conn))
                 mainOper conn
 
-send :: GraphId id => Operation id -> Titan ()
-send op conn = WS.send conn (mkGremlinWSCommand (T.decodeUtf8 (serializeOperation op)))
+send :: GraphId id => Operation id -> Titan Text
+send op conn =
+ do let (req,uuid) = uncurry mkGremlinWSCommand (serializeOperation op)
+    WS.send conn req
+    return uuid
+
+commit :: Titan ()
+commit conn = WS.send conn (fst $ mkGremlinWSCommand "graph.tx().commit()" Map.empty)
 
 -- `titan server ops` is like `titanWS` except it batches the operations
 -- into sets of no more than `batchSize`.  This is to avoid the issue with
@@ -129,26 +133,32 @@ titanWS ops conn =
         DataMessage _   -> receiveTillClose (n-1) acc
 
  go :: GraphId id => Operation id -> IO ()
- go = WS.send conn . mkGremlinWSCommand . T.decodeUtf8 . serializeOperation
+ go op =
+   do let (cmd,bnd) = serializeOperation op
+      WS.send conn (fst $ mkGremlinWSCommand cmd bnd)
 
-mkGremlinWSCommand :: Text -> Message
-mkGremlinWSCommand cmd = DataMessage $ Text (mkJSON cmd)
+-- Make the data insertion command and return the request UUID string
+mkGremlinWSCommand :: Text -> Env -> (Message,Text)
+mkGremlinWSCommand cmd bnd =
+  let req = mkRequest cmd bnd
+  in (DataMessage $ Text (A.encode req), requestId req)
 
-mkJSON :: Text -> BL.ByteString
-mkJSON cmd =
-    A.encode
-      Req { requestId = UUID.toText (mkHashedUUID cmd)
+mkRequest :: Text -> Env -> GremlinRequest
+mkRequest cmd bnd =
+      Req { requestId = UUID.toText (mkHashedUUID cmd bnd)
           , op        = "eval"
           , processor = ""
           , args = ReqArgs { gremlin  = cmd
+                           , bindings = bnd
                            , language = "gremlin-groovy"
                            }
           }
 
-mkHashedUUID :: Text -> UUID.UUID
-mkHashedUUID t =
+mkHashedUUID :: Text -> Env -> UUID.UUID
+mkHashedUUID t env =
   maybe (error "Impossible uuid decode failure") id
-        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 t)))))
+        (UUID.fromByteString (BL.take 16 (BL.fromStrict (hash (T.encodeUtf8 unique)))))
+  where unique = T.concat $ t : map (T.pack . show) (Map.toList env)
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
@@ -160,16 +170,18 @@ data GremlinRequest =
       , args      :: RequestArgs
       }
 
+type Env = Map.Map Text A.Value
 data RequestArgs =
   ReqArgs { gremlin    :: Text
+          , bindings   :: Env
           , language   :: Text
           }
 
 instance ToJSON RequestArgs where
-  toJSON (ReqArgs g l) =
+  toJSON (ReqArgs g b l) =
     A.object [ "gremlin"  .= g
              , "language" .= l
-             , "bindings" .= A.Null
+             , "bindings" .= b
              , "rebindings" .= A.emptyObject
              ]
 
@@ -181,9 +193,16 @@ instance ToJSON GremlinRequest where
              , "args"      .= a
              ]
 
+instance ToJSON GremlinValue where
+  toJSON gv =
+    case gv of
+      GremlinNum i    -> toJSON i
+      x               -> toJSON (encodeGremlinValue x)
+
 instance FromJSON RequestArgs where
   parseJSON (A.Object obj) =
       ReqArgs <$> obj .: "gremlin"
+              <*> obj .: "bindings"
               <*> obj .: "language"
   parseJSON j = A.typeMismatch "RequestArgs" j
 
@@ -200,71 +219,105 @@ instance FromJSON GremlinRequest where
 --  Gremlin language serialization
 
 class GraphId a where
-  serializeOperation :: Operation a -> ByteString
+  serializeOperation :: Operation a -> (Text,Env)
 
 instance GraphId Text where
-  serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
+  serializeOperation (InsertVertex l ps) = (cmd,env)
     where
-       -- g.addV(id, vectorName, param1, val1, param2, val2 ...)
-      call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," (labelKey : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l src dst ps)   = escapeChars call
+       cmd = escapeChars call
+       -- g.addV('ident', vertexName, param1, val1, param2, val2 ...)
+       call = T.unwords
+                [ "g.addV('ident', l "
+                , if (not (null ps)) then "," else ""
+                , T.unwords $ intersperse "," (map mkParams [1..length ps])
+                , ")"
+                ]
+       env = Map.fromList $ ("l", A.String l) : mkBinding ps
+  serializeOperation (InsertEdge l src dst ps genVerts)   =
+     if genVerts
+      then (nonTestCmd, env)
+      else (testAndInsertCmd, env)
     where
-       -- g.V(dst).has(id,src).next().addE(edgeName, g.V().has(id,dst).next(), param1, val1, ...)
-       call = BC.concat $ ["g.V(", encodeQuoteText src
-                          , ").next().addEdge(", encodeQuoteText l
-                                          , ", g.V(", encodeQuoteText dst, ").next(), "
-                              ] ++ args ++ [")"]
-       args = intersperse "," (concatMap attrs ps)
-instance GraphId ResultId where
-  serializeOperation (InsertVertex l ps) = escapeChars $ BC.concat [call, args]
-    where
-      call = "g.addV"
-      args = paren $ BC.concat $ intersperse "," (labelKey : encodeQuoteText l : concatMap attrs ps)
-  serializeOperation (InsertEdge l (ResultId src) (ResultId dst) ps) = escapeChars call
-    where
-      call = BC.concat $ ["g.V(", T.encodeUtf8 src, ").next().addEdge(", encodeQuoteText l , ", g.V(", T.encodeUtf8 dst, ").next(), "] ++ args ++ [")"]
-      args = intersperse "," (concatMap attrs ps)
+      -- g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next(), param1, val1, ...)
+      nonTestCmd = escapeChars $
+             T.unwords
+              [ "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
+              , if (not (null ps)) then "," else ""
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      -- x = g.V().has('ident',src)
+      -- y = g.V().has('ident',dst)
+      -- if (!x.hasNext()) { x = g.addV('ident',src) }
+      -- if (!y.hasNext()) { y = g.addV('ident',dst) }
+      -- x.next().addEdge(edgeName, y.next())
+      testAndInsertCmd = escapeChars $
+             T.unwords
+              [ "x = g.V().has('ident',src) ;"
+              , "y = g.V().has('ident',dst) ;"
+              , "if (!x.hasNext()) { x = g.addV('ident',src) } ;"
+              , "if (!y.hasNext()) { y = g.addV('ident',dst) } ;"
+              , "x.next().addEdge(edgeName, y.next() "
+              , if (not (null ps)) then "," else ""
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      env = Map.fromList $ ("src", A.String src) : ("dst", A.String dst) :
+                           ("edgeName", A.String l) : mkBinding ps
 
-encodeQuoteText :: Text -> ByteString
-encodeQuoteText = quote . subChars . escapeChars . T.encodeUtf8
+encodeQuoteText :: Text -> Text
+encodeQuoteText = quote . subChars . escapeChars
 
-encodeGremlinValue :: GremlinValue -> ByteString
+encodeGremlinValue :: GremlinValue -> Text
 encodeGremlinValue gv =
   case gv of
-    GremlinString s -> encodeQuoteText s
-    GremlinNum  n   -> BC.pack (show n)
-    GremlinMap xs   -> BC.concat ["[ "
-                                 , BC.concat (intersperse "," $ map renderKV xs)
-                                 , " ]"
+    GremlinString s -> escapeChars s
+    GremlinNum  n   -> T.pack (show n)
+    -- XXX maps and lists are only notionally supported
+    GremlinMap xs   -> T.concat ["'["
+                                 , T.concat (intersperse "," $ map renderKV xs)
+                                 , "]'"
                                  ]
-    GremlinList vs  -> BC.concat ["[ "
-                                 , BC.concat (intersperse "," $ map encodeGremlinValue vs)
-                                 , " ]"
+    GremlinList vs  -> T.concat ["'[ "
+                                 , T.concat (intersperse "," $ map encodeGremlinValue vs)
+                                 , " ]'"
                                  ]
   where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
 
-quote :: ByteString -> ByteString
-quote b = BC.concat ["\'", b, "\'"]
+quote :: Text -> Text
+quote b = T.concat ["\'", b, "\'"]
 
-paren :: ByteString -> ByteString
-paren b = BC.concat ["(", b, ")"]
+mkBinding :: [(Text, GremlinValue)] -> [(Text, Value)]
+mkBinding pvs =
+  let lbls = [ (param n, val n) | n <- [1..length pvs] ]
+  in concat [ [(pstr, String p), (vstr,toJSON v)]
+                    | (pstr,vstr) <- lbls
+                    | (p,v) <- pvs ]
 
-attrs :: (Text,GremlinValue) -> [ByteString]
-attrs (a,b) = [encodeQuoteText a, encodeGremlinValue b]
+-- Build strin g"param1, val1, param2, val2, ..."
+mkParams :: Int -> Text
+mkParams n = T.concat [param n, ",", val n]
 
-escapeChars :: ByteString -> ByteString
+-- Construct the variable name for the nth parameter name.
+param :: Int -> Text
+param n = "param" <> T.pack (show n)
+
+-- Construct the variable name for the Nth value
+val :: Int -> Text
+val n = "val" <> T.pack (show n)
+
+escapeChars :: Text -> Text
 escapeChars b
-  | not (BC.any (`Set.member` escSet) b) = b
-  | otherwise = BC.concatMap (\c -> if c `Set.member` escSet then BC.pack ['\\', c] else BC.singleton c) b
+  | not (T.any (`Set.member` escSet) b) = b
+  | otherwise = T.concatMap (\c -> if c `Set.member` escSet then T.pack ['\\', c] else T.singleton c) b
 
 escSet :: Set.Set Char
 escSet = Set.fromList ['\\', '"']
 
-subChars :: ByteString -> ByteString
+subChars :: Text -> Text
 subChars b
-  | not (BC.any (`Set.member` badChars) b) = b
-  | otherwise = BC.map (\c -> maybe c id (Map.lookup c charRepl)) b
+  | not (T.any (`Set.member` badChars) b) = b
+  | otherwise = T.map (\c -> maybe c id (Map.lookup c charRepl)) b
 
 charRepl :: Map.Map Char Char
 charRepl = Map.fromList [('\t',' ')]
