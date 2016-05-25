@@ -66,7 +66,6 @@ install_titan() {
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
-    mkdir -p $TITAN_SERVER_DIR/conf/triggers
     cd $CWD || handle_error $LINENO
 }
 
