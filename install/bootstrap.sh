@@ -99,6 +99,7 @@ install_adapt_dependencies() {
     sudo apt-get update || handle_error $LINENO
     echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
                 | sudo debconf-set-selections || handle_error $LINENO
+    echo "timeout = 500" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc || handle_error $LINENO
     sudo apt-get install -y stack \
                             python python3-setuptools \
                             supervisor unzip wget \
