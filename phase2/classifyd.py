@@ -68,7 +68,7 @@ class TopLevelClassifier:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Se
                 self.report_status(STATUS_IN_PROGRESS)
-                #do_stuff()
+                # do_stuff()
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 

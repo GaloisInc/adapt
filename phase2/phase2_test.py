@@ -43,7 +43,7 @@ def test_phase2():
     ins.drop_all_test_nodes()
 
     # precondition
-    assert False == exfil_detect.is_exfil_segment(
+    assert False is exfil_detect.is_exfil_segment(
         ins._get_segment('seg1'))
 
     ins.insert_reqd_events()
