@@ -103,6 +103,7 @@ install_adapt_dependencies() {
                             python python3-setuptools \
                             supervisor unzip wget \
                             python-pip \
+                            python3-nose \
                             git \
                             oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
