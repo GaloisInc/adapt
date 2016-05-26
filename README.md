@@ -82,6 +82,34 @@ of operation such as 1) ingesting data from TA-3 then sending the signal
 (Adapt-specific) signal  2) ingesting data from multiple Avro files 3) ingesting
 data by replaying Kafka log files produce by some TA-1 performers.
 
+## Helper Scripts for Avro Files, Titan, and More
+
+If you want to do X then use Y:
+
+*Use just the N-th to M-th statements from an avro (.avro or .bin) file:* For
+this you can use the Python command line tool 'avroknife', which is installed in
+the VM by default.  To use knife you must give it a source and destination
+_directory_ along with any desired parameters (copying statements, extracting
+fields, ranges, etc). For example:
+
+```
+$ mkdir /tmp/avro
+$ cp example/bad-ls.avro /tmp/avro
+$ avroknife --index 0-5000 --output local:/tmp/slicedData copy local:/tmp/avro
+$ Trint -p /tmp/slicedData/content.avro
+Sent 5001 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+```
+
+*Counting nodes:* Numerous tools exist in `$HOME/adapt/tools` including
+`node_count.py`.  Just run `python3 $HOME/adapt/tools/node_count.py` and be
+aware it performs about a half dozen full database traversals.
+
+*Restarting Everything:* If you have changed titan configurations, or something
+in supervisor.d, and would like to restart services without restarting the VM
+then try running `$HOME/adapt/tools/restart_services.sh`.  Similarly, you can
+follow the steps in that script but insert a `/opt/titan/bin/titan clean`
+command if you'd like to wipe the database at the same time.
+
 # Directory Descriptions
 
 - ad: Anomaly Detection
