@@ -59,27 +59,52 @@ the notice about listening on port 8182 at or near the bottom of
 `/opt/titan/log/gremlin-server.log`. Use Trint to push data from a file into the
 database:
 
-- dx: Diagnostics
-Parameters:
+```
+Trint -p $HOME/adapt/example/bad-ls.avro
+```
 
-N.B. Trint places the data on ingestd's inbound Kafka queue.  Ingestd manages
-  -l                 --lint                    Check the given file for syntactic and type issues.
-  -q                 --quiet                   Quiet linter warnings
-- install: Scripts to install all available tools in a single virtual machine.
-  -v                 --verbose                 Verbose debugging messages
-  -a                 --ast                     Produce a pretty-printed internal CDM AST
-  -u[Database host]  --upload[=Database host]  Uploads the data by inserting it into a Titan database using gremlin.
-send the 'finished' signal to Ingestd which then propogates it to the pattern
-extractor and on down the chain:
+Trint can also send the 'finished' signal to Ingestd which then propogates it to
+the pattern extractor and on down the chain:
+
+```
 Trint -f
 ```
-- Segment: Graph segmentation
-While it might be convenient for Trint to automatically append this signal
-The 'upload' command has been tested with a gremlin server configured with the
-of operation such as 1) ingesting data from TA-3 then sending the signal
-(Adapt-specific) signal  2) ingesting data from multiple Avro files 3) ingesting
-data by replaying Kafka log files produce by some TA-1 performers.
-default websockets channelizer.
+
+N.B. Trint places the data on ingestd's inbound Kafka queue.  Ingestd manages
+the interactions with Titan while Trint returns almost immediately.  Just
+because trint has returned does not mean ingest is complete or the finish signal
+should be sent. While it might be convenient for Trint to automatically append
+the signal to the data stream, we can't expect TA-3 to send this non-standard
+signal and have opted to keep it manual for now.  Suggestions welcome.
+
+## Helper Scripts for Avro Files, Titan, and More
+
+If you want to do X then use Y:
+
+*Use just the N-th to M-th statements from an avro (.avro or .bin) file:* For
+this you can use the Python command line tool 'avroknife', which is installed in
+the VM by default.  To use knife you must give it a source and destination
+_directory_ along with any desired parameters (copying statements, extracting
+fields, ranges, etc). For example:
+
+```
+$ mkdir /tmp/avro
+$ cp example/bad-ls.avro /tmp/avro
+$ avroknife --index 0-5000 --output local:/tmp/slicedData copy local:/tmp/avro
+$ Trint -p /tmp/slicedData/content.avro
+Sent 5001 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+```
+
+*Counting nodes:* Numerous tools exist in `$HOME/adapt/tools` including
+`node_count.py`.  Just run `python3 $HOME/adapt/tools/node_count.py` and be
+aware it performs about a half dozen full database traversals.
+
+*Restarting Everything:* If you have changed titan configurations, or something
+in supervisor.d, and would like to restart services without restarting the VM
+then try running `$HOME/adapt/tools/restart_services.sh`.  Similarly, you can
+follow the steps in that script but insert a `/opt/titan/bin/titan clean`
+command if you'd like to wipe the database at the same time.
+
 # Directory Descriptions
 
 - ad: Anomaly Detection
