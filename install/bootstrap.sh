@@ -45,6 +45,7 @@ install_kafka() {
     sudo tar xvzf kafka_${SCALA_VER}-${KAFKA_VER}.tgz || handle_error $LINENO
     sudo ln -fsn /opt/kafka_${SCALA_VER}-${KAFKA_VER} /opt/kafka || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant /opt/kafka
+    sudo chmod g+w /opt/kafka
     cd ${CWD} || handle_error $LINENO
 }
 
@@ -64,7 +65,14 @@ install_titan() {
     sudo unzip $GRZIP || handle_error $LINENO
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
+    sudo chmod g+w $TITAN_SERVER_DIR
     cd $CWD || handle_error $LINENO
+}
+
+ensure_vagrant_user() {
+    # post-condition:  a vagrant userid shall appear in /etc/passwd
+    egrep '^vagrant:' /etc/group  > /dev/null || sudo addgroup vagrant
+    egrep '^vagrant:' /etc/passwd > /dev/null || sudo adduser vagrant --disabled-password --gecos "" --ingroup vagrant
 }
 
 install_adapt_dependencies() {
@@ -91,10 +99,12 @@ install_adapt_dependencies() {
     sudo apt-get update || handle_error $LINENO
     echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
                 | sudo debconf-set-selections || handle_error $LINENO
+    echo "timeout = 500" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc || handle_error $LINENO
     sudo apt-get install -y stack \
                             python python3-setuptools \
                             supervisor unzip wget \
                             python-pip \
+                            python3-nose \
                             git \
                             oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
@@ -107,6 +117,7 @@ install_adapt_dependencies() {
 
     stack setup || handle_error $LINENO
 
+    ensure_vagrant_user
     install_kafka $KAFKAVER $SCALAVER $KAFKA_HASH || handle_error $LINENO
     install_titan
     if [ -e $CONFIG_DIR/titan ] ; then
