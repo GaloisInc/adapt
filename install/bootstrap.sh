@@ -66,6 +66,8 @@ install_titan() {
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
+    cd /vagrant/config/titan || handle_error $LINENO
+    python GenerateSchema.py || handle_error $LINENO
     cd $CWD || handle_error $LINENO
 }
 
@@ -111,6 +113,7 @@ install_adapt_dependencies() {
                         gremlinrestclient aiogremlin || handle_error $LINENO
     sudo -H pip install kafka-python || handle_error $LINENO
     sudo -H pip2 install avroknife || handle_error $LINENO
+    sudo -H pip2 install tornado gremlinclient || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
