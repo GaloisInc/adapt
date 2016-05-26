@@ -99,14 +99,13 @@ install_adapt_dependencies() {
     sudo apt-get update || handle_error $LINENO
     echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
                 | sudo debconf-set-selections || handle_error $LINENO
-    echo "timeout = 500" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc || handle_error $LINENO
     sudo apt-get install -y stack \
                             python python3-setuptools \
                             supervisor unzip wget \
                             python-pip \
                             python3-nose \
-                            git \
-                            oracle-java8-installer || handle_error $LINENO
+                            git || handle_error $LINENO
+    sudo apt-get install -y oracle-java8-installer || echo "timeout = 500" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip3 install coverage flake8 \
                         gremlinrestclient aiogremlin || handle_error $LINENO
