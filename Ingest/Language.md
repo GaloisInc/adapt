@@ -881,9 +881,9 @@ EDGE_NETFLOW_AFFECTS_EVENT
 An event reads from a network flow.
 
 [schema]: #
-makeEdgeLabel('EDGE_NETFLOW_AFFECTS_EVENT' out').multiplicity(SIMPLE)
+makeEdgeLabel('EDGE_NETFLOW_AFFECTS_EVENT out').multiplicity(SIMPLE)
 [schema]: #
-makeVertexLabel('EDGE_NETFLOW_AFFECTS_EVENT'')
+makeVertexLabel('EDGE_NETFLOW_AFFECTS_EVENT')
 [schema]: #
 makeEdgeLabel('EDGE_NETFLOW_AFFECTS_EVENT in').multiplicity(SIMPLE)
 
