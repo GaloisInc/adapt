@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class TitanClient:
     def __init__(self, broker):
         self.broker = broker
-        assert re.match('.+:\d+', self.broker),\
+        assert not self.broker or re.match('.+:\d+', self.broker),\
             'Broker must be in format url:port'
         self.loop = asyncio.get_event_loop()
         self.gc = GremlinClient(url=broker, loop=self.loop)
@@ -35,8 +35,14 @@ class TitanClient:
     def execute(self, gremlin_query_str, bindings={}):
         execute = self.gc.execute(gremlin_query_str, bindings=bindings)
         logger.debug('QUERY:\n {}'.format(gremlin_query_str))
-        result = self.loop.run_until_complete(execute)
-        assert result[0].status_code in (200, 204), result[0].status_code
+        try:
+            result = self.loop.run_until_complete(execute)
+        except Exception as e:
+            print('Error trying to connect to Titan DB: {0}...aborting'.
+                format(e))
+            self.close()
+            sys.exit(-1)
+        assert result[0].status_code in (200, 204, 206), result[0].status_code
         if result == 204:
             return None
         else:
@@ -68,18 +74,30 @@ class TitanClient:
     def add_node(self, n, d):
         """
         Adds node with name n to the DB if it does not already exist.
+        A node with name n and dictionary d exists in the DB if
+          c1) there is already a node with name n in the db, or
+          c2) there is already a node with dictionary d in the db
         """
         d['name'] = n
+        c1 = self.execute('g.V().has(\'name\', \'{}\')'.format(n))
         properties_str = ', '.join(
-            map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]), d.items()))
-        r = self.execute('g.V().has(\'name\', \'{}\')'.format(n))
-        if not r:
-            r = self.execute('g.addV({})'.format(properties_str))
+            map(lambda x: '__().has(\'{0}\',\'{1}\')'.format(
+                x[0], x[1]), d.items()))
+        c2 = self.execute('g.V().and({0})'.format(properties_str))
+        if not (c1 or c2):
+            properties_str = ', '.join(
+                map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]), d.items()))
+            c1 = self.execute('g.addV({})'.format(properties_str))
+            assert 'name' in d, d
             logger.debug('add_node: Added node with properties {}'.format(d))
         else:
-            logger.debug(
-                'add_node: Node with name {} already exists'.format(n))
-        return r
+            if c1:
+                logger.debug(
+                    'add_node: Node with name {} already exists'.format(n))
+            if c2:
+                logger.debug(
+                    'add_node: Node with dictionary {} already exists'.format(d))
+        return c1
 
     def load_from_document_graph(self, dg):
         for n1, n2 in dg.g.edges():
@@ -94,6 +112,8 @@ class TitanClient:
         doc = Document()
         node_id2name_map = {}
         nodes = self.all_nodes()
+        if not nodes:
+            return DocumentGraph(doc)
         for v in nodes:
             d = v['properties']
             assert 'type' in d, d
@@ -159,7 +179,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='A simple wrapper around a Titan DB')
     parser.add_argument('provn_file', help='A prov-tc file in provn format')
-    parser.add_argument('broker', help='Teh broker to the Titan DB')
+    parser.add_argument('broker', help='The broker to the Titan DB')
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
 
@@ -170,7 +190,7 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
