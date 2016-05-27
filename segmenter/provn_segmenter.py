@@ -111,9 +111,11 @@ class Segmenter:
             try:
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
-                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith":
+                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
+                        self.dg.g.edge[x][y]['type'] != "includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
+                        'and includes '
                         'must have a timestamp')
                 continue
             if ts >= begin_time and ts < end_time:
@@ -175,33 +177,43 @@ class Segmenter:
                             for n in segment_i & segment_j:
                                 e = SegmentExpr(s.id, n, {})
                                 segmentation_doc.expression_list += [e]
-        return segmentation_doc
+        segmentation_dg = DocumentGraph(segmentation_doc)
+        return segmentation_dg
 
 
 class DocumentGraph:
+    def _populate_graph(self):
+        for e in self.doc.expression_list:
+            d = e.att_val_dict
+            d['type'] = e.label()
+            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
+                self.g.add_node(e.id, e.att_val_dict)
+            else:
+                d = e.att_val_dict
+                if e.timestamp:
+                    d['timestamp'] = e.timestamp
+                    if (not self.min_time) or e.timestamp < self.min_time:
+                        self.min_time = e.timestamp
+                    if not self.max_time or e.timestamp > self.max_time:
+                        self.max_time = e.timestamp
+                d['type'] = e.label()
+                self.g.add_edge(e.s, e.t, d)
+
     def __init__(self, document):
         self.g = NX.DiGraph()
         self.doc = document
         self.max_time = None
         self.min_time = None
 
-        def populate_graph():
-            for e in self.doc.expression_list:
-                d = e.att_val_dict
-                d['type'] = e.label()
-                if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
-                    self.g.add_node(e.id, e.att_val_dict)
-                else:
-                    d = e.att_val_dict
-                    if e.timestamp:
-                        d['timestamp'] = e.timestamp
-                        if (not self.min_time) or e.timestamp < self.min_time:
-                            self.min_time = e.timestamp
-                        if not self.max_time or e.timestamp > self.max_time:
-                            self.max_time = e.timestamp
-                    d['type'] = e.label()
-                    self.g.add_edge(e.s, e.t, d)
-        populate_graph()
+        self._populate_graph()
+
+    def union(self, dg):
+        self.doc.union(dg.doc)
+        self.g = NX.DiGraph()
+        self._populate_graph()
+
+    def __str__(self):
+        return str(self.doc)
 
     def print_summary(self):
         print('=' * 30)
@@ -313,8 +325,13 @@ if __name__ == "__main__":
 
     s = Segmenter(dg, args.spec_file)
 
-    segmentation_doc = s.eval_spec()
+    segmentation_dg = s.eval_spec()
     print('=' * 30)
     print('\tSegmentation result')
     print('=' * 30)
-    print(segmentation_doc)
+    print(segmentation_dg)
+
+    dg.union(segmentation_dg)
+    dg.print_summary()
+
+
