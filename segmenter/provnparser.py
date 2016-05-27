@@ -182,13 +182,10 @@ class PrefixDecl:
 
 
 class Document:
-    """
-    A program in our language is just a list of functions
-    """
     def __init__(self):
         self.filename = None
         self.expression_list = []
-        self.prefix_decl = []
+        self.prefix_decls = []
 
     def parse_provn(self, filename):
         self.filename = filename
@@ -196,10 +193,15 @@ class Document:
         assert self.expression_list != None
         assert self.prefix_decls != None
 
+    def union(self, doc):
+        for e in doc.expression_list:
+            self.expression_list.append(e)
+        self.prefix_decls = list(set(self.prefix_decls) | set(doc.prefix_decls))
+
     def __str__(self):
         def f(x): return '\t' + str(x)
         l = ['document']
-        l += map(f, self.prefix_decl)
+        l += map(f, self.prefix_decls)
         l += map(f, self.expression_list)
         l += ['endDocument']
         return '\n'.join(l)
