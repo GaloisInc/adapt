@@ -67,7 +67,6 @@ install_titan() {
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
     cd /vagrant/config/titan || handle_error $LINENO
-    python GenerateSchema.py || handle_error $LINENO
     cd $CWD || handle_error $LINENO
 }
 
@@ -107,7 +106,7 @@ install_adapt_dependencies() {
                             python-pip \
                             python3-nose \
                             git || handle_error $LINENO
-    sudo apt-get install -y oracle-java8-installer || echo "timeout = 500" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
+    sudo apt-get install -y oracle-java8-installer || echo "tries = 100\ntimeout = 5000" | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip3 install coverage flake8 \
                         gremlinrestclient aiogremlin || handle_error $LINENO

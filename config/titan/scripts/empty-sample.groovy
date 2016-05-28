@@ -2,6 +2,11 @@
 graph = TitanFactory.open('/opt/titan/conf/gremlin-server/titan-cassandra-server.properties')
 graph.tx().rollback()
 mgmt = graph.openManagement()
+if(!mgmt.containsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {
+    def command = "python /vagrant/adapt/config/titan/GenerateSchema.py"
+    def proc = command.execute()
+    proc.waitFor()
+}
 i = mgmt.getGraphIndex('byIdent')
 if(! i) {
   idKey = mgmt.getPropertyKey('ident')
