@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE TemplateHaskell     #-}
 -- | Ingestd is the ingest daemon which takes TA-1 data from Kafka queue,
 -- decodes it as Avro-encodedCDM, translates to Adapt Schema, uploads to
@@ -19,7 +20,6 @@ import           Control.Concurrent.STM (atomically)
 import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
-import           Data.Aeson (FromJSON(..), Value(..), decode, (.:))
 import           Data.Int (Int64)
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
@@ -37,9 +37,9 @@ import           SimpleGetOpt
 import           System.IO (stderr)
 import           Text.Printf
 import           Text.Read (readMaybe)
-import           Text.Groom
 
-import           Titan as Titan
+import           Gremlin.Client as GC
+import           CompileSchema
 import           IngestDaemon.KafkaManager
 import           IngestDaemon.Types
 
@@ -52,7 +52,7 @@ data Config =
              , _inputTopics   :: [TopicName]
              , _outputTopic   :: TopicName
              , _triggerTopic  :: TopicName
-             , _titanServer   :: Titan.ServerInfo
+             , _titanServer   :: GC.ServerInfo
              } deriving (Show)
 
 makeLenses ''Config
@@ -76,7 +76,7 @@ defaultConfig = Config
   , _inputTopics   = []
   , _outputTopic   = "pe"
   , _triggerTopic  = "in-finished"
-  , _titanServer   = Titan.defaultServer
+  , _titanServer   = GC.defaultServer
   }
 
 opts :: OptSpec Config
@@ -109,7 +109,8 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Set the titan server"
                     $ ReqArg "host:port" $
                         \str s ->
-                            let svr = uncurry ServerInfo <$> (parseHostPort str)
+                            let svr = do (h,p) <- parseHostPort str
+                                         return (ServerInfo h p 128)
                             in case svr of
                                 Just res -> Right (s & titanServer .~ res)
                                 Nothing  -> Left "Could not parse host:port string."
@@ -233,105 +234,49 @@ persistant logMsg io =
 
 titanManager :: Config
              -> (Text -> IO ())
-             -> Titan.ServerInfo
+             -> GC.ServerInfo
              -> TBChan Input
              -> FailedInsertionDB
              -> IO (Either ConnectionException ())
-titanManager cfg logTitan svr inputs reqStatus =
+titanManager _cfg logTitan svr inputs reqStatus =
  do logTitan "Connecting to titan..."
-    Titan.withTitan svr (handleResponses cfg reqStatus)
-                        (runDB logTitan inputs reqStatus)
-
-data Response = Response { respUUID :: Text, respCode :: Int }
-
-instance FromJSON Response where
-  parseJSON (Object obj) =
-    do rid         <- obj .: ("requestId" :: Text)
-       mstat <- obj .: ("status" :: Text)
-       case mstat of
-        Object stat ->
-          do cd          <- stat .: ("code" :: Text)
-             return (Response rid cd)
-        _ -> fail "Titan response field 'status' must be an object"
-  parseJSON _ = fail "Titan JSON response must be an object"
-
-handleResponses :: Config
-                -> FailedInsertionDB
-                -> Titan.Message
-                -> Titan.Titan ()
-handleResponses cfg db resp _ =
-  case resp of
-    ControlMessage _ -> return ()
-    DataMessage dm   -> do
-      let bs = case dm of
-                Text t   -> t
-                Binary b -> b
-      case decode bs of
-        Nothing -> return ()
-        Just r ->
-          do when (cfg ^. verbose) (emitData r)
-             go r
- where
- -- Delete operations that return 200 (success) and retain operations with
- -- other HTTP response codes, updating the code for later use in follow-on
- -- insertion attempts.
- go :: Response -> IO ()
- go (Response uuid code)
-  | code == 200 = deleteDB uuid db
-  | otherwise   = setCodeDB uuid code db
-
- -- If verbosity is on, print to stdout:
- -- '''
- -- --- $UUID ---
- -- Code: $code   -- only when code /= 200
- -- CDM: $cdm
- -- Statement: $statement
- -- '''
- emitData :: Response -> IO ()
- emitData (Response uuid code) = do
-  mor <- lookupDB uuid db
-  case mor of
-    Just (OpRecord (Input cdm stmt) _) ->
-     do T.putStrLn ("--- DB Transaction: " <> uuid <> " ---")
-        when (code /= 200) (T.putStrLn ("code:" <> T.pack (show code)))
-        T.putStrLn ("CDM: " <> groom' cdm)
-        T.putStrLn ("Statement: " <> groom' stmt)
-    Nothing -> return ()
- groom' val = T.concatMap (\x -> if x == '\n' then "\n\t" else T.singleton x) ("\n" <> T.pack (groom val))
+    dbc <- GC.connect svr
+    case dbc of
+      Left e   -> return (Left e)
+      Right db -> runDB logTitan inputs reqStatus db >> return (Right ())
 
 runDB :: (Text -> IO ())
       -> TBChan Input
       -> FailedInsertionDB
-      -> Titan.Connection
+      -> DBConnection
       -> IO ()
 runDB logTitan inputs db conn =
   do logTitan "Connected to titan."
-     go commitInterval reportInterval (0,0)
+     go reportInterval (0,0)
  where
- commitInterval = 1
  reportInterval = 1000
 
- go :: Int -> Int -> (Int64,Int64) -> IO ()
- go ci 0 !cnts@(!nrE,!nrV) =
+ go :: Int -> (Int64,Int64) -> IO ()
+ go 0 !cnts@(!nrE,!nrV) =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
-     go ci reportInterval cnts
- go 0 ri cnts =
-  do Titan.commit conn
-     threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
-     go commitInterval ri cnts
- go ci ri !(!nrE,!nrV) =
+     go reportInterval cnts
+ go ri !(!nrE,!nrV) =
   do opr <- atomically (TB.readTBChan inputs)
-     let stmt = statement opr
-     uuid <- Titan.send stmt conn
-     insertDB uuid opr db
+     let (cmd,env) = serializeOperation stmt
+         stmt = statement opr
+         req  = mkRequest cmd env
+     future <- GC.sendOn conn req
+     _ <- forkIO $ do
+            resp <- wait future
+            when (respStatus resp /= 200) (insertDB (respRequestId resp) opr db)
      let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
-     go (ci - 1) (ri - 1) (nrE2,nrV2)
+     go (ri - 1) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
 --  Utils
 
 isVertex :: Operation a -> Bool
-isVertex (InsertVertex _ _) = True
+isVertex (InsertVertex {}) = True
 isVertex _                  = False
 
 channelToStderr :: TBChan Text -> IO ()

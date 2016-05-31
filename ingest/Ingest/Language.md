@@ -187,7 +187,7 @@ The following are type definitions for types used in the schema description.
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:source').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('source').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:agentType* is used in Agents, and maps to CDM enum type PrincipalType:
 
@@ -200,7 +200,7 @@ enum PrincipalType {
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:agentType').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('agentType').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:eventType* is used in Subjects, and maps to CDM enum type EventType:
 
@@ -237,7 +237,7 @@ makePropertyKey('prov-tc:agentType').dataType(Short.class).cardinality(Cardinali
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:eventType').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('eventType').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:sourceType* is used in Resources, and maps to CDM enum SourceType:
 
@@ -270,7 +270,7 @@ enum SourceType {
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:sourceType').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('srcSinkType').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:trustworthiness* is used in many places, and maps to CDM enum type IntegrityTag:
 
@@ -284,7 +284,7 @@ makePropertyKey('prov-tc:sourceType').dataType(Short.class).cardinality(Cardinal
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:trustworthiness').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('trustworthiness').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:privacyLevel* is used in many places, and maps to CDM enum type ConfidentialityTag
 
@@ -315,7 +315,7 @@ makePropertyKey('prov-tc:privacyLevel').dataType(Short.class).cardinality(Cardin
 
 and maps to the Titan data type:
 [schema]: #
-makePropertyKey('prov-tc:subjectType').dataType(Short.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('subjectType').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 *prov-tc:strength* is used in wasDerivedFrom relationships:
 
@@ -356,147 +356,147 @@ Other primitive types used in our model:
 * *prov-tc:properties* : map\<string,string\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:properties').dataType(String.class).cardinality(Cardinality.LIST)
+  makePropertyKey('properties').dataType(String.class).cardinality(Cardinality.LIST)
 
 * *prov-tc:uid* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:uid').dataType(Long.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('ident').dataType(Long.class).cardinality(Cardinality.SINGLE)
   
 * *prov-tc:url* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:url').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('url').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:file-version* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:file-version').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('file-version').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:size* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:size').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('size').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:permissions* : short;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:permissions').dataType(Short.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('permissions').dataType(Short.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:time* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:time').dataType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('time').dataType(Date.class).cardinality(Cardinality.SINGLE)
 
 * *prov:startedAtTime* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:startedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('startedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
 
 * *prov:endedAtTime* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:endedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('endedAtTime').dataType(Date.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:srcAddress* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:srcAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('srcAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:srcPort* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:srcPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('srcPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:dstAddress* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:dstAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('dstAddress').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:dstPort* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:dstPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('dstPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pageNumber* : Maybe int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:address* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pid* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:pid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('pid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:ppid* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:ppid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('ppid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:unitid* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:unitid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('unitid').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:commandLine* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:commandLine').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('commandLine').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:importLibs* : list\<string\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:importLibs').dataType(String.class).cardinality(Cardinality.SET)
+  makePropertyKey('importLibs').dataType(String.class).cardinality(Cardinality.SET)
 
 * *prov-tc:exportLibs* : list\<string\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:exportLibs').dataType(String.class).cardinality(Cardinality.SET)
+  makePropertyKey('exportLibs').dataType(String.class).cardinality(Cardinality.SET)
 
 * *prov-tc:env* : map\<string,string\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:env').dataType(String.class).cardinality(Cardinality.LIST)
+  makePropertyKey('env').dataType(String.class).cardinality(Cardinality.LIST)
 
 * *prov-tc:pInfo* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:pInfo').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('pInfo').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:location* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:location').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('location').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:ppt* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:ppt').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('ppt').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:args* : list\<prov-tc:argValue\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:args').dataType(Byte.class).cardinality(Cardinality.LIST)
+  makePropertyKey('args').dataType(Byte.class).cardinality(Cardinality.LIST)
 
 * *prov-tc:gid* : list\<int\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:gid').dataType(Integer.class).cardinality(Cardinality.LIST)
+  makePropertyKey('gid').dataType(Integer.class).cardinality(Cardinality.LIST)
 
 * *prov-tc:userID* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:userID').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('userID').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:sequence* : long;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('prov-tc:sequence').dataType(Long.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('sequence').dataType(Long.class).cardinality(Cardinality.SINGLE)
  
 
 Data Model Classes
@@ -954,7 +954,11 @@ prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
 This relationship connects Subjects with the hosts they run on.
 
 [schema]: #
-makeEdgeLabel('prov-tc:runsOn').multiplicity(MANY2ONE)
+makeEdgeLabel('EDGE_SUBJECT_RUNSON out').multiplicity(SIMPLE)
+[schema]: #
+makeVertexLabel('EDGE_SUBJECT_RUNSON')
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_RUNSON in').multiplicity(SIMPLE)
 
 prov-tc:residesOn (CDM Edge Type EDGE_OBJECT_RESIDESON)
 ----------
@@ -968,7 +972,11 @@ prov:wasAttributedTo (includes CDM Edge Type EDGE_SUBJECT_HASLOCALPRINCIPAL)
 This relationship connects entities or Subjects to the agents responsible for them. It has no attributes.
 
 [schema]: #
-makeEdgeLabel('prov:wasAttributedTo').multiplicity(SIMPLE)
+makeEdgeLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL out').multiplicity(SIMPLE)
+[schema]: #
+makeVertexLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL')
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL in').multiplicity(SIMPLE)
 
 prov-tc:partOfPattern (not in CDM)
 --------

@@ -3,34 +3,41 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ParallelListComp  #-}
 module CompileSchema
   ( -- * Operations
-    compile, compileNode, compileEdge
+    compile, compileNode, compileEdge, serializeOperation
     -- * Types
     , GremlinValue(..)
     , Operation(..)
   ) where
 
+import qualified Data.Aeson as A
 import           Data.Binary (encode,decode)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as ByteString
+import           Data.Char (isUpper)
+import qualified Data.Char as C
 import           Data.Foldable as F
+import           Data.List (intersperse)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time
-import           Schema
+import           Schema hiding (Env)
 import           System.Entropy (getEntropy)
 
 -- Operations represent gremlin-groovy commands such as:
 -- assume: graph = TinkerGraph.open()
 --         g = graph.traversal(standard())
-data Operation id = InsertVertex { ident      :: Text
+data Operation id = InsertVertex { vertexType :: Text
+                                 , ident      :: Text
                                  , properties :: [(Text,GremlinValue)]
                                  }
                   | InsertEdge { ident            :: Text
@@ -49,6 +56,12 @@ data GremlinValue = GremlinNum Integer
                   | GremlinMap [(Text, GremlinValue)]
   deriving (Eq,Ord,Show)
 
+instance A.ToJSON GremlinValue where
+  toJSON gv =
+    case gv of
+      GremlinNum i    -> A.toJSON i
+      x               -> A.toJSON (encodeGremlinValue x)
+
 compile :: ([Node], [Edge]) -> IO [Operation Text]
 compile (ns,es) =
   do let vertOfNodes = concatMap compileNode ns
@@ -56,17 +69,23 @@ compile (ns,es) =
      pure $ concat [vertOfNodes , vertOfEdges , edgeOfEdges]
 
 compileNode :: Node -> [Operation Text]
-compileNode n = [InsertVertex (nodeUID_base64 n) (propertiesOf n)]
+compileNode n = [InsertVertex ty (nodeUID_base64 n) props]
+ where
+  (ty,props) = propertiesAndTypeOf n
 
 compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
 compileEdge e =
   do euid <- newUID
-     let erel  = T.pack $ show (edgeRelationship e)
-         e1Lbl = "src-" <> erel
-         e2Lbl = "dst-" <> erel
+     let e1Lbl = vLbl <> " out"
+         e2Lbl = vLbl <> " in"
          eMe   = uidToBase64 euid
          [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
-         v     = InsertVertex eMe [("relationship", GremlinString erel)]
+         fixCamelCase str =
+           let go x | isUpper x = T.pack ['_' , x]
+                    | otherwise = T.pack [C.toUpper x]
+           in T.take 1 str <> T.concatMap go (T.drop 1 str)
+         vLbl  = fixCamelCase $ T.pack $ show (edgeRelationship e) -- XXX Fix camel case vs snake case
+         v     = InsertVertex vLbl eMe [("relationship", GremlinString vLbl)]
          eTo   = insertEdge e1Lbl esrc eMe []
          eFrom = insertEdge e2Lbl eMe edst []
      return ([v], [eTo, eFrom])
@@ -74,23 +93,23 @@ compileEdge e =
 class PropertiesOf a where
   propertiesOf :: a -> [(Text,GremlinValue)]
 
-instance PropertiesOf Node where
-  propertiesOf node =
+class PropertiesAndTypeOf a where
+  propertiesAndTypeOf :: a -> (Text,[(Text,GremlinValue)])
+
+instance PropertiesAndTypeOf Node where
+  propertiesAndTypeOf node =
    case node of
-    NodeEntity entity     -> propertiesOf entity
-    NodeResource resource -> propertiesOf resource
-    NodeSubject subject   -> propertiesOf subject
-    NodeHost host         -> propertiesOf host
-    NodeAgent agent       -> propertiesOf agent
+    NodeEntity entity     -> propertiesAndTypeOf entity
+    NodeResource resource -> propertiesAndTypeOf resource
+    NodeSubject subject   -> propertiesAndTypeOf subject
+    NodeHost host         -> propertiesAndTypeOf host
+    NodeAgent agent       -> propertiesAndTypeOf agent
 
 enumOf :: Enum a => a -> GremlinValue
 enumOf = GremlinNum . fromIntegral . fromEnum
 
 mkSource :: InstrumentationSource -> (Text,GremlinValue)
 mkSource = ("source",) . enumOf
-
-mkType :: Text -> (Text,GremlinValue)
-mkType = ("type",) . GremlinString
 
 mayAppend :: Maybe (Text,GremlinValue) -> [(Text,GremlinValue)] -> [(Text,GremlinValue)]
 mayAppend Nothing  = id
@@ -102,36 +121,41 @@ instance PropertiesOf OptionalInfo where
                   , ("permissions",)  . gremlinNum <$> infoPermissions
           ] <> propertiesOf infoOtherProperties
 
-instance PropertiesOf Entity where
-  propertiesOf e =
+instance PropertiesAndTypeOf Entity where
+  propertiesAndTypeOf e =
    case e of
-      File {..} ->   mkType "file"
-                   : mkSource entitySource
-                   : ("url", GremlinString entityURL)
-                   : ("fileVersion", gremlinNum entityFileVersion)
-                   : mayAppend ( (("fileSize",) . gremlinNum) <$> entityFileSize)
-                               (propertiesOf entityInfo)
+      File {..} -> ("file"
+                   , mkSource entitySource
+                     : ("url", GremlinString entityURL)
+                     : ("file-version", gremlinNum entityFileVersion)
+                     : mayAppend ( (("size",) . gremlinNum) <$> entityFileSize)
+                                 (propertiesOf entityInfo)
+                   )
       NetFlow {..} -> 
-                  mkType "netflow"
-                : mkSource entitySource
-                : ("srcAddress", GremlinString entitySrcAddress)
-                : ("dstAddress", GremlinString entityDstAddress)
-                : ("srcPort", gremlinNum entitySrcPort)
-                : ("dstPort", gremlinNum entityDstPort)
-                : propertiesOf entityInfo
+                ("netflow"
+                , mkSource entitySource
+                  : ("srcAddress", GremlinString entitySrcAddress)
+                  : ("dstAddress", GremlinString entityDstAddress)
+                  : ("srcPort", gremlinNum entitySrcPort)
+                  : ("dstPort", gremlinNum entityDstPort)
+                  : propertiesOf entityInfo
+                )
       Memory {..} ->
-                 mkType "memory"
-               : mkSource entitySource
-               : maybe id (\p -> (("pageNumber", gremlinNum p):)) entityPageNumber
-               ( ("address", gremlinNum entityAddress)
-               : propertiesOf entityInfo
+               ("memory"
+               , mkSource entitySource
+                 : maybe id (\p -> (("pageNumber", gremlinNum p):)) entityPageNumber
+                 ( ("address", gremlinNum entityAddress)
+                 : propertiesOf entityInfo
+                 )
                )
 
-instance PropertiesOf Resource where
-  propertiesOf (Resource {..}) =
-                 mkType "resource"
-               : mkSource resourceSource
-               : propertiesOf resourceInfo
+instance PropertiesAndTypeOf Resource where
+  propertiesAndTypeOf (Resource {..}) =
+               ("resource"
+               , ("srcSinkType", enumOf resourceSource)
+                 : propertiesOf resourceInfo
+               )
+
 instance PropertiesOf SubjectType where
   propertiesOf s =
    let subjTy = ("subjectType",) . GremlinString
@@ -161,48 +185,51 @@ instance PropertiesOf a => PropertiesOf (Maybe a) where
   propertiesOf Nothing  = []
   propertiesOf (Just x) = propertiesOf x
 
-instance PropertiesOf Subject where
-  propertiesOf (Subject {..}) =
-                mkType "subject"
-              : mkSource subjectSource
-              : maybe id (\s -> (("startTime", gremlinTime s) :)) subjectStartTime
-              ( concat
-                 [ propertiesOf subjectType
-                 , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
-                 , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
-                 , F.toList (("unitid"     ,) . gremlinNum    <$> subjectUnitID     )
-                 , F.toList (("endtime"    ,) . gremlinTime   <$> subjectEndTime    )
-                 , F.toList (("commandline",) . GremlinString <$> subjectCommandLine)
-                 , F.toList (("importlibs" ,) . gremlinList   <$> subjectImportLibs )
-                 , F.toList (("exportlibs" ,) . gremlinList   <$> subjectExportLibs )
-                 , F.toList (("processinfo",) . GremlinString <$> subjectProcessInfo)
-                 , F.toList (("location"   ,) . gremlinNum    <$> subjectLocation   )
-                 , F.toList (("size"       ,) . gremlinNum    <$> subjectSize       )
-                 , F.toList (("ppt"        ,) . GremlinString <$> subjectPpt        )
-                 , F.toList (("env"        ,) . GremlinMap . propertiesOf  <$> subjectEnv)
-                 , F.toList (("args"       ,) . gremlinArgs   <$> subjectArgs       )
-                 , propertiesOf subjectOtherProperties
-                 ])
+instance PropertiesAndTypeOf Subject where
+  propertiesAndTypeOf (Subject {..}) =
+              ("subject"
+              , mkSource subjectSource
+                : maybe id (\s -> (("startedAtTime", gremlinTime s) :)) subjectStartTime
+                ( concat
+                   [ propertiesOf subjectType
+                   , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
+                   , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
+                   , F.toList (("unitid"     ,) . gremlinNum    <$> subjectUnitID     )
+                   , F.toList (("endedAtTime"    ,) . gremlinTime   <$> subjectEndTime    )
+                   , F.toList (("commandLine",) . GremlinString <$> subjectCommandLine)
+                   , F.toList (("importLibs" ,) . gremlinList   <$> subjectImportLibs )
+                   , F.toList (("exportLibs" ,) . gremlinList   <$> subjectExportLibs )
+                   , F.toList (("pInfo",) . GremlinString <$> subjectProcessInfo)
+                   , F.toList (("location"   ,) . gremlinNum    <$> subjectLocation   )
+                   , F.toList (("size"       ,) . gremlinNum    <$> subjectSize       )
+                   , F.toList (("ppt"        ,) . GremlinString <$> subjectPpt        )
+                   , F.toList (("env"        ,) . GremlinMap . propertiesOf  <$> subjectEnv)
+                   , F.toList (("args"       ,) . gremlinArgs   <$> subjectArgs       )
+                   , propertiesOf subjectOtherProperties
+                   ])
+               )
 
 instance PropertiesOf (Map Text Text) where
-  propertiesOf = Map.toList . fmap GremlinString
+  propertiesOf x = [("properties", GremlinMap (map (\(a,b) -> (a,GremlinString b)) (Map.toList x)))]
 
-instance PropertiesOf Host  where
-  propertiesOf (Host {..}) =
-          mkType "host" :
-            catMaybes [ mkSource <$> hostSource
+instance PropertiesAndTypeOf Host  where
+  propertiesAndTypeOf (Host {..}) =
+          ( "host"
+          , catMaybes [ mkSource <$> hostSource
                       , ("hostIP",) . GremlinString <$> hostIP
                       ]
+          )
 
-instance PropertiesOf Agent where
-  propertiesOf (Agent {..}) =
-        mkType "agent"
-      : ("userID", gremlinNum agentUserID)
-      : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
-               , F.toList (("principleType",) . enumOf <$> agentType)
-               , F.toList (mkSource <$> agentSource)
-               , propertiesOf agentProperties
-               ]
+instance PropertiesAndTypeOf Agent where
+  propertiesAndTypeOf (Agent {..}) =
+      ("agent"
+      , ("userID", gremlinNum agentUserID)
+        : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
+                 , F.toList (("agentType",) . enumOf <$> agentType)
+                 , F.toList (mkSource <$> agentSource)
+                 , propertiesOf agentProperties
+                 ]
+      )
 
 nodeUID_base64 :: Node -> Text
 nodeUID_base64 = uidToBase64 . nodeUID
@@ -216,3 +243,114 @@ newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 gremlinNum :: Integral i => i -> GremlinValue
 gremlinNum = GremlinNum . fromIntegral
 
+--------------------------------------------------------------------------------
+--  Gremlin language serialization
+
+class GraphId a where
+  serializeOperation :: Operation a -> (Text,Env)
+
+type Env = Map.Map Text A.Value
+
+instance GraphId Text where
+  serializeOperation (InsertVertex ty l ps) = (cmd,env)
+    where
+       cmd = escapeChars call
+       -- g.addV(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
+       call = T.unwords
+                [ "g.addV(label, tyParam, 'ident', l "
+                , if (not (null ps)) then "," else ""
+                , T.unwords $ intersperse "," (map mkParams [1..length ps])
+                , ")"
+                ]
+       env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
+  serializeOperation (InsertEdge l src dst ps genVerts)   =
+     if genVerts
+      then (nonTestCmd, env)
+      else (testAndInsertCmd, env)
+    where
+      -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
+      nonTestCmd = escapeChars $
+             T.unwords
+              [ "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next() "
+              , if (not (null ps)) then "," else ""
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      -- x = g.V().has('ident',src)
+      -- y = g.V().has('ident',dst)
+      -- if (!x.hasNext()) { x = g.addV('ident',src) }
+      -- if (!y.hasNext()) { y = g.addV('ident',dst) }
+      -- x.next().addEdge(edgeName, y.next())
+      testAndInsertCmd = escapeChars $
+             T.unwords
+              [ "x = g.V().has('ident',src) ;"
+              , "y = g.V().has('ident',dst) ;"
+              , "if (!x.hasNext()) { x = g.addV('ident',src) } ;"
+              , "if (!y.hasNext()) { y = g.addV('ident',dst) } ;"
+              , "x.next().addEdge(edgeName, y.next() "
+              , if (not (null ps)) then "," else ""
+              , T.unwords $ intersperse "," (map mkParams [1..length ps])
+              , ")"
+              ]
+      env = Map.fromList $ ("src", A.String src) : ("dst", A.String dst) :
+                           ("edgeTy", A.String l) : mkBinding ps
+
+encodeQuoteText :: Text -> Text
+encodeQuoteText = quote . subChars . escapeChars
+
+encodeGremlinValue :: GremlinValue -> Text
+encodeGremlinValue gv =
+  case gv of
+    GremlinString s -> escapeChars s
+    GremlinNum  n   -> T.pack (show n)
+    -- XXX maps and lists are only notionally supported
+    GremlinMap xs   -> T.concat ["'["
+                                 , T.concat (intersperse "," $ map renderKV xs)
+                                 , "]'"
+                                 ]
+    GremlinList vs  -> T.concat ["'[ "
+                                 , T.concat (intersperse "," $ map encodeGremlinValue vs)
+                                 , " ]'"
+                                 ]
+  where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
+
+quote :: Text -> Text
+quote b = T.concat ["\'", b, "\'"]
+
+mkBinding :: [(Text, GremlinValue)] -> [(Text, A.Value)]
+mkBinding pvs =
+  let lbls = [ (param n, val n) | n <- [1..length pvs] ]
+  in concat [ [(pstr, A.String p), (vstr, A.toJSON v)]
+                    | (pstr,vstr) <- lbls
+                    | (p,v) <- pvs ]
+
+-- Build strin g"param1, val1, param2, val2, ..."
+mkParams :: Int -> Text
+mkParams n = T.concat [param n, ",", val n]
+
+-- Construct the variable name for the nth parameter name.
+param :: Int -> Text
+param n = "param" <> T.pack (show n)
+
+-- Construct the variable name for the Nth value
+val :: Int -> Text
+val n = "val" <> T.pack (show n)
+
+escapeChars :: Text -> Text
+escapeChars b
+  | not (T.any (`Set.member` escSet) b) = b
+  | otherwise = T.concatMap (\c -> if c `Set.member` escSet then T.pack ['\\', c] else T.singleton c) b
+
+escSet :: Set.Set Char
+escSet = Set.fromList ['\\', '"']
+
+subChars :: Text -> Text
+subChars b
+  | not (T.any (`Set.member` badChars) b) = b
+  | otherwise = T.map (\c -> maybe c id (Map.lookup c charRepl)) b
+
+charRepl :: Map.Map Char Char
+charRepl = Map.fromList [('\t',' ')]
+
+badChars :: Set.Set Char
+badChars = Map.keysSet charRepl

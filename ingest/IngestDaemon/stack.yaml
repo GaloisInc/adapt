@@ -2,6 +2,7 @@ resolver: nightly-2015-11-04
 packages:
 - '.'
 - ../Ingest
+- ../GremlinClient
 extra-deps:
 - dotgen-0.4.2
 - simple-get-opt-0.1.0.0
