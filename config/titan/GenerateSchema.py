@@ -6,21 +6,24 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 from gremlinclient.tornado_client import submit
 
-with open(os.path.expanduser('~/adapt/ingest/Ingest/Language.md')) as langFile:
-  langCont = langFile.read()
-  regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)", re.MULTILINE)
-  matches = [m.groups() for m in regexp.finditer(langCont)]
+def get_schema():
+    spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
+    with open(spec) as langFile:
+        langCont = langFile.read()
+        regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)",
+                            re.MULTILINE)
+        matches = [m.groups() for m in regexp.finditer(langCont)]
 
-  schema = "mgmt = graph.openManagement(); "
-  for m in matches:
-      schema += "mgmt." + m[0] + ".make(); "
-  schema += "mgmt.commit()"
+        schema = "mgmt = graph.openManagement(); "
+        for m in matches:
+            schema += "mgmt." + m[0] + ".make(); "
+            schema += "mgmt.commit()"
 
-loop = IOLoop.current()
+    return schema
 
 
 @gen.coroutine
-def go():
+def go(schema):
     resp = yield submit("ws://localhost:8182/", schema)
     while True:
         msg = yield resp.read()
@@ -30,4 +33,5 @@ def go():
 
 
 if __name__ == '__main__':
-    loop.run_sync(go)
+    loop = IOLoop.current()
+    loop.run_sync(go(get_schema()))
