@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
     =======
-    `RDF-Segmenter` --- Main module
+    `PROVN-Segmenter` --- Main module
     =======
 
     Adria Gascon, 2016.
@@ -42,7 +42,7 @@ class Datetime:
 
         def two_digits(v):
             if v < 10:
-                return '0'+str(v)
+                return '0' + str(v)
             return v
         return '{0}-{1}-{2}T{3}:{4}:{5}'.format(
             two_digits(new_datetime.year),
@@ -111,9 +111,11 @@ class Segmenter:
             try:
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
-                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith":
+                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
+                        self.dg.g.edge[x][y]['type'] != "includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
+                        'and includes '
                         'must have a timestamp')
                 continue
             if ts >= begin_time and ts < end_time:
@@ -169,54 +171,64 @@ class Segmenter:
                             att_val_dict = [(str(prop_i), str(val_i)),
                                 (str(prop_j), str(val_j))]
                             s = Segment('segment_id_{0}'.format(
-                                len(segmentation_doc.expression_list)), att_val_dict)
+                                len(segmentation_doc.expression_list)),
+                                att_val_dict)
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
                                 e = SegmentExpr(s.id, n, {})
                                 segmentation_doc.expression_list += [e]
-        return segmentation_doc
+        segmentation_dg = DocumentGraph(segmentation_doc)
+        return segmentation_dg
 
 
 class DocumentGraph:
+    def _populate_graph(self):
+        for e in self.doc.expression_list:
+            d = e.att_val_dict
+            d['type'] = e.label()
+            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
+                self.g.add_node(e.id, e.att_val_dict)
+            else:
+                d = e.att_val_dict
+                if e.timestamp:
+                    d['timestamp'] = e.timestamp
+                    if (not self.min_time) or e.timestamp < self.min_time:
+                        self.min_time = e.timestamp
+                    if not self.max_time or e.timestamp > self.max_time:
+                        self.max_time = e.timestamp
+                d['type'] = e.label()
+                self.g.add_edge(e.s, e.t, d)
+
     def __init__(self, document):
         self.g = NX.DiGraph()
         self.doc = document
         self.max_time = None
         self.min_time = None
 
-        def populate_graph():
-            for e in self.doc.expression_list:
-                d = e.att_val_dict
-                d['type'] = e.label()
-                if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
-                    self.g.add_node(e.id, e.att_val_dict)
-                else:
-                    d = e.att_val_dict
-                    if e.timestamp:
-                        d['timestamp'] = e.timestamp
-                        if (not self.min_time) or e.timestamp < self.min_time:
-                            self.min_time = e.timestamp
-                        if not self.max_time or e.timestamp > self.max_time:
-                            self.max_time = e.timestamp
-                    d['type'] = e.label()
-                    self.g.add_edge(e.s, e.t, d)
-        populate_graph()
+        self._populate_graph()
+
+    def union(self, dg):
+        self.doc.union(dg.doc)
+        self.g = NX.DiGraph()
+        self._populate_graph()
+
+    def __str__(self):
+        return str(self.doc)
 
     def print_summary(self):
-        print '='*30
-        print '\tGraph summary'
-        print '='*30
-        print 'Min time: {0}'.format(self.min_time)
-        print 'Max time: {0}'.format(self.max_time)
-        print 'nodes ({0}):'.format(len(self.g.nodes()))
+        print('=' * 30)
+        print('\tGraph summary')
+        print('=' * 30)
+        print('Min time: {0}'.format(self.min_time))
+        print('Max time: {0}'.format(self.max_time))
+        print('nodes ({0}):'.format(len(self.g.nodes())))
         for n in self.g.nodes():
-            print '\t', n, self.g.node[n]
-        print 'edges ({0}):'.format(len(self.g.edges()))
+            print('\t', n, self.g.node[n])
+        print('edges ({0}):'.format(len(self.g.edges())))
         for e in self.g.edges():
-            print '\t', e, self.g.edge[e[0]][e[1]]
+            print('\t', e, self.g.edge[e[0]][e[1]])
 
-
-    #def draw(self):
+    # def draw(self):
     #    import matplotlib.pyplot as plt
     #   print 'here'
     #    NX.draw(self.g)
@@ -236,19 +248,19 @@ class DocumentGraph:
         return set([n for n in self.g.nodes()
             if att in self.g.node[n] and self.g.node[n][att] == val])
 
+
 def test_provn_segmenter():
     # Testing parser
-    sys.stderr.write('*'*30+'\n')
+    sys.stderr.write('*' * 30 + '\n')
     sys.stderr.write('Running PROVN Segmenter Tests\n')
-    sys.stderr.write('*'*30+'\n')
+    sys.stderr.write('*' * 30 + '\n')
     test_input_files = [
-        #{'filename': 'test/2016-01-28/bad-ls.provn',
+        # {'filename': 'test/2016-01-28/bad-ls.provn',
         # 'num_nodes': 2712,
         # 'num_edges': 9683},
         {'filename': 'test/test_james.provn',
          'num_nodes': 10,
-         'num_edges': 11}
-        ]
+         'num_edges': 11}]
     for test_d in test_input_files:
         filename = test_d['filename']
         sys.stderr.write('---> Parsing {0}\n'.format(filename))
@@ -256,16 +268,17 @@ def test_provn_segmenter():
         doc.parse_provn(filename)
         dg = DocumentGraph(doc)
         sys.stderr.write('---> Verifying number of edges and nodes\n')
-        assert len(dg.g.nodes()) == test_d['num_nodes'], '{0} != {1}'.format(len(dg.g.nodes()), test_d['num_nodes']) 
-        assert len(dg.g.edges()) == test_d['num_edges'], '{0} != {1}'.format(len(dg.g.edges()), test_d['num_edges']) 
+        assert len(dg.g.nodes()) == test_d['num_nodes'], '{0} != {1}'.format(
+            len(dg.g.nodes()), test_d['num_nodes'])
+        assert len(dg.g.edges()) == test_d['num_edges'], '{0} != {1}'.format(
+            len(dg.g.edges()), test_d['num_edges'])
 
     # Testing segmenter
     test_input_files = [
         {'filename': 'test/test_james.provn',
          'spec': 'test/test_james_spec.json',
          'num_nodes': 15,
-         'num_edges': 13}
-        ]
+         'num_edges': 13}]
     for test_d in test_input_files:
         filename = test_d['filename']
         spec = test_d['spec']
@@ -277,14 +290,16 @@ def test_provn_segmenter():
         sdg = DocumentGraph(segmentation_doc)
         seg_num_nodes = len(sdg.g.nodes())
         seg_num_edges = len(sdg.g.edges())
-        assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(seg_num_nodes, test_d['num_nodes']) 
-        assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(seg_num_edges, test_d['num_edges']) 
-
+        assert seg_num_nodes == test_d['num_nodes'], '{0} != {1}'.format(
+            seg_num_nodes, test_d['num_nodes'])
+        assert seg_num_edges == test_d['num_edges'], '{0} != {1}'.format(
+            seg_num_edges, test_d['num_edges'])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A provn segmenter')
-    parser.add_argument('provn_file', help='A prov-tc file in provn format')
+    parser.add_argument(
+        '--provn_file', '-p', help='A prov-tc file in provn format')
     parser.add_argument('spec_file',
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -297,7 +312,7 @@ if __name__ == "__main__":
     # Check that provided non-optional files actually exist
     for f in [args.provn_file, args.spec_file]:
         if not (os.path.isfile(f)):
-            print 'File {0} does not exist...aborting'.format(f)
+            print('File {0} does not exist...aborting'.format(f))
 
     doc = Document()
     doc.parse_provn(args.provn_file)
@@ -310,9 +325,13 @@ if __name__ == "__main__":
 
     s = Segmenter(dg, args.spec_file)
 
-    segmentation_doc = s.eval_spec()
-    print '='*30
-    print '\tSegmentation result'
-    print '='*30
-    print segmentation_doc
-    #for e in segmentation_doc.expression_list:
+    segmentation_dg = s.eval_spec()
+    print('=' * 30)
+    print('\tSegmentation result')
+    print('=' * 30)
+    print(segmentation_dg)
+
+    dg.union(segmentation_dg)
+    dg.print_summary()
+
+
