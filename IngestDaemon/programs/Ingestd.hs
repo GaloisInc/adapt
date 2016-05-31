@@ -331,7 +331,7 @@ runDB logTitan inputs db conn =
 --  Utils
 
 isVertex :: Operation a -> Bool
-isVertex (InsertVertex _ _) = True
+isVertex (InsertVertex {}) = True
 isVertex _                  = False
 
 channelToStderr :: TBChan Text -> IO ()

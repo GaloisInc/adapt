@@ -4,5 +4,6 @@ dist
 .cabal-sandbox
 .*.swp
 cabal.sandbox.config
+IngestDaemon/.stack-work/
 Trint/.stack-work/
 .DS_Store
