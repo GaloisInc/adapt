@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python2
 
 import os
 import re
@@ -35,4 +35,4 @@ def go(schema):
 
 if __name__ == '__main__':
     loop = IOLoop.current()
-    loop.run_sync(go(get_schema()))
+    loop.run_sync(lambda: go(get_schema()))
