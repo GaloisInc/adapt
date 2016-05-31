@@ -1,9 +1,12 @@
+#! /usr/bin/env python3
+
+import os
 import re
 from tornado import gen
 from tornado.ioloop import IOLoop
 from gremlinclient.tornado_client import submit
 
-with open('../../ingest/Ingest/Language.md', 'r') as langFile:
+with open(os.path.expanduser('~/adapt/ingest/Ingest/Language.md')) as langFile:
   langCont = langFile.read()
   regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)", re.MULTILINE)
   matches = [m.groups() for m in regexp.finditer(langCont)]
