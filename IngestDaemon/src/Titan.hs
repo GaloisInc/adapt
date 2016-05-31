@@ -222,26 +222,26 @@ class GraphId a where
   serializeOperation :: Operation a -> (Text,Env)
 
 instance GraphId Text where
-  serializeOperation (InsertVertex l ps) = (cmd,env)
+  serializeOperation (InsertVertex ty l ps) = (cmd,env)
     where
        cmd = escapeChars call
-       -- g.addV('ident', vertexName, param1, val1, param2, val2 ...)
+       -- g.addV(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
        call = T.unwords
-                [ "g.addV('ident', l "
+                [ "g.addV(label, tyParam, 'ident', l "
                 , if (not (null ps)) then "," else ""
                 , T.unwords $ intersperse "," (map mkParams [1..length ps])
                 , ")"
                 ]
-       env = Map.fromList $ ("l", A.String l) : mkBinding ps
+       env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
   serializeOperation (InsertEdge l src dst ps genVerts)   =
      if genVerts
       then (nonTestCmd, env)
       else (testAndInsertCmd, env)
     where
-      -- g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next(), param1, val1, ...)
+      -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
       nonTestCmd = escapeChars $
              T.unwords
-              [ "g.V().has('ident',src).next().addEdge(edgeName, g.V().has('ident',dst).next() "
+              [ "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
               , ")"
@@ -263,7 +263,7 @@ instance GraphId Text where
               , ")"
               ]
       env = Map.fromList $ ("src", A.String src) : ("dst", A.String dst) :
-                           ("edgeName", A.String l) : mkBinding ps
+                           ("edgeTy", A.String l) : mkBinding ps
 
 encodeQuoteText :: Text -> Text
 encodeQuoteText = quote . subChars . escapeChars
