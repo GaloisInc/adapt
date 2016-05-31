@@ -84,7 +84,7 @@ compileEdge e =
            let go x | isUpper x = T.pack ['_' , x]
                     | otherwise = T.pack [C.toUpper x]
            in T.take 1 str <> T.concatMap go (T.drop 1 str)
-         vLbl  = fixCamelCase $ T.pack $ show (edgeRelationship e) -- XXX Fix camel case vs snake case
+         vLbl  = fixCamelCase $ T.pack $ show (edgeRelationship e)
          v     = InsertVertex vLbl eMe [("relationship", GremlinString vLbl)]
          eTo   = insertEdge e1Lbl esrc eMe []
          eFrom = insertEdge e2Lbl eMe edst []
