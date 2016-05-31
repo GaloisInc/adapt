@@ -54,7 +54,7 @@ class AssociationExpr(ProvRelation):
     def __str__(self):
         return 'wasAssociatedWith({0}, {1}, {2}, {3})'.format(
             self.s, self.t,
-            self.timestamp if self.timestamp else '-', self.att_val_dict)
+            self.timestamp if self.timestamp else '-'   , self.att_val_dict)
 
     def label(self):
         return 'wasAssociatedWith'
@@ -182,13 +182,10 @@ class PrefixDecl:
 
 
 class Document:
-    """
-    A program in our language is just a list of functions
-    """
     def __init__(self):
         self.filename = None
         self.expression_list = []
-        self.prefix_decl = []
+        self.prefix_decls = []
 
     def parse_provn(self, filename):
         self.filename = filename
@@ -196,10 +193,15 @@ class Document:
         assert self.expression_list != None
         assert self.prefix_decls != None
 
+    def union(self, doc):
+        for e in doc.expression_list:
+            self.expression_list.append(e)
+        self.prefix_decls = list(set(self.prefix_decls) | set(doc.prefix_decls))
+
     def __str__(self):
         def f(x): return '\t' + str(x)
         l = ['document']
-        l += map(f, self.prefix_decl)
+        l += map(f, self.prefix_decls)
         l += map(f, self.expression_list)
         l += ['endDocument']
         return '\n'.join(l)
@@ -405,14 +407,14 @@ if __name__ == "__main__":
     def test(s, nt):
         doc = Document()
         result = bnf(doc)[nt].parseString(s, True)
-        print s, '\n\t=>\n', result
-        print '---------------------'
+        print(s, '\n\t=>\n', result)
+        print('---------------------')
 
     def test_file(f, nt):
         doc = Document()
         result = bnf(doc)[nt].parseFile(f, True)
-        print f, '\n\t=>\n', result
-        print '---------------------'
+        print(f, '\n\t=>\n', result)
+        print('---------------------')
 
     f = sys.argv[1]
     test_file(f, 'document')
