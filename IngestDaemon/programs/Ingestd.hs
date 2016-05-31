@@ -316,8 +316,8 @@ runDB logTitan inputs db conn =
   do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
      go ci reportInterval cnts
  go 0 ri cnts =
-  do Titan.commit conn
-     threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
+  do -- Titan.commit conn
+     -- threadDelay 10000 -- XXX Locking exceptions in titan without a delay!
      go commitInterval ri cnts
  go ci ri !(!nrE,!nrV) =
   do opr <- atomically (TB.readTBChan inputs)
