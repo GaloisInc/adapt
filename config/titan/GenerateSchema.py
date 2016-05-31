@@ -6,6 +6,7 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 from gremlinclient.tornado_client import submit
 
+
 def get_schema():
     spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
     with open(spec) as langFile:
@@ -14,12 +15,12 @@ def get_schema():
                             re.MULTILINE)
         matches = [m.groups() for m in regexp.finditer(langCont)]
 
-        schema = "mgmt = graph.openManagement(); "
+        lines = ["mgmt = graph.openManagement();"]
         for m in matches:
-            schema += "mgmt." + m[0] + ".make(); "
-            schema += "mgmt.commit()"
+            lines.append("mgmt." + m[0] + ".make();")
+            lines.append("mgmt.commit();")
 
-    return schema
+    return " ".join(lines)  # Consider using \n rather than blank.
 
 
 @gen.coroutine
