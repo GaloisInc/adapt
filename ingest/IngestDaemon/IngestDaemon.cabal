@@ -17,7 +17,7 @@ extra-source-files:  stack.yaml
 cabal-version:       >=1.10
 
 Library
-  exposed-modules:      Titan, CompileSchema
+  exposed-modules:      CompileSchema
   default-language:    Haskell2010
   build-depends:       base >=4.7 && <4.9
                      , text >=1.2 && <1.3
@@ -48,6 +48,7 @@ executable ingestd
   other-modules:       IngestDaemon.KafkaManager
   build-depends:       base >=4.7 && <4.9
                      , Ingest >= 0.2 && < 0.3
+                     , GremlinClient
                      , IngestDaemon
                      , aeson
                      , base64-bytestring
@@ -68,6 +69,7 @@ executable ingestd
                      , time
                      , transformers
                      , unordered-containers
+                     , uuid
   hs-source-dirs:      programs
   default-language:    Haskell2010
   ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N2 -Wall -Werror
