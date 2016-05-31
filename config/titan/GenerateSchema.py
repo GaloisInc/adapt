@@ -18,6 +18,7 @@ with open(os.path.expanduser('~/adapt/ingest/Ingest/Language.md')) as langFile:
 
 loop = IOLoop.current()
 
+
 @gen.coroutine
 def go():
     resp = yield submit("ws://localhost:8182/", schema)
@@ -27,4 +28,6 @@ def go():
             break
         print(msg)
 
-loop.run_sync(go)
+
+if __name__ == '__main__':
+    loop.run_sync(go)
