@@ -15,12 +15,15 @@ def get_schema():
                             re.MULTILINE)
         matches = [m.groups() for m in regexp.finditer(langCont)]
 
+        # generate schema from Language.md to insert in a single transaction
         lines = ["mgmt = graph.openManagement();"]
         for m in matches:
             lines.append("mgmt." + m[0] + ".make();")
-            lines.append("mgmt.commit();")
+        # We only want one commit within a single transaction, not per schema item.
+        lines.append("mgmt.commit();")
 
-    return " ".join(lines)  # Consider using \n rather than blank.
+    schema = " ".join(lines)
+    return schema
 
 
 @gen.coroutine
