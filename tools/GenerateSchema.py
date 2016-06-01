@@ -22,7 +22,7 @@ def get_schema():
             lines.append("mgmt." + m[0] + ".make();")
         lines.append("}")
         # We only want one commit within a single transaction, not per schema item.
-        lines.append("mgmt.commit();")
+        lines.append(" ; mgmt.commit();")
 
     schema = " ".join(lines)
     return schema
