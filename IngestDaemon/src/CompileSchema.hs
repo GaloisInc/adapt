@@ -260,7 +260,7 @@ instance GraphId Text where
                 [ "g.addV(label, tyParam, 'ident', l "
                 , if (not (null ps)) then "," else ""
                 , T.unwords $ intersperse "," (map mkParams [1..length ps])
-                , ")"
+                , ") ; graph.tx().commit()"
                 ]
        env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
   serializeOperation (InsertEdge l src dst ps genVerts)   =
@@ -274,7 +274,7 @@ instance GraphId Text where
               [ "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
-              , ")"
+              , ") ; graph.tx().commit()"
               ]
       -- x = g.V().has('ident',src)
       -- y = g.V().has('ident',dst)
@@ -290,7 +290,7 @@ instance GraphId Text where
               , "x.next().addEdge(edgeName, y.next() "
               , if (not (null ps)) then "," else ""
               , T.unwords $ intersperse "," (map mkParams [1..length ps])
-              , ")"
+              , ") ; graph.tx().commit()"
               ]
       env = Map.fromList $ ("src", A.String src) : ("dst", A.String dst) :
                            ("edgeTy", A.String l) : mkBinding ps
