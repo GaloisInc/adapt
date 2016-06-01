@@ -113,6 +113,7 @@ install_adapt_dependencies() {
     sudo -H pip install kafka-python || handle_error $LINENO
     sudo -H pip2 install avroknife || handle_error $LINENO
     sudo -H pip2 install tornado gremlinclient || handle_error $LINENO
+    sudo -H pip3 install networkx pyparsing || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
