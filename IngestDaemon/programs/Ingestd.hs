@@ -265,10 +265,8 @@ runDB logTitan inputs db conn =
      let (cmd,env) = serializeOperation stmt
          stmt = statement opr
          req  = mkRequest cmd env
-     future <- GC.sendOn conn req
-     _ <- forkIO $ do
-            resp <- wait future
-            when (respStatus resp /= 200) (insertDB (respRequestId resp) opr db)
+     GC.sendOn conn req $ \resp ->
+             when (respStatus resp /= 200) (insertDB (respRequestId resp) opr db)
      let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
      go (ri - 1) (nrE2,nrV2)
 

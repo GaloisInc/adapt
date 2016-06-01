@@ -111,8 +111,12 @@ sendCommand cmd env =
 sendRequest :: Request -> DB UUID
 sendRequest req =
   do DBS lock conn <- get
-     lift $ mutexDec lock
-     lift $ WS.send conn (WS.DataMessage $ WS.Text (A.encode req))
+     lift $ sendRequestIO req lock conn
+
+sendRequestIO :: Request -> Mutex -> WS.Connection -> IO UUID
+sendRequestIO req lock conn =
+  do mutexDec lock
+     WS.send conn (WS.DataMessage $ WS.Text (A.encode req))
      return (requestId req)
 
 -- | Make the data insertion command and return the request's UUID
@@ -144,7 +148,7 @@ mkRequest cmd bnd =
 --------------------------------------------------------------------------------
 --  Manual Resource Management API
 
-data DBConnection = DBC { sendOn :: Request -> IO (Async Response)
+data DBConnection = DBC { sendOn :: Request -> (Response -> IO ()) -> IO ()
                         -- ^ @res <- sendOn dbc req@ sends a request over a database connection,
                         -- acquiring an async.  Use `wait res` to get the
                         -- response.
@@ -153,46 +157,62 @@ data DBConnection = DBC { sendOn :: Request -> IO (Async Response)
                         }
 
 -- | Create a persistent connection to the database websocket.
+--
+-- N.B. This mechanism is currently extremely inefficient!
 connect :: ServerInfo -> IO (Either WS.ConnectionException DBConnection)
 connect si =
   do reqMVar  <- newEmptyMVar
-     respMVar <- newEmptyMVar
      respMap  <- newTVarIO Map.empty
-     let recvResponse = recvHdl respMap reqMVar respMVar
-         loop = mainOper respMap reqMVar respMVar
+     let recvResponse = recvHdl respMap
+         loop = mainOper respMap reqMVar
      dbThread <- forkIO (void (withDB si recvResponse loop))
-     let doSend r = putMVar reqMVar r >> takeMVar respMVar
-         doClose  = killThread dbThread
+     let doSend r op = putMVar reqMVar (r,op)
+         doClose     = killThread dbThread
      return $ Right $ DBC doSend doClose
  where
-  recvHdl :: TVar (Map.Map UUID Response) -> MVar Request -> MVar (Async Response) -> WS.Message -> DB ()
-  recvHdl respMap reqMVar respMVar msg =
+  recvHdl :: TVar (Map.Map UUID (Response -> IO ())) -> WS.Message -> DB ()
+  recvHdl respMap msg =
     case msg of
        WS.DataMessage dm ->
           do let bs = case dm of { WS.Text val -> val; WS.Binary val -> val }
              case A.decode bs of
               Just resp ->
-                  lift $ atomically $ do
-                      mp <- readTVar respMap
-                      writeTVar respMap (Map.insert (respRequestId resp) resp mp)
+               do op <- lift $ atomically $ do
+                          mp <- readTVar respMap
+                          let uuid = respRequestId resp
+                          case Map.lookup uuid mp of
+                            Nothing -> error "Unknown UUID response from Gremlin Server."
+                            Just op ->
+                              do writeTVar respMap (Map.delete uuid mp)
+                                 return op
+                  lift $ op resp
               Nothing   -> return ()
        WS.ControlMessage _ -> return ()
-  mainOper :: TVar (Map.Map UUID Response) -> MVar Request -> MVar (Async Response) -> DB ()
-  mainOper respMap reqMVar respMVar = forever $ do
-       req    <- lift $ takeMVar reqMVar
-       future <- sendAsync respMap req
-       lift $ putMVar respMVar future
+  mainOper :: TVar (Map.Map UUID (Response -> IO ()))
+           -> MVar (Request,Response -> IO ())
+           -> DB ()
+  mainOper respMap reqMVar =
+   do DBS lock conn <- get
+      lift $ foreverSafe $
+              do (req,op) <- takeMVar reqMVar
+                 sendAsync respMap req op lock conn
 
-  sendAsync :: TVar (Map.Map UUID Response) -> Request -> DB (Async Response)
-  sendAsync respMap req =
-    do uuid <- sendRequest req
-       lift $ async $ atomically $
+  foreverSafe op =
+    X.catch (forever op)
+            (\e -> case X.fromException e of
+                    Just X.ThreadKilled -> X.throw e
+                    Nothing             -> foreverSafe op)
+
+  sendAsync :: TVar (Map.Map UUID (Response -> IO ()))
+            -> Request
+            -> (Response -> IO ())
+            -> Mutex -> WS.Connection
+            -> IO ()
+  sendAsync respMap req op lock conn =
+    do uuid <- sendRequestIO req lock conn
+       void $ forkIO $ atomically $
         do mp <- readTVar respMap
-           case Map.lookup uuid mp of
-            Nothing   -> retry
-            Just resp ->
-              do writeTVar respMap (Map.delete uuid mp)
-                 return resp
+           writeTVar respMap (Map.insert uuid op mp)
 
 --------------------------------------------------------------------------------
 --  Gremlin WebSockets JSON API
@@ -245,14 +265,6 @@ instance ToJSON Request where
              , "args"      .= a
              ]
 
-{-
-instance ToJSON GremlinValue where
-  toJSON gv =
-    case gv of
-      GremlinNum i    -> toJSON i
-      x               -> toJSON (encodeGremlinValue x)
--}
-
 instance ToJSON UUID where
   toJSON = toJSON . UUID.toText
 
@@ -279,24 +291,6 @@ instance FromJSON Request where
 
 encodeQuoteText :: Text -> Text
 encodeQuoteText = quote . subChars . escapeChars
-
-{-
-encodeGremlinValue :: GremlinValue -> Text
-encodeGremlinValue gv =
-  case gv of
-    GremlinString s -> escapeChars s
-    GremlinNum  n   -> T.pack (show n)
-    -- XXX maps and lists are only notionally supported
-    GremlinMap xs   -> T.concat ["'["
-                                 , T.concat (intersperse "," $ map renderKV xs)
-                                 , "]'"
-                                 ]
-    GremlinList vs  -> T.concat ["'[ "
-                                 , T.concat (intersperse "," $ map encodeGremlinValue vs)
-                                 , " ]'"
-                                 ]
-  where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
--}
 
 quote :: Text -> Text
 quote b = T.concat ["\'", b, "\'"]
