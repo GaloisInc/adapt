@@ -158,9 +158,11 @@ connect si =
   do reqMVar  <- newEmptyMVar
      respMVar <- newEmptyMVar
      respMap  <- newTVarIO Map.empty
-     dbThread <- forkIO $ void $ withDB si (recvHdl respMap reqMVar respMVar) (mainOper respMap reqMVar respMVar)
+     let recvResponse = recvHdl respMap reqMVar respMVar
+         loop = mainOper respMap reqMVar respMVar
+     dbThread <- forkIO (void (withDB si recvResponse loop))
      let doSend r = putMVar reqMVar r >> takeMVar respMVar
-         doClose = killThread dbThread
+         doClose  = killThread dbThread
      return $ Right $ DBC doSend doClose
  where
   recvHdl :: TVar (Map.Map UUID Response) -> MVar Request -> MVar (Async Response) -> WS.Message -> DB ()
@@ -176,8 +178,8 @@ connect si =
               Nothing   -> return ()
        WS.ControlMessage _ -> return ()
   mainOper :: TVar (Map.Map UUID Response) -> MVar Request -> MVar (Async Response) -> DB ()
-  mainOper respMap reqMVar respMVar =
-    do req    <- lift $ takeMVar reqMVar
+  mainOper respMap reqMVar respMVar = forever $ do
+       req    <- lift $ takeMVar reqMVar
        future <- sendAsync respMap req
        lift $ putMVar respMVar future
 
