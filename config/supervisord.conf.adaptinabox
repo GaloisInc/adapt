@@ -30,3 +30,8 @@ startsecs=10
 command=%(ENV_HOME)s/adapt/classifier/phase2/classifyd.py
 autorestart=yes
 startsecs=20
+
+[program:segmentd]
+command=%(ENV_HOME)s/adapt/segment/segmenter/segmentd.py
+autorestart=yes
+startsecs=20

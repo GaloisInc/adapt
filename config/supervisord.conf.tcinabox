@@ -30,3 +30,8 @@ startsecs=2
 command=python3 /home/vagrant/adapt/ad/test/StartAD.py
 autorestart=yes
 startsecs=2
+
+[program:segmentd]
+command=%(ENV_HOME)s/adapt/segment/segmenter/segmentd.py
+autorestart=yes
+startsecs=20
