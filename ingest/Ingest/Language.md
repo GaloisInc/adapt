@@ -360,7 +360,6 @@ Other primitive types used in our model:
 
 * *prov-tc:uid* : int;
   and maps to the Titan data type:
-  [schema]: #
   makePropertyKey('ident').dataType(Long.class).cardinality(Cardinality.SINGLE)
   
 * *prov-tc:url* : string;
@@ -948,17 +947,6 @@ An entity can be part of another entity. We use dc:isPartOf for this constructio
 
 [schema]: #
 makeEdgeLabel('dc:isPartOf').multiplicity(MANY2ONE)
-
-prov-tc:runsOn (CDM Edge Type EDGE_SUBJECT_RUNSON)
---------
-This relationship connects Subjects with the hosts they run on.
-
-[schema]: #
-makeEdgeLabel('EDGE_SUBJECT_RUNSON out').multiplicity(SIMPLE)
-[schema]: #
-makeVertexLabel('EDGE_SUBJECT_RUNSON')
-[schema]: #
-makeEdgeLabel('EDGE_SUBJECT_RUNSON in').multiplicity(SIMPLE)
 
 prov-tc:residesOn (CDM Edge Type EDGE_OBJECT_RESIDESON)
 ----------
