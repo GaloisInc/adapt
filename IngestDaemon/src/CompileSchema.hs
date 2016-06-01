@@ -124,7 +124,7 @@ instance PropertiesOf OptionalInfo where
 instance PropertiesAndTypeOf Entity where
   propertiesAndTypeOf e =
    case e of
-      File {..} -> ("file"
+      File {..} -> ("Entity-File"
                    , mkSource entitySource
                      : ("url", GremlinString entityURL)
                      : ("file-version", gremlinNum entityFileVersion)
