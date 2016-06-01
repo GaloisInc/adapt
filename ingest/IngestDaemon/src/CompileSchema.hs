@@ -265,8 +265,8 @@ instance GraphId Text where
        env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
   serializeOperation (InsertEdge l src dst ps genVerts)   =
      if genVerts
-      then (nonTestCmd, env)
-      else (testAndInsertCmd, env)
+      then (testAndInsertCmd, env)
+      else (nonTestCmd, env)
     where
       -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
       nonTestCmd = escapeChars $
