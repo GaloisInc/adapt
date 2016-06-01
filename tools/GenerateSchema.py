@@ -17,7 +17,7 @@ def get_schema():
 
         # generate schema from Language.md to insert in a single transaction
         lines = ["mgmt = graph.openManagement();"]
-        lines.append("if(!mgmt.constainsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {")
+        lines.append("if(!mgmt.containsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {")
         for m in matches:
             lines.append("mgmt." + m[0] + ".make();")
         lines.append("}")
