@@ -91,12 +91,14 @@ data Subject
               , subjectPpt             :: Maybe Ppt
               , subjectEnv             :: Maybe Env
               , subjectArgs            :: Maybe Args
+              , subjectEventType       :: Maybe EventType
+              , subjectEventSequence   :: Maybe Sequence
               }
       deriving (Eq, Ord, Show, Read, Generic)
 
 mkEvent :: InstrumentationSource -> UID -> EventType -> Maybe Sequence -> Time -> Subject
 mkEvent src uid eTy eSeq start =
-  Subject src uid (SubjectEvent eTy eSeq) (Just start) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing
+  Subject src uid SubjectEvent (Just start) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Map.empty Nothing Nothing Nothing Nothing Nothing (Just eTy) eSeq
 
 data Host =
       Host { hostUID    :: UID
@@ -273,8 +275,8 @@ data SubjectType
       | SubjectThread
       | SubjectUnit
       | SubjectBlock
-      | SubjectEvent EventType (Maybe Sequence)
-      deriving (Eq, Ord, Show, Read, Generic)
+      | SubjectEvent
+      deriving (Eq, Ord, Show, Read, Generic, Enum)
 
 data Strength = UnknownStrength | Weak | Medium | Strong
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
