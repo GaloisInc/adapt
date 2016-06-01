@@ -814,6 +814,18 @@ makeVertexLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT')
 [schema]: #
 makeEdgeLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').multiplicity(MANY2ONE)
 
+EDGE_EVENT_CAUSES_EVENT
+-------
+
+Event causality tracking.
+
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT out').multiplicity(ONE2ONE)
+[schema]: #
+makeVertexLabel('EDGE_EVENT_CAUSES_EVENT')
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT in').multiplicity(MANY2ONE)
+
 EDGE_SUBJECT_AFFECTS_EVENT
 -------
 
