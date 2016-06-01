@@ -132,7 +132,7 @@ instance PropertiesAndTypeOf Entity where
                                  (propertiesOf entityInfo)
                    )
       NetFlow {..} -> 
-                ("netflow"
+                ("Entity-NetFlow"
                 , mkSource entitySource
                   : ("srcAddress", GremlinString entitySrcAddress)
                   : ("dstAddress", GremlinString entityDstAddress)
@@ -141,7 +141,7 @@ instance PropertiesAndTypeOf Entity where
                   : propertiesOf entityInfo
                 )
       Memory {..} ->
-               ("memory"
+               ("Entity-Memory"
                , mkSource entitySource
                  : maybe id (\p -> (("pageNumber", gremlinNum p):)) entityPageNumber
                  ( ("address", gremlinNum entityAddress)
@@ -151,7 +151,7 @@ instance PropertiesAndTypeOf Entity where
 
 instance PropertiesAndTypeOf Resource where
   propertiesAndTypeOf (Resource {..}) =
-               ("resource"
+               ("Resource"
                , ("srcSinkType", enumOf resourceSource)
                  : propertiesOf resourceInfo
                )
@@ -187,7 +187,7 @@ instance PropertiesOf a => PropertiesOf (Maybe a) where
 
 instance PropertiesAndTypeOf Subject where
   propertiesAndTypeOf (Subject {..}) =
-              ("subject"
+              ("Subject"
               , mkSource subjectSource
                 : maybe id (\s -> (("startedAtTime", gremlinTime s) :)) subjectStartTime
                 ( concat
@@ -214,7 +214,7 @@ instance PropertiesOf (Map Text Text) where
 
 instance PropertiesAndTypeOf Host  where
   propertiesAndTypeOf (Host {..}) =
-          ( "host"
+          ( "Host"
           , catMaybes [ mkSource <$> hostSource
                       , ("hostIP",) . GremlinString <$> hostIP
                       ]
@@ -222,7 +222,7 @@ instance PropertiesAndTypeOf Host  where
 
 instance PropertiesAndTypeOf Agent where
   propertiesAndTypeOf (Agent {..}) =
-      ("agent"
+      ("Agent"
       , ("userID", gremlinNum agentUserID)
         : concat [ F.toList (("gid",) . GremlinList . map gremlinNum <$> agentGID)
                  , F.toList (("agentType",) . enumOf <$> agentType)
