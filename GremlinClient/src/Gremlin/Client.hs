@@ -247,7 +247,8 @@ instance FromJSON Response where
     do mp <- o .: ("result" :: Text)
        uuid <- o .: ("requestId" :: Text)
        stat <- o .: ("status" :: Text)
-       return (Resp uuid mp stat)
+       code <- stat .: ("code" :: Text)
+       return (Resp uuid mp code)
 
   parseJSON j = A.typeMismatch "Response" j
 
