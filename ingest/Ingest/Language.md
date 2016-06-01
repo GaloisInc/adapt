@@ -766,6 +766,30 @@ makeVertexLabel('EDGE_EVENT_AFFECTS_MEMORY')
 [schema]: #
 makeEdgeLabel('EDGE_EVENT_AFFECTS_MEMORY in').multiplicity(SIMPLE)
 
+EDGE_EVENT_AFFECTS_FILE
+-------
+
+And for files...
+
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_AFFECTS_FILE out').multiplicity(SIMPLE)
+[schema]: #
+makeVertexLabel('EDGE_EVENT_AFFECTS_FILE')
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_AFFECTS_FILE in').multiplicity(SIMPLE)
+
+EDGE_EVENT_AFFECTS_NETFLOW
+-------
+
+And for netflows...
+
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_AFFECTS_NETFLOW out').multiplicity(SIMPLE)
+[schema]: #
+makeVertexLabel('EDGE_EVENT_AFFECTS_NETFLOW')
+[schema]: #
+makeEdgeLabel('EDGE_EVENT_AFFECTS_NETFLOW in').multiplicity(SIMPLE)
+
 EDGE_EVENT_AFFECTS_SUBJECT
 -------
 
