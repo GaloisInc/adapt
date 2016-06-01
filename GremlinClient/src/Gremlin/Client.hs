@@ -109,16 +109,16 @@ sendCommand cmd env =
     lift $ WS.send conn req
     return uuid
 
-sendRequest :: Request -> DB UUID
+sendRequest :: Request -> DB ()
 sendRequest req =
   do DBS lock conn <- get
      lift $ sendRequestIO req lock conn
 
-sendRequestIO :: Request -> Mutex -> WS.Connection -> IO UUID
+sendRequestIO :: Request -> Mutex -> WS.Connection -> IO ()
 sendRequestIO req lock conn =
   do mutexDec lock
      WS.send conn (WS.DataMessage $ WS.Text (A.encode req))
-     return (requestId req)
+     return ()
 
 -- | Make the data insertion command and return the request's UUID
 -- N.B. The UUID is deterministic, computed as a hash of command and
