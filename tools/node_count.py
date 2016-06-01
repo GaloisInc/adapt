@@ -5,7 +5,7 @@ from aiogremlin import GremlinClient
 
 QUERYV="g.V().count()"
 QUERYE="g.E().count()"
-Q1="g.V().has(label,'File').count()"
+Q1="g.V().has(label,'Entity-File').count()"
 Q2="g.V().has(label,'Entity-NetFlow').count()"
 Q3="g.V().has(label,'Entity-Memory').count()"
 Q4="g.V().has(label,'Resource').count()"
