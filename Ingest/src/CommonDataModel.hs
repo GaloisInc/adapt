@@ -114,6 +114,8 @@ translateSubject       (Subject {..}) =
                   , S.subjectPpt = Nothing
                   , S.subjectEnv = Nothing
                   , S.subjectArgs = Nothing
+                  , S.subjectEventType = Nothing
+                  , S.subjectEventSequence = Nothing
                   }
   in tellNode (S.NodeSubject s)
 {-# INLINE translateSubject #-}
@@ -146,8 +148,9 @@ translateEvent :: Event -> Translate ()
 translateEvent         (Event {..}) =
   let s = S.Subject { S.subjectSource = translateSource evtSource
                     , S.subjectUID    = translateUUID evtUUID
-                    , S.subjectType   = S.SubjectEvent (translateEventType evtType)
-                                                       (Just evtSequence)
+                    , S.subjectType   = S.SubjectEvent
+                    , S.subjectEventType = Just (translateEventType evtType)
+                    , S.subjectEventSequence = Just evtSequence
                     , S.subjectStartTime = fmap translateTime evtTimestampMicros
                     , S.subjectEndTime   = Nothing
                     , S.subjectPID    = Nothing

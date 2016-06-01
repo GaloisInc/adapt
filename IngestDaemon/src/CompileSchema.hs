@@ -157,20 +157,10 @@ instance PropertiesAndTypeOf Resource where
                )
 
 instance PropertiesOf SubjectType where
-  propertiesOf s =
-   let subjTy = ("subjectType",) . GremlinString
-   in case s of
-       SubjectProcess    ->
-         [subjTy "process"]
-       SubjectThread     ->
-         [subjTy "thread"]
-       SubjectUnit       ->
-         [subjTy "unit"]
-       SubjectBlock      ->
-         [subjTy "block"]
-       SubjectEvent et sx  ->
-         [subjTy "event", ("eventType", enumOf et) ]
-          ++ F.toList ((("sequence",) . gremlinNum) <$> sx)
+  propertiesOf s = [("subjectType", gremlinNum (fromEnum s))]
+
+instance PropertiesOf EventType where
+  propertiesOf s = [("subjectType", gremlinNum (fromEnum s))]
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)
@@ -192,6 +182,8 @@ instance PropertiesAndTypeOf Subject where
                 : maybe id (\s -> (("startedAtTime", gremlinTime s) :)) subjectStartTime
                 ( concat
                    [ propertiesOf subjectType
+                   , propertiesOf subjectEventType
+                   , F.toList (("sequence"   ,) . gremlinNum <$> subjectEventSequence)
                    , F.toList (("pid"        ,) . gremlinNum    <$> subjectPID        )
                    , F.toList (("ppid"       ,) . gremlinNum    <$> subjectPPID       )
                    , F.toList (("unitid"     ,) . gremlinNum    <$> subjectUnitID     )
