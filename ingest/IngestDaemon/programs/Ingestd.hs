@@ -209,6 +209,7 @@ mainLoop cfg =
             InsertEdge {}
               | code == Just 597 -> Input orig stmt { generateVertices = True }
               | otherwise        -> ipt
+            InsertReifiedEdge {} -> ipt
             InsertVertex {}      -> ipt
 
 
