@@ -104,7 +104,7 @@ kafkaInput host topic chan =
  insertCDM cdmFmt =
    liftIO $ do let nses = CDM.toSchema [cdmFmt]
                operations <- compile nses
-               let ipts = map (Input cdmFmt) operations
+               let ipts = map (\o -> Input cdmFmt o 0) operations
                mapM_ (atomically . TB.writeTBChan chan) ipts
 
 emit :: String -> Kafka ()

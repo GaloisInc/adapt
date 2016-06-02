@@ -188,30 +188,42 @@ mainLoop cfg =
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
+    forkPersist logMsg (garbageCollectFailures reqStatus inputs)
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
   where
+  garbageCollectFailures :: FailedInsertionDB -> TBChan Input -> IO (Either () ())
+  garbageCollectFailures fidb inputs = forever $ do
+       threadDelay 10000000 -- 10 seconds
+       es <- resetDB fidb
+       let is = catMaybes $ map ageOperation es
+       mapM_ (atomically . TB.writeTBChan inputs) is
+
   finisher :: FailedInsertionDB -> TBChan Input -> IO ()
   finisher fidb inputs =
    do es <- resetDB fidb
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
-          newOperations = catMaybes (map updateOperation es)
       T.hPutStrLn stderr msg
+      let newOperations = catMaybes $ map updateOperation es
       mapM_ (atomically . TB.writeTBChan inputs) newOperations
       delayWhileNonEmpty inputs
 
   -- Given a failed operation and an HTTP error code from Titan,
   -- build a new operation suitable for re-trying (or not) the operation.
   updateOperation :: OperationRecord -> Maybe Input
-  updateOperation (OpRecord ipt@(Input orig stmt) code) =
+  updateOperation (OpRecord ipt@(Input orig stmt cnt) code) =
     Just $ case stmt of
             InsertEdge {}
-              | code == Just 597 -> Input orig stmt { generateVertices = True }
+              | code == Just 597 -> Input orig stmt { generateVertices = True } cnt
               | otherwise        -> ipt
             InsertReifiedEdge {} -> ipt
             InsertVertex {}      -> ipt
 
+  ageOperation :: OperationRecord -> Maybe Input
+  ageOperation (OpRecord (Input orig stmt cnt) _)
+      | cnt > 2   = Nothing
+      | otherwise = Just (Input orig stmt (cnt + 1))
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
