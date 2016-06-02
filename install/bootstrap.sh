@@ -67,6 +67,7 @@ install_titan() {
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
     cd /vagrant/config/titan || handle_error $LINENO
+    /vagrant/tools/GenerateSchema.py || handle_error $LINENO
     cd $CWD || handle_error $LINENO
 }
 

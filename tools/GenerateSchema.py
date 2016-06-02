@@ -2,42 +2,25 @@
 
 import os
 import re
-from tornado import gen
-from tornado.ioloop import IOLoop
-from gremlinclient.tornado_client import submit
 
+schemaFile = open('/opt/titan/scripts/schema.groovy', 'w')
+schemaFile.truncate()
+schemaFile.write("graph = TitanFactory.open('/opt/titan/conf/gremlin-server/titan-cassandra-server.properties')\n")
+schemaFile.write("graph.tx().rollback()\n")
+schemaFile.write("mgmt = graph.openManagement()\n")
+schemaFile.write("if(!mgmt.containsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {\n")
 
-def get_schema():
-    spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
-    with open(spec) as langFile:
-        langCont = langFile.read()
-        regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)",
-                            re.MULTILINE)
-        matches = [m.groups() for m in regexp.finditer(langCont)]
+# generate schema groovy from Language.md
+spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
+with open(spec) as langFile:
+    langCont = langFile.read()
+    regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)", re.MULTILINE)
+    matches = [m.groups() for m in regexp.finditer(langCont)]
+    for m in matches:
+        schemaFile.write("    mgmt." + m[0] + ".make()\n")
 
-        # generate schema from Language.md to insert in a single transaction
-        lines = ["mgmt = graph.openManagement();"]
-        lines.append("if(!mgmt.containsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {")
-        for m in matches:
-            lines.append("mgmt." + m[0] + ".make();")
-        lines.append("}")
-        # We only want one commit within a single transaction, not per schema item.
-        lines.append(" ; mgmt.commit();")
+schemaFile.write("}\n")
+# We only want one commit within a single transaction, not per schema item.
+schemaFile.write("mgmt.commit()\n")
 
-    schema = " ".join(lines)
-    return schema
-
-
-@gen.coroutine
-def go(schema):
-    resp = yield submit("ws://localhost:8182/", schema)
-    while True:
-        msg = yield resp.read()
-        if msg is None:
-            break
-        print(msg)
-
-
-if __name__ == '__main__':
-    loop = IOLoop.current()
-    loop.run_sync(lambda: go(get_schema()))
+schemaFile.close()

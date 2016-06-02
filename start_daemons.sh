@@ -29,10 +29,6 @@ sudo sysctl -w vm.overcommit_memory=1
 # run supervisord (zookeeper, kafka, Adapt components)
 pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; echo Started.)
 
-# Setup the database schema.  This might take a while as it can block waiting
-# for the database to be ready, which itself can depend on indexing etc.
-$HOME/adapt/tools/GenerateSchema.py
-
 # Setup the Kafka Topics for our internal (adapt components only) kafka instance
 KAFKA=/opt/kafka/bin/
 
