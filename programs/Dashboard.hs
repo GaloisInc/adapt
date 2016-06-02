@@ -19,6 +19,9 @@ import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
 import           Data.Monoid
+import qualified Data.Sequence as Seq
+import           Data.Sequence (Seq)
+import qualified Data.Foldable as F
 import           Data.String
 import           Data.String.QQ
 import           Data.Text (Text)
@@ -138,10 +141,11 @@ main =
             threadDelay 5000000
 
 data Channels = Channels { igChan, pxChan, seChan, adChan, acChan, dxChan :: TChan Text }
-data Status   = Status   { igStat, pxStat, seStat, adStat, acStat, dxStat :: Text }
+data Status   = Status   { igStat :: Seq Text
+                         , pxStat, seStat, adStat, acStat, dxStat :: Text }
 
 defaultStatus :: Status
-defaultStatus = Status "" "" "" "" "" ""
+defaultStatus = Status Seq.empty "" "" "" "" ""
 
 dashboard :: Config -> MVar Status -> Application
 dashboard c curr = serve dashboardAPI (lonePage c curr)
@@ -151,12 +155,17 @@ lonePage c stMV =
   do st <- liftIO (readMVar stMV)
      return (buildPage st)
  where
+ scrollTextAreas =
+  T.unlines [ "var ig = document.getElementById('ig_textarea');"
+            , "ig.scrollTop = ig.scrollHeight;"
+            ]
  buildPage :: Status -> Html ()
  buildPage (Status {..}) =
   do title_ "ADAPT Dashbaord"
-     body_ [] $ do
+     body_ [onload_ scrollTextAreas] $ do
+      meta_ [httpEquiv_ "refresh", content_ "5"]
       h2_ "Ingestion"
-      p_ (toHtml igStat)
+      textarea_ [id_ "ig_textarea", readonly_ "true", rows_ "25", cols_ "100"] (toHtml $ T.unlines $ F.toList igStat)
       h2_ "Pattern Extraction"
       p_ (toHtml pxStat)
       h2_ "Segmentation"
@@ -173,13 +182,14 @@ updateStatus :: Channels -> MVar Status -> IO ()
 updateStatus (Channels {..}) stMV = forever (go >> threadDelay 100000)
  where
   go :: IO ()
-  go = mapM_ (uncurry doMod) [ (igChan, (\st x -> st { igStat = x }))
-                             , (pxChan, (\st x -> st { pxStat = x }))
-                             , (seChan, (\st x -> st { seStat = x }))
-                             , (adChan, (\st x -> st { adStat = x }))
-                             , (acChan, (\st x -> st { acStat = x }))
-                             , (dxChan, (\st x -> st { dxStat = x }))
-                             ]
+  go = mapM_ (uncurry doMod)
+             [ (igChan, (\st x -> st { igStat = Seq.take 1000 (igStat st Seq.|> x) }))
+             , (pxChan, (\st x -> st { pxStat = x }))
+             , (seChan, (\st x -> st { seStat = x }))
+             , (adChan, (\st x -> st { adStat = x }))
+             , (acChan, (\st x -> st { acStat = x }))
+             , (dxChan, (\st x -> st { dxStat = x }))
+             ]
 
   doMod ch setter =
      modifyMVar_ stMV $ \st ->
