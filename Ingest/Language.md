@@ -360,6 +360,7 @@ Other primitive types used in our model:
 
 * *prov-tc:uid* : int;
   and maps to the Titan data type:
+  [schema]: #
   makePropertyKey('ident').dataType(Long.class).cardinality(Cardinality.SINGLE)
   
 * *prov-tc:url* : string;
