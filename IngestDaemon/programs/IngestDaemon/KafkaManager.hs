@@ -41,7 +41,7 @@ channelToKafka ch host topic =
 -- PE Signalling
 
 -- We don't place node IDs on the queue for the first engagement, just
--- a signal indicating KB is ready.
+-- a signal indicating DB is ready.
 finishIngestSignal :: IO () -> KafkaAddress -> TopicName -> TopicName -> IO (Either KafkaClientError ())
 finishIngestSignal finisher svr out ipt =
  do r <- runKafka state oper
@@ -50,7 +50,7 @@ finishIngestSignal finisher svr out ipt =
       Right () -> hPutStrLn stderr ("Kafka signaling terminated somehow.")
     return r
  where
- state = mkKafkaState "ingest-px" svr
+ state = mkKafkaState "ingest-pe" svr
  oper =
    do o <- getLastOffset LatestTime 0 ipt
       forever (process o)
@@ -79,15 +79,18 @@ getMessage topicNm offset =
 --  Getting the CDM input from TA1
 
 -- | Acquire CDM from a given kafka host/topic and place values a channel.
-kafkaInput :: KafkaAddress -> TopicName -> TBChan Input -> IO (Either KafkaClientError ())
-kafkaInput host topic chan =
+kafkaInput :: (Text -> IO ())
+           -> KafkaAddress
+           -> TopicName
+           -> TBChan Input
+           -> IO (Either KafkaClientError ())
+kafkaInput logK host topic chan =
   do r <- runKafka state oper
      return r
  where
  state = mkKafkaState "adapt-ingest" host
- oper  = forever $
-  do o <- getLastOffset LatestTime 0 topic
-     process o
+ oper  = do liftIO (logK "Connected.")
+            forever $ getLastOffset LatestTime 0 topic >>= process
 
  process :: Offset -> Kafka ()
  process offset =
