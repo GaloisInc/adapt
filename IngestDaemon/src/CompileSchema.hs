@@ -42,13 +42,15 @@ data Operation id = InsertVertex { vertexType :: Text
                                  }
                   | InsertEdge { ident            :: Text
                                , src,dst          :: id
-                               , properties       :: [(Text,GremlinValue)]
                                , generateVertices :: Bool
                                }
+                  | InsertReifiedEdge
+                            { labelNode :: Text
+                            , labelE1   :: Text
+                            , labelE2   :: Text
+                            , nodeIdent,src,dst :: id
+                            }
   deriving (Eq,Ord,Show)
-
-insertEdge :: Text -> id -> id -> [(Text,GremlinValue)] -> Operation id
-insertEdge l s d p = InsertEdge l s d p False
 
 data GremlinValue = GremlinNum Integer
                   | GremlinString Text
@@ -78,17 +80,15 @@ compileEdge e =
   do euid <- newUID
      let e1Lbl = vLbl <> " out"
          e2Lbl = vLbl <> " in"
-         eMe   = uidToBase64 euid
+         eNode   = uidToBase64 euid
          [esrc, edst] = map uidToBase64 [edgeSource e, edgeDestination e]
          fixCamelCase str =
            let go x | isUpper x = T.pack ['_' , x]
                     | otherwise = T.pack [C.toUpper x]
            in T.take 1 str <> T.concatMap go (T.drop 1 str)
          vLbl  = fixCamelCase $ T.pack $ show (edgeRelationship e)
-         v     = InsertVertex vLbl eMe []
-         eTo   = insertEdge e1Lbl esrc eMe []
-         eFrom = insertEdge e2Lbl eMe edst []
-     return ([v], [eTo, eFrom])
+         eTriple = InsertReifiedEdge vLbl e1Lbl e2Lbl eNode esrc edst
+     return ([], [eTriple])
 
 class PropertiesOf a where
   propertiesOf :: a -> [(Text,GremlinValue)]
@@ -259,19 +259,29 @@ instance GraphId Text where
                 , ")"
                 ]
        env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
-  serializeOperation (InsertEdge l src dst ps genVerts)   =
+  serializeOperation (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
+    where
+    cmd = escapeChars call
+    call = T.unwords
+            [ "edgeNode = g.addV(label, lNode, 'ident', nId) ; "
+            , "g.V().has('ident',srcId).next().addEdge(lE1,edgeNode) ; "
+            , "edgeNode.addEdge(lE2, g.V().has('ident', dstId).next())"
+            ]
+    env = Map.fromList [ ("lNode", A.String lNode)
+                       , ("lE1", A.String lE1), ("lE2", A.String lE2)
+                       , ("nId", A.String nId)
+                       , ("srcId", A.String srcId), ("dstId", A.String dstId)
+                       ]
+
+  serializeOperation (InsertEdge l src dst genVerts)   =
      if genVerts
       then (testAndInsertCmd, env)
       else (nonTestCmd, env)
     where
       -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
-      nonTestCmd = escapeChars $
-             T.unwords
-              [ "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next() "
-              , if (not (null ps)) then "," else ""
-              , T.unwords $ intersperse "," (map mkParams [1..length ps])
-              , ")"
-              ]
+      nonTestCmd =
+        escapeChars $
+            "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next())"
       -- x = g.V().has('ident',src)
       -- y = g.V().has('ident',dst)
       -- if (!x.hasNext()) { x = g.addV('ident',src) }
@@ -283,13 +293,12 @@ instance GraphId Text where
               , "y = g.V().has('ident',dst) ;"
               , "if (!x.hasNext()) { x = g.addV('ident',src) } ;"
               , "if (!y.hasNext()) { y = g.addV('ident',dst) } ;"
-              , "x.next().addEdge(edgeName, y.next() "
-              , if (not (null ps)) then "," else ""
-              , T.unwords $ intersperse "," (map mkParams [1..length ps])
-              , ")"
+              , "x.next().addEdge(edgeName, y.next())"
               ]
-      env = Map.fromList $ ("src", A.String src) : ("dst", A.String dst) :
-                           ("edgeTy", A.String l) : mkBinding ps
+      env = Map.fromList [ ("src", A.String src)
+                         , ("dst", A.String dst)
+                         , ("edgeTy", A.String l)
+                         ]
 
 encodeQuoteText :: Text -> Text
 encodeQuoteText = quote . subChars . escapeChars
