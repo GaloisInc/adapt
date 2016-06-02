@@ -263,7 +263,7 @@ instance GraphId Text where
     where
     cmd = escapeChars call
     call = T.unwords
-            [ "edgeNode = g.addV(label, lNode, 'ident', nId) ; "
+            [ "edgeNode = graph.addVertex(label, lNode, 'ident', nId) ; "
             , "g.V().has('ident',srcId).next().addEdge(lE1,edgeNode) ; "
             , "edgeNode.addEdge(lE2, g.V().has('ident', dstId).next())"
             ]
