@@ -844,11 +844,11 @@ EDGE_EVENT_CAUSES_EVENT
 Event causality tracking.
 
 [schema]: #
-makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT out').multiplicity(ONE2ONE)
+makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT out').multiplicity(MANY2ONE)
 [schema]: #
 makeVertexLabel('EDGE_EVENT_CAUSES_EVENT')
 [schema]: #
-makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT in').multiplicity(MANY2ONE)
+makeEdgeLabel('EDGE_EVENT_CAUSES_EVENT in').multiplicity(SIMPLE)
 
 EDGE_SUBJECT_AFFECTS_EVENT
 -------
@@ -868,7 +868,7 @@ EDGE_SUBJECT_HASPARENT_SUBJECT
 A subject has a parent subject (such as thread has parent process).
 
 [schema]: #
-makeEdgeLabel('EDGE_SUBJECT_HASPARENT_SUBJECT out').multiplicity(MANY2ONE)
+makeEdgeLabel('EDGE_SUBJECT_HASPARENT_SUBJECT out').multiplicity(MULTI)
 [schema]: #
 makeVertexLabel('EDGE_SUBJECT_HASPARENT_SUBJECT')
 [schema]: #
@@ -892,7 +892,7 @@ EDGE_SUBJECT_RUNSON
 A subject runs on a host.
 
 [schema]: #
-makeEdgeLabel('EDGE_SUBJECT_RUNSON out').multiplicity(MANY2ONE)
+makeEdgeLabel('EDGE_SUBJECT_RUNSON out').multiplicity(MULTI)
 [schema]: #
 makeVertexLabel('EDGE_SUBJECT_RUNSON')
 [schema]: #
