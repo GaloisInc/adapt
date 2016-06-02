@@ -3,32 +3,41 @@
 import asyncio
 from aiogremlin import GremlinClient
 
-QUERYV="g.V().count()"
-QUERYE="g.E().count()"
-Q1="g.V().has(label,'Entity-File').count()"
-Q2="g.V().has(label,'Entity-NetFlow').count()"
-Q3="g.V().has(label,'Entity-Memory').count()"
-Q4="g.V().has(label,'Resource').count()"
-Q5="g.V().has(label,'Subject').count()"
-Q6="g.V().has(label,'Host').count()"
-Q7="g.V().has(label,'Agent').count()"
-QUERIES = [Q1,Q2,Q3,Q4,Q5,Q6,Q7]
+QUERYV = "g.V().count()"
+QUERYE = "g.E().count()"
+QUERIES = [
+    "g.V().has(label, 'Entity-File').count()",
+    "g.V().has(label, 'Entity-NetFlow').count()",
+    "g.V().has(label, 'Entity-Memory').count()",
+    "g.V().has(label, 'Resource').count()",
+    "g.V().has(label, 'Subject').count()",
+    "g.V().has(label, 'Host').count()",
+    "g.V().has(label, 'Agent').count()",
+]
+
+
+class GremlinQueryRunner:
+
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.gc = GremlinClient(loop=self.loop)
+
+    def fetch(self, query):
+        return self.loop.run_until_complete(self.gc.execute(query))
+
+    def close(self):
+        self.loop.run_until_complete(self.gc.close())
+
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    gc = GremlinClient(loop=loop)
+
+    gremlin = GremlinQueryRunner()
 
     for q in QUERIES:
-        e = gc.execute(q)
-        r = loop.run_until_complete(e)
-        print(q, "\n\t", r)
+        print(q, "\n\t", gremlin.fetch(q))
 
-    execute = gc.execute(QUERYV)
-    result = loop.run_until_complete(execute)
-    print("total nodes: ", result)
+    print("total nodes: ", gremlin.fetch(QUERYV))
 
-    execute = gc.execute(QUERYE)
-    result = loop.run_until_complete(execute)
-    print("total edges: ", result)
+    print("total edges: ", gremlin.fetch(QUERYE))
 
-    loop.run_until_complete(gc.close())
+    gremlin.close()

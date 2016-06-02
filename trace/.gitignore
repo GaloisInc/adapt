@@ -11,4 +11,6 @@
 *.ttl
 *.txt
 *.zip
+2016-*
+current
 ssh_and_exfiltrate
