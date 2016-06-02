@@ -5,14 +5,15 @@ from aiogremlin import GremlinClient
 
 QUERYV = "g.V().count()"
 QUERYE = "g.E().count()"
-Q1 = "g.V().has(label, 'Entity-File').count()"
-Q2 = "g.V().has(label, 'Entity-NetFlow').count()"
-Q3 = "g.V().has(label, 'Entity-Memory').count()"
-Q4 = "g.V().has(label, 'Resource').count()"
-Q5 = "g.V().has(label, 'Subject').count()"
-Q6 = "g.V().has(label, 'Host').count()"
-Q7 = "g.V().has(label, 'Agent').count()"
-QUERIES = [Q1, Q2, Q3, Q4, Q5, Q6, Q7]
+QUERIES = [
+    "g.V().has(label, 'Entity-File').count()",
+    "g.V().has(label, 'Entity-NetFlow').count()",
+    "g.V().has(label, 'Entity-Memory').count()",
+    "g.V().has(label, 'Resource').count()",
+    "g.V().has(label, 'Subject').count()",
+    "g.V().has(label, 'Host').count()",
+    "g.V().has(label, 'Agent').count()",
+]
 
 
 class GremlinQueryRunner:
