@@ -178,7 +178,8 @@ mainLoop cfg =
         triTopic = cfg ^. triggerTopic
         logMsg   = void . atomically . TB.tryWriteTBChan logChan
         logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
-        logIpt t = logMsg . (("ingestd[from " <> kafkaString t <> "]") <>)
+        logGC    = logMsg . ("ingestd[Retry thread]:    " <>)
+        logIpt t = logMsg . (("ingestd[KafkaTopic:" <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
         forkPersist lg = void . forkIO . persistant lg
     forkPersist logMsg $
@@ -187,17 +188,23 @@ mainLoop cfg =
                        (Left <$> channelToStderr logChan :: IO (Either () ())))
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
-    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput srvExt t inputs) inTopics
-    forkPersist logMsg (garbageCollectFailures reqStatus inputs)
+    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput (logIpt t) srvExt t inputs) inTopics
+    forkPersist logMsg (garbageCollectFailures logGC reqStatus inputs)
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
   where
-  garbageCollectFailures :: FailedInsertionDB -> TBChan Input -> IO (Either () ())
-  garbageCollectFailures fidb inputs = forever $ do
+  garbageCollectFailures :: (Text -> IO ()) -> FailedInsertionDB -> TBChan Input -> IO (Either () ())
+  garbageCollectFailures logGC fidb inputs = forever $ do
        threadDelay 10000000 -- 10 seconds
        es <- resetDB fidb
-       let is = catMaybes $ map ageOperation es
+       let ageOperation :: OperationRecord -> IO (Maybe Input)
+           ageOperation (OpRecord (Input orig stmt cnt) _)
+              | cnt > 2   =
+                 do logGC $ T.pack $ printf "Dropping a statement: %s" (show orig)
+                    return Nothing
+              | otherwise = return $ Just (Input orig stmt (cnt + 1))
+       is <- catMaybes <$> mapM ageOperation es
        mapM_ (atomically . TB.writeTBChan inputs) is
 
   finisher :: FailedInsertionDB -> TBChan Input -> IO ()
@@ -219,11 +226,6 @@ mainLoop cfg =
               | otherwise        -> ipt
             InsertReifiedEdge {} -> ipt
             InsertVertex {}      -> ipt
-
-  ageOperation :: OperationRecord -> Maybe Input
-  ageOperation (OpRecord (Input orig stmt cnt) _)
-      | cnt > 2   = Nothing
-      | otherwise = Just (Input orig stmt (cnt + 1))
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
@@ -271,7 +273,7 @@ runDB logTitan inputs db conn =
 
  go :: Int -> (Int64,Int64) -> IO ()
  go 0 !cnts@(!nrE,!nrV) =
-  do logTitan (T.pack $ printf "Ingested %d edges, %d verticies." nrE nrV)
+  do logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies." nrE nrV)
      go reportInterval cnts
  go ri !(!nrE,!nrV) =
   do opr <- atomically (TB.readTBChan inputs)
@@ -280,7 +282,9 @@ runDB logTitan inputs db conn =
          req  = mkRequest cmd env
          recover resp
             | respStatus resp /= 200 =
-                insertDB (respRequestId resp) opr db
+                do let respData = (respRequestId resp, respResult resp)
+                   logTitan (T.pack $ "DB exception: " <> show respData)
+                   insertDB (fst respData) opr db
             | otherwise              = return ()
      GC.sendOn conn req recover
      let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
