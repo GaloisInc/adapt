@@ -358,10 +358,10 @@ Other primitive types used in our model:
   [schema]: #
   makePropertyKey('properties').dataType(String.class).cardinality(Cardinality.LIST)
 
-* *prov-tc:uid* : int;
+* *prov-tc:uid* : string;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('ident').dataType(Long.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('ident').dataType(String.class).cardinality(Cardinality.SINGLE)
   
 * *prov-tc:url* : string;
   and maps to the Titan data type:

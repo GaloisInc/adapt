@@ -1,5 +1,9 @@
 # Combined Revision history for Ingest, IngestDaemon, GremlinClient
 
+## 0.2
+
+* Increased the verbosity, sending more data to the Kafka log topic.
+
 ## 0.1  -- 2016-06-02
 
 * First version. Released on an unsuspecting world.

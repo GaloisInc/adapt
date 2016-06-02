@@ -281,10 +281,7 @@ runDB logTitan inputs db conn =
          stmt = statement opr
          req  = mkRequest cmd env
          recover resp
-            | respStatus resp /= 200 =
-                do let respData = (respRequestId resp, respResult resp)
-                   logTitan (T.pack $ "DB exception: " <> show respData)
-                   insertDB (fst respData) opr db
+            | respStatus resp /= 200 = insertDB (respRequestId resp) opr db
             | otherwise              = return ()
      GC.sendOn conn req recover
      let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
