@@ -19,7 +19,7 @@ supercfg=$ADAPT/config/supervisord.conf
 cd $ADAPT || exit 1
 
 # This takes about one second of CPU if no building is needed.
-(cd $ADAPT/ingest && make)
+(cd $ADAPT/.stack-adapt && stack install)
 
 # Some applications over allocate and expect an allocate-on-use behavior as
 # typical of Linux VMM.  For this to work we need to enable over-allocation
