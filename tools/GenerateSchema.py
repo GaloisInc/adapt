@@ -11,7 +11,7 @@ schemaFile.write("mgmt = graph.openManagement()\n")
 schemaFile.write("if(!mgmt.containsRelationType('EDGE_SUBJECT_HASPARENT_SUBJECT out')) {\n")
 
 # generate schema groovy from Language.md
-spec = os.path.expanduser('/vagrant/ingest/Ingest/Language.md')
+spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
 with open(spec) as langFile:
     langCont = langFile.read()
     regexp = re.compile(r"^\s*\[schema\]: #\s*(?:\n|\r\n?)\s*(.+$)", re.MULTILINE)
