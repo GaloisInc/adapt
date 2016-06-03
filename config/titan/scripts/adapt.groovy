@@ -16,10 +16,8 @@ if(! i) {
   if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
     mgmt.awaitGraphIndexStatus(graph, 'byIdent').status(SchemaStatus.REGISTERED).call()
   }
-  # mgmt.updateIndex(mgmt.getGraphIndex('byIdent'), SchemaAction.REINDEX).get()
-  # reindexing is unnecessary if the index existed before any data was inserted.
   mgmt.commit()
-  mgmt.awaitGraphIndexStatus(graph, 'byIdent').status(SchemaStatus.ENABLED).timeout(6,ChronoUnit.MINUTES).call()
+  mgmt.awaitGraphIndexStatus(graph, 'byIdent').status(SchemaStatus.ENABLED).call()
 } else { mgmt.commit() }
 
 g = graph.traversal()
