@@ -1,0 +1,22 @@
+# 0.1
+
+- Initial versioned release of adapt-in-a-box
+- System services auto start:
+  - Titan+cassandra+elasticsearch
+      - Titan schema from Ingest 0.1
+      - Indexing on 'ident'
+  - Kafka starts
+    - topics are created per SystemSpecification in AdaptMisc.git
+  - Zookeeper starts (incidental, needed by Kafka)
+- Auto-starting Adapt components include:
+  - Ingestd
+  - AD
+  - dashboard
+  - classifyd
+  - segmentd
+- Can ingest at ~300 statements per second on commodity hardware.
+- Trint, avroknife utilities installed.
+- Currently non-existent components include:
+  - PX
+  - DX
+  - UI
