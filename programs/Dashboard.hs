@@ -15,7 +15,7 @@ import           Control.Concurrent.STM.TChan
 import           Control.Concurrent.STM
 import           Control.Exception as X
 import           Control.Monad
-import           Control.Monad.Trans.Either (EitherT)
+import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
 import           Data.Monoid
@@ -150,7 +150,7 @@ defaultStatus = Status Seq.empty "" "" "" "" ""
 dashboard :: Config -> MVar Status -> Application
 dashboard c curr = serve dashboardAPI (lonePage c curr)
 
-lonePage :: Config -> MVar Status -> EitherT ServantErr IO (Html ())
+lonePage :: Config -> MVar Status -> ExceptT ServantErr IO (Html ())
 lonePage c stMV =
   do st <- liftIO (readMVar stMV)
      return (buildPage st)
