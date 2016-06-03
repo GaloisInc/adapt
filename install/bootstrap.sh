@@ -66,8 +66,8 @@ install_titan() {
     sudo mv titan-1.0.0-hadoop1 $TITAN_SERVER_DIR || handle_error $LINENO
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
-    cd /vagrant/config/titan || handle_error $LINENO
-    /vagrant/tools/GenerateSchema.py || handle_error $LINENO
+    cd $CONFIG_DIR/titan || handle_error $LINENO
+    $ADAPT_DIR/tools/GenerateSchema.py || handle_error $LINENO
     cd $CWD || handle_error $LINENO
 }
 
