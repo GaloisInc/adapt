@@ -14,8 +14,11 @@ if(! i) {
   idx   = mgmt.getGraphIndex('byIdent')
   // Wait for index availability
   if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
+    mgmt.commit()
     mgmt.awaitGraphIndexStatus(graph, 'byIdent').status(SchemaStatus.REGISTERED).call()
-  }
+  } else { mgmt.commit() }
+  mgmt  = graph.openManagement()
+  mgmt.updateIndex(mgmt.getGraphIndex('byIdent'),SchemaAction.ENABLE_INDEX).get()
   mgmt.commit()
   mgmt.awaitGraphIndexStatus(graph, 'byIdent').status(SchemaStatus.ENABLED).call()
 } else { mgmt.commit() }
