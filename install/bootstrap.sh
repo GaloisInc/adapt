@@ -77,6 +77,7 @@ ensure_vagrant_user() {
     egrep '^vagrant:' /etc/passwd > /dev/null || sudo adduser vagrant --disabled-password --gecos "" --ingroup vagrant
 }
 
+# Install zookeeper, kafka, titan, java, git, python, stack, ghc, etc.
 install_adapt_dependencies() {
     USER_BIN=$HOME/.local/bin
     TEMP=$ADAPT_DIR/tmp
@@ -129,36 +130,48 @@ install_adapt_dependencies() {
     sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 }
 
+function install_ingest_dashboard() {
+    CWD=$(pwd)
+    # Install ingest and dashboard using a single sandbox
+    mkdir -p $ADAPT_DIR/.stack-adapt                          || handle_error $LINENO
+    cp $ADAPT_DIR/install/stack.yaml $ADAPT_DIR/.stack-adapt/ || handle_error $LINENO
+    cd $ADAPT_DIR/.stack-adapt                                || handle_error $LINENO
+    stack install                                             || handle_error $LINENO
+    cd $CWD
+}
+
+function install_ad() {
+    CWD=$(pwd)
+    cd $ADAPT_DIR/ad/osu_iforest || handle_error $LINENO
+    make                         || handle_error $LINENO
+    cd $CWD
+}
+
+function install_supervisor_config() {
+    # Copy over supervisor configuration files
+    ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
+}
+
 function install_adapt() {
     # Installs: In, PE, Se, AD, AC,DX
     export PATH=$PATH:$HOME/.local/bin
 
-    # Install ingest system
-    cd $ADAPT_DIR/ingest/IngestDaemon || handle_error $LINENO
-    stack install || handle_error $LINENO
-    cd $ADAPT_DIR/dashboard || handle_error $LINENO
-    stack install || handle_error $LINENO
-    ln -sf $CONFIG_DIR/supervisord.conf.adaptinabox $CONFIG_DIR/supervisord.conf || handle_error $LINENO
+    install_ingest_dashboard
+    install_ad
+    install_supervisor_config
 }
 
 function copy_adapt() {
     CWD=$(pwd)
-    sudo apt-get install -y git || handle_error $LINENO
-    hash -r || handle_error $LINENO
+    sudo apt-get install -y git                 || handle_error $LINENO
+    hash -r                                     || handle_error $LINENO
     if [ -e $ADAPT_DIR ] ; then
-        cd $ADAPT_DIR || handle_error $LINENO
-        git pull || handle_error $LINENO
+        cd $ADAPT_DIR                           || handle_error $LINENO
+        git pull                                || handle_error $LINENO
     else
         git clone --depth 1 /vagrant $ADAPT_DIR || handle_error $LINENO
     fi
-    cd $CWD || handle_error $LINENO
-}
-
-install_ad() {
-    CWD=$(pwd)
-    cd $ADAPT_DIR/ad/osu_iforest || handle_error $LINENO
-    make || handle_error $LINENO
-    cd $CWD
+    cd $CWD                                     || handle_error $LINENO
 }
 
 mkdir -p $KAFKA_ROOT
@@ -166,4 +179,3 @@ mkdir -p $KAFKA_ROOT
 copy_adapt
 install_adapt_dependencies
 install_adapt
-install_ad
