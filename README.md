@@ -24,7 +24,7 @@ First install [stack](https://github.com/commercialhaskell/stack/releases) build
 
 tool then run `make` from the top level.
 # Directory Descriptions
-    git subtree push --prefix=classifier https://github.com/GaloisInc/Adapt-classify.git master
+    git subtree pull --prefix=classifier https://github.com/GaloisInc/Adapt-classify.git master --squash
 
 A helper script exists to pull all known components in via git subtree:
 - ad: Anomaly Detection
