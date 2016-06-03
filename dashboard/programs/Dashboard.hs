@@ -15,7 +15,7 @@ import           Control.Concurrent.STM.TChan
 import           Control.Concurrent.STM
 import           Control.Exception as X
 import           Control.Monad
-import           Control.Monad.Trans.Either (EitherT)
+import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
 import           Data.Monoid
@@ -150,22 +150,21 @@ defaultStatus = Status Seq.empty "" "" "" "" ""
 dashboard :: Config -> MVar Status -> Application
 dashboard c curr = serve dashboardAPI (lonePage c curr)
 
-lonePage :: Config -> MVar Status -> EitherT ServantErr IO (Html ())
+lonePage :: Config -> MVar Status -> ExceptT ServantErr IO (Html ())
 lonePage c stMV =
   do st <- liftIO (readMVar stMV)
      return (buildPage st)
  where
- scrollTextAreas =
-  T.unlines [ "var ig = document.getElementById('ig_textarea');"
-            , "ig.scrollTop = ig.scrollHeight;"
-            ]
  buildPage :: Status -> Html ()
  buildPage (Status {..}) =
   do title_ "ADAPT Dashbaord"
-     body_ [onload_ scrollTextAreas] $ do
+     body_ [] $ do
       meta_ [httpEquiv_ "refresh", content_ "5"]
       h2_ "Ingestion"
-      textarea_ [id_ "ig_textarea", readonly_ "true", rows_ "25", cols_ "100"] (toHtml $ T.unlines $ F.toList igStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml $ T.unlines $ F.toList igStat)
       h2_ "Pattern Extraction"
       p_ (toHtml pxStat)
       h2_ "Segmentation"
