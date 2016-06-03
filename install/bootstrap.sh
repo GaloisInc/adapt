@@ -169,7 +169,7 @@ function copy_adapt() {
         cd $ADAPT_DIR                           || handle_error $LINENO
         git pull                                || handle_error $LINENO
     else
-        git clone --depth 1 /vagrant $ADAPT_DIR || handle_error $LINENO
+        git clone --depth 1 file:///vagrant -b $(cd /vagrant ; git branch | grep '*' | awk '{print $2}') $ADAPT_DIR || handle_error $LINENO
     fi
     cd $CWD                                     || handle_error $LINENO
 }
