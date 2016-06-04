@@ -1,12 +1,13 @@
 *~
-infoleak-small.provn
+.DS_Store
+.idea
+.stack-adapt/
+.vagrant
 example/infoleak-small.provn
 gremlin-server/
 hs_err_pid*.log
+infoleak-small.provn
 kafka/
 node_modules/
 supervisord.log
 supervisord.pid
-.DS_Store
-.idea
-.vagrant
