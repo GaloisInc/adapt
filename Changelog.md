@@ -2,6 +2,7 @@
 
 - Add ElasticSearch to Titan config
 - Add an index 'byURL' that uses elastic search for the 'url' property key.
+- New 'stop the world' script
 
 # 0.1
 
