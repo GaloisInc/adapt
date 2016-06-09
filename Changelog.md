@@ -1,3 +1,8 @@
+# 0.2 (unreleased, partial change list)
+
+- Add ElasticSearch to Titan config
+- Add an index 'byURL' that uses elastic search for the 'url' property key.
+
 # 0.1
 
 - Initial versioned release of adapt-in-a-box
