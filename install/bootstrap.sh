@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 KAFKA_ROOT=/opt
 ADAPT_DIR=$HOME/adapt
@@ -37,7 +37,7 @@ install_kafka() {
     KAFKA_VER=$1
     SCALA_VER=$2
     VALID_HASH=$3
-    SOURCE=http://apache.mirrors.pair.com/kafka/${KAFKA_VER}/kafka_${SCALA_VER}-${KAFKA_VER}.tgz 
+    SOURCE=http://apache.mirrors.pair.com/kafka/${KAFKA_VER}/kafka_${SCALA_VER}-${KAFKA_VER}.tgz
 
     CWD=$(pwd)
     cd $KAFKA_ROOT || handle_error $LINENO
@@ -110,12 +110,21 @@ install_adapt_dependencies() {
                             git || handle_error $LINENO
     sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
-    sudo -H pip3 install coverage flake8 \
-                        gremlinrestclient aiogremlin || handle_error $LINENO
-    sudo -H pip install kafka-python || handle_error $LINENO
-    sudo -H pip2 install avroknife || handle_error $LINENO
-    sudo -H pip2 install tornado gremlinclient || handle_error $LINENO
-    sudo -H pip3 install networkx pyparsing || handle_error $LINENO
+    sudo -H pip2 install \
+        avroknife \
+        gremlinclient \
+        kafka-python \
+        tornado \
+      || handle_error $LINENO
+    sudo -H pip3 install \
+        avroknife \
+        aiogremlin \
+        coverage \
+        flake8 \
+        gremlinrestclient \
+        networkx \
+        pyparsing \
+      || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
