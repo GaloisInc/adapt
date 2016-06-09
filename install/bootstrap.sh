@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 KAFKA_ROOT=/opt
 ADAPT_DIR=$HOME/adapt
@@ -37,7 +37,7 @@ install_kafka() {
     KAFKA_VER=$1
     SCALA_VER=$2
     VALID_HASH=$3
-    SOURCE=http://apache.mirrors.pair.com/kafka/${KAFKA_VER}/kafka_${SCALA_VER}-${KAFKA_VER}.tgz 
+    SOURCE=http://apache.mirrors.pair.com/kafka/${KAFKA_VER}/kafka_${SCALA_VER}-${KAFKA_VER}.tgz
 
     CWD=$(pwd)
     cd $KAFKA_ROOT || handle_error $LINENO
@@ -117,6 +117,7 @@ install_adapt_dependencies() {
         tornado \
       || handle_error $LINENO
     sudo -H pip3 install \
+        avroknife \
         aiogremlin \
         coverage \
         flake8 \
