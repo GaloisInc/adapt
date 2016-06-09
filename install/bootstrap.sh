@@ -111,16 +111,16 @@ install_adapt_dependencies() {
     sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip2 install \
-        tornado \
+        avroknife \
         gremlinclient \
         kafka-python \
-        avroknife \
+        tornado \
       || handle_error $LINENO
     sudo -H pip3 install \
+        aiogremlin \
         coverage \
         flake8 \
         gremlinrestclient \
-        aiogremlin \
         networkx \
         pyparsing \
       || handle_error $LINENO
