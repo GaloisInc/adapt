@@ -110,12 +110,20 @@ install_adapt_dependencies() {
                             git || handle_error $LINENO
     sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
-    sudo -H pip3 install coverage flake8 \
-                        gremlinrestclient aiogremlin || handle_error $LINENO
-    sudo -H pip install kafka-python || handle_error $LINENO
-    sudo -H pip2 install avroknife || handle_error $LINENO
-    sudo -H pip2 install tornado gremlinclient || handle_error $LINENO
-    sudo -H pip3 install networkx pyparsing || handle_error $LINENO
+    sudo -H pip2 install \
+        tornado \
+        gremlinclient \
+        kafka-python \
+        avroknife \
+      || handle_error $LINENO
+    sudo -H pip3 install \
+        coverage \
+        flake8 \
+        gremlinrestclient \
+        aiogremlin \
+        networkx \
+        pyparsing \
+      || handle_error $LINENO
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
