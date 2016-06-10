@@ -40,6 +40,11 @@ A fancier criterion would be sets of base nodes with identical PID,
 each set size being no more than K,
 and difference between last and first timestamp no more than T.
 
+Linux can and will recycle PIDs.
+After `fork()` creates process 1234, and it calls `exit()`,
+a subsequent fork can create a new distinct process with PID 1234.
+It is important that events from such process appear in distinct segments.
+
 Events within an event stream are reported serially;
 each one has a HappensBefore relationship with its successor.
 Multiple concurrent event streams will occasionally synchronize with
