@@ -1,8 +1,11 @@
-# 0.2 (unreleased, partial change list)
+# 0.3 -- In progress
+
+# 0.2 -- Released 2016-06-10
 
 - Add ElasticSearch to Titan config
 - Add an index 'byURL' that uses elastic search for the 'url' property key.
 - New 'stop the world' script
+- Pull in Adapt-Ingest 0.2 for fixes.
 - Changes that are not user-visible:
   * Modularize the adapt.groovy script
 
