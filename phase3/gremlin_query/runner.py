@@ -20,44 +20,26 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-#
-'''
-Writes one or more classification nodes to Titan / Cassandra.
-'''
-
-import classify
-import logging
-import unittest
-
-__author__ = 'John.Hanley@parc.com'
-
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler())
-log.setLevel(logging.DEBUG)
 
 
-def test_phase2():
-    '''Test Ac component with upstream deps for phase2 development.'''
-    exfil_detect = classify.ExfilDetector()
-    ins = classify.Phase2NodeInserter()
-    ins.drop_all_test_nodes()
-
-    # precondition
-    assert False is exfil_detect.is_exfil_segment(
-        ins._get_segment('seg1'))
-
-    ins.insert_reqd_events()
-    ins.insert_reqd_segment()
-
-    # postcondition
-    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
-        ins._insert_node('ac1', 'classification',
-                         ('classificationType',
-                          'exfiltrate_sensitive_file'))
-    else:
-        assert None, 'phase2 test failed'
+import asyncio
+from aiogremlin import GremlinClient
 
 
-if __name__ == '__main__':
-    test_phase2()
-    unittest.main()
+class Runner:
+
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.gc = GremlinClient(loop=self.loop)
+
+    def fetch(self, query):
+        return self.loop.run_until_complete(self.gc.execute(query))
+
+    def close(self):
+        self.loop.run_until_complete(self.gc.close())
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
