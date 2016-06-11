@@ -53,7 +53,7 @@ class Injector:
             return struct.unpack("B", status_byte)[0]
 
         log.info("reporting %d", to_int(status))
-        s = self.producer.send(topic, status)
+        s = self.producer.send(topic, status).get()
         log.info("sent: %s", s)
 
 
