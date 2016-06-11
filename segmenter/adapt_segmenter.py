@@ -1,23 +1,35 @@
-import sys
-import os
-import titandb
-from provn_segmenter import *
+#! /usr/bin/env python3
+
+from provn_segmenter import Document, DocumentGraph, Segmenter
+import argparse
 import logging
+import os
+import sys
+import titandb
+
+
+def get_arg_parser():
+    p = argparse.ArgumentParser(description='A provn segmenter')
+    p.add_argument('--broker', '-b',
+                   help='The broker to the Titan DB', required=True)
+    p.add_argument('--provn_file', '-p',
+                   help='A prov-tc file in provn format')
+    p.add_argument('spec_file',
+                   help='A segment specification file in json format')
+    p.add_argument('--verbose', '-v', action='store_true',
+                   help='Run in verbose mode')
+    p.add_argument('--summary', '-s', action='store_true',
+                   help='Print a summary of the input file and quit,'
+                   ' segment spec is ignored')
+    p.add_argument('--drop_db', action='store_true',
+                   help='Drop DB and quit, segment spec is ignored')
+    p.add_argument('--store_segment', action='store_true',
+                   help='Store segments in Titan DB')
+    return p
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='A provn segmenter')
-    parser.add_argument('--broker', '-b', help='The broker to the Titan DB', required=True)
-    parser.add_argument('--provn_file', '-p', help='A prov-tc file in provn format')
-    parser.add_argument('spec_file',
-                        help='A segment specification file in json format')
-    parser.add_argument('--verbose', '-v', action='store_true',
-        help='Run in verbose mode')
-    parser.add_argument('--summary', '-s', action='store_true',
-        help='Print a summary of the input file and quit, segment spec is ignored')
-    parser.add_argument('--drop_db', action='store_true',
-        help='Drop DB and quit, segment spec is ignored')
-    parser.add_argument('--store_segment', action='store_true',
-        help='Store segments in Titan DB')
+    parser = get_arg_parser()
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
