@@ -92,7 +92,7 @@ def arg_parser():
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='ws://localhost:8182/')
+                   default='http://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
