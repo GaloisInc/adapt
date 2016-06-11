@@ -126,6 +126,8 @@ install_adapt_dependencies() {
         pyparsing \
       || handle_error $LINENO
 
+    sudo -H pip3 install -r $ADAPT_DIR/dx/simulator/config/requirements.txt
+
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
     stack setup || handle_error $LINENO
