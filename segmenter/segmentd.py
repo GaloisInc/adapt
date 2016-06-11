@@ -27,6 +27,7 @@ The segmenter daemon - a kafka consumer.
 import argparse
 import kafka
 import logging
+import os
 import struct
 import time
 
@@ -63,13 +64,16 @@ class TopLevelSegmenter:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_ingest(self, broker, spec, start_msg="Awaiting ingested data..."):
+    def await_ingest(self, broker, spec, start_msg='Awaiting ingested data.'):
+        os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
         log.info(start_msg)
         for msg in self.consumer:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
                 self.report_status(STATUS_IN_PROGRESS)
-                os.system('python3 adapt_segmenter.py -b ' + broker + ' ' + spec+' --store-segment')
+                cmd = './adapt_segmenter.py --broker %s %s --store-segment' % (
+                    broker, spec)
+                os.system(cmd)
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
@@ -79,7 +83,7 @@ class TopLevelSegmenter:
 
         log.info("reporting %d", to_int(status))
         for downstream in downstreams:
-            s = self.producer.send(downstream, status)
+            s = self.producer.send(downstream, status).get()
             log.info("sent: %s", s)
 
 
