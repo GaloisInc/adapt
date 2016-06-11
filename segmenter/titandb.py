@@ -21,9 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class TitanClient:
-    def __init__(self, broker):
-        assert broker.startswith('http'), '%s, not %s' % (
-            'Please specify a value like http://localhost:8182', broker)
+    def __init__(self, broker='ws://localhost:8182/'):
         self.broker = broker
         self.loop = asyncio.get_event_loop()
         self.gc = GremlinClient(url=broker, loop=self.loop)
