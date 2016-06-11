@@ -2,7 +2,8 @@
 The DX module generates a segmentation-level DAG, simulating the output of the segmenter, and
 annotates the graph with APT grammar terminals, simulating the output of the classifier. Given an
 APT campaign grammar and a symptomatic node, the module produces a list of paths through the symptom
-that match the grammar.
+that match the grammar. A symptomatic node is an observation of a suspicious behavior in a set of
+nodes (segments/patterns).
 
 ## Dependencies
 * Python 3
@@ -87,9 +88,10 @@ Running `make pdf` with the default `dx.yml` configuration yields the following 
 
 ![](docs/images/sg.png)
 
-Each node is a segmentation node. Nodes can be connected via directed edges. The simulation also
-annotates nodes with APT activity labels and respective classification confidence scores.
-The node with the blue border is the symptomatic node.
+Each node is a segmentation node. Nodes can be connected via directed edges, mean that there is a
+causal relationship between the nodes. The simulation also annotates nodes with APT activity labels
+and respective classification confidence scores. The node with the blue border is the symptomatic
+node.
 
 The following page in the generated PDF document shows a reduced diagnosis. Nodes are colored
 according to their frequency in diagnoses. The color mapping ranges from bright yellow (low
