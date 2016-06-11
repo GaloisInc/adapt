@@ -71,8 +71,9 @@ class TopLevelSegmenter:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
                 self.report_status(STATUS_IN_PROGRESS)
-                cmd = './adapt_segmenter.py --broker %s %s --store-segment' % (
+                cmd = './adapt_segmenter.py --broker %s --store-segment %s' % (
                     broker, spec)
+                log.info(cmd)
                 os.system(cmd)
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
@@ -91,7 +92,7 @@ def arg_parser():
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='')
+                   default='ws://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
