@@ -35,3 +35,8 @@ startsecs=20
 command=%(ENV_HOME)s/adapt/segment/segmenter/segmentd.py
 autorestart=yes
 startsecs=20
+
+[program:dxd]
+command=%(ENV_HOME)s/adapt/dx/simulator/dx.py
+autorestart=yes
+startsecs=20
