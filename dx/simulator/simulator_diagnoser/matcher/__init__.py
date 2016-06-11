@@ -1,1 +1,1 @@
-from grammar_matcher import *
+from .grammar_matcher import *

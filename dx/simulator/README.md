@@ -6,7 +6,7 @@ that match the grammar. A symptomatic node is an observation of a suspicious beh
 nodes (segments/patterns).
 
 ## Dependencies
-* Python 2.7
+* Python 3
 * [Virtualenv](https://virtualenv.pypa.io/)
 * [Graphviz](http://www.graphviz.org/)
 

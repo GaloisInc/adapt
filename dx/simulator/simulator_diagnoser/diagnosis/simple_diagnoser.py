@@ -49,4 +49,4 @@ class DiagnosticResult(object):
 
     def print_dx(self):
         for path, match in self.iterate():
-            print "Path: ", path, " - Potential APT: ", match.matches
+            print("Path: ", path, " - Potential APT: ", match.matches)
