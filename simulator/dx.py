@@ -59,8 +59,8 @@ if __name__ == "__main__":
     configs = sd.ConfigParser(scriptdir + '/dx.yml')
 
     for _ in messaging.receive():
-        stub_db(db, configs)
-        diagnose(db, configs)
+        # stub_db(db, configs)
+        # diagnose(db, configs)
 
         if args.single_run:
             messaging.send()
