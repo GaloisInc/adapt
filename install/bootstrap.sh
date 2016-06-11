@@ -172,6 +172,7 @@ function install_adapt() {
 
 function copy_adapt() {
     CWD=$(pwd)
+    sudo apt-get update                         || handle_error $LINENO
     sudo apt-get install -y git                 || handle_error $LINENO
     hash -r                                     || handle_error $LINENO
     if [ -e $ADAPT_DIR ] ; then
