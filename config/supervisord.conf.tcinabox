@@ -21,6 +21,11 @@ command=/home/vagrant/.local/bin/ingestd -e ta3.tc.dev:9092 -i trace-topic -l in
 autorestart=yes
 startsecs=20
 
+[program:px]
+command=/home/vagrant/adapt/px/fake-fe.py
+autorestart=yes
+startsec=10
+
 [program:dashboard]
 command=/home/vagrant/.local/bin/dashboard
 autorestart=yes
