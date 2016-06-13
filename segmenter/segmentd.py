@@ -27,6 +27,7 @@ The segmenter daemon - a kafka consumer.
 import argparse
 import kafka
 import logging
+import os
 import struct
 import time
 import os
@@ -64,13 +65,17 @@ class TopLevelSegmenter:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_ingest(self, broker, spec, start_msg="Awaiting ingested data..."):
+    def await_ingest(self, broker, spec, start_msg='Awaiting ingested data.'):
+        os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
         log.info(start_msg)
         for msg in self.consumer:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
                 self.report_status(STATUS_IN_PROGRESS)
-                os.system('python3 /home/vagrant/adapt/segment/segmenter/adapt_segmenter.py -b ' + broker + ' ' + spec+' --store-segment')
+                cmd = './adapt_segmenter.py --broker %s --store-segment %s' % (
+                    broker, spec)
+                log.info(cmd)
+                os.system(cmd)
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
@@ -80,7 +85,7 @@ class TopLevelSegmenter:
 
         log.info("reporting %d", to_int(status))
         # Segmenter only talks to AD
-        s = self.producer.send("ad", status)
+        s = self.producer.send("ad", status).get()
         log.info("sent: %s", s)
 
 
@@ -88,7 +93,7 @@ def arg_parser():
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='')
+                   default='http://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
