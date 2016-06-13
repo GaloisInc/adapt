@@ -29,6 +29,7 @@ import kafka
 import logging
 import struct
 import time
+import os
 
 # __author__ = 'John.Hanley@parc.com'
 __author__ = 'jcheney@inf.ed.ac.uk'
@@ -69,18 +70,18 @@ class TopLevelSegmenter:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
                 self.report_status(STATUS_IN_PROGRESS)
-                os.system('python3 adapt_segmenter.py -b ' + broker + ' ' + spec+' --store-segment')
+                os.system('python3 /home/vagrant/adapt/segment/segmenter/adapt_segmenter.py -b ' + broker + ' ' + spec+' --store-segment')
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
-    def report_status(self, status, downstreams='ad ac ui'.split()):
+    def report_status(self, status):
         def to_int(status_byte):
             return struct.unpack("B", status_byte)[0]
 
         log.info("reporting %d", to_int(status))
-        for downstream in downstreams:
-            s = self.producer.send(downstream, status)
-            log.info("sent: %s", s)
+        # Segmenter only talks to AD
+        s = self.producer.send("ad", status)
+        log.info("sent: %s", s)
 
 
 def arg_parser():
@@ -91,7 +92,7 @@ def arg_parser():
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='test/spec/default_spec.json')
+                   default='/home/vagrant/adapt/segment/segmenter/test/spec/default_spec.json')
     return p
 
 
