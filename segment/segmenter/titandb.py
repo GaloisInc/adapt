@@ -21,10 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class TitanClient:
-    def __init__(self, broker):
+    def __init__(self, broker='ws://localhost:8182/'):
         self.broker = broker
-        assert not self.broker or re.match('.+:\d+', self.broker),\
-            'Broker must be in format url:port'
         self.loop = asyncio.get_event_loop()
         self.gc = GremlinClient(url=broker, loop=self.loop)
 
