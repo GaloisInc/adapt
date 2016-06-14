@@ -34,9 +34,7 @@ class Datetime:
             self.time.minute, self.time.second)
 
     def add(self, days, hs, ms, secs):
-        assert hs < 24
-        assert ms < 59
-        assert secs < 59
+        assert secs > 0
         new_datetime = self.datetime + datetime.timedelta(
             days=days, hours=hs, minutes=ms, seconds=secs)
 
@@ -63,7 +61,12 @@ class Datetime:
             return 0
 
     @classmethod
-    def time_slices(cls, start, end, days, hs, ms, secs):
+    def time_slices(cls, start, end, secs):
+        # Vestigal, can be deleted.
+        days = 0
+        hs = 0
+        ms = 0
+
         intervals = []
         x = start
         y = str(Datetime(start).add(days, hs, ms, secs))
@@ -124,9 +127,9 @@ class Segmenter:
         return res_set
 
     def segment_by_time(self, from_, window_dict):
-        intervals = Datetime.time_slices(from_, self.dg.max_time,
-            window_dict['days'], window_dict['hours'],
-            window_dict['minutes'], window_dict['seconds'])
+        max_time = self.dg.max_time or str(datetime.datetime(2037, 1, 1))
+        intervals = Datetime.time_slices(from_, max_time,
+            window_dict['seconds'])
         return [(x, self.time_slice(x, y)) for x, y in intervals]
 
     def segment_by_att(self, att, radius, edges):
