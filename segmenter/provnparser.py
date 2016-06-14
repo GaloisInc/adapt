@@ -9,8 +9,15 @@
     Adria Gascon, 2016.
 """
 
-from pyparsing import *
+# flake8 --ignore=E121,E128 segmenter/provnparser.py
+
+from pyparsing import Combine, Keyword, Literal, OneOrMore, \
+     Optional, Suppress, Word, alphanums, delimitedList, nums
+import logging
 import sys
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 
 class ProvRelation:
@@ -54,7 +61,7 @@ class AssociationExpr(ProvRelation):
     def __str__(self):
         return 'wasAssociatedWith({0}, {1}, {2}, {3})'.format(
             self.s, self.t,
-            self.timestamp if self.timestamp else '-'   , self.att_val_dict)
+            self.timestamp if self.timestamp else '-', self.att_val_dict)
 
     def label(self):
         return 'wasAssociatedWith'
@@ -196,10 +203,11 @@ class Document:
     def union(self, doc):
         for e in doc.expression_list:
             self.expression_list.append(e)
-        self.prefix_decls = list(set(self.prefix_decls) | set(doc.prefix_decls))
+        self.prefix_decls = list(set(self.prefix_decls + doc.prefix_decls))
 
     def __str__(self):
-        def f(x): return '\t' + str(x)
+        def f(x):
+            return '\t' + str(x)
         l = ['document']
         l += map(f, self.prefix_decls)
         l += map(f, self.expression_list)
@@ -386,7 +394,9 @@ def bnf(doc):
         ((lbrack + delimitedList(att_val_pair).setResultsName('att_val_list') +
         rbrack) | (lbrack + rbrack)) + rpar).\
         setParseAction(doc.make_derivation_expression)
-    expression = ( association_expr | activity_expr | communication_expr | entity_expr | usage_expr | generation_expr | derivation_expr | agent_expr | validation_expr).\
+    expression = (association_expr | activity_expr | communication_expr
+                  | entity_expr | usage_expr | generation_expr
+                  | derivation_expr | agent_expr | validation_expr).\
         setParseAction(doc.make_expression)
     prefix_decl = (Keyword('prefix') + prefix_name.setResultsName('id') + la +
         url_word.setResultsName('url') + ra).\
