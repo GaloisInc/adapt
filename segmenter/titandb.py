@@ -7,15 +7,17 @@
 
     Adria Gascon, 2016.
 """
-import asyncio
 from aiogremlin import GremlinClient
 from provn_segmenter import DocumentGraph, Document
 from provnparser import ResourceFactory, EventFactory
-import re
 import argparse
-import os
-import sys
+import asyncio
 import logging
+import os
+import re
+import sys
+import traceback
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -36,8 +38,10 @@ class TitanClient:
         try:
             result = self.loop.run_until_complete(execute)
         except Exception as e:
-            print('Error trying to connect to Titan DB: {0}...aborting'.
-                format(e))
+            traceback.print_exc()
+            logger.error('query failed: %s', gremlin_query_str)
+            logger.error('Error trying to connect to Titan DB: {0}...aborting'.
+                         format(e))
             self.close()
             sys.exit(-1)
         assert result[0].status_code in (200, 204, 206), result[0].status_code
@@ -94,7 +98,7 @@ class TitanClient:
                     'add_node: Node with name {} already exists'.format(n))
             if c2:
                 logger.debug(
-                    'add_node: Node with dictionary {} already exists'.format(d))
+                    'add_node: Node with dict {} already exists'.format(d))
         return c1
 
     def load_from_document_graph(self, dg):
@@ -104,7 +108,7 @@ class TitanClient:
             d = dg.g.edge[n1][n2]
             label = d['type']
             self.add_edge(n1, d1,
-                n2, d2, d, label)
+                          n2, d2, d, label)
 
     def read_into_document_graph(self):
         doc = Document()
@@ -114,23 +118,38 @@ class TitanClient:
             return DocumentGraph(doc)
         for v in nodes:
             d = v['properties']
-            assert 'type' in d, d
-            assert 'name' in d, d
-            resource_id = d['name'][0]['value']
+            if 'eventType' not in d:
+                continue
+            if 'source' not in d:
+                continue
+            logger.debug('d.keys: %s', sorted(d.keys()))
+            logger.debug('d is %s', d.items())
+            resource_id = d['source'][0]['value']
             node_id2name_map[v['id']] = resource_id
-            resource_type = d['type'][0]['value']
+            resource_type = d['eventType'][0]['value']  # e.g. 17
+            resource_type = 'activity'
             att_val_list = [
                 (str(k), str(val[0]['value']))
                 for (k, val) in d.items()
-                if k not in ['name', 'type']]
+                if k not in ['source', 'eventType']]
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
         edges = self.all_edges()
         for e in edges:
-            d = e['properties']
-            assert 'type' in d
-            event_type = d['type']
+            logger.debug('edge: %s', e)
+            assert e['type'] == 'edge'
+
+            # other common in/out labels:
+            #   EDGE_EVENT_CAUSES_EVENT
+            #   EDGE_SUBJECT_HASPARENT_SUBJECT
+            #   EDGE_SUBJECT_RUNSON
+            if not e['label'].startswith('EDGE_EVENT_AFFECTS_SUBJECT '):
+                continue
+
+            d = e
+            assert 'outVLabel' in d, d
+            event_type = 'wasInformedBy'
             event_timestamp = d['timestamp'] if 'timestamp' in d else None
             att_val_list = [
                 (k, val)
@@ -138,8 +157,8 @@ class TitanClient:
                 if k not in ['timestamp', 'type']]
             ev = EventFactory.create(
                 event_type,
-                node_id2name_map[e['outV']],
-                node_id2name_map[e['inV']],
+                str(e['outV']),
+                str(e['inV']),
                 att_val_list, event_timestamp)
             doc.expression_list.append(ev)
         return DocumentGraph(doc)
@@ -179,7 +198,7 @@ if __name__ == "__main__":
     parser.add_argument('provn_file', help='A prov-tc file in provn format')
     parser.add_argument('broker', help='The broker to the Titan DB')
     parser.add_argument('--verbose', '-v', action='store_true',
-        help='Run in verbose mode')
+                        help='Run in verbose mode')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -188,7 +207,8 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match(
+        '.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)

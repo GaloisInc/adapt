@@ -8,13 +8,17 @@
     Adria Gascon, 2016.
 """
 
-import os
+from provnparser import Activity, Agent, Document, Entity, Segment, SegmentExpr
 import argparse
-import networkx as NX
-from provnparser import *
-import json
 import datetime
+import json
+import logging
+import networkx as NX
+import os
 import sys
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 VERBOSE = True
 
@@ -112,6 +116,9 @@ class Segmenter:
         res_set = set()
         for x, y in self.dg.g.edges():
             try:
+                log.debug("edge: %s", self.dg.g.edge[x][y])
+                if 'timestamp' not in self.dg.g.edge[x][y]:
+                    continue
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
                 if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
@@ -143,9 +150,11 @@ class Segmenter:
 
     def eval_spec(self):
         self.name = self.spec['segmentation_specification']['segment']['name']
-        self.specifications = self.spec['segmentation_specification']['segment']['specifications']
+        self.specifications = self.spec[
+            'segmentation_specification']['segment']['specifications']
         results = []
-        assert len(self.specifications) < 3, 'At most 2 segmentation specifications supported'
+        assert len(self.specifications) < 3, (
+            'At most 2 segmentation specifications supported')
         properties = [x['property'] for x in
             self.spec['segmentation_specification']['segment']['args']]
         segmentation_doc = Document()
@@ -189,7 +198,10 @@ class DocumentGraph:
         for e in self.doc.expression_list:
             d = e.att_val_dict
             d['type'] = e.label()
-            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
+            if (isinstance(e, Activity)
+                    or isinstance(e, Entity)
+                    or isinstance(e, Agent)
+                    or isinstance(e, Segment)):
                 self.g.add_node(e.id, e.att_val_dict)
             else:
                 d = e.att_val_dict
@@ -308,7 +320,8 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
     parser.add_argument('--summary', '-s', action='store_true',
-        help='Print a summary of the input file an quit, segment spec is ignored')
+        help='Print a summary of the input file an quit,'
+        ' segment spec is ignored')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -336,5 +349,3 @@ if __name__ == "__main__":
 
     dg.union(segmentation_dg)
     dg.print_summary()
-
-
