@@ -33,6 +33,7 @@ class TitanClient:
         self.loop.close()
 
     def execute(self, gremlin_query_str, bindings={}):
+        assert "'name'" not in gremlin_query_str, gremlin_query_str
         execute = self.gc.execute(gremlin_query_str, bindings=bindings)
         logger.debug('QUERY:\n {}'.format(gremlin_query_str))
         try:
@@ -80,8 +81,8 @@ class TitanClient:
           c1) there is already a node with name n in the db, or
           c2) there is already a node with dictionary d in the db
         """
-        d['name'] = n
-        c1 = self.execute('g.V().has(\'name\', \'{}\')'.format(n))
+        d['ident'] = n
+        c1 = self.execute('g.V().has(\'ident\', \'{}\')'.format(n))
         properties_str = ', '.join(
             map(lambda x: '__().has(\'{0}\',\'{1}\')'.format(
                 x[0], x[1]), d.items()))
@@ -90,7 +91,7 @@ class TitanClient:
             properties_str = ', '.join(
                 map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]), d.items()))
             c1 = self.execute('g.addV({})'.format(properties_str))
-            assert 'name' in d, d
+            assert 'ident' in d, d
             logger.debug('add_node: Added node with properties {}'.format(d))
         else:
             if c1:
@@ -134,6 +135,7 @@ class TitanClient:
                 if k not in ['source', 'eventType']]
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
+            logger.debug('r is %s', r)
             doc.expression_list.append(r)
         edges = self.all_edges()
         for e in edges:
