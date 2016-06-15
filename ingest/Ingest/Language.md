@@ -1037,3 +1037,20 @@ This relationship connects a Segment instance to a component element of the segm
 
 [schema]: #
 makeEdgeLabel('prov-tc:partOfSegment').multiplicity(SIMPLE)
+
+prov-tc:segmentName (not in CDM)
+-----------
+This property specifies the string name of a segment.
+
+[schema]: #
+makePropertyKey('name').dataType(String.class).cardinality(Cardinality.SINGLE)
+
+
+prov-tc:segmentEdge (not in CDM)
+-----------
+This edge relates two segmentssuch that there is an edge in the raw
+graph from a node in the first to a node in the second.
+
+[schema]: #
+makeEdgeLabel('prov-tc:segmentEdge').multiplicity(SIMPLE)
+
