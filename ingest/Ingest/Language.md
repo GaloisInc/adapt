@@ -546,6 +546,8 @@ Required:
 * the source port of the network flow (*prov-tc:srcPort*) // maps to CDM NetFlowObject.srcPort
 * the destination IP address of the network flow (*prov-tc:dstAddress*) // maps to CDM NetFlowObject.dstAddress
 * the destination port of the network flow (*prov-tc:dstPort*) // maps to CDM NetFlowObject.dstPort
+* number of bytes sent
+* number of bytes received
 
 Desired:
 
