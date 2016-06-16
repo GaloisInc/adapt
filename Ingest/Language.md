@@ -1031,9 +1031,26 @@ This relationship connects an APT instance to a component phase instance. No att
 [schema]: #
 makeEdgeLabel('prov-tc:partOfAPT').multiplicity(SIMPLE)
 
-prov-tc:partOfSegment (not in CDM)
+segment:includes (not in CDM)
 -----------
 This relationship connects a Segment instance to a component element of the segment. No attributes.
 
 [schema]: #
-makeEdgeLabel('prov-tc:partOfSegment').multiplicity(SIMPLE)
+makeEdgeLabel('segment:includes').multiplicity(SIMPLE)
+
+segment:name (not in CDM)
+-----------
+This property specifies the string name of a segment.
+
+[schema]: #
+makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.SINGLE)
+
+
+segment:edge (not in CDM)
+-----------
+This edge relates two segmentssuch that there is an edge in the raw
+graph from a node in the first to a node in the second.
+
+[schema]: #
+makeEdgeLabel('segment:edge').multiplicity(SIMPLE)
+
