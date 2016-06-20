@@ -76,7 +76,7 @@ class TitanClient:
           c1) there is already a node with name n in the db, or
           c2) there is already a node with dictionary d in the db
         """
-        d['name'] = n
+        d['ident'] = n
         c1 = self.execute('g.V().has(\'name\', \'{}\')'.format(n))
         properties_str = ', '.join(
             map(lambda x: '__().has(\'{0}\',\'{1}\')'.format(
@@ -86,7 +86,7 @@ class TitanClient:
             properties_str = ', '.join(
                 map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]), d.items()))
             c1 = self.execute('g.addV({})'.format(properties_str))
-            assert 'name' in d, d
+            assert 'ident' in d, d
             logger.debug('add_node: Added node with properties {}'.format(d))
         else:
             if c1:
@@ -102,7 +102,7 @@ class TitanClient:
             d1 = dg.g.node[n1]
             d2 = dg.g.node[n2]
             d = dg.g.edge[n1][n2]
-            label = d['type']
+            label = d['label']
             self.add_edge(n1, d1,
                 n2, d2, d, label)
 
@@ -114,28 +114,28 @@ class TitanClient:
             return DocumentGraph(doc)
         for v in nodes:
             d = v['properties']
-            assert 'type' in d, d
-            assert 'name' in d, d
-            resource_id = d['name'][0]['value']
+            assert 'label' in d, d
+            assert 'ident' in d, d
+            resource_id = d['ident'][0]['value']
             node_id2name_map[v['id']] = resource_id
-            resource_type = d['type'][0]['value']
+            resource_type = d['label'][0]['value']
             att_val_list = [
                 (str(k), str(val[0]['value']))
                 for (k, val) in d.items()
-                if k not in ['name', 'type']]
+                if k not in ['ident', 'label']]
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
         edges = self.all_edges()
         for e in edges:
             d = e['properties']
-            assert 'type' in d
-            event_type = d['type']
+            assert 'label' in d
+            event_type = d['label']
             event_timestamp = d['timestamp'] if 'timestamp' in d else None
             att_val_list = [
                 (k, val)
                 for (k, val) in d.items()
-                if k not in ['timestamp', 'type']]
+                if k not in ['timestamp', 'label']]
             ev = EventFactory.create(
                 event_type,
                 node_id2name_map[e['outV']],
