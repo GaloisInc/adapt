@@ -114,11 +114,12 @@ class TitanClient:
             return DocumentGraph(doc)
         for v in nodes:
             d = v['properties']
-            assert 'label' in d, d
+            assert 'label' in v, v
             assert 'ident' in d, d
             resource_id = d['ident'][0]['value']
+            print(v['id'], " ", resource_id)
             node_id2name_map[v['id']] = resource_id
-            resource_type = d['label'][0]['value']
+            resource_type = v['label']
             att_val_list = [
                 (str(k), str(val[0]['value']))
                 for (k, val) in d.items()
@@ -126,21 +127,14 @@ class TitanClient:
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
+        print(node_id2name_map)
         edges = self.all_edges()
         for e in edges:
-            d = e['properties']
-            assert 'label' in d
-            event_type = d['label']
-            event_timestamp = d['timestamp'] if 'timestamp' in d else None
-            att_val_list = [
-                (k, val)
-                for (k, val) in d.items()
-                if k not in ['timestamp', 'label']]
+            event_type = e['label']
             ev = EventFactory.create(
                 event_type,
-                node_id2name_map[e['outV']],
-                node_id2name_map[e['inV']],
-                att_val_list, event_timestamp)
+                node_id2name_map.get(e['outV'], None),
+                node_id2name_map.get(e['inV'], None))
             doc.expression_list.append(ev)
         return DocumentGraph(doc)
 
