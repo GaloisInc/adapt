@@ -164,7 +164,7 @@ class Segmenter:
         for i, (prop_i, r_i) in enumerate(results):
             for (val_i, segment_i) in r_i:
                 for j, (prop_j, r_j) in enumerate(results):
-                    if i >= j:
+                    if i >= j and len(results) > 1:
                         continue
                     else:
                         for (val_j, segment_j) in r_j:
