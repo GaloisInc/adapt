@@ -97,7 +97,7 @@ def arg_parser():
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='/home/vagrant/adapt/segment/segmenter/test/spec/default_spec.json')
+                   default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
     return p
 
 
