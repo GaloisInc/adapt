@@ -23,6 +23,9 @@ class ProvRelation:
 
 
 class SegmentExpr(ProvRelation):
+    def __init__(self, s, t):
+        super().__init__(s, t, [])
+
     def __str__(self):
         return 'segment:includes({0}, {1}, [{2}])'.format(
             self.s, self.t, ','.join(['{0}=\"{1}\"'.format(k, v)
@@ -33,7 +36,7 @@ class SegmentExpr(ProvRelation):
 
 class EdgeExpr(ProvRelation):
     def __init__(self, etype, s, t):
-        super().__init__(s, t, {})
+        super().__init__(s, t, [])
         self.etype = etype
 
     def label(self):
@@ -497,7 +500,7 @@ class ResourceFactory:
             return Phase(id_, att_val_list)
         elif type_ == 'APT':
             return APT(id_, att_val_list)
-        elif type_ == 'Segment':
+        elif type_ == 'Segment' or type_ == 'vertex':
             return Segment(id_, att_val_list)
         elif type_ == 'EDGE_EVENT_AFFECTS_MEMORY':
             return EDGE_EVENT_AFFECTS_MEMORY(id_, att_val_list)
@@ -544,7 +547,7 @@ class EventFactory:
         if s is None or t is None:
             return
         if type_ == 'segment:includes':
-            return SegmentExpr(s, t, att_val_list, timestamp)
+            return SegmentExpr(s, t)
         else:
             return EdgeExpr(type_, s, t)
         raise Exception('Unknown event type: {}'.format(type_))
