@@ -94,7 +94,7 @@ class TitanClient:
             properties_str = ', '.join(
                 map(lambda x: '\'{0}\',\'{1}\''.format(x[0], escape(x[1])), d.items()))
             # Hack: for now, label all new nodes as segment nodes.
-            c1 = self.execute('g.addV(label,\'Segment\'{})'.format(properties_str))
+            c1 = self.execute('g.addV(label,\'Segment\',{})'.format(properties_str))
             assert 'ident' in d, d
             logger.debug('add_node: Added node with properties {}'.format(d))
         else:
