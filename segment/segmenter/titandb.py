@@ -71,7 +71,7 @@ class TitanClient:
         id1 = r1[0]['id']
         id2 = r2[0]['id']
         properties_str = ', '.join(
-            map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]) if x[0] != 'label' else "", d.items())
+            map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]) if x[0] != 'label' else "", d.items()))
         r = self.execute(
             'g.V({0}).next().addEdge(\'{2}\', g.V({1}).next(), {3})'.format(
                 id1, id2, label, properties_str))
