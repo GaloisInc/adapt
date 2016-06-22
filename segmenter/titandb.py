@@ -69,6 +69,9 @@ class TitanClient:
                 id1, id2, label, properties_str))
         return r
 
+    def escape(s):
+        return s.replace("\'","\\\'").replace("\"","\\\"")
+    
     def add_node(self, n, d):
         """
         Adds node with name n to the DB if it does not already exist.
@@ -77,10 +80,10 @@ class TitanClient:
           c2) there is already a node with dictionary d in the db
         """
         d['ident'] = n
-        c1 = self.execute('g.V().has(\'name\', \'{}\')'.format(n))
+        c1 = self.execute('g.V().has(\'ident\', \'{}\')'.format(n))
         properties_str = ', '.join(
             map(lambda x: '__().has(\'{0}\',\'{1}\')'.format(
-                x[0], x[1]), d.items()))
+                x[0], escape(x[1])), d.items()))
         c2 = self.execute('g.V().and({0})'.format(properties_str))
         if not (c1 or c2):
             properties_str = ', '.join(
@@ -102,7 +105,7 @@ class TitanClient:
             d1 = dg.g.node[n1]
             d2 = dg.g.node[n2]
             d = dg.g.edge[n1][n2]
-            label = d['label']
+            label = d['type']
             self.add_edge(n1, d1,
                 n2, d2, d, label)
 
