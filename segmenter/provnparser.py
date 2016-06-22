@@ -24,12 +24,12 @@ class ProvRelation:
 
 class SegmentExpr(ProvRelation):
     def __str__(self):
-        return 'includes({0}, {1}, [{2}])'.format(
+        return 'segment:includes({0}, {1}, [{2}])'.format(
             self.s, self.t, ','.join(['{0}=\"{1}\"'.format(k, v)
                 for k, v in self.att_val_dict.items()]))
 
     def label(self):
-        return 'includes'
+        return 'segment:includes'
 
 class EdgeExpr(ProvRelation):
     def __init__(self, etype, s, t):
@@ -543,7 +543,7 @@ class EventFactory:
     def create(cls, type_, s, t):
         if s is None or t is None:
             return
-        if type_ == 'includes':
+        if type_ == 'segment:includes':
             return SegmentExpr(s, t, att_val_list, timestamp)
         else:
             return EdgeExpr(type_, s, t)

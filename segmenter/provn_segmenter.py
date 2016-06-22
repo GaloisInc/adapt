@@ -112,10 +112,10 @@ class Segmenter:
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
                 if self.dg.g.edge[x][y]['label'] != "wasAssociatedWith" and \
-                        self.dg.g.edge[x][y]['label'] != "includes":
+                        self.dg.g.edge[x][y]['label'] != "segment:includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
-                        'and includes '
+                        'and segment:includes '
                         'must have a timestamp')
                 continue
             if ts >= begin_time and ts < end_time:
