@@ -105,7 +105,7 @@ class TitanClient:
             d1 = dg.g.node[n1]
             d2 = dg.g.node[n2]
             d = dg.g.edge[n1][n2]
-            label = d['type']
+            label = d['label']
             self.add_edge(n1, d1,
                 n2, d2, d, label)
 
