@@ -175,7 +175,7 @@ class Segmenter:
                                 att_val_dict)
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
-                                e = SegmentExpr(s.id, n, {})
+                                e = SegmentExpr(s.id, n)
                                 segmentation_doc.expression_list += [e]
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
