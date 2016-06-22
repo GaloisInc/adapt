@@ -95,7 +95,7 @@ class Segmenter:
             reach_set_i = set()
             for x in reach_set_i_1:
                 for succ in self.dg.g.successors(x):
-                    if self.dg.g.edge[x][succ]['type'] in edge_type_set:
+                    if self.dg.g.edge[x][succ]['label'] in edge_type_set:
                         reach_set_i.add(succ)
             reach_set_i_1 = reach_set_i
             reach_set |= reach_set_i
@@ -111,8 +111,8 @@ class Segmenter:
             try:
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
-                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
-                        self.dg.g.edge[x][y]['type'] != "includes":
+                if self.dg.g.edge[x][y]['label'] != "wasAssociatedWith" and \
+                        self.dg.g.edge[x][y]['label'] != "includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
                         'and includes '
@@ -188,7 +188,7 @@ class DocumentGraph:
                 self.g.add_node(e.id, e.att_val_dict)
             elif e is not None:
                 d = {}
-                d['type'] = e.label()
+                d['label'] = e.label()
                 self.g.add_edge(e.s, e.t, d)
 
     def __init__(self, document):
