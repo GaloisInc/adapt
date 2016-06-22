@@ -19,6 +19,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def escape(s):
+    """
+    A simple-minded function to escape strings for use in Gremlin queries.
+    Replaces qutes with their escaped versions.  Other escaping
+    may be necessary to avoid problems.
+    """
+    return s.replace("\'","\\\'").replace("\"","\\\"")
+
 
 class TitanClient:
     def __init__(self, broker='ws://localhost:8182/'):
@@ -68,9 +76,6 @@ class TitanClient:
             'g.V({0}).next().addEdge(\'{2}\', g.V({1}).next(), {3})'.format(
                 id1, id2, label, properties_str))
         return r
-
-    def escape(s):
-        return s.replace("\'","\\\'").replace("\"","\\\"")
     
     def add_node(self, n, d):
         """
