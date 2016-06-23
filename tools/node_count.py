@@ -13,6 +13,7 @@ QUERIES = [
     "g.V().has(label, 'Subject').count()",
     "g.V().has(label, 'Host').count()",
     "g.V().has(label, 'Agent').count()",
+    "g.V().has(label, 'Segment').count()",
 ]
 
 

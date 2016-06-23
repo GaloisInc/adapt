@@ -30,6 +30,7 @@ import logging
 import os
 import struct
 import time
+import os
 
 # __author__ = 'John.Hanley@parc.com'
 __author__ = 'jcheney@inf.ed.ac.uk'
@@ -89,14 +90,16 @@ class TopLevelSegmenter:
 
 
 def arg_parser():
+    spec = os.path.expanduser(
+        "~/adapt/segment/segmenter/test/spec/segmentByPID.json")
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='http://localhost:8182/')
+                   default='ws://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='test/spec/default_spec.json')
+                   default=spec)
     return p
 
 

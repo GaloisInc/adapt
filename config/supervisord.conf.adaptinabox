@@ -16,6 +16,11 @@ command=%(ENV_HOME)s/.local/bin/ingestd -i ta2 -l ingestd-log -f in-finished
 autorestart=yes
 startsecs=20
 
+[program:px]
+command=%(ENV_HOME)s/adapt/px/fake-fe.py
+autorestart=yes
+startsecs=10
+
 [program:dashboard]
 command=%(ENV_HOME)s/.local/bin/dashboard
 autorestart=yes
