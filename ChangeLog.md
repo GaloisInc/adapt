@@ -8,6 +8,7 @@
 * Parse _but silently drop_ RegistryKeyObject's from FiveDirections
     - No technical reason, it's just a time constraint till we think on the
       schema and actually add it.
+* More schema type specifications for Segments.
 
 ## 0.2 -- 2016-06-10
 
