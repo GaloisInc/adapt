@@ -3,6 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CommonDataModel where
 
+import qualified Data.Avro as Avro
+import qualified Data.Avro.Schema as Avro
+import qualified Data.Aeson as Aeson
 import qualified Data.Binary.Get as G
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -16,6 +19,20 @@ import           MonadLib
 
 import           CommonDataModel.Types
 import qualified Schema as S
+import Paths_Ingest
+
+getAvroSchema :: IO Avro.Schema
+getAvroSchema =
+  do fp <- getDataFileName "data/TCCDMDatum13.avsc"
+     schM <- Aeson.eitherDecode <$> BL.readFile fp
+     case schM of
+      Left e    -> error e
+      Right sch -> return sch
+
+readContainer :: BL.ByteString -> IO [[TCCDMDatum]]
+readContainer bs =
+  do sch <- getAvroSchema
+     return $ Avro.decodeContainer sch bs
 
 -- | toSchema is the top-level operation for translating TC CDM data into
 -- the Adapt schema.
@@ -85,6 +102,7 @@ translate datum =
    DatumPri principal         -> translatePrincipal     principal
    DatumTag tagObject         -> translateTagObject     tagObject
    DatumSim simpleEdge        -> translateSimpleEdge    simpleEdge
+   DatumReg rko               -> translateRegistryKeyObject rko
 
 translatePTN :: ProvenanceTagNode -> Translate ()
 translatePTN           (PTN {..}) =
@@ -309,6 +327,9 @@ translateSimpleEdge (SimpleEdge {..}) =
                      }
       in warn (WarnOther "Ignoring edge time and properties") >> tellEdge e
 {-# INLINE translateSimpleEdge #-}
+
+translateRegistryKeyObject :: RegistryKeyObject -> Translate ()
+translateRegistryKeyObject _ = warn (WarnOther "Ignoring a registry key object.")
 
 translateRelationship :: EdgeType -> S.Relationship
 translateRelationship e = toEnum (fromEnum e)
