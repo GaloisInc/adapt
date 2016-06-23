@@ -1,18 +1,25 @@
+{-# LANGUAGE OverloadedStrings #-}
 module CommonDataModel.Types where
 
-import Data.ByteString (ByteString)
+import           Data.Avro (FromAvro(..), (.:))
+import qualified Data.Avro.Schema as Avro
+import qualified Data.Avro.Types as Ty
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import           Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BC
-import Data.ByteString.Base64 as B64
-import Data.Int
-import Data.Text (Text)
-import Data.Map
-import Data.Word (Word16)
+import           Data.Int
+import           Data.Map
+import           Data.Monoid
+import           Data.Text (Text)
+import           Data.Word (Word16)
+
 
 -- | A two byte value we keep as 16 bits in little endian.
 newtype Short = Short { unShort :: Word16 }
   deriving (Eq,Ord,Show,Read)
 
--- | UUIDs are 256 bit (32 byte) values.
+-- | UUIDs are 128 bit (16 byte) values in CDM13 (our base)
 newtype UUID = UUID ByteString
   deriving (Eq,Ord)
 
@@ -51,12 +58,13 @@ data SrcSinkType
         | SOURCE_AUDIO
         -- Environment variables
         | SOURCE_SYSTEM_PROPERTY
+        | SOURCE_ENV_VARIABLE
         -- IPC should only be used for internal IPC instead of network flows
         -- ClearScope might be using this in the interim for flows
         -- Can be a source or a sink
         | SOURCE_SINK_IPC
         | SOURCE_UNKNOWN -- ideally, this should never be used
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data InstrumentationSource
         = SOURCE_LINUX_AUDIT_TRACE
@@ -71,10 +79,11 @@ data InstrumentationSource
         | SOURCE_FREEBSD_MACIF_CADETS
         | SOURCE_WINDOWS_DIFT_FAROS
         | SOURCE_LINUX_THEIA
+        | SOURCE_WINDOWS_FIVEDIRECTIONS
       deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data PrincipalType = PRINCIPAL_LOCAL | PRINCIPAL_REMOTE
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data EventType
         = EVENT_ACCEPT
@@ -110,11 +119,16 @@ data EventType
         | EVENT_BLIND
         | EVENT_UNIT
         | EVENT_UPDATE
-  deriving (Eq, Ord, Enum, Bounded, Show)
+        | EVENT_SENDTO
+        | EVENT_SENDMSG
+        | EVENT_SHM
+        | EVENT_EXIT
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data TagEntity =
   TagEntity { teUUID       :: UUID
             , tePTN        :: ProvenanceTagNode
+            , teTimestamp  :: Maybe Int64
             , teProperties :: Maybe Properties
             }
          deriving (Eq,Ord,Show)
@@ -143,14 +157,17 @@ data EdgeType
         | EDGE_SRCSINK_HAS_TAG
         | EDGE_SUBJECT_HAS_TAG
         | EDGE_EVENT_HAS_TAG
-  deriving (Eq, Ord, Enum, Bounded, Show)
+        | EDGE_EVENT_AFFECTS_REGISTRYKEY
+        | EDGE_REGISTRYKEY_AFFECTS_EVENT
+        | EDGE_REGISTRYKEY_HAS_TAG
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data LocalAuthType
         = LOCALAUTH_NONE
         | LOCALAUTH_PASSWORD
         | LOCALAUTH_PUBLIC_KEY
         | LOCALAUTH_ONE_TIME_PASSWORD
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data TagOpCode
         = TAG_OP_SEQUENCE
@@ -159,20 +176,20 @@ data TagOpCode
         | TAG_OP_STRONG
         | TAG_OP_MEDIUM
         | TAG_OP_WEAK
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data IntegrityTag
         = INTEGRITY_UNTRUSTED
         | INTEGRITY_BENIGN
         | INTEGRITY_INVULNERABLE
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data ConfidentialityTag
         = CONFIDENTIALITY_SECRET
         | CONFIDENTIALITY_SENSITIVE
         | CONFIDENTIALITY_PRIVATE
         | CONFIDENTIALITY_PUBLIC
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data ProvenanceTagNode
     = PTN { ptnValue    :: PTValue
@@ -192,17 +209,29 @@ data PTValue = PTVInt Int64
              | PTVConfidentialityTag ConfidentialityTag
      deriving (Eq,Ord,Show)
 
-data Value = Value { valSize      :: Int32
-                   , valType      :: ValueType
-                   , valDataType  :: Maybe Text
-                   , valBytes     :: Maybe ByteString
-                   , valTags      :: Maybe [Int32] -- XXX Run Length and ID pairs
+data Value = Value { valSize       :: Int32
+                   , valType       :: ValueType
+                   , valDataType   :: ValueDataType
+                   , valBytes      :: Maybe ByteString
+                   , valTags       :: Maybe [Int32] -- XXX Run Length and ID pairs
                    , valComponents :: Maybe [Value]
                    }
      deriving (Eq,Ord,Show)
 
 data ValueType = TypeIn | TypeOut | TypeInOut
   deriving (Eq,Ord,Show,Enum,Bounded)
+
+data ValueDataType
+        = VALUE_DATA_TYPE_BYTE     -- 8 bit
+        | VALUE_DATA_TYPE_BOOL     -- 8 bit TRUE=1 FALSE=0
+        | VALUE_DATA_TYPE_CHAR     -- 16 bit unicode char
+        | VALUE_DATA_TYPE_SHORT    -- 16 bit signed value
+        | VALUE_DATA_TYPE_INT      -- 32 bit signed value
+        | VALUE_DATA_TYPE_FLOAT    -- 32 bit floating point value
+        | VALUE_DATA_TYPE_LONG     -- 64 bit signed value
+        | VALUE_DATA_TYPE_DOUBLE   -- 64 bit double value
+        | VALUE_DATA_TYPE_COMPLEX  -- everything else that is not a primitive data type
+  deriving (Eq,Ord,Show,Read,Enum,Bounded)
 
 data Subject =
   Subject { subjUUID                 :: UUID
@@ -262,6 +291,7 @@ data NetFlowObject =
                 , nfSrcPort     :: Int32
                 , nfDstAddress  :: Text
                 , nfDstPort     :: Int32
+                , nfIpProtocol  :: Maybe Int32
                 }
      deriving (Eq,Ord,Show)
 
@@ -283,8 +313,8 @@ data SrcSinkObject =
 data Principal =
   Principal { pUUID     :: UUID
             , pType     :: PrincipalType
-            , pUserId   :: Int32
-            , pGroupIds :: [Int32]
+            , pUserId   :: Text
+            , pGroupIds :: [Text]
             , pSource   :: InstrumentationSource
             , pProperties :: Maybe Properties
             }
@@ -299,6 +329,15 @@ data SimpleEdge =
              }
      deriving (Eq,Ord,Show)
 
+data RegistryKeyObject =
+  RegistryKeyObject { regUUID       :: UUID
+                     , regBaseObject :: AbstractObject
+                     , regKey        :: Text
+                     , regVersion    :: Int32
+                     , regSize       :: Maybe Int64
+                     }
+     deriving (Eq,Ord,Show)
+
 data TCCDMDatum
         = DatumPTN ProvenanceTagNode
         | DatumSub Subject
@@ -310,4 +349,216 @@ data TCCDMDatum
         | DatumPri Principal
         | DatumTag TagEntity
         | DatumSim SimpleEdge
+        | DatumReg RegistryKeyObject
       deriving (Eq,Ord,Show)
+
+instance FromAvro TCCDMDatum where
+  fromAvro (Ty.Record rec) = do
+    val <- rec .: "datum"
+    case val of
+      Ty.Union _ t v ->
+        case Avro.typeName t of
+          "ProvenanceTagNode"  -> DatumPTN <$> fromAvro v
+          "Subject"            -> DatumSub <$> fromAvro v
+          "Event"              -> DatumEve <$> fromAvro v
+          "NetFlowObject"      -> DatumNet <$> fromAvro v
+          "FileObject"         -> DatumFil <$> fromAvro v
+          "SrcSinkObject"      -> DatumSrc <$> fromAvro v
+          "MemoryObject"       -> DatumMem <$> fromAvro v
+          "Principal"          -> DatumPri <$> fromAvro v
+          "TagEntity"          -> DatumTag <$> fromAvro v
+          "SimpleEdge"         -> DatumSim <$> fromAvro v
+          "RegistryKeyObject" -> DatumReg <$> fromAvro v
+          x                   -> fail $ "Unrecognized TCCDMDatum option in union: " <> show x
+      v                   -> fail $ "TCCDMDatum 'datum' should be a union, found: " <> show v
+  fromAvro v = fail $ "Invalid type for TCCDMDatum, should be a record but found: " <> show v
+instance FromAvro ProvenanceTagNode where
+  fromAvro (Ty.Record obj) =
+      PTN <$> obj .: "value"
+          <*> obj .: "children"
+          <*> obj .: "tagId"
+          <*> obj .: "properties"
+  fromAvro _ = fail "Invalid value for ProvenanceTagNode"
+instance FromAvro PTValue where
+  fromAvro (Ty.Union _ t v) =
+     case Avro.typeName t of
+      "int" -> PTVInt <$> fromAvro v
+      "TagOpCode" -> PTVTagOpCode <$> fromAvro v
+      "IntegrityTag" -> PTVIntegrityTag <$> fromAvro v
+      "ConfidentialityTag" -> PTVConfidentialityTag <$> fromAvro v
+      _ -> fail "Unrecognized tag in ProvTagNode value union"
+  fromAvro _ = fail "Non-union value in PTValue"
+instance FromAvro TagOpCode where
+  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
+  fromAvro _ = fail "Invalid value for TagOpCode"
+instance FromAvro Event where
+  fromAvro (Ty.Record obj) =
+    Event <$> obj .: "uuid"
+          <*> obj .: "sequence"
+          <*> obj .: "type"
+          <*> obj .: "threadId"
+          <*> obj .: "source"
+          <*> obj .: "timestampMicros"
+          <*> obj .: "name"
+          <*> obj .: "parameters"
+          <*> obj .: "location"
+          <*> obj .: "size"
+          <*> obj .: "programPoint"
+          <*> obj .: "properties"
+  fromAvro _ = fail "Invalid value for Event"
+instance FromAvro EventType where
+  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
+  fromAvro _ = fail "Non-enum for EventType"
+instance FromAvro InstrumentationSource where
+  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
+  fromAvro _ = fail "Non-enum for InstrumentationSource"
+instance FromAvro Value where
+  fromAvro (Ty.Record obj) =
+    Value <$> obj .: "size"
+          <*> obj .: "type"
+          <*> obj .: "valueDataType"
+          -- "isNull"
+          -- "name"
+          -- "runtimeDataType"
+          <*> obj .: "valueBytes"
+          <*> obj .: "tag"
+          <*> obj .: "components"
+  fromAvro _ = fail "Non-record for Value."
+
+instance FromAvro ValueType where
+  fromAvro (Ty.Enum _ t) =
+      case t of
+        "VALUE_TYPE_IN"    -> pure TypeIn
+        "VALUE_TYPE_OUT"   -> pure TypeOut
+        "VALUE_TYPE_INOUT" -> pure TypeInOut
+        _                  -> fail "Unrecognized enum for ValueType."
+  fromAvro _ = fail "Non-enum for ValueType"
+instance FromAvro ValueDataType where
+  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
+  fromAvro _ = fail "Non-enum for ValueDataType"
+instance FromAvro NetFlowObject where
+  fromAvro (Ty.Record obj)  =
+    NetFlowObject <$> obj .: "uuid"
+                  <*> obj .: "baseObject"
+                  <*> obj .: "srcAddress"
+                  <*> obj .: "srcPort"
+                  <*> obj .: "destAddress"
+                  <*> obj .: "destPort"
+                  <*> obj .: "ipProtocol"
+  fromAvro _ = fail "Non-record type for NetFlowObject."
+instance FromAvro AbstractObject where
+  fromAvro (Ty.Record obj) =
+    AbstractObject <$> obj .: "source"
+                   <*> obj .: "permission"
+                   <*> obj .: "lastTimestampMicros"
+                   <*> obj .: "properties"
+  fromAvro _ = fail "Non-record for AbstractObject"
+instance FromAvro Short where
+  fromAvro (Ty.Fixed bs)
+    | [b,a] <- B.unpack bs = pure $ Short $ fromIntegral a * 256 + fromIntegral b
+  fromAvro _ = fail "Invalid value for Short - requires 16 bit fixed."
+instance FromAvro FileObject where
+  fromAvro (Ty.Record obj) =
+    FileObject  <$> obj .: "uuid"
+                <*> obj .: "baseObject"
+                <*> obj .: "url"
+                <*> obj .: "isPipe"
+                <*> obj .: "version"
+                <*> obj .: "size"
+  fromAvro _ = fail "Non-record for FileObject"
+instance FromAvro SrcSinkObject where
+  fromAvro (Ty.Record obj) =
+    SrcSinkObject <$> obj .: "uuid"
+                  <*> obj .: "baseObject"
+                  <*> obj .: "type"
+  fromAvro _ = fail "Non-record for SrcSinkObject"
+instance FromAvro SrcSinkType where
+  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
+  fromAvro _ = fail "Invalid value for SrcSinkType"
+instance FromAvro MemoryObject where
+  fromAvro (Ty.Record obj) =
+    MemoryObject <$> obj .: "uuid"
+                 <*> obj .: "baseObject"
+                 <*> obj .: "pageNumber"
+                 <*> obj .: "memoryAddress"
+  fromAvro _ = fail "Non-record for MemoryObject"
+instance FromAvro Principal where
+  fromAvro (Ty.Record obj) =
+    Principal <$> obj .: "uuid"
+              <*> obj .: "type"
+              <*> obj .: "userId"
+              <*> obj .: "groupIds"
+              <*> obj .: "source"
+              <*> obj .: "properties"
+  fromAvro _ = fail "Invalid value for Principal"
+instance FromAvro PrincipalType where
+  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
+  fromAvro _ = fail "Invalid value for PrincipalType"
+instance FromAvro TagEntity where
+  fromAvro (Ty.Record obj) =
+    TagEntity <$> obj .: "uuid"
+              <*> obj .: "tag"
+              <*> obj .: "timestampMicros"
+              <*> obj .: "properties"
+  fromAvro _ = fail "Invalid value for TagEntity"
+instance FromAvro Subject where
+  fromAvro (Ty.Record obj) =
+    Subject <$> obj .: "uuid"
+            <*> obj .: "type"
+            <*> obj .: "pid"
+            <*> obj .: "ppid"
+            <*> obj .: "source"
+            <*> obj .: "startTimestampMicros"
+            <*> obj .: "unitId"
+            <*> obj .: "endTimestampMicros"
+            <*> obj .: "cmdLine"
+            <*> obj .: "importedLibraries"
+            <*> obj .: "exportedLibraries"
+            <*> obj .: "pInfo"
+            <*> obj .: "properties"
+  fromAvro _ = fail "Invalid value for Subject"
+
+instance FromAvro SubjectType where
+  fromAvro (Ty.Enum _ txt) =
+    case txt of
+      "SUBJECT_PROCESS"     -> pure Process
+      "SUBJECT_THREAD"      -> pure Thread
+      "SUBJECT_UNIT"        -> pure Unit
+      "SUBJECT_BASIC_BLOCK" -> pure BasicBlock
+      _                     -> fail "Invalid enum string for SubjectType."
+  fromAvro _ = fail "Invalid value for SubjectType"
+
+instance FromAvro ConfidentialityTag where
+  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
+  fromAvro _ = fail "Invalid value for ConfidentialityTag"
+
+instance FromAvro IntegrityTag where
+  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
+  fromAvro _ = fail "Invalid value for IntegrityTag"
+
+instance FromAvro SimpleEdge where
+  fromAvro (Ty.Record fields) =
+    SimpleEdge <$> fields .: "fromUuid"
+               <*> fields .: "toUuid"
+               <*> fields .: "type"
+               <*> fields .: "timestamp"
+               <*> fields .: "properties"
+  fromAvro _ = fail "Invalid Avro type for SimpleEdge"
+
+instance FromAvro UUID where
+  fromAvro (Ty.Fixed bs) | B.length bs == 16 = pure $ UUID bs
+  fromAvro _ = fail "Invalid value for UUID"
+
+instance FromAvro EdgeType where
+  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
+  fromAvro _ = fail "Invalid value for EdgeType"
+
+instance FromAvro RegistryKeyObject where
+  fromAvro (Ty.Record obj) =
+    RegistryKeyObject <$> obj .: "uuid"
+                      <*> obj .: "baseObject"
+                      <*> obj .: "key"
+                      <*> obj .: "version"
+                      <*> obj .: "size"
+  fromAvro _ = fail "Invalid value for RegistryKeyObject"
+

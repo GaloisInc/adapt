@@ -40,12 +40,13 @@ Library
                      , binary
                      , time
                      , milena >= 0.5
+                     , avro
   hs-source-dirs:       src
   ghc-options:         -O2 -Wall -Werror
 
 executable ingestd
   main-is:             Ingestd.hs
-  other-modules:       IngestDaemon.KafkaManager
+  other-modules:       IngestDaemon.KafkaManager, IngestDaemon.Types
   build-depends:       base >=4.7 && <4.9
                      , Ingest >= 0.2 && < 0.3
                      , GremlinClient
@@ -70,6 +71,7 @@ executable ingestd
                      , transformers
                      , unordered-containers
                      , uuid
+                     , avro
   hs-source-dirs:      programs
   default-language:    Haskell2010
   ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N2 -Wall -Werror
@@ -101,6 +103,7 @@ executable Trint
                      , time
                      , uuid
                      , websockets
+                     , avro
   hs-source-dirs:      programs
   default-language:    Haskell2010
   ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N2 -Wall -Werror

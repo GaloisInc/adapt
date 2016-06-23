@@ -40,6 +40,7 @@ import           Text.Read (readMaybe)
 
 import           Gremlin.Client as GC
 import           CompileSchema
+import           CommonDataModel as CDM
 import           IngestDaemon.KafkaManager
 import           IngestDaemon.Types
 
@@ -188,7 +189,8 @@ mainLoop cfg =
                        (Left <$> channelToStderr logChan :: IO (Either () ())))
                (forkPersist logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
-    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput (logIpt t) srvExt t inputs) inTopics
+    inputSchema <- CDM.getAvroSchema
+    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput (logIpt t) srvExt t inputSchema inputs) inTopics
     forkPersist logMsg (garbageCollectFailures logGC reqStatus inputs)
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))

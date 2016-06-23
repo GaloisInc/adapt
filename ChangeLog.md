@@ -1,5 +1,15 @@
 # Combined Revision history for Ingest, IngestDaemon, GremlinClient
 
+## 0.3 -- 2016-06-23
+* Use the 'avro' library to handle avro decoding, schema resolution and container objects.
+  - This is pulled in as a subtree till we can opensource
+* Switch to CDM13
+* Make the internal schema userId and gid text instead of int.
+* Parse _but silently drop_ RegistryKeyObject's from FiveDirections
+    - No technical reason, it's just a time constraint till we think on the
+      schema and actually add it.
+* More schema type specifications for Segments.
+
 ## 0.2 -- 2016-06-10
 
 * Increased the verbosity, sending more data to the Kafka log topic.
