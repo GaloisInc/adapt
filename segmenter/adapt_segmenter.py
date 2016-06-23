@@ -81,7 +81,7 @@ if __name__ == '__main__':
         # This will add the segment nodes to the db, is equivalent to
         # tc.load_from_document_graph(dg), as long as we call it after
         # calling dg.union(segmentation_dg)
-        tc.load_from_document_graph(dg)
-        segmented_dg = tc.read_into_document_graph()
+        tc.load_segments_from_document_graph(dg)
+        # segmented_dg = tc.read_into_document_graph()
 
     tc.close()
