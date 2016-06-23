@@ -1,8 +1,9 @@
 # Combined Revision history for Ingest, IngestDaemon, GremlinClient
 
-## 0.2
+## 0.2 -- 2016-06-10
 
 * Increased the verbosity, sending more data to the Kafka log topic.
+* Fix a mis-labeled eventType property (was "subjectType")
 
 ## 0.1  -- 2016-06-02
 
