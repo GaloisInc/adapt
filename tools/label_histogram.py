@@ -56,8 +56,9 @@ def get_label_counts():
         q = 'g.V().label()'
         msgs = gremlin.fetch(q)
         for msg in msgs:
-            for label in msg.data:
-                cnt[label] += 1
+            if msg.data:
+                for label in msg.data:
+                    cnt[label] += 1
 
     return sorted(['%6d  %s' % (cnt[k], k)
                    for k in cnt.keys()])
