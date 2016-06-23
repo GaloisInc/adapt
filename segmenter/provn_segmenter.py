@@ -8,17 +8,13 @@
     Adria Gascon, 2016.
 """
 
-from provnparser import Activity, Agent, Document, Entity, Segment, SegmentExpr
-import argparse
-import datetime
-import json
-import logging
-import networkx as NX
 import os
+import argparse
+import networkx as NX
+from provnparser import *
+import json
+import datetime
 import sys
-
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
 
 VERBOSE = True
 
@@ -38,7 +34,9 @@ class Datetime:
             self.time.minute, self.time.second)
 
     def add(self, days, hs, ms, secs):
-        assert secs > 0
+        assert hs < 24
+        assert ms < 59
+        assert secs < 59
         new_datetime = self.datetime + datetime.timedelta(
             days=days, hours=hs, minutes=ms, seconds=secs)
 
@@ -65,12 +63,7 @@ class Datetime:
             return 0
 
     @classmethod
-    def time_slices(cls, start, end, secs):
-        # Vestigal, can be deleted.
-        days = 0
-        hs = 0
-        ms = 0
-
+    def time_slices(cls, start, end, days, hs, ms, secs):
         intervals = []
         x = start
         y = str(Datetime(start).add(days, hs, ms, secs))
@@ -102,7 +95,7 @@ class Segmenter:
             reach_set_i = set()
             for x in reach_set_i_1:
                 for succ in self.dg.g.successors(x):
-                    if self.dg.g.edge[x][succ]['type'] in edge_type_set:
+                    if self.dg.g.edge[x][succ]['label'] in edge_type_set:
                         reach_set_i.add(succ)
             reach_set_i_1 = reach_set_i
             reach_set |= reach_set_i
@@ -116,16 +109,13 @@ class Segmenter:
         res_set = set()
         for x, y in self.dg.g.edges():
             try:
-                log.debug("edge: %s", self.dg.g.edge[x][y])
-                if 'timestamp' not in self.dg.g.edge[x][y]:
-                    continue
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
-                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
-                        self.dg.g.edge[x][y]['type'] != "includes":
+                if self.dg.g.edge[x][y]['label'] != "wasAssociatedWith" and \
+                        self.dg.g.edge[x][y]['label'] != "segment:includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
-                        'and includes '
+                        'and segment:includes '
                         'must have a timestamp')
                 continue
             if ts >= begin_time and ts < end_time:
@@ -134,9 +124,9 @@ class Segmenter:
         return res_set
 
     def segment_by_time(self, from_, window_dict):
-        max_time = self.dg.max_time or str(datetime.datetime(2037, 1, 1))
-        intervals = Datetime.time_slices(from_, max_time,
-            window_dict['seconds'])
+        intervals = Datetime.time_slices(from_, self.dg.max_time,
+            window_dict['days'], window_dict['hours'],
+            window_dict['minutes'], window_dict['seconds'])
         return [(x, self.time_slice(x, y)) for x, y in intervals]
 
     def segment_by_att(self, att, radius, edges):
@@ -150,11 +140,9 @@ class Segmenter:
 
     def eval_spec(self):
         self.name = self.spec['segmentation_specification']['segment']['name']
-        self.specifications = self.spec[
-            'segmentation_specification']['segment']['specifications']
+        self.specifications = self.spec['segmentation_specification']['segment']['specifications']
         results = []
-        assert len(self.specifications) < 3, (
-            'At most 2 segmentation specifications supported')
+        assert len(self.specifications) < 3, 'At most 2 segmentation specifications supported'
         properties = [x['property'] for x in
             self.spec['segmentation_specification']['segment']['args']]
         segmentation_doc = Document()
@@ -176,7 +164,7 @@ class Segmenter:
         for i, (prop_i, r_i) in enumerate(results):
             for (val_i, segment_i) in r_i:
                 for j, (prop_j, r_j) in enumerate(results):
-                    if i >= j:
+                    if i >= j and len(results) > 1:
                         continue
                     else:
                         for (val_j, segment_j) in r_j:
@@ -187,7 +175,7 @@ class Segmenter:
                                 att_val_dict)
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
-                                e = SegmentExpr(s.id, n, {})
+                                e = SegmentExpr(s.id, n)
                                 segmentation_doc.expression_list += [e]
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
@@ -196,22 +184,11 @@ class Segmenter:
 class DocumentGraph:
     def _populate_graph(self):
         for e in self.doc.expression_list:
-            d = e.att_val_dict
-            d['type'] = e.label()
-            if (isinstance(e, Activity)
-                    or isinstance(e, Entity)
-                    or isinstance(e, Agent)
-                    or isinstance(e, Segment)):
+            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, EntityFile) or isinstance(e, EntityNetFlow) or isinstance(e, EntityMemory) or isinstance(e, Resource) or isinstance(e, Subject) or isinstance(e, Host) or isinstance(e, Agent) or isinstance(e, Pattern) or isinstance(e, Phase) or isinstance(e, APT) or isinstance(e, Segment) or isinstance(e, EDGE_EVENT_AFFECTS_MEMORY) or isinstance(e, EDGE_EVENT_AFFECTS_FILE) or isinstance(e, EDGE_EVENT_AFFECTS_NETFLOW) or isinstance(e, EDGE_EVENT_AFFECTS_SUBJECT) or isinstance(e, EDGE_EVENT_AFFECTS_SRCSINK) or isinstance(e, EDGE_EVENT_HASPARENT_EVENT) or isinstance(e, EDGE_EVENT_ISGENERATEDBY_SUBJECT) or isinstance(e, EDGE_EVENT_CAUSES_EVENT) or isinstance(e, EDGE_SUBJECT_AFFECTS_EVENT) or isinstance(e, EDGE_SUBJECT_HASPARENT_SUBJECT) or isinstance(e, EDGE_SUBJECT_HASPRINCIPAL) or isinstance(e, EDGE_SUBJECT_RUNSON) or isinstance(e, EDGE_FILE_AFFECTS_EVENT) or isinstance(e, EDGE_NETFLOW_AFFECTS_EVENT) or isinstance(e, EDGE_MEMORY_AFFECTS_EVENT) or isinstance(e, EDGE_SRCSINK_AFFECTS_EVENT) or isinstance(e, EDGE_OBJECT_PREV_VERSION) or isinstance(e, EDGE_SUBJECT_HASLOCALPRINCIPAL):
                 self.g.add_node(e.id, e.att_val_dict)
-            else:
-                d = e.att_val_dict
-                if e.timestamp:
-                    d['timestamp'] = e.timestamp
-                    if (not self.min_time) or e.timestamp < self.min_time:
-                        self.min_time = e.timestamp
-                    if not self.max_time or e.timestamp > self.max_time:
-                        self.max_time = e.timestamp
-                d['type'] = e.label()
+            elif e is not None:
+                d = {}
+                d['label'] = e.label()
                 self.g.add_edge(e.s, e.t, d)
 
     def __init__(self, document):
@@ -320,8 +297,7 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
     parser.add_argument('--summary', '-s', action='store_true',
-        help='Print a summary of the input file an quit,'
-        ' segment spec is ignored')
+        help='Print a summary of the input file an quit, segment spec is ignored')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -349,3 +325,5 @@ if __name__ == "__main__":
 
     dg.union(segmentation_dg)
     dg.print_summary()
+
+

@@ -30,6 +30,7 @@ import logging
 import os
 import struct
 import time
+import os
 
 # __author__ = 'John.Hanley@parc.com'
 __author__ = 'jcheney@inf.ed.ac.uk'
@@ -78,25 +79,25 @@ class TopLevelSegmenter:
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
-    def report_status(self, status, downstreams='ad ac ui'.split()):
+    def report_status(self, status):
         def to_int(status_byte):
             return struct.unpack("B", status_byte)[0]
 
         log.info("reporting %d", to_int(status))
-        for downstream in downstreams:
-            s = self.producer.send(downstream, status).get()
-            log.info("sent: %s", s)
+        # Segmenter only talks to AD
+        s = self.producer.send("ad", status).get()
+        log.info("sent: %s", s)
 
 
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='http://localhost:8182/')
+                   default='ws://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='test/spec/default_spec.json')
+                   default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
     return p
 
 
