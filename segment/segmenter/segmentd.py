@@ -90,6 +90,8 @@ class TopLevelSegmenter:
 
 
 def arg_parser():
+    spec = os.path.expanduser(
+        "~/adapt/segment/segmenter/test/spec/segmentByPID.json")
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
@@ -97,7 +99,7 @@ def arg_parser():
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
+                   default=spec)
     return p
 
 
