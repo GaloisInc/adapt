@@ -18,7 +18,6 @@ import sys
 
 VERBOSE = True
 
-
 class Datetime:
     def __init__(self, s):
         date, time = s.split('T')
@@ -138,12 +137,12 @@ class Segmenter:
                     self.dg.get_nodes_by_att(att, v), radius, edges)))
         return segments
 
-    def eval_spec(self):
+    def eval_spec(self, add_segment2segment_edges=True):
 
-        def segment_2_segment_exprs(segments_reverse_map):
+        def segment2segment_exprs(segments_reverse_map):
             s2s_list = []
             edges = set()
-            for _, l in segments_reverse_map:
+            for _, l in segments_reverse_map.items():
                 for i, x in enumerate(l):
                     for j, y in enumerate(l):
                         if i < j and not (x, y) in edges:
@@ -191,11 +190,12 @@ class Segmenter:
                                 e = SegmentExpr(s.id, n)
                                 try:
                                     segment_reverse_map[n] += [s]
-                                except IndexError:
+                                except KeyError:
                                     segment_reverse_map[n] = [s]
                                 segmentation_doc.expression_list += [e]
-        segmentation_doc.expression_list += segment2segment_edges(
-            segment_reverse_map)
+        if add_segment2segment_edges:
+            segmentation_doc.expression_list += segment2segment_exprs(
+                segment_reverse_map)
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
 
@@ -315,6 +315,8 @@ if __name__ == "__main__":
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
+    parser.add_argument('--no_seg2seg', action='store_true',
+        help='Do not add segment2segment edges')
     parser.add_argument('--summary', '-s', action='store_true',
         help='Print a summary of the input file an quit, segment spec is ignored')
 
@@ -336,7 +338,7 @@ if __name__ == "__main__":
 
     s = Segmenter(dg, args.spec_file)
 
-    segmentation_dg = s.eval_spec()
+    segmentation_dg = s.eval_spec(add_segment2segment_edges=not args.no_seg2seg)
     print('=' * 30)
     print('\tSegmentation result')
     print('=' * 30)
