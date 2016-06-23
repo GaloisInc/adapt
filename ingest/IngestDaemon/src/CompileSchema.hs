@@ -160,7 +160,7 @@ instance PropertiesOf SubjectType where
   propertiesOf s = [("subjectType", gremlinNum (fromEnum s))]
 
 instance PropertiesOf EventType where
-  propertiesOf s = [("subjectType", gremlinNum (fromEnum s))]
+  propertiesOf s = [("eventType", gremlinNum (fromEnum s))]
 
 gremlinTime :: UTCTime -> GremlinValue
 gremlinTime t = GremlinString (T.pack $ show t)
