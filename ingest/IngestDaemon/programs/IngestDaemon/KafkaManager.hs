@@ -20,7 +20,8 @@ import           Network.Kafka.Protocol as Kafka
 
 import           CompileSchema
 import           CommonDataModel as CDM
-import           CommonDataModel.Avro
+import qualified Data.Avro as Avro
+import qualified Data.Avro.Schema as Avro
 import           IngestDaemon.Types
 
 -- Straight text to a Kafka topic. Used for logging.
@@ -82,9 +83,10 @@ getMessage topicNm offset =
 kafkaInput :: (Text -> IO ())
            -> KafkaAddress
            -> TopicName
+           -> Avro.Schema
            -> TBChan Input
            -> IO (Either KafkaClientError ())
-kafkaInput logK host topic chan =
+kafkaInput logK host topic cdmSchema chan =
   do r <- runKafka state oper
      return r
  where
@@ -96,9 +98,9 @@ kafkaInput logK host topic chan =
  process offset =
   do bs <- getMessage topic offset
      let handleMsg b =
-          case runGetOrFail getAvro (BL.fromStrict b) of
-            Right (_,_,cdmFmt) -> insertCDM cdmFmt
-            Left err           -> emit (show err)
+          case Avro.decode cdmSchema (BL.fromStrict b) of
+            Avro.Success cdmFmt -> insertCDM cdmFmt
+            Avro.Error err      -> emit (show err)
      mapM_ handleMsg bs
      if null bs
       then liftIO (threadDelay 100000) >> process offset
