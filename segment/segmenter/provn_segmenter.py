@@ -139,6 +139,18 @@ class Segmenter:
         return segments
 
     def eval_spec(self):
+
+        def segment_2_segment_exprs(segments_reverse_map):
+            s2s_list = []
+            edges = set()
+            for _, l in segments_reverse_map:
+                for i, x in enumerate(l):
+                    for j, y in enumerate(l):
+                        if i < j and not (x, y) in edges:
+                            s2s_list.append(Segment2SegmentExpr(x, y))
+                            edges.add((x, y))
+            return s2s_list
+
         self.name = self.spec['segmentation_specification']['segment']['name']
         self.specifications = self.spec['segmentation_specification']['segment']['specifications']
         results = []
@@ -147,6 +159,7 @@ class Segmenter:
             self.spec['segmentation_specification']['segment']['args']]
         segmentation_doc = Document()
         segmentation_doc.prefix_decls = self.dg.doc.prefix_decls
+        segment_reverse_map = {}
         for i, d in enumerate(self.specifications):
             if 'radius' in d:
                 # segment by att
@@ -176,7 +189,13 @@ class Segmenter:
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
                                 e = SegmentExpr(s.id, n)
+                                try:
+                                    segment_reverse_map[n] += [s]
+                                except IndexError:
+                                    segment_reverse_map[n] = [s]
                                 segmentation_doc.expression_list += [e]
+        segmentation_doc.expression_list += segment2segment_edges(
+            segment_reverse_map)
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
 
