@@ -486,12 +486,12 @@ Other primitive types used in our model:
 * *prov-tc:gid* : list\<int\>;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('gid').dataType(Integer.class).cardinality(Cardinality.LIST)
+  makePropertyKey('gid').dataType(String.class).cardinality(Cardinality.LIST)
 
 * *prov-tc:userID* : int;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('userID').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('userID').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:sequence* : long;
   and maps to the Titan data type:

@@ -14,8 +14,6 @@ import           Data.List.Split (chunksOf)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
-import           Data.Monoid ((<>))
-import           Data.Proxy (Proxy(..))
 import           Data.String
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
@@ -28,9 +26,8 @@ import           Text.Groom
 import           Text.Printf
 import           Text.Read (readMaybe)
 
-import qualified CommonDataModel.Avro  as Avro
+import qualified Data.Avro as Avro
 import qualified CommonDataModel       as CDM
-import qualified CommonDataModel.Types as CDM
 
 import           Schema
 
@@ -143,16 +140,11 @@ handleFile c fl = do
   ingest :: File -> IO (Either String (([Node],[Edge]), [BS.ByteString]))
   ingest (CDMFile fp)  =
     do t <- handle onError (BL.readFile fp)
-       let prox = Proxy :: Proxy CDM.TCCDMDatum
-           eBytes = Avro.decodeObjectContainerFor (Avro.getBytesOfObject prox) t
-           eStmts = Avro.decodeObjectContainer t
-       case (eStmts,eBytes) of
-        (Left err,_)    -> return $ Left $ "Object container decode failure: " <> show err
-        (_, Left err)   -> return $ Left $ "Impossible case: decode failure: " <> show err
-        (Right (_,_,xs), Right (_,_,bs)) ->
-           do let (ns,es) = CDM.toSchema (concat xs)
-                  bytestringsOfStmts = BL.toStrict <$> concat bs
-              return $ Right ((ns,es), bytestringsOfStmts)
+       let bytess = Avro.decodeContainerBytes t
+       stmts <- CDM.readContainer t
+       let (ns,es) = CDM.toSchema (concat stmts)
+           bytestringsOfStmts = BL.toStrict <$> concat bytess
+       return $ Right ((ns,es), bytestringsOfStmts)
   onError :: IOException -> IO a
   onError e = do putStrLn ("Error reading " ++ getFP fl ++ ":")
                  print e

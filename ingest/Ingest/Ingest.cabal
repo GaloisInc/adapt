@@ -14,27 +14,21 @@ maintainer:          tommd@galois.com
 category:            Language
 build-type:          Simple
 extra-source-files:  README
+data-files:          data/TCCDMDatum13.avsc
 cabal-version:       >=1.10
 
 library
-  exposed-modules: CommonDataModel, CommonDataModel.Types,
-                   CommonDataModel.Avro, Schema
+  exposed-modules: CommonDataModel, CommonDataModel.Types, Schema
+  other-modules:   Paths_Ingest
   build-depends:       base >=4.7 && <4.9
+                     , avro, aeson
                      , bytestring >= 0.10
                      , base64-bytestring >= 1.0.0.1
                      , containers >=0.5 && <0.6
-                     -- , unordered-containers >=0.2 && <0.3
                      , text >=1.2 && <1.3
                      , monadLib >=3.7 && <3.8
                      , time >=1.5 && <1.6
-                     -- , network-uri >=2.6 && <2.7
-                     -- , dlist >= 0.7 && <0.8
-                     -- , array >= 0.5 && <0.6
-                     -- , pretty
-                     -- , crypto-api
-                     -- , monadcryptorandom
                      , binary, data-binary-ieee754
-                     , pure-zlib
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Werror
