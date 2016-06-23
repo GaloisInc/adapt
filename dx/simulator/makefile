@@ -1,20 +1,23 @@
-.PHONY: run test test-coverage coverage coverage-html pdf dxpdf upreqs check help
+.PHONY: dx run test test-coverage coverage coverage-html pdf dxpdf upreqs check help
 
 MODULE = simulator_diagnoser
 
 ENV = env
 REQS = config/requirements.txt
 
-PYTHON = $(ENV)/bin/python
-PIP = $(ENV)/bin/pip
+PYTHON = $(ENV)/bin/python3
+PIP = $(ENV)/bin/pip3
 PEP8 = $(ENV)/bin/pep8
-COVERAGE = $(ENV)/bin/coverage
+COVERAGE = $(ENV)/bin/coverage3
 COVERAGERC = --rcfile=config/coveragerc
 
 TEST_PATTERN = -p "*_test.py"
 
 ## Default target. Same as 'make run'.
-all: run
+all: dx
+
+dx: $(ENV)
+	$(PYTHON) dx.py -s
 
 ## Run entrypoint: sim.py.
 run: $(ENV)
@@ -49,7 +52,7 @@ d3: $(ENV)
 
 $(ENV): $(ENV)/bin/activate
 $(ENV)/bin/activate: $(REQS)
-	test -d $(ENV) || virtualenv $(ENV)
+	test -d $(ENV) || virtualenv -p python3 $(ENV)
 	$(PIP) install -r $(REQS)
 	touch $(ENV)/bin/activate
 

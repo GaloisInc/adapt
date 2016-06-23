@@ -114,6 +114,13 @@ then try running `$HOME/adapt/tools/restart_services.sh`.  Similarly, you can
 follow the steps in that script but insert a `/opt/titan/bin/titan clean`
 command if you'd like to wipe the database at the same time.
 
+*Query based on elastic search index*: The query mechanism for indexed data
+seems to vary more drastically for non-node-indexed   The direct index method
+involves using the graph to query the index then turn around and acquire the
+vertices, edges etc:
+
+    QUERYV = "graph.indexQuery('byURL', 'v.url:/.*null.*/').vertices()"
+
 # Directory Descriptions
 
 - ad: Anomaly Detection

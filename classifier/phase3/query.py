@@ -20,44 +20,38 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-#
 '''
-Writes one or more classification nodes to Titan / Cassandra.
+Ad hoc query runner to report on distinct Entity-File node values.
 '''
-
-import classify
-import logging
-import unittest
-
-__author__ = 'John.Hanley@parc.com'
-
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler())
-log.setLevel(logging.DEBUG)
+import argparse
+import collections
+import gremlin_query
 
 
-def test_phase2():
-    '''Test Ac component with upstream deps for phase2 development.'''
-    exfil_detect = classify.ExfilDetector()
-    ins = classify.Phase2NodeInserter()
-    ins.drop_all_test_nodes()
-
-    # precondition
-    assert False is exfil_detect.is_exfil_segment(
-        ins._get_segment('seg1'))
-
-    ins.insert_reqd_events()
-    ins.insert_reqd_segment()
-
-    # postcondition
-    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
-        ins._insert_node('ac1', 'classification',
-                         ('classificationType',
-                          'exfiltrate_sensitive_file'))
-    else:
-        assert None, 'phase2 test failed'
+def arg_parser():
+    p = argparse.ArgumentParser(
+        description='Ad hoc query runner to report on Entity-File values.')
+    p.add_argument('--query', help='gremlin query to run',
+                   default="g.V().has(label, 'Entity-File').limit(5000)")
+    return p
 
 
 if __name__ == '__main__':
-    test_phase2()
-    unittest.main()
+
+    args = arg_parser().parse_args()
+    with gremlin_query.Runner() as gremlin:
+
+        # Number of times we've seen a given filename.
+        counts = collections.defaultdict(int)
+
+        for msg in gremlin.fetch(args.query):
+            for item in msg.data:
+                prop = item['properties']
+                if 'url' in prop:
+                    file = prop['url'][0]['value']
+                    assert file.startswith('file://'), file
+                    counts[file] += 1
+        i = 1
+        for file, count in sorted(counts.items()):
+            print('%3d %4d  %s' % (i, count, file))
+            i += 1

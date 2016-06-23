@@ -12,7 +12,7 @@ if __name__ == "__main__":
     dxs = dx.diagnose(graph, symptoms)
 
     if len(sys.argv) == 1:
-        print "Reduced diagnosis: ", dxs
+        print("Reduced diagnosis: ", dxs)
         dxs.print_dx()
     else:
         if(sys.argv[1] == 'pdf'):

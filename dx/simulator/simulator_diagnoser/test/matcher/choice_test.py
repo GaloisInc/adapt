@@ -1,5 +1,5 @@
 import unittest
-from test_util import map_path
+from .test_util import map_path
 from simulator_diagnoser.matcher import MatcherResult, \
                                         Terminal, \
                                         Choice, \

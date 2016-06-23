@@ -22,42 +22,52 @@
 # the software.
 #
 '''
-Writes one or more classification nodes to Titan / Cassandra.
+Injects a kafka message that says some component is done with processing.
 '''
-
-import classify
+import argparse
+import kafka
 import logging
-import unittest
+import struct
 
 __author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler())
-log.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 
-def test_phase2():
-    '''Test Ac component with upstream deps for phase2 development.'''
-    exfil_detect = classify.ExfilDetector()
-    ins = classify.Phase2NodeInserter()
-    ins.drop_all_test_nodes()
+STATUS_IN_PROGRESS = b'\x00'
+STATUS_DONE = b'\x01'
 
-    # precondition
-    assert False is exfil_detect.is_exfil_segment(
-        ins._get_segment('seg1'))
 
-    ins.insert_reqd_events()
-    ins.insert_reqd_segment()
+class Injector:
 
-    # postcondition
-    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
-        ins._insert_node('ac1', 'classification',
-                         ('classificationType',
-                          'exfiltrate_sensitive_file'))
-    else:
-        assert None, 'phase2 test failed'
+    def __init__(self, url):
+        self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
+
+    def report_status(self, status, topic):
+        def to_int(status_byte):
+            return struct.unpack("B", status_byte)[0]
+
+        log.info("reporting %d", to_int(status))
+        s = self.producer.send(topic, status).get()
+        log.info("sent: %s", s)
+
+
+def arg_parser():
+    p = argparse.ArgumentParser(
+        description='Injects a "done" kafka message,'
+        ' signaling that processing is complete.')
+    p.add_argument('--kafka', help='location of the kafka pub-sub service',
+                   default='localhost:9092')
+    p.add_argument('topic',
+                   help="Send message via this kafka channel, e.g.: se")
+    return p
 
 
 if __name__ == '__main__':
-    test_phase2()
-    unittest.main()
+    args = arg_parser().parse_args()
+    Injector(args.kafka).report_status(STATUS_DONE, args.topic)

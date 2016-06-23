@@ -30,7 +30,6 @@ import logging
 import os
 import struct
 import time
-import os
 
 # __author__ = 'John.Hanley@parc.com'
 __author__ = 'jcheney@inf.ed.ac.uk'

@@ -20,44 +20,48 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-#
 '''
-Writes one or more classification nodes to Titan / Cassandra.
+Displays number of occurences of each distinct node label.
 '''
-
-import classify
-import logging
-import unittest
 
 __author__ = 'John.Hanley@parc.com'
 
-log = logging.getLogger(__name__)
-log.addHandler(logging.StreamHandler())
-log.setLevel(logging.DEBUG)
+from aiogremlin import GremlinClient
+import asyncio
+import collections
 
 
-def test_phase2():
-    '''Test Ac component with upstream deps for phase2 development.'''
-    exfil_detect = classify.ExfilDetector()
-    ins = classify.Phase2NodeInserter()
-    ins.drop_all_test_nodes()
+class GremlinQueryRunner:
 
-    # precondition
-    assert False is exfil_detect.is_exfil_segment(
-        ins._get_segment('seg1'))
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.gc = GremlinClient(loop=self.loop)
 
-    ins.insert_reqd_events()
-    ins.insert_reqd_segment()
+    def fetch(self, query):
+        return self.loop.run_until_complete(self.gc.execute(query))
 
-    # postcondition
-    if exfil_detect.is_exfil_segment(ins._get_segment('seg1')):
-        ins._insert_node('ac1', 'classification',
-                         ('classificationType',
-                          'exfiltrate_sensitive_file'))
-    else:
-        assert None, 'phase2 test failed'
+    def close(self):
+        self.loop.run_until_complete(self.gc.close())
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+
+def get_label_counts():
+    with GremlinQueryRunner() as gremlin:
+        cnt = collections.defaultdict(int)
+        q = 'g.V().label()'
+        msgs = gremlin.fetch(q)
+        for msg in msgs:
+            for label in msg.data:
+                cnt[label] += 1
+
+    return sorted(['%6d  %s' % (cnt[k], k)
+                   for k in cnt.keys()])
 
 
 if __name__ == '__main__':
-    test_phase2()
-    unittest.main()
+    print('\n'.join(get_label_counts()))
