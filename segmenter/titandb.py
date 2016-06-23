@@ -7,17 +7,20 @@
 
     Adria Gascon, 2016.
 """
-import asyncio
 from aiogremlin import GremlinClient
 from provn_segmenter import DocumentGraph, Document
 from provnparser import ResourceFactory, EventFactory
-import re
 import argparse
-import os
-import sys
+import asyncio
 import logging
+import os
+import pprint
+import re
+import sys
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def escape(s):
     """
@@ -25,7 +28,7 @@ def escape(s):
     Replaces qutes with their escaped versions.  Other escaping
     may be necessary to avoid problems.
     """
-    return s.replace("\'","\\\'").replace("\"","\\\"")
+    return s.replace("\'", "\\\'").replace("\"", "\\\"")
 
 
 class TitanClient:
@@ -45,7 +48,7 @@ class TitanClient:
             result = self.loop.run_until_complete(execute)
         except Exception as e:
             print('Error trying to connect to Titan DB: {0}...aborting'.
-                format(e))
+                  format(e))
             self.close()
             sys.exit(-1)
         assert result[0].status_code in (200, 204, 206), result[0].status_code
@@ -71,12 +74,13 @@ class TitanClient:
         id1 = r1[0]['id']
         id2 = r2[0]['id']
         properties_str = ', '.join(
-            map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1]) if x[0] != 'label' else "", d.items()))
+            map(lambda x: '\'{0}\',\'{1}\''.format(x[0], x[1])
+                if x[0] != 'label' else "", d.items()))
         r = self.execute(
             'g.V({0}).next().addEdge(\'{2}\', g.V({1}).next(), {3})'.format(
                 id1, id2, label, properties_str))
         return r
-    
+
     def add_node(self, n, d):
         """
         Adds node with name n to the DB if it does not already exist.
@@ -92,9 +96,11 @@ class TitanClient:
         c2 = self.execute('g.V().and({0})'.format(properties_str))
         if not (c1 or c2):
             properties_str = ', '.join(
-                map(lambda x: '\'{0}\',\'{1}\''.format(x[0], escape(x[1])), d.items()))
+                map(lambda x: '\'{0}\',\'{1}\''.format(
+                    x[0], escape(x[1])), d.items()))
             # Hack: for now, label all new nodes as segment nodes.
-            c1 = self.execute('g.addV(label,\'Segment\',{})'.format(properties_str))
+            c1 = self.execute(
+                'g.addV(label,\'Segment\',{})'.format(properties_str))
             assert 'ident' in d, d
             logger.debug('add_node: Added node with properties {}'.format(d))
         else:
@@ -103,7 +109,7 @@ class TitanClient:
                     'add_node: Node with name {} already exists'.format(n))
             if c2:
                 logger.debug(
-                    'add_node: Node with dictionary {} already exists'.format(d))
+                    'add_node: Node with dict {} already exists'.format(d))
         return c1
 
     def load_from_document_graph(self, dg):
@@ -113,8 +119,7 @@ class TitanClient:
             d = dg.g.edge[n1][n2]
             label = d['label']
             self.add_edge(n1, d1,
-                n2, d2, d, label)
-
+                          n2, d2, d, label)
 
     def load_segments_from_document_graph(self, dg):
         """
@@ -128,8 +133,8 @@ class TitanClient:
             label = d['label']
             if label.startswith('segment:'):
                 self.add_edge(n1, d1,
-                    n2, d2, d, label)
-            
+                              n2, d2, d, label)
+
     def read_into_document_graph(self):
         doc = Document()
         node_id2name_map = {}
@@ -141,7 +146,7 @@ class TitanClient:
             assert 'label' in v, v
             assert 'ident' in d, d
             resource_id = d['ident'][0]['value']
-            print(v['id'], " ", resource_id)
+            logger.info('%9d  %s' % (int(v['id']), resource_id))
             node_id2name_map[v['id']] = resource_id
             resource_type = v['label']
             att_val_list = [
@@ -151,7 +156,7 @@ class TitanClient:
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
-        print(node_id2name_map)
+        pprint.pprint(node_id2name_map)
         edges = self.all_edges()
         for e in edges:
             event_type = e['label']
@@ -164,7 +169,7 @@ class TitanClient:
 
     def drop_db(self):
         r = self.execute('g.V().drop().iterate()')
-        assert r == None
+        assert r is None
 
 
 def test():
@@ -197,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument('provn_file', help='A prov-tc file in provn format')
     parser.add_argument('broker', help='The broker to the Titan DB')
     parser.add_argument('--verbose', '-v', action='store_true',
-        help='Run in verbose mode')
+                        help='Run in verbose mode')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -206,7 +211,8 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match(
+        '.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
