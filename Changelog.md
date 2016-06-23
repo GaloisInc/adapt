@@ -1,4 +1,12 @@
-# 0.3 -- In progress
+# 0.3 -- Released 2016-06-23
+
+- Move to CDM13, including schema changes
+  - This impacts both ingestd and Trint
+  - We should now be able to consume and translate between compatible CDM versions.
+- Improved schema for segements
+- TMD: I observed some DX work and segment work - feel free to update the
+       changelog if you want that documented more completely.
+
 
 # 0.2 -- Released 2016-06-10
 
