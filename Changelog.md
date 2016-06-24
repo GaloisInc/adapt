@@ -1,6 +1,10 @@
 # 0.3.1 -- Minor point release, 2016-06-24
 - Fixes for CDM13 to Adapt Schema translation
 - Fixes for building ingester with new Avro library
+- Add --clean to restart_services.sh
+- Make the 'ident' index unique.
+    - NB this is notionally different than making the schema 'ident' unique but
+      with the same result to the end users.
 
 # 0.3 -- Released 2016-06-23
 
