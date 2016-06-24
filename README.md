@@ -23,7 +23,7 @@ deployment scripts to install new dependencies or alter the startup.
 
 Update adapt files from a subtree repo with a command like:
 
-    git subtree pull --prefix=classifier https://github.com/GaloisInc/Adapt-classify.git master --squash ; or ...
+    git subtree pull --prefix=classifier https://github.com/GaloisInc/Adapt-classify.git master --squash ; or
     git subtree pull --prefix=ingest git@github.com:GaloisInc/Adapt-ingest.git master --squash
 
 A helper script exists to pull all known components in via git subtree:
