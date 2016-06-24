@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import asyncio
 from aiogremlin import GremlinClient
 from math import floor
@@ -17,8 +19,8 @@ def run_query(query, bindings={}):
 with open(in_file, 'r') as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
     for row in reader:
-        if row[0] != 'segment_id':
-            run_query("g.V().has('vertexType','segment').hasLabel('" + str(row[0]) + "')[0].property('anomalyScore','" + str(row[8]) + "')")
+        if row[0] != 'ident':
+            run_query("g.V().has('ident','" + str(row[0]) + "').property('anomalyScore'," + str(row[5]) + ")")
     print('Anomaly score attach finished')
 
 loop.run_until_complete(gc.close())
