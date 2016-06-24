@@ -176,6 +176,7 @@ data InstrumentationSource
       | SourceFreeBSDMacifCadets
       | SourceWindowsDiftFaros
       | SourceLinuxTheia
+      | SourceWindowsFiveDirections
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data PrincipalType
@@ -286,7 +287,7 @@ data Derivation = UnknownDerivation | Copy | Encode | Compile | Encrypt | Other
 
 -- "Other primitive types used in our model"
 type Properties    = Map Text Text
-type UID           = (Word64, Word64, Word64, Word64)
+type UID           = (Word32, Word32, Word32, Word32)
 type UserID        = Text
 type URL           = Text
 type FileVersion   = Int64
