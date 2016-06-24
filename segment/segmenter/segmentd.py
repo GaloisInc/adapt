@@ -70,12 +70,14 @@ class TopLevelSegmenter:
         for msg in self.consumer:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
+                self.producer.send("se-log", b'starting processing')
                 self.report_status(STATUS_IN_PROGRESS)
                 cmd = './adapt_segmenter.py --broker %s --store-segment %s' % (
                     broker, spec)
                 log.info(cmd)
                 os.system(cmd)
                 self.report_status(STATUS_DONE)
+                self.producer.send("se-log", b'done processing')
                 log.info(start_msg)  # Go back and do it all again.
 
     def report_status(self, status):
