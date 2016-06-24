@@ -140,7 +140,7 @@ translateSubject       (Subject {..}) =
 
 translateUUID :: UUID -> S.UID
 translateUUID (UUID bs) =
-  let [a,b,c,d] = G.runGet (replicateM 4 G.getWord64le) (BL.fromStrict bs)
+  let [a,b,c,d] = G.runGet (replicateM 4 G.getWord32le) (BL.fromStrict bs)
   in (a,b,c,d)
 {-# INLINE translateUUID #-}
 
