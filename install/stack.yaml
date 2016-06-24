@@ -3,6 +3,7 @@ packages:
 - ../dashboard
 - ../ingest/IngestDaemon
 - ../ingest/Ingest
+- ../ingest/avro
 - ../ingest/GremlinClient
 extra-deps:
 - dotgen-0.4.2
