@@ -9,34 +9,30 @@ $ make
 ### Run Anomaly Detection Module
 
 ```
-$ python3 StartAD.py
-Waiting for signal from segmenter...
-ConsumerRecord(topic='ad', partition=0, offset=1, key=None, value=b'1')
-[ProduceResponsePayload(topic='ac', partition=0, error=0, offset=2)]
-Starting Anomaly Detection
-Inserting dummy segment nodes
-Finished Inserting dummy segment nodes
-Extracting features from segments
-Segment 0
-Segment 1
-Segment 2
-Segment 3
-Segment 4
-Segment 5
-Segment 6
-Segment 7
-Segment 8
-Segment 9
-Feature extraction and attaching finished
-Writing features to file: seg_spec_features.csv
+$ ./start.sh
+Writing features to file: features.csv
+Found 64 idents
+Extracting feature for: c8RLI0E7ATyVwfVt+p1t4AjvlwI7hfIQyERar6rSA8U=
+Extracting feature for: apjeInJRzQ8jaky+CAQB5H+AyrnHnIooDDNbIZEe7CM=
+Extracting feature for: Urupygd2nsUpV1JvE27w5l9nKbAsWcrArEQVJ3PyJJI=
+Extracting feature for: PzPi9E1J8qFerg23aA9ULTAo5bTVF6vmRvzE7aULAFM=
+Extracting feature for: YOmkyJ3/o2YeXDZ9YJG0pCvXi7w8OghA27HBnom5rEo=
+Extracting feature for: tSGKUWdOexIE744uxq2d1+eIE90ZM/o80B6J4+0Rw4s=
+Extracting feature for: BTM8zliW7ZQZUfU31v91bq51KSHGNa+bUCo+S4FKHto=
+...
+...
+...
+Extracting feature for: 9iEsH2vI/S00Ixd2B/W0+tXOIRdZ22LT5H4AsYdewnw=
+Extracting feature for: LrcXgwv8TIveK7VCMS+BZlHS5Bh1uuhIFNYBgbDZ3Eo=
+Extracting feature for: wVPJyCksys7pkyhc/HBDn7H2ArpeejNxGwrf1pwXxYI=
+Extracting feature for: apjeInJRzQ8jaky+CAQB5H+AyrnHnIooDDNbIZEe7CM=
+Extracting feature for: m9+2ccABww7+gL9k9R832/d+HaAvK75t3MFCvLg55Aw=
+Extracting feature for: apjeInJRzQ8jaky+CAQB5H+AyrnHnIooDDNbIZEe7CM=
 Writing Finished
 # Trees     = 100
 # Samples   = 100
-Original Data Dimension: 10,5
+Original Data Dimension: 64,4
 Anomaly score attach finished
-POST Test PASSED!
-Finished Anomaly Detection
-[ProduceResponsePayload(topic='ac', partition=0, error=0, offset=3)]
 
 ```
 
