@@ -145,9 +145,10 @@ class Segmenter:
             for _, l in segments_reverse_map.items():
                 for i, x in enumerate(l):
                     for j, y in enumerate(l):
-                        if i < j and not (x, y) in edges:
-                            s2s_list.append(Segment2SegmentExpr(x, y))
-                            edges.add((x, y))
+                        if i < j and not (x.id, y.id) in edges:
+                            s2s_list.append(Segment2SegmentExpr(x.id, y.id))
+                            edges.add((x.id, y.id))
+             return s2s_list
             return s2s_list
 
         self.name = self.spec['segmentation_specification']['segment']['name']

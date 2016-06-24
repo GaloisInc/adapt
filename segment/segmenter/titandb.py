@@ -146,7 +146,9 @@ class TitanClient:
             d = v['properties']
             assert 'label' in v, v
             assert 'ident' in d, d
-            resource_id = d['ident'][0]['value']
+            # apparently 'ident' is not unique
+            # resource_id = d['ident'][0]['value']
+            resource_id = str(v['id'])
             logger.debug('%9d  %s' % (int(v['id']), resource_id))
             node_id2name_map[v['id']] = resource_id
             resource_type = v['label']
