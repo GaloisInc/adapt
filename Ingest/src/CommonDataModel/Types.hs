@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CommonDataModel.Types where
 
+import           Prelude as P
 import           Data.Avro (FromAvro(..), (.:))
 import qualified Data.Avro.Schema as Avro
 import qualified Data.Avro.Types as Ty
@@ -12,7 +13,9 @@ import           Data.Int
 import           Data.Map
 import           Data.Monoid
 import           Data.Text (Text)
+import qualified Data.Text as T
 import           Data.Word (Word16)
+import           Text.Read  (readMaybe)
 
 
 -- | A two byte value we keep as 16 bits in little endian.
@@ -389,8 +392,7 @@ instance FromAvro PTValue where
       _ -> fail "Unrecognized tag in ProvTagNode value union"
   fromAvro _ = fail "Non-union value in PTValue"
 instance FromAvro TagOpCode where
-  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
-  fromAvro _ = fail "Invalid value for TagOpCode"
+  fromAvro = fromAvroEnum "TagOpCode"
 instance FromAvro Event where
   fromAvro (Ty.Record obj) =
     Event <$> obj .: "uuid"
@@ -407,11 +409,9 @@ instance FromAvro Event where
           <*> obj .: "properties"
   fromAvro _ = fail "Invalid value for Event"
 instance FromAvro EventType where
-  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
-  fromAvro _ = fail "Non-enum for EventType"
+  fromAvro = fromAvroEnum "EventType"
 instance FromAvro InstrumentationSource where
-  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
-  fromAvro _ = fail "Non-enum for InstrumentationSource"
+  fromAvro = fromAvroEnum "InstrumentationSource"
 instance FromAvro Value where
   fromAvro (Ty.Record obj) =
     Value <$> obj .: "size"
@@ -434,8 +434,7 @@ instance FromAvro ValueType where
         _                  -> fail "Unrecognized enum for ValueType."
   fromAvro _ = fail "Non-enum for ValueType"
 instance FromAvro ValueDataType where
-  fromAvro (Ty.Enum _ t) = pure $ read (show t) -- XXX
-  fromAvro _ = fail "Non-enum for ValueDataType"
+  fromAvro = fromAvroEnum "ValueDataType"
 instance FromAvro NetFlowObject where
   fromAvro (Ty.Record obj)  =
     NetFlowObject <$> obj .: "uuid"
@@ -473,8 +472,7 @@ instance FromAvro SrcSinkObject where
                   <*> obj .: "type"
   fromAvro _ = fail "Non-record for SrcSinkObject"
 instance FromAvro SrcSinkType where
-  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
-  fromAvro _ = fail "Invalid value for SrcSinkType"
+  fromAvro = fromAvroEnum "SrcSinkType"
 instance FromAvro MemoryObject where
   fromAvro (Ty.Record obj) =
     MemoryObject <$> obj .: "uuid"
@@ -486,14 +484,19 @@ instance FromAvro Principal where
   fromAvro (Ty.Record obj) =
     Principal <$> obj .: "uuid"
               <*> obj .: "type"
-              <*> obj .: "userId"
-              <*> obj .: "groupIds"
+              <*> (textOf <$> obj .: "userId")
+              <*> (P.map textOf <$> obj .: "groupIds")
               <*> obj .: "source"
               <*> obj .: "properties"
   fromAvro _ = fail "Invalid value for Principal"
+data TextOrInt = TOI {textOf :: Text}
+instance FromAvro TextOrInt where
+  fromAvro (Ty.String s) = pure $ TOI s
+  fromAvro (Ty.Int i) = pure (TOI $ T.pack (show i))
+  fromAvro (Ty.Long i) = pure (TOI $ T.pack (show i))
+  fromAvro _ = fail "Invalid value for TextOrInt used by Principal"
 instance FromAvro PrincipalType where
-  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
-  fromAvro _ = fail "Invalid value for PrincipalType"
+  fromAvro = fromAvroEnum "PrincipalType"
 instance FromAvro TagEntity where
   fromAvro (Ty.Record obj) =
     TagEntity <$> obj .: "uuid"
@@ -529,12 +532,10 @@ instance FromAvro SubjectType where
   fromAvro _ = fail "Invalid value for SubjectType"
 
 instance FromAvro ConfidentialityTag where
-  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
-  fromAvro _ = fail "Invalid value for ConfidentialityTag"
+  fromAvro = fromAvroEnum "ConfidentialityTag"
 
 instance FromAvro IntegrityTag where
-  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
-  fromAvro _ = fail "Invalid value for IntegrityTag"
+  fromAvro = fromAvroEnum "IntegrityTag"
 
 instance FromAvro SimpleEdge where
   fromAvro (Ty.Record fields) =
@@ -546,12 +547,11 @@ instance FromAvro SimpleEdge where
   fromAvro _ = fail "Invalid Avro type for SimpleEdge"
 
 instance FromAvro UUID where
-  fromAvro (Ty.Fixed bs) | B.length bs == 16 = pure $ UUID bs
+  fromAvro (Ty.Fixed bs) = pure $ UUID bs
   fromAvro _ = fail "Invalid value for UUID"
 
 instance FromAvro EdgeType where
-  fromAvro (Ty.Enum _ txt) = pure $ read (show txt) -- XXX seriously...
-  fromAvro _ = fail "Invalid value for EdgeType"
+  fromAvro = fromAvroEnum "EdgeType"
 
 instance FromAvro RegistryKeyObject where
   fromAvro (Ty.Record obj) =
@@ -562,3 +562,9 @@ instance FromAvro RegistryKeyObject where
                       <*> obj .: "size"
   fromAvro _ = fail "Invalid value for RegistryKeyObject"
 
+-- XXX seriously...
+fromAvroEnum :: (Read a) => String -> Ty.Value Avro.Type -> Avro.Result a
+fromAvroEnum ty (Ty.Enum _ txt)
+  | Just v <- readMaybe (T.unpack txt) = pure v
+  | otherwise = fail $ "Unrecognized enum for '" <> ty <> "': " <> T.unpack txt
+fromAvroEnum ty v = fail $ "Invalid value for '" <> ty <> "': " <> show v
