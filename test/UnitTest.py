@@ -13,7 +13,7 @@ def run_query(query, bindings={}):
 
 # Unit test
 # Test that all Entity-NetFlow nodes has attached anomaly scores
-n_net_idents = run_query("g.V().hasLabel('Entity-NetFlow').values('ident')")[0]
+n_net_idents = run_query("g.V().hasLabel('Entity-NetFlow').values('ident')")
 n_nodes_attach = run_query("g.V().has('anomalyScore').count()")[0]
 assert len(n_net_idents) == n_nodes_attach, "Anomaly score not attached on all Entity-NetFlow nodes"
 print("Anomaly Score Test PASSED!")
