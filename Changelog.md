@@ -1,3 +1,7 @@
+# 0.3.1 -- Minor point release, 2016-06-24
+- Fixes for CDM13 to Adapt Schema translation
+- Fixes for building ingester with new Avro library
+
 # 0.3 -- Released 2016-06-23
 
 - Move to CDM13, including schema changes
