@@ -107,7 +107,6 @@ data Host =
            }
       deriving (Eq, Ord, Show, Read, Generic)
 
-
 data Agent =
       Agent { agentUID          :: UID
             , agentUserID       :: UserID
@@ -218,11 +217,10 @@ data EventType
         | EventBlind
         | EventUnit
         | EventUpdate
-      -- The below are not (yet) in the specification.
-      | EventStop
-      | EventCreate
-      | EventChmod
-      | EventSend
+        | EventSendTo
+        | EventSentMsg
+        | EventShm
+        | EventExit
       deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 data SourceType
@@ -250,6 +248,7 @@ data SourceType
       | SourceAudio
       -- environment variables
       | SourceSystemProperty
+      | SourceEnvVariable
       -- ipc should only be used for internal ipc instead of network flows
       -- clearscope might be using this in the interim for flows
       -- can be a source or a sink
@@ -288,7 +287,7 @@ data Derivation = UnknownDerivation | Copy | Encode | Compile | Encrypt | Other
 -- "Other primitive types used in our model"
 type Properties    = Map Text Text
 type UID           = (Word64, Word64, Word64, Word64)
-type UserID        = Int32
+type UserID        = Text
 type URL           = Text
 type FileVersion   = Int64
 type Size          = Int64
@@ -315,4 +314,4 @@ type PInfo         = Text
 type Location      = Int64
 type Ppt           = Text
 type Args          = [ByteString]
-type GID           = [Int32]
+type GID           = [Text]

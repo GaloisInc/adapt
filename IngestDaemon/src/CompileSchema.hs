@@ -215,7 +215,7 @@ instance PropertiesAndTypeOf Host  where
 instance PropertiesAndTypeOf Agent where
   propertiesAndTypeOf (Agent {..}) =
       ("Agent"
-      , ("userID", gremlinNum agentUserID)
+      , ("userID", GremlinString agentUserID)
         : concat [ gidProps agentGID
                  , F.toList (("agentType",) . enumOf <$> agentType)
                  , F.toList (mkSource <$> agentSource)
@@ -225,7 +225,7 @@ instance PropertiesAndTypeOf Agent where
 
 gidProps :: Maybe GID -> [(Text, GremlinValue)]
 gidProps Nothing = []
-gidProps (Just xs) = map (("gid",) . gremlinNum) xs
+gidProps (Just xs) = map (("gid",) . GremlinString) xs
 
 nodeUID_base64 :: Node -> Text
 nodeUID_base64 = uidToBase64 . nodeUID
