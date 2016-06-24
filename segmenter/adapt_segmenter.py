@@ -25,6 +25,8 @@ def arg_parser():
                    help='Drop DB and quit, segment spec is ignored')
     p.add_argument('--store-segment', action='store_true',
                    help='Store segments in Titan DB')
+    p.add_argument('--noseg2seg', action='store_true',
+        help='Do not add edges between segment nodes')
     return p
 
 
@@ -67,7 +69,7 @@ if __name__ == '__main__':
     s = Segmenter(dg, args.spec_file)
 
     # segmentation_dg is the DocumentGraph containing segment nodes
-    segmentation_dg = s.eval_spec()
+    segmentation_dg = s.eval_spec(add_segment2segment_edges=not args.noseg2seg)
     # egmentation_dg.print_summary()
 
     logger.info('=' * 30)
