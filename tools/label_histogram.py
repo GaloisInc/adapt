@@ -31,13 +31,15 @@ __author__ = 'John.Hanley@parc.com'
 
 
 def get_label_counts():
+    '''Queries titan with read throughput of ~2700 node/sec.'''
     with gremlin_query.Runner() as gremlin:
         cnt = collections.defaultdict(int)
         q = 'g.V().label()'
-        msgs = gremlin.fetch(q)
-        for msg in msgs:
+        for msg in gremlin.fetch(q):
             if msg.data:
                 for label in msg.data:
+                    assert 'total' != label
+                    cnt['total'] += 1
                     cnt[label] += 1
 
     return sorted(['%6d  %s' % (cnt[k], k)
