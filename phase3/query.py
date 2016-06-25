@@ -20,6 +20,11 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
+
+#
+# usage:
+#     ./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)"
+#
 '''
 Ad hoc query runner to report on distinct Entity-File node values.
 '''
@@ -42,7 +47,7 @@ class Prop:
         return self.prop[key][0]['value']
 
 
-def report(query, threshold=3):
+def report(query, threshold=1):
     with gremlin_query.Runner() as gremlin:
 
         # Number of times we've seen a given filename.
@@ -53,10 +58,17 @@ def report(query, threshold=3):
         for msg in gremlin.fetch(args.query):
             for item in msg.data:
                 prop = Prop(item)
-                if 'url' in prop:
+                try:
+                    counts[prop['dstAddress']] += 1
+                except KeyError:
+                    pass
+
+                try:
                     file = prop['url']
                     assert fspec_re.search(file), file
                     counts[file] += 1
+                except KeyError:
+                    pass
         i = 1
         for file, count in sorted(counts.items()):
             if count >= threshold:
