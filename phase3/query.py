@@ -29,19 +29,32 @@ import gremlin_query
 import re
 
 
+class Prop:
+    '''Models a gremlin node attribute, the "properties" map.'''
+
+    def __init__(self, item):
+        self.prop = item['properties']
+
+    def __contains__(self, key):
+        return key in self.prop
+
+    def __getitem__(self, key):
+        return self.prop[key][0]['value']
+
+
 def report(query, threshold=3):
     with gremlin_query.Runner() as gremlin:
 
         # Number of times we've seen a given filename.
         counts = collections.defaultdict(int)
 
-        fspec_re = re.compile('^(C:|file://)')
+        fspec_re = re.compile('^(C:|[A-Z]:|file://)')
 
         for msg in gremlin.fetch(args.query):
             for item in msg.data:
-                prop = item['properties']
+                prop = Prop(item)
                 if 'url' in prop:
-                    file = prop['url'][0]['value']
+                    file = prop['url']
                     assert fspec_re.search(file), file
                     counts[file] += 1
         i = 1
