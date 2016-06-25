@@ -64,7 +64,7 @@ class TopLevelSegmenter:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_ingest(self, broker, spec, start_msg='Awaiting ingested data.'):
+    def await_ingest(self, broker, spec, kafkaUrl, start_msg='Awaiting ingested data.'):
         os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
         log.info(start_msg)
         for msg in self.consumer:
@@ -72,8 +72,8 @@ class TopLevelSegmenter:
             if msg.value == STATUS_DONE:  # from Ingest
                 self.producer.send("se-log", b'starting processing')
                 self.report_status(STATUS_IN_PROGRESS)
-                cmd = './adapt_segmenter.py --broker %s --store-segment %s' % (
-                    broker, spec)
+                cmd = './adapt_segmenter.py --broker %s --store-segment %s --log-to-kafka --kafka %s' % (
+                    broker, spec, kafkaUrl)
                 log.info(cmd)
                 os.system(cmd)
                 self.report_status(STATUS_DONE)
@@ -104,4 +104,4 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec)
+    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec, args.kafka)
