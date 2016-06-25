@@ -28,9 +28,9 @@ def arg_parser():
                    help='Store segments in Titan DB')
     p.add_argument('--noseg2seg', action='store_true',
         help='Do not add edges between segment nodes')
-    p.add_argument('--log-to-kafka', action='log_to_kafka',
+    p.add_argument('--log-to-kafka', action='store_true',
                    help='Send logging information to kafka server')
-    p.add_argument('--kafka', action='kafka',
+    p.add_argument('--kafka', 
                    help='location of the kafka server',
                    default='localhost:9092')
     return p
@@ -50,7 +50,7 @@ class AdaptSegmenter:
 
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        self.logToKafka = args.logToKafka
+        self.logToKafka = args.log_to_kafka
         
         if self.logToKafka:
             self.producer = kafka.KafkaProducer(bootstrap_servers=[args.kafka])
@@ -58,12 +58,12 @@ class AdaptSegmenter:
     def log_error(self, text):
         self.logger.error(text)
         if self.logToKafka:
-            self.producer.send("se-log", text)
+            self.producer.send("se-log", str.encode(text))
 
     def log_info(self, text):
         self.logger.info(text)
         if self.logToKafka:
-            self.producer.send("se-log", text)
+            self.producer.send("se-log", str.encode(text))
 
     def run(self):
         if self.drop_db:
@@ -101,7 +101,7 @@ class AdaptSegmenter:
         self.log_info('=' * 30)
         self.log_info('\tSegmentation result')
         self.log_info('=' * 30)
-        self.log_info(segmentation_dg)
+        self.log_info(str(segmentation_dg))
 
         if self.store_segment:
             # Add the segment nodes and edges to our document graph representation
