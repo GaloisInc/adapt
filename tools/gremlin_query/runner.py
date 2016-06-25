@@ -20,29 +20,27 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-'''
-Displays number of occurences of each distinct node label.
-'''
 
-import gremlin_query
-import collections
+from aiogremlin import GremlinClient
+import asyncio
 
 __author__ = 'John.Hanley@parc.com'
 
 
-def get_label_counts():
-    with gremlin_query.Runner() as gremlin:
-        cnt = collections.defaultdict(int)
-        q = 'g.V().label()'
-        msgs = gremlin.fetch(q)
-        for msg in msgs:
-            if msg.data:
-                for label in msg.data:
-                    cnt[label] += 1
+class Runner:
 
-    return sorted(['%6d  %s' % (cnt[k], k)
-                   for k in cnt.keys()])
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.gc = GremlinClient(loop=self.loop)
 
+    def fetch(self, query):
+        return self.loop.run_until_complete(self.gc.execute(query))
 
-if __name__ == '__main__':
-    print('\n'.join(get_label_counts()))
+    def close(self):
+        self.loop.run_until_complete(self.gc.close())
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()

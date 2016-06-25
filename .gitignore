@@ -13,3 +13,4 @@ kafka/
 node_modules/
 supervisord.log
 supervisord.pid
+tools/gremlin_query/__pycache__
