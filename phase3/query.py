@@ -26,6 +26,29 @@ Ad hoc query runner to report on distinct Entity-File node values.
 import argparse
 import collections
 import gremlin_query
+import re
+
+
+def report(query, threshold=3):
+    with gremlin_query.Runner() as gremlin:
+
+        # Number of times we've seen a given filename.
+        counts = collections.defaultdict(int)
+
+        fspec_re = re.compile('^(C:|file://)')
+
+        for msg in gremlin.fetch(args.query):
+            for item in msg.data:
+                prop = item['properties']
+                if 'url' in prop:
+                    file = prop['url'][0]['value']
+                    assert fspec_re.search(file), file
+                    counts[file] += 1
+        i = 1
+        for file, count in sorted(counts.items()):
+            if count >= threshold:
+                print('%3d %4d  %s' % (i, count, file))
+            i += 1
 
 
 def arg_parser():
@@ -39,19 +62,4 @@ def arg_parser():
 if __name__ == '__main__':
 
     args = arg_parser().parse_args()
-    with gremlin_query.Runner() as gremlin:
-
-        # Number of times we've seen a given filename.
-        counts = collections.defaultdict(int)
-
-        for msg in gremlin.fetch(args.query):
-            for item in msg.data:
-                prop = item['properties']
-                if 'url' in prop:
-                    file = prop['url'][0]['value']
-                    assert file.startswith('file://'), file
-                    counts[file] += 1
-        i = 1
-        for file, count in sorted(counts.items()):
-            print('%3d %4d  %s' % (i, count, file))
-            i += 1
+    report(args.query)
