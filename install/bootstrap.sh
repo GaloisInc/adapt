@@ -126,6 +126,7 @@ install_adapt_dependencies() {
         avroknife \
         aiogremlin \
         coverage \
+        dnspython \
         flake8 \
         gremlinrestclient \
         networkx \
