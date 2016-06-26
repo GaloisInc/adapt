@@ -23,13 +23,15 @@
 
 #
 # usage:
-#     ./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)"
+#     ./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" |
+#       sort -nk2
 #
 '''
 Ad hoc query runner to report on distinct Entity-File node values.
 '''
 import argparse
 import collections
+import dns.resolver
 import gremlin_query
 import re
 
@@ -48,25 +50,44 @@ class Prop:
 
 
 def report(query, threshold=1):
+
+    ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+    filespec_re = re.compile('^(C:|[A-Z]:|file://)')
+
+    def validate_file(file):
+        assert filespec_re.search(file), file
+        return file
+
+    def validate_ip(ip4):
+        assert ip4_re.search(ip4), ip4
+        return ip4
+
+    def asn(ip4):
+        '''Maps to a BGP Autonomous System Number - cannot be airgapped.'''
+        rev = '.'.join(reversed(ip4.split('.')))
+        answers = dns.resolver.query(rev + '.origin.asn.cymru.com', 'TXT')
+        resp = 0
+        for rdata in answers:
+            resp = int(str(rdata).split()[0].lstrip('"'))
+            # e.g. '15169 | 216.58.192.0/19 | US | arin | 2012-01-27'
+        return 'AS%d' % resp
+
     with gremlin_query.Runner() as gremlin:
 
-        # Number of times we've seen a given filename.
+        # Number of times we've seen a given filename or address.
         counts = collections.defaultdict(int)
-
-        fspec_re = re.compile('^(C:|[A-Z]:|file://)')
 
         for msg in gremlin.fetch(args.query):
             for item in msg.data:
                 prop = Prop(item)
                 try:
-                    counts[prop['dstAddress']] += 1
+                    counts[validate_file(prop['url'])] += 1
                 except KeyError:
                     pass
 
                 try:
-                    file = prop['url']
-                    assert fspec_re.search(file), file
-                    counts[file] += 1
+                    counts[validate_ip(prop['dstAddress'])] += 1
+                    counts[asn(prop['dstAddress'])] += 1
                 except KeyError:
                     pass
         i = 1
@@ -85,6 +106,5 @@ def arg_parser():
 
 
 if __name__ == '__main__':
-
     args = arg_parser().parse_args()
     report(args.query)
