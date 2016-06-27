@@ -34,6 +34,20 @@ class SegmentExpr(ProvRelation):
     def label(self):
         return 'segment:includes'
 
+
+class Segment2SegmentExpr(ProvRelation):
+    def __init__(self, s, t):
+        super().__init__(s, t, [])
+
+    def __str__(self):
+        return 'segment:edge({0}, {1}, [{2}])'.format(
+            self.s, self.t, ','.join(['{0}=\"{1}\"'.format(k, v)
+                for k, v in self.att_val_dict.items()]))
+
+    def label(self):
+        return 'segment:edge'
+
+
 class EdgeExpr(ProvRelation):
     def __init__(self, etype, s, t):
         super().__init__(s, t, [])
