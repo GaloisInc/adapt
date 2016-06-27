@@ -41,21 +41,22 @@ class TitanClient:
         self.loop.run_until_complete(self.gc.close())
         self.loop.close()
 
+
     def execute(self, gremlin_query_str, bindings={}):
-        execute = self.gc.execute(gremlin_query_str, bindings=bindings)
-        logger.debug('QUERY:\n {}'.format(gremlin_query_str))
-        try:
-            result = self.loop.run_until_complete(execute)
-        except Exception as e:
-            print('Error trying to connect to Titan DB: {0}...aborting'.
-                  format(e))
-            self.close()
-            sys.exit(-1)
-        assert result[0].status_code in (200, 204, 206), result[0].status_code
-        if result == 204:
-            return None
-        else:
-            return result[0].data
+        @asyncio.coroutine
+        def stream(gc):
+            result_data = []
+            resp = yield from gc.submit(gremlin_query_str, bindings=bindings)
+            while True:
+                result = yield from resp.stream.read()
+                if result is None:
+                    break
+                assert result.status_code in [206, 200, 204], result.status_code
+                if not result.status_code == 204:
+                    result_data += result.data
+            return result_data
+        result = self.loop.run_until_complete(stream(self.gc))
+        return result
 
     def all_edges(self):
         return self.execute('g.E()')
@@ -146,7 +147,7 @@ class TitanClient:
             assert 'label' in v, v
             assert 'ident' in d, d
             resource_id = d['ident'][0]['value']
-            logger.info('%9d  %s' % (int(v['id']), resource_id))
+            print(v['id'], " ", resource_id)
             node_id2name_map[v['id']] = resource_id
             resource_type = v['label']
             att_val_list = [
@@ -156,7 +157,7 @@ class TitanClient:
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
-        pprint.pprint(node_id2name_map)
+        print(node_id2name_map)
         edges = self.all_edges()
         for e in edges:
             event_type = e['label']
@@ -169,7 +170,7 @@ class TitanClient:
 
     def drop_db(self):
         r = self.execute('g.V().drop().iterate()')
-        assert r is None
+        assert r == None
 
 
 def test():
@@ -211,8 +212,7 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match(
-        '.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
