@@ -18,7 +18,6 @@ import sys
 
 VERBOSE = True
 
-
 class Datetime:
     def __init__(self, s):
         date, time = s.split('T')
@@ -138,7 +137,19 @@ class Segmenter:
                     self.dg.get_nodes_by_att(att, v), radius, edges)))
         return segments
 
-    def eval_spec(self):
+    def eval_spec(self, add_segment2segment_edges=True):
+
+        def segment2segment_exprs(segments_reverse_map):
+            s2s_list = []
+            edges = set()
+            for _, l in segments_reverse_map.items():
+                for i, x in enumerate(l):
+                    for j, y in enumerate(l):
+                        if i < j and not (x.id, y.id) in edges:
+                            s2s_list.append(Segment2SegmentExpr(x.id, y.id))
+                            edges.add((x.id, y.id))
+            return s2s_list
+
         self.name = self.spec['segmentation_specification']['segment']['name']
         self.specifications = self.spec['segmentation_specification']['segment']['specifications']
         results = []
@@ -147,6 +158,7 @@ class Segmenter:
             self.spec['segmentation_specification']['segment']['args']]
         segmentation_doc = Document()
         segmentation_doc.prefix_decls = self.dg.doc.prefix_decls
+        segment_reverse_map = {}
         for i, d in enumerate(self.specifications):
             if 'radius' in d:
                 # segment by att
@@ -176,7 +188,14 @@ class Segmenter:
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
                                 e = SegmentExpr(s.id, n)
+                                try:
+                                    segment_reverse_map[n] += [s]
+                                except KeyError:
+                                    segment_reverse_map[n] = [s]
                                 segmentation_doc.expression_list += [e]
+        if add_segment2segment_edges:
+            segmentation_doc.expression_list += segment2segment_exprs(
+                segment_reverse_map)
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
 
@@ -296,6 +315,8 @@ if __name__ == "__main__":
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
+    parser.add_argument('--no_seg2seg', action='store_true',
+        help='Do not add segment2segment edges')
     parser.add_argument('--summary', '-s', action='store_true',
         help='Print a summary of the input file an quit, segment spec is ignored')
 
@@ -317,7 +338,7 @@ if __name__ == "__main__":
 
     s = Segmenter(dg, args.spec_file)
 
-    segmentation_dg = s.eval_spec()
+    segmentation_dg = s.eval_spec(add_segment2segment_edges=not args.no_seg2seg)
     print('=' * 30)
     print('\tSegmentation result')
     print('=' * 30)
