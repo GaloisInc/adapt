@@ -4,13 +4,17 @@ graph.tx().rollback()
 // makeNodeIndex: Makes a node-centric index for fast lookup
 // A Node index is a Titan-only index mechanism that supports equality queries
 // such as `g.has(indexKey, 'somevalue').next()`
-def makeNodeIndex = { String indexName, String indexKey, indexType ->
+def makeNodeIndex = { String indexName, String indexKey, Boolean mkUnique, indexType ->
     mgmt = graph.openManagement()
     i = mgmt.getGraphIndex(indexName)
     if(! i) {
       idKey = mgmt.getPropertyKey(indexKey)
       idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
-      mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildCompositeIndex()
+      if(mkUnique) {
+        mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).unique().buildCompositeIndex()
+      } else {
+        mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildCompositeIndex()
+      }
       mgmt.commit()
       graph.tx().commit()
 
@@ -58,7 +62,7 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
 }
 
 // We index the 'ident' field, which matches CDM 'UUID' but as a Base64 string.
-makeNodeIndex('byIdent','ident',String.class)
+makeNodeIndex('byIdent','ident',true,String.class)
 
 
 // URL index use ElasticSearch which provides richer queries
