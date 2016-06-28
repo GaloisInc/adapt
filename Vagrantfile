@@ -3,7 +3,7 @@
 
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
-  config.vm.box_url = "https://atlas.hashicorp.com/ubuntu/boxes/trusty64/versions/20160107.1.0/providers/virtualbox.box"
+  config.vm.box_version = ">= 20160621.0.0"
 
   # Forward the Dashboard port for the user to get system status.
   config.vm.network "forwarded_port", guest: 8080, host: 8081
