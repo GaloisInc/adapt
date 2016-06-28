@@ -1,4 +1,4 @@
-{"segmentation_specification" : 
+{"segmentation_specification" :
  {"segment" :
   {"name": "byPidTime",
    "args": [{"property" : "pid", "value" : {"var" : "X"}},

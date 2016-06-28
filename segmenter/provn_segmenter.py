@@ -18,7 +18,6 @@ import sys
 
 VERBOSE = True
 
-
 class Datetime:
     def __init__(self, s):
         date, time = s.split('T')
@@ -95,7 +94,7 @@ class Segmenter:
             reach_set_i = set()
             for x in reach_set_i_1:
                 for succ in self.dg.g.successors(x):
-                    if self.dg.g.edge[x][succ]['type'] in edge_type_set:
+                    if self.dg.g.edge[x][succ]['label'] in edge_type_set:
                         reach_set_i.add(succ)
             reach_set_i_1 = reach_set_i
             reach_set |= reach_set_i
@@ -111,11 +110,11 @@ class Segmenter:
             try:
                 ts = self.dg.g.edge[x][y]['timestamp']
             except KeyError:
-                if self.dg.g.edge[x][y]['type'] != "wasAssociatedWith" and \
-                        self.dg.g.edge[x][y]['type'] != "includes":
+                if self.dg.g.edge[x][y]['label'] != "wasAssociatedWith" and \
+                        self.dg.g.edge[x][y]['label'] != "segment:includes":
                     raise Exception(
                         'All events of type other than wasAssociatedWith '
-                        'and includes '
+                        'and segment:includes '
                         'must have a timestamp')
                 continue
             if ts >= begin_time and ts < end_time:
@@ -138,7 +137,19 @@ class Segmenter:
                     self.dg.get_nodes_by_att(att, v), radius, edges)))
         return segments
 
-    def eval_spec(self):
+    def eval_spec(self, add_segment2segment_edges=True):
+
+        def segment2segment_exprs(segments_reverse_map):
+            s2s_list = []
+            edges = set()
+            for _, l in segments_reverse_map.items():
+                for i, x in enumerate(l):
+                    for j, y in enumerate(l):
+                        if i < j and not (x.id, y.id) in edges:
+                            s2s_list.append(Segment2SegmentExpr(x.id, y.id))
+                            edges.add((x.id, y.id))
+            return s2s_list
+
         self.name = self.spec['segmentation_specification']['segment']['name']
         self.specifications = self.spec['segmentation_specification']['segment']['specifications']
         results = []
@@ -147,6 +158,7 @@ class Segmenter:
             self.spec['segmentation_specification']['segment']['args']]
         segmentation_doc = Document()
         segmentation_doc.prefix_decls = self.dg.doc.prefix_decls
+        segment_reverse_map = {}
         for i, d in enumerate(self.specifications):
             if 'radius' in d:
                 # segment by att
@@ -164,7 +176,7 @@ class Segmenter:
         for i, (prop_i, r_i) in enumerate(results):
             for (val_i, segment_i) in r_i:
                 for j, (prop_j, r_j) in enumerate(results):
-                    if i >= j:
+                    if i >= j and len(results) > 1:
                         continue
                     else:
                         for (val_j, segment_j) in r_j:
@@ -175,8 +187,15 @@ class Segmenter:
                                 att_val_dict)
                             segmentation_doc.expression_list += [s]
                             for n in segment_i & segment_j:
-                                e = SegmentExpr(s.id, n, {})
+                                e = SegmentExpr(s.id, n)
+                                try:
+                                    segment_reverse_map[n] += [s]
+                                except KeyError:
+                                    segment_reverse_map[n] = [s]
                                 segmentation_doc.expression_list += [e]
+        if add_segment2segment_edges:
+            segmentation_doc.expression_list += segment2segment_exprs(
+                segment_reverse_map)
         segmentation_dg = DocumentGraph(segmentation_doc)
         return segmentation_dg
 
@@ -184,19 +203,11 @@ class Segmenter:
 class DocumentGraph:
     def _populate_graph(self):
         for e in self.doc.expression_list:
-            d = e.att_val_dict
-            d['type'] = e.label()
-            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, Agent) or isinstance(e, Segment):
+            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, EntityFile) or isinstance(e, EntityNetFlow) or isinstance(e, EntityMemory) or isinstance(e, Resource) or isinstance(e, Subject) or isinstance(e, Host) or isinstance(e, Agent) or isinstance(e, Pattern) or isinstance(e, Phase) or isinstance(e, APT) or isinstance(e, Segment) or isinstance(e, EDGE_EVENT_AFFECTS_MEMORY) or isinstance(e, EDGE_EVENT_AFFECTS_FILE) or isinstance(e, EDGE_EVENT_AFFECTS_NETFLOW) or isinstance(e, EDGE_EVENT_AFFECTS_SUBJECT) or isinstance(e, EDGE_EVENT_AFFECTS_SRCSINK) or isinstance(e, EDGE_EVENT_HASPARENT_EVENT) or isinstance(e, EDGE_EVENT_ISGENERATEDBY_SUBJECT) or isinstance(e, EDGE_EVENT_CAUSES_EVENT) or isinstance(e, EDGE_SUBJECT_AFFECTS_EVENT) or isinstance(e, EDGE_SUBJECT_HASPARENT_SUBJECT) or isinstance(e, EDGE_SUBJECT_HASPRINCIPAL) or isinstance(e, EDGE_SUBJECT_RUNSON) or isinstance(e, EDGE_FILE_AFFECTS_EVENT) or isinstance(e, EDGE_NETFLOW_AFFECTS_EVENT) or isinstance(e, EDGE_MEMORY_AFFECTS_EVENT) or isinstance(e, EDGE_SRCSINK_AFFECTS_EVENT) or isinstance(e, EDGE_OBJECT_PREV_VERSION) or isinstance(e, EDGE_SUBJECT_HASLOCALPRINCIPAL):
                 self.g.add_node(e.id, e.att_val_dict)
-            else:
-                d = e.att_val_dict
-                if e.timestamp:
-                    d['timestamp'] = e.timestamp
-                    if (not self.min_time) or e.timestamp < self.min_time:
-                        self.min_time = e.timestamp
-                    if not self.max_time or e.timestamp > self.max_time:
-                        self.max_time = e.timestamp
-                d['type'] = e.label()
+            elif e is not None:
+                d = {}
+                d['label'] = e.label()
                 self.g.add_edge(e.s, e.t, d)
 
     def __init__(self, document):
@@ -304,6 +315,8 @@ if __name__ == "__main__":
                         help='A segment specification file in json format')
     parser.add_argument('--verbose', '-v', action='store_true',
         help='Run in verbose mode')
+    parser.add_argument('--no_seg2seg', action='store_true',
+        help='Do not add segment2segment edges')
     parser.add_argument('--summary', '-s', action='store_true',
         help='Print a summary of the input file an quit, segment spec is ignored')
 
@@ -325,7 +338,7 @@ if __name__ == "__main__":
 
     s = Segmenter(dg, args.spec_file)
 
-    segmentation_dg = s.eval_spec()
+    segmentation_dg = s.eval_spec(add_segment2segment_edges=not args.no_seg2seg)
     print('=' * 30)
     print('\tSegmentation result')
     print('=' * 30)

@@ -64,42 +64,44 @@ class TopLevelSegmenter:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_ingest(self, broker, spec, start_msg='Awaiting ingested data.'):
+    def await_ingest(self, broker, spec, kafkaUrl, start_msg='Awaiting ingested data.'):
         os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
         log.info(start_msg)
         for msg in self.consumer:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Ingest
+                self.producer.send("se-log", b'starting processing')
                 self.report_status(STATUS_IN_PROGRESS)
-                cmd = './adapt_segmenter.py --broker %s --store-segment %s' % (
-                    broker, spec)
+                cmd = './adapt_segmenter.py --broker %s --store-segment %s --log-to-kafka --kafka %s' % (
+                    broker, spec, kafkaUrl)
                 log.info(cmd)
                 os.system(cmd)
                 self.report_status(STATUS_DONE)
+                self.producer.send("se-log", b'done processing')
                 log.info(start_msg)  # Go back and do it all again.
 
-    def report_status(self, status, downstreams='ad ac ui'.split()):
+    def report_status(self, status):
         def to_int(status_byte):
             return struct.unpack("B", status_byte)[0]
 
         log.info("reporting %d", to_int(status))
-        for downstream in downstreams:
-            s = self.producer.send(downstream, status).get()
-            log.info("sent: %s", s)
+        # Segmenter only talks to AD
+        s = self.producer.send("ad", status).get()
+        log.info("sent: %s", s)
 
 
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Perform segmentation according to a given specification.')
     p.add_argument('--broker', help='location of the database broker',
-                   default='http://localhost:8182/')
+                   default='ws://localhost:8182/')
     p.add_argument('--kafka', help='location of the kafka pub-sub service',
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
-                   default='test/spec/default_spec.json')
+                   default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec)
+    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec, args.kafka)
