@@ -170,7 +170,7 @@ class TitanClient:
 
     def drop_db(self):
         r = self.execute('g.V().drop().iterate()')
-        assert r == None
+        assert r is None
 
 
 def test():
