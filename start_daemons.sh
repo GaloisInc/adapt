@@ -2,6 +2,8 @@
 
 # Starts daemons: titan, supervisord, zookeeper, kafka, Adapt components
 
+cd /tmp
+
 jps | grep GremlinServer > /dev/null || /opt/titan/bin/titan.sh start
 
 # If supervisord is already running we avoid re-running.
