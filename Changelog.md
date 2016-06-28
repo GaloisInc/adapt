@@ -1,3 +1,7 @@
+# 0.4
+- Segmenter functions
+- Require Trusty64 >= 06/21/2016
+
 # 0.3.1 -- Minor point release, 2016-06-24
 - Fixes for CDM13 to Adapt Schema translation
 - Fixes for building ingester with new Avro library
