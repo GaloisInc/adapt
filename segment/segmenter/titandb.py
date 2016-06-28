@@ -146,10 +146,8 @@ class TitanClient:
             d = v['properties']
             assert 'label' in v, v
             assert 'ident' in d, d
-            # apparently 'ident' is not unique
-            # resource_id = d['ident'][0]['value']
-            resource_id = str(v['id'])
-            logger.debug('%9d  %s' % (int(v['id']), resource_id))
+            resource_id = d['ident'][0]['value']
+            logger.info('%9d  %s' % (int(v['id']), resource_id))
             node_id2name_map[v['id']] = resource_id
             resource_type = v['label']
             att_val_list = [
@@ -159,7 +157,7 @@ class TitanClient:
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
-        #pprint.pprint(node_id2name_map)
+        pprint.pprint(node_id2name_map)
         edges = self.all_edges()
         for e in edges:
             event_type = e['label']
@@ -172,7 +170,7 @@ class TitanClient:
 
     def drop_db(self):
         r = self.execute('g.V().drop().iterate()')
-        assert r == [], r
+        assert r is None
 
 
 def test():
@@ -214,8 +212,7 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match(
-        '.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
