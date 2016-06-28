@@ -29,15 +29,15 @@
 '''
 Ad hoc query runner to report on distinct Entity-File node values.
 '''
-import os
-import sys
-sys.path.append(os.path.expanduser('~/adapt/tools'))
 import argparse
 import collections
 import dns.resolver
-import gremlin_query
-import gremlin_properties
+import os
 import re
+import sys
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import gremlin_properties
+import gremlin_query
 
 
 def report(query, threshold=1):
@@ -68,23 +68,21 @@ def report(query, threshold=1):
         # Number of times we've seen a given filename or address.
         counts = collections.defaultdict(int)
 
-        for msg in gremlin.fetch(args.query):
-            for item in msg.data:
-                prop = gremlin_properties.Prop(item)
-                try:
-                    counts[validate_file(prop['url'])] += 1
-                except KeyError:
-                    pass
+        for prop in gremlin_properties.fetch(gremlin, args.query):
+            try:
+                counts[validate_file(prop['url'])] += 1
+            except KeyError:
+                pass
 
-                try:
-                    counts[validate_ip(prop['dstAddress'])] += 1
-                    counts[asn(prop['dstAddress'])] += 1
-                except KeyError:
-                    pass
+            try:
+                counts[validate_ip(prop['dstAddress'])] += 1
+                counts[asn(prop['dstAddress'])] += 1
+            except KeyError:
+                pass
         i = 1
         for file, count in sorted(counts.items()):
             if count >= threshold:
-                print('%3d %4d  %s' % (i, count, file))
+                print('%4d %4d  %s' % (i, count, file))
             i += 1
 
 
