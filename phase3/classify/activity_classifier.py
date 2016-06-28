@@ -21,11 +21,40 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Classifies a PG segment.
-'''
 
-from .activity_classifier import ActivityClassifier
-from .escalation import Escalation
-from .exfil_detector import ExfilDetector
-from .fs_proxy import FsProxy
+import io
+import os
+import re
+
+
+class ActivityClassifier(object):
+    '''
+    Classifies activities found in segments of a CDM13 trace.
+    '''
+
+    def __init__(self, gremlin_client):
+        self.gremlin = gremlin_client
+
+    def find_new_segments(self, last_previously_processed_seg):
+        q = "g.V().has(label, 'Segment').id().is(gt(%d)).order()" % (
+            last_previously_processed_seg)
+        for msg in self.gremlin.fetch(q):
+            if msg is not None:
+                for seg_db_id in msg.data:
+                    yield seg_db_id
+
+    def classify(self, seg_ids):
+        for seg_id in seg_ids:
+            self.classify1(seg_id)
+
+    def classify1(self, seg_id):
+        q = "g.V(%d).outE('segment:includes').inV()"
+
+    def fetch1(self, query):
+        '''Return a single query result.'''
+        ret = 0
+        for msg in self.gremlin.fetch(query):
+            for item in msg.data:
+                ret = item
+        return ret
+
