@@ -1,16 +1,19 @@
 #! /usr/bin/env python3
+'''
+Discards all nodes and edges from Titan,
+to set up for another cycle of testing.
+'''
 
-import asyncio
-from aiogremlin import GremlinClient
+import gremlin_query
 
-QUERY="g.V().drop().iterate()"
+
+def drop_all():
+    with gremlin_query.Runner() as gremlin:
+        for x in ['E', 'V']:
+            q = 'g.%s().drop().iterate()' % x
+            for msg in gremlin.fetch(q):
+                print(x, msg)
+
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    gc = GremlinClient(loop=loop)
-    execute = gc.execute(QUERY)
-    result = loop.run_until_complete(execute)
-
-    print("result: ", result)
-
-    loop.run_until_complete(gc.close())
+    drop_all()
