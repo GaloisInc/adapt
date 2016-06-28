@@ -53,15 +53,27 @@ def report(query, threshold=1):
         assert ip4_re.search(ip4), ip4
         return ip4
 
-    def asn(ip4):
+    def get_asn(ip4):
         '''Maps to a BGP Autonomous System Number - cannot be airgapped.'''
         rev = '.'.join(reversed(ip4.split('.')))
         answers = dns.resolver.query(rev + '.origin.asn.cymru.com', 'TXT')
         resp = 0
         for rdata in answers:
             resp = int(str(rdata).split()[0].lstrip('"'))
-            # e.g. '15169 | 216.58.192.0/19 | US | arin | 2012-01-27'
+            # e.g. "15169 | 216.58.192.0/19 | US | arin | 2012-01-27"
         return 'AS%d' % resp
+
+    def get_asn_name(asn):
+        '''Maps e.g. AS15169 to GOOGLE.'''
+        assert asn.startswith('AS'), asn
+        assert int(asn[2:]) > 0, asn
+        answers = dns.resolver.query(asn + '.asn.cymru.com', 'TXT')
+        name = 'unknown'
+        for rdata in answers:
+            name = str(rdata).split('| ')[4].rstrip('"')
+            # e.g. "15169 | US | arin | 2000-03-30 | GOOGLE - Google Inc., US"
+        return name
+
 
     with gremlin_query.Runner() as gremlin:
 
@@ -76,7 +88,9 @@ def report(query, threshold=1):
 
             try:
                 counts[validate_ip(prop['dstAddress'])] += 1
-                counts[asn(prop['dstAddress'])] += 1
+                asn = get_asn(prop['dstAddress'])
+                asn += '  ' + get_asn_name(asn)
+                counts[asn] += 1
             except KeyError:
                 pass
         i = 1
