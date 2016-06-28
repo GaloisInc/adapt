@@ -36,20 +36,8 @@ import argparse
 import collections
 import dns.resolver
 import gremlin_query
+import gremlin_properties
 import re
-
-
-class Prop:
-    '''Models a gremlin node attribute, the "properties" map.'''
-
-    def __init__(self, item):
-        self.prop = item['properties']
-
-    def __contains__(self, key):
-        return key in self.prop
-
-    def __getitem__(self, key):
-        return self.prop[key][0]['value']
 
 
 def report(query, threshold=1):
@@ -82,7 +70,7 @@ def report(query, threshold=1):
 
         for msg in gremlin.fetch(args.query):
             for item in msg.data:
-                prop = Prop(item)
+                prop = gremlin_properties.Prop(item)
                 try:
                     counts[validate_file(prop['url'])] += 1
                 except KeyError:
