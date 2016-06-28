@@ -8,7 +8,6 @@ import logging
 import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
-import gremlin_properties
 import gremlin_query
 
 log = logging.getLogger(__name__)
@@ -133,7 +132,7 @@ class SSegmenter:
                     cur_seg.remaining -= 1
         self.report_done()
 
-    def report_done():
+    def report_done(self):
         for topic in ['ac']:  # Add others as needed, e.g. 'ad'
             self.producer.send(topic, STATUS_DONE).get()
 
