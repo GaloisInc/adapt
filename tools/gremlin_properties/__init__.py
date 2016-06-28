@@ -24,6 +24,7 @@
 
 from .prop import Prop
 
+
 def fetch(gremlin_client, query):
     for msg in gremlin_client.fetch(query):
         if msg.data is not None:
