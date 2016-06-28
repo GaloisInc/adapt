@@ -147,7 +147,7 @@ class TitanClient:
             assert 'label' in v, v
             assert 'ident' in d, d
             resource_id = d['ident'][0]['value']
-            print(v['id'], " ", resource_id)
+            logger.info('%9d  %s' % (int(v['id']), resource_id))
             node_id2name_map[v['id']] = resource_id
             resource_type = v['label']
             att_val_list = [
@@ -157,7 +157,7 @@ class TitanClient:
             r = ResourceFactory.create(
                 resource_type, resource_id, att_val_list)
             doc.expression_list.append(r)
-        print(node_id2name_map)
+        pprint.pprint(node_id2name_map)
         edges = self.all_edges()
         for e in edges:
             event_type = e['label']
@@ -212,7 +212,8 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match(
+        '.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
