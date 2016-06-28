@@ -170,7 +170,7 @@ class TitanClient:
 
     def drop_db(self):
         r = self.execute('g.V().drop().iterate()')
-        assert r is None
+        assert r == None
 
 
 def test():
@@ -212,7 +212,8 @@ if __name__ == "__main__":
         if not (os.path.isfile(f)):
             print('File {0} does not exist...aborting'.format(f))
 
-    assert not args.broker or re.match('.+:\d+', args.broker), 'Broker must be in format url:port'
+    assert not args.broker or re.match(
+        '.+:\d+', args.broker), 'Broker must be in format url:port'
 
     doc = Document()
     doc.parse_provn(args.provn_file)
