@@ -29,6 +29,9 @@
 '''
 Ad hoc query runner to report on distinct Entity-File node values.
 '''
+import os
+import sys
+sys.path.append(os.path.expanduser('~/adapt/tools'))
 import argparse
 import collections
 import dns.resolver
