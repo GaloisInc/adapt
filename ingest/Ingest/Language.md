@@ -1033,6 +1033,29 @@ This relationship connects an APT instance to a component phase instance. No att
 [schema]: #
 makeEdgeLabel('prov-tc:partOfAPT').multiplicity(SIMPLE)
 
+activity:type (not in CDM)
+-----------
+This property specifies the string type of an Activity instance, which shall appear in the APT grammar.
+
+[schema]: #
+makePropertyKey('activity:type').dataType(String.class).cardinality(Cardinality.SINGLE)
+
+activity:suspicionScore (not in CDM)
+-----------
+This property specifies a value from 0 (benign) to 1 (evil).
+It is intended to aid DX in prioritizing interesting symptoms.
+When in doubt, a value of 0.1 shall be used.
+
+[schema]: #
+makePropertyKey('activity:suspicionScore').dataType(Float.class).cardinality(Cardinality.SINGLE)
+
+activity:includes (not in CDM)
+-----------
+This relationship connects an Activity instance to a base node. No attributes.
+
+[schema]: #
+makeEdgeLabel('activity:includes').multiplicity(SIMPLE)
+
 segment:includes (not in CDM)
 -----------
 This relationship connects a Segment instance to a component element of the segment. No attributes.
