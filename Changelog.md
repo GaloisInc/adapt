@@ -1,6 +1,7 @@
 # 0.4
 - Segmenter functions
 - Require Trusty64 >= 06/21/2016
+- Smarter testing / creation of Kafka topics
 
 # 0.3.1 -- Minor point release, 2016-06-24
 - Fixes for CDM13 to Adapt Schema translation
