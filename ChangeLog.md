@@ -1,5 +1,9 @@
 # Combined Revision history for Ingest, IngestDaemon, GremlinClient
 
+## 0.4 -- Unreleased, running changes please add any items.
+* More CDM13->Adapt Schema fixes.
+* stack.yaml updates for avro library.
+
 ## 0.3 -- 2016-06-23
 * Use the 'avro' library to handle avro decoding, schema resolution and container objects.
   - This is pulled in as a subtree till we can opensource
