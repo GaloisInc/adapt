@@ -35,20 +35,13 @@ pgrep supervisord > /dev/null || (set -x; supervisord -c $supercfg; sleep 5; ech
 KAFKA=/opt/kafka/bin/
 
 TOPICS="ta2 in-finished ac ad dx pe se ui ac-log ad-log dx-log in-log pe-log se-log "
-
-# Avoid creating topic names that already exist.
-declare -A CURR
-for TOPIC in `$KAFKA/kafka-topics.sh --list --zookeeper localhost:2181`
+for TOPIC in $TOPICS
 do
-    CURR[$TOPIC]=1
-done
-for TOPIC in $TOPICS ; do
-    if [[ -z "${CURR[$TOPIC]}" ]]
-    then
+    QUERYRES=`$KAFKA/kafka-topics.sh --topic $TOPIC --describe --zookeeper localhost:2181`
+    if [ -z "$QUERYRES" ] ; then
         $KAFKA/kafka-topics.sh --create --topic $TOPIC --zookeeper localhost:2181 --partitions 1 --replication-factor 1
     fi
 done
-
 
 # To halt daemons, use:
 #   /opt/titan/bin/titan.sh stop;  killall supervisord
