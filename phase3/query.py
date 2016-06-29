@@ -74,7 +74,6 @@ def report(query, threshold=1):
             # e.g. "15169 | US | arin | 2000-03-30 | GOOGLE - Google Inc., US"
         return name
 
-
     with gremlin_query.Runner() as gremlin:
 
         # Number of times we've seen a given filename or address.
