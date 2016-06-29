@@ -22,9 +22,11 @@
 # the software.
 #
 
-import io
+import classify
 import os
-import re
+import sys
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import gremlin_properties
 
 
 class ActivityClassifier(object):
@@ -34,6 +36,9 @@ class ActivityClassifier(object):
 
     def __init__(self, gremlin_client):
         self.gremlin = gremlin_client
+        # At present we have only tackled challenge problems for two threats:
+        self.exfil = classify.ExfilDetector()
+        self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
 
     def find_new_segments(self, last_previously_processed_seg):
         q = "g.V().has(label, 'Segment').id().is(gt(%d)).order()" % (
@@ -48,7 +53,28 @@ class ActivityClassifier(object):
             self.classify1(seg_id)
 
     def classify1(self, seg_id):
-        q = "g.V(%d).outE('segment:includes').inV()"
+        exfil_idents = set()
+        q = "g.V(%d).outE('segment:includes').inV()" % seg_id
+        for prop in gremlin_properties.fetch(self.gremlin, q):
+            # During phase3 integration we're more worried about
+            # plumbing than correctness. Clearly this needs to improve.
+            if 'url' not in prop:
+                continue
+            if self.exfil.is_exfil(prop['url']) or True:
+                exfil_idents.add(prop['ident'])
+        if len(exfil_idents) > 0:
+            self.insert_activity_classification(
+                exfil_idents, seg_id, 'exfiltration', .1)
+
+    def insert_activity_classification(self, base_nodes, seg_id, typ, score):
+        cmds = ["act = graph.addVertex(label, 'Activity',"
+                "  'activity:type', '%s',"
+                "  'activity:suspicionScore', %f)" % (typ, score)]
+        # activity_id = self.fetch1(cmd)['id']
+        for base_node_ident in base_nodes:
+            cmds.append("act.addEdge('activity:includes',"
+                        " g.V().has('ident', '%s').next())" % base_node_ident)
+        self.fetch1(';  '.join(cmds))
 
     def fetch1(self, query):
         '''Return a single query result.'''
@@ -57,4 +83,3 @@ class ActivityClassifier(object):
             for item in msg.data:
                 ret = item
         return ret
-

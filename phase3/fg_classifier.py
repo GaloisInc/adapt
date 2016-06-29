@@ -31,7 +31,6 @@ import logging
 import os
 import struct
 import sys
-import time
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
@@ -53,7 +52,7 @@ def report_status(status, downstreams='dx ui'.split()):
     def to_int(status_byte):
         return struct.unpack("B", status_byte)[0]
 
-    log.info("reporting %d", to_int(status))
+    log.debug("reporting %d", to_int(status))
     producer = kafka.KafkaProducer()
     for downstream in downstreams:
         s = producer.send(downstream, status).get()

@@ -29,7 +29,7 @@ import re
 
 class ExfilDetector(object):
     '''
-    Classifies exfiltration activities found in subgraphs of a SPADE trace.
+    Classifies exfiltration activities found in subgraphs of a CDM13 trace.
     '''
 
     def __init__(self, k=1):

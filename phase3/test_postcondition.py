@@ -55,7 +55,7 @@ class TestPhase3Postcondition(unittest.TestCase):
 
         with gremlin_query.Runner() as gremlin:
             count = fetch1(gremlin, "g.V().has(label, 'Activity').count()")
-            self.assertEqual(1, count)
+            self.assertTrue(count > 0)
 
 
 if __name__ == '__main__':
