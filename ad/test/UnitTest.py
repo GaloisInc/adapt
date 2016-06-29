@@ -12,11 +12,11 @@ def run_query(query, bindings={}):
     return result[0].data
 
 # Unit test
-# Test that all segment nodes has attached anomaly scores
-n_seg_nodes = run_query("g.V().has('vertexType','segment').count()")[0]
+# Test that all Entity-NetFlow nodes has attached anomaly scores
+n_net_idents = run_query("g.V().hasLabel('Entity-NetFlow').values('ident')")
 n_nodes_attach = run_query("g.V().has('anomalyScore').count()")[0]
-assert n_seg_nodes == n_nodes_attach, "Anomaly score not attached on all segment nodes"
-print("POST Test PASSED!")
+assert len(n_net_idents) == n_nodes_attach, "Anomaly score not attached on all Entity-NetFlow nodes"
+print("Anomaly Score Test PASSED!")
 
 loop.run_until_complete(gc.close())
 loop.close()
