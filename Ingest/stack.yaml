@@ -3,10 +3,13 @@ flags:
     integer-simple: false
 packages:
 - '.'
+- '../avro'
 extra-deps:
 - data-binary-ieee754-0.4.4
 - fingertree-0.1.1.0
 - monadLib-3.7.3
 - pure-zlib-0.4
 - text-1.2.2.1
-resolver: ghc-7.10
+- aeson-0.11.2.0
+- base64-bytestring-1.0.0.1
+resolver: lts-6.4
