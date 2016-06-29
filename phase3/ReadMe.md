@@ -22,9 +22,9 @@ Several lessons were learned during development.
    id's. (Assume for the sake of argument that `v1` has already been seen.)
    It may be due to:
 
-    a. `v2` will be introduced within the next `K` events (and TA1 intended this behavior, which seems a Bad Thing).
-    b. `v2` will be introduced a very very long time in the future, say after a million more nodes, so a streaming component should likely discard the edge, or maybe stub `v2`.
-    c. `v2` was lost, and will never be seen again, in which case the edge should likely be discarded.
+    - `v2` will be introduced within the next `K` events (and TA1 intended this behavior, which seems a Bad Thing).
+    - `v2` will be introduced a very very long time in the future, say after a million more nodes, so a streaming component should likely discard the edge, or maybe stub `v2`.
+    - `v2` was lost, and will never be seen again, in which case the edge should likely be discarded.
 
 2. Queries that are non-deterministic should be frowned upon; `order()` & `sort()` can help.
 3. Naïve DB commands will yield a gremlin throughput of only 40 inserts per second.
