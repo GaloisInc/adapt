@@ -122,25 +122,15 @@ To classify nodes, use `make`:
     nosetests3 --with-doctest --doctest-tests test_precondition.py classify/*.py
     .
     ----------------------------------------------------------------------
-<<<<<<< HEAD
-    Ran 1 test in 8.703s
-
-=======
     Ran 1 test in 18.977s
 
->>>>>>> 53428a279502bdf77d740c34c00503174574e09b
     OK
     ./fg_classifier.py
     nosetests3 --with-doctest --doctest-tests test_postcondition.py
     .
     ----------------------------------------------------------------------
-<<<<<<< HEAD
-    Ran 1 test in 2.832s
-
-=======
     Ran 1 test in 6.861s
 
->>>>>>> 53428a279502bdf77d740c34c00503174574e09b
     OK
     touch /tmp/classified.txt
     26.17user 2.75system 12:19.07elapsed 3%CPU (0avgtext+0avgdata 22372maxresident)k
