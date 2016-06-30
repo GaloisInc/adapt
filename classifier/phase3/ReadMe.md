@@ -70,73 +70,78 @@ execution
 
 To classify nodes, use `make`:
 
-    trantor:~/Documents/Adapt-classify/phase3$  make clean all
+    trantor:~/adapt$  time make clean all
     bash -c 'rm -f /tmp/{trace_loaded,segmented,classified}.txt'
     pgrep supervisord > /dev/null
-    ~/adapt/trace/trace_rsync.sh
-    + cd /tilde/jhanley/adapt/trace
-    + rsync -av --exclude '*ttl.txt' --exclude '*.dot' --exclude '*.dot.gz' --exclude '*.json.CDM.json' --exclude '*.log' --exclude '*.log.gz' --exclude '*.provn' --exclude '*.provn.gz' --exclude '*.provn.ttl' --exclude '*.raw' --exclude '*.raw.pp_json' --exclude '*.tar.gz' --exclude '*.tgz' --exclude '*.ttl' --exclude '*.zip' adapt@seaside.galois.com:trace/ .
-    receiving incremental file list
-    2016-06-22/
-    2016-06-22/5d_youtube_ie_output.bin
-    current/
-    current/5d_youtube_ie_output.bin -> ../2016-06-22/5d_youtube_ie_output.bin
-    sent 274 bytes  received 639,858 bytes  256,052.80 bytes/sec
-    total size is 567,762,861  speedup is 886.95
     killall ingestd; sleep 1  # Background writers can interfere with drop.
-    /tilde/jhanley/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
+    ~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
     g.E().drop().iterate()   [Message(status_code=204, data=None, message='', metadata={})]
     graph.tx().commit()      [Message(status_code=200, data=[None], message='', metadata={})]
     g.V().drop().iterate()   [Message(status_code=204, data=None, message='', metadata={})]
     graph.tx().commit()      [Message(status_code=200, data=[None], message='', metadata={})]
     Trint -p /tilde/jhanley/adapt/trace/current/5d_youtube_ie_output.bin | tee /tmp/trace_loaded.txt
     Sent 11106 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
-    time /tilde/jhanley/adapt/tools/await_completion.py se
-    2016-06-28 14:17:28,048 INFO Waiting for se kafka message...
-    2016-06-28 14:17:33,941 INFO recvd msg: ConsumerRecord(topic='se', partition=0, offset=1, key=None, value=b'\x01')
-    0.24user 0.06system 0:06.92elapsed 4%CPU (0avgtext+0avgdata 13956maxresident)k
-    3480inputs+0outputs (16major+3925minor)pagefaults 0swaps
+    time ~/adapt/tools/await_completion.py se
+    2016-06-29 17:25:23,907 INFO Waiting for se kafka message...
+    2016-06-29 17:28:43,446 INFO recvd msg: ConsumerRecord(topic='se', partition=0, offset=7, key=None, value=b'\x01')
+    1.18user 0.07system 3:20.00elapsed 0%CPU (0avgtext+0avgdata 14060maxresident)k
+    8inputs+16outputs (0major+3957minor)pagefaults 0swaps
     time ~/adapt/tools/label_histogram.py
-         2  EDGE_SUBJECT_HASLOCALPRINCIPAL
-         4  Agent
-         6  EDGE_EVENT_AFFECTS_NETFLOW
-        12  EDGE_OBJECT_PREV_VERSION
-        22  Entity-NetFlow
-        41  EDGE_EVENT_AFFECTS_FILE
-        83  EDGE_FILE_AFFECTS_EVENT
-       238  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-       303  Entity-File
-       586  Subject
-      1297  total
-    0.27user 0.10system 0:05.59elapsed 6%CPU (0avgtext+0avgdata 17812maxresident)k
-    0inputs+0outputs (0major+8360minor)pagefaults 0swaps
+         9  Agent
+         9  EDGE_SUBJECT_HASLOCALPRINCIPAL
+       170  EDGE_EVENT_AFFECTS_NETFLOW
+       170  Entity-NetFlow
+       486  EDGE_OBJECT_PREV_VERSION
+      1006  EDGE_EVENT_AFFECTS_FILE
+      1268  Entity-File
+      1514  EDGE_FILE_AFFECTS_EVENT
+      2973  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+      2982  Subject
+     10587  total
+    0.30user 0.13system 0:05.23elapsed 8%CPU (0avgtext+0avgdata 18832maxresident)k
+    8inputs+8outputs (0major+8612minor)pagefaults 0swaps
     ./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" | sort -nk2 | awk '$2 >= 10'
-    /tilde/jhanley/adapt/segment/segmenter/simple_segmenter.py --k 3 --drop | time tee /tmp/segmented.txt
-    2016-06-28 14:18:05,370 WARNING Dropping any existing segments.
-    2016-06-28 14:19:13,946 INFO adding 67830000
-    2016-06-28 14:19:18,465 INFO adding 68010000
-    2016-06-28 14:20:22,709 INFO adding 70570000
-    2016-06-28 14:21:48,195 INFO adding 135250000
-    2016-06-28 14:22:15,507 INFO adding 137810000
-    2016-06-28 14:23:06,232 INFO adding 142930000
-    2016-06-28 14:23:07,542 INFO Inserted 9558 edges.
-    15.65user 1.06system 5:19.87elapsed 5%CPU (0avgtext+0avgdata 21444maxresident)k
-    13224inputs+0outputs (141major+10734minor)pagefaults 0swaps
-    ...
-    $  touch /tmp/trace_loaded.txt /tmp/segmented.txt && make
-    pgrep supervisord > /dev/null
+      80   10  AS29990  ASN-APPNEXUS - AppNexus, Inc, US
+      90   12  AS8075  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
+      17   14  173.194.121.34
+      74   90  AS15169  GOOGLE - Google Inc., US
+    ~/adapt/segment/segmenter/simple_segmenter.py --k 3 --drop | time tee /tmp/segmented.txt
+    2016-06-29 17:29:11,662 WARNING Dropping any existing segments.
+    2016-06-29 17:29:46,522 INFO adding 250000
+    2016-06-29 17:30:52,084 INFO adding 2470000
+    2016-06-29 17:30:54,768 INFO adding 2560000
+    2016-06-29 17:30:59,776 INFO adding 2810000
+    2016-06-29 17:31:55,154 INFO adding 5030000
+    2016-06-29 17:31:57,138 INFO adding 5120000
+    2016-06-29 17:32:02,835 INFO adding 5370000
+    2016-06-29 17:32:46,683 INFO adding 45900000
+    2016-06-29 17:33:16,492 INFO adding 84050000
+    2016-06-29 17:34:22,132 INFO Inserted 10587 edges.
+    0.00user 0.00system 5:20.71elapsed 0%CPU (0avgtext+0avgdata 704maxresident)k
+    56inputs+0outputs (1major+231minor)pagefaults 0swaps
     nosetests3 --with-doctest --doctest-tests test_precondition.py classify/*.py
     .
     ----------------------------------------------------------------------
+<<<<<<< HEAD
     Ran 1 test in 8.703s
 
+=======
+    Ran 1 test in 18.977s
+
+>>>>>>> 53428a279502bdf77d740c34c00503174574e09b
     OK
     ./fg_classifier.py
     nosetests3 --with-doctest --doctest-tests test_postcondition.py
     .
     ----------------------------------------------------------------------
+<<<<<<< HEAD
     Ran 1 test in 2.832s
 
+=======
+    Ran 1 test in 6.861s
+
+>>>>>>> 53428a279502bdf77d740c34c00503174574e09b
     OK
     touch /tmp/classified.txt
-    $
+    26.17user 2.75system 12:19.07elapsed 3%CPU (0avgtext+0avgdata 22372maxresident)k
+    75096inputs+344outputs (178major+79348minor)pagefaults 0swaps
