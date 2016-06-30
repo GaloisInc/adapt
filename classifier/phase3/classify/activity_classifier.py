@@ -70,7 +70,7 @@ class ActivityClassifier(object):
         cmds = ["act = graph.addVertex(label, 'Activity',"
                 "  'activity:type', '%s',"
                 "  'activity:suspicionScore', %f)" % (typ, score)]
-        # activity_id = self.fetch1(cmd)['id']
+        cmds.append("g.V(%d).next().addEdge('segment:includes', act)" % seg_id)
         for base_node_ident in base_nodes:
             cmds.append("act.addEdge('activity:includes',"
                         " g.V().has('ident', '%s').next())" % base_node_ident)

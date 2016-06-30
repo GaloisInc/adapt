@@ -21,9 +21,9 @@ Several lessons were learned during development.
    relationship between HappensBefore and monotonically increasing DB
    id's. (Assume for the sake of argument that `v1` has already been seen.)
    It may be due to:
-    a. `v2` will be introduced within the next `K` events (and TA1 intended this behavior, which seems a Bad Thing).
-    b. `v2` will be introduced a very very long time in the future, say after a million more nodes, so a streaming component should likely discard the edge, or maybe stub `v2`.
-    c. `v2` was lost, and will never be seen again, in which case the edge should likely be discarded.
+    - `v2` will be introduced within the next `K` events (and TA1 intended this behavior, which seems a Bad Thing).
+    - `v2` will be introduced a very very long time in the future, say after a million more nodes, so a streaming component should likely discard the edge, or maybe stub `v2`.
+    - `v2` was lost, and will never be seen again, in which case the edge should likely be discarded.
 2. Queries that are non-deterministic should be frowned upon; `order()` & `sort()` can help.
 3. Naïve DB commands will yield a gremlin throughput of only 40 inserts per second.
 4. It is necessary for Se to efficiently query unseen (unprocessed) nodes, so indices matter. Ingestd could help, by transmitting query arguments via kafka.
@@ -129,14 +129,14 @@ To classify nodes, use `make`:
     .
     ----------------------------------------------------------------------
     Ran 1 test in 8.703s
-    
+
     OK
     ./fg_classifier.py
     nosetests3 --with-doctest --doctest-tests test_postcondition.py
     .
     ----------------------------------------------------------------------
     Ran 1 test in 2.832s
-    
+
     OK
     touch /tmp/classified.txt
     $
