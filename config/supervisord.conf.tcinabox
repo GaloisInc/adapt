@@ -27,7 +27,7 @@ autorestart=yes
 startsecs=2
 
 [program:ad]
-command=bash -c 'sleep 8 && %(ENV_HOME)s/adapt/ad/test/StartAD.py'
+command=%(ENV_HOME)s/adapt/ad/test/StartAD.py
 autorestart=yes
 startsecs=10
 

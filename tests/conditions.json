@@ -1,0 +1,120 @@
+{"5d_youtube_ie_output-100.avro": {
+    "ingest": {
+        "pre": [{"query": "g.V().count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.E().count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"}
+               ],
+        "post": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Memory').count()", "reponse": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Resource').count()", "reponse": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+                ]
+    },
+    "segment": {
+        "pre": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Memory').count()", "reponse": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Resource').count()", "reponse": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+               ],
+        "post": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+                ]
+    },
+    "ad": {
+        "pre": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+               ],
+        "post": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyScore').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyType').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+                ]
+    },
+    "classifier": {
+        "pre": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').has('anomalyScore').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').has('anomalyType').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+               ],
+        "post": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Activity').count()", "response": "[Message(status_code=200, data=[1], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyScore').count()", "response": "[Message(status_code=200, data=[3], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyType').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+                ]
+
+    },
+    "dx": {
+        "pre": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Activity').count()", "response": "[Message(status_code=200, data=[1], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').has('anomalyScore').count()", "response": "[Message(status_code=200, data=[3], message='', metadata={})]"},
+                {"query": "g.V().has(label, 'Segment').has('anomalyType').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+               ],
+        "post": [{"query": "g.V().has(label, 'Entity').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-File').count()", "response": "[Message(status_code=200, data=[18], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Netflow').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Entity-Memory').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Resource').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Subject').count()", "response": "[Message(status_code=200, data=[28], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Host').count()", "response": "[Message(status_code=200, data=[0], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Agent').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Phase').count()", "response": "[Message(status_code=200, data=[1], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'APT').count()", "response": "[Message(status_code=200, data=[1], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Activity').count()", "response": "[Message(status_code=200, data=[1], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyScore').count()", "response": "[Message(status_code=200, data=[3], message='', metadata={})]"},
+                 {"query": "g.V().has(label, 'Segment').has('anomalyType').count()", "response": "[Message(status_code=200, data=[2], message='', metadata={})]"}
+                ]
+    }
+ }
+}
