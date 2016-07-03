@@ -51,23 +51,28 @@ enum = 'enum' name '{' ( name ','? )+ '}' EOF
 
 def gen(fin, fout):
     parser = arpeggio.cleanpeg.ParserPEG(get_grammar(), 'enum')
+    fout.write('from enum import Enum\n')
     for sect in fin.read().split('```'):
         if not sect.lstrip().startswith('enum '):
             continue
         parsed = list(filter(not_punct, parser.parse(strip_comments(sect))))
         assert parsed[0] == 'enum'
-        fout.write('\n'.join(fmt(parsed[1], parsed[2:])) + '\n')
+        klass = str(parsed[1]).replace('Type', '').capitalize()
+        fout.write('\n\nclass %s(Enum):\n    ' % klass)
+        fout.write('\n    '.join(fmt(parsed[2:])) + '\n')
 
 
-def fmt(name, vals):
-    prefix = ''
-    if name == 'InstrumentationSource':
-        prefix = 'INSTRUMENTATION'
-        # Defining both SOURCE_LINUX_AUDIT_TRACE = 0
-        # and SOURCE_ACCELEROMETER = 0 seems unfortunate, so change one.
-    if name in ['Strength', 'Derivation']:  # These use regrettably short IDs.
-        prefix = str(name).upper() + '_'  # Avoid defining names like 'COPY'.
-    return ['%s%s = %d' % (prefix, val, i)
+def strip(s):
+    '''Strip an overly verbose class name prefix from each identifier.'''
+    if '_' in s:
+        return re.sub(r'^[A-Z]+_', '', s)  # Class names lack underscore.
+    # At this point we have an un-prefixed Strength (WEAK, MEDIUM, STRONG)
+    # or a Derivation (COPY, ENCODE, COMPILE, ENCRYPT, OTHER).
+    return s
+
+
+def fmt(vals):
+    return ['%s = %d' % (strip(str(val)), i)
             for i, val in enumerate(vals)]
 
 
