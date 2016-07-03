@@ -26,6 +26,7 @@ import classify
 import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
+import cdm.enums
 import gremlin_properties
 
 
@@ -39,12 +40,13 @@ class ActivityClassifier(object):
         # At present we have only tackled challenge problems for two threats:
         self.exfil = classify.ExfilDetector()
         self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
+        assert cdm.enums.EVENT_UNLINK == 12
 
     def find_new_segments(self, last_previously_processed_seg):
         q = "g.V().has(label, 'Segment').id().is(gt(%d)).order()" % (
             last_previously_processed_seg)
         for msg in self.gremlin.fetch(q):
-            if msg is not None:
+            if msg.data is not None:
                 for seg_db_id in msg.data:
                     yield seg_db_id
 
