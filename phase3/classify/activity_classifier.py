@@ -40,7 +40,8 @@ class ActivityClassifier(object):
         # At present we have only tackled challenge problems for two threats:
         self.exfil = classify.ExfilDetector()
         self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
-        assert cdm.enums.EVENT_UNLINK == 12
+        assert cdm.enums.Event.UNLINK.value == 12
+        assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
     def find_new_segments(self, last_previously_processed_seg):
         q = "g.V().has(label, 'Segment').id().is(gt(%d)).order()" % (
