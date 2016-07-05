@@ -8,8 +8,13 @@ class Instrumentationsource(Enum):
     FREEBSD_OPENBSM_TRACE = 3
     ANDROID_JAVA_CLEARSCOPE = 4
     ANDROID_NATIVE_CLEARSCOPE = 5
-    LINUX_AUDIT_CADETS = 6
-    WINDOWS_DIFT_FAROS = 7
+    FREEBSD_DTRACE_CADETS = 6
+    FREEBSD_TESLA_CADETS = 7
+    FREEBSD_LOOM_CADETS = 8
+    FREEBSD_MACIF_CADETS = 9
+    WINDOWS_DIFT_FAROS = 10
+    LINUX_THEIA = 11
+    WINDOWS_FIVEDIRECTIONS = 12
 
 
 class Principal(Enum):
@@ -36,14 +41,25 @@ class Event(Enum):
     MPROTECT = 15
     OPEN = 16
     READ = 17
-    RENAME = 18
-    WRITE = 19
-    SIGNAL = 20
-    TRUNCATE = 21
-    WAIT = 22
-    BLIND = 23
-    UNIT = 24
-    UPDATE = 25
+    RECVFROM = 18
+    RECVMSG = 19
+    RENAME = 20
+    WRITE = 21
+    SIGNAL = 22
+    TRUNCATE = 23
+    WAIT = 24
+    OS_UNKNOWN = 25
+    KERNEL_UNKNOWN = 26
+    APP_UNKNOWN = 27
+    UI_UNKNOWN = 28
+    UNKNOWN = 29
+    BLIND = 30
+    UNIT = 31
+    UPDATE = 32
+    SENDTO = 33
+    SENDMSG = 34
+    SHM = 35
+    EXIT = 36
 
 
 class Source(Enum):
@@ -66,6 +82,11 @@ class Source(Enum):
     GEOMAGNETIC_ROTATION_VECTOR = 16
     CAMERA = 17
     GPS = 18
+    AUDIO = 19
+    SYSTEM_PROPERTY = 20
+    ENV_VARIABLE = 21
+    SINK_IPC = 22
+    UNKNOWN = 23
 
 
 class Integritytag(Enum):
@@ -85,19 +106,4 @@ class Subject(Enum):
     PROCESS = 0
     THREAD = 1
     UNIT = 2
-    BLOCK = 3
-    EVENT = 4
-
-
-class Strength(Enum):
-    WEAK = 0
-    MEDIUM = 1
-    STRONG = 2
-
-
-class Derivation(Enum):
-    COPY = 0
-    ENCODE = 1
-    COMPILE = 2
-    ENCRYPT = 3
-    OTHER = 4
+    BASIC_BLOCK = 3

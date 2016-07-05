@@ -42,24 +42,46 @@ def not_punct(terminal):
     return len(s) > 1 or (s not in ',{}')
 
 
+def get_preferred_order():
+    '''Gen classes in the order specified by Language.md (not CDM13.avdl).'''
+    # $ echo `tr '()' '  ' < tools/cdm/enums.py | awk '/^class/ {print $2}'`
+    return ('Instrumentationsource Principal Event Source Integritytag'
+            ' Confidentialitytag Subject Strength Derivation'
+            ).split()[:-2]  # Suppress Strength & Derivation.
+
+
+def get_cdm13_avdl_spec_order():
+    # CDM13.avdl lacks Derivation & Strength, and adds
+    # Edge, LocalAuth, TagOpCode, Value & Valuedata.
+    # Well, actually TagOpCode subsumes Strength plus Derivation.TAG_OP_ENCODE.
+    # Too bad that compression and encryption both come out as TAG_OP_ENCODE.
+    # Presumably TAG_OP_ENCODE is lossless (reversible) unlike strong/med/weak.
+    return ('Subject Srcsink Instrumentationsource Principal Event Edge Value'
+            ' Valuedata Localauth Tagopcode Integritytag Confidentialitytag'
+            ).split()
+
+
 def get_grammar():
     return """
 name = r'\w+'
-enum = 'enum' name '{' ( name ','? )+ '}' EOF
+enum = name '{' ( name ','? )+ '}' EOF
 """
 
 
 def gen(fin, fout):
     parser = arpeggio.cleanpeg.ParserPEG(get_grammar(), 'enum')
+    enum_re = re.compile(r'(```|\*/)\s*enum\s+([^}]+})')
     fout.write('from enum import Enum\n')
-    for sect in fin.read().split('```'):
-        if not sect.lstrip().startswith('enum '):
-            continue
+    out = {}
+    for _, sect in enum_re.findall(fin.read()):
         parsed = list(filter(not_punct, parser.parse(strip_comments(sect))))
-        assert parsed[0] == 'enum'
-        klass = str(parsed[1]).replace('Type', '').capitalize()
-        fout.write('\n\nclass %s(Enum):\n    ' % klass)
-        fout.write('\n    '.join(fmt(parsed[2:])) + '\n')
+        klass = str(parsed[0]).replace('Type', '').capitalize()
+        klass = klass.replace('Srcsink', 'Source')
+        print(klass)
+        out[klass] = ('\n\nclass %s(Enum):\n    ' % klass
+                      + '\n    '.join(fmt(parsed[1:])) + '\n')
+    for klass in get_preferred_order():
+        fout.write(out[klass])
 
 
 def strip(s):
@@ -83,6 +105,9 @@ def fmt(vals):
 
 
 if __name__ == '__main__':
-    spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
+    spec = os.path.expanduser(
+        '~/Documents/bbn/ta3-serialization-schema/avro/CDM13.avdl')
+    if not os.path.exists(spec):
+        spec = os.path.expanduser('~/adapt/ingest/Ingest/Language.md')
     with open(os.path.expanduser('~/adapt/tools/cdm/enums.py'), 'w') as fout:
         gen(open(spec), fout)
