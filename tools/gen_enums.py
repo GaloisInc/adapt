@@ -78,7 +78,7 @@ def gen(fin, fout):
         klass = str(parsed[0]).replace('Type', '').capitalize()
         out[klass] = ('\n\nclass %s(Enum):\n    ' % klass
                       + '\n    '.join(fmt(parsed[1:])) + '\n')
-    for klass in get_preferred_order():
+    for klass in get_cdm13_avdl_spec_order():
         fout.write(out[klass])
 
 
