@@ -45,7 +45,7 @@ def not_punct(terminal):
 def get_preferred_order():
     '''Gen classes in the order specified by Language.md (not CDM13.avdl).'''
     # $ echo `tr '()' '  ' < tools/cdm/enums.py | awk '/^class/ {print $2}'`
-    return ('Instrumentationsource Principal Event Source Integritytag'
+    return ('Instrumentationsource Principal Event Srcsink Integritytag'
             ' Confidentialitytag Subject Strength Derivation'
             ).split()[:-2]  # Suppress Strength & Derivation.
 
@@ -76,8 +76,6 @@ def gen(fin, fout):
     for _, sect in enum_re.findall(fin.read()):
         parsed = list(filter(not_punct, parser.parse(strip_comments(sect))))
         klass = str(parsed[0]).replace('Type', '').capitalize()
-        klass = klass.replace('Srcsink', 'Source')
-        print(klass)
         out[klass] = ('\n\nclass %s(Enum):\n    ' % klass
                       + '\n    '.join(fmt(parsed[1:])) + '\n')
     for klass in get_preferred_order():

@@ -62,7 +62,7 @@ class Event(Enum):
     EXIT = 36
 
 
-class Source(Enum):
+class Srcsink(Enum):
     ACCELEROMETER = 0
     TEMPERATURE = 1
     GYROSCOPE = 2
