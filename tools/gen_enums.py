@@ -64,6 +64,12 @@ def gen(fin, fout):
 
 def strip(s):
     '''Strip an overly verbose class name prefix from each identifier.'''
+    # Note that CDM13 symbols are drawn from a global namespace rather than
+    # from per-class namespaces, e.g. SOURCE_LINUX_AUDIT_TRACE does not
+    # fall under SrcSinkType, and conversely SOURCE_ACCELEROMETER is not
+    # an InstrumentationSource.
+    # In the interest of being concise we strip name prefixes anyway,
+    # as that happens to still leave us with globally unique names.
     if '_' in s:
         return re.sub(r'^[A-Z]+_', '', s)  # Class names lack underscore.
     # At this point we have an un-prefixed Strength (WEAK, MEDIUM, STRONG)
