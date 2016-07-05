@@ -24,7 +24,7 @@ check_daemons:
 	./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" | sort -nk2 | awk '$$2 >= 10'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac
-	~/adapt/segment/segmenter/simple_segmenter.py --k 3 --drop | time tee $@
+	~/adapt/segment/segmenter/simple_segmenter.py --k 90 --drop | time tee $@
 
 
 /tmp/classified.txt: /tmp/segmented.txt
