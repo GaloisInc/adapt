@@ -202,7 +202,9 @@ instance PropertiesAndTypeOf Subject where
                )
 
 instance PropertiesOf (Map Text Text) where
-  propertiesOf x = [("properties", GremlinMap (map (\(a,b) -> (a,GremlinString b)) (Map.toList x)))]
+  propertiesOf x
+    | Map.null x = []
+    | otherwise  = [("properties", GremlinMap (map (\(a,b) -> (a,GremlinString b)) (Map.toList x)))]
 
 instance PropertiesAndTypeOf Host  where
   propertiesAndTypeOf (Host {..}) =
