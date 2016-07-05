@@ -123,6 +123,7 @@ install_adapt_dependencies() {
         tornado \
       || handle_error $LINENO
     sudo -H pip3 install \
+        Arpeggio \
         avroknife \
         aiogremlin \
         coverage \
