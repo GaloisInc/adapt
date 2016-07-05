@@ -151,12 +151,12 @@ class Localauth(Enum):
 
 
 class Tagopcode(Enum):
-    OP_SEQUENCE = 0
-    OP_UNION = 1
-    OP_ENCODE = 2
-    OP_STRONG = 3
-    OP_MEDIUM = 4
-    OP_WEAK = 5
+    SEQUENCE = 0
+    UNION = 1
+    ENCODE = 2
+    STRONG = 3
+    MEDIUM = 4
+    WEAK = 5
 
 
 class Integritytag(Enum):
