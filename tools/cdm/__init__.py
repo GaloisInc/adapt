@@ -20,30 +20,3 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-
-import cdm.enums
-
-
-class Prop:
-    '''Models a gremlin node attribute, the "properties" map.'''
-
-    def __init__(self, item):
-        self.prop = item['properties']
-
-    def __contains__(self, key):
-        return key in self.prop
-
-    def __getitem__(self, key):
-        return self.prop[key][0]['value']
-
-    def __str__(self):
-        return 'properties: ' + ' '.join([key
-                                          for key in sorted(self.prop.keys())])
-
-# Note that max Instrumentationsource is WINDOWS_DIFT_FAROS (7),
-# while max Source is GPS(18).
-
-    def source(self):
-        if 'source' in self.prop:
-            return cdm.enums.Source(self.__getitem__('source'))
-        return None

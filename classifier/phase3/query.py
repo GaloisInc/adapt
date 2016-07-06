@@ -36,6 +36,7 @@ import os
 import re
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
+import cdm.enums
 import gremlin_properties
 import gremlin_query
 
@@ -80,6 +81,12 @@ def report(query, threshold=1):
         counts = collections.defaultdict(int)
 
         for prop in gremlin_properties.fetch(gremlin, args.query):
+            del prop.prop['properties']  # ingestd accidentally added empty map
+
+            # Not sure what a step counter is.
+            assert cdm.enums.Source.STEP_COUNTER == prop.source()
+            assert cdm.enums.Source.STEP_COUNTER.value == 12
+
             try:
                 counts[validate_file(prop['url'])] += 1
             except KeyError:
