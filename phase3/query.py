@@ -83,9 +83,8 @@ def report(query, threshold=1):
         for prop in gremlin_properties.fetch(gremlin, args.query):
             del prop.prop['properties']  # ingestd accidentally added empty map
 
-            # Not sure what a step counter is.
-            assert cdm.enums.Source.STEP_COUNTER == prop.source()
-            assert cdm.enums.Source.STEP_COUNTER.value == 12
+            assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS == prop.source()
+            assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS.value == 12
 
             try:
                 counts[validate_file(prop['url'])] += 1
