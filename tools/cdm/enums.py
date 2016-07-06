@@ -8,7 +8,7 @@ class Subject(Enum):
     BASIC_BLOCK = 3
 
 
-class Srcsink(Enum):
+class SrcSink(Enum):
     ACCELEROMETER = 0
     TEMPERATURE = 1
     GYROSCOPE = 2
@@ -35,7 +35,7 @@ class Srcsink(Enum):
     UNKNOWN = 23
 
 
-class Instrumentationsource(Enum):
+class InstrumentationSource(Enum):
     LINUX_AUDIT_TRACE = 0
     LINUX_PROC_TRACE = 1
     LINUX_BEEP_TRACE = 2
@@ -131,7 +131,7 @@ class Value(Enum):
     TYPE_INOUT = 2
 
 
-class Valuedata(Enum):
+class ValueData(Enum):
     DATA_TYPE_BYTE = 0
     DATA_TYPE_BOOL = 1
     DATA_TYPE_CHAR = 2
@@ -143,14 +143,14 @@ class Valuedata(Enum):
     DATA_TYPE_COMPLEX = 8
 
 
-class Localauth(Enum):
+class LocalAuth(Enum):
     NONE = 0
     PASSWORD = 1
     PUBLIC_KEY = 2
     ONE_TIME_PASSWORD = 3
 
 
-class Tagopcode(Enum):
+class TagOpCode(Enum):
     SEQUENCE = 0
     UNION = 1
     ENCODE = 2
@@ -159,13 +159,13 @@ class Tagopcode(Enum):
     WEAK = 5
 
 
-class Integritytag(Enum):
+class IntegrityTag(Enum):
     UNTRUSTED = 0
     BENIGN = 1
     INVULNERABLE = 2
 
 
-class Confidentialitytag(Enum):
+class ConfidentialityTag(Enum):
     SECRET = 0
     SENSITIVE = 1
     PRIVATE = 2

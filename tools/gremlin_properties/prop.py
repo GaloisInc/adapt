@@ -40,7 +40,13 @@ class Prop:
         return 'properties: ' + ' '.join([key
                                           for key in sorted(self.prop.keys())])
 
-    def source(self):
-        if 'source' in self.prop:
-            return cdm.enums.Instrumentationsource(self.__getitem__('source'))
+    def _find_enum(self, key, type_):
+        if key in self.prop:
+            return type_(self.__getitem__(key))
         return None
+
+    def source(self):
+        return self._find_enum('source', cdm.enums.Instrumentationsource)
+
+    def src_sink_type(self):
+        return self._find_enum('srcSinkType', cdm.enums.Srcsink)

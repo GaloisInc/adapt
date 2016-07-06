@@ -56,8 +56,8 @@ def get_cdm13_avdl_spec_order():
     # Well, actually TagOpCode subsumes Strength plus Derivation.TAG_OP_ENCODE.
     # Too bad that compression and encryption both come out as TAG_OP_ENCODE.
     # Presumably TAG_OP_ENCODE is lossless (reversible) unlike strong/med/weak.
-    return ('Subject Srcsink Instrumentationsource Principal Event Edge Value'
-            ' Valuedata Localauth Tagopcode Integritytag Confidentialitytag'
+    return ('Subject SrcSink InstrumentationSource Principal Event Edge Value'
+            ' ValueData LocalAuth TagOpCode IntegrityTag ConfidentialityTag'
             ).split()
 
 
@@ -75,7 +75,7 @@ def gen(fin, fout):
     out = {}
     for _, sect in enum_re.findall(fin.read()):
         parsed = list(filter(not_punct, parser.parse(strip_comments(sect))))
-        klass = str(parsed[0]).replace('Type', '').capitalize()
+        klass = str(parsed[0]).replace('Type', '')
         out[klass] = ('\n\nclass %s(Enum):\n    ' % klass
                       + '\n    '.join(fmt(parsed[1:])) + '\n')
     for klass in get_cdm13_avdl_spec_order():
