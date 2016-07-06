@@ -40,10 +40,7 @@ class Prop:
         return 'properties: ' + ' '.join([key
                                           for key in sorted(self.prop.keys())])
 
-# Note that max Instrumentationsource is WINDOWS_DIFT_FAROS (7),
-# while max Source is GPS(18).
-
     def source(self):
         if 'source' in self.prop:
-            return cdm.enums.Source(self.__getitem__('source'))
+            return cdm.enums.Instrumentationsource(self.__getitem__('source'))
         return None
