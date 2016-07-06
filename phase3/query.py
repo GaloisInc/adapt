@@ -81,8 +81,8 @@ def report(query, threshold=1):
         counts = collections.defaultdict(int)
 
         for prop in gremlin_properties.fetch(gremlin, args.query):
-            del prop.prop['properties']  # ingestd accidentally added empty map
 
+            print(prop.prop['source'])
             assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS == prop.source()
             assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS.value == 12
 
