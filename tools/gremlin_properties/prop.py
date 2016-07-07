@@ -46,7 +46,7 @@ class Prop:
         return None
 
     def source(self):
-        return self._find_enum('source', cdm.enums.Instrumentationsource)
+        return self._find_enum('source', cdm.enums.InstrumentationSource)
 
     def src_sink_type(self):
-        return self._find_enum('srcSinkType', cdm.enums.Srcsink)
+        return self._find_enum('srcSinkType', cdm.enums.SrcSink)
