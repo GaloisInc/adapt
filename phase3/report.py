@@ -109,12 +109,17 @@ def report(query, threshold=1, debug=False):
                 pass
 
             try:
-                counts[validate_file(prop['url'])] += 1
+                counts[validate_file(prop['url'])] += 1  # file
             except KeyError:
                 pass
 
             try:
-                counts[validate_ip(prop['dstAddress'])] += 1
+                counts['%08x' % prop['address']] += 1  # memory
+            except KeyError:
+                pass
+
+            try:
+                counts[validate_ip(prop['dstAddress'])] += 1  # netflow
                 asn = get_asn(prop['dstAddress'])
                 asn += '  ' + get_asn_name(asn)
                 counts[asn] += 1
@@ -122,13 +127,13 @@ def report(query, threshold=1, debug=False):
                 pass
 
             try:
-                ss = cdm.enums.SrcSink(prop['srcSinkType'])
+                ss = cdm.enums.SrcSink(prop['srcSinkType'])  # resource
                 counts[ss] += 1
             except KeyError:
                 pass
 
             try:
-                counts[str(cdm.enums.Event(prop['eventType']))] += 1
+                counts[str(cdm.enums.Event(prop['eventType']))] += 1  # subject
 
                 # Currently this would fail, as 4 is greater than the max of 3.
                 # counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
@@ -158,15 +163,23 @@ def switch_brackets(s):
 
 def get_canned_reports():
     ret = {}
-    for name, label in [
-            ('agent', 'Agent'),
-            ('file', 'Entity-File'),
-            ('netflow', 'Entity-Netflow'),
-            ('resource', 'Resource'),
-            ('subject', 'Subject'),
-    ]:
+    labels = ('EDGE_EVENT_AFFECTS_FILE'
+              ' EDGE_EVENT_AFFECTS_MEMORY'
+              ' EDGE_EVENT_AFFECTS_SRCSINK'
+              ' EDGE_EVENT_AFFECTS_SUBJECT'
+              ' EDGE_EVENT_ISGENERATEDBY_SUBJECT'
+              ' EDGE_FILE_AFFECTS_EVENT'
+              ' EDGE_MEMORY_AFFECTS_EVENT'
+              ' EDGE_OBJECT_PREV_VERSION'
+              ' EDGE_SRCSINK_AFFECTS_EVENT'
+              ' EDGE_SUBJECT_HASLOCALPRINCIPAL')
+    labels = 'Agent Entity-File Entity-Memory Entity-Netflow Resource Subject'
+    for label in labels.split():
+        name = re.sub(r'^Entity-', '', label).lower()
         ret[name] = "g.V().has(label, '%s').limit(5000)" % label
     return ret
+    # Finds a pair of accelerometer reports:
+    # g.V().has(label, 'EDGE_EVENT_AFFECTS_SRCSINK').outE().inV().valueMap()
 
 
 def arg_parser():
@@ -174,7 +187,8 @@ def arg_parser():
         description='Ad hoc query runner to report on Entity-File values.')
     p.add_argument('--query', help='gremlin query to run')
     p.add_argument('--report', help='name of canned report to run',
-                   choices=get_canned_reports().keys())
+                   choices=sorted(get_canned_reports().keys()))
+    p.add_argument('--debug', help='verbose output', action='store_true')
     return p
 
 
@@ -184,4 +198,4 @@ if __name__ == '__main__':
         args.query = get_canned_reports()[args.report]
     if args.query is None:
         arg_parser().error('Please specify a query or choose a canned report.')
-    report(args.query)
+    report(args.query, debug=args.debug)
