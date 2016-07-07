@@ -23,7 +23,7 @@
 
 #
 # usage:
-#     ./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" |
+#     ./report.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" |
 #       sort -nk2
 #
 '''
