@@ -98,10 +98,11 @@ def report(query, threshold=1, debug=False):
             try:
                 counts['userID_' + prop['userID']] += 1
                 counts['gid_' + prop['gid']] += 1
-                data_ghetto = json.loads(switch_brackets(
+                # http://tinyurl.com/cdm13-spec says yes, we need this nonsense
+                properties = json.loads(switch_brackets(
                     prop['properties'].strip("'")))
-                counts['euid_%d' % data_ghetto['euid']] += 1
-                counts['egid_%d' % data_ghetto['egid']] += 1
+                counts['euid_%d' % properties['euid']] += 1
+                counts['egid_%d' % properties['egid']] += 1
             except KeyError:
                 pass
 
