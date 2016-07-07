@@ -32,6 +32,7 @@ Ad hoc query runner to report on distinct Entity-File node values.
 import argparse
 import collections
 import dns.resolver
+import json
 import os
 import re
 import sys
@@ -41,7 +42,7 @@ import gremlin_properties
 import gremlin_query
 
 
-def report(query, threshold=1):
+def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
     filespec_re = re.compile('^(C:|[A-Z]:|file://)')
@@ -82,9 +83,27 @@ def report(query, threshold=1):
 
         for prop in gremlin_properties.fetch(gremlin, args.query):
 
-            print(prop.prop['source'])
-            assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS == prop.source()
-            assert cdm.enums.Instrumentationsource.WINDOWS_FIVEDIRECTIONS.value == 12
+            assert prop.source() in [  # So far, SRI SPADE & 5D are winning.
+                cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
+                cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
+                cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS,
+                None  # Hmmm, who's injecting untagged 'Resource' base events?
+            ], prop.source()
+            assert cdm.enums.InstrumentationSource \
+                .WINDOWS_FIVEDIRECTIONS.value == 12
+
+            if debug:
+                print(prop.prop)
+
+            try:
+                counts['userID_' + prop['userID']] += 1
+                counts['gid_' + prop['gid']] += 1
+                data_ghetto = json.loads(switch_brackets(
+                    prop['properties'].strip("'")))
+                counts['euid_%d' % data_ghetto['euid']] += 1
+                counts['egid_%d' % data_ghetto['egid']] += 1
+            except KeyError:
+                pass
 
             try:
                 counts[validate_file(prop['url'])] += 1
@@ -98,6 +117,12 @@ def report(query, threshold=1):
                 counts[asn] += 1
             except KeyError:
                 pass
+
+            try:
+                ss = cdm.enums.SrcSink(prop['srcSinkType'])
+                counts[ss] += 1
+            except KeyError:
+                pass
         i = 1
         for file, count in sorted(counts.items()):
             if count >= threshold:
@@ -105,14 +130,36 @@ def report(query, threshold=1):
             i += 1
 
 
+def switch_brackets(s):
+    '''Turns [x] into {x}, and also returns JSON-compatible quotes.'''
+    return s.replace('[', '{').replace(']', '}').replace("'", '"')
+
+
+def get_canned_reports():
+    ret = {}
+    for name, label in [
+            ('agent', 'Agent'),
+            ('file', 'Entity-File'),
+            ('netflow', 'Entity-Netflow'),
+            ('resource', 'Resource'),
+    ]:
+        ret[name] = "g.V().has(label, '%s').limit(5000)" % label
+    return ret
+
+
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Ad hoc query runner to report on Entity-File values.')
-    p.add_argument('--query', help='gremlin query to run',
-                   default="g.V().has(label, 'Entity-File').limit(5000)")
+    p.add_argument('--query', help='gremlin query to run')
+    p.add_argument('--report', help='name of canned report to run',
+                   choices=get_canned_reports().keys())
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
+    if args.report:
+        args.query = get_canned_reports()[args.report]
+    if args.query is None:
+        arg_parser().error('Please specify a query or choose a canned report.')
     report(args.query)

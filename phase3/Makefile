@@ -41,7 +41,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
 	time ~/adapt/tools/label_histogram.py
-	./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" | sort -nk2 | awk '$$2 >= 10'
+	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 10'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac
 	~/adapt/segment/segmenter/simple_segmenter.py --k 30 --drop | time tee $@
