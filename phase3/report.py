@@ -46,6 +46,8 @@ def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
     filespec_re = re.compile('^(C:|[A-Z]:|file://)')
+    crazy_started_re = re.compile(
+        '^\d{4,8}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$')
 
     def validate_file(file):
         assert filespec_re.search(file), file
@@ -124,6 +126,24 @@ def report(query, threshold=1, debug=False):
                 counts[ss] += 1
             except KeyError:
                 pass
+
+            try:
+                counts[str(cdm.enums.Event(prop['eventType']))] += 1
+
+                # Currently this would fail, as 4 is greater than the max of 3.
+                # counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
+
+                stamp = prop['startedAtTime']
+                assert crazy_started_re.search(stamp), stamp
+                # e.g. a so-called timestamp of "45957544-07-27 13:43:20 UTC"
+                # or occasionally "1970-01-01 00:00:00 UTC"
+
+                properties = json.loads(switch_brackets(
+                    prop['properties'].strip("'")))
+                # The seq so nice, gotta say it twice.
+                assert properties['event id'] == prop['sequence']
+            except KeyError:
+                pass
         i = 1
         for file, count in sorted(counts.items()):
             if count >= threshold:
@@ -143,6 +163,7 @@ def get_canned_reports():
             ('file', 'Entity-File'),
             ('netflow', 'Entity-Netflow'),
             ('resource', 'Resource'),
+            ('subject', 'Subject'),
     ]:
         ret[name] = "g.V().has(label, '%s').limit(5000)" % label
     return ret
