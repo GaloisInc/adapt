@@ -306,7 +306,7 @@ instance GraphId Text where
 encodeGremlinValue :: GremlinValue -> Text
 encodeGremlinValue gv =
   case gv of
-    GremlinString s -> escapeChars s
+    GremlinString s -> s
     GremlinNum  n   -> T.pack (show n)
     -- XXX maps and lists are only notionally supported
     GremlinMap xs   -> T.decodeUtf8 $ ByteString.toStrict $ A.encode (Map.fromList xs)
