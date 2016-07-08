@@ -17,11 +17,10 @@ def run_query(query, bindings={}):
     return result[0].data
 
 with open(in_file, 'r') as csvfile:
-    reader = csv.reader(csvfile, delimiter=',')
+    reader = csv.DictReader(csvfile)
     for row in reader:
-        if row[0] != 'ident':
-            run_query("g.V().has('ident','" + str(row[0]) + "').property('anomalyScore'," + str(row[5]) + ")")
-    print('Anomaly score attach finished')
+        run_query("g.V().has('ident','" + str(row['ident']) + "').property('anomalyScore'," + str(row['anomaly_score']) + ")")
+    print('Anomaly scores attached')
 
 loop.run_until_complete(gc.close())
 loop.close()
