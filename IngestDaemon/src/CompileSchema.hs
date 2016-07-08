@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import           Data.Char (isUpper)
 import qualified Data.Char as C
 import           Data.Foldable as F
+import           Data.Int (Int64)
 import           Data.List (intersperse)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -29,7 +30,6 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time
 import           Schema hiding (Env)
 import           System.Entropy (getEntropy)
 
@@ -162,8 +162,8 @@ instance PropertiesOf SubjectType where
 instance PropertiesOf EventType where
   propertiesOf s = [("eventType", gremlinNum (fromEnum s))]
 
-gremlinTime :: UTCTime -> GremlinValue
-gremlinTime t = GremlinString (T.pack $ show t)
+gremlinTime :: Int64 -> GremlinValue
+gremlinTime = gremlinNum
 
 gremlinList :: [Text] -> GremlinValue
 gremlinList = GremlinList . map GremlinString

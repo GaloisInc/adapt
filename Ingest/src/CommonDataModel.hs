@@ -13,8 +13,6 @@ import           Data.Int
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
-import           Data.Time
-import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import           MonadLib
 
 import           CommonDataModel.Types
@@ -285,8 +283,8 @@ translateMemoryObject  (MemoryObject {..}) = do
   tellNode (S.NodeEntity m)
 {-# INLINE translateMemoryObject #-}
 
-translateTime :: Int64 -> UTCTime
-translateTime = posixSecondsToUTCTime . fromIntegral
+translateTime :: Int64 -> Int64
+translateTime = id
 {-# INLINE translateTime #-}
 
 translatePrincipalType :: PrincipalType -> S.PrincipalType
