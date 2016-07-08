@@ -418,6 +418,11 @@ Other primitive types used in our model:
   [schema]: #
   makePropertyKey('dstPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
+* *prov-tc:IpProtocol* : int;
+  and maps to the Titan data type:
+  [schema]: #
+  makePropertyKey('ipProtocol').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+
 * *prov-tc:pageNumber* : Maybe int;
   and maps to the Titan data type:
   [schema]: #
