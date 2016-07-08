@@ -33,6 +33,13 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 ~/adapt/trace/current/gather.avro.bin:
 	$(RSYNC)
 
+%.bin:
+	$(RSYNC)
+
+%.avro:
+	$(RSYNC)
+
+
 
 # Keep track in the filesystem of whether ingestd has run yet.
 /tmp/1_trace_loaded.txt: ~/adapt/trace/current/gather.avro.bin
