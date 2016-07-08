@@ -30,9 +30,18 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 ~/adapt/trace/current/ta5attack1_units.avro:
 	$(RSYNC)
 
+~/adapt/trace/current/gather.avro.bin:
+	$(RSYNC)
+
+%.bin:
+	$(RSYNC)
+
+%.avro:
+	$(RSYNC)
+
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/infoleak_small_units.avro
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack1_units.avro
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p $< | tee $@
@@ -41,7 +50,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
 	time ~/adapt/tools/label_histogram.py
-	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 10'
+	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 1'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac
 	~/adapt/segment/segmenter/simple_segmenter.py --k 30 --drop | time tee $@

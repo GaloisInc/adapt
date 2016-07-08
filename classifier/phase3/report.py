@@ -27,7 +27,7 @@
 #       sort -nk2
 #
 '''
-Ad hoc query runner to report on distinct Entity-File node values.
+Ad hoc query runner to report on e.g. distinct Entity-File node values.
 '''
 import argparse
 import collections
@@ -45,7 +45,7 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
-    filespec_re = re.compile('^(C:|[A-Z]:|file://)')
+    filespec_re = re.compile('^(C:|[A-Z]:|/|file://)')
     crazy_started_re = re.compile(
         '^\d{4,8}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$')
 
@@ -83,9 +83,10 @@ def report(query, threshold=1, debug=False):
         # Number of times we've seen a given filename or address.
         counts = collections.defaultdict(int)
 
-        for prop in gremlin_properties.fetch(gremlin, args.query):
+        for prop in gremlin_properties.fetch(gremlin, query):
 
-            assert prop.source() in [  # So far, SRI SPADE & 5D are winning.
+            assert prop.source() in [
+                cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
                 cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS,
@@ -95,7 +96,7 @@ def report(query, threshold=1, debug=False):
                 .WINDOWS_FIVEDIRECTIONS.value == 12
 
             if debug:
-                print(prop.prop)
+                print(sorted(prop.prop))
 
             try:
                 counts['userID_' + prop['userID']] += 1
@@ -184,18 +185,24 @@ def get_canned_reports():
 
 def arg_parser():
     p = argparse.ArgumentParser(
-        description='Ad hoc query runner to report on Entity-File values.')
+        description='Ad hoc query runner to report on Entity-File values &c.')
     p.add_argument('--query', help='gremlin query to run')
     p.add_argument('--report', help='name of canned report to run',
                    choices=sorted(get_canned_reports().keys()))
+    p.add_argument('--all', help='run all canned reports', action='store_true')
     p.add_argument('--debug', help='verbose output', action='store_true')
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    if args.report:
-        args.query = get_canned_reports()[args.report]
-    if args.query is None:
-        arg_parser().error('Please specify a query or choose a canned report.')
-    report(args.query, debug=args.debug)
+    if args.all:
+        for name, query in sorted(get_canned_reports().items()):
+            print('\n' + name)
+            report(query, debug=args.debug)
+    else:
+        if args.report:
+            args.query = get_canned_reports()[args.report]
+        if args.query is None:
+            arg_parser().error('Please specify a query or choose a canned report.')
+        report(args.query, debug=args.debug)
