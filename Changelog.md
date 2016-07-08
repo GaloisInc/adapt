@@ -2,6 +2,8 @@
 - Segmenter functions
 - Require Trusty64 >= 06/21/2016
 - Smarter testing / creation of Kafka topics
+- Schema change: Use Int64 microseconds for time, not strings.
+- Schema change: Add IP Protocol to NetFlow nodes.
 
 # 0.3.1 -- Minor point release, 2016-06-24
 - Fixes for CDM13 to Adapt Schema translation
