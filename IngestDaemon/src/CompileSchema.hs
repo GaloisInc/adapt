@@ -138,7 +138,8 @@ instance PropertiesAndTypeOf Entity where
                   : ("dstAddress", GremlinString entityDstAddress)
                   : ("srcPort", gremlinNum entitySrcPort)
                   : ("dstPort", gremlinNum entityDstPort)
-                  : propertiesOf entityInfo
+                  : mayAppend ( (("ipProtocol",) . gremlinNum) <$> entityIPProtocol)
+                    (propertiesOf entityInfo)
                 )
       Memory {..} ->
                ("Entity-Memory"
