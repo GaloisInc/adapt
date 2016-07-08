@@ -27,7 +27,7 @@
 #       sort -nk2
 #
 '''
-Ad hoc query runner to report on distinct Entity-File node values.
+Ad hoc query runner to report on e.g. distinct Entity-File node values.
 '''
 import argparse
 import collections
@@ -83,7 +83,7 @@ def report(query, threshold=1, debug=False):
         # Number of times we've seen a given filename or address.
         counts = collections.defaultdict(int)
 
-        for prop in gremlin_properties.fetch(gremlin, args.query):
+        for prop in gremlin_properties.fetch(gremlin, query):
 
             assert prop.source() in [  # So far, SRI SPADE & 5D are winning.
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
@@ -184,7 +184,7 @@ def get_canned_reports():
 
 def arg_parser():
     p = argparse.ArgumentParser(
-        description='Ad hoc query runner to report on Entity-File values.')
+        description='Ad hoc query runner to report on Entity-File values &c.')
     p.add_argument('--query', help='gremlin query to run')
     p.add_argument('--report', help='name of canned report to run',
                    choices=sorted(get_canned_reports().keys()))
