@@ -303,27 +303,14 @@ instance GraphId Text where
                          , ("edgeTy", A.String l)
                          ]
 
-encodeQuoteText :: Text -> Text
-encodeQuoteText = quote . subChars . escapeChars
-
 encodeGremlinValue :: GremlinValue -> Text
 encodeGremlinValue gv =
   case gv of
     GremlinString s -> escapeChars s
     GremlinNum  n   -> T.pack (show n)
     -- XXX maps and lists are only notionally supported
-    GremlinMap xs   -> T.concat ["'["
-                                 , T.concat (intersperse "," $ map renderKV xs)
-                                 , "]'"
-                                 ]
-    GremlinList vs  -> T.concat ["'[ "
-                                 , T.concat (intersperse "," $ map encodeGremlinValue vs)
-                                 , " ]'"
-                                 ]
-  where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
-
-quote :: Text -> Text
-quote b = T.concat ["\'", b, "\'"]
+    GremlinMap xs   -> T.decodeUtf8 $ ByteString.toStrict $ A.encode (Map.fromList xs)
+    GremlinList vs  -> T.decodeUtf8 $ ByteString.toStrict $ A.encode vs
 
 mkBinding :: [(Text, GremlinValue)] -> [(Text, A.Value)]
 mkBinding pvs =
@@ -351,14 +338,3 @@ escapeChars b
 
 escSet :: Set.Set Char
 escSet = Set.fromList ['\\', '"']
-
-subChars :: Text -> Text
-subChars b
-  | not (T.any (`Set.member` badChars) b) = b
-  | otherwise = T.map (\c -> maybe c id (Map.lookup c charRepl)) b
-
-charRepl :: Map.Map Char Char
-charRepl = Map.fromList [('\t',' ')]
-
-badChars :: Set.Set Char
-badChars = Map.keysSet charRepl
