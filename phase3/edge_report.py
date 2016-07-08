@@ -31,9 +31,11 @@
 Ad hoc query runner to report on CDM provenance edges.
 '''
 import argparse
+import json
 import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
+import cdm.enums
 import gremlin_properties
 import gremlin_query
 
@@ -44,20 +46,51 @@ def report(query, debug=False):
 
         for prop in gremlin_properties.fetch(gremlin, query):
 
+            print('')
+
             if debug:
-                print(prop.prop)
+                print(sorted(prop.prop))
+                print(prop['properties'])
 
             try:
                 print('%4d' % prop['file-version'], prop['url'])
             except KeyError:
                 pass
 
+            try:
+                print(cdm.enums.SrcSink(prop['srcSinkType']))
+            except KeyError:
+                pass
+
+            try:
+                print(prop['commandLine'])
+                # prop has 'commandLine', 'ident', 'pid', 'ppid', 'properties',
+                # 'source', 'subjectType', 'unitid', and properties has
+                # 'cwd', 'name', 'uid', 'gid'.
+            except KeyError:
+                pass
+
+            try:
+                stamp = prop['startedAtTime']
+                print(switch_brackets(
+                    prop['properties'].strip("'")))
+                properties = json.loads(switch_brackets(
+                    prop['properties'].strip("'")))
+                print(stamp, properties['name'])
+            except KeyError:
+                pass
+
     print(-1, query)
+
+
+def switch_brackets(s):
+    '''Turns [x] into {x}, and also returns JSON-compatible quotes.'''
+    return s.replace('[', '{').replace(']', '}').replace("'", '"')
 
 
 def get_canned_reports():
     labels = ('EDGE_EVENT_AFFECTS_FILE'
-              ' EDGE_EVENT_AFFECTS_MEMORY'
+              # ' EDGE_EVENT_AFFECTS_MEMORY'
               ' EDGE_EVENT_AFFECTS_SRCSINK'
               ' EDGE_EVENT_AFFECTS_SUBJECT'
               ' EDGE_EVENT_ISGENERATEDBY_SUBJECT'

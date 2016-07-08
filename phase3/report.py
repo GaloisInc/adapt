@@ -95,7 +95,7 @@ def report(query, threshold=1, debug=False):
                 .WINDOWS_FIVEDIRECTIONS.value == 12
 
             if debug:
-                print(prop.prop)
+                print(sorted(prop.prop))
 
             try:
                 counts['userID_' + prop['userID']] += 1
