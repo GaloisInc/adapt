@@ -203,7 +203,37 @@ class Segmenter:
 class DocumentGraph:
     def _populate_graph(self):
         for e in self.doc.expression_list:
-            if isinstance(e, Activity) or isinstance(e, Entity) or isinstance(e, EntityFile) or isinstance(e, EntityNetFlow) or isinstance(e, EntityMemory) or isinstance(e, Resource) or isinstance(e, Subject) or isinstance(e, Host) or isinstance(e, Agent) or isinstance(e, Pattern) or isinstance(e, Phase) or isinstance(e, APT) or isinstance(e, Segment) or isinstance(e, EDGE_EVENT_AFFECTS_MEMORY) or isinstance(e, EDGE_EVENT_AFFECTS_FILE) or isinstance(e, EDGE_EVENT_AFFECTS_NETFLOW) or isinstance(e, EDGE_EVENT_AFFECTS_SUBJECT) or isinstance(e, EDGE_EVENT_AFFECTS_SRCSINK) or isinstance(e, EDGE_EVENT_HASPARENT_EVENT) or isinstance(e, EDGE_EVENT_ISGENERATEDBY_SUBJECT) or isinstance(e, EDGE_EVENT_CAUSES_EVENT) or isinstance(e, EDGE_SUBJECT_AFFECTS_EVENT) or isinstance(e, EDGE_SUBJECT_HASPARENT_SUBJECT) or isinstance(e, EDGE_SUBJECT_HASPRINCIPAL) or isinstance(e, EDGE_SUBJECT_RUNSON) or isinstance(e, EDGE_FILE_AFFECTS_EVENT) or isinstance(e, EDGE_NETFLOW_AFFECTS_EVENT) or isinstance(e, EDGE_MEMORY_AFFECTS_EVENT) or isinstance(e, EDGE_SRCSINK_AFFECTS_EVENT) or isinstance(e, EDGE_OBJECT_PREV_VERSION) or isinstance(e, EDGE_SUBJECT_HASLOCALPRINCIPAL):
+            if (isinstance(e, Activity) or
+                    isinstance(e, Entity) or
+                    isinstance(e, EntityFile) or
+                    isinstance(e, EntityNetFlow) or
+                    isinstance(e, EntityMemory) or
+                    isinstance(e, Resource) or
+                    isinstance(e, Subject) or
+                    isinstance(e, Host) or
+                    isinstance(e, Agent) or
+                    isinstance(e, Pattern) or
+                    isinstance(e, Phase) or
+                    isinstance(e, APT) or
+                    isinstance(e, Segment) or
+                    isinstance(e, EDGE_EVENT_AFFECTS_MEMORY) or
+                    isinstance(e, EDGE_EVENT_AFFECTS_FILE) or
+                    isinstance(e, EDGE_EVENT_AFFECTS_NETFLOW) or
+                    isinstance(e, EDGE_EVENT_AFFECTS_SUBJECT) or
+                    isinstance(e, EDGE_EVENT_AFFECTS_SRCSINK) or
+                    isinstance(e, EDGE_EVENT_HASPARENT_EVENT) or
+                    isinstance(e, EDGE_EVENT_ISGENERATEDBY_SUBJECT) or
+                    isinstance(e, EDGE_EVENT_CAUSES_EVENT) or
+                    isinstance(e, EDGE_SUBJECT_AFFECTS_EVENT) or
+                    isinstance(e, EDGE_SUBJECT_HASPARENT_SUBJECT) or
+                    isinstance(e, EDGE_SUBJECT_HASPRINCIPAL) or
+                    isinstance(e, EDGE_SUBJECT_RUNSON) or
+                    isinstance(e, EDGE_FILE_AFFECTS_EVENT) or
+                    isinstance(e, EDGE_NETFLOW_AFFECTS_EVENT) or
+                    isinstance(e, EDGE_MEMORY_AFFECTS_EVENT) or
+                    isinstance(e, EDGE_SRCSINK_AFFECTS_EVENT) or
+                    isinstance(e, EDGE_OBJECT_PREV_VERSION) or
+                    isinstance(e, EDGE_SUBJECT_HASLOCALPRINCIPAL)):
                 self.g.add_node(e.id, e.att_val_dict)
             elif e is not None:
                 d = {}
