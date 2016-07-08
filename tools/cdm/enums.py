@@ -6,6 +6,7 @@ class Subject(Enum):
     THREAD = 1
     UNIT = 2
     BASIC_BLOCK = 3
+    SUBJECT_EVENT = 4
 
 
 class SrcSink(Enum):

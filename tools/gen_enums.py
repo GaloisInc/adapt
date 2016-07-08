@@ -78,6 +78,7 @@ def gen(fin, fout):
         klass = str(parsed[0]).replace('Type', '')
         out[klass] = ('\n\nclass %s(Enum):\n    ' % klass
                       + '\n    '.join(fmt(parsed[1:])) + '\n')
+    out['Subject'] += '    SUBJECT_EVENT = 4\n'  # CDM13.avdl lags behind :-(
     for klass in get_cdm13_avdl_spec_order():
         fout.write(out[klass])
 
