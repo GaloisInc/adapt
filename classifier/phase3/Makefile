@@ -1,5 +1,13 @@
 
-all: check_daemons /tmp/classified.txt
+#
+# Typical usage, faster than "make clean all",
+# is to start with the segmentation phase:
+#
+#     make clean && touch /tmp/1_trace_loaded.txt && time make
+#
+
+
+all: check_daemons TAGS /tmp/3_classified.txt
 
 
 check_daemons:
@@ -7,27 +15,39 @@ check_daemons:
 	pgrep supervisord > /dev/null
 
 
+TAGS: *.py */*.py
+	etags *.py */*.py ../../../adapt/tools/*/[a-z]*.py
+
+
+RSYNC = ~/adapt/trace/trace_rsync.sh
+
 ~/adapt/trace/current/5d_youtube_ie_output.bin:
-	~/adapt/trace/trace_rsync.sh
+	$(RSYNC)
+
+~/adapt/trace/current/infoleak_small_units.avro:
+	$(RSYNC)
+
+~/adapt/trace/current/ta5attack1_units.avro:
+	$(RSYNC)
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/trace_loaded.txt: ~/adapt/trace/current/5d_youtube_ie_output.bin
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/infoleak_small_units.avro
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p $< | tee $@
 	time ~/adapt/tools/await_completion.py se
 
 
-/tmp/segmented.txt: /tmp/trace_loaded.txt
+/tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
 	time ~/adapt/tools/label_histogram.py
-	./query.py --query "g.V().has(label, 'Entity-NetFlow').limit(5000)" | sort -nk2 | awk '$$2 >= 10'
+	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 10'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac
-	~/adapt/segment/segmenter/simple_segmenter.py --k 3 --drop | time tee $@
+	~/adapt/segment/segmenter/simple_segmenter.py --k 30 --drop | time tee $@
 
 
-/tmp/classified.txt: /tmp/segmented.txt
+/tmp/3_classified.txt: /tmp/2_segmented.txt
 	nosetests3 --with-doctest --doctest-tests test_precondition.py classify/*.py
 	./fg_classifier.py
 	nosetests3 --with-doctest --doctest-tests test_postcondition.py
@@ -40,4 +60,4 @@ tests:
 
 
 clean:
-	bash -c 'rm -f /tmp/{trace_loaded,segmented,classified}.txt'
+	bash -c 'rm -f TAGS /tmp/{1_trace_loaded,2_segmented,3_classified}.txt'

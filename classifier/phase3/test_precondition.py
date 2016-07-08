@@ -55,9 +55,9 @@ class TestPhase3Precondition(unittest.TestCase):
 
         with gremlin_query.Runner() as gremlin:
             # Ensure that we have some of these...
-            for x in ['Entity-NetFlow', 'Segment']:
+            for x in ['Entity-File', 'Segment']:
                 count = fetch1(gremlin, "g.V().has(label, '%s').count()" % x)
-                self.assertTrue(count > 0)
+                self.assertTrue(count > 0, x + ' count was %d' % count)
 
             # ...and none of these:
             count = fetch1(gremlin, "g.V().has(label, 'Activity').count()")

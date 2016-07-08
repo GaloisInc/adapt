@@ -1,15 +1,55 @@
 from enum import Enum
 
 
-class Instrumentationsource(Enum):
+class Subject(Enum):
+    PROCESS = 0
+    THREAD = 1
+    UNIT = 2
+    BASIC_BLOCK = 3
+    SUBJECT_EVENT = 4
+
+
+class SrcSink(Enum):
+    ACCELEROMETER = 0
+    TEMPERATURE = 1
+    GYROSCOPE = 2
+    MAGNETIC_FIELD = 3
+    HEART_RATE = 4
+    LIGHT = 5
+    PROXIMITY = 6
+    PRESSURE = 7
+    RELATIVE_HUMIDITY = 8
+    LINEAR_ACCELERATION = 9
+    MOTION = 10
+    STEP_DETECTOR = 11
+    STEP_COUNTER = 12
+    TILT_DETECTOR = 13
+    ROTATION_VECTOR = 14
+    GRAVITY = 15
+    GEOMAGNETIC_ROTATION_VECTOR = 16
+    CAMERA = 17
+    GPS = 18
+    AUDIO = 19
+    SYSTEM_PROPERTY = 20
+    ENV_VARIABLE = 21
+    SINK_IPC = 22
+    UNKNOWN = 23
+
+
+class InstrumentationSource(Enum):
     LINUX_AUDIT_TRACE = 0
     LINUX_PROC_TRACE = 1
     LINUX_BEEP_TRACE = 2
     FREEBSD_OPENBSM_TRACE = 3
     ANDROID_JAVA_CLEARSCOPE = 4
     ANDROID_NATIVE_CLEARSCOPE = 5
-    LINUX_AUDIT_CADETS = 6
-    WINDOWS_DIFT_FAROS = 7
+    FREEBSD_DTRACE_CADETS = 6
+    FREEBSD_TESLA_CADETS = 7
+    FREEBSD_LOOM_CADETS = 8
+    FREEBSD_MACIF_CADETS = 9
+    WINDOWS_DIFT_FAROS = 10
+    LINUX_THEIA = 11
+    WINDOWS_FIVEDIRECTIONS = 12
 
 
 class Principal(Enum):
@@ -36,68 +76,98 @@ class Event(Enum):
     MPROTECT = 15
     OPEN = 16
     READ = 17
-    RENAME = 18
-    WRITE = 19
-    SIGNAL = 20
-    TRUNCATE = 21
-    WAIT = 22
-    BLIND = 23
-    UNIT = 24
-    UPDATE = 25
+    RECVFROM = 18
+    RECVMSG = 19
+    RENAME = 20
+    WRITE = 21
+    SIGNAL = 22
+    TRUNCATE = 23
+    WAIT = 24
+    OS_UNKNOWN = 25
+    KERNEL_UNKNOWN = 26
+    APP_UNKNOWN = 27
+    UI_UNKNOWN = 28
+    UNKNOWN = 29
+    BLIND = 30
+    UNIT = 31
+    UPDATE = 32
+    SENDTO = 33
+    SENDMSG = 34
+    SHM = 35
+    EXIT = 36
 
 
-class Source(Enum):
-    ACCELEROMETER = 0
-    TEMPERATURE = 1
-    GYROSCOPE = 2
-    MAGNETIC_FIELD = 3
-    HEART_RATE = 4
-    LIGHT = 5
-    PROXIMITY = 6
-    PRESSURE = 7
-    RELATIVE_HUMIDITY = 8
-    LINEAR_ACCELERATION = 9
-    MOTION = 10
-    STEP_DETECTOR = 11
-    STEP_COUNTER = 12
-    TILT_DETECTOR = 13
-    ROTATION_VECTOR = 14
-    GRAVITY = 15
-    GEOMAGNETIC_ROTATION_VECTOR = 16
-    CAMERA = 17
-    GPS = 18
+class Edge(Enum):
+    EVENT_AFFECTS_MEMORY = 0
+    EVENT_AFFECTS_FILE = 1
+    EVENT_AFFECTS_NETFLOW = 2
+    EVENT_AFFECTS_SUBJECT = 3
+    EVENT_AFFECTS_SRCSINK = 4
+    EVENT_HASPARENT_EVENT = 5
+    EVENT_CAUSES_EVENT = 6
+    EVENT_ISGENERATEDBY_SUBJECT = 7
+    SUBJECT_AFFECTS_EVENT = 8
+    SUBJECT_HASPARENT_SUBJECT = 9
+    SUBJECT_HASLOCALPRINCIPAL = 10
+    SUBJECT_RUNSON = 11
+    FILE_AFFECTS_EVENT = 12
+    NETFLOW_AFFECTS_EVENT = 13
+    MEMORY_AFFECTS_EVENT = 14
+    SRCSINK_AFFECTS_EVENT = 15
+    OBJECT_PREV_VERSION = 16
+    FILE_HAS_TAG = 17
+    NETFLOW_HAS_TAG = 18
+    MEMORY_HAS_TAG = 19
+    SRCSINK_HAS_TAG = 20
+    SUBJECT_HAS_TAG = 21
+    EVENT_HAS_TAG = 22
+    EVENT_AFFECTS_REGISTRYKEY = 23
+    REGISTRYKEY_AFFECTS_EVENT = 24
+    REGISTRYKEY_HAS_TAG = 25
 
 
-class Integritytag(Enum):
+class Value(Enum):
+    TYPE_IN = 0
+    TYPE_OUT = 1
+    TYPE_INOUT = 2
+
+
+class ValueData(Enum):
+    DATA_TYPE_BYTE = 0
+    DATA_TYPE_BOOL = 1
+    DATA_TYPE_CHAR = 2
+    DATA_TYPE_SHORT = 3
+    DATA_TYPE_INT = 4
+    DATA_TYPE_FLOAT = 5
+    DATA_TYPE_LONG = 6
+    DATA_TYPE_DOUBLE = 7
+    DATA_TYPE_COMPLEX = 8
+
+
+class LocalAuth(Enum):
+    NONE = 0
+    PASSWORD = 1
+    PUBLIC_KEY = 2
+    ONE_TIME_PASSWORD = 3
+
+
+class TagOpCode(Enum):
+    SEQUENCE = 0
+    UNION = 1
+    ENCODE = 2
+    STRONG = 3
+    MEDIUM = 4
+    WEAK = 5
+
+
+class IntegrityTag(Enum):
     UNTRUSTED = 0
     BENIGN = 1
     INVULNERABLE = 2
 
 
-class Confidentialitytag(Enum):
+class ConfidentialityTag(Enum):
     SECRET = 0
     SENSITIVE = 1
     PRIVATE = 2
     PUBLIC = 3
-
-
-class Subject(Enum):
-    PROCESS = 0
-    THREAD = 1
-    UNIT = 2
-    BLOCK = 3
-    EVENT = 4
-
-
-class Strength(Enum):
-    WEAK = 0
-    MEDIUM = 1
-    STRONG = 2
-
-
-class Derivation(Enum):
-    COPY = 0
-    ENCODE = 1
-    COMPILE = 2
-    ENCRYPT = 3
-    OTHER = 4
