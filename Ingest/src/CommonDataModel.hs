@@ -224,6 +224,7 @@ translateNetFlowObject (NetFlowObject {..}) = do
                 , S.entityDstAddress   = nfDstAddress
                 , S.entitySrcPort      = nfSrcPort
                 , S.entityDstPort      = nfDstPort
+                , S.entityIPProtocol   = fmap fromIntegral nfIpProtocol
                 }
   tellNode (S.NodeEntity e)
 {-# INLINE translateNetFlowObject #-}

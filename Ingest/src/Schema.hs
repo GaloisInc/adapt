@@ -52,6 +52,7 @@ data Entity
                 , entityDstAddress   :: DstAddress
                 , entitySrcPort      :: SrcPort
                 , entityDstPort      :: DstPort
+                , entityIPProtocol   :: Maybe Word32
                 }
       | Memory { entitySource       :: InstrumentationSource
                , entityUID          :: UID
