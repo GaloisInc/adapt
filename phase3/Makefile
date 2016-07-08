@@ -40,7 +40,6 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 	$(RSYNC)
 
 
-
 # Keep track in the filesystem of whether ingestd has run yet.
 /tmp/1_trace_loaded.txt: ~/adapt/trace/current/gather.avro.bin
 	killall ingestd; sleep 1  # Background writers can interfere with drop.

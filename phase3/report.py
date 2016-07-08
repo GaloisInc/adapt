@@ -45,7 +45,7 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
-    filespec_re = re.compile('^(C:|[A-Z]:|file://)')
+    filespec_re = re.compile('^(C:|[A-Z]:|/|file://)')
     crazy_started_re = re.compile(
         '^\d{4,8}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$')
 
@@ -85,7 +85,8 @@ def report(query, threshold=1, debug=False):
 
         for prop in gremlin_properties.fetch(gremlin, query):
 
-            assert prop.source() in [  # So far, SRI SPADE & 5D are winning.
+            assert prop.source() in [
+                cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
                 cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS,
