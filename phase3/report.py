@@ -189,14 +189,20 @@ def arg_parser():
     p.add_argument('--query', help='gremlin query to run')
     p.add_argument('--report', help='name of canned report to run',
                    choices=sorted(get_canned_reports().keys()))
+    p.add_argument('--all', help='run all canned reports', action='store_true')
     p.add_argument('--debug', help='verbose output', action='store_true')
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    if args.report:
-        args.query = get_canned_reports()[args.report]
-    if args.query is None:
-        arg_parser().error('Please specify a query or choose a canned report.')
-    report(args.query, debug=args.debug)
+    if args.all:
+        for name, query in sorted(get_canned_reports().items()):
+            print('\n' + name)
+            report(query, debug=args.debug)
+    else:
+        if args.report:
+            args.query = get_canned_reports()[args.report]
+        if args.query is None:
+            arg_parser().error('Please specify a query or choose a canned report.')
+        report(args.query, debug=args.debug)
