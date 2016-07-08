@@ -3,7 +3,7 @@
 import asyncio
 from aiogremlin import GremlinClient
 import sys
-
+import csv
 
 url='http://localhost:8182/'
 loop = asyncio.get_event_loop()
@@ -17,9 +17,10 @@ def run_query(query, bindings={}):
 
 
 # feature headers
-f_h = ['srcAddress', 'srcPort', 'dstAddress', 'dstPort']
+f_h = ['eventType', 'srcAddress', 'srcPort', 'dstAddress', 'dstPort']
 # feature extraction queries
-f_q = [	"values('srcAddress')",
+f_q = [	"inE('EDGE_EVENT_AFFECTS_NETFLOW in').outV().inE('EDGE_EVENT_AFFECTS_NETFLOW out').outV().values('eventType')",
+        "values('srcAddress')",
         "values('srcPort')",
         "values('dstAddress')",
         "values('dstPort')"]
@@ -35,7 +36,7 @@ def process(q, ret):
     return ret
 
 def extract_features_and_write_to_file(out_file):
-    print("Writing features to file: "+ out_file)
+    print("Writing features to file: " + out_file)
     f = open(out_file, "w")
     f.write("ident")
     for h in f_h:
@@ -54,10 +55,38 @@ def extract_features_and_write_to_file(out_file):
     f.close()
     print("Writing Finished")
 
+def convert_to_binary_features(in_file, out_file):
+    with open(in_file, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        data = {}
+        for row in reader:
+            for header, value in row.items():
+                try:
+                    data[header].append(value)
+                except KeyError:
+                    data[header] = [value]
+        for h in f_h:
+            data[h] = list(set(data[h]))
+        f = open(out_file, "w")
+        f.write("ident")
+        for h in f_h:
+            for item in data[h]:
+                f.write("," + h + "_" + str(item))
+        f.write("\n")
+        csvfile.seek(0)
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            f.write(row['ident'])
+            for h in f_h:
+                for item in data[h]:
+                    f.write("," + str(1 if(item == row[h]) else 0))
+            f.write("\n")
+
 
 # main
 out_file = sys.argv[1]
-extract_features_and_write_to_file(out_file)
-
+temp_file = 'temp.csv'
+extract_features_and_write_to_file(temp_file)
+convert_to_binary_features(temp_file, out_file)
 loop.run_until_complete(gc.close())
 loop.close()
