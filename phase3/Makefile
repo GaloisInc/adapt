@@ -30,9 +30,12 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 ~/adapt/trace/current/ta5attack1_units.avro:
 	$(RSYNC)
 
+~/adapt/trace/current/gather.avro.bin:
+	$(RSYNC)
+
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/infoleak_small_units.avro
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/gather.avro.bin
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p $< | tee $@
