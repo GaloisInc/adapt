@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import           Data.Char (isUpper)
 import qualified Data.Char as C
 import           Data.Foldable as F
+import           Data.Int (Int64)
 import           Data.List (intersperse)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -29,7 +30,6 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time
 import           Schema hiding (Env)
 import           System.Entropy (getEntropy)
 
@@ -138,7 +138,8 @@ instance PropertiesAndTypeOf Entity where
                   : ("dstAddress", GremlinString entityDstAddress)
                   : ("srcPort", gremlinNum entitySrcPort)
                   : ("dstPort", gremlinNum entityDstPort)
-                  : propertiesOf entityInfo
+                  : mayAppend ( (("ipProtocol",) . gremlinNum) <$> entityIPProtocol)
+                    (propertiesOf entityInfo)
                 )
       Memory {..} ->
                ("Entity-Memory"
@@ -162,8 +163,8 @@ instance PropertiesOf SubjectType where
 instance PropertiesOf EventType where
   propertiesOf s = [("eventType", gremlinNum (fromEnum s))]
 
-gremlinTime :: UTCTime -> GremlinValue
-gremlinTime t = GremlinString (T.pack $ show t)
+gremlinTime :: Int64 -> GremlinValue
+gremlinTime = gremlinNum
 
 gremlinList :: [Text] -> GremlinValue
 gremlinList = GremlinList . map GremlinString
@@ -302,27 +303,14 @@ instance GraphId Text where
                          , ("edgeTy", A.String l)
                          ]
 
-encodeQuoteText :: Text -> Text
-encodeQuoteText = quote . subChars . escapeChars
-
 encodeGremlinValue :: GremlinValue -> Text
 encodeGremlinValue gv =
   case gv of
-    GremlinString s -> escapeChars s
+    GremlinString s -> s
     GremlinNum  n   -> T.pack (show n)
     -- XXX maps and lists are only notionally supported
-    GremlinMap xs   -> T.concat ["'["
-                                 , T.concat (intersperse "," $ map renderKV xs)
-                                 , "]'"
-                                 ]
-    GremlinList vs  -> T.concat ["'[ "
-                                 , T.concat (intersperse "," $ map encodeGremlinValue vs)
-                                 , " ]'"
-                                 ]
-  where renderKV (k,v) = encodeQuoteText k <> " : " <> encodeGremlinValue v
-
-quote :: Text -> Text
-quote b = T.concat ["\'", b, "\'"]
+    GremlinMap xs   -> T.decodeUtf8 $ ByteString.toStrict $ A.encode (Map.fromList xs)
+    GremlinList vs  -> T.decodeUtf8 $ ByteString.toStrict $ A.encode vs
 
 mkBinding :: [(Text, GremlinValue)] -> [(Text, A.Value)]
 mkBinding pvs =
@@ -350,14 +338,3 @@ escapeChars b
 
 escSet :: Set.Set Char
 escSet = Set.fromList ['\\', '"']
-
-subChars :: Text -> Text
-subChars b
-  | not (T.any (`Set.member` badChars) b) = b
-  | otherwise = T.map (\c -> maybe c id (Map.lookup c charRepl)) b
-
-charRepl :: Map.Map Char Char
-charRepl = Map.fromList [('\t',' ')]
-
-badChars :: Set.Set Char
-badChars = Map.keysSet charRepl

@@ -13,8 +13,6 @@ import           Data.Int
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
-import           Data.Time
-import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import           MonadLib
 
 import           CommonDataModel.Types
@@ -226,6 +224,7 @@ translateNetFlowObject (NetFlowObject {..}) = do
                 , S.entityDstAddress   = nfDstAddress
                 , S.entitySrcPort      = nfSrcPort
                 , S.entityDstPort      = nfDstPort
+                , S.entityIPProtocol   = fmap fromIntegral nfIpProtocol
                 }
   tellNode (S.NodeEntity e)
 {-# INLINE translateNetFlowObject #-}
@@ -285,8 +284,8 @@ translateMemoryObject  (MemoryObject {..}) = do
   tellNode (S.NodeEntity m)
 {-# INLINE translateMemoryObject #-}
 
-translateTime :: Int64 -> UTCTime
-translateTime = posixSecondsToUTCTime . fromIntegral
+translateTime :: Int64 -> Int64
+translateTime = id
 {-# INLINE translateTime #-}
 
 translatePrincipalType :: PrincipalType -> S.PrincipalType

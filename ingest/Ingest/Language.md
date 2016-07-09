@@ -386,17 +386,17 @@ Other primitive types used in our model:
 * *prov-tc:time* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('time').dataType(Date.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('time').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov:startedAtTime* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('startedAtTime').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('startedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov:endedAtTime* : ZuluTime;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('endedAtTime').dataType(String.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('endedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:srcAddress* : string;
   and maps to the Titan data type:
@@ -417,6 +417,11 @@ Other primitive types used in our model:
   and maps to the Titan data type:
   [schema]: #
   makePropertyKey('dstPort').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+
+* *prov-tc:IpProtocol* : int;
+  and maps to the Titan data type:
+  [schema]: #
+  makePropertyKey('ipProtocol').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pageNumber* : Maybe int;
   and maps to the Titan data type:

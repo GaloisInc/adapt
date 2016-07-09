@@ -9,7 +9,6 @@ import           Data.Int
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
-import           Data.Time (UTCTime)
 import           Data.Word
 import           GHC.Generics
 
@@ -53,6 +52,7 @@ data Entity
                 , entityDstAddress   :: DstAddress
                 , entitySrcPort      :: SrcPort
                 , entityDstPort      :: DstPort
+                , entityIPProtocol   :: Maybe Word32
                 }
       | Memory { entitySource       :: InstrumentationSource
                , entityUID          :: UID
@@ -294,9 +294,9 @@ type FileVersion   = Int64
 type Size          = Int64
 type Permissions   = Word16 -- 2 bytes, decoded in little endian to match much of Avro
 type Sequence      = Int64
-type Time          = UTCTime -- ZuluTime
-type StartedAtTime = UTCTime
-type EndedAtTime   = UTCTime
+type Time          = Int64 -- Microseconds from posix epoch
+type StartedAtTime = Int64
+type EndedAtTime   = Int64
 type IPAddress     = Text
 type SrcAddress    = Text
 type SrcPort       = Int32

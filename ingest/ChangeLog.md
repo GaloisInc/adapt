@@ -4,6 +4,9 @@
 * More CDM13->Adapt Schema fixes.
 * stack.yaml updates for avro library.
 * Do not add empty 'properties' maps to the database
+* Schema Change: Use Int64 microseconds, not UTC converted to strings, for our times
+* Schema Change: Include IP Protocol in NetFlow data.
+* Properties and string escape fixes (#11, #12)
 
 ## 0.3 -- 2016-06-23
 * Use the 'avro' library to handle avro decoding, schema resolution and container objects.
