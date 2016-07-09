@@ -25,7 +25,7 @@ Displays number of occurences of each distinct node label.
 '''
 
 import gremlin_query
-import collections
+import json
 
 __author__ = 'John.Hanley@parc.com'
 
@@ -33,14 +33,13 @@ __author__ = 'John.Hanley@parc.com'
 def get_label_counts():
     '''Queries titan with read throughput of ~2700 node/sec.'''
     with gremlin_query.Runner() as gremlin:
-        cnt = collections.defaultdict(int)
-        q = 'g.V().label()'
+        cnt = {}
+        q = 'g.V().countBy{ it.label() }'
+        q = 'g.V().groupCount().by(label())'
         for msg in gremlin.fetch(q):
             if msg.data:
-                for label in msg.data:
-                    assert 'total' != label
-                    cnt['total'] += 1
-                    cnt[label] += 1
+                assert len(msg.data) == 1
+                cnt = msg.data[0]
 
     return sorted(['%6d  %s' % (cnt[k], k)
                    for k in cnt.keys()])
