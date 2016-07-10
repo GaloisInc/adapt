@@ -46,10 +46,11 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
-    filespec_re = re.compile('^(C:|[A-Z]:|/|file://)')
+    # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
+    filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w)')
 
     def validate_file(file):
-        assert filespec_re.search(file), file
+        assert filespec_re.search(file.strip('"')), file
         return file
 
     def validate_ip(ip4):
@@ -88,6 +89,7 @@ def report(query, threshold=1, debug=False):
                 cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
+                cdm.enums.InstrumentationSource.LINUX_THEIA,
                 cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS,
                 None  # Hmmm, who's injecting untagged 'Resource' base events?
             ], prop.source()
