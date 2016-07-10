@@ -40,6 +40,7 @@ def get_label_counts():
             if msg.data:
                 assert len(msg.data) == 1
                 cnt = msg.data[0]
+                cnt['total'] = sum(cnt.values())
 
     return sorted(['%6d  %s' % (cnt[k], k)
                    for k in cnt.keys()])
