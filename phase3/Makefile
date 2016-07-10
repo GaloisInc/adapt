@@ -41,7 +41,8 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack1_units.avro
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack2_units.avro
+	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p $< | tee $@
@@ -49,7 +50,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
-	time ~/adapt/tools/label_histogram.py
+	time ~/adapt/tools/label_count.py
 	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 1'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac

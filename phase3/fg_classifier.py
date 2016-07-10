@@ -26,12 +26,15 @@ The foreground classifier is a kafka producer.
 '''
 import argparse
 import classify
+import inspect
 import kafka
 import logging
 import os
+import parsley
 import struct
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
+import adapt
 import gremlin_query
 
 __author__ = 'John.Hanley@parc.com'
@@ -46,6 +49,15 @@ log.setLevel(logging.INFO)
 
 STATUS_IN_PROGRESS = b'\x00'
 STATUS_DONE = b'\x01'
+
+
+def get_grammar():
+    return """
+exfil_channel = 'http_post_activity'
+                | 'ssh_activity'
+exfil_execution = exfil_channel 'TCP'
+exfil_format = 'compress_activity'? 'encrypt_activity'?
+"""
 
 
 def report_status(status, downstreams='dx ui'.split()):
@@ -67,6 +79,7 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
+    gr = parsley.makeGrammar(get_grammar(), {})
     with gremlin_query.Runner() as gremlin:
         ac = classify.ActivityClassifier(gremlin)
         ac.classify(ac.find_new_segments(0))
