@@ -38,7 +38,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/cameragrab1.bin
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/recordaudio1.bin
 	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
