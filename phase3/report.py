@@ -47,10 +47,10 @@ def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
     # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
-    filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w)')
+    filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
     def validate_file(file):
-        assert filespec_re.search(file.strip('"')), file
+        assert filespec_re.search(file), file
         return file
 
     def validate_ip(ip4):
@@ -110,8 +110,10 @@ def report(query, threshold=1, debug=False):
             except KeyError:
                 pass
 
+            # Remove strip() once this issue is closed:
+            # https://git.tc.bbn.com/ta1-theia/ta1-integration-theia/issues/5
             try:
-                counts[validate_file(prop['url'])] += 1  # file
+                counts[validate_file(prop['url'].strip('"'))] += 1  # file
             except KeyError:
                 pass
 
