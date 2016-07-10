@@ -31,6 +31,7 @@ Ad hoc query runner to report on e.g. distinct Entity-File node values.
 '''
 import argparse
 import collections
+import datetime
 import dns.resolver
 import json
 import os
@@ -46,8 +47,6 @@ def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
     filespec_re = re.compile('^(C:|[A-Z]:|/|file://)')
-    crazy_started_re = re.compile(
-        '^\d{4,8}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$')
 
     def validate_file(file):
         assert filespec_re.search(file), file
@@ -139,15 +138,15 @@ def report(query, threshold=1, debug=False):
                 # Currently this would fail, as 4 is greater than the max of 3.
                 # counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
 
-                stamp = prop['startedAtTime']
-                assert crazy_started_re.search(stamp), stamp
-                # e.g. a so-called timestamp of "45957544-07-27 13:43:20 UTC"
-                # or occasionally "1970-01-01 00:00:00 UTC"
+                usec = int(prop['startedAtTime'])
+                stamp = datetime.datetime.utcfromtimestamp(usec / 1e6)
+                if usec != 0:  # Sigh! Why do people insert zeros?
+                    assert str(stamp) > '2015-01-01', stamp
 
                 properties = json.loads(switch_brackets(
                     prop['properties'].strip("'")))
                 # The seq so nice, gotta say it twice.
-                assert properties['event id'] == prop['sequence']
+                assert int(properties['event id']) == prop['sequence'], es
             except KeyError:
                 pass
         i = 1
