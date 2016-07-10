@@ -138,8 +138,7 @@ def report(query, threshold=1, debug=False):
             try:
                 counts[str(cdm.enums.Event(prop['eventType']))] += 1  # subject
 
-                # Currently this would fail, as 4 is greater than the max of 3.
-                # counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
+                counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
 
                 usec = int(prop['startedAtTime'])
                 stamp = datetime.datetime.utcfromtimestamp(usec / 1e6)
