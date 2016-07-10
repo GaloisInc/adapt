@@ -172,7 +172,7 @@ def get_canned_reports():
     labels = 'Agent Entity-File Entity-Memory Entity-Netflow Resource Subject'
     for label in labels.split():
         name = re.sub(r'^Entity-', '', label).lower()
-        ret[name] = "g.V().has(label, '%s').limit(5000)" % label
+        ret[name] = "g.V().hasLabel('%s').limit(5000)" % label
     return ret
     # Finds a pair of accelerometer reports:
     # g.V().has(label, 'EDGE_EVENT_AFFECTS_SRCSINK').outE().inV().valueMap()
