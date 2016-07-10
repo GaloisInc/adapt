@@ -104,8 +104,8 @@ def report(query, threshold=1, debug=False):
                 # http://tinyurl.com/cdm13-spec says yes, we need this nonsense
                 properties = json.loads(switch_brackets(
                     prop['properties'].strip("'")))
-                counts['euid_%d' % properties['euid']] += 1
-                counts['egid_%d' % properties['egid']] += 1
+                counts['euid_%d' % int(properties['euid'])] += 1
+                counts['egid_%d' % int(properties['egid'])] += 1
             except KeyError:
                 pass
 
