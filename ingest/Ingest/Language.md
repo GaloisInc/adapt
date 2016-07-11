@@ -966,6 +966,15 @@ makeVertexLabel('EDGE_OBJECT_PREV_VERSION')
 [schema]: #
 makeEdgeLabel('EDGE_OBJECT_PREV_VERSION in').multiplicity(ONE2ONE)
 
+Accepting these three THEIA vertex types keeps a great many exceptions out of gremlin-server.log.
+
+[schema]: #
+makeVertexLabel('EDGE_FILE_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_MEMORY_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_NETFLOW_HAS_TAG')
+
 A Note About Provenance Tags
 ----------
 
@@ -1016,6 +1025,13 @@ This relationship connects a pattern instance to a component base layer element.
 
 [schema]: #
 makeEdgeLabel('prov-tc:partOfPattern').multiplicity(SIMPLE)
+
+This one seems dicey, and urelated to the ADAPT notion of "pattern". Delete, once ingestd suppresses such vertices from 5D traces.
+[schema]: #
+makeVertexLabel('PART_OF_PATTERN')
+[schema]: #
+makeEdgeLabel('PART_OF_PATTERN out').multiplicity(SIMPLE)
+
 
 prov-tc:partOfActivity (not in CDM)
 ----------
