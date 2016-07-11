@@ -36,14 +36,15 @@ def get_label_counts(with_edges=False):
     if with_edges:
         queries.append('g.E().groupCount().by(label())')
 
+    cnt = {}
     with gremlin_query.Runner() as gremlin:
-        cnt = {}
         for query in queries:
             for msg in gremlin.fetch(query):
                 if msg.data:
                     assert len(msg.data) == 1
-                    cnt = msg.data[0]
-                    cnt['total'] = sum(cnt.values())
+                    cnt.update(msg.data[0])
+
+    cnt['total'] = sum(cnt.values())
 
     return sorted(['%6d  %s' % (cnt[k], k)
                    for k in cnt.keys()])
