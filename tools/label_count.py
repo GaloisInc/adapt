@@ -24,27 +24,39 @@
 Displays number of occurences of each distinct node label.
 '''
 
+import argparse
 import gremlin_query
-import json
 
 __author__ = 'John.Hanley@parc.com'
 
 
-def get_label_counts():
+def get_label_counts(with_edges=False):
     '''Queries titan with read throughput of ~2700 node/sec.'''
+    queries = ['g.V().groupCount().by(label())']
+    if with_edges:
+        queries.append('g.E().groupCount().by(label())')
+
     with gremlin_query.Runner() as gremlin:
         cnt = {}
-        q = 'g.V().countBy{ it.label() }'
-        q = 'g.V().groupCount().by(label())'
-        for msg in gremlin.fetch(q):
-            if msg.data:
-                assert len(msg.data) == 1
-                cnt = msg.data[0]
-                cnt['total'] = sum(cnt.values())
+        for query in queries:
+            for msg in gremlin.fetch(query):
+                if msg.data:
+                    assert len(msg.data) == 1
+                    cnt = msg.data[0]
+                    cnt['total'] = sum(cnt.values())
 
     return sorted(['%6d  %s' % (cnt[k], k)
                    for k in cnt.keys()])
 
 
+def arg_parser():
+    p = argparse.ArgumentParser(
+        description='Reports on number of distinct labels (and edges).')
+    p.add_argument('--with-edges', action='store_true',
+                   help='report on edges, as well')
+    return p
+
+
 if __name__ == '__main__':
-    print('\n'.join(get_label_counts()))
+    args = arg_parser().parse_args()
+    print('\n'.join(get_label_counts(args.with_edges)))
