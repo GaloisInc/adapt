@@ -428,10 +428,10 @@ Other primitive types used in our model:
   [schema]: #
   makePropertyKey('pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
-* *prov-tc:address* : int;
+* *prov-tc:address* : long;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('address').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pid* : int;
   and maps to the Titan data type:
