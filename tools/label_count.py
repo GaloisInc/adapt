@@ -20,67 +20,44 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-#
 '''
-The foreground classifier is a kafka producer.
+Displays number of occurences of each distinct node label.
 '''
+
 import argparse
-import classify
-import inspect
-import kafka
-import logging
-import os
-import parsley
-import struct
-import sys
-sys.path.append(os.path.expanduser('~/adapt/tools'))
-import adapt
 import gremlin_query
 
 __author__ = 'John.Hanley@parc.com'
 
-log = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-log.addHandler(handler)
-log.setLevel(logging.INFO)
 
+def get_label_counts(with_edges=False):
+    '''Queries titan with read throughput of ~2700 node/sec.'''
+    queries = ['g.V().groupCount().by(label())']
+    if with_edges:
+        queries.append('g.E().groupCount().by(label())')
 
-STATUS_IN_PROGRESS = b'\x00'
-STATUS_DONE = b'\x01'
+    cnt = {}
+    with gremlin_query.Runner() as gremlin:
+        for query in queries:
+            for msg in gremlin.fetch(query):
+                if msg.data:
+                    assert len(msg.data) == 1
+                    cnt.update(msg.data[0])
 
+    cnt['total'] = sum(cnt.values())
 
-def get_grammar():
-    return """
-exfil_channel = 'http_post_activity'
-                | 'ssh_activity'
-exfil_execution = exfil_channel 'TCP'
-exfil_format = 'compress_activity'? 'encrypt_activity'?
-"""
-
-
-def report_status(status, downstreams='dx ui'.split()):
-    def to_int(status_byte):
-        return struct.unpack("B", status_byte)[0]
-
-    log.debug("reporting %d", to_int(status))
-    producer = kafka.KafkaProducer()
-    for downstream in downstreams:
-        s = producer.send(downstream, status).get()
-        log.debug("sent: %s", s)
+    return sorted(['%6d  %s' % (cnt[k], k)
+                   for k in cnt.keys()])
 
 
 def arg_parser():
     p = argparse.ArgumentParser(
-        description='Classify activities found in segments of a CDM13 trace.')
+        description='Reports on number of distinct labels (and edges).')
+    p.add_argument('--with-edges', action='store_true',
+                   help='report on edges, as well')
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    gr = parsley.makeGrammar(get_grammar(), {})
-    with gremlin_query.Runner() as gremlin:
-        ac = classify.ActivityClassifier(gremlin)
-        ac.classify(ac.find_new_segments(0))
-    report_status(STATUS_DONE)
+    print('\n'.join(get_label_counts(args.with_edges)))

@@ -31,6 +31,7 @@ Ad hoc query runner to report on e.g. distinct Entity-File node values.
 '''
 import argparse
 import collections
+import datetime
 import dns.resolver
 import json
 import os
@@ -45,9 +46,8 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
-    filespec_re = re.compile('^(C:|[A-Z]:|/|file://)')
-    crazy_started_re = re.compile(
-        '^\d{4,8}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$')
+    # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
+    filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
     def validate_file(file):
         assert filespec_re.search(file), file
@@ -89,6 +89,7 @@ def report(query, threshold=1, debug=False):
                 cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
+                cdm.enums.InstrumentationSource.LINUX_THEIA,
                 cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS,
                 None  # Hmmm, who's injecting untagged 'Resource' base events?
             ], prop.source()
@@ -102,15 +103,16 @@ def report(query, threshold=1, debug=False):
                 counts['userID_' + prop['userID']] += 1
                 counts['gid_' + prop['gid']] += 1
                 # http://tinyurl.com/cdm13-spec says yes, we need this nonsense
-                properties = json.loads(switch_brackets(
-                    prop['properties'].strip("'")))
-                counts['euid_%d' % properties['euid']] += 1
-                counts['egid_%d' % properties['egid']] += 1
+                properties = json.loads(prop['properties'])
+                counts['euid_%d' % int(properties['euid'])] += 1
+                counts['egid_%d' % int(properties['egid'])] += 1
             except KeyError:
                 pass
 
+            # Remove strip() once this issue is closed:
+            # https://git.tc.bbn.com/ta1-theia/ta1-integration-theia/issues/5
             try:
-                counts[validate_file(prop['url'])] += 1  # file
+                counts[validate_file(prop['url'].strip('"'))] += 1  # file
             except KeyError:
                 pass
 
@@ -136,18 +138,18 @@ def report(query, threshold=1, debug=False):
             try:
                 counts[str(cdm.enums.Event(prop['eventType']))] += 1  # subject
 
-                # Currently this would fail, as 4 is greater than the max of 3.
-                # counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
+                counts[str(cdm.enums.Subject(prop['subjectType']))] += 1
 
-                stamp = prop['startedAtTime']
-                assert crazy_started_re.search(stamp), stamp
-                # e.g. a so-called timestamp of "45957544-07-27 13:43:20 UTC"
-                # or occasionally "1970-01-01 00:00:00 UTC"
+                usec = int(prop['startedAtTime'])
+                stamp = datetime.datetime.utcfromtimestamp(usec / 1e6)
+                five_d = cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+                if prop.source() != five_d:  # 5D uses dates like 17-Jan-1970.
+                    if usec != 0:  # Sigh! Why do people insert zeros?
+                        assert str(stamp) > '2015-01-01', stamp
 
-                properties = json.loads(switch_brackets(
-                    prop['properties'].strip("'")))
+                properties = json.loads(prop['properties'])
                 # The seq so nice, gotta say it twice.
-                assert properties['event id'] == prop['sequence']
+                assert int(properties['event id']) == prop['sequence'], stamp
             except KeyError:
                 pass
         i = 1
@@ -155,11 +157,6 @@ def report(query, threshold=1, debug=False):
             if count >= threshold:
                 print('%4d %4d  %s' % (i, count, file))
             i += 1
-
-
-def switch_brackets(s):
-    '''Turns [x] into {x}, and also returns JSON-compatible quotes.'''
-    return s.replace('[', '{').replace(']', '}').replace("'", '"')
 
 
 def get_canned_reports():
@@ -177,7 +174,7 @@ def get_canned_reports():
     labels = 'Agent Entity-File Entity-Memory Entity-Netflow Resource Subject'
     for label in labels.split():
         name = re.sub(r'^Entity-', '', label).lower()
-        ret[name] = "g.V().has(label, '%s').limit(5000)" % label
+        ret[name] = "g.V().hasLabel('%s').limit(5000)" % label
     return ret
     # Finds a pair of accelerometer reports:
     # g.V().has(label, 'EDGE_EVENT_AFFECTS_SRCSINK').outE().inV().valueMap()

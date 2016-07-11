@@ -20,31 +20,5 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
-'''
-Displays number of occurences of each distinct node label.
-'''
 
-import gremlin_query
-import collections
-
-__author__ = 'John.Hanley@parc.com'
-
-
-def get_label_counts():
-    '''Queries titan with read throughput of ~2700 node/sec.'''
-    with gremlin_query.Runner() as gremlin:
-        cnt = collections.defaultdict(int)
-        q = 'g.V().label()'
-        for msg in gremlin.fetch(q):
-            if msg.data:
-                for label in msg.data:
-                    assert 'total' != label
-                    cnt['total'] += 1
-                    cnt[label] += 1
-
-    return sorted(['%6d  %s' % (cnt[k], k)
-                   for k in cnt.keys()])
-
-
-if __name__ == '__main__':
-    print('\n'.join(get_label_counts()))
+from . grammar import Grammar

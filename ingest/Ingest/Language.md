@@ -428,10 +428,10 @@ Other primitive types used in our model:
   [schema]: #
   makePropertyKey('pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
-* *prov-tc:address* : int;
+* *prov-tc:address* : long;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('address').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pid* : int;
   and maps to the Titan data type:
@@ -966,6 +966,35 @@ makeVertexLabel('EDGE_OBJECT_PREV_VERSION')
 [schema]: #
 makeEdgeLabel('EDGE_OBJECT_PREV_VERSION in').multiplicity(ONE2ONE)
 
+Accepting these three THEIA vertex types keeps a great many exceptions out of gremlin-server.log.
+
+[schema]: #
+makeVertexLabel('EDGE_FILE_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_MEMORY_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_NETFLOW_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG out').multiplicity(SIMPLE)
+
+Bad_ls includes EDGE_SUBJECT_HAS_TAG.
+[schema]: #
+makeVertexLabel('EDGE_SUBJECT_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG out').multiplicity(SIMPLE)
+
 A Note About Provenance Tags
 ----------
 
@@ -1016,6 +1045,13 @@ This relationship connects a pattern instance to a component base layer element.
 
 [schema]: #
 makeEdgeLabel('prov-tc:partOfPattern').multiplicity(SIMPLE)
+
+This one seems dicey, and urelated to the ADAPT notion of "pattern". Delete, once ingestd suppresses such vertices from 5D traces.
+[schema]: #
+makeVertexLabel('PART_OF_PATTERN')
+[schema]: #
+makeEdgeLabel('PART_OF_PATTERN out').multiplicity(SIMPLE)
+
 
 prov-tc:partOfActivity (not in CDM)
 ----------

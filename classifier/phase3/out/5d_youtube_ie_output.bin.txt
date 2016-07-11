@@ -1,0 +1,273 @@
+Sent 11106 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+     1  EDGE_SUBJECT_HASLOCALPRINCIPAL
+     2  Agent
+     2  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+     2  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+     5  EDGE_OBJECT_PREV_VERSION
+     6  EDGE_OBJECT_PREV_VERSION in
+     6  EDGE_OBJECT_PREV_VERSION out
+    15  EDGE_EVENT_AFFECTS_FILE
+    17  EDGE_FILE_AFFECTS_EVENT
+    21  EDGE_EVENT_AFFECTS_FILE in
+    22  EDGE_EVENT_AFFECTS_FILE out
+    28  EDGE_FILE_AFFECTS_EVENT in
+    28  EDGE_FILE_AFFECTS_EVENT out
+    37  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+    64  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+    65  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+    71  Entity-File
+   101  Subject
+   493  total
+
+
+agent
+   1    1  userID_S-1-5-18
+   2    2  userID_S-1-5-21-487229149-790607292-55006933-1000
+
+file
+   1    1  C:\Program Files (x86)\Internet Explorer
+   2    1  C:\Program Files (x86)\Internet Explorer\IEShims.dll
+   3    1  C:\Program Files (x86)\Internet Explorer\en-US\iexplore.exe.mui
+   4    1  C:\Program Files (x86)\Internet Explorer\ieproxy.dll
+   5    1  C:\Program Files (x86)\Internet Explorer\iexplore.exe
+   6    1  C:\Program Files (x86)\Internet Explorer\sqmapi.dll
+   7    1  C:\Program Files\Internet Explorer\IEShims.dll
+   8    1  C:\Program Files\Internet Explorer\en-US\iexplore.exe.mui
+   9    1  C:\Program Files\Internet Explorer\ieproxy.dll
+  10    1  C:\Users\Sarah\AppData\Local
+  11    1  C:\Users\Sarah\AppData\LocalLow
+  12    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content\6AA3321A15A787985201D7A6820782F0_4E35DE6F4FCFB7BE2C045F6B5ED89FC8
+  13    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content\8890A77645B73478F5B1DED18ACBF795_1E5D470765E0BE1964814B1F5A3581DC
+  14    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content\B1D4D8DB6B8F8A95577A5F09D0390539_400415EBB5E3145DF4A9DA90BCA63E4A
+  15    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\Content\D47DBD2F9E3365FBBE008D71FB06716F_835A2FD7EE5F1F37B7872C78D42A88BF
+  16    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\MetaData
+  17    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\MetaData\6AA3321A15A787985201D7A6820782F0_4E35DE6F4FCFB7BE2C045F6B5ED89FC8
+  18    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\MetaData\8890A77645B73478F5B1DED18ACBF795_1E5D470765E0BE1964814B1F5A3581DC
+  19    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\MetaData\B1D4D8DB6B8F8A95577A5F09D0390539_400415EBB5E3145DF4A9DA90BCA63E4A
+  20    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\CryptnetUrlCache\MetaData\D47DBD2F9E3365FBBE008D71FB06716F_835A2FD7EE5F1F37B7872C78D42A88BF
+  21    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\Internet Explorer\DOMStore\JFWF4VC3\www.msn[1].xml
+  22    1  C:\Users\Sarah\AppData\LocalLow\Microsoft\Internet Explorer\Services\search_{0633EE93-D776-472f-A0FF-E1416B8B2E3A}.ico
+  23    1  C:\Users\Sarah\AppData\Local\Microsoft
+  24    3  C:\Users\Sarah\AppData\Local\Microsoft\Internet Explorer\Recovery\Active\RecoveryStore.{81A98FEF-42A4-11E5-8EB8-20C9D091B958}.dat
+  25    3  C:\Users\Sarah\AppData\Local\Microsoft\Internet Explorer\Recovery\Active\{81A98FF1-42A4-11E5-8EB8-20C9D091B958}.dat
+  26    2  C:\Users\Sarah\AppData\Local\Microsoft\Internet Explorer\TabRoaming
+  27    1  C:\Users\Sarah\AppData\Local\Microsoft\Internet Explorer\imagestore\3scka47\imagestore.dat
+  28    1  C:\Users\Sarah\AppData\Local\Microsoft\PlayReady
+  29    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows
+  30    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Caches\cversions.1.db
+  31    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Caches\{AFBF9F1A-8EE8-4C77-AF34-C647E37CA0D9}.1.ver0x0000000000000008.db
+  32    2  C:\Users\Sarah\AppData\Local\Microsoft\Windows\History\Low
+  33    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\History\desktop.ini
+  34    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files
+  35    2  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low
+  36    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\AntiPhishing\4A72F430-B40C-4D36-A068-CE33ADA5ADF9.dat
+  37    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\5439BT1G\407073[1].woff
+  38    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\5439BT1G\chartbeat[1].js
+  39    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\BB8MIiC[1].png
+  40    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\BB8MKSg[1].png
+  41    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\BBlK1rY[1].jpg
+  42    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\BBlK2Us[1].jpg
+  43    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\BBlK7g5[1].jpg
+  44    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\a2-4b2e5c-68ddb2ab[1].js
+  45    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\9OXXCPP3\dapmsn[1].js
+  46    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\HXDZHMW6\AA36Tom[1].png
+  47    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\HXDZHMW6\AA9UBR2[1].png
+  48    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\HXDZHMW6\BBfBQ[1].png
+  49    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\HXDZHMW6\fwlink[1].htm
+  50    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\12-ac8633-4b5f58d3[1].css
+  51    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\AA42Hq5[1].png
+  52    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\ADSAdClient31[7].htm
+  53    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\O4WY0U55.htm
+  54    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\e151e5[1].gif
+  55    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\Content.IE5\Q10QFMV7\jquery-2.1.1.min[1].js
+  56    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Low\MSIMGSIZ.DAT
+  57    2  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\Virtualized
+  58    1  C:\Users\Sarah\AppData\Local\Microsoft\Windows\Temporary Internet Files\counters.dat
+  59    2  C:\Users\Sarah\AppData\Local\Temp\Low
+  60    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Internet Explorer\UserData\Low
+  61    1  C:\Users\Sarah\AppData\Roaming\Microsoft\SystemCertificates\My
+  62    1  C:\Users\Sarah\AppData\Roaming\Microsoft\SystemCertificates\My\CRLs
+  63    1  C:\Users\Sarah\AppData\Roaming\Microsoft\SystemCertificates\My\CTLs
+  64    1  C:\Users\Sarah\AppData\Roaming\Microsoft\SystemCertificates\My\Certificates
+  65    3  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low
+  66    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\00HFDW9J.txt
+  67    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\1UBZ7LOD.txt
+  68    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\27ZVOSML.txt
+  69    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\5DUWRKQF.txt
+  70    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\AEPT3S9L.txt
+  71    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\ISEBHRYT.txt
+  72    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\JWWOSK6M.txt
+  73    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\KRSRU49D.txt
+  74    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\L5BI1V22.txt
+  75    3  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\M0661SQD.txt
+  76    3  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\WR0X5JOH.txt
+  77    1  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\Cookies\Low\sarah@scorecardresearch[2].txt
+  78    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\DNTException\Low
+  79    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\IECompatCache\Low
+  80    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\IECompatUACache\Low
+  81    2  C:\Users\Sarah\AppData\Roaming\Microsoft\Windows\PrivacIE\Low
+  82    1  C:\Users\Sarah\Favorites
+  83    1  C:\Users\Sarah\Favorites\desktop.ini
+  84    1  C:\Windows
+  85    1  C:\Windows\Fonts\StaticCache.dat
+  86    1  C:\Windows\Fonts\segoeui.ttf
+  87    1  C:\Windows\Fonts\times.ttf
+  88    1  C:\Windows\Globalization\Sorting\SortDefault.nls
+  89    1  C:\Windows\Registration\R00000000000c.clb
+  90    1  C:\Windows\SysWOW64
+  91    1  C:\Windows\SysWOW64\DWrite.dll
+  92    1  C:\Windows\SysWOW64\FWPUCLNT.DLL
+  93    1  C:\Windows\SysWOW64\IPHLPAPI.DLL
+  94    1  C:\Windows\SysWOW64\RpcRtRemote.dll
+  95    1  C:\Windows\SysWOW64\SensApi.dll
+  96    1  C:\Windows\SysWOW64\WSHTCPIP.DLL
+  97    1  C:\Windows\SysWOW64\WindowsCodecs.dll
+  98    1  C:\Windows\SysWOW64\api-ms-win-downlevel-advapi32-l2-1-0.dll
+  99    1  C:\Windows\SysWOW64\api-ms-win-downlevel-shell32-l1-1-0.dll
+ 100    1  C:\Windows\SysWOW64\api-ms-win-downlevel-shlwapi-l2-1-0.dll
+ 101    1  C:\Windows\SysWOW64\apphelp.dll
+ 102    1  C:\Windows\SysWOW64\bcrypt.dll
+ 103    1  C:\Windows\SysWOW64\bcryptprimitives.dll
+ 104    1  C:\Windows\SysWOW64\credssp.dll
+ 105    1  C:\Windows\SysWOW64\cryptnet.dll
+ 106    1  C:\Windows\SysWOW64\cryptsp.dll
+ 107    1  C:\Windows\SysWOW64\d2d1.dll
+ 108    1  C:\Windows\SysWOW64\d3d10level9.dll
+ 109    1  C:\Windows\SysWOW64\d3d11.dll
+ 110    1  C:\Windows\SysWOW64\dnsapi.dll
+ 111    1  C:\Windows\SysWOW64\dwmapi.dll
+ 112    1  C:\Windows\SysWOW64\dxgi.dll
+ 113    1  C:\Windows\SysWOW64\dxgidebug.dll
+ 114    1  C:\Windows\SysWOW64\en-US\crypt32.dll.mui
+ 115    1  C:\Windows\SysWOW64\en-US\dnsapi.dll.mui
+ 116    1  C:\Windows\SysWOW64\en-US\ieframe.dll.mui
+ 117    1  C:\Windows\SysWOW64\en-US\jscript9.dll.mui
+ 118    1  C:\Windows\SysWOW64\en-US\mshtml.dll.mui
+ 119    1  C:\Windows\SysWOW64\en-US\p2pcollab.dll.mui
+ 120    1  C:\Windows\SysWOW64\en-US\setupapi.dll.mui
+ 121    1  C:\Windows\SysWOW64\en-US\tzres.dll.mui
+ 122    1  C:\Windows\SysWOW64\en-US\urlmon.dll.mui
+ 123    1  C:\Windows\SysWOW64\en-US\wship6.dll.mui
+ 124    1  C:\Windows\SysWOW64\en-US\wshqos.dll.mui
+ 125    1  C:\Windows\SysWOW64\en-US\wshtcpip.dll.mui
+ 126    1  C:\Windows\SysWOW64\gpapi.dll
+ 127    1  C:\Windows\SysWOW64\ieapfltr.dat
+ 128    1  C:\Windows\SysWOW64\ieapfltr.dll
+ 129    2  C:\Windows\SysWOW64\ieframe.dll
+ 130    1  C:\Windows\SysWOW64\ieui.dll
+ 131    2  C:\Windows\SysWOW64\imm32.dll
+ 132    1  C:\Windows\SysWOW64\jscript9.dll
+ 133    1  C:\Windows\SysWOW64\mlang.dll
+ 134    2  C:\Windows\SysWOW64\msctf.dll
+ 135    2  C:\Windows\SysWOW64\mshtml.dll
+ 136    1  C:\Windows\SysWOW64\msimtf.dll
+ 137    1  C:\Windows\SysWOW64\mswsock.dll
+ 138    1  C:\Windows\SysWOW64\ncrypt.dll
+ 139    1  C:\Windows\SysWOW64\netprofm.dll
+ 140    1  C:\Windows\SysWOW64\nlaapi.dll
+ 141    1  C:\Windows\SysWOW64\npmproxy.dll
+ 142    1  C:\Windows\SysWOW64\ole32.dll
+ 143    1  C:\Windows\SysWOW64\oleacc.dll
+ 144    1  C:\Windows\SysWOW64\oleaccrc.dll
+ 145    1  C:\Windows\SysWOW64\p2pcollab.dll
+ 146    1  C:\Windows\SysWOW64\powrprof.dll
+ 147    1  C:\Windows\SysWOW64\propsys.dll
+ 148    1  C:\Windows\SysWOW64\rasadhlp.dll
+ 149    2  C:\Windows\SysWOW64\rsaenh.dll
+ 150    1  C:\Windows\SysWOW64\schannel.dll
+ 151    1  C:\Windows\SysWOW64\sechost.dll
+ 152    1  C:\Windows\SysWOW64\secur32.dll
+ 153    1  C:\Windows\SysWOW64\shell32.dll
+ 154    1  C:\Windows\SysWOW64\sxs.dll
+ 155    1  C:\Windows\SysWOW64\tzres.dll
+ 156    1  C:\Windows\SysWOW64\uxtheme.dll
+ 157    1  C:\Windows\SysWOW64\version.dll
+ 158    2  C:\Windows\SysWOW64\vm3dum.dll
+ 159    1  C:\Windows\SysWOW64\webio.dll
+ 160    1  C:\Windows\SysWOW64\winhttp.dll
+ 161    1  C:\Windows\SysWOW64\wininet.dll
+ 162    1  C:\Windows\SysWOW64\winmm.dll
+ 163    1  C:\Windows\SysWOW64\winnsi.dll
+ 164    1  C:\Windows\SysWOW64\wship6.dll
+ 165    1  C:\Windows\SysWOW64\wshqos.dll
+ 166    1  C:\Windows\SysWOW64\xmllite.dll
+ 167    1  C:\Windows\System32\ExplorerFrame.dll
+ 168    1  C:\Windows\System32\FWPUCLNT.DLL
+ 169    1  C:\Windows\System32\IPHLPAPI.DLL
+ 170    2  C:\Windows\System32\RpcRtRemote.dll
+ 171    1  C:\Windows\System32\WSHTCPIP.DLL
+ 172    1  C:\Windows\System32\WindowsCodecs.dll
+ 173    1  C:\Windows\System32\api-ms-win-downlevel-advapi32-l2-1-0.dll
+ 174    1  C:\Windows\System32\api-ms-win-downlevel-shell32-l1-1-0.dll
+ 175    1  C:\Windows\System32\api-ms-win-downlevel-shlwapi-l2-1-0.dll
+ 176    1  C:\Windows\System32\apphelp.dll
+ 177    2  C:\Windows\System32\cryptbase.dll
+ 178    2  C:\Windows\System32\cryptsp.dll
+ 179    1  C:\Windows\System32\dhcpcsvc.dll
+ 180    1  C:\Windows\System32\dhcpcsvc6.dll
+ 181    1  C:\Windows\System32\dnsapi.dll
+ 182    1  C:\Windows\System32\dui70.dll
+ 183    1  C:\Windows\System32\duser.dll
+ 184    1  C:\Windows\System32\dwmapi.dll
+ 185    1  C:\Windows\System32\dxgi.dll
+ 186    1  C:\Windows\System32\dxgidebug.dll
+ 187    1  C:\Windows\System32\en-US\ieframe.dll.mui
+ 188    1  C:\Windows\System32\en-US\oleaccrc.dll.mui
+ 189    1  C:\Windows\System32\en-US\setupapi.dll.mui
+ 190    1  C:\Windows\System32\en-US\shell32.dll.mui
+ 191    1  C:\Windows\System32\ieframe.dll
+ 192    1  C:\Windows\System32\ieui.dll
+ 193    3  C:\Windows\System32\imm32.dll
+ 194    1  C:\Windows\System32\mlang.dll
+ 195    1  C:\Windows\System32\msimg32.dll
+ 196    1  C:\Windows\System32\mssprxy.dll
+ 197    1  C:\Windows\System32\mswsock.dll
+ 198    1  C:\Windows\System32\netprofm.dll
+ 199    1  C:\Windows\System32\nlaapi.dll
+ 200    1  C:\Windows\System32\npmproxy.dll
+ 201    1  C:\Windows\System32\ntmarta.dll
+ 202    1  C:\Windows\System32\oleacc.dll
+ 203    1  C:\Windows\System32\oleaccrc.dll
+ 204    1  C:\Windows\System32\powrprof.dll
+ 205    2  C:\Windows\System32\propsys.dll
+ 206    1  C:\Windows\System32\rasadhlp.dll
+ 207    1  C:\Windows\System32\rpcss.dll
+ 208    3  C:\Windows\System32\rsaenh.dll
+ 209    2  C:\Windows\System32\sechost.dll
+ 210    1  C:\Windows\System32\secur32.dll
+ 211    1  C:\Windows\System32\sspicli.dll
+ 212    1  C:\Windows\System32\stdole2.tlb
+ 213    1  C:\Windows\System32\sxs.dll
+ 214    1  C:\Windows\System32\thumbcache.dll
+ 215    2  C:\Windows\System32\uxtheme.dll
+ 216    1  C:\Windows\System32\version.dll
+ 217    1  C:\Windows\System32\webio.dll
+ 218    1  C:\Windows\System32\winhttp.dll
+ 219    1  C:\Windows\System32\winnsi.dll
+ 220    1  C:\Windows\System32\wow64.dll
+ 221    1  C:\Windows\System32\wow64cpu.dll
+ 222    1  C:\Windows\System32\wow64win.dll
+ 223    1  C:\Windows\System32\wship6.dll
+ 224    1  C:\Windows\WindowsShell.Manifest
+ 225    1  C:\Windows\winsxs\amd64_microsoft.windows.common-controls_6595b64144ccf1df_5.82.7601.18837_none_a4d981ff711297b6\comctl32.dll
+ 226    1  C:\Windows\winsxs\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.7601.18837_none_fa3b1e3d17594757\comctl32.dll
+ 227    1  C:\Windows\winsxs\x86_microsoft.windows.common-controls_6595b64144ccf1df_5.82.7601.18837_none_ec86b8d6858ec0bc\comctl32.dll
+ 228    1  C:\Windows\winsxs\x86_microsoft.windows.common-controls_6595b64144ccf1df_6.0.7601.18837_none_41e855142bd5705d\comctl32.dll
+
+memory
+
+netflow
+
+resource
+
+subject
+   1  118  Event.CHECK_FILE_ATTRIBUTES
+   2   50  Event.CONNECT
+   3    2  Event.CREATE_OBJECT
+   4  177  Event.EXECUTE
+   5    2  Event.EXIT
+   6   52  Event.MODIFY_FILE_ATTRIBUTES
+   7  497  Event.READ
+   8    7  Event.UNLINK
+   9  183  Event.WRITE
+  10 1088  Subject.SUBJECT_EVENT

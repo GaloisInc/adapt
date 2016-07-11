@@ -131,6 +131,7 @@ install_adapt_dependencies() {
         flake8 \
         gremlinrestclient \
         networkx \
+        parsley \
         pyparsing \
       || handle_error $LINENO
 
