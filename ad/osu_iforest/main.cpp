@@ -311,17 +311,8 @@ void printScoreToFile(vector<double> &scores, ntstringframe* csv,
 	// print header
 	for(int i = 0; i < metadata->ncol; ++i)
 		outscore << metadata->colnames[i] << ",";
-	for(int i = 0; i < csv->ncol; ++i){
-		if(i == csv->ncol-1){
-			size_t l = strlen(csv->colnames[i]);
-			char temp[l];
-			strncpy(temp, csv->colnames[i], l-1);
-			temp[l] = '\0';
-			outscore << temp << ",";
-		}
-		else
-			outscore << csv->colnames[i] << ",";
-	}
+	for(int i = 0; i < csv->ncol; ++i)
+        outscore << csv->colnames[i] << ",";
 
 	outscore << "anomaly_score\n";
 	for (int i = 0; i < (int) scores.size(); i++) {
