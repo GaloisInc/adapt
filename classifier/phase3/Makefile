@@ -39,18 +39,18 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 #
 # Several traces are conveniently small, less than half a megabyte:
-#   324K    apt1.bin
-#   108K    gather.avro.bin
-#   48K     imagegrab.bin
-#   60K     imagegrab2.bin
-#   220K    infoleak_small_units.avro
-#   60K     screengrab.bin
-#   116K    screengrab1.bin
+#   324K    apt1.bin                   THEIA
+#   108K    gather.avro.bin            ClearScope
+#   48K     imagegrab.bin              5D
+#   60K     imagegrab2.bin             5D
+#   220K    infoleak_small_units.avro  SPADE
+#   60K     screengrab.bin             5D
+#   116K    screengrab1.bin            THEIA
 #
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/screengrab1.bin
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/5d_youtube_ie_output.bin
 	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.

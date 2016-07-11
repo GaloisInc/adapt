@@ -1,0 +1,139 @@
+Sent 96017 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+    10  EDGE_EVENT_AFFECTS_SRCSINK
+    10  EDGE_EVENT_AFFECTS_SRCSINK in
+    10  EDGE_EVENT_AFFECTS_SRCSINK out
+    10  EDGE_EVENT_AFFECTS_SUBJECT
+    10  EDGE_EVENT_AFFECTS_SUBJECT in
+    10  EDGE_EVENT_AFFECTS_SUBJECT out
+    16  Agent
+    16  EDGE_SUBJECT_HASLOCALPRINCIPAL
+    16  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+    16  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    20  Resource
+    34  EDGE_SRCSINK_AFFECTS_EVENT
+    34  EDGE_SRCSINK_AFFECTS_EVENT in
+    34  EDGE_SRCSINK_AFFECTS_EVENT out
+   167  EDGE_EVENT_AFFECTS_FILE
+   215  EDGE_FILE_AFFECTS_EVENT
+   219  EDGE_FILE_AFFECTS_EVENT out
+   220  EDGE_FILE_AFFECTS_EVENT in
+   232  EDGE_OBJECT_PREV_VERSION
+   419  EDGE_EVENT_AFFECTS_FILE in
+   425  EDGE_EVENT_AFFECTS_FILE out
+   472  EDGE_OBJECT_PREV_VERSION in
+   475  EDGE_OBJECT_PREV_VERSION out
+   675  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+   909  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+   914  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+   924  Entity-File
+  1148  Subject
+  7660  total
+
+
+agent
+   1   10  egid_0
+   2    6  egid_1000
+   3   14  euid_0
+   4    2  euid_1000
+   5   10  gid_0
+   6    6  gid_1000
+   7   13  userID_0
+   8    3  userID_1000
+
+file
+   1    2  file:///dev/null
+   2    1  file:///dev/tty
+   3    1  file:///etc/apt/trusted.gpg
+   4    1  file:///etc/default/nss
+   5    1  file:///etc/group
+   6    1  file:///etc/host.conf
+   7    1  file:///etc/hosts
+   8    1  file:///etc/ld.so.cache
+   9    1  file:///etc/localtime
+  10    1  file:///etc/login.defs
+  11    1  file:///etc/nsswitch.conf
+  12    1  file:///etc/pam.d/common-account
+  13    1  file:///etc/pam.d/common-auth
+  14    1  file:///etc/pam.d/common-password
+  15    1  file:///etc/pam.d/common-session
+  16    1  file:///etc/pam.d/common-session-noninteractive
+  17    1  file:///etc/pam.d/other
+  18    1  file:///etc/pam.d/sudo
+  19    1  file:///etc/passwd
+  20    1  file:///etc/resolv.conf
+  21    1  file:///etc/sudoers
+  22    1  file:///etc/sudoers.d/README
+  23    1  file:///lib/x86_64-linux-gnu/libbz2.so.1.0
+  24    1  file:///lib/x86_64-linux-gnu/libc.so.6
+  25    1  file:///lib/x86_64-linux-gnu/libcap.so.2
+  26    1  file:///lib/x86_64-linux-gnu/libcgmanager.so.0
+  27    1  file:///lib/x86_64-linux-gnu/libcrypt.so.1
+  28    1  file:///lib/x86_64-linux-gnu/libdbus-1.so.3
+  29    1  file:///lib/x86_64-linux-gnu/libdl.so.2
+  30    1  file:///lib/x86_64-linux-gnu/libnih-dbus.so.1
+  31    1  file:///lib/x86_64-linux-gnu/libnih.so.1
+  32    1  file:///lib/x86_64-linux-gnu/libnsl.so.1
+  33    1  file:///lib/x86_64-linux-gnu/libnss_compat.so.2
+  34    1  file:///lib/x86_64-linux-gnu/libnss_files.so.2
+  35    1  file:///lib/x86_64-linux-gnu/libnss_nis.so.2
+  36    1  file:///lib/x86_64-linux-gnu/libpam.so.0
+  37    1  file:///lib/x86_64-linux-gnu/libpam_misc.so.0
+  38    1  file:///lib/x86_64-linux-gnu/libpcre.so.3
+  39    1  file:///lib/x86_64-linux-gnu/libpthread.so.0
+  40    1  file:///lib/x86_64-linux-gnu/libresolv.so.2
+  41    1  file:///lib/x86_64-linux-gnu/librt.so.1
+  42    1  file:///lib/x86_64-linux-gnu/libselinux.so.1
+  43    1  file:///lib/x86_64-linux-gnu/libutil.so.1
+  44    1  file:///lib/x86_64-linux-gnu/libz.so.1
+  45    1  file:///lib/x86_64-linux-gnu/security/pam_cap.so
+  46    1  file:///lib/x86_64-linux-gnu/security/pam_deny.so
+  47    1  file:///lib/x86_64-linux-gnu/security/pam_env.so
+  48    1  file:///lib/x86_64-linux-gnu/security/pam_gnome_keyring.so
+  49    1  file:///lib/x86_64-linux-gnu/security/pam_permit.so
+  50    1  file:///lib/x86_64-linux-gnu/security/pam_systemd.so
+  51    1  file:///lib/x86_64-linux-gnu/security/pam_umask.so
+  52    1  file:///lib/x86_64-linux-gnu/security/pam_unix.so
+  53    4  file:///lib64/ld-linux-x86-64.so.2
+  54    1  file:///proc/2622/stat
+  55    1  file:///proc/filesystems
+  56    1  file:///proc/stat
+  57    1  file:///proc/sys/kernel/ngroups_max
+  58 1296  file:///tmp/apt.data.AtqWZd
+  59   37  file:///tmp/apt.sig.06ng3G
+  60  238  file:///tmp/fileutl.message.L8F3ic
+  61    1  file:///usr/bin/env
+  62    1  file:///usr/bin/gpgv
+  63    1  file:///usr/bin/sudo
+  64    1  file:///usr/lib/locale/locale-archive
+  65    1  file:///usr/lib/sudo/sudoers.so
+  66    1  file:///usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache
+  67    1  file:///usr/local/lib/libaudit.so.1
+  68    1  file:///usr/local/lib/libauparse.so.0
+  69    1  file:///usr/local/sbin/auditctl
+  70    1  file:///usr/share/locale/locale.alias
+  71   18  file:///var/lib/apt/lists/partial/us.archive.ubuntu.com_ubuntu_dists_trusty-updates_InRelease
+  72    3  file:///var/lib/sudo/kexin/0
+  73    1  file:///var/run/utmp
+  74    1  file://pipe:[3-4]
+  75    1  file://stdin
+  76    8  file://stdout
+
+memory
+
+netflow
+
+resource
+   1   65  SrcSink.ACCELEROMETER
+
+subject
+   1    1  Event.CONNECT
+   2    8  Event.CREATE_OBJECT
+   3    5  Event.EXECUTE
+   4    5  Event.FORK
+   5    4  Event.KERNEL_UNKNOWN
+   6    2  Event.LINK
+   7  155  Event.OPEN
+   8  387  Event.READ
+   9    1  Event.RENAME
+  10 3765  Event.WRITE
+  11 4333  Subject.SUBJECT_EVENT
