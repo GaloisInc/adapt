@@ -2,6 +2,10 @@
 
 # Starts daemons: titan, supervisord, zookeeper, kafka, Adapt components
 
+# Keep /opt/titan/scripts/schema.groovy in sync.
+cd ~/adapt
+tools/GenerateSchema.py  # This is fast, just 100ms.
+rsync -av config/titan/scripts/adapt.groovy /opt/titan/scripts/
 cd /tmp
 
 jps | grep GremlinServer > /dev/null || /opt/titan/bin/titan.sh start
@@ -44,4 +48,4 @@ do
 done
 
 # To halt daemons, use:
-#   /opt/titan/bin/titan.sh stop;  killall supervisord
+#   tools/stop_services.sh
