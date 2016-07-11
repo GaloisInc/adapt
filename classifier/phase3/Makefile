@@ -24,10 +24,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 ~/adapt/trace/current/5d_youtube_ie_output.bin:
 	$(RSYNC)
 
-~/adapt/trace/current/infoleak_small_units.avro:
-	$(RSYNC)
-
-~/adapt/trace/current/ta5attack1_units.avro:
+~/adapt/trace/current/ta5attack2_units.avro:
 	$(RSYNC)
 
 ~/adapt/trace/current/gather.avro.bin:
@@ -40,8 +37,21 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 	$(RSYNC)
 
 
+#
+# Several traces are conveniently small, less than half a megabyte:
+#   324K    apt1.bin
+#   108K    gather.avro.bin
+#   48K     imagegrab.bin
+#   60K     imagegrab2.bin
+#   220K    infoleak_small_units.avro
+#   60K     screengrab.bin
+#   116K    screengrab1.bin
+#
+
+
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack1_units.avro
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/screengrab1.bin
+	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p $< | tee $@
@@ -49,7 +59,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
-	time ~/adapt/tools/label_histogram.py
+	time ~/adapt/tools/label_count.py
 	./report.py --report=netflow | sort -nk2 | awk '$$2 >= 1'
 # Uncomment exactly one of these two commands, to use background or foreground segmenter.
 # time ~/adapt/tools/await_completion.py ac
