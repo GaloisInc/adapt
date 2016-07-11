@@ -142,8 +142,10 @@ def report(query, threshold=1, debug=False):
 
                 usec = int(prop['startedAtTime'])
                 stamp = datetime.datetime.utcfromtimestamp(usec / 1e6)
-                if usec != 0:  # Sigh! Why do people insert zeros?
-                    assert str(stamp) > '2015-01-01', stamp
+                five_d = cdm.enums.InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+                if prop.source() != five_d:  # 5D uses dates like 17-Jan-1970.
+                    if usec != 0:  # Sigh! Why do people insert zeros?
+                        assert str(stamp) > '2015-01-01', stamp
 
                 properties = json.loads(prop['properties'])
                 # The seq so nice, gotta say it twice.
