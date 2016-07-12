@@ -56,29 +56,36 @@ class ActivityClassifier(object):
             self.classify1(seg_id)
 
     def classify1(self, seg_id):
-        exfil_idents = set()
         q = "g.V().has('ident', '%s').outE('segment:includes').inV()" % seg_id
         for prop in gremlin_properties.fetch(self.gremlin, q):
-            # During phase3 integration we're more worried about
-            # plumbing than correctness. Clearly this needs to improve.
             if 'url' not in prop:
                 continue
+            if self.exfil.is_sensitive_file(prop['url']):
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'sensitive_file', .1)
             if self.exfil.is_exfil(prop['url']):
-                exfil_idents.add(prop['ident'])
-        if len(exfil_idents) > 0:
-            self.insert_activity_classification(
-                exfil_idents, seg_id, 'exfiltration', .1)
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'exfiltration', .1)
 
-    def insert_activity_classification(self, base_nodes, seg_id, typ, score):
+    def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"
                 "  'activity:type', '%s',"
                 "  'activity:suspicionScore', %f)" % (typ, score)]
         cmds.append("g.V().has('ident', '%s').next()"
                     ".addEdge('segment:includes', act)" % seg_id)
-        for base_node_ident in base_nodes:
-            cmds.append("act.addEdge('activity:includes',"
-                        " g.V().has('ident', '%s').next())" % base_node_ident)
+        cmds.append("act.addEdge('activity:includes',"
+                    " g.V().has('ident', '%s').next())" % base_node_id)
         self.fetch1(';  '.join(cmds))
+    #
+    # example Activity node:
+    #
+    # gremlin> g.V().hasLabel('Segment').out().has(label,'Activity').valueMap()
+    # ==>[activity:type:[exfiltration], activity:suspicionScore:[0.1]]
+    # gremlin>
+    # gremlin>
+    # gremlin> g.V().has(label, 'Activity').out().limit(1).valueMap()
+    # ==>[ident:[...], source:[0], file-version:[0], url:[file:///etc/shadow]]
+    #
 
     def fetch1(self, query):
         '''Return a single query result.'''
