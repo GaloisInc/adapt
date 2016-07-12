@@ -46,7 +46,7 @@ Windows from Linux traces:
 
 The spec defines a FileObject url as
 "the location of the file absolute path or remote url";
-note that predictably different TA1's have used
+Predictably, different TA1's have used
 the flexibility afforded by the disjunction.
 Sadly, the "absolute" becomes "relative" in some traces,
 as for `./run.sh` and `run.sh` in recordaudio1.
@@ -64,6 +64,20 @@ Interesting representation choices can be seen in this example:
     ta5attack2_units.avro.txt:  file://pipe:[3-4]
 
 
+hotwash targets
+===============
+
+Features that TA5 might possibly point out as relevant to a recent
+trace analysis:
+
+- `/dev/video0`
+- `file:///etc/shadow` (also `passwd`)
+- `file:///tmp/victim/secret1` (also `simple`)
+
+The first two should have TA1 tags of `CONFIDENTIALITY_SENSITIVE` (or secret).
+We can synthesize such tags.
+
+
 lessons learned
 ===============
 
@@ -74,6 +88,7 @@ It appeared the implemented code was posting "done" on the pe channel,
 so I tried using `tools/await_completion.py pe` with Pe disabled,
 but still never obtained "done" messages until I manually injected
 them with `signal_completion.py`.
+It may be related to this ingestd stderr report: "Kafka signaling failed: KafkaNoOffset"
 
 Discarding old forensic traces wastes much processing time.
 It would be desirable to query for "trace segments"
@@ -91,6 +106,10 @@ to add app-level timestamps to messages we produce,
 so downstream clients will know how stale they are.
 This would also let a discard policy assess how far
 behind TA1 we are.
+
+TA1's are clearly torn between two trace suffixes.
+It would be useful for BBN to offer guidance that all forensic
+trace files shall end with `.avro` (or conversely, shall end with `.bin`).
 
 Some TA1's apparently always send `edge(v1, v2)` first,
 followed by `v1` and/or `v2`. So gremlin logs N exceptions

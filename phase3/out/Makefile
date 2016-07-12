@@ -22,7 +22,7 @@ all: $(OUT)
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p ~/adapt/trace/current/$(subst .txt,,$@) > $@
-	echo reading $@ >> /tmp/ingestd-stderr---supervisor-*.log
+	bash -c "echo reading $@ >> /tmp/ingestd-stderr---supervisor-*.log"
 	time ~/adapt/tools/await_completion.py pe >> $@
 	(~/adapt/tools/label_count.py --with-edges; echo) >> $@
 	../report.py --all >> $@
