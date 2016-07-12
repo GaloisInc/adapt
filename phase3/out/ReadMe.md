@@ -63,6 +63,9 @@ Interesting representation choices can be seen in this example:
     ta5attack2_units.avro.txt:  file:///usr/bin/lesspipe
     ta5attack2_units.avro.txt:  file://pipe:[3-4]
 
+See also `egrep -m1 InstrumentationSource *.txt | awk '{print $1,$4}' | column -t`,
+bearing in mind that infoleak additionally mentions `LINUX_BEEP_TRACE` as a source.
+
 
 hotwash targets
 ===============
@@ -70,12 +73,26 @@ hotwash targets
 Features that TA5 might possibly point out as relevant to a recent
 trace analysis:
 
-- `/dev/video0`
 - `file:///etc/shadow` (also `passwd`)
+- `/dev/video0`
+- `/dev/snd/controlC1` (also `pcmC1D0c1`) 
+- `C:\Windows\inf\hdaudio.PNF`
 - `file:///tmp/victim/secret1` (also `simple`)
+- `C:\Users\5d-tc\tc\malware\out.wav`
 
-The first two should have TA1 tags of `CONFIDENTIALITY_SENSITIVE` (or secret).
+The first four should have TA1 tags of `CONFIDENTIALITY_SENSITIVE` (or secret).
 We can synthesize such tags.
+
+In the case of hdaudio it is "accidental" that it is read as part of
+microphone access; malware that manipulates I/O ports directly
+would not go through the card's driver and would not go through
+a TA1-logged system interface.
+
+In the case of /dev/video0, note that we see the arg that goes
+through the interface, but not the result of symlink resolution,
+so `ln -s /dev/video0 readme.txt` would make a TA5 trace more obscure.
+We would need help from TA1: a midnight listing of (at least) symlink files,
+perhaps near-realtime `stat()` or `lstat()` output added to the event stream.
 
 
 lessons learned
@@ -99,7 +116,7 @@ and serialization errors, which disappear with a re-run.
 
 Kafka persists all messages to disk.
 In the presence of client restarts,
-it is very important for clients to `seek_to_end()`,
+it is very important for clients to initially `seek_to_end()`,
 else they will read lots of stale "done" messages.
 If we move to a fancier API, it would be useful
 to add app-level timestamps to messages we produce,
@@ -110,6 +127,12 @@ behind TA1 we are.
 TA1's are clearly torn between two trace suffixes.
 It would be useful for BBN to offer guidance that all forensic
 trace files shall end with `.avro` (or conversely, shall end with `.bin`).
+
+It seems doubtful that we will be able to make good
+use of machine addresses in the event stream.
+They should probably be pruned early, perhaps even by TA1.
+On the other hand, there is rich, not yet exploited information
+in the "tag" data we see.
 
 Some TA1's apparently always send `edge(v1, v2)` first,
 followed by `v1` and/or `v2`. So gremlin logs N exceptions
