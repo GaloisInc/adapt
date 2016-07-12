@@ -2,7 +2,6 @@
 OUT = \
  5d_youtube_ie_output.bin.txt \
  apt1.bin.txt \
- bad-ls.avro.txt \
  cameragrab1.bin.txt \
  gather.avro.bin.txt \
  imagegrab.bin.txt \
@@ -23,6 +22,7 @@ all: $(OUT)
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p ~/adapt/trace/current/$(subst .txt,,$@) > $@
+	echo reading $@ >> /tmp/ingestd-stderr---supervisor-*.log
 	time ~/adapt/tools/await_completion.py pe >> $@
 	(~/adapt/tools/label_count.py --with-edges; echo) >> $@
 	../report.py --all >> $@
