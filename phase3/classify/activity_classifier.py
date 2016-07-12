@@ -37,9 +37,10 @@ class ActivityClassifier(object):
 
     def __init__(self, gremlin_client):
         self.gremlin = gremlin_client
-        # At present we have only tackled challenge problems for two threats:
+        # At present we have only tackled challenge problems for a few threats:
         self.exfil = classify.ExfilDetector()
         self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
+        self.scan = classify.ScanDetector()
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
@@ -66,6 +67,9 @@ class ActivityClassifier(object):
             if self.exfil.is_exfil(prop['url']):
                 self.insert_activity_classification(
                     prop['ident'], seg_id, 'exfiltration', .1)
+            if self.scan.is_part_of_scan(prop['url']):  # Could do counting here.
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'scanning', .1)
 
     def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"
