@@ -9,11 +9,11 @@ Sent 447 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
      5  EDGE_SRCSINK_AFFECTS_EVENT in
      5  EDGE_SRCSINK_AFFECTS_EVENT out
     12  Resource
-    26  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-    26  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
-    26  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
-    33  Subject
-   146  total
+    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+    32  Subject
+   136  total
 
 
 agent
@@ -32,8 +32,8 @@ resource
 
 subject
    1    1  Event.BIND
-   2    5  Event.CLOSE
-   3    2  Event.OPEN
-   4    6  Event.READ
-   5   20  Event.WRITE
-   6   34  Subject.SUBJECT_EVENT
+   2    3  Event.CLOSE
+   3    3  Event.OPEN
+   4   10  Event.READ
+   5   18  Event.WRITE
+   6   35  Subject.SUBJECT_EVENT
