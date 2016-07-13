@@ -9,7 +9,8 @@ An interpreter for executing tests from the associated json file.
 
 import sys, os, json, unittest, argparse
 from time import sleep
-sys.path.insert(0, '../tools')  # add tools directory to path for gremlin_query library
+# Add tools directory to path, for gremlin_query library.
+sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
 
