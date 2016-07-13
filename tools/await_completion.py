@@ -45,10 +45,12 @@ STATUS_DONE = b'\x01'
 class Waiter:
 
     def __init__(self, topic, url):
-        self.consumer = kafka.KafkaConsumer(topic, bootstrap_servers=[url])
         self.topic = topic
+        self.consumer = kafka.KafkaConsumer(bootstrap_servers=[url])
+        self.consumer.assign([kafka.TopicPartition(topic, 0)])
 
     def await_message(self):
+        self.consumer.seek_to_end()
         log.info("Waiting for %s kafka message..." % self.topic)
         done = False
         while not done:

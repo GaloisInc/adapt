@@ -195,9 +195,9 @@ data ConfidentialityTag
   deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 data ProvenanceTagNode
-    = PTN { ptnValue    :: PTValue
-          , ptnChildren :: Maybe [ProvenanceTagNode]
-          , ptnId       :: Maybe TagId
+    = PTN { ptnValue       :: PTValue
+          , ptnChildren    :: Maybe [ProvenanceTagNode]
+          , ptnId          :: Maybe TagId
           , ptnProperties  :: Maybe Properties
           }
      deriving (Eq,Ord,Show)
@@ -207,6 +207,7 @@ type Properties = Map Text Text -- XXX map to dynamic?
 type TagId = Int32
 
 data PTValue = PTVInt Int64
+             | PTVUUID UUID
              | PTVTagOpCode  TagOpCode
              | PTVIntegrityTag IntegrityTag
              | PTVConfidentialityTag ConfidentialityTag
@@ -385,11 +386,12 @@ instance FromAvro ProvenanceTagNode where
 instance FromAvro PTValue where
   fromAvro (Ty.Union _ t v) =
      case Avro.typeName t of
-      "int" -> PTVInt <$> fromAvro v
-      "TagOpCode" -> PTVTagOpCode <$> fromAvro v
-      "IntegrityTag" -> PTVIntegrityTag <$> fromAvro v
+      "int"                -> PTVInt <$> fromAvro v
+      "UUID"               -> PTVUUID <$> fromAvro v
+      "TagOpCode"          -> PTVTagOpCode <$> fromAvro v
+      "IntegrityTag"       -> PTVIntegrityTag <$> fromAvro v
       "ConfidentialityTag" -> PTVConfidentialityTag <$> fromAvro v
-      _ -> fail "Unrecognized tag in ProvTagNode value union"
+      _                    -> fail "Unrecognized tag in ProvTagNode value union"
   fromAvro _ = fail "Non-union value in PTValue"
 instance FromAvro TagOpCode where
   fromAvro = fromAvroEnum "TagOpCode"

@@ -5,13 +5,13 @@ OUT = \
  bad-ls.avro.txt \
  cameragrab1.bin.txt \
  gather.avro.bin.txt \
- imagegrab2.bin.txt \
  imagegrab.bin.txt \
+ imagegrab2.bin.txt \
  infoleak_small_units.avro.txt \
  recordaudio1.bin.txt \
  recorder.bin.txt \
- screengrab1.bin.txt \
  screengrab.bin.txt \
+ screengrab1.bin.txt \
  ta5attack1_units.avro.txt \
  ta5attack2_units.avro.txt \
  youtube_ie_update.bin.txt \
@@ -23,7 +23,7 @@ all: $(OUT)
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p ~/adapt/trace/current/$(subst .txt,,$@) > $@
-	time ~/adapt/tools/await_completion.py se >> $@
+	time ~/adapt/tools/await_completion.py pe >> $@
 	(~/adapt/tools/label_count.py --with-edges; echo) >> $@
 	../report.py --all >> $@
 
