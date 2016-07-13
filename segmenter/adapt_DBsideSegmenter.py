@@ -15,6 +15,7 @@ import pprint
 import re
 import sys
 import asyncio
+import kafka
 
 property_segmentNodeName='segment:name'
 property_segmentEdgeLabel='segment:includes'
