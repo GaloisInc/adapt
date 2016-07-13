@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 '''
-Naive implementation of a DB-side segmenter (only the segmentation by PID is supported for now)
+Naive implementation of a DB-side segmenter (only the segmentation by PID-like properties is supported for now)
 Based on parts of TitanClient (by Adria Gascon)
 TODO: code refactoring to eliminate duplication and preserve in-memory implementation alongside DB-side segmentation
 JSON specification handling
@@ -163,6 +163,9 @@ class SimpleTitanGremlinSegmenter:
 
 
 	def storeSegments(self):
+		'''
+		creates segments in the database (only segment nodes when '--store-segment' is equal to 'OnlyNodes' and full segments when it is equal to 'Yes')
+		'''
 		count=self.getNumberVerticesWithProperty()[0]
 		if count>0:
 			if isinstance(self.criterion,str):
@@ -182,13 +185,11 @@ class SimpleTitanGremlinSegmenter:
 			else:
 				self.createSchemaVertexLabel('Segment')
 				self.createSchemaVertexProperty('segname','String','SINGLE')
+				self.createSchemaVertexProperty('parentVertexId','Integer','SINGLE')
 				self.createSchemaVertexProperty(self.criterion,type_criterion,'SINGLE')
-				#criterion_values="g.V().has('"+self.criterion+"').id().fold().next()-g.V().has('Segment').has('"+self.criterion+"').id().fold().next()"
-				#val=self.titanclient.execute(criterion_values)
-				#print(val,type(val))
-				createVertices_query="for (i in g.V().has('"+self.criterion+"').id().fold().next()) {graph.addVertex(label,'Segment','segname','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}"
+				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'segname','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
 				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
-				addEdges_query="""for (i in g.V().has(\'"""+self.criterion+"""\').id().fold().next()) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal();s=graph.addVertex(label,'Segment','segname','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next());for (node in subtr.V().id().fold().next()) {s.addEdge('prov-tc:partOfSegment',g.V(node).next())}}"""
+				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment','segname','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()};for (node in subtr.V().id().fold().next()) {if (g.V().hasLabel('Segment').has('parentVertexId',i).outE('prov-tc:partOfSegment').as('e').inV().hasId(node).select('e')==[]) {s.addEdge('prov-tc:partOfSegment',g.V(node).next())}}}"""
 				if self.store_segment=='OnlyNodes':
 					createSegmentNodes=self.titanclient.execute(createVertices_query)
 					sys.stdout.write('Segment nodes created')
