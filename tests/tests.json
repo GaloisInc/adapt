@@ -2,6 +2,54 @@
 {
     "_lint": "python3 -m json.tool tests/tests.json | grep query",
 
+    "gather.avro.bin": {
+        "pre": [
+            {
+                "query": "g.V().drop()",
+                "response": "None",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+            }, {
+                "query": "g.V().count()",
+                "response": 0,
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
+            }, {
+                "query": "g.E().count()",
+                "response": 0,
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
+            }
+        ],
+        "in": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": 2,
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that we found both file mentions."
+            }, {
+                "query": "g.V().has(label, 'Entity-NetFlow').values('dstAddress').order().limit(1)",
+                "response": "255.255.255.255",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that we found both file mentions."
+            }, {
+                "query": "g.V().values('url').order().limit(1)",
+                "response": "/data/data/com.TA5.android.GatherApp/cache/gather1558304758.txt",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that we found both file mentions."
+            }, {
+                "query": "g.V().has(label, 'Subject').limit(30).count()",
+                "response": 30,
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are at least thirty Subjects."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": 1,
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there is just one Agent."
+            }
+        ]
+    },
     "5d_youtube_ie_output-100.avro": {
         "pre": [
             {
