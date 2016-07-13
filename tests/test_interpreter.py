@@ -3,7 +3,7 @@
 """ 
 An interpreter for executing tests from the associated json file. 
 
-** Depends upon 'gremlin_query' and finding it in the 'tools' folder inside the home directory
+** Depends upon 'gremlin_query' and finding it in the 'tools' folder by relative path
 
 """
 
