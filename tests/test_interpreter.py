@@ -114,6 +114,9 @@ def get_args():
 
 
 def main(args):
+    if not os.path.exists(args.data):
+        os.chdir(os.path.expanduser('~/adapt/tests'))
+
     pipeline = module_sequence(args.module)
     for module in pipeline:
         print("\n======================================================================\n"
