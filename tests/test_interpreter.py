@@ -18,6 +18,12 @@ sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
 
+def simplify(result):
+    if result and len(result) == 1:
+        return result[0]
+    return result
+
+
 class DynamicTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         '''
@@ -29,9 +35,10 @@ class DynamicTestCase(unittest.TestCase):
         unittest.TestCase.__init__(self, *args, **kwargs)
 
     def test_json_condition(self):
-        result = execute_graph_query(self.query)
-        self.assertEqual(result, self.response,
-                         "for test query:\n%s" % self.query)
+        for msg in execute_graph_query(self.query):
+            result = simplify(msg.data)
+            self.assertEqual(str(result), str(self.response),
+                             "for test query:\n%s" % self.query)
 
 
 def get_test_json(path):
@@ -48,7 +55,7 @@ def tests_for_module(module_key, json_path="./tests.json",
 
 def execute_graph_query(query):
     with gremlin_query.Runner() as g:
-        return str(g.fetch(query))
+        return g.fetch(query)
 
 
 def run_tests_for_module(module_key, json_path="./tests.json",
