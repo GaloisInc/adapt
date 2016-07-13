@@ -93,7 +93,8 @@ def get_args():
     parser = argparse.ArgumentParser(description='An Adapt module and test runner')
     parser.add_argument(
         "-m", "--module", type=str, default="dx",
-        help="Tests will run through the specified module; a module key from the sequence: pre, in, se, ad, ac, dx")
+        choices='pre in se ad ac dx'.split(),
+        help="Tests will run through the specified module")
     parser.add_argument(
         "-t", "--tests", type=str, default="./tests.json",
         help="Path to a JSON file with test data of the expected structure.")
