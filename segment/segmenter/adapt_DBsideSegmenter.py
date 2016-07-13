@@ -30,12 +30,12 @@ def escape(s):
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
 	p.add_argument('--broker', '-b', help='The broker to the Titan DB',required=True)
-	p.add_argument('--criterion', '-c', help='The segmentation criterion (e.g PID)',required=True,default='pid')
-	p.add_argument('--radius', '-r', help='The segmentation radius', type=int, required=True)
+	p.add_argument('--criterion', '-c', help='The segmentation criterion (e.g PID)',default='pid')
+	p.add_argument('--radius', '-r', help='The segmentation radius', type=int, default=2)
 	p.add_argument('--directionEdges', '-e',help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', choices=['in','out','both'],default='both')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', action='store_true',help='Drop DB and quit, no segmentation performed')
-	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='No')
+	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='Yes')
 	p.add_argument('--log-to-kafka', action='store_true',help='Send logging information to kafka server')
 	p.add_argument('--kafka',help='location of the kafka server',default='localhost:9092')
 	return p
