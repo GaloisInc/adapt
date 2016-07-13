@@ -16,8 +16,8 @@ import re
 import sys
 import asyncio
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+property_segmentNodeName='segment:name'
+property_segmentEdgeLabel='segment:includes'
 
 def escape(s):
     """
@@ -30,12 +30,12 @@ def escape(s):
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
 	p.add_argument('--broker', '-b', help='The broker to the Titan DB',required=True)
-	p.add_argument('--criterion', '-c', help='The segmentation criterion (e.g PID)',required=True)
-	p.add_argument('--radius', '-r', help='The segmentation radius', type=int, required=True)
+	p.add_argument('--criterion', '-c', help='The segmentation criterion (e.g PID)',default='pid')
+	p.add_argument('--radius', '-r', help='The segmentation radius', type=int, default=2)
 	p.add_argument('--directionEdges', '-e',help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', choices=['in','out','both'],default='both')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', action='store_true',help='Drop DB and quit, no segmentation performed')
-	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='No')
+	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='Yes')
 	p.add_argument('--log-to-kafka', action='store_true',help='Send logging information to kafka server')
 	p.add_argument('--kafka',help='location of the kafka server',default='localhost:9092')
 	return p
@@ -60,10 +60,10 @@ class SimpleTitanGremlinSegmenter:
 		'''
 		sends a query to Titan that:
 		-gets all the nodes n in the graph that have a property (segmentation criterion) P (with value v_n)
-		-for each such vertex, creates a segment vertex s_n ('segname' property) and gives it property P with value v_n
+		-for each such vertex, creates a segment vertex s_n and gives it property P with value v_n
 		'''
 		print('Constructing query\n')
-		query="for (i in g.V().has('"+self.criterion+"').id()) graph.addVertex(label,'segment','segname','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())"
+		query="for (i in g.V().has('"+self.criterion+"').id()) graph.addVertex(label,'segment','"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())"
 		print('Query sent for execution\n')
 		return self.titanclient.execute(query)
 
@@ -90,9 +90,9 @@ class SimpleTitanGremlinSegmenter:
 
 	def getSegmentNodeFromVertexId(self,vertexId):
 		'''
-		query Titan to get the segment node corresponding to a vertex identified by its id (assumes the name of the segment (i.e 'segname') is of the format 's'+id e.g s1)
+		query Titan to get the segment node corresponding to a vertex identified by its id (assumes the name of the segment (i.e 'segment:name') is of the format 's'+id e.g s1)
 		'''
-		query="g.V().has('segname','s'+g.V("+str(vertexId)+").id().next().toString())"
+		query="g.V().has('"+property_segmentNodeName+"','s'+g.V("+str(vertexId)+").id().next().toString())"
 		return self.titanclient.execute(query)
 
 	def getSubgraphFromVertexId(self,vertexId):
@@ -107,7 +107,7 @@ class SimpleTitanGremlinSegmenter:
 		'''
 		query Titan to add edges between a segment node with name 'segmentNodeName' and nodes that are in the segment. Requires segment nodes to have been created
 		'''
-		query="for (node in "+subgraph_ids+") g.V().has('segname','"+segmentNodeName+"').next().addEdge('"+segmentEdgeLabel+"',g.V(i).next())"
+		query="for (node in "+subgraph_ids+") g.V().has('"+property_segmentNodeName+"','"+segmentNodeName+"').next().addEdge('"+segmentEdgeLabel+"',g.V(i).next())"
 		return self.titanclient.execute(query)
 
 	def getSegments(self):
@@ -184,18 +184,18 @@ class SimpleTitanGremlinSegmenter:
 				return "Undefined criterion type"
 			else:
 				self.createSchemaVertexLabel('Segment')
-				self.createSchemaVertexProperty('segname','String','SINGLE')
+				self.createSchemaVertexProperty(property_segmentNodeName,'String','SINGLE')
 				self.createSchemaVertexProperty('parentVertexId','Integer','SINGLE')
 				self.createSchemaVertexProperty(self.criterion,type_criterion,'SINGLE')
-				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'segname','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
+				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
 				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
-				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment','segname','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()};for (node in subtr.V().id().fold().next()) {if (g.V().hasLabel('Segment').has('parentVertexId',i).outE('prov-tc:partOfSegment').as('e').inV().hasId(node).select('e')==[]) {s.addEdge('prov-tc:partOfSegment',g.V(node).next())}}}"""
+				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()};for (node in subtr.V().id().fold().next()) {if (g.V().hasLabel('Segment').has('parentVertexId',i).outE('prov-tc:partOfSegment').as('e').inV().hasId(node).select('e')==[]) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}}"""
 				if self.store_segment=='OnlyNodes':
 					createSegmentNodes=self.titanclient.execute(createVertices_query)
 					sys.stdout.write('Segment nodes created')
 					return "Nodes created"
 				elif self.store_segment=='Yes':
-					self.createSchemaEdgeLabel('prov-tc:partOfSegment')
+					self.createSchemaEdgeLabel(property_segmentEdgeLabel)
 					createFullSegments=self.titanclient.execute(addEdges_query)
 					sys.stdout.write('Segments (including edges) created\n')
 					return "Segments created"
