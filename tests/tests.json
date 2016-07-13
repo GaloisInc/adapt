@@ -1,244 +1,197 @@
-{  
-    "5d_youtube_ie_output-100.avro" : {  
-        "pre" : [  
-            {  
-                "query" : "g.V().drop()",
-                "response" : "[Message(status_code=204, data=None, message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.E().count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
+{
+    "5d_youtube_ie_output-100.avro": {
+        "pre": [
+            {
+                "query": "g.V().drop()",
+                "response": "[Message(status_code=204, data=None, message='', metadata={})]",
+                "requester_email": "ryan@galois.com",
+                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+            }, {
+                "query": "g.V().count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "ryan@galois.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
+            }, {
+                "query": "g.E().count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "ryan@galois.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
             }
         ],
-        "in" : [  
-            {  
-                "query" : "g.V().has(label, 'Entity').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-File').count()",
-                "response" : "[Message(status_code=200, data=[18], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Netflow').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Memory').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Resource').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Subject').count()",
-                "response" : "[Message(status_code=200, data=[28], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Host').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Agent').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
+        "in": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ],
-        "se" : [  
-            {  
-                "query" : "g.V().has(label, 'Entity').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-File').count()",
-                "response" : "[Message(status_code=200, data=[18], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Netflow').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Memory').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Resource').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Subject').count()",
-                "response" : "[Message(status_code=200, data=[28], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Host').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Agent').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
+        "se": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ],
-        "ad" : [  
-            {  
-                "query" : "g.V().has(label, 'Entity').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-File').count()",
-                "response" : "[Message(status_code=200, data=[18], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Netflow').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Memory').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Resource').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Subject').count()",
-                "response" : "[Message(status_code=200, data=[28], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Host').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Agent').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyScore').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyType').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
+        "ad": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyScore').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyType').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ],
-        "ac" : [  
-            {  
-                "query" : "g.V().has(label, 'Entity').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-File').count()",
-                "response" : "[Message(status_code=200, data=[18], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Netflow').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Memory').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Resource').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Subject').count()",
-                "response" : "[Message(status_code=200, data=[28], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Host').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Agent').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Activity').count()",
-                "response" : "[Message(status_code=200, data=[1], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyScore').count()",
-                "response" : "[Message(status_code=200, data=[3], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyType').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
+        "ac": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Activity').count()",
+                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyScore').count()",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyType').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ],
-        "dx" : [  
-            {  
-                "query" : "g.V().has(label, 'Entity').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-File').count()",
-                "response" : "[Message(status_code=200, data=[18], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Netflow').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Entity-Memory').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Resource').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Subject').count()",
-                "response" : "[Message(status_code=200, data=[28], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Host').count()",
-                "response" : "[Message(status_code=200, data=[0], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Agent').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Phase').count()",
-                "response" : "[Message(status_code=200, data=[1], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'APT').count()",
-                "response" : "[Message(status_code=200, data=[1], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Activity').count()",
-                "response" : "[Message(status_code=200, data=[1], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyScore').count()",
-                "response" : "[Message(status_code=200, data=[3], message='', metadata={})]"
-            },
-            {  
-                "query" : "g.V().has(label, 'Segment').has('anomalyType').count()",
-                "response" : "[Message(status_code=200, data=[2], message='', metadata={})]"
+        "dx": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Phase').count()",
+                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'APT').count()",
+                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Activity').count()",
+                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyScore').count()",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
+            }, {
+                "query": "g.V().has(label, 'Segment').has('anomalyType').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "fake@email.com",
+                "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ]
+    },
+    "bad-ls-100.avro": {
+        "pre": [
+            {
+                "query": "g.V().drop()",
+                "response": "[Message(status_code=204, data=None, message='', metadata={})]",
+                "requester_email": "ryan@galois.com",
+                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+            }
+        ],
+        "in": [],
+        "se": [],
+        "ad": [],
+        "ac": [],
+        "dx": []
     }
 }
