@@ -974,6 +974,26 @@ makeVertexLabel('EDGE_FILE_HAS_TAG')
 makeVertexLabel('EDGE_MEMORY_HAS_TAG')
 [schema]: #
 makeVertexLabel('EDGE_NETFLOW_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG out').multiplicity(SIMPLE)
+
+Bad_ls includes EDGE_SUBJECT_HAS_TAG.
+[schema]: #
+makeVertexLabel('EDGE_SUBJECT_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG out').multiplicity(SIMPLE)
 
 A Note About Provenance Tags
 ----------
