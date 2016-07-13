@@ -1,4 +1,7 @@
+
 {
+    "_lint": "python3 -m json.tool tests/tests.json | grep query",
+
     "5d_youtube_ie_output-100.avro": {
         "pre": [
             {
@@ -178,20 +181,5 @@
                 "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ]
-    },
-    "bad-ls-100.avro": {
-        "pre": [
-            {
-                "query": "g.V().drop()",
-                "response": "[Message(status_code=204, data=None, message='', metadata={})]",
-                "requester_email": "ryan@galois.com",
-                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
-            }
-        ],
-        "in": [],
-        "se": [],
-        "ad": [],
-        "ac": [],
-        "dx": []
     }
 }
