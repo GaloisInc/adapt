@@ -63,17 +63,22 @@ def run_tests_for_module(module_key, json_path="./tests.json",
 
 
 def execute_module(module_key, data_key="5d_youtube_ie_output-100.avro"):
+    top = os.path.expanduser('~/adapt')
     if module_key is "in":
         os.system('Trint -p ~/adapt/example/' + data_key)
         sleep(5)  # no way to know when Trint is finished?
         os.system('Trint -f')
         sleep(1)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
-        pass
+        cmd = ('%s/segment/segmenter/adapt_segmenter.py'
+               ' --broker http://localhost:8182/'
+               ' --store-segment %s/config/segmentByPID.json' % (top, top))
+        os.system(cmd)
     elif module_key is "ad":
         pass
     elif module_key is "ac":
-        pass
+        cmd = os.path.join(top, 'classifier/phase3/fg_classifier.py')
+        os.system(cmd)
     elif module_key is "dx":
         pass
     else:
