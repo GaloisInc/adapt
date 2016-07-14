@@ -177,15 +177,15 @@
             }
         ]
     },
-    "_config_gather": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
+    "_config_cameragrab1": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
 
-    "_run_gather": "killall ingestd; sleep 2; time tests/test_interpreter.py --data=gather.avro.bin",
+    "_run_cameragrab1": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=cameragrab1.bin",
 
-    "gather.avro.bin": {
+    "cameragrab1.bin": {
         "pre": [
             {
-                "query": "g.V().drop()",
-                "response": "[Message(status_code=204, data=None, message='', metadata={})]",
+                "query": "g.V().drop().iterate(); graph.tx().commit()",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Drop all data so that we have a clean starting point for remaining tests."
             },
@@ -202,27 +202,27 @@
         "ac": [
             {
                 "query": "g.V().has(label, 'Entity-File').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[1557], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify there are files."
             },
 	    {
                 "query": "g.V().has(label, 'Subject').count()",
-                "response": "[Message(status_code=200, data=[62], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[2783], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify there are subjects."
             },
 	    {
                 "query": "g.V().has(label, 'Agent').count()",
-                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify there is an agent."
+                "explanation": "Verify there are no agents."
             },
 	    {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[199], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify there is a PID-based segment."
+                "explanation": "Verify that many PID-based segments were found."
             },
 	    {
                 "query": "g.V().has(label, 'Activity').count()",
@@ -230,6 +230,7 @@
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify that no relevant features were found in the very short trace."
             }
-        ]
+        ],
+        "dx": []
         }
 }
