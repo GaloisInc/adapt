@@ -36,6 +36,14 @@ class Runner:
     def fetch(self, query):
         return self.loop.run_until_complete(self.gc.execute(query))
 
+    def fetch_data(self, query):
+        result = self.fetch(query)
+        data = []
+        for r in result:
+            if r.data:
+                data = data + r.data
+        return data
+
     def close(self):
         self.loop.run_until_complete(self.gc.close())
 
