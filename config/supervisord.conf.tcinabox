@@ -37,7 +37,7 @@ autorestart=yes
 startsecs=20
 
 [program:segmentd]
-command=%(ENV_HOME)s/adapt/segment/segmenter/segmentd.py --spec %(ENV_HOME)s/adapt/config/segmentByPID.json
+command=%(ENV_HOME)s/adapt/segment/segmenter/segmentd.py --inmemory --spec %(ENV_HOME)s/adapt/config/segmentByPID.json
 autorestart=yes
 startsecs=20
 
