@@ -246,7 +246,7 @@ class SimpleTitanGremlinSegmenter:
 				elif self.store_segment=='OnlyNodes':
 					self.log('info','Segment nodes stored in Titan DB\n')
 			self.titanclient.close()
-			self.log('\nSegmentation finished\n')
+			self.log('info','\nSegmentation finished\n')
 			sys.exit()
 			
 		
