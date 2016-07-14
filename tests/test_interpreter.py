@@ -65,7 +65,8 @@ def run_tests_for_module(module_key, json_path="./tests.json",
 def execute_module(module_key, data_key="5d_youtube_ie_output-100.avro"):
     top = os.path.expanduser('~/adapt')
     if module_key is "in":
-        os.system('Trint -p ~/adapt/example/' + data_key)
+        # Large binary artifacts are transfered using trace/trace_rsync.sh.
+        os.system('Trint -p ~/adapt/trace/current/' + data_key)
         sleep(5)  # no way to know when Trint is finished?
         os.system('Trint -f')
         sleep(1)  # currently no way to know when other services are complete with their respective processing.
