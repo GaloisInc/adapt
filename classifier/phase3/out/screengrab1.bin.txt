@@ -56,12 +56,13 @@ file
   18    3  /usr/lib/x86_64-linux-gnu/libXau.so.6
   19    3  /usr/lib/x86_64-linux-gnu/libXdmcp.so.6
   20    3  /usr/lib/x86_64-linux-gnu/libxcb.so.1
-  21    1  chmod
-  22    1  client.sh
-  23    2  nc
-  24    1  pipe
-  25    4  screen.png
-  26    9  screengrab
+  21  103  InstrumentationSource.LINUX_THEIA
+  22    1  chmod
+  23    1  client.sh
+  24    2  nc
+  25    1  pipe
+  26    4  screen.png
+  27    9  screengrab
 
 memory
    1    1  00601000
@@ -152,9 +153,10 @@ memory
   86    1  85ed1000
   87    1  860d0000
   88    1  862f5000
-  89    1  ec2a3000
-  90    1  ec4a2000
-  91    1  ec6cf000
+  89   96  InstrumentationSource.LINUX_THEIA
+  90    1  ec2a3000
+  91    1  ec4a2000
+  92    1  ec6cf000
 
 netflow
 
@@ -169,4 +171,5 @@ subject
    6   18  Event.RECVFROM
    7   17  Event.RECVMSG
    8   13  Event.WRITE
-   9  212  Subject.SUBJECT_EVENT
+   9  246  InstrumentationSource.LINUX_THEIA
+  10  212  Subject.SUBJECT_EVENT

@@ -1,22 +1,13 @@
 #! /usr/bin/env python3
 
-import asyncio
-from aiogremlin import GremlinClient
+import sys
+import os
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import gremlin_query
 
-loop = asyncio.get_event_loop()
-gc = GremlinClient(loop=loop)
-
-def run_query(query, bindings={}):
-    execute = gc.execute(query, bindings=bindings)
-    result = loop.run_until_complete(execute)
-    return result[0].data
-
-# Unit test
-# Test that all Entity-NetFlow nodes has attached anomaly scores
-n_net_idents = run_query("g.V().hasLabel('Entity-NetFlow').values('ident')")
-n_nodes_attach = run_query("g.V().has('anomalyScore').count()")[0]
-assert len(n_net_idents) == n_nodes_attach, "Anomaly score not attached on all Entity-NetFlow nodes"
-print("Anomaly Score Test PASSED!")
-
-loop.run_until_complete(gc.close())
-loop.close()
+# Unit test: Test that all Entity-NetFlow nodes has attached anomaly scores
+with gremlin_query.Runner() as gremlin:
+    n_net_ids = gremlin.fetch_data("g.V().hasLabel('Entity-NetFlow').count()")[0]
+    n_nodes_attach = gremlin.fetch_data("g.V().has('anomalyScore').count()")[0]
+    assert n_net_ids == n_nodes_attach, "Anomaly score not attached on all Entity-NetFlow nodes"
+    print("Anomaly Score Test PASSED!")

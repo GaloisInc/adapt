@@ -4,6 +4,7 @@
 .idea
 .stack-adapt/
 .vagrant
+TAGS
 config/supervisord.conf
 example/infoleak-small.provn
 gremlin-server/

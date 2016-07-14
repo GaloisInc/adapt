@@ -40,9 +40,19 @@ class ExfilDetector(object):
         self._ip_re = re.compile(
             r'data:destination host="' + ip_pat + '",'
             r'\s*audit:subtype="network",\s*data:destination port=')
-        self._file_re = re.compile(
-            r'audit:path="(?P<fspec>[\w/\.-]+)",'
-            r'\s*audit:subtype="file",')
+        self._sensitive_fspecs_re = re.compile(
+            r'^C:\\Windows\\inf\\hdaudio\.PNF'
+            r'|^file:///etc/shadow'
+            r'|^file:///etc/passwd'
+            r'|^/etc/passwd'
+            r'|^/dev/video\d'
+            r'|^/dev/snd/controlC1'
+            r'|^/dev/snd/pcmC1D0c'
+            )
+        # We no longer get commands from SPADE in this way.
+        # self._file_re = re.compile(
+        #     r'audit:path="(?P<fspec>[\w/\.-]+)",'
+        #     r'\s*audit:subtype="file",')
         self._sensitive_re = re.compile(
             'Company Confidential'
             '|Xerox Confidential'
@@ -87,18 +97,22 @@ class ExfilDetector(object):
                     '/etc/issue.net', '/etc/shadow']:
             assert not self.is_sensitive_file(audit_tmpl % tst)
 
-    def is_sensitive_file(self, cmd):
+    def is_sensitive_file(self, url):
         '''Predicate is True for files with restrictive markings.'''
+        m = self._sensitive_fspecs_re.search(url)
+        return m is not None
+
         # NB: Analysis filesystem must be quite similar to Monitored Host FS.
         # File paths relative to cwd may require us to track additional state.
-        if cmd.endswith('/etc/shadow'):
-            return True
-        if (' auditctl ' in cmd and
-                cmd.startswith('sudo ')):
-            return True
-        event = cmd
+        # We no longer get commands from SPADE in this way.
+        # if (' auditctl ' in cmd and
+        #         cmd.startswith('sudo ')):
+        #     return True
+        # This code is unused and likely will soon be deleted.
+        event = url
         m = self._file_re.search(event)
         if m:
+            # fspec = url.replace('file://', '')
             fspec = m.group('fspec')
             if not os.path.exists(fspec):
                 return False

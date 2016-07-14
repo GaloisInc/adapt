@@ -37,15 +37,16 @@ class ActivityClassifier(object):
 
     def __init__(self, gremlin_client):
         self.gremlin = gremlin_client
-        # At present we have only tackled challenge problems for two threats:
+        # At present we have only tackled challenge problems for a few threats:
         self.exfil = classify.ExfilDetector()
         self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
+        self.scan = classify.ScanDetector()
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
     def find_new_segments(self, last_previously_processed_seg):
-        q = "g.V().has(label, 'Segment').id().is(gt(%d)).order()" % (
-            last_previously_processed_seg)
+        q = ("g.V().has(label, 'Segment').values('ident').is(gt('%s')).order()"
+             % last_previously_processed_seg)
         for msg in self.gremlin.fetch(q):
             if msg.data is not None:
                 for seg_db_id in msg.data:
@@ -56,28 +57,39 @@ class ActivityClassifier(object):
             self.classify1(seg_id)
 
     def classify1(self, seg_id):
-        exfil_idents = set()
-        q = "g.V(%d).outE('segment:includes').inV()" % seg_id
+        q = "g.V().has('ident', '%s').outE('segment:includes').inV()" % seg_id
         for prop in gremlin_properties.fetch(self.gremlin, q):
-            # During phase3 integration we're more worried about
-            # plumbing than correctness. Clearly this needs to improve.
             if 'url' not in prop:
                 continue
-            if self.exfil.is_exfil(prop['url']) or True:
-                exfil_idents.add(prop['ident'])
-        if len(exfil_idents) > 0:
-            self.insert_activity_classification(
-                exfil_idents, seg_id, 'exfiltration', .1)
+            if self.exfil.is_sensitive_file(prop['url']):
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'sensitive_file', .1)
+            if self.exfil.is_exfil(prop['url']):
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'exfiltration', .1)
+            if self.scan.is_part_of_scan(prop['url']):  # Could do counting here.
+                self.insert_activity_classification(
+                    prop['ident'], seg_id, 'scanning', .1)
 
-    def insert_activity_classification(self, base_nodes, seg_id, typ, score):
+    def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"
                 "  'activity:type', '%s',"
                 "  'activity:suspicionScore', %f)" % (typ, score)]
-        cmds.append("g.V(%d).next().addEdge('segment:includes', act)" % seg_id)
-        for base_node_ident in base_nodes:
-            cmds.append("act.addEdge('activity:includes',"
-                        " g.V().has('ident', '%s').next())" % base_node_ident)
+        cmds.append("g.V().has('ident', '%s').next()"
+                    ".addEdge('segment:includes', act)" % seg_id)
+        cmds.append("act.addEdge('activity:includes',"
+                    " g.V().has('ident', '%s').next())" % base_node_id)
         self.fetch1(';  '.join(cmds))
+    #
+    # example Activity node:
+    #
+    # gremlin> g.V().hasLabel('Segment').out().has(label,'Activity').valueMap()
+    # ==>[activity:type:[exfiltration], activity:suspicionScore:[0.1]]
+    # gremlin>
+    # gremlin>
+    # gremlin> g.V().has(label, 'Activity').out().limit(1).valueMap()
+    # ==>[ident:[...], source:[0], file-version:[0], url:[file:///etc/shadow]]
+    #
 
     def fetch1(self, query):
         '''Return a single query result.'''

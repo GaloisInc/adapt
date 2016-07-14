@@ -128,11 +128,12 @@ file
   93    1  /usr/share/alsa/pulse-alsa.conf
   94    1  /var/lib/dbus/machine-id
   95    2  0x7fe350032250
-  96    1  chmod
-  97   79  myfile.pcm
-  98    8  pipe
-  99    1  recordAudio
- 100    1  run.sh
+  96  549  InstrumentationSource.LINUX_THEIA
+  97    1  chmod
+  98   79  myfile.pcm
+  99    8  pipe
+ 100    1  recordAudio
+ 101    1  run.sh
 
 memory
    1    1  -0000001
@@ -275,6 +276,7 @@ memory
  138    1  9680b000
  139    1  96a0a000
  140    1  96c34000
+ 141  269  InstrumentationSource.LINUX_THEIA
 
 netflow
 
@@ -290,4 +292,5 @@ subject
    7   22  Event.RECVMSG
    8    1  Event.SHM
    9   96  Event.WRITE
-  10  709  Subject.SUBJECT_EVENT
+  10  765  InstrumentationSource.LINUX_THEIA
+  11  709  Subject.SUBJECT_EVENT

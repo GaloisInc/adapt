@@ -30,6 +30,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Data.Word
 import           Schema hiding (Env)
 import           System.Entropy (getEntropy)
 
@@ -53,6 +54,7 @@ data Operation id = InsertVertex { vertexType :: Text
   deriving (Eq,Ord,Show)
 
 data GremlinValue = GremlinNum Integer
+                  | GremlinBytess [[Word8]]
                   | GremlinString Text
                   | GremlinList [GremlinValue]
                   | GremlinMap [(Text, GremlinValue)]
@@ -61,8 +63,13 @@ data GremlinValue = GremlinNum Integer
 instance A.ToJSON GremlinValue where
   toJSON gv =
     case gv of
-      GremlinNum i    -> A.toJSON i
-      x               -> A.toJSON (encodeGremlinValue x)
+      GremlinNum i     -> A.toJSON i
+      GremlinBytess xs -> A.toJSON xs
+      GremlinString s -> A.toJSON s
+      -- XXX maps and lists are only notionally supported
+      GremlinMap xs   -> A.toJSON (Map.fromList xs)
+      GremlinList vs  -> A.toJSON vs
+
 
 compile :: ([Node], [Edge]) -> IO [Operation Text]
 compile (ns,es) =
@@ -170,7 +177,7 @@ gremlinList :: [Text] -> GremlinValue
 gremlinList = GremlinList . map GremlinString
 
 gremlinArgs :: [BS.ByteString] -> GremlinValue
-gremlinArgs = gremlinList . map T.decodeUtf8
+gremlinArgs = GremlinBytess . map BS.unpack
 
 instance PropertiesOf a => PropertiesOf (Maybe a) where
   propertiesOf Nothing  = []
@@ -302,15 +309,6 @@ instance GraphId Text where
                          , ("dst", A.String dst)
                          , ("edgeTy", A.String l)
                          ]
-
-encodeGremlinValue :: GremlinValue -> Text
-encodeGremlinValue gv =
-  case gv of
-    GremlinString s -> s
-    GremlinNum  n   -> T.pack (show n)
-    -- XXX maps and lists are only notionally supported
-    GremlinMap xs   -> T.decodeUtf8 $ ByteString.toStrict $ A.encode (Map.fromList xs)
-    GremlinList vs  -> T.decodeUtf8 $ ByteString.toStrict $ A.encode vs
 
 mkBinding :: [(Text, GremlinValue)] -> [(Text, A.Value)]
 mkBinding pvs =
