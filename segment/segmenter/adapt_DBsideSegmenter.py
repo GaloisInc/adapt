@@ -39,7 +39,7 @@ def arg_parser():
 	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='Yes')
 	p.add_argument('--log-to-kafka', action='store_true',help='Send logging information to kafka server')
 	p.add_argument('--kafka',help='location of the kafka server',default='localhost:9092')
-	p.add_argument('spec_file',
+	p.add_argument('--spec',
 		help='A segment specification file in json format')
 	return p
 
