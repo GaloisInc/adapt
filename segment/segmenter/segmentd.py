@@ -64,7 +64,7 @@ class TopLevelSegmenter:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_ingest(self, broker, spec, kafkaUrl, inmemory, start_msg='Awaiting ingested data.'):
+    def await_ingest(self, broker, spec, kafkaUrl, start_msg='Awaiting ingested data.'):
         os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
         log.info(start_msg)
         for msg in self.consumer:
@@ -73,19 +73,13 @@ class TopLevelSegmenter:
             if msg.value == STATUS_DONE:  # from Ingest
                 self.producer.send("se-log", b'starting processing')
                 self.report_status(STATUS_IN_PROGRESS)
-                do_segmentation(broker, spec, kafkaUrl)
+                cmd = './adapt_DBsideSegmenter.py --broker %s --criterion pid --radius 2 --store-segment Yes --spec %s --log-to-kafka --kafka %s' % (
+                        broker, spec, kafkaUrl)
+                log.info(cmd)
+                os.system(cmd)
                 self.report_status(STATUS_DONE)
                 self.producer.send("se-log", b'done processing')
                 log.info(start_msg)  # Go back and do it all again.
-
-    def segmentation_cmd(broker,spec,kafkaUrl,inmemory):
-        if inmemory: 
-            return './adapt_segmenter.py --broker %s --store-segment %s --log-to-kafka --kafka %s' % (
-                broker, spec, kafkaUrl)
-        else: 
-            return './adapt_DBsideSegmenter.py --broker %s --criterion pid --radius 2 --store-segment %s --log-to-kafka --kafka %s' % (
-                broker, spec, kafkaUrl)
-
 
     def report_status(self, status):
         def to_int(status_byte):
@@ -106,12 +100,9 @@ def arg_parser():
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
                    default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
-    p.add_argument('--inmemory', action='store_true', 
-                   help='Use (inefficient) in-memory segmenter'
-                  )
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec, args.kafka, args.inmemory)
+    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec, args.kafka)
