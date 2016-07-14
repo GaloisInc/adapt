@@ -82,5 +82,6 @@ if __name__ == '__main__':
     gr = parsley.makeGrammar(get_grammar(), {})
     with gremlin_query.Runner() as gremlin:
         ac = classify.ActivityClassifier(gremlin)
-        ac.classify(ac.find_new_segments('segment_id_'))
+        ac.classify(ac.find_new_segments('s'))
+        # ac.classify(ac.find_new_segments('segment_id_'))
     report_status(STATUS_DONE)
