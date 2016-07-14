@@ -35,17 +35,21 @@ class ActivityClassifier(object):
     Classifies activities found in segments of a CDM13 trace.
     '''
 
-    def __init__(self, gremlin_client):
-        self.gremlin = gremlin_client
+    def __init__(self, gremlin):
+        self.gremlin = gremlin
         # At present we have only tackled challenge problems for a few threats:
-        self.exfil = classify.ExfilDetector()
-        self.escalation = classify.Escalation(classify.FsProxy(self.gremlin))
-        self.scan = classify.ScanDetector()
+        self.detectors = [
+            classify.ExfilDetector(gremlin),
+            classify.ScanDetector(gremlin),
+            ]
+        unused = classify.Escalation(gremlin, classify.FsProxy(self.gremlin))
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
     def find_new_segments(self, last_previously_processed_seg):
         q = ("g.V().has(label, 'Segment').values('ident').is(gt('%s')).order()"
+             % last_previously_processed_seg)
+        q = ("g.V().has(label, 'Segment').values('segment:name').is(gt('%s')).order()"
              % last_previously_processed_seg)
         for msg in self.gremlin.fetch(q):
             if msg.data is not None:
@@ -57,19 +61,16 @@ class ActivityClassifier(object):
             self.classify1(seg_id)
 
     def classify1(self, seg_id):
-        q = "g.V().has('ident', '%s').outE('segment:includes').inV()" % seg_id
+        q = "g.V().has('ident',        '%s').outE('segment:includes').inV()" % seg_id
+        q = "g.V().has('segment:name', '%s').outE('segment:includes').inV()" % seg_id
         for prop in gremlin_properties.fetch(self.gremlin, q):
             if 'url' not in prop:
                 continue
-            if self.exfil.is_sensitive_file(prop['url']):
-                self.insert_activity_classification(
-                    prop['ident'], seg_id, 'sensitive_file', .1)
-            if self.exfil.is_exfil(prop['url']):
-                self.insert_activity_classification(
-                    prop['ident'], seg_id, 'exfiltration', .1)
-            if self.scan.is_part_of_scan(prop['url']):  # Could do counting here.
-                self.insert_activity_classification(
-                    prop['ident'], seg_id, 'scanning', .1)
+            for detector in self.detectors:
+                property = prop[detector.name_of_input_property()]
+                print(property, detector)
+                if detector.finds_feature(property):
+                    detector.insert_activity_classification(prop['ident'], seg_id)
 
     def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"

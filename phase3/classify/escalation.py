@@ -22,18 +22,29 @@
 # the software.
 #
 
+from .detector import Detector
 import os
 
 __author__ = 'John.Hanley@parc.com'
 
 
-class Escalation(object):
+class Escalation(Detector):
     '''
     Detects privilege escalation events (specifically escalation to root).
     '''
 
-    def __init__(self, fs_proxy):
+    def __init__(self, gremlin, fs_proxy):
+        self.gremlin = gremlin
         self.fs = fs_proxy
+
+    def name_of_input_property(self):
+        return ''
+
+    def name_of_output_classification():
+        return 'privilege_escalation'
+
+    def finds_feature(self, event):
+        return is_escalation(event)
 
     def is_escalation(self, event):
         assert event['vertexType'][0]['value'] == 'unitOfExecution', event
