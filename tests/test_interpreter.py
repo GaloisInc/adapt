@@ -69,7 +69,7 @@ def execute_module(module_key, data_key="5d_youtube_ie_output-100.avro"):
         os.system('Trint -p ~/adapt/trace/current/' + data_key)
         sleep(5)  # no way to know when Trint is finished?
         os.system('Trint -f')
-        sleep(1)  # currently no way to know when other services are complete with their respective processing.
+        sleep(15)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
         cmd = ('%s/segment/segmenter/adapt_DBsideSegmenter.py'
                ' --broker http://localhost:8182/'
