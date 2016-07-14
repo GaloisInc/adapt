@@ -10,12 +10,7 @@
                 "requester_email": "ryan@galois.com",
                 "explanation": "Drop all data so that we have a clean starting point for remaining tests."
             }, {
-                "query": "g.V().count()",
-                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-                "requester_email": "ryan@galois.com",
-                "explanation": "Ensure that we have a clean starting point for remaining tests."
-            }, {
-                "query": "g.E().count()",
+                "query": "g.V().count() + g.E().count()",
                 "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "ryan@galois.com",
                 "explanation": "Ensure that we have a clean starting point for remaining tests."
