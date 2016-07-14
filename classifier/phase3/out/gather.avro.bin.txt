@@ -5,23 +5,25 @@ Sent 447 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL out
      2  Entity-File
      2  Entity-NetFlow
-     5  EDGE_SRCSINK_AFFECTS_EVENT
-     5  EDGE_SRCSINK_AFFECTS_EVENT in
-     5  EDGE_SRCSINK_AFFECTS_EVENT out
+     4  EDGE_SRCSINK_AFFECTS_EVENT
+     4  EDGE_SRCSINK_AFFECTS_EVENT in
+     4  EDGE_SRCSINK_AFFECTS_EVENT out
     12  Resource
-    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
-    23  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
-    32  Subject
-   136  total
+    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+    29  Subject
+   127  total
 
 
 agent
-   1    1  gid_NA
-   2    1  userID_10054
+   1    1  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
+   2    1  gid_NA
+   3    1  userID_10054
 
 file
    1    2  /data/data/com.TA5.android.GatherApp/cache/gather1558304758.txt
+   2    2  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
 
 memory
 
@@ -32,8 +34,9 @@ resource
 
 subject
    1    1  Event.BIND
-   2    3  Event.CLOSE
-   3    3  Event.OPEN
-   4   10  Event.READ
-   5   18  Event.WRITE
-   6   35  Subject.SUBJECT_EVENT
+   2    2  Event.CLOSE
+   3    1  Event.OPEN
+   4    5  Event.READ
+   5   21  Event.WRITE
+   6   31  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
+   7   30  Subject.SUBJECT_EVENT

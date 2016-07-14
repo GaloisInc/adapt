@@ -78,12 +78,13 @@ file
   47    1  /usr/share/locale/locale.alias
   48    1  /usr/share/lxqt/themes/frost/mainmenu.svg
   49   14  0x7fc9d5cf4250
-  50    2  cat
-  51    2  flag2.txt
-  52    4  ls
-  53    3  pipe
-  54    1  rm
-  55    1  simple
+  50  838  InstrumentationSource.LINUX_THEIA
+  51    2  cat
+  52    2  flag2.txt
+  53    4  ls
+  54    3  pipe
+  55    1  rm
+  56    1  simple
 
 memory
    1    2  0060a000
@@ -247,36 +248,37 @@ memory
  159    1  7fea71238000
  160    1  7fea712c4000
  161    1  7fea71450000
- 162    1  a77f6000
- 163    1  a79f5000
- 164    1  a7c22000
- 165    1  b61c3000
- 166    1  c325d000
- 167    1  c345c000
- 168    1  c3461000
- 169    1  c3660000
- 170    1  c369f000
- 171    1  c389e000
- 172    1  c3a5b000
- 173    1  c3c5a000
- 174    1  c3c6c000
- 175    1  c3e6b000
- 176    1  c3e8d000
- 177    1  c408c000
- 178    1  c42b2000
- 179    1  d552c000
- 180    1  d572b000
- 181    1  d5730000
- 182    1  d592f000
- 183    1  d596e000
- 184    1  d5b6d000
- 185    1  d5d2a000
- 186    1  d5f29000
- 187    1  d5f3b000
- 188    1  d613a000
- 189    1  d615c000
- 190    1  d635b000
- 191    1  d6581000
+ 162  521  InstrumentationSource.LINUX_THEIA
+ 163    1  a77f6000
+ 164    1  a79f5000
+ 165    1  a7c22000
+ 166    1  b61c3000
+ 167    1  c325d000
+ 168    1  c345c000
+ 169    1  c3461000
+ 170    1  c3660000
+ 171    1  c369f000
+ 172    1  c389e000
+ 173    1  c3a5b000
+ 174    1  c3c5a000
+ 175    1  c3c6c000
+ 176    1  c3e6b000
+ 177    1  c3e8d000
+ 178    1  c408c000
+ 179    1  c42b2000
+ 180    1  d552c000
+ 181    1  d572b000
+ 182    1  d5730000
+ 183    1  d592f000
+ 184    1  d596e000
+ 185    1  d5b6d000
+ 186    1  d5d2a000
+ 187    1  d5f29000
+ 188    1  d5f3b000
+ 189    1  d613a000
+ 190    1  d615c000
+ 191    1  d635b000
+ 192    1  d6581000
 
 netflow
 
@@ -288,4 +290,5 @@ subject
    3  427  Event.MMAP
    4   94  Event.MPROTECT
    5  102  Event.READ
-   6  640  Subject.SUBJECT_EVENT
+   6  714  InstrumentationSource.LINUX_THEIA
+   7  640  Subject.SUBJECT_EVENT

@@ -21,12 +21,22 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Classifies a PG segment.
-'''
 
-from .activity_classifier import ActivityClassifier
-from .escalation import Escalation
-from .exfil_detector import ExfilDetector
-from .fs_proxy import FsProxy
-from .scan_detector import ScanDetector
+import re
+
+
+class ScanDetector(object):
+    '''
+    Classifies scanning activities found in subgraphs of a CDM13 trace.
+    '''
+
+    def __init__(self):
+        self._scan_url_re = re.compile(
+            r'^file:///proc/\d+/cmdline'
+            r'|^file:///proc/\d+/status'
+            r'|^file:///proc/\d+/stat'
+            )
+
+    def is_part_of_scan(self, url):
+        '''Predicate is True for url access that could be part of scan.'''
+        return self._scan_url_re.search(url)
