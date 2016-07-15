@@ -29,6 +29,7 @@ if __name__ == '__main__':
 
     for v in vertices:
         print(v)
+        print(gremlin.fetch(QUERYE.format(v['id'])))
 
 
 
