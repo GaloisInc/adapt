@@ -55,7 +55,7 @@
                 "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
                 "requester_email": "fake@email.com",
                 "explanation": "Sample test. To be deleted (or claimed) later."
-            }
+            },
 			{
                 "query": "g.E().hasLabel('segment:includes').count()",
                 "response": "[Message(status_code=200, data=[56], message='', metadata={})]",
