@@ -21,8 +21,9 @@ Sent 617 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
 
 
 agent
-   1    1  userID_S-1-5-18
-   2    1  userID_S-1-5-21-487229149-790607292-55006933-1000
+   1    2  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   2    1  userID_S-1-5-18
+   3    1  userID_S-1-5-21-487229149-790607292-55006933-1000
 
 file
    1    1  C:\
@@ -74,6 +75,7 @@ file
   47    1  C:\Windows\System32\wow64cpu.dll
   48    1  C:\Windows\System32\wow64win.dll
   49    1  C:\Windows\winsxs\x86_microsoft.windows.gdiplus_6595b64144ccf1df_1.1.7601.23407_none_5c02a2f5a011f9be\GdiPlus.dll
+  50   55  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
 
 memory
 
@@ -88,4 +90,5 @@ subject
    4  100  Event.READ
    5    2  Event.UNLINK
    6   11  Event.WRITE
-   7  175  Subject.SUBJECT_EVENT
+   7  184  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   8  175  Subject.SUBJECT_EVENT

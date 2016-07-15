@@ -20,35 +20,34 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
+#
 
-from aiogremlin import GremlinClient
-import asyncio
-
-__author__ = 'John.Hanley@parc.com'
+from .detector import Detector
+import re
 
 
-class Runner:
+class ScanDetector(Detector):
+    '''
+    Classifies scanning activities found in subgraphs of a CDM13 trace.
+    '''
 
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
+    def __init__(self, gremlin):
+        self.gremlin = gremlin
+        self._scan_url_re = re.compile(
+            r'^file:///proc/\d+/cmdline'
+            r'|^file:///proc/\d+/status'
+            r'|^file:///proc/\d+/stat'
+            )
 
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
+    def name_of_input_property(self):
+        return 'url'
 
-    def fetch_data(self, query):
-        result = self.fetch(query)
-        data = []
-        for r in result:
-            if r.data:
-                data = data + r.data
-        return data
+    def name_of_output_classification():
+        return 'scanning'
 
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
+    def finds_feature(self, event):
+        return is_part_of_scan(event)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
+    def is_part_of_scan(self, url):
+        '''Predicate is True for url access that could be part of scan.'''
+        return self._scan_url_re.search(url)

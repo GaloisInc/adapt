@@ -1,26 +1,16 @@
 #! /usr/bin/env python3
 
-import asyncio
-from aiogremlin import GremlinClient
-from math import floor
-import sys
 import csv
+import sys
+import os
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import gremlin_query
 
-in_file = sys.argv[1]
-
-loop = asyncio.get_event_loop()
-gc = GremlinClient(loop=loop)
-
-def run_query(query, bindings={}):
-    execute = gc.execute(query, bindings=bindings)
-    result = loop.run_until_complete(execute)
-    return result[0].data
-
-with open(in_file, 'r') as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        run_query("g.V().has('ident','" + str(row['ident']) + "').property('anomalyScore'," + str(row['anomaly_score']) + ")")
-    print('Anomaly scores attached')
-
-loop.run_until_complete(gc.close())
-loop.close()
+if __name__ == '__main__':
+    in_file = sys.argv[1]
+    with gremlin_query.Runner() as gremlin:
+        with open(in_file, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                gremlin.fetch_data("g.V(" + str(row['id']) + ").property('anomalyScore'," + str(row['anomaly_score']) + ")")
+            print('Anomaly scores attached')

@@ -85,7 +85,8 @@ def report(query, threshold=1, debug=False):
 
         for prop in gremlin_properties.fetch(gremlin, query):
 
-            assert prop.source() in [
+            source = prop.source()
+            assert source in [
                 cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
@@ -95,6 +96,8 @@ def report(query, threshold=1, debug=False):
             ], prop.source()
             assert cdm.enums.InstrumentationSource \
                 .WINDOWS_FIVEDIRECTIONS.value == 12
+            if source:
+                counts[str(source)] += 1
 
             if debug:
                 print(sorted(prop.prop))

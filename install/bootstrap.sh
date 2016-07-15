@@ -103,6 +103,7 @@ install_adapt_dependencies() {
     echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
                 | sudo debconf-set-selections || handle_error $LINENO
     sudo apt-get install -y \
+         exuberant-ctags \
          git \
          jq \
          python \
