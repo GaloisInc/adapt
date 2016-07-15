@@ -24,7 +24,15 @@ if __name__ == '__main__':
 
     gremlin = GremlinQueryRunner()
 
-    print("total segments: ", len(gremlin.fetch(QUERYV).data))
-    print("total segment edges: ", gremlin.fetch(QUERYE))
+    vertices = gremlin.fetch(QUERYV)[0].data
+    print("total segments: ", len(vertices))
+
+    for v in vertices:
+        print(v)
+
+
+
+
+
 
     gremlin.close()
