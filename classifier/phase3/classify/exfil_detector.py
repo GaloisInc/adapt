@@ -22,17 +22,19 @@
 # the software.
 #
 
+from .detector import Detector
 import io
 import os
 import re
 
 
-class ExfilDetector(object):
+class ExfilDetector(Detector):
     '''
     Classifies exfiltration activities found in subgraphs of a CDM13 trace.
     '''
 
-    def __init__(self, k=1):
+    def __init__(self, gremlin, k=1):
+        self.gremlin = gremlin
         self.k = k
         self.recent_events = ['' * k]
         self.cmd = 'unknown'  # This is always the most recent cmd seen.
@@ -68,6 +70,16 @@ class ExfilDetector(object):
             r'|usr/lib/x86_64-linux-gnu'
             r'|usr/share/locale|usr/lib/sudo)/'
             r'|^/etc/localtime')
+
+    def name_of_input_property(self):
+        return 'url'
+
+    def name_of_output_classification():
+        return 'exfiltration'
+
+    def finds_feature(self, event):
+        return is_exfil(event)
+
 
     def remember(self, cmd):
         '''Maintain a history of recently seen events.'''
