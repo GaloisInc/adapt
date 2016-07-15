@@ -19,5 +19,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.provision "shell", privileged: false, path: "install/bootstrap.sh"
   config.vm.provision "shell", run: "always", privileged: false, path: "start_daemons.sh"
-end
 
+  config.ssh.private_key_path = "~/.ssh/id_rsa"
+  config.ssh.forward_agent = true
+end
