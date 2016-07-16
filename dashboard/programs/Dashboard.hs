@@ -166,15 +166,32 @@ lonePage c stMV =
                 , rows_ "25", cols_ "140"]
                 (toHtml $ T.unlines $ F.toList igStat)
       h2_ "Pattern Extraction"
-      p_ (toHtml pxStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml pxStat)
       h2_ "Segmentation"
-      p_ (toHtml seStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml seStat)
       h2_ "Anomaly Detection"
-      p_ (toHtml adStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml adStat)
       h2_ "Activity Classification"
-      p_ (toHtml acStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml acStat)
       h2_ "Diagnostics"
-      p_ (toHtml dxStat)
+      textarea_ [ id_ "ig_textarea"
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml dxStat)
+      h2_ "UI"
+      a_ [href_ "http://localhost:8181/3viewer.html"] "Segment Graph Viewer"
       return ()
 
 updateStatus :: Channels -> MVar Status -> IO ()
@@ -236,4 +253,3 @@ kafkaInput host topic chan = runKafka state oper
  getMessage :: Offset -> Kafka [ByteString]
  getMessage offset =
   map tamPayload . fetchMessages <$> withAnyHandle (\h -> fetch' h =<< fetchRequest offset 0 topic)
-

@@ -114,6 +114,7 @@ install_adapt_dependencies() {
          supervisor \
          unzip \
          wget \
+         graphviz \
        || handle_error $LINENO
     sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
