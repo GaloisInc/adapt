@@ -135,6 +135,7 @@ install_adapt_dependencies() {
         networkx \
         parsley \
         pyparsing \
+        flask \
       || handle_error $LINENO
 
     sudo -H pip3 install -r $ADAPT_DIR/dx/simulator/config/requirements.txt
