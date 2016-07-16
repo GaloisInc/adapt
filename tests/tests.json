@@ -65,6 +65,11 @@
         ],
         "ad": [
             {
+                "query": "g.V().has(label,'Entity-NetFlow').local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that all the Entity-NetFlow nodes are contained within at least one segment"
+            },{
                 "query": "g.V().has(label, 'Entity-File').count()",
                 "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
