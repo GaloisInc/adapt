@@ -2,9 +2,7 @@
 
 echo "Generating Segment Graph Visualization"
 
-python3 showSegmentsSubGraph.py > seggraph.dot
-dot -Tsvg seggraph.dot > seggraph.svg
-
-rm seggraph.dot
+python3 showSegmentsSubGraph.py > static/seggraph.dot
+dot -Tsvg seggraph.dot > static/seggraph.svg
 
 echo "Done!"
