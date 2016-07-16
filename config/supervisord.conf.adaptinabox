@@ -47,6 +47,6 @@ autorestart=yes
 startsecs=20
 
 [program:uid]
-command=%(ENV_HOME)s/adapt/ui/viz/UId.sh %(ENV_HOME)s
+command=%(ENV_HOME)s/adapt/ui/viz/UId.sh %(ENV_HOME)s/adapt/ui/viz
 autorestart=yes
 startsecs=20
