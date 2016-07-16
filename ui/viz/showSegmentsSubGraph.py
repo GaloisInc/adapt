@@ -1,39 +1,68 @@
 #! /usr/bin/env python3
-
+​
+import os
+import sys
+import pprint
 import asyncio
 from aiogremlin import GremlinClient
-
+import graphviz
+​
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import cdm.enums
+import gremlin_properties
+import gremlin_query
+​
 QUERYV = "g.V().hasLabel('Segment')"
-
 QUERYE = "g.V({}).as('a').out('segment:includes').out().in('segment:includes').where(neq('a'))"
-
-class GremlinQueryRunner:
-
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
-
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
-
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
-
-
+​
+def toDot(graph, label='Segmentation Graph'):
+    dot = graphviz.Digraph(graph_attr={'label': label,
+                                       'labelloc': 't',
+                                       'fontname': 'sans-serif'},
+                           node_attr={'margin': '0',
+                                      'fontsize': '6',
+​
+                                      'fontname': 'sans-serif'})
+    for n in graph.keys():
+        linecolor, color, penwidth = ('black', 'white', '1')
+        fontcolor = linecolor
+        node_label = graph[n]['name'] + ':' + str(graph[n]['criteria'])
+​
+        dot.node(str(n),
+                 node_label,
+                 style='filled',
+                 fillcolor=color,
+                 color=linecolor,
+                 fontcolor=fontcolor,
+                 penwidth=penwidth)
+​
+        for o in graph[n]['edges_out']:
+            dot.edge(str(n), str(o), color=linecolor)
+​
+    return dot
+​
 if __name__ == '__main__':
+​
+    with gremlin_query.Runner() as gremlin:
+​
+        vertices = gremlin.fetch(QUERYV)[0].data
+        if vertices:
+            graph = {}
+            for v in vertices:
+                val = {}
+                val['criteria'] = v['properties']['pid'][0]['value']
+                val['name'] = v['properties']['segment:name'][0]['value']
 
-    gremlin = GremlinQueryRunner()
+                edges = gremlin.fetch(QUERYE.format(v['id']))[0].data
+                out = []
+                if edges:
+                    for e in edges:
+                        out.append(edges[0]['id'])
+                val['edges_out'] = out
 
-    vertices = gremlin.fetch(QUERYV)[0].data
-    print("total segments: ", len(vertices))
+                graph[v['id']] = val
 
-    for v in vertices:
-        print(v)
-        print(">>>", gremlin.fetch(QUERYE.format(v['id'])))
-        print("")
+            gremlin.close()
 
-
-
-
-
-    gremlin.close()
+            dot = toDot(graph)
+            print(dot)
