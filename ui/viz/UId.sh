@@ -1,13 +1,5 @@
-import os
+#!/bin/sh
 
-from flask import Flask, render_template, url_for
-app = Flask(__name__)
+export FLASK_APP=server.py
 
-@app.route('/')
-def service():
-    os.system("./genSegGraph.sh")
-    return render_template('index.html') 
-
-
-app.run(host='0.0.0.0', port=8180)
-
+cd $1; python3 -m flask run
