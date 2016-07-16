@@ -34,6 +34,7 @@
                 "explanation": "Sample test. To be deleted (or claimed) later."
             }
         ],
+        "_se_throughput": "101 nodes in 17s:  5.9 node/sec.",
         "se": [
             {
                 "query": "g.V().has(label, 'Entity-File').count()",
