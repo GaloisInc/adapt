@@ -21,34 +21,43 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 
-from aiogremlin import GremlinClient
-import asyncio
+#
+# usage:
+#     tools/time_span.py
+#
+'''
+Reports on the span of time covered by the currently loaded trace.
+'''
+import datetime
+import os
+import sys
+sys.path.append(os.path.expanduser('~/adapt/tools'))
+import gremlin_query
 
-__author__ = 'John.Hanley@parc.com'
+
+def report(gremlin):
+
+    stamps = []
+
+    # Dates before 1971 fail the sanity check and are rejected.
+    sane = 365 * 86400 * 1e6
+
+    queries = [
+        "g.V().values('startedAtTime').is(gt(%d)).min()" % sane,
+        "g.V().values('startedAtTime').max()",
+        ]
+
+    for query in queries:
+        for msg in gremlin.fetch(query):
+            if msg.data:
+                for usec in msg.data:
+                    stamp = datetime.datetime.utcfromtimestamp(usec / 1e6)
+                    print(stamp)
+                    stamps.append(stamp)
+    delta = stamps[1] - stamps[0]
+    print(delta, 'elapsed time')
 
 
-class Runner:
-
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
-
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
-
-    def fetch_data(self, query):
-        result = self.fetch(query)
-        data = []
-        for r in result:
-            if r.data:
-                data = data + r.data
-        return data
-
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
+if __name__ == '__main__':
+    with gremlin_query.Runner() as gremlin:
+        report(gremlin)

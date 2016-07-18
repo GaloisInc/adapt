@@ -20,35 +20,44 @@
 # liability, whether in an action of contract, tort or otherwise, arising from,
 # out of or in connection with the software or the use or other dealings in
 # the software.
+'''
+Displays number of occurences of each distinct node label.
+'''
 
-from aiogremlin import GremlinClient
-import asyncio
+import argparse
+import gremlin_query
 
 __author__ = 'John.Hanley@parc.com'
 
 
-class Runner:
+def get_label_counts(with_edges=False):
+    '''Queries titan with read throughput of ~2700 node/sec.'''
+    queries = ['g.V().groupCount().by(label())']
+    if with_edges:
+        queries.append('g.E().groupCount().by(label())')
 
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
+    cnt = {}
+    with gremlin_query.Runner() as gremlin:
+        for query in queries:
+            for msg in gremlin.fetch(query):
+                if msg.data:
+                    assert len(msg.data) == 1
+                    cnt.update(msg.data[0])
 
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
+    cnt['total'] = sum(cnt.values())
 
-    def fetch_data(self, query):
-        result = self.fetch(query)
-        data = []
-        for r in result:
-            if r.data:
-                data = data + r.data
-        return data
+    return sorted(['%6d  %s' % (cnt[k], k)
+                   for k in cnt.keys()])
 
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
 
-    def __enter__(self):
-        return self
+def arg_parser():
+    p = argparse.ArgumentParser(
+        description='Reports on number of distinct labels (and edges).')
+    p.add_argument('--with-edges', action='store_true',
+                   help='report on edges, as well')
+    return p
 
-    def __exit__(self, type, value, traceback):
-        self.close()
+
+if __name__ == '__main__':
+    args = arg_parser().parse_args()
+    print('\n'.join(get_label_counts(args.with_edges)))

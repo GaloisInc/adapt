@@ -21,34 +21,31 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 
-from aiogremlin import GremlinClient
-import asyncio
-
-__author__ = 'John.Hanley@parc.com'
+from enum import Enum
+from parsley import makeGrammar
 
 
-class Runner:
+def any_(*args):
+    return ' | '.join([str(arg)
+                       for arg in args])
 
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
 
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
+# from https://docs.python.org/3/library/enum.html#autonumber
+class AutoNumber(Enum):
+    def __new__(cls):
+        value = len(cls.__members__) + 1
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
 
-    def fetch_data(self, query):
-        result = self.fetch(query)
-        data = []
-        for r in result:
-            if r.data:
-                data = data + r.data
-        return data
 
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
+class Grammar(Enum):
+    '''
+    Terminals of our APT Attack Grammar.
+    They are simply unique symbols; numeric value is ignored.
+    '''
+    http_post_activity = 1
+    ssh_activity = 2
+    exfil_channel = makeGrammar('x = ' + any_(http_post_activity, ssh_activity), {})
+# exfil_execution = exfil_channel 'TCP'
+# exfil_format = 'compress_activity'? 'encrypt_activity'?

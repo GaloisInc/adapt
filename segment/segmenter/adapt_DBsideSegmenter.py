@@ -34,6 +34,7 @@ def arg_parser():
 	p.add_argument('--criterion', '-c', help='The segmentation criterion (e.g PID)',default='pid')
 	p.add_argument('--radius', '-r', help='The segmentation radius', type=int, default=2)
 	p.add_argument('--directionEdges', '-e',help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', choices=['in','out','both'],default='both')
+	p.add_argument('--verbose','-v', action='store_true',help='Verbose mode')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', action='store_true',help='Drop DB and quit, no segmentation performed')
 	group.add_argument('--store-segment', help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', choices=['Yes','No','OnlyNodes'],default='Yes')
@@ -51,6 +52,7 @@ class SimpleTitanGremlinSegmenter:
 		self.titanclient=tclient(self.broker)
 		self.criterion=args.criterion
 		self.radius=args.radius
+		self.verbose=args.verbose
 		self.directionEdges=args.directionEdges
 		self.store_segment = args.store_segment
 		logging.basicConfig(level=logging.INFO)
@@ -192,7 +194,7 @@ class SimpleTitanGremlinSegmenter:
 				self.createSchemaVertexProperty(self.criterion,type_criterion,'SINGLE')
 				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
 				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
-				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()};for (node in subtr.V().id().fold().next()) {if (g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').as('e').inV().hasId(node).select('e')==[]) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}}"""
+				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
 				if self.store_segment=='OnlyNodes':
 					createSegmentNodes=self.titanclient.execute(createVertices_query)
 					sys.stdout.write('Segment nodes created')
@@ -236,7 +238,8 @@ class SimpleTitanGremlinSegmenter:
 				self.log('error','Unknown segmentation criterion\n')
 			sys.exit()
 		else:
-			self.printSegments()
+			if self.verbose:
+				self.printSegments()
 			storageres=self.storeSegments()
 			if ("Unknown" in storageres) or ("Undefined" in storageres):
 				self.log('error',storageres+"\n")

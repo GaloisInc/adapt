@@ -7,6 +7,7 @@ Vagrant.configure(2) do |config|
 
   # Forward the Dashboard port for the user to get system status.
   config.vm.network "forwarded_port", guest: 8080, host: 8081
+  config.vm.network "forwarded_port", guest: 8180, host: 8181
 
   config.vm.provider "virtualbox" do |vb|
   #   # Display the VirtualBox GUI when booting the machine
@@ -19,5 +20,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.provision "shell", privileged: false, path: "install/bootstrap.sh"
   config.vm.provision "shell", run: "always", privileged: false, path: "start_daemons.sh"
-end
 
+  #config.ssh.private_key_path = "~/.ssh/id_rsa"
+  #config.ssh.forward_agent = true
+end
