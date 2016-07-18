@@ -23,43 +23,31 @@
 #
 
 from .detector import Detector
-import os
-
-__author__ = 'John.Hanley@parc.com'
+import re
 
 
-class Escalation(Detector):
+class ScanDetector(Detector):
     '''
-    Detects privilege escalation events (specifically escalation to root).
+    Classifies scanning activities found in subgraphs of a CDM13 trace.
     '''
 
-    def __init__(self, gremlin, fs_proxy):
+    def __init__(self, gremlin):
         self.gremlin = gremlin
-        self.fs = fs_proxy
+        self._scan_url_re = re.compile(
+            r'^file:///proc/\d+/cmdline'
+            r'|^file:///proc/\d+/status'
+            r'|^file:///proc/\d+/stat'
+            )
 
     def name_of_input_property(self):
-        return ''
+        return 'url'
 
     def name_of_output_classification():
-        return 'privilege_escalation'
+        return 'scanning'
 
     def finds_feature(self, event):
-        return is_escalation(event)
+        return is_part_of_scan(event)
 
-    def is_escalation(self, event):
-        assert event['vertexType'][0]['value'] == 'unitOfExecution', event
-        uids = event['UID'][0]['value']  # four of them
-        executing_uid = int(uids.split()[0])
-        if executing_uid != 0:
-            return False  # We detect alice -> root, but not alice -> bob.
-        if 'CWD' not in event:
-            # Grrrr. Sometimes this happens when programName is 'ls'.
-            return False
-        prog = event['programName'][0]['value']
-        cwd = event['CWD'][0]['value']
-        path = [cwd, '/usr/bin', '/bin', '/usr/sbin']
-        for dir in path:
-            fspec = os.path.normpath(os.path.join(dir, prog))
-            if self.fs.is_present(fspec):
-                return not self.fs.is_locked_down(fspec)
-        return False
+    def is_part_of_scan(self, url):
+        '''Predicate is True for url access that could be part of scan.'''
+        return self._scan_url_re.search(url)

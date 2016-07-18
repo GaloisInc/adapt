@@ -1,0 +1,121 @@
+Sent 744 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+     2  Agent
+     9  EDGE_SUBJECT_HASLOCALPRINCIPAL
+     9  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+     9  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    12  EDGE_OBJECT_PREV_VERSION
+    12  EDGE_OBJECT_PREV_VERSION in
+    12  EDGE_OBJECT_PREV_VERSION out
+    71  EDGE_EVENT_AFFECTS_FILE
+    71  EDGE_EVENT_AFFECTS_FILE in
+    71  EDGE_EVENT_AFFECTS_FILE out
+    89  Entity-File
+   121  EDGE_FILE_AFFECTS_EVENT
+   121  EDGE_FILE_AFFECTS_EVENT in
+   121  EDGE_FILE_AFFECTS_EVENT out
+   204  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+   204  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+   204  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+   213  Subject
+  1555  total
+
+
+agent
+   1    2  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   2    1  userID_S-1-5-18
+   3    1  userID_S-1-5-21-487229149-790607292-55006933-1000
+
+file
+   1    1  C:\
+   2    1  C:\Users\5d-tc\tc\malware
+   3    1  C:\Users\5d-tc\tc\malware\Recorder.exe
+   4    1  C:\Users\5d-tc\tc\malware\out.wav
+   5    1  C:\Users\desktop.ini
+   6    1  C:\Windows\Globalization\Sorting\SortDefault.nls
+   7    1  C:\Windows\Microsoft.NET\Framework64\v4.0.30319
+   8    1  C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscoreei.dll
+   9    1  C:\Windows\Registration\R00000000000c.clb
+  10    1  C:\Windows\SysWOW64\AudioSes.dll
+  11    1  C:\Windows\SysWOW64\MMDevAPI.dll
+  12    1  C:\Windows\SysWOW64\api-ms-win-core-file-l1-2-0.dll
+  13    1  C:\Windows\SysWOW64\api-ms-win-core-file-l2-1-0.dll
+  14    1  C:\Windows\SysWOW64\api-ms-win-core-localization-l1-2-0.dll
+  15    1  C:\Windows\SysWOW64\api-ms-win-core-processthreads-l1-1-1.dll
+  16    1  C:\Windows\SysWOW64\api-ms-win-core-synch-l1-2-0.dll
+  17    1  C:\Windows\SysWOW64\api-ms-win-core-timezone-l1-1-0.dll
+  18    1  C:\Windows\SysWOW64\api-ms-win-crt-convert-l1-1-0.dll
+  19    1  C:\Windows\SysWOW64\api-ms-win-crt-heap-l1-1-0.dll
+  20    1  C:\Windows\SysWOW64\api-ms-win-crt-locale-l1-1-0.dll
+  21    1  C:\Windows\SysWOW64\api-ms-win-crt-math-l1-1-0.dll
+  22    1  C:\Windows\SysWOW64\api-ms-win-crt-runtime-l1-1-0.dll
+  23    1  C:\Windows\SysWOW64\api-ms-win-crt-stdio-l1-1-0.dll
+  24    1  C:\Windows\SysWOW64\api-ms-win-crt-string-l1-1-0.dll
+  25    1  C:\Windows\SysWOW64\avrt.dll
+  26    1  C:\Windows\SysWOW64\dwmapi.dll
+  27    2  C:\Windows\SysWOW64\imm32.dll
+  28    1  C:\Windows\SysWOW64\ksuser.dll
+  29    1  C:\Windows\SysWOW64\midimap.dll
+  30    1  C:\Windows\SysWOW64\msacm32.dll
+  31    1  C:\Windows\SysWOW64\msacm32.drv
+  32    1  C:\Windows\SysWOW64\propsys.dll
+  33    1  C:\Windows\SysWOW64\sechost.dll
+  34    1  C:\Windows\SysWOW64\ucrtbase.dll
+  35    1  C:\Windows\SysWOW64\uxtheme.dll
+  36    1  C:\Windows\SysWOW64\vcruntime140.dll
+  37    1  C:\Windows\SysWOW64\wdmaud.drv
+  38    1  C:\Windows\SysWOW64\winmm.dll
+  39    1  C:\Windows\System32\DriverStore\en-US
+  40    1  C:\Windows\System32\Query.dll
+  41    2  C:\Windows\System32\RpcRtRemote.dll
+  42    1  C:\Windows\System32\SearchFilterHost.exe
+  43    1  C:\Windows\System32\SearchProtocolHost.exe
+  44    1  C:\Windows\System32\apphelp.dll
+  45    1  C:\Windows\System32\atl.dll
+  46    1  C:\Windows\System32\authz.dll
+  47    1  C:\Windows\System32\avrt.dll
+  48    2  C:\Windows\System32\cryptbase.dll
+  49    2  C:\Windows\System32\cryptsp.dll
+  50    1  C:\Windows\System32\ksuser.dll
+  51    1  C:\Windows\System32\mapi32.dll
+  52    2  C:\Windows\System32\mf.dll
+  53    1  C:\Windows\System32\mfplat.dll
+  54    1  C:\Windows\System32\mscoree.dll
+  55    1  C:\Windows\System32\msidle.dll
+  56    2  C:\Windows\System32\msshooks.dll
+  57    1  C:\Windows\System32\mssitlb.dll
+  58    1  C:\Windows\System32\mssph.dll
+  59    2  C:\Windows\System32\mssprxy.dll
+  60    1  C:\Windows\System32\ntmarta.dll
+  61    2  C:\Windows\System32\propsys.dll
+  62    1  C:\Windows\System32\rpcss.dll
+  63    3  C:\Windows\System32\rsaenh.dll
+  64    2  C:\Windows\System32\sechost.dll
+  65    1  C:\Windows\System32\shell32.dll
+  66    1  C:\Windows\System32\stdole2.tlb
+  67    1  C:\Windows\System32\sxs.dll
+  68    2  C:\Windows\System32\tquery.dll
+  69    1  C:\Windows\System32\tzres.dll
+  70    1  C:\Windows\System32\version.dll
+  71    1  C:\Windows\System32\wow64.dll
+  72    1  C:\Windows\System32\wow64cpu.dll
+  73    1  C:\Windows\System32\wow64win.dll
+  74    1  C:\Windows\WindowsShell.Manifest
+  75    1  C:\Windows\inf
+  76    1  C:\Windows\inf\hdaudio.PNF
+  77    1  C:\Windows\winsxs\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.7601.18837_none_fa3b1e3d17594757\comctl32.dll
+  78   89  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+
+memory
+
+netflow
+
+resource
+
+subject
+   1   15  Event.CHECK_FILE_ATTRIBUTES
+   2   73  Event.EXECUTE
+   3    1  Event.EXIT
+   4  106  Event.READ
+   5    9  Event.WRITE
+   6  213  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   7  204  Subject.SUBJECT_EVENT

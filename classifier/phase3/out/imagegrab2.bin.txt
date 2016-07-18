@@ -1,0 +1,115 @@
+Sent 604 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+     1  EDGE_EVENT_AFFECTS_NETFLOW
+     1  EDGE_EVENT_AFFECTS_NETFLOW in
+     1  EDGE_EVENT_AFFECTS_NETFLOW out
+     2  Agent
+     2  EDGE_NETFLOW_AFFECTS_EVENT
+     2  EDGE_NETFLOW_AFFECTS_EVENT in
+     2  EDGE_NETFLOW_AFFECTS_EVENT out
+     3  Entity-NetFlow
+     8  EDGE_SUBJECT_HASLOCALPRINCIPAL
+     8  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+     8  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    10  EDGE_OBJECT_PREV_VERSION
+    10  EDGE_OBJECT_PREV_VERSION in
+    10  EDGE_OBJECT_PREV_VERSION out
+    54  EDGE_EVENT_AFFECTS_FILE
+    54  EDGE_EVENT_AFFECTS_FILE in
+    54  EDGE_EVENT_AFFECTS_FILE out
+    72  Entity-File
+    94  EDGE_FILE_AFFECTS_EVENT
+    94  EDGE_FILE_AFFECTS_EVENT in
+    94  EDGE_FILE_AFFECTS_EVENT out
+   163  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+   163  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+   163  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+   172  Subject
+  1245  total
+
+
+agent
+   1    2  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   2    1  userID_S-1-5-18
+   3    1  userID_S-1-5-21-487229149-790607292-55006933-1000
+
+file
+   1    1  C:\
+   2    1  C:\Users\5d-tc\tc\malware
+   3    1  C:\Users\5d-tc\tc\malware\imagegrab2.exe
+   4    1  C:\Users\desktop.ini
+   5    1  C:\Windows\Fonts\StaticCache.dat
+   6    1  C:\Windows\Globalization\Sorting\SortDefault.nls
+   7    1  C:\Windows\Microsoft.NET\Framework64\v4.0.30319
+   8    1  C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscoreei.dll
+   9    1  C:\Windows\Registration\R00000000000c.clb
+  10    1  C:\Windows\SysWOW64\SearchFilterHost.exe
+  11    1  C:\Windows\SysWOW64\api-ms-win-core-file-l1-2-0.dll
+  12    1  C:\Windows\SysWOW64\api-ms-win-core-file-l2-1-0.dll
+  13    1  C:\Windows\SysWOW64\api-ms-win-core-localization-l1-2-0.dll
+  14    1  C:\Windows\SysWOW64\api-ms-win-core-processthreads-l1-1-1.dll
+  15    1  C:\Windows\SysWOW64\api-ms-win-core-synch-l1-2-0.dll
+  16    1  C:\Windows\SysWOW64\api-ms-win-core-timezone-l1-1-0.dll
+  17    1  C:\Windows\SysWOW64\avicap32.dll
+  18    1  C:\Windows\SysWOW64\devenum.dll
+  19    1  C:\Windows\SysWOW64\dwmapi.dll
+  20    1  C:\Windows\SysWOW64\en-US\avicap32.dll.mui
+  21    1  C:\Windows\SysWOW64\en-US\msvfw32.dll.mui
+  22    2  C:\Windows\SysWOW64\imm32.dll
+  23    1  C:\Windows\SysWOW64\msdmo.dll
+  24    1  C:\Windows\SysWOW64\msvfw32.dll
+  25    1  C:\Windows\SysWOW64\ntmarta.dll
+  26    1  C:\Windows\SysWOW64\qcap.dll
+  27    1  C:\Windows\SysWOW64\quartz.dll
+  28    1  C:\Windows\SysWOW64\sechost.dll
+  29    1  C:\Windows\SysWOW64\ucrtbased.dll
+  30    1  C:\Windows\SysWOW64\uxtheme.dll
+  31    1  C:\Windows\SysWOW64\vcruntime140d.dll
+  32    1  C:\Windows\SysWOW64\version.dll
+  33    1  C:\Windows\SysWOW64\winmm.dll
+  34    2  C:\Windows\System32\RpcRtRemote.dll
+  35    1  C:\Windows\System32\SearchFilterHost.exe
+  36    1  C:\Windows\System32\SearchProtocolHost.exe
+  37    1  C:\Windows\System32\authz.dll
+  38    2  C:\Windows\System32\cryptbase.dll
+  39    2  C:\Windows\System32\cryptsp.dll
+  40    1  C:\Windows\System32\mapi32.dll
+  41    1  C:\Windows\System32\mscoree.dll
+  42    1  C:\Windows\System32\msidle.dll
+  43    2  C:\Windows\System32\msshooks.dll
+  44    1  C:\Windows\System32\mssitlb.dll
+  45    1  C:\Windows\System32\mssph.dll
+  46    2  C:\Windows\System32\mssprxy.dll
+  47    1  C:\Windows\System32\ntmarta.dll
+  48    1  C:\Windows\System32\propsys.dll
+  49    1  C:\Windows\System32\rpcss.dll
+  50    3  C:\Windows\System32\rsaenh.dll
+  51    2  C:\Windows\System32\sechost.dll
+  52    1  C:\Windows\System32\shell32.dll
+  53    1  C:\Windows\System32\stdole2.tlb
+  54    1  C:\Windows\System32\sxs.dll
+  55    2  C:\Windows\System32\tquery.dll
+  56    1  C:\Windows\System32\tzres.dll
+  57    1  C:\Windows\System32\wow64.dll
+  58    1  C:\Windows\System32\wow64cpu.dll
+  59    1  C:\Windows\System32\wow64win.dll
+  60    1  C:\Windows\WindowsShell.Manifest
+  61    1  C:\Windows\winsxs\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.7601.18837_none_fa3b1e3d17594757\comctl32.dll
+  62    1  C:\Windows\winsxs\x86_microsoft.windows.common-controls_6595b64144ccf1df_5.82.7601.18837_none_ec86b8d6858ec0bc\comctl32.dll
+  63   72  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+
+memory
+
+netflow
+
+resource
+
+subject
+   1    2  Event.ACCEPT
+   2   18  Event.CHECK_FILE_ATTRIBUTES
+   3    1  Event.CONNECT
+   4   57  Event.EXECUTE
+   5    1  Event.EXIT
+   6   76  Event.READ
+   7    8  Event.WRITE
+   8  172  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+   9  163  Subject.SUBJECT_EVENT
