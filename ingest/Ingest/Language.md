@@ -362,7 +362,7 @@ Other primitive types used in our model:
   and maps to the Titan data type:
   [schema]: #
   makePropertyKey('ident').dataType(String.class).cardinality(Cardinality.SINGLE)
-  
+
 * *prov-tc:url* : string;
   and maps to the Titan data type:
   [schema]: #
@@ -428,10 +428,10 @@ Other primitive types used in our model:
   [schema]: #
   makePropertyKey('pageNumber').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
-* *prov-tc:address* : int;
+* *prov-tc:address* : long;
   and maps to the Titan data type:
   [schema]: #
-  makePropertyKey('address').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+  makePropertyKey('address').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 * *prov-tc:pid* : int;
   and maps to the Titan data type:
@@ -502,7 +502,7 @@ Other primitive types used in our model:
   and maps to the Titan data type:
   [schema]: #
   makePropertyKey('sequence').dataType(Long.class).cardinality(Cardinality.SINGLE)
- 
+
 
 Data Model Classes
 =========
@@ -966,6 +966,35 @@ makeVertexLabel('EDGE_OBJECT_PREV_VERSION')
 [schema]: #
 makeEdgeLabel('EDGE_OBJECT_PREV_VERSION in').multiplicity(ONE2ONE)
 
+Accepting these three THEIA vertex types keeps a great many exceptions out of gremlin-server.log.
+
+[schema]: #
+makeVertexLabel('EDGE_FILE_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_MEMORY_HAS_TAG')
+[schema]: #
+makeVertexLabel('EDGE_NETFLOW_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_FILE_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_MEMORY_HAS_TAG out').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_NETFLOW_HAS_TAG out').multiplicity(SIMPLE)
+
+Bad_ls includes EDGE_SUBJECT_HAS_TAG.
+[schema]: #
+makeVertexLabel('EDGE_SUBJECT_HAS_TAG')
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG in').multiplicity(SIMPLE)
+[schema]: #
+makeEdgeLabel('EDGE_SUBJECT_HAS_TAG out').multiplicity(SIMPLE)
+
 A Note About Provenance Tags
 ----------
 
@@ -1017,6 +1046,13 @@ This relationship connects a pattern instance to a component base layer element.
 [schema]: #
 makeEdgeLabel('prov-tc:partOfPattern').multiplicity(SIMPLE)
 
+This one seems dicey, and urelated to the ADAPT notion of "pattern". Delete, once ingestd suppresses such vertices from 5D traces.
+[schema]: #
+makeVertexLabel('PART_OF_PATTERN')
+[schema]: #
+makeEdgeLabel('PART_OF_PATTERN out').multiplicity(SIMPLE)
+
+
 prov-tc:partOfActivity (not in CDM)
 ----------
 This relationship connects an activity instance to a component pattern instance. No attributes.
@@ -1026,17 +1062,31 @@ makeEdgeLabel('prov-tc:partOfActivity').multiplicity(SIMPLE)
 
 prov-tc:partOfPhase (not in CDM)
 ----------
-This relationship connects a phase instance to a component activity instance. No attributes.
+This relationship connects a phase instance to another phase instance. No attributes.
 
 [schema]: #
 makeEdgeLabel('prov-tc:partOfPhase').multiplicity(SIMPLE)
 
-prov-tc:partOfAPT (not in CDM)
+apt:includes (not in CDM)
 -----------
-This relationship connects an APT instance to a component phase instance. No attributes.
+This relationship connects an APT instance to a phase instance. No attributes.
 
 [schema]: #
-makeEdgeLabel('prov-tc:partOfAPT').multiplicity(SIMPLE)
+makeEdgeLabel('apt:includes').multiplicity(SIMPLE)
+
+phase:includes (not in CDM)
+-----------
+This relationship connects phase to an activity instance. No attributes.
+
+[schema]: #
+makeEdgeLabel('phase:includes').multiplicity(SIMPLE)
+
+phase:order (not in CDM)
+-----------
+This property specifies the order of a phase instance.
+
+[schema]: #
+makePropertyKey('phase:order').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 activity:type (not in CDM)
 -----------
@@ -1086,4 +1136,3 @@ graph from a node in the first to a node in the second.
 
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(SIMPLE)
-
