@@ -7,8 +7,9 @@ import asyncio
 from aiogremlin import GremlinClient
 import graphviz
 
-sys.path.append(os.path.expanduser('~/adapt/tools'))
-import cdm.enums
+#sys.path.append(os.path.expanduser('~/adapt/tools'))
+sys.path.append(os.path.expanduser('/vagrant/tools'))
+import gremlin_properties
 import gremlin_query
 
 QUERYV = "g.V().hasLabel('Segment')"
@@ -43,20 +44,17 @@ if __name__ == '__main__':
 
     with gremlin_query.Runner() as gremlin:
 
-        vertices = gremlin.fetch(QUERYV)[0].data
-        if vertices:
-            graph = {}
-            for v in vertices:
-                val = {}
-                val['criteria'] = v['properties']['pid'][0]['value']
-                val['name'] = v['properties']['segment:name'][0]['value']
+        vertices = gremlin_properties.fetch(gremlin, QUERYV)
+        graph = {}
+        for v in vertices:
+            val = {}
+            val['criteria'] = v['pid']
+            val['name'] = v['segment:name']
 
-                edges = gremlin.fetch(QUERYE.format(v['id']))[0].data
-                val['edges_out'] = []
-                if edges != None:
-                    val['edges_out'] = list(map(lambda e: e['id'], edges))
+            edges = gremlin_properties.fetch(gremlin, QUERYE.format(v.getId()))
+            val['edges_out'] = [e.getId() for e in edges]
 
-                graph[v['id']] = val
+            graph[v.getId()] = val
 
-        dot = toDot(graph)
-        print(dot)
+    dot = toDot(graph)
+    print(dot)
