@@ -204,8 +204,6 @@ g.V().has('startedAtTime', between(%d, %d))
                 print(proc, stamp, event)
             if proc not in procs:
                 procs[proc] = SegNode(self, proc)
-            if debug:
-                print(procs[proc].add_edge(p['IDENT']))
             self.execute(procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
