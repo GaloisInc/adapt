@@ -9,7 +9,6 @@ import graphviz
 
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
-import gremlin_properties
 import gremlin_query
 
 QUERYV = "g.V().hasLabel('Segment')"
@@ -53,15 +52,11 @@ if __name__ == '__main__':
                 val['name'] = v['properties']['segment:name'][0]['value']
 
                 edges = gremlin.fetch(QUERYE.format(v['id']))[0].data
-                out = []
-                if edges:
-                    for e in edges:
-                        out.append(edges[0]['id'])
-                val['edges_out'] = out
+                val['edges_out'] = []
+                if edges != None:
+                    val['edges_out'] = list(map(lambda e: e['id'], edges))
 
                 graph[v['id']] = val
 
-            gremlin.close()
-
-            dot = toDot(graph)
-            print(dot)
+        dot = toDot(graph)
+        print(dot)
