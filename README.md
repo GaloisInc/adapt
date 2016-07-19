@@ -21,14 +21,23 @@ deployment scripts to install new dependencies or alter the startup.
 
 ## Pulling Commits
 
-Update adapt files from a subtree repo with a command like:
+To get the latest version:
 
-    git subtree pull --prefix=classifier https://github.com/GaloisInc/Adapt-classify.git master --squash ; or
-    git subtree pull --prefix=ingest git@github.com:GaloisInc/Adapt-ingest.git master --squash
+    git checkout master; git pull
 
-A helper script exists to pull all known components in via git subtree:
+To begin work on a new feature:
 
-    ./pull-all.sh
+    git branch <branch>; git checkout <branch>
+
+or
+
+    git checkout -b <branch>
+
+To push your work remotely:
+
+    git push origin <branch>
+
+To merge your code to master, open a pull request on GitHub.
 
 The infrastructure files of interest are:
 

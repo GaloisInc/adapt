@@ -19,6 +19,7 @@ import kafka
 
 property_segmentNodeName='segment:name'
 property_segmentEdgeLabel='segment:includes'
+property_seg2segEdgeLabel='segment:edge'
 
 def escape(s):
     """
@@ -195,6 +196,7 @@ class SimpleTitanGremlinSegmenter:
 				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
 				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
 				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
+				addSeg2SegEdges_query="""for (snode in g.V().id().fold().next()){linkedSeg=g.V(snode).out(\'"""+property_segmentEdgeLabel+"""\').out().in(\'"""+property_segmentEdgeLabel+"""\').id().fold().next()-g.V(snode).out(\'"""+property_seg2segEdgeLabel+"""\').id().fold().next();for (s in linkedSeg){g.V(snode).next().addEdge(\'"""+property_seg2segEdgeLabel+"""\',g.V(s).next())}}"""
 				if self.store_segment=='OnlyNodes':
 					createSegmentNodes=self.titanclient.execute(createVertices_query)
 					sys.stdout.write('Segment nodes created')
@@ -202,6 +204,7 @@ class SimpleTitanGremlinSegmenter:
 				elif self.store_segment=='Yes':
 					self.createSchemaEdgeLabel(property_segmentEdgeLabel)
 					createFullSegments=self.titanclient.execute(addEdges_query)
+					addSeg2SegEdges=self.titanclient.execute(addSeg2SegEdges_query)
 					sys.stdout.write('Segments (including edges) created\n')
 					return "Segments created"
 				else:
