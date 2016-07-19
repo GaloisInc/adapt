@@ -103,6 +103,7 @@ install_adapt_dependencies() {
     echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
                 | sudo debconf-set-selections || handle_error $LINENO
     sudo apt-get install -y \
+         exuberant-ctags \
          git \
          jq \
          python \
@@ -113,6 +114,7 @@ install_adapt_dependencies() {
          supervisor \
          unzip \
          wget \
+         graphviz \
        || handle_error $LINENO
     sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
@@ -133,6 +135,7 @@ install_adapt_dependencies() {
         networkx \
         parsley \
         pyparsing \
+        flask \
       || handle_error $LINENO
 
     sudo -H pip3 install -r $ADAPT_DIR/dx/simulator/config/requirements.txt
@@ -192,7 +195,7 @@ function copy_adapt() {
         cd $ADAPT_DIR                           || handle_error $LINENO
         git pull                                || handle_error $LINENO
     else
-        git clone --depth 1 file:///vagrant -b $(cd /vagrant ; git branch | grep '*' | awk '{print $2}') $ADAPT_DIR || handle_error $LINENO
+        git clone file:///vagrant -b $(cd /vagrant ; git branch | grep '*' | awk '{print $2}') $ADAPT_DIR || handle_error $LINENO
     fi
     cd $CWD                                     || handle_error $LINENO
 }

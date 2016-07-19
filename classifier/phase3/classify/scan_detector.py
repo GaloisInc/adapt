@@ -22,20 +22,31 @@
 # the software.
 #
 
+from .detector import Detector
 import re
 
 
-class ScanDetector(object):
+class ScanDetector(Detector):
     '''
     Classifies scanning activities found in subgraphs of a CDM13 trace.
     '''
 
-    def __init__(self):
+    def __init__(self, gremlin):
+        self.gremlin = gremlin
         self._scan_url_re = re.compile(
             r'^file:///proc/\d+/cmdline'
             r'|^file:///proc/\d+/status'
             r'|^file:///proc/\d+/stat'
             )
+
+    def name_of_input_property(self):
+        return 'url'
+
+    def name_of_output_classification():
+        return 'scanning'
+
+    def finds_feature(self, event):
+        return is_part_of_scan(event)
 
     def is_part_of_scan(self, url):
         '''Predicate is True for url access that could be part of scan.'''

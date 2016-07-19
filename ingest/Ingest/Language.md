@@ -362,7 +362,7 @@ Other primitive types used in our model:
   and maps to the Titan data type:
   [schema]: #
   makePropertyKey('ident').dataType(String.class).cardinality(Cardinality.SINGLE)
-  
+
 * *prov-tc:url* : string;
   and maps to the Titan data type:
   [schema]: #
@@ -502,7 +502,7 @@ Other primitive types used in our model:
   and maps to the Titan data type:
   [schema]: #
   makePropertyKey('sequence').dataType(Long.class).cardinality(Cardinality.SINGLE)
- 
+
 
 Data Model Classes
 =========
@@ -1062,17 +1062,31 @@ makeEdgeLabel('prov-tc:partOfActivity').multiplicity(SIMPLE)
 
 prov-tc:partOfPhase (not in CDM)
 ----------
-This relationship connects a phase instance to a component activity instance. No attributes.
+This relationship connects a phase instance to another phase instance. No attributes.
 
 [schema]: #
 makeEdgeLabel('prov-tc:partOfPhase').multiplicity(SIMPLE)
 
-prov-tc:partOfAPT (not in CDM)
+apt:includes (not in CDM)
 -----------
-This relationship connects an APT instance to a component phase instance. No attributes.
+This relationship connects an APT instance to a phase instance. No attributes.
 
 [schema]: #
-makeEdgeLabel('prov-tc:partOfAPT').multiplicity(SIMPLE)
+makeEdgeLabel('apt:includes').multiplicity(SIMPLE)
+
+phase:includes (not in CDM)
+-----------
+This relationship connects phase to an activity instance. No attributes.
+
+[schema]: #
+makeEdgeLabel('phase:includes').multiplicity(SIMPLE)
+
+phase:order (not in CDM)
+-----------
+This property specifies the order of a phase instance.
+
+[schema]: #
+makePropertyKey('phase:order').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
 activity:type (not in CDM)
 -----------
@@ -1113,6 +1127,8 @@ makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.S
 
 [schema]: #
 makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.SINGLE)
+[schema]: #
+makePropertyKey('anomalyType').dataType(Float.class).cardinality(Cardinality.SINGLE)
 
 
 segment:edge (not in CDM)
@@ -1122,4 +1138,3 @@ graph from a node in the first to a node in the second.
 
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(SIMPLE)
-
