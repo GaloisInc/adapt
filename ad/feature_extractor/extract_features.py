@@ -8,10 +8,10 @@ import gremlin_query
 # feature headers
 f_h = ['writeBytes', 'readBytes', 'numWrites', 'numReads', 'ratioR2W']
 # feature extraction queries
-f_q = [	"in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('size').sum()",
-        "in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).values('size').sum()",
-        "in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count()",
-        "in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).count()"]
+f_q = [	"g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('size').sum()",
+        "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).values('size').sum()",
+        "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count()",
+        "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).count()"]
 
 def extract_features_and_write_to_file(out_file):
     print("Writing features to file: " + out_file)
@@ -31,11 +31,11 @@ def extract_features_and_write_to_file(out_file):
             print("Extracting features for: " + str(id))
             f.write(str(id))
             for q in f_q:
-                res = gremlin.fetch_data("g.V(" + str(id) + ")." + q)[0]
+                res = gremlin.fetch_data( q.format(id=id) )[0]
                 f.write("," + str(res))
             # Ratio of read to write
-            rSize = gremlin.fetch_data("g.V("+ str(id) +")." + f_q[1])[0]
-            wSize = gremlin.fetch_data("g.V("+ str(id) +")." + f_q[0])[0]
+            rSize = gremlin.fetch_data( f_q[1].format(id=id) )[0]
+            wSize = gremlin.fetch_data( f_q[0].format(id=id) )[0]
             r2wRatio = 0 if(wSize==0) else (rSize/wSize)
             f.write("," + str(r2wRatio))
             f.write("\n")
