@@ -28,6 +28,7 @@ class Prop:
     '''Models a gremlin node attribute, the "properties" map.'''
 
     def __init__(self, item):
+        self.id = item['id']
         self.prop = item['properties']
 
     def __contains__(self, key):
@@ -50,3 +51,6 @@ class Prop:
 
     def src_sink_type(self):
         return self._find_enum('srcSinkType', cdm.enums.SrcSink)
+
+    def getId(self):
+        return self.id
