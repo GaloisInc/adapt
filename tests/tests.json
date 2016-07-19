@@ -231,13 +231,13 @@
             },
             {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[199], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify that many PID-based segments were found."
             },
             {
                 "query": "g.V().has(label, 'Activity').count()",
-                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[8], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify that no relevant features were found in the very short trace."
             }
