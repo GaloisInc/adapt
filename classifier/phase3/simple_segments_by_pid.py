@@ -204,6 +204,8 @@ g.V().has('startedAtTime', between(%d, %d))
                 print(proc, stamp, event)
             if proc not in procs:
                 procs[proc] = SegNode(self, proc)
+            if debug:
+                print(procs[proc].add_edge(p['IDENT']))
             self.execute(procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
@@ -219,7 +221,7 @@ class SegNode:
 
     def __init__(self, sseg, proc):
         self.proc = proc
-        cmd = "g.addV(label, 'Segment',  'ident', 's%s')" % proc
+        cmd = "g.addV(label, 'Segment',  'segment:name', 's%s')" % proc
         result = sseg.execute(cmd)
         assert result['type'] == 'vertex', result
         assert result['label'] == 'Segment', result
@@ -227,7 +229,7 @@ class SegNode:
         # Each proc is a 21-byte string, plus 8-byte SegNode object overhead.
 
     def add_edge(self, ident):
-        q = ("g.V().has('ident', 's%s').next()"
+        q = ("g.V().has('segment:name', 's%s').next()"
              ".addEdge('segment:includes', g.V().has('ident','%s').next())" % (
                      self.proc, ident))
         return q
