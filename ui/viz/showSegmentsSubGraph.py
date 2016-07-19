@@ -7,8 +7,7 @@ import asyncio
 from aiogremlin import GremlinClient
 import graphviz
 
-#sys.path.append(os.path.expanduser('~/adapt/tools'))
-sys.path.append(os.path.expanduser('/vagrant/tools'))
+sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_properties
 import gremlin_query
 
