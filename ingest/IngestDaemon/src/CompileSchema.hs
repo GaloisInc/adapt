@@ -6,7 +6,7 @@
 {-# LANGUAGE ParallelListComp  #-}
 module CompileSchema
   ( -- * Operations
-    compile, compileNode, compileEdge, serializeOperation
+    compile, compileNode, compileEdge, serializeOperation, serializeOperations
     -- * Types
     , GremlinValue(..)
     , Operation(..)
@@ -252,38 +252,55 @@ gremlinNum = GremlinNum . fromIntegral
 --------------------------------------------------------------------------------
 --  Gremlin language serialization
 
+serializeOperations :: GraphId a => [Operation a] -> (Text,Env)
+serializeOperations ops =
+  let (cmds,envs) = unzip $ map (uncurry serializeOperationFrom) (zip [1,1000..] ops)
+  in (T.intercalate " ; " cmds, Map.unions envs)
+
+serializeOperation :: GraphId a => Operation a -> (Text,Env)
+serializeOperation = serializeOperationFrom 0
+
 class GraphId a where
-  serializeOperation :: Operation a -> (Text,Env)
+  serializeOperationFrom :: Int -> Operation a -> (Text,Env)
 
 type Env = Map.Map Text A.Value
 
 instance GraphId Text where
-  serializeOperation (InsertVertex ty l ps) = (cmd,env)
+  serializeOperationFrom start (InsertVertex ty l ps) = (cmd,env)
     where
        cmd = escapeChars call
        -- g.addV(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
        call = T.unwords
-                [ "g.addV(label, tyParam, 'ident', l "
+                [ "g.addV(label, " <> tyParamVar <> ", 'ident', " <> identVar
                 , if (not (null ps)) then "," else ""
-                , T.unwords $ intersperse "," (map mkParams [1..length ps])
+                , T.unwords $ intersperse "," (map mkParams [start+2..start+2+length ps])
                 , ")"
                 ]
-       env = Map.fromList $ ("tyParam", A.String ty) : ("l", A.String l) : mkBinding ps
-  serializeOperation (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
+       tyParamVar = "tyParam" <> T.pack (show start)
+       identVar   = "l" <> T.pack (show (start+1))
+       env = Map.fromList $ (tyParamVar, A.String ty) : (identVar, A.String l) : mkBinding (start+2) ps
+
+  serializeOperationFrom start (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
     where
     cmd = escapeChars call
     call = T.unwords
-            [ "edgeNode = graph.addVertex(label, lNode, 'ident', nId) ; "
-            , "g.V().has('ident',srcId).next().addEdge(lE1,edgeNode) ; "
-            , "edgeNode.addEdge(lE2, g.V().has('ident', dstId).next())"
+            [ "edgeNode = graph.addVertex(label, " <> tyParamVar <> ", 'ident', " <> identVar <> ") ; "
+            , "g.V().has('ident'," <> srcVar <> ").next().addEdge(" <> lE1Var <> ",edgeNode) ; "
+            , "edgeNode.addEdge(" <> lE2Var <> ", g.V().has('ident', " <> dstVar <> ").next())"
             ]
-    env = Map.fromList [ ("lNode", A.String lNode)
-                       , ("lE1", A.String lE1), ("lE2", A.String lE2)
-                       , ("nId", A.String nId)
-                       , ("srcId", A.String srcId), ("dstId", A.String dstId)
+    tyParamVar = "tyParam" <> T.pack (show $ start + 0)
+    identVar   = "nId"     <> T.pack (show $ start + 1)
+    srcVar     = "srcId"   <> T.pack (show $ start + 2)
+    dstVar     = "dstId"   <> T.pack (show $ start + 3)
+    lE1Var     = "lE1"     <> T.pack (show $ start + 4)
+    lE2Var     = "lE2"     <> T.pack (show $ start + 5)
+    env = Map.fromList [ (tyParamVar, A.String lNode)
+                       , (lE1Var, A.String lE1), (lE2Var, A.String lE2)
+                       , (identVar, A.String nId)
+                       , (srcVar, A.String srcId), (dstVar, A.String dstId)
                        ]
 
-  serializeOperation (InsertEdge l src dst genVerts)   =
+  serializeOperationFrom start (InsertEdge l src dst genVerts)   =
      if genVerts
       then (testAndInsertCmd, env)
       else (nonTestCmd, env)
@@ -291,7 +308,7 @@ instance GraphId Text where
       -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
       nonTestCmd =
         escapeChars $
-            "g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next())"
+            "g.V().has('ident'," <> srcVar <> ").next().addEdge(" <> edgeTyVar <> ", g.V().has('ident'," <> dstVar <> ").next())"
       -- x = g.V().has('ident',src)
       -- y = g.V().has('ident',dst)
       -- if (!x.hasNext()) { x = g.addV('ident',src) }
@@ -299,20 +316,23 @@ instance GraphId Text where
       -- x.next().addEdge(edgeName, y.next())
       testAndInsertCmd = escapeChars $
              T.unwords
-              [ "x = g.V().has('ident',src) ;"
-              , "y = g.V().has('ident',dst) ;"
-              , "if (!x.hasNext()) { x = g.addV('ident',src) } ;"
-              , "if (!y.hasNext()) { y = g.addV('ident',dst) } ;"
-              , "x.next().addEdge(edgeName, y.next())"
+              [ "x = g.V().has('ident'," <> srcVar <> ") ;"
+              , "y = g.V().has('ident'," <> dstVar <> ") ;"
+              , "if (!x.hasNext()) { x = g.addV('ident'," <> srcVar <> ") } ;"
+              , "if (!y.hasNext()) { y = g.addV('ident'," <> dstVar <> ") } ;"
+              , "x.next().addEdge(" <> edgeTyVar <> ", y.next())"
               ]
-      env = Map.fromList [ ("src", A.String src)
-                         , ("dst", A.String dst)
-                         , ("edgeTy", A.String l)
+      srcVar    = "srcVar"    <> T.pack (show $ start + 0)
+      dstVar    = "dstVar"    <> T.pack (show $ start + 1)
+      edgeTyVar = "edgeTyVar" <> T.pack (show $ start + 2)
+      env = Map.fromList [ (srcVar, A.String src)
+                         , (dstVar, A.String dst)
+                         , (edgeTyVar, A.String l)
                          ]
 
-mkBinding :: [(Text, GremlinValue)] -> [(Text, A.Value)]
-mkBinding pvs =
-  let lbls = [ (param n, val n) | n <- [1..length pvs] ]
+mkBinding :: Int -> [(Text, GremlinValue)] -> [(Text, A.Value)]
+mkBinding start pvs =
+  let lbls = [ (param n, val n) | n <- [start..] ]
   in concat [ [(pstr, A.String p), (vstr, A.toJSON v)]
                     | (pstr,vstr) <- lbls
                     | (p,v) <- pvs ]

@@ -21,6 +21,7 @@ import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
 import           Data.Int (Int64)
+import qualified Data.List as L
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import           Data.String
@@ -200,13 +201,14 @@ mainLoop cfg =
   garbageCollectFailures logGC fidb inputs = forever $ do
        threadDelay 10000000 -- 10 seconds
        es <- resetDB fidb
-       let ageOperation :: OperationRecord -> IO (Maybe Input)
-           ageOperation (OpRecord (Input orig stmt cnt) _)
+       let ageOperations :: OperationRecord -> IO [Maybe Input]
+           ageOperations (OpRecord ipts _) = mapM ageOperation ipts
+           ageOperation (Input orig stmt cnt)
               | cnt > 2   =
                  do logGC $ T.pack $ printf "Dropping a statement: %s" (show orig)
                     return Nothing
               | otherwise = return $ Just (Input orig stmt (cnt + 1))
-       is <- catMaybes <$> mapM ageOperation es
+       is <- catMaybes . concat <$> mapM ageOperations es
        mapM_ (atomically . TB.writeTBChan inputs) is
 
   finisher :: FailedInsertionDB -> TBChan Input -> IO ()
@@ -214,20 +216,21 @@ mainLoop cfg =
    do es <- resetDB fidb
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
       T.hPutStrLn stderr msg
-      let newOperations = catMaybes $ map updateOperation es
+      let newOperations = concatMap updateOperation es
       mapM_ (atomically . TB.writeTBChan inputs) newOperations
       delayWhileNonEmpty inputs
 
   -- Given a failed operation and an HTTP error code from Titan,
   -- build a new operation suitable for re-trying (or not) the operation.
-  updateOperation :: OperationRecord -> Maybe Input
-  updateOperation (OpRecord ipt@(Input orig stmt cnt) code) =
-    Just $ case stmt of
-            InsertEdge {}
-              | code == Just 597 -> Input orig stmt { generateVertices = True } cnt
-              | otherwise        -> ipt
-            InsertReifiedEdge {} -> ipt
-            InsertVertex {}      -> ipt
+  updateOperation :: OperationRecord -> [Input]
+  updateOperation (OpRecord ipts code)
+              | code == Just 597 = map genVerts ipts
+              | otherwise        = ipts
+  genVerts ipt@(Input orig stmt cnt) =
+    case stmt of
+      InsertEdge {}        -> Input orig stmt { generateVertices = True } cnt
+      InsertReifiedEdge {} -> ipt
+      InsertVertex {}      -> ipt
 
 persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
 persistant logMsg io =
@@ -272,22 +275,41 @@ runDB logTitan inputs db conn =
      go reportInterval (0,0)
  where
  reportInterval = 1000
+ nrInBulk       = 2000  --  Number of commands to handle in bulk
 
  go :: Int -> (Int64,Int64) -> IO ()
- go 0 !cnts@(!nrE,!nrV) =
+ go ri !cnts@(!nrE,!nrV) | ri <= 0 =
   do logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies." nrE nrV)
      go reportInterval cnts
  go ri !(!nrE,!nrV) =
-  do opr <- atomically (TB.readTBChan inputs)
-     let (cmd,env) = serializeOperation stmt
-         stmt = statement opr
-         req  = mkRequest cmd env
-         recover resp
-            | respStatus resp /= 200 = insertDB (respRequestId resp) opr db
+  do oprs <- atomically $ catMaybes <$> replicateM nrInBulk (TB.tryReadTBChan inputs)
+     let 
+         (operVS,operES) = L.partition (isVertex . statement) oprs
+         (vs,es)   = (map statement operVS, map statement operES)
+         nrVS      = length vs
+         nrES      = length es
+         vsCmdEnv  = serializeOperations vs
+         esCmdEnv  = serializeOperations es
+         vsReq     = uncurry mkRequest vsCmdEnv
+         esReq     = uncurry mkRequest esCmdEnv
+         recover xs resp
+            | respStatus resp /= 200 = insertDB (respRequestId resp) xs db
             | otherwise              = return ()
-     GC.sendOn conn req recover
-     let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
-     go (ri - 1) (nrE2,nrV2)
+     GC.sendOn conn vsReq (recover operVS)
+     GC.sendOn conn esReq (recover operES)
+     let (nrE2,nrV2) = (nrE + fromIntegral nrES,nrV + fromIntegral nrVS)
+     go (ri - nrES - nrVS) (nrE2,nrV2)
+
+  -- do opr <- atomically (TB.readTBChan inputs)
+  --    let (cmd,env) = serializeOperation stmt
+  --        stmt = statement opr
+  --        req  = mkRequest cmd env
+  --        recover resp
+  --           | respStatus resp /= 200 = insertDB (respRequestId resp) opr db
+  --           | otherwise              = return ()
+  --    GC.sendOn conn req recover
+  --    let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
+  --    go (ri - 1) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
 --  Utils

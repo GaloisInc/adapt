@@ -17,7 +17,7 @@ newtype FailedInsertionDB =
 
 type HttpCode = Int
 data OperationRecord = OpRecord
-                          { input    :: Input
+                          { input    :: [Input]
                           , code     :: Maybe HttpCode
                           }
 
@@ -34,9 +34,9 @@ type Statement = Operation Text
 
 --  Mutations on the map
 
-insertDB :: UUID.UUID -> Input -> FailedInsertionDB -> IO ()
-insertDB key ipt (FIDB mv) = modifyMVar_ mv (pure . HMap.insert key rec)
- where rec = OpRecord ipt Nothing
+insertDB :: UUID.UUID -> [Input] -> FailedInsertionDB -> IO ()
+insertDB key ipts (FIDB mv) = modifyMVar_ mv (pure . HMap.insert key rec)
+ where rec = OpRecord ipts Nothing
 
 lookupDB :: UUID.UUID -> FailedInsertionDB -> IO (Maybe OperationRecord)
 lookupDB uid fdb =
