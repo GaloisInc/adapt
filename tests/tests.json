@@ -1,7 +1,5 @@
 
 {
-    "_lint": "python3 -m json.tool tests/tests.json | grep query",
-
     "5d_youtube_ie_output-100.avro": {
         "pre": [
             {
@@ -17,55 +15,10 @@
             }
         ],
         "in": [
-            {
-                "query": "g.V().has(label, 'Entity-File').count()",
-                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.V().has(label, 'Subject').count()",
-                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.V().has(label, 'Agent').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }
+
         ],
         "se": [
             {
-                "query": "g.V().has(label, 'Entity-File').count()",
-                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.V().has(label, 'Subject').count()",
-                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.V().has(label, 'Agent').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.E().hasLabel('segment:includes').count()",
-                "response": "[Message(status_code=200, data=[56], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
-                "query": "g.E().hasLabel('segment:edge').count()",
-                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-                "requester_email": "fake@email.com",
-                "explanation": "Sample test. To be deleted (or claimed) later."
-            }, {
                 "query": "g.V().as('a').out('segment:includes').out().in('segment:includes').dedup().where(neq('a')).count().next() == g.E().hasLabel('segment:edge').count().next()",
                 "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
                 "requester_email": "rui@parc.com",
@@ -149,62 +102,62 @@
             }
         ],
         "dx": [
-          {
-              "query": "g.V().hasLabel('Entity-File').count()",
-              "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify files are stable."
-          }, {
-              "query": "g.V().hasLabel('Subject').count()",
-              "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify subjects are stable."
-          }, {
-              "query": "g.V().hasLabel('Agent').count()",
-              "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify agents are stable."
-          }, {
-              "query": "g.V().hasLabel('Segment').count()",
-              "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify segments are stable."
-          }, {
-              "query": "g.V().hasLabel('Activity').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify activities are stable."
-          }, {
-              "query": "g.V().hasLabel('Segment').has('anomalyScore').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify scores are stable"
-          }, {
-              "query": "g.V().hasLabel('Phase').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify that no APT Phases are found in the very short trace."
-          }, {
-              "query": "g.V().hasLabel('APT').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify that no APTs are found in the very short trace."
-          }, {
-              "query": "g.E().hasLabel('apt:includes').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify that no APTs are found in the very short trace (no APTs, no edges)."
-          }, {
-              "query": "g.V().hasLabel('phase:includes').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify that no APT Phases are found in the very short trace (no Phases, no edges)."
-          }, {
-              "query": "g.V().hasLabel('phase:order').count()",
-              "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-              "requester_email": "rui@parc.com",
-              "explanation": "Verify that no APT Phases, hence no order, are found in the very short trace."
-          }
-      ]
+            {
+                "query": "g.V().hasLabel('Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify files are stable."
+            }, {
+                "query": "g.V().hasLabel('Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify subjects are stable."
+            }, {
+                "query": "g.V().hasLabel('Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify agents are stable."
+            }, {
+                "query": "g.V().hasLabel('Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify segments are stable."
+            }, {
+                "query": "g.V().hasLabel('Activity').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activities are stable."
+            }, {
+                "query": "g.V().hasLabel('Segment').has('anomalyScore').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify scores are stable"
+            }, {
+                "query": "g.V().hasLabel('Phase').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify that no APT Phases are found in the very short trace."
+            }, {
+                "query": "g.V().hasLabel('APT').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify that no APTs are found in the very short trace."
+            }, {
+                "query": "g.E().hasLabel('apt:includes').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify that no APTs are found in the very short trace (no APTs, no edges)."
+            }, {
+                "query": "g.V().hasLabel('phase:includes').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify that no APT Phases are found in the very short trace (no Phases, no edges)."
+            }, {
+                "query": "g.V().hasLabel('phase:order').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify that no APT Phases, hence no order, are found in the very short trace."
+            }
+        ]
     }
 }
