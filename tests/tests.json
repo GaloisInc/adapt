@@ -15,14 +15,49 @@
             }
         ],
         "in": [
-
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify files were ingested."
+            },
+            {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify subjects were ingested."
+            },
+            {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify agents were ingested."
+            }
         ],
         "se": [
+            {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify segment nodes were inserted."
+            },
+            {
+                "query": "g.E().hasLabel('segment:includes').count()",
+                "response": "[Message(status_code=200, data=[56], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify base nodes are included in segments."
+            },
+            {
+                "query": "g.E().hasLabel('segment:edge').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that segments are connected to other segments."
+            },
             {
                 "query": "g.V().as('a').out('segment:includes').out().in('segment:includes').dedup().where(neq('a')).count().next() == g.E().hasLabel('segment:edge').count().next()",
                 "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
                 "requester_email": "rui@parc.com",
-                "explanation": "Ensure that segment edges connect two different segment nodes."
+                "explanation": "Ensure that segment edges connect two different segment nodes. Works fine in SegProfiling commit d0c61."
             }
         ],
         "ad": [
