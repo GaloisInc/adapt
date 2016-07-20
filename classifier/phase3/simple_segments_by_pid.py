@@ -12,6 +12,8 @@ sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
 import gremlin_query
 
+# python3 -m json.tool ~/adapt/tests/tests.json | grep query
+
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 handler = logging.StreamHandler()
@@ -243,7 +245,7 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    with SPSegmenter(-1, wipe_segs=True) as sseg:
+    with SPSegmenter(-1, wipe_segs=args.drop_all_existing_segments) as sseg:
         sseg.next_node_id = 1  # During testing we will segment everything.
         # sseg.await_base_nodes()
         sseg.gen_pid_segments()

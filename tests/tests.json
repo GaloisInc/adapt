@@ -1,7 +1,5 @@
 
 {
-    "_lint": "python3 -m json.tool tests/tests.json | grep query",
-
     "5d_youtube_ie_output-100.avro": {
         "pre": [
             {
@@ -190,7 +188,7 @@
     },
     "_config_cameragrab1": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
 
-    "_run_cameragrab1": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=cameragrab1.bin",
+    "_run_cameragrab1": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=~/adapt/trace/current/cameragrab1.bin",
 
     "cameragrab1.bin": {
         "pre": [
@@ -207,8 +205,28 @@
                 "explanation": "Ensure that we have a clean starting point for remaining tests."
             }
         ],
-        "in": [],
-        "se": [],
+        "in": [
+            {
+                "query": "Thread.sleep(15000)",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
+            },
+            {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[2783], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are subjects."
+            }
+            ],
+        "se": [
+            {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that many PID-based segments were found."
+            }
+        ],
         "ad": [],
         "ac": [
             {
@@ -218,22 +236,10 @@
                 "explanation": "Verify there are files."
             },
             {
-                "query": "g.V().has(label, 'Subject').count()",
-                "response": "[Message(status_code=200, data=[2783], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify there are subjects."
-            },
-            {
                 "query": "g.V().has(label, 'Agent').count()",
                 "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify there are no agents."
-            },
-            {
-                "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify that many PID-based segments were found."
             },
             {
                 "query": "g.V().has(label, 'Activity').count()",
