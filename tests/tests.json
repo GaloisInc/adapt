@@ -194,5 +194,68 @@
                 "explanation": "Verify that no APT Phases, hence no order, are found in the very short trace."
             }
         ]
+    },
+    "_config_cameragrab1": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
+    "_run_cameragrab1": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=~/adapt/trace/current/cameragrab1.bin",
+
+    "cameragrab1.bin": {
+        "pre": [
+            {
+                "query": "g.V().drop().iterate(); graph.tx().commit()",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+            },
+            {
+                "query": "g.V().count().next() + g.E().count().next()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
+            }
+        ],
+        "in": [
+            {
+                "query": "Thread.sleep(15000)",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
+            },
+            {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[2783], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are subjects."
+            }
+            ],
+        "se": [
+            {
+                "query": "g.V().has(label, 'Segment').count()",
+                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that many PID-based segments were found."
+            }
+        ],
+        "ad": [],
+        "ac": [
+            {
+                "query": "g.V().has(label, 'Entity-File').count()",
+                "response": "[Message(status_code=200, data=[1557], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are files."
+            },
+            {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are no agents."
+            },
+            {
+                "query": "g.V().has(label, 'Activity').count()",
+                "response": "[Message(status_code=200, data=[8], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify that no relevant features were found in the very short trace."
+            }
+        ],
+        "dx": []
     }
 }
