@@ -257,5 +257,42 @@
             }
         ],
         "dx": []
+    },
+    "_config_ta5attack2": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
+    "_run_ta5attack2": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=~/adapt/trace/current/ta5attack2_units.avro",
+
+    "ta5attack2_units.avro": {
+        "pre": [
+            {
+                "query": "g.V().drop().iterate(); graph.tx().commit()",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+            },
+            {
+                "query": "g.V().count().next() + g.E().count().next()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Ensure that we have a clean starting point for remaining tests."
+            }
+        ],
+        "in": [
+            {
+                "query": "Thread.sleep(15000)",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
+            },
+            {
+                "query": "g.V().has(label, 'Subject').count()",
+                "response": "[Message(status_code=200, data=[5272], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are subjects."
+            }
+            ],
+        "se": [],
+        "ad": [],
+        "ac": [],
+        "dx": []
     }
 }
