@@ -30,7 +30,7 @@ class SPSegmenter:
     '''
     Simple PID Segmenter splits an input graph into PID-based subgraphs.
 
-    # Grr, need sort, not yet true: This segmenter always produces a deterministic output for a given input.
+    This segmenter always produces a deterministic output for a given input.
     It does not attempt to insert edges connecting one segment to another.
     '''
 
