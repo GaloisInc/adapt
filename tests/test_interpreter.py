@@ -65,16 +65,14 @@ def run_tests_for_module(module_key, json_path="./tests.json",
 def execute_module(module_key, data_key="5d_youtube_ie_output-100.avro"):
     top = os.path.expanduser('~/adapt')
     if module_key is "in":
-        # Large binary artifacts are transfered using trace/trace_rsync.sh.
-        os.system('Trint -p ~/adapt/trace/current/' + data_key)
+        os.system('Trint -p ~/adapt/example/' + data_key)
         sleep(5)  # no way to know when Trint is finished?
         os.system('Trint -f')
-        sleep(25)  # currently no way to know when other services are complete with their respective processing.
+        sleep(1)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
         cmd = ('%s/segment/segmenter/adapt_DBsideSegmenter.py'
                ' --broker http://localhost:8182/'
                ' --store-segment Yes --spec %s/config/segmentByPID.json' % (top, top))
-        # cmd = '../classifier/phase3/simple_segments_by_pid.py'
         os.system(cmd)
     elif module_key is "ad":
         pass
