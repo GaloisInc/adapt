@@ -126,6 +126,11 @@ def get_args():
     return parser.parse_args()
 
 
+def print1(*args):
+    print(*args)
+    sys.stdout.flush()
+
+
 def main(args):
     pipeline = module_sequence(args.module)
     data_key = args.data.split(os.sep)[-1]
@@ -134,11 +139,11 @@ def main(args):
           "\n ==> ....through module: %s" %
         (args.tests, args.data, args.module))
     for module in pipeline:
-        print("\n======================================================================\n"
-              "Executing module: %s" % module)
+        print1("\n======================================================================\n"
+               "Executing module: %s" % module)
         execute_module(module, args.data)
-        print("======================================================================\n"
-              "Running module tests: %s" % module)
+        print1("======================================================================\n"
+               "Running module tests: %s" % module)
         if run_tests_for_module(module, args.tests, data_key, args.run_all).shouldStop:
             sys.exit(1)
     if args.query is not None:
