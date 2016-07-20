@@ -9,6 +9,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
 maintainer:          tommd@galois.com
+data-files:          static/testfile
 -- copyright:           
 -- category:            
 build-type:          Simple
@@ -17,7 +18,7 @@ cabal-version:       >=1.10
 
 executable dashboard
   main-is:             Dashboard.hs
-  -- other-modules:       
+  other-modules:       Paths_adapt_dashboard
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.8 && <4.9,
                        simple-get-opt >=0.1 && <0.2,
