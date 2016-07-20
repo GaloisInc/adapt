@@ -61,16 +61,19 @@ class ActivityClassifier(object):
             self.classify1(seg_id)
 
     def classify1(self, seg_id):
-        q = "g.V().has('ident',        '%s').outE('segment:includes').inV()" % seg_id
-        q = "g.V().has('segment:name', '%s').outE('segment:includes').inV()" % seg_id
-        for prop in gremlin_properties.fetch(self.gremlin, q):
+        q = ("g.V().has('segment:name', '%s').out('segment:includes')"
+             ".out().hasLabel('EDGE_EVENT_AFFECTS_FILE')"
+             ".out().hasLabel('Entity-File').valueMap()"
+             ) % seg_id
+
+        for prop in self.gremlin.fetch_data(q):
             if 'url' not in prop:
                 continue
             for detector in self.detectors:
-                property = prop[detector.name_of_input_property()]
-                print(property, detector)
+                property = prop[detector.name_of_input_property()][0]
+                property = property.strip('"')  # THEIA says "/tmp", not /tmp.
                 if detector.finds_feature(property):
-                    detector.insert_activity_classification(prop['ident'], seg_id)
+                    detector.insert_activity_classification(prop['ident'][0], seg_id)
 
     def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"

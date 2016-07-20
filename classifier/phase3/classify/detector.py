@@ -51,8 +51,7 @@ class Detector:
                 "  'activity:suspicionScore', %f)" % (
                     self.name_of_output_classification(),
                     self.activity_suspicion_score())]
-        print(cmds)
-        cmds.append("g.V().has('ident', '%s').next()"
+        cmds.append("g.V().has('segment:name', '%s').next()"
                     ".addEdge('segment:includes', act)" % seg_id)
         cmds.append("act.addEdge('activity:includes',"
                     " g.V().has('ident', '%s').next())" % base_node_id)

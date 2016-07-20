@@ -71,9 +71,17 @@ def report_status(status, downstreams='dx ui'.split()):
         log.debug("sent: %s", s)
 
 
+def drop_activities(gremlin):
+    log.warn('Dropping any existing activities.')
+    q = "g.V().has(label, 'Activity').drop().iterate()"
+    gremlin.fetch_data(q)
+
+
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Classify activities found in segments of a CDM13 trace.')
+    p.add_argument('--drop-all-existing-activities', action='store_true',
+                   help='destructive, useful during testing')
     return p
 
 
@@ -81,7 +89,8 @@ if __name__ == '__main__':
     args = arg_parser().parse_args()
     gr = parsley.makeGrammar(get_grammar(), {})
     with gremlin_query.Runner() as gremlin:
+        if args.drop_all_existing_activities:
+            drop_activities(gremlin)
         ac = classify.ActivityClassifier(gremlin)
         ac.classify(ac.find_new_segments('s'))
-        # ac.classify(ac.find_new_segments('segment_id_'))
     report_status(STATUS_DONE)

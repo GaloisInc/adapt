@@ -74,11 +74,11 @@ class ExfilDetector(Detector):
     def name_of_input_property(self):
         return 'url'
 
-    def name_of_output_classification():
+    def name_of_output_classification(self):
         return 'exfiltration'
 
     def finds_feature(self, event):
-        return is_exfil(event)
+        return self._is_exfil(event)
 
 
     def remember(self, cmd):
@@ -86,12 +86,12 @@ class ExfilDetector(Detector):
         assert self.k == 1
         self.recent_events = [cmd]  # Later we'll retain multiple events.
 
-    def is_exfil(self, cmd):
+    def _is_exfil(self, cmd):
         '''Predicate is True for sensitive file exfiltration events.'''
         # recent_foreign_ip = self.get_foreign_ip(self.recent_events[0])
-        return self.is_sensitive_file(cmd)  # and recent_foreign_ip
+        return self._is_sensitive_file(cmd)  # and recent_foreign_ip
 
-    def is_exfil_segment(self, nodes):
+    def _is_exfil_segment(self, nodes):
         '''Predicate is True for sensitive file exfiltration events.'''
         is_exfil = False
         for node in nodes:
@@ -104,12 +104,12 @@ class ExfilDetector(Detector):
     def test_is_sensitive_file(self):
         '''Exercise the several conditional cases.'''
         audit_tmpl = 'audit:path="%s", audit:subtype="file",'
-        assert self.is_sensitive_file(audit_tmpl % __file__)
+        assert self._is_sensitive_file(audit_tmpl % __file__)
         for tst in ['/non/existent', '/proc/meminfo',
                     '/etc/issue.net', '/etc/shadow']:
             assert not self.is_sensitive_file(audit_tmpl % tst)
 
-    def is_sensitive_file(self, url):
+    def _is_sensitive_file(self, url):
         '''Predicate is True for files with restrictive markings.'''
         m = self._sensitive_fspecs_re.search(url)
         return m is not None

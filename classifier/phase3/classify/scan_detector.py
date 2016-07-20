@@ -42,12 +42,12 @@ class ScanDetector(Detector):
     def name_of_input_property(self):
         return 'url'
 
-    def name_of_output_classification():
+    def name_of_output_classification(self):
         return 'scanning'
 
     def finds_feature(self, event):
-        return is_part_of_scan(event)
+        return self._is_part_of_scan(event)
 
-    def is_part_of_scan(self, url):
+    def _is_part_of_scan(self, url):
         '''Predicate is True for url access that could be part of scan.'''
         return self._scan_url_re.search(url)
