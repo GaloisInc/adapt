@@ -69,7 +69,6 @@ class ActivityClassifier(object):
             " .valueMap()",
             ]
         for query in queries:
-            print(, query)
             for seg_id in seg_ids:
                 self.classify1(query, seg_id)
 
