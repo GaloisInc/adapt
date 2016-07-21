@@ -70,13 +70,14 @@ def compute_view_process(out_file):
     # write features
     with gremlin_query.Runner() as gremlin:
         max_time = gremlin.fetch_data("g.V().has('startedAtTime').values('startedAtTime').max()")[0]
-        ids = gremlin.fetch_data("g.V().has('subjectType',0).limit(10).id()")
+        ids = gremlin.fetch_data("g.V().has('subjectType',0).id()")
         print("Found " + str(len(ids)) + " process nodes")
         for id in ids:
             print("Extracting features for: " + str(id))
             f.write(str(id))
 
-            duration = (max_time - gremlin.fetch_data("g.V({id}).values('startedAtTime')".format(id=id))[0])/1000000.0
+            started_at = gremlin.fetch_data("g.V({id}).values('startedAtTime')".format(id=id))
+            duration = (max_time - 0 if(len(started_at)==0) else started_at[0] )/1000000.0
             f.write("," + str(duration))
 
             for q in f_q:
