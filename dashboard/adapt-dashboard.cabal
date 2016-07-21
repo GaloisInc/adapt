@@ -9,7 +9,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Thomas M. DuBuisson
 maintainer:          tommd@galois.com
-data-files:          static/testfile
+data-files:          static/*.html,static/*.js,static/*.css
 -- copyright:           
 -- category:            
 build-type:          Simple
