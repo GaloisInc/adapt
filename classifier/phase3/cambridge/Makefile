@@ -28,7 +28,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/cameragrab1.bin
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack2_units.avro
 	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
@@ -38,8 +38,9 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
-	time ~/adapt/tools/label_count.py
-	~/adapt/classifier/phase3/simple_segments_by_pid.py --drop | time tee $@
+	@echo '~/adapt/tools/label_count.py'
+	~/adapt/classifier/phase3/simple_segments_by_pid.py --debug --drop
+	touch $@
 
 
 /tmp/3_classified.txt: /tmp/2_segmented.txt
