@@ -57,18 +57,27 @@ class ActivityClassifier(object):
                     yield seg_db_id
 
     def classify(self, seg_ids):
-        for seg_id in seg_ids:
-            self.classify1(seg_id)
+        g_seg = "g.V().has('segment:name', '%s').out('segment:includes')"
+        queries = [
+            g_seg +
+            " .out().hasLabel('EDGE_EVENT_AFFECTS_FILE')"
+            " .out().hasLabel('Entity-File')"
+            " .valueMap()",
+            g_seg +
+            " .in().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL')"
+            " .in('EDGE_SUBJECT_HASLOCALPRINCIPAL out').hasLabel('Subject')"
+            " .valueMap()",
+            ]
+        for query in queries:
+            print(, query)
+            for seg_id in seg_ids:
+                self.classify1(query, seg_id)
 
-    def classify1(self, seg_id):
-        q = ("g.V().has('segment:name', '%s').out('segment:includes')"
-             ".out().hasLabel('EDGE_EVENT_AFFECTS_FILE')"
-             ".out().hasLabel('Entity-File').valueMap()"
-             ) % seg_id
+    def classify1(self, query, seg_id):
 
-        for prop in self.gremlin.fetch_data(q):
-            if 'url' not in prop:
-                continue
+        for prop in self.gremlin.fetch_data(query):
+            print(prop)
+            # if 'url' not in prop:  continue
             for detector in self.detectors:
                 property = prop[detector.name_of_input_property()][0]
                 property = property.strip('"')  # THEIA says "/tmp", not /tmp.

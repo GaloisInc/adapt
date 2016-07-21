@@ -44,7 +44,8 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 /tmp/3_classified.txt: /tmp/2_segmented.txt
-	../fg_classifier.py | time tee $@
+	../fg_classifier.py
+	touch $@
 
 
 clean:
