@@ -254,7 +254,7 @@ gremlinNum = GremlinNum . fromIntegral
 
 serializeOperations :: GraphId a => [Operation a] -> (Text,Env)
 serializeOperations ops =
-  let (cmds,envs) = unzip $ map (uncurry serializeOperationFrom) (zip [1,1000..] ops)
+  let (cmds,envs) = unzip $ map (uncurry serializeOperationFrom) (zip [1,1001..] ops)
   in (T.intercalate " ; " cmds, Map.unions envs)
 
 serializeOperation :: GraphId a => Operation a -> (Text,Env)
@@ -273,7 +273,7 @@ instance GraphId Text where
        call = T.unwords
                 [ "g.addV(label, " <> tyParamVar <> ", 'ident', " <> identVar
                 , if (not (null ps)) then "," else ""
-                , T.unwords $ intersperse "," (map mkParams [start+2..start+2+length ps])
+                , T.unwords $ intersperse "," (map mkParams [start+2..start+1+length ps])
                 , ")"
                 ]
        tyParamVar = "tyParam" <> T.pack (show start)

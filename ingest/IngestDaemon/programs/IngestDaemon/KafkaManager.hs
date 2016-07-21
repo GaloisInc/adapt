@@ -101,6 +101,7 @@ kafkaInput logK host topic cdmSchema chan =
           case Avro.decode cdmSchema (BL.fromStrict b) of
             Avro.Success cdmFmt -> insertCDM cdmFmt
             Avro.Error err      -> emit (show err)
+     liftIO $ hPutStrLn stderr ("Kafka input received " ++ show (length bs) ++ " messages!") 
      mapM_ handleMsg bs
      if null bs
       then liftIO (threadDelay 100000) >> process offset
@@ -110,7 +111,7 @@ kafkaInput logK host topic cdmSchema chan =
    liftIO $ do let nses = CDM.toSchema [cdmFmt]
                operations <- compile nses
                let ipts = map (\o -> Input cdmFmt o 0) operations
-               mapM_ (atomically . TB.writeTBChan chan) ipts
+               atomically $ mapM_ (TB.writeTBChan chan) ipts
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr

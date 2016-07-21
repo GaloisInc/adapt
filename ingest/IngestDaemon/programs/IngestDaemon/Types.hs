@@ -49,6 +49,9 @@ deleteDB k (FIDB mv) = modifyMVar_ mv (pure . HMap.delete k)
 resetDB :: FailedInsertionDB -> IO [OperationRecord]
 resetDB (FIDB mv) = HMap.elems <$> modifyMVar mv (pure . (HMap.empty,))
 
+sizeDB :: FailedInsertionDB -> IO Int
+sizeDB (FIDB mv) = HMap.size <$> readMVar mv
+
 -- Sets the HTTP code for the OperationRecord indicated by a particular map
 -- key.
 setCodeDB :: UUID.UUID -> HttpCode -> FailedInsertionDB -> IO ()
