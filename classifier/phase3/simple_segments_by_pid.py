@@ -146,8 +146,11 @@ class SPSegmenter:
     #   2016-06-22 17:28:36.796064  Event.MMAP
     #   2016-06-22 17:28:36.796064  Event.MMAP
 
-    def get_query(self):
-        # between(21870, 21880))
+    def get_event_query(self):
+        '''Finds subjects.'''
+        # Tested with cameragrab1 (GT/THEIA).
+        #
+        # .has('pid', between(21870, 21880))
         return """
 g.V().has('startedAtTime', between(%d, %d))
     .hasLabel('Subject')
@@ -170,10 +173,49 @@ g.V().has('startedAtTime', between(%d, %d))
     .select('b').values('subjectType').as('SUBJ')
     .select('b').values('eventType').as('EVENT')
     .select('b').values('ident').as('IDENT')
-    .select('TIME', 'PID', 'EVENT', 'SUBJ', 'IDENT')
+    .select('TIME', 'PID', 'SUBJ', 'EVENT', 'IDENT')
 """
 
-    def gen_pid_segments(self, end_stamp=None, debug=False):
+    def get_principal_query(self):
+        '''Finds agents.'''
+        # Tested with ta5attack2_units (SRI/SPADE).
+        # (No, I don't understand why the event query doesn't need a barrier.)
+        #
+        # Agents may have properties:[{euid=0, egid=0}]]
+        return """
+g.V().has('startedAtTime', between(%d, %d))
+    .hasLabel('Subject')
+    .has('pid', between(0, 32768))
+    .order()
+    .as('a')
+    .local(
+        out('EDGE_SUBJECT_HASLOCALPRINCIPAL out')
+            .hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL')
+        .out('EDGE_SUBJECT_HASLOCALPRINCIPAL in')
+            .hasLabel('Agent')
+            .has('userID')
+            .has('gid')
+            .has('ident')
+            .barrier()
+            .order()
+            .as('b')
+    )
+    .select('a').values('startedAtTime').as('TIME')
+    .select('a').values('pid').as('PID')
+    .select('b').values('userID').as('USERID')
+    .select('b').values('gid').as('GID')
+    .select('b').values('ident').as('IDENT')
+    .select('TIME', 'PID', 'USERID', 'GID', 'IDENT')
+"""
+
+    def gen_pid_segments(self, debug=False):
+        for q_getter in [
+                self.get_event_query,
+                self.get_principal_query,
+                ]:
+            self.gen_pid_segments1(q_getter(), debug)
+
+    def gen_pid_segments1(self, pid_query, debug, end_stamp=None):
         '''Segments from begin_stamp up to but not including end_stamp.'''
         #
         # This mallocs proportional to number of segment nodes being inserted
@@ -187,7 +229,7 @@ g.V().has('startedAtTime', between(%d, %d))
         #
         far_future = int((2 ** 31 - 1) * 1e6)  # A timestamp at +Inf.
         end_stamp = end_stamp or far_future
-        q_subj = self.get_query() % (self.begin_stamp, end_stamp)
+        q_subj = pid_query % (self.begin_stamp, end_stamp)
         if debug:
             print(' '.join(q_subj.split()))
         # These happen often. Very often.
@@ -198,12 +240,17 @@ g.V().has('startedAtTime', between(%d, %d))
         procs = {}  # A pqueue should trim this down to fixed size.
         for p in self.gremlin.fetch_data(q_subj):
             stamp = datetime.datetime.utcfromtimestamp(p['TIME'] / 1e6)
-            subj = cdm.enums.Subject(p['SUBJ'])
-            assert cdm.enums.Subject.SUBJECT_EVENT == subj, (subj, stamp)
-            event = cdm.enums.Event(p['EVENT'])
             proc = '%d%05d' % (p['TIME'], p['PID'])
-            if debug and event not in boring:
-                print(proc, stamp, event)
+            if 'SUBJ' in p:
+                subj = cdm.enums.Subject(p['SUBJ'])
+                assert cdm.enums.Subject.SUBJECT_EVENT == subj, (subj, stamp)
+            if debug:
+                if 'EVENT' in p:
+                    event = cdm.enums.Event(p['EVENT'])
+                    if event not in boring:
+                        log.info('  '.join(proc, stamp, event))
+                else:
+                    log.info('%s  %s  user %s' % (proc, stamp, p['USERID']))
             if proc not in procs:
                 procs[proc] = SegNode(self, proc)
             self.execute(procs[proc].add_edge(p['IDENT']))
@@ -240,6 +287,8 @@ def arg_parser():
         description='Segments a graph into PID-based subgraphs.')
     p.add_argument('--drop-all-existing-segments', action='store_true',
                    help='destructive, useful during testing')
+    p.add_argument('--debug', action='store_true',
+                   help='Increase verbosity.')
     return p
 
 
@@ -248,5 +297,5 @@ if __name__ == '__main__':
     with SPSegmenter(-1, wipe_segs=args.drop_all_existing_segments) as sseg:
         sseg.next_node_id = 1  # During testing we will segment everything.
         # sseg.await_base_nodes()
-        sseg.gen_pid_segments()
+        sseg.gen_pid_segments(args.debug)
         log.info('Inserted %d edges.' % sseg.total_edges_inserted)
