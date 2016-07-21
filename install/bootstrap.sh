@@ -193,6 +193,8 @@ function copy_adapt() {
     hash -r                                     || handle_error $LINENO
     if [ -e $ADAPT_DIR ] ; then
         cd $ADAPT_DIR                           || handle_error $LINENO
+        git fetch                               || handle_error $LINENO
+        git checkout $(cd /vagrant ; git branch | grep '*' | awk '{print $2}') || handle_error $LINENO
         git pull                                || handle_error $LINENO
     else
         git clone file:///vagrant -b $(cd /vagrant ; git branch | grep '*' | awk '{print $2}') $ADAPT_DIR || handle_error $LINENO
