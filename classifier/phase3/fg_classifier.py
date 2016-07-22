@@ -93,4 +93,5 @@ if __name__ == '__main__':
             drop_activities(gremlin)
         ac = classify.ActivityClassifier(gremlin)
         ac.classify(ac.find_new_segments('s'))
+        log.info('fetched %d base nodes' % ac.num_nodes_fetched)
     report_status(STATUS_DONE)

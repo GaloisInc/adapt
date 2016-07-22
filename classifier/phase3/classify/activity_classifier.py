@@ -37,6 +37,7 @@ class ActivityClassifier(object):
 
     def __init__(self, gremlin):
         self.gremlin = gremlin
+        self.num_nodes_fetched = 0
         # At present we have only tackled challenge problems for a few threats:
         self.detectors = [
             classify.ExfilDetector(gremlin),
@@ -76,6 +77,7 @@ class ActivityClassifier(object):
 
         for prop in self.gremlin.fetch_data(query):
             print(prop)
+            self.num_nodes_fetched += 1
             # if 'url' not in prop:  continue
             for detector in self.detectors:
                 property = prop[detector.name_of_input_property()][0]
