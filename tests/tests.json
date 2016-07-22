@@ -195,9 +195,6 @@
             }
         ]
     },
-    "_config_cameragrab1": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
-    "_run_cameragrab1": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=~/adapt/trace/current/cameragrab1.bin",
-
     "cameragrab1.bin": {
         "pre": [
             {
@@ -258,9 +255,6 @@
         ],
         "dx": []
     },
-    "_config_ta5attack2": "only these should be active in supervisord.conf:  zookeeper kafka ingestd dashboard",
-    "_run_ta5attack2": "killall ingestd; tools/label_count.py; sleep 2; time tests/test_interpreter.py --data=~/adapt/trace/current/ta5attack2_units.avro",
-
     "ta5attack2_units.avro": {
         "pre": [
             {
