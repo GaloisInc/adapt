@@ -45,7 +45,7 @@ def compute_view_netflow(out_file):
 
 def compute_view_process(out_file):
     # feature headers
-    f_h = ['duration', 'nFilesOpenDuringWrToNetFlow', 'numDistDstPortAccess', 'numDistSrcPortAccess',
+    f_h = ['nFilesOpenDuringWrToNetFlow', 'numDistDstPortAccess', 'numDistSrcPortAccess',
            'tBytesSentToNetFlow', 'tBytesRcvFromNetFlow', 'numWritesToNetFlow', 'numReadsToNetFlow', 'ratioR2WEvents']
     # feature extraction queries
     f_q = [ "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow')"
@@ -76,9 +76,9 @@ def compute_view_process(out_file):
             print("Extracting features for: " + str(id))
             f.write(str(id))
 
-            started_at = gremlin.fetch_data("g.V({id}).values('startedAtTime')".format(id=id))
-            duration = (max_time - 0 if(len(started_at)==0) else started_at[0] )/1000000.0
-            f.write("," + str(duration))
+#            started_at = gremlin.fetch_data("g.V({id}).values('startedAtTime')".format(id=id))
+#            duration = (max_time - 0 if(len(started_at)==0) else started_at[0] )/1000000.0
+#            f.write("," + str(duration))
 
             for q in f_q:
                 res = gremlin.fetch_data( q.format(id=id) )[0]
