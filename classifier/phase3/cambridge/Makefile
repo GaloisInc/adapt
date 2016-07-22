@@ -14,6 +14,8 @@ check_daemons:
         # pgrep verifies the start_daemons.sh precondition, or bails out early.
 	pgrep supervisord > /dev/null
 
+# Don't let zero status from tee mask an earlier failure:
+SHELL = /bin/bash -o pipefail
 
 RSYNC = ~/adapt/trace/trace_rsync.sh
 
@@ -44,14 +46,17 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 /tmp/3_classified.txt: /tmp/2_segmented.txt
-	csh -c 'time ../fg_classifier.py'
-	touch $@
+	csh -c 'time ../fg_classifier.py' 2>&1 | tee $@
 
 
-/tmp/test_interpreter.py:
+/tmp/tests.json:
+	cd /tmp && ln -s ~/adapt/tests/tests.json
+
+/tmp/test_interpreter.py: /tmp/tests.json
 	cp -p ~/adapt/tests/test_interpreter.py /tmp
 	cat test_interpreter_seg_patch.txt | (cd /tmp && patch -p2)
-	@egrep -n 'cmd = [^o]' $@
+	@egrep -n 'cmd = [^o]' $@  # Use the alternate segmenter on big traces.
+
 
 clean:
 	bash -c 'rm -f /tmp/{1_trace_loaded,2_segmented,3_classified}.txt'

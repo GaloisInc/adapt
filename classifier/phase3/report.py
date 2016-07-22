@@ -204,5 +204,5 @@ if __name__ == '__main__':
         if args.report:
             args.query = get_canned_reports()[args.report]
         if args.query is None:
-            arg_parser().error('Please specify a query or choose a canned report.')
+            arg_parser().error('Please give a query or a canned report name.')
         report(args.query, debug=args.debug)

@@ -27,7 +27,6 @@ import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
-import gremlin_properties
 
 
 class ActivityClassifier(object):
@@ -48,9 +47,8 @@ class ActivityClassifier(object):
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
     def find_new_segments(self, last_previously_processed_seg):
-        q = ("g.V().has(label, 'Segment').values('ident').is(gt('%s')).order()"
-             % last_previously_processed_seg)
-        q = ("g.V().has(label, 'Segment').values('segment:name').is(gt('%s')).order()"
+        q = ("g.V().has(label, 'Segment').values('segment:name')"
+             ".is(gt('%s')).order()"
              % last_previously_processed_seg)
         for msg in self.gremlin.fetch(q):
             if msg.data is not None:
@@ -63,27 +61,30 @@ class ActivityClassifier(object):
             g_seg +
             " .out().hasLabel('EDGE_EVENT_AFFECTS_FILE')"
             " .out().hasLabel('Entity-File')"
-            " .valueMap()",
+            " .valueMap(true)",
             g_seg +
             " .in().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL')"
-            " .in('EDGE_SUBJECT_HASLOCALPRINCIPAL out').hasLabel('Subject')"
-            " .valueMap()",
+            " .out().where(hasLabel('Subject').or().hasLabel('Agent'))"
+            " .valueMap(true)",
             ]
-        for query in queries:
-            for seg_id in seg_ids:
+        for seg_id in seg_ids:
+            for query in queries:
                 self.classify1(query, seg_id)
 
     def classify1(self, query, seg_id):
 
-        for prop in self.gremlin.fetch_data(query):
-            print(prop)
+        for prop in self.gremlin.fetch_data(query % seg_id):
             self.num_nodes_fetched += 1
-            # if 'url' not in prop:  continue
             for detector in self.detectors:
-                property = prop[detector.name_of_input_property()][0]
+                try:
+                    property = prop[detector.name_of_input_property()][0]
+                except KeyError:
+                    # print(seg_id, detector.name_of_input_property(), prop['label'], detector)
+                    continue  # We don't have an input to offer this detector.
                 property = property.strip('"')  # THEIA says "/tmp", not /tmp.
                 if detector.finds_feature(property):
-                    detector.insert_activity_classification(prop['ident'][0], seg_id)
+                    ident = prop['ident'][0]
+                    detector.insert_activity_classification(ident, seg_id)
 
     def insert_activity_classification(self, base_node_id, seg_id, typ, score):
         cmds = ["act = graph.addVertex(label, 'Activity',"
