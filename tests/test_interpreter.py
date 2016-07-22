@@ -78,6 +78,7 @@ def execute_module(module_key, data_path="~/adapt/example/5d_youtube_ie_output-1
         cmd = ('%s/segment/segmenter/adapt_DBsideSegmenter.py'
                ' --broker http://localhost:8182/'
                ' --store-segment Yes --spec %s/config/segmentByPID.json' % (top, top))
+        # cmd = 'classifier/phase3/simple_segments_by_pid.py --drop'
         os.system(cmd)
     elif module_key is "ad":
         pass

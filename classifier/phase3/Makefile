@@ -7,16 +7,12 @@
 #
 
 
-all: check_daemons TAGS /tmp/3_classified.txt
+all: check_daemons /tmp/3_classified.txt
 
 
 check_daemons:
         # pgrep verifies the start_daemons.sh precondition, or bails out early.
 	pgrep supervisord > /dev/null
-
-
-TAGS: *.py */*.py
-	etags *.py */*.py ../../../adapt/tools/*/[a-z]*.py
 
 
 RSYNC = ~/adapt/trace/trace_rsync.sh
@@ -79,4 +75,4 @@ tests:
 
 
 clean:
-	bash -c 'rm -f TAGS /tmp/{1_trace_loaded,2_segmented,3_classified}.txt'
+	bash -c 'rm -f /tmp/{1_trace_loaded,2_segmented,3_classified}.txt'
