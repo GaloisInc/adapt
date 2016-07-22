@@ -1,4 +1,7 @@
 
+NetFlow:
+--------
+
 Starting from NetFlow node reach to a process node and print the path:
     g.V().hasLabel('Entity-NetFlow').repeat(both()).times(4).simplePath().groupCount().by('subjectType')
     g.V().hasLabel('Entity-NetFlow').repeat(both()).times(4).simplePath().count()
@@ -13,6 +16,10 @@ Sum of total bytes written to a NetFlow node:
 Number of write events effected a NetFlow node:
     g.V(8650824).both().both().has('eventType',21).values('size').count()
 
+
+Process:
+--------
+    
 Process duration in seconds:
     (g.V().has('startedAtTime').values('startedAtTime').max().next() - g.V(21856440).values('startedAtTime').next())/1000000.0
 
@@ -25,6 +32,6 @@ Number of writes by a process to NetFlow:
 Number of files opened by a process during writing to NetFlow:
     g.V(11063312).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow').select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()
 
-Number of distinct destination ports accessed:
+Number of distinct destination ports accessed by a process:
     g.V(11063312).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstPort').dedup().count()
-    
+
