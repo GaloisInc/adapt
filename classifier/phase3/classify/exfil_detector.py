@@ -80,7 +80,6 @@ class ExfilDetector(Detector):
     def finds_feature(self, event):
         return self._is_exfil(event)
 
-
     def remember(self, cmd):
         '''Maintain a history of recently seen events.'''
         assert self.k == 1

@@ -165,6 +165,7 @@ g.V().has('startedAtTime', between(%d, %d))
             .has('subjectType')
             .has('eventType')
             .has('ident')
+            .barrier()
             .order()
             .as('b')
     )
@@ -176,10 +177,37 @@ g.V().has('startedAtTime', between(%d, %d))
     .select('TIME', 'PID', 'SUBJ', 'EVENT', 'IDENT')
 """
 
+    def get_subject_event_query(self):
+        '''Finds SUBJECT_EVENT subjects.'''
+        # Tested with 5D youtube.
+        # Common eventType's: 9 execute, 17 read, cf 'sequence'.
+        return """
+g.V().has('startedAtTime', between(%d, %d))
+    .hasLabel('Subject')
+    .has('pid', between(0, 32768))
+    .order()
+    .as('a')
+    .local(
+        __.in().in().not(has('pid'))
+            .hasLabel('Subject')
+            .has('subjectType')
+            .has('eventType')
+            .has('ident')
+            .barrier()
+            .order()
+            .as('b')
+    )
+    .select('a').values('startedAtTime').as('TIME')
+    .select('a').values('pid').as('PID')
+    .select('b').values('subjectType').as('SUBJ')
+    .select('b').values('eventType').as('EVENT')
+    .select('b').values('ident').as('IDENT')
+    .select('TIME', 'PID', 'USERID', 'GID', 'IDENT')
+"""
+
     def get_principal_query(self):
         '''Finds agents.'''
-        # Tested with ta5attack2_units (SRI/SPADE).
-        # (No, I don't understand why the event query doesn't need a barrier.)
+        # Tested with ta5attack2_units (SRI/SPADE) and 5D youtube.
         #
         # Agents may have properties:[{euid=0, egid=0}]]
         return """
@@ -211,6 +239,7 @@ g.V().has('startedAtTime', between(%d, %d))
     def gen_pid_segments(self, debug=False):
         for q_getter in [
                 self.get_event_query,
+                self.get_subject_event_query,
                 self.get_principal_query,
                 ]:
             self.gen_pid_segments1(q_getter(), debug)
@@ -252,7 +281,7 @@ g.V().has('startedAtTime', between(%d, %d))
                 else:
                     log.info('%s  %s  user %s' % (proc, stamp, p['USERID']))
             if proc not in procs:
-                procs[proc] = SegNode(self, proc)
+                procs[proc] = SegNode(self, p['PID'], proc)
             self.execute(procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
@@ -266,9 +295,11 @@ g.V().has('startedAtTime', between(%d, %d))
 class SegNode:
     '''Models a segment node stored by gremlin in the DB.'''
 
-    def __init__(self, sseg, proc):
+    def __init__(self, sseg, pid, proc):
         self.proc = proc
-        cmd = "g.addV(label, 'Segment',  'segment:name', 's%s')" % proc
+        cmd = "g.addV(label, 'Segment',"
+        "             'pid', '%s',"
+        "             'segment:name', 's%s')" % (pid, proc)
         result = sseg.execute(cmd)
         assert result['type'] == 'vertex', result
         assert result['label'] == 'Segment', result

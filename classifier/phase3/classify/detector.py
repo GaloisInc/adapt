@@ -22,8 +22,6 @@
 # the software.
 #
 
-import os
-
 __author__ = 'John.Hanley@parc.com'
 
 
