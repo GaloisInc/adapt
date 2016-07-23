@@ -86,28 +86,36 @@ class SPSegmenter:
 
     def base_node_types(self):
         '''Types inserted by ingestd, and *not* by downstream components.'''
-        # Caveat executor. Tested on 5D youtube trace, plus cameragrab1.
-        # For cameragrab1 we focus on 'Subject', as only Subjects offer a PID.
-        # These types come from gremlin query results, not the CDM13 spec.
-        # Relying upon the spec would be better.
-        # For example, DB query results have not yet returned
-        #   EDGE_EVENT_AFFECTS_SRCSINK,
-        #   EDGE_EVENT_AFFECTS_SRCSINK,
-        #   EDGE_SUBJECT_AFFECTS_EVENT, etc.
         types = [
             'Agent',
             'EDGE_EVENT_AFFECTS_FILE',
             'EDGE_EVENT_AFFECTS_MEMORY',
             'EDGE_EVENT_AFFECTS_NETFLOW',
+            'EDGE_EVENT_AFFECTS_SRCSINK',
             'EDGE_EVENT_AFFECTS_SUBJECT',
+            'EDGE_EVENT_CAUSES_EVENT',
+            'EDGE_EVENT_HASPARENT_EVENT',
             'EDGE_EVENT_ISGENERATEDBY_SUBJECT',
             'EDGE_FILE_AFFECTS_EVENT',
+            'EDGE_FILE_HAS_TAG',
+            'EDGE_MEMORY_AFFECTS_EVENT',
+            'EDGE_MEMORY_HAS_TAG',
             'EDGE_NETFLOW_AFFECTS_EVENT',
+            'EDGE_NETFLOW_HAS_TAG',
             'EDGE_OBJECT_PREV_VERSION',
+            'EDGE_SRCSINK_AFFECTS_EVENT',
+            'EDGE_SUBJECT_AFFECTS_EVENT',
             'EDGE_SUBJECT_HASLOCALPRINCIPAL',
+            'EDGE_SUBJECT_HASPARENT_SUBJECT',
+            'EDGE_SUBJECT_HASPRINCIPAL',
+            'EDGE_SUBJECT_HAS_TAG',
+            'EDGE_SUBJECT_RUNSON',
+            'Entity',
             'Entity-File',
             'Entity-Memory',
             'Entity-NetFlow',
+            'Host',
+            'Resource',
             'Subject',
             ]
         return ', '.join(["'%s'" % typ
@@ -146,28 +154,28 @@ class SPSegmenter:
     #   2016-06-22 17:28:36.796064  Event.MMAP
     #   2016-06-22 17:28:36.796064  Event.MMAP
 
+    # Caveat executor. Tested on 5D youtube trace, plus cameragrab1.
+    # For cameragrab1 we focus on 'Subject', as only Subjects offer a PID.
+
     def get_event_query(self):
         '''Finds subjects.'''
-        # Tested with cameragrab1 (GT/THEIA).
+        # Tested with 5D youtube & cameragrab1 (GT/THEIA).
+        # Common eventType's: 9 execute, 17 read, cf 'sequence'.
         #
         # .has('pid', between(21870, 21880))
         return """
 g.V().has('startedAtTime', between(%d, %d))
-    .hasLabel('Subject')
     .has('pid', between(0, 32768))
     .order()
     .as('a')
     .local(
-        out('EDGE_SUBJECT_AFFECTS_EVENT out')
-            .hasLabel('EDGE_SUBJECT_AFFECTS_EVENT')
-        .out('EDGE_SUBJECT_AFFECTS_EVENT in')
-            .hasLabel('Subject')
-            .has('subjectType')
-            .has('eventType')
-            .has('ident')
-            .barrier()
-            .order()
-            .as('b')
+        both().both().hasLabel('Subject')
+        .has('subjectType')
+        .has('eventType')
+        .has('ident')
+        .barrier()
+        .order()
+        .as('b')
     )
     .select('a').values('startedAtTime').as('TIME')
     .select('a').values('pid').as('PID')
@@ -177,34 +185,6 @@ g.V().has('startedAtTime', between(%d, %d))
     .select('TIME', 'PID', 'SUBJ', 'EVENT', 'IDENT')
 """
 
-    def get_subject_event_query(self):
-        '''Finds SUBJECT_EVENT subjects.'''
-        # Tested with 5D youtube.
-        # Common eventType's: 9 execute, 17 read, cf 'sequence'.
-        return """
-g.V().has('startedAtTime', between(%d, %d))
-    .hasLabel('Subject')
-    .has('pid', between(0, 32768))
-    .order()
-    .as('a')
-    .local(
-        __.in().in().not(has('pid'))
-            .hasLabel('Subject')
-            .has('subjectType')
-            .has('eventType')
-            .has('ident')
-            .barrier()
-            .order()
-            .as('b')
-    )
-    .select('a').values('startedAtTime').as('TIME')
-    .select('a').values('pid').as('PID')
-    .select('b').values('subjectType').as('SUBJ')
-    .select('b').values('eventType').as('EVENT')
-    .select('b').values('ident').as('IDENT')
-    .select('TIME', 'PID', 'USERID', 'GID', 'IDENT')
-"""
-
     def get_principal_query(self):
         '''Finds agents.'''
         # Tested with ta5attack2_units (SRI/SPADE) and 5D youtube.
@@ -212,21 +192,18 @@ g.V().has('startedAtTime', between(%d, %d))
         # Agents may have properties:[{euid=0, egid=0}]]
         return """
 g.V().has('startedAtTime', between(%d, %d))
-    .hasLabel('Subject')
     .has('pid', between(0, 32768))
     .order()
     .as('a')
     .local(
-        out('EDGE_SUBJECT_HASLOCALPRINCIPAL out')
-            .hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL')
-        .out('EDGE_SUBJECT_HASLOCALPRINCIPAL in')
-            .hasLabel('Agent')
-            .has('userID')
-            .has('gid')
-            .has('ident')
-            .barrier()
-            .order()
-            .as('b')
+        both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').both()
+        .hasLabel('Agent')
+        .has('userID')
+        .has('gid')
+        .has('ident')
+        .barrier()
+        .order()
+        .as('b')
     )
     .select('a').values('startedAtTime').as('TIME')
     .select('a').values('pid').as('PID')
@@ -239,7 +216,6 @@ g.V().has('startedAtTime', between(%d, %d))
     def gen_pid_segments(self, debug=False):
         for q_getter in [
                 self.get_event_query,
-                self.get_subject_event_query,
                 self.get_principal_query,
                 ]:
             self.gen_pid_segments1(q_getter(), debug)
@@ -277,7 +253,7 @@ g.V().has('startedAtTime', between(%d, %d))
                 if 'EVENT' in p:
                     event = cdm.enums.Event(p['EVENT'])
                     if event not in boring:
-                        log.info('  '.join(proc, stamp, event))
+                        log.info('%s  %s  %s' % (proc, stamp, event))
                 else:
                     log.info('%s  %s  user %s' % (proc, stamp, p['USERID']))
             if proc not in procs:
@@ -297,9 +273,9 @@ class SegNode:
 
     def __init__(self, sseg, pid, proc):
         self.proc = proc
-        cmd = "g.addV(label, 'Segment',"
-        "             'pid', '%s',"
-        "             'segment:name', 's%s')" % (pid, proc)
+        cmd = ("g.addV(label, 'Segment',"
+               "             'pid', '%s',"
+               "             'segment:name', 's%s')") % (pid, proc)
         result = sseg.execute(cmd)
         assert result['type'] == 'vertex', result
         assert result['label'] == 'Segment', result

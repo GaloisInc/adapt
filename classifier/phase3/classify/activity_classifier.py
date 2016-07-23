@@ -47,8 +47,8 @@ class ActivityClassifier(object):
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
 
     def find_new_segments(self, last_previously_processed_seg):
-        q = ("g.V().has(label, 'Segment').values('segment:name')"
-             ".is(gt('%s')).order()"
+        q = ("g.V().has(label, 'Segment')"
+             ".values('segment:name').is(gt('%s')).barrier().order()"
              % last_previously_processed_seg)
         for msg in self.gremlin.fetch(q):
             if msg.data is not None:
