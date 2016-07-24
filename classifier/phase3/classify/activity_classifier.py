@@ -62,21 +62,20 @@ class ActivityClassifier(object):
             " .valueMap(true)",
 
             # Sadly there's no pid on middle subject with eventType:9 execute.
-            "g.V().has('segment:name', '%s').out('segment:includes').hasLabel('Subject').has('pid')"
-            " .in().in().hasLabel('Subject')"
+            "g.V().has('segment:name', '%s').out('segment:includes').hasLabel('Subject')"
             " .out().out().hasLabel('Entity-File').has('url')"
             " .valueMap(true)",
             ]
         for seg_id in seg_ids:
             for query in queries:
-                print(query % seg_id)
+                # print(query % seg_id)
                 self.classify1(query, seg_id)
 
     def classify1(self, query, seg_id):
 
         for prop in self.gremlin.fetch_data(query % seg_id):
             self.num_nodes_fetched += 1
-            if prop['label'] != 'Agent':
+            if prop['label'] == 'zEntity-File':
                 print(prop)
             for detector in self.detectors:
                 try:
@@ -85,7 +84,7 @@ class ActivityClassifier(object):
                     # print(seg_id, detector.name_of_input_property(), prop['label'], detector)
                     continue  # We don't have an input to offer this detector.
                 property = property.strip('"')  # THEIA says "/tmp", not /tmp.
-                print(detector.name_of_input_property(), property, seg_id, detector)
+                # print(seg_id, detector.name_of_input_property(), property)
                 if detector.finds_feature(property):
                     ident = prop['ident'][0]
                     detector.insert_activity_classification(ident, seg_id)
