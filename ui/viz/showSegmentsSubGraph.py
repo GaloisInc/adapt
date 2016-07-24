@@ -39,8 +39,7 @@ def toDot(graph, label='Segmentation Graph'):
 
     return dot
 
-if __name__ == '__main__':
-
+def renderSegments(verbose = False):
     with gremlin_query.Runner() as gremlin:
 
         vertices = gremlin_properties.fetch(gremlin, QUERYV)
@@ -56,4 +55,13 @@ if __name__ == '__main__':
             graph[v.getId()] = val
 
     dot = toDot(graph)
-    print(dot)
+
+    if verbose:
+        print(dot)
+
+    dot.format = 'svg'
+    dot.render('static/seggraph.dot', view=False)
+
+
+if __name__ == '__main__':
+    renderSegments()
