@@ -200,6 +200,7 @@ lonePage c stMV =
                 (toHtml dxStat)
       h2_ "UI"
       a_ [href_ "http://localhost:8181"] "Segment Graph Viewer"
+      a_ [href_ "http://localhost:8181/graph"] "General Graph Viewer"
       return ()
 
 updateStatus :: Channels -> MVar Status -> IO ()
