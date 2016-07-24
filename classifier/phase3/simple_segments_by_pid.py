@@ -165,13 +165,12 @@ class SPSegmenter:
         # .has('pid', between(21870, 21880))
         return """
 g.V().has('startedAtTime', between(%d, %d))
-    .has('pid', between(0, 32768))
+    .has('pid')
     .order()
     .as('a')
     .local(
-        both().both().hasLabel('Subject')
-        .has('subjectType')
-        .has('eventType')
+        both().both().or(hasLabel('Subject'),
+                         hasLabel('Entity-File'))
         .has('ident')
         .barrier()
         .order()
@@ -179,10 +178,8 @@ g.V().has('startedAtTime', between(%d, %d))
     )
     .select('a').values('startedAtTime').as('TIME')
     .select('a').values('pid').as('PID')
-    .select('b').values('subjectType').as('SUBJ')
-    .select('b').values('eventType').as('EVENT')
     .select('b').values('ident').as('IDENT')
-    .select('TIME', 'PID', 'SUBJ', 'EVENT', 'IDENT')
+    .select('TIME', 'PID', 'IDENT')
 """
 
     def get_principal_query(self):
@@ -192,7 +189,7 @@ g.V().has('startedAtTime', between(%d, %d))
         # Agents may have properties:[{euid=0, egid=0}]]
         return """
 g.V().has('startedAtTime', between(%d, %d))
-    .has('pid', between(0, 32768))
+    .has('pid')
     .order()
     .as('a')
     .local(
@@ -254,10 +251,8 @@ g.V().has('startedAtTime', between(%d, %d))
                     event = cdm.enums.Event(p['EVENT'])
                     if event not in boring:
                         log.info('%s  %s  %s' % (proc, stamp, event))
-                else:
-                    log.info('%s  %s  user %s' % (proc, stamp, p['USERID']))
             if proc not in procs:
-                procs[proc] = SegNode(self, p['PID'], proc)
+                procs[proc] = SegNode(self, p['TIME'], p['PID'], proc)
             self.execute(procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
@@ -271,11 +266,12 @@ g.V().has('startedAtTime', between(%d, %d))
 class SegNode:
     '''Models a segment node stored by gremlin in the DB.'''
 
-    def __init__(self, sseg, pid, proc):
+    def __init__(self, sseg, time, pid, proc):
         self.proc = proc
         cmd = ("g.addV(label, 'Segment',"
-               "             'pid', '%s',"
-               "             'segment:name', 's%s')") % (pid, proc)
+               "       'startedAtTime', %d,"
+               "       'pid', '%s',"
+               "       'segment:name', 's%s')") % (time, pid, proc)
         result = sseg.execute(cmd)
         assert result['type'] == 'vertex', result
         assert result['label'] == 'Segment', result
