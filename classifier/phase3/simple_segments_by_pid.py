@@ -164,16 +164,12 @@ class SPSegmenter:
         #
         # .has('pid', between(21870, 21880))
         return """
-g.V().has('startedAtTime', between(%d, %d))
-    .has('pid')
+g.V().has('pid').has('startedAtTime', between(%d, %d))
     .order()
     .as('a')
     .local(
-        both().both().or(hasLabel('Subject'),
-                         hasLabel('Entity-File'))
-        .has('ident')
-        .barrier()
-        .order()
+        __.in().in().hasLabel('Subject').has('ident')
+        .barrier().order()
         .as('b')
     )
     .select('a').values('startedAtTime').as('TIME')
@@ -211,6 +207,7 @@ g.V().has('startedAtTime', between(%d, %d))
 """
 
     def gen_pid_segments(self, debug=False):
+        self.procs = {}  # A pqueue should trim this down to fixed size.
         for q_getter in [
                 self.get_event_query,
                 self.get_principal_query,
@@ -239,7 +236,6 @@ g.V().has('startedAtTime', between(%d, %d))
             cdm.enums.Event.MMAP,
             cdm.enums.Event.READ,
             ])
-        procs = {}  # A pqueue should trim this down to fixed size.
         for p in self.gremlin.fetch_data(q_subj):
             stamp = datetime.datetime.utcfromtimestamp(p['TIME'] / 1e6)
             proc = '%d%05d' % (p['TIME'], p['PID'])
@@ -251,9 +247,9 @@ g.V().has('startedAtTime', between(%d, %d))
                     event = cdm.enums.Event(p['EVENT'])
                     if event not in boring:
                         log.info('%s  %s  %s' % (proc, stamp, event))
-            if proc not in procs:
-                procs[proc] = SegNode(self, p['TIME'], p['PID'], proc)
-            self.execute(procs[proc].add_edge(p['IDENT']))
+            if proc not in self.procs:
+                self.procs[proc] = SegNode(self, p['TIME'], p['PID'], proc)
+            self.execute(self.procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
         self.report_done()
