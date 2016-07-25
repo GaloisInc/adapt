@@ -13,25 +13,19 @@
             var query_string = document.getElementById('query-string').value
             
             $.post("/query", {"query": query_string}, function(node_results) {
-                var all_ids = {}  // poor man's Set. I hate javascript!
                 var nodes = _.filter(node_results, function(i) { return i['type'] == "vertex" })
                 nodes = _.map(nodes, function(v, i, list) {
-                    all_ids[v['id']] = true
-                    var keys = Object.keys(v['properties'])
-                    var prop_lines = _.map(keys, function(key, i, list) {
-                        return key + " : " + v['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
-                    })
                     var node = { 
                         "id" : v['id'],
                         "label" : makeNodeLabel(v),
-                        "title" : "id : " + v['id'] + "<br />" + prop_lines.join("<br />")
+                        "title" : makeNodeTitle(v)
                     }
                     return node
                 })
 
                 var node_id_list = _.map(nodes, function(n) { return n['id'] })
                 var node_text_string = node_id_list.join(",")
-                var edge_query = "g.V([" + node_text_string + "].toArray()).both()"
+                var edge_query = "g.V([" + node_text_string + "].toArray()).outE()"
 
                 console.log("Found nodes: " + nodes.length)
 
@@ -56,6 +50,11 @@
         }
 
 
+        function clearInput() {
+            $("#query-string").css("background-color", "white")
+        }
+
+
         function draw(data) {
             var container = document.getElementById('graph');
             var options = {
@@ -63,20 +62,39 @@
                 layout: { 
                     improvedLayout : false,
                     randomSeed : 10203040
+                },
+                physics: {
+                    forceAtlas2Based: {
+                        gravitationalConstant: -26,
+                        centralGravity: 0.005,
+                        springLength: 230,
+                        springConstant: 0.18,
+                        avoidOverlap: 1.5
+
+                    },
+                    maxVelocity: 25,
+                    solver: 'forceAtlas2Based',
+                    timestep: 0.25,
+                    stabilization: {
+                        enabled: true,
+                        iterations: 150,
+                        updateInterval: 25
+                    }
                 }
             };
             var network = new vis.Network(container, data, options);
+
+            network.on("stabilizationIterationsDone", function () {
+                setTimeout(function() {
+                    network.setOptions({ physics: false });
+                }, 1000)
+            });
 
             // TODO:
             network.on("doubleClick", function (params) {
                 params.event = "[original event]";
                 console.log(JSON.stringify(params, null, 4))
             });
-        }
-
-
-        function clearInput() {
-            $("#query-string").css("background-color", "white")
         }
 
 
@@ -93,6 +111,34 @@
             } else {
                 return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
             }
+        }
+
+        function makeNodeTitle(node) {
+            var keys = Object.keys(node['properties'])
+
+            function translateEnum(prop_key, ordered_list) {
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+            
+            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+
+            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+
+            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+
+            translateEnum("agentType", ["Local","Remote"])
+
+            var prop_lines = _.map(keys, function(key, i, list) {
+                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
+            })
+
+            return"id : " + node['id'] + "<br />" + prop_lines.join("<br />")
         }
     </script>
 
