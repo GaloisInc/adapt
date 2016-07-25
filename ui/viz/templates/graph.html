@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="{{ url_for('static', filename='jquery.3.1.0.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='underscore.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='vis.4.16.1.js') }}"></script>
+    <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript">
+        function queryClick() { 
+            $('#query-string').css("background-color", "white")
+            var query_string = document.getElementById('query-string').value
+            
+            $.post("/query", {"query": query_string}, function(node_results) {
+                var nodes = _.filter(node_results, function(i) { return i['type'] == "vertex" })
+                nodes = _.map(nodes, function(v, i, list) {
+                    var node = { 
+                        "id" : v['id'],
+                        "label" : makeNodeLabel(v),
+                        "title" : makeNodeTitle(v)
+                    }
+                    return node
+                })
+
+                var node_id_list = _.map(nodes, function(n) { return n['id'] })
+                var node_text_string = node_id_list.join(",")
+                var edge_query = "g.V([" + node_text_string + "].toArray()).outE()"
+
+                console.log("Found nodes: " + nodes.length)
+
+                $.post("/query", {"query": edge_query}, function(edge_results) {
+                    var edges = _.filter(edge_results, function(i) { return i['type'] == "edge" })
+                    edges = _.map(edges, function(e, i, list) {
+                        return { "from" : e['outV'],
+                                 "to" : e['inV'],
+                                 // "label" : e['label'],
+                                 "arrows" : "to",
+                                 "title" : e['label'] }
+                    })
+                    console.log("Found edges: " + edges.length)
+                    draw( { "nodes" : nodes, "edges" : edges } )
+                }).fail(failHandler)
+            }).fail(failHandler)
+        }
+
+
+        function failHandler(response) {
+            $('#query-string').css("background-color", "pink")
+        }
+
+
+        function clearInput() {
+            $("#query-string").css("background-color", "white")
+        }
+
+
+        function draw(data) {
+            var container = document.getElementById('graph');
+            var options = {
+                interaction : { hover : true },
+                layout: { 
+                    improvedLayout : false,
+                    randomSeed : 10203040
+                },
+                physics: {
+                    forceAtlas2Based: {
+                        gravitationalConstant: -26,
+                        centralGravity: 0.005,
+                        springLength: 230,
+                        springConstant: 0.18,
+                        avoidOverlap: 1.5
+
+                    },
+                    maxVelocity: 25,
+                    solver: 'forceAtlas2Based',
+                    timestep: 0.25,
+                    stabilization: {
+                        enabled: true,
+                        iterations: 150,
+                        updateInterval: 25
+                    }
+                }
+            };
+            var network = new vis.Network(container, data, options);
+
+            network.on("stabilizationIterationsDone", function () {
+                setTimeout(function() {
+                    network.setOptions({ physics: false });
+                }, 1000)
+            });
+
+            // TODO:
+            network.on("doubleClick", function (params) {
+                params.event = "[original event]";
+                console.log(JSON.stringify(params, null, 4))
+            });
+        }
+
+
+        function makeNodeLabel(node) {
+            if (node['label'] == "Subject") {
+                var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+                var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+                var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+                return "(S) T: " + t + ", E: " + e + ", PID: " + pid
+            } else if (node['label'] == "Entity-File") {
+                var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
+                var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
+                return "(F) " + url + " : " + file_version
+            } else {
+                return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
+            }
+        }
+
+        function makeNodeTitle(node) {
+            var keys = Object.keys(node['properties'])
+
+            function translateEnum(prop_key, ordered_list) {
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+            
+            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+
+            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+
+            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+
+            translateEnum("agentType", ["Local","Remote"])
+
+            var prop_lines = _.map(keys, function(key, i, list) {
+                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
+            })
+
+            return"id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+        }
+    </script>
+
+    <style type="text/css">
+        html, body, #graph {
+            padding: 0px;
+            margin: 0px;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <input id="query-string" value="g.V().limit(100)" placeholder="Query returning nodes" onfocus="clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" />
+    <button id="query-button" onclick="queryClick()">Query</button>
+    <div id="graph"></div>
+</body>
+</html>
