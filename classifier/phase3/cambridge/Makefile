@@ -4,7 +4,11 @@
 # is to start with the segmentation phase:
 #
 #     make clean && touch /tmp/1_trace_loaded.txt && time make
+# or
+#     make TRACE=5d_youtube_ie_output.bin
 #
+
+TRACE ?= ta5attack2_units.avro
 
 
 all: check_daemons /tmp/3_classified.txt
@@ -30,7 +34,7 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 
 # Keep track in the filesystem of whether ingestd has run yet.
-/tmp/1_trace_loaded.txt: ~/adapt/trace/current/ta5attack2_units.avro
+/tmp/1_trace_loaded.txt: ~/adapt/trace/current/$(TRACE)
 	ls -Hl $<; du -Dh $<
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
