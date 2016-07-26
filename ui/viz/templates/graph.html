@@ -17,7 +17,7 @@
                 var nodes = formatNodes(node_results)
 
                 var nodes_text_string = _.map(nodes, function(n) { return n['id'] }).join(",")
-                var edge_query = "g.V([" + nodes_text_string + "].toArray()).bothE()"
+                var edge_query = "g.V([" + nodes_text_string + "].toArray()).bothE().dedup()"
 
                 console.log("Found nodes: " + nodes.length)
 
