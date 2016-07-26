@@ -3,13 +3,15 @@ sys.path.append(os.path.expanduser('~/adapt/segment/segmenter'))
 from bareBonesTitanDB import BareBonesTitanClient
 from flask import Flask, render_template, url_for, request, Response
 
+from showSegmentsSubGraph import renderSegments
+
 
 app = Flask(__name__)
 db = BareBonesTitanClient()
 
 @app.route('/')
 def service():
-    os.system("./genSegGraph.sh")
+    renderSegments()
     return render_template('index.html')
 
 
