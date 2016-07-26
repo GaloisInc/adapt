@@ -25,6 +25,8 @@
 from .detector import Detector
 import re
 
+__author__ = 'John.Hanley@parc.com'
+
 
 class ScanDetector(Detector):
     '''

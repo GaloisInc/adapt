@@ -12,6 +12,8 @@ sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
 import gremlin_query
 
+__author__ = 'John.Hanley@parc.com'
+
 # python3 -m json.tool ~/adapt/tests/tests.json | grep query
 
 log = logging.getLogger(__name__)
@@ -165,6 +167,35 @@ class SPSegmenter:
         # .has('pid', between(21870, 21880))
         return """
 g.V().has('pid').has('startedAtTime', between(%d, %d))
+    .order()
+    .as('a')
+    .local(
+        __.in().in().hasLabel('Subject').has('ident')
+        .barrier().order()
+        .as('b')
+    )
+    .select('a').values('startedAtTime').as('TIME')
+    .select('a').values('pid').as('PID')
+    .select('b').values('ident').as('IDENT')
+    .select('TIME', 'PID', 'IDENT')
+"""
+
+    def get_timestampless_event_query(self):
+        '''Returns the other kind of subject, those that lack startedAtTime.'''
+        # Ugghh! This is so annoying.
+        # Tested with ta5attack2.
+        # , between(%d, %d))
+        return """
+g.V().has('pid').has('startedAtTime').
+    out().out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').
+    out().out().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').
+    in().hasLabel('Subject').has('pid').has('commandLine').
+    both().both().has('url').valueMap(true)
+
+
+g.V().has('pid').has('startedAtTime').
+    out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').
+    out().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').out().label()
     .order()
     .as('a')
     .local(

@@ -227,7 +227,7 @@
         "se": [
             {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[113], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify that many PID-based segments were found."
             }
@@ -284,7 +284,14 @@
                 "explanation": "Verify there are subjects."
             }
             ],
-        "se": [],
+        "se": [
+            {
+                "query": "g.V().hasLabel('Segment').out().has('pid', 5141).count()",
+                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify we segmented a certain type of subject."
+            }
+            ],
         "ad": [],
         "ac": [],
         "dx": []

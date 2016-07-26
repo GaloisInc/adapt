@@ -57,9 +57,16 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 	cd /tmp && ln -s ~/adapt/tests/tests.json
 
 /tmp/test_interpreter.py: /tmp/tests.json
-	cp -p ~/adapt/tests/test_interpreter.py /tmp
+	cp -p ~/adapt/tests/test_interpreter.py $@
 	cat test_interpreter_seg_patch.txt | (cd /tmp && patch -p2)
 	@egrep -n 'cmd = [^o]' $@  # Use the alternate segmenter on big traces.
+
+
+%.png: %.dot
+	dot -Tpng -o $@ $<
+
+%.pdf: %.dot
+	dot -Tpdf -o $@ $<
 
 
 clean:

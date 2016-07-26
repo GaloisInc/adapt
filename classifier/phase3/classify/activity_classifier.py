@@ -23,6 +23,7 @@
 #
 
 import classify
+import logging
 import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
@@ -45,6 +46,13 @@ class ActivityClassifier(object):
         unused = classify.Escalation(gremlin, classify.FsProxy(self.gremlin))
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
+        self.log = logging.getLogger(__name__)
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        self.log.addHandler(handler)
+        self.log.setLevel(logging.INFO)
+
 
     def find_new_segments(self, last_previously_processed_seg):
         q = ("g.V().has(label, 'Segment')"
@@ -62,13 +70,14 @@ class ActivityClassifier(object):
             " .valueMap(true)",
 
             # Sadly there's no pid on middle subject with eventType:9 execute.
-            "g.V().has('segment:name', '%s').out('segment:includes').hasLabel('Subject')"
+            "g.V().has('segment:name', '%s')"
+            " .out('segment:includes').hasLabel('Subject')"
             " .out().out().hasLabel('Entity-File').has('url')"
             " .valueMap(true)",
             ]
         for seg_id in seg_ids:
             for query in queries:
-                # print(query % seg_id)
+                print(query % seg_id)
                 self.classify1(query, seg_id)
 
     def classify1(self, query, seg_id):
@@ -84,20 +93,15 @@ class ActivityClassifier(object):
                     # print(seg_id, detector.name_of_input_property(), prop['label'], detector)
                     continue  # We don't have an input to offer this detector.
                 property = property.strip('"')  # THEIA says "/tmp", not /tmp.
+                if 'proc' in property:
+                    print(property)
                 # print(seg_id, detector.name_of_input_property(), property)
                 if detector.finds_feature(property):
                     ident = prop['ident'][0]
                     detector.insert_activity_classification(ident, seg_id)
+                    t = str(type(detector)).replace('.', ' ').strip("'>")
+                    self.log.info('%s %s %s' % (seg_id, property, t.split()[3]))
 
-    def insert_activity_classification(self, base_node_id, seg_id, typ, score):
-        cmds = ["act = graph.addVertex(label, 'Activity',"
-                "  'activity:type', '%s',"
-                "  'activity:suspicionScore', %f)" % (typ, score)]
-        cmds.append("g.V().has('ident', '%s').next()"
-                    ".addEdge('segment:includes', act)" % seg_id)
-        cmds.append("act.addEdge('activity:includes',"
-                    " g.V().has('ident', '%s').next())" % base_node_id)
-        self.fetch1(';  '.join(cmds))
     #
     # example Activity node:
     #
