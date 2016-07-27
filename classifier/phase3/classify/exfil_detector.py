@@ -50,7 +50,7 @@ class ExfilDetector(Detector):
             r'|^/dev/video\d'
             r'|^/dev/snd/controlC1'
             r'|^/dev/snd/pcmC1D0c'
-            )
+        )
         # We no longer get commands from SPADE in this way.
         # self._file_re = re.compile(
         #     r'audit:path="(?P<fspec>[\w/\.-]+)",'

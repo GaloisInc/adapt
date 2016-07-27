@@ -38,11 +38,12 @@ class ActivityClassifier(object):
     def __init__(self, gremlin):
         self.gremlin = gremlin
         self.num_nodes_fetched = 0
+        self.num_classifications_inserted = 0
         # At present we have only tackled challenge problems for a few threats:
         self.detectors = [
             classify.ExfilDetector(gremlin),
             classify.ScanDetector(gremlin),
-            ]
+        ]
         unused = classify.Escalation(gremlin, classify.FsProxy(self.gremlin))
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
@@ -52,7 +53,6 @@ class ActivityClassifier(object):
         handler.setFormatter(formatter)
         self.log.addHandler(handler)
         self.log.setLevel(logging.INFO)
-
 
     def find_new_segments(self, last_previously_processed_seg):
         q = ("g.V().has(label, 'Segment')"
@@ -74,10 +74,10 @@ class ActivityClassifier(object):
             " .out('segment:includes').hasLabel('Subject')"
             " .out().out().hasLabel('Entity-File').has('url')"
             " .valueMap(true)",
-            ]
+        ]
         for seg_id in seg_ids:
             for query in queries:
-                print(query % seg_id)
+                # print(query % seg_id)
                 self.classify1(query, seg_id)
 
     def classify1(self, query, seg_id):
@@ -90,17 +90,17 @@ class ActivityClassifier(object):
                 try:
                     property = prop[detector.name_of_input_property()][0]
                 except KeyError:
-                    # print(seg_id, detector.name_of_input_property(), prop['label'], detector)
                     continue  # We don't have an input to offer this detector.
                 property = property.strip('"')  # THEIA says "/tmp", not /tmp.
-                if 'proc' in property:
-                    print(property)
                 # print(seg_id, detector.name_of_input_property(), property)
                 if detector.finds_feature(property):
                     ident = prop['ident'][0]
                     detector.insert_activity_classification(ident, seg_id)
+                    self.num_classifications_inserted += 1
                     t = str(type(detector)).replace('.', ' ').strip("'>")
-                    self.log.info('%s %s %s' % (seg_id, property, t.split()[3]))
+                    self.log.info('%3d %s %s %s' % (
+                        self.num_classifications_inserted,
+                        seg_id, property, t.split()[3]))
 
     #
     # example Activity node:

@@ -39,7 +39,7 @@ class ScanDetector(Detector):
             r'^file:///proc/\d+/cmdline'
             r'|^file:///proc/\d+/status'
             r'|^file:///proc/\d+/stat'
-            )
+        )
 
     def name_of_input_property(self):
         return 'url'

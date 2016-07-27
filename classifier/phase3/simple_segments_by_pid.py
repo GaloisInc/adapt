@@ -119,7 +119,7 @@ class SPSegmenter:
             'Host',
             'Resource',
             'Subject',
-            ]
+        ]
         return ', '.join(["'%s'" % typ
                           for typ in types])
 
@@ -135,15 +135,6 @@ class SPSegmenter:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:
                 return
-
-    # In the cameragrab1 trace we see a pair of closely spaced pid 878 events:
-    #   startedAtTime: 2016-06-22 17:28:34 Z 1466616514839838
-    #   startedAtTime: 2016-06-22 17:28:36 Z 1466616516280587
-    # We can't wrap through 32,000 forks in two seconds.
-    # I don't know what those base nodes mean. Another example is pid 886:
-    #   startedAtTime: 2016-06-22 17:28:36 Z 1466616516259767
-    #   startedAtTime: 2016-06-22 17:28:36 Z 1466616516606469
-    # Each of those nodes has no outE() edges.
 
     # We may still want to use a counter to preserve HappensBefore,
     # since at usec resolution we will still routinely see events happen
@@ -182,31 +173,23 @@ g.V().has('pid').has('startedAtTime', between(%d, %d))
 
     def get_timestampless_event_query(self):
         '''Returns the other kind of subject, those that lack startedAtTime.'''
-        # Ugghh! This is so annoying.
         # Tested with ta5attack2.
-        # , between(%d, %d))
         return """
-g.V().has('pid').has('startedAtTime').
-    out().out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').
-    out().out().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').
-    in().hasLabel('Subject').has('pid').has('commandLine').
-    both().both().has('url').valueMap(true)
-
-
-g.V().has('pid').has('startedAtTime').
-    out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').
-    out().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').out().label()
-    .order()
-    .as('a')
-    .local(
-        __.in().in().hasLabel('Subject').has('ident')
-        .barrier().order()
-        .as('b')
-    )
-    .select('a').values('startedAtTime').as('TIME')
-    .select('a').values('pid').as('PID')
-    .select('b').values('ident').as('IDENT')
-    .select('TIME', 'PID', 'IDENT')
+g.V().has('pid').has('startedAtTime', between(%d, %d)).
+    as('a').
+    out().hasLabel('Subject').
+    out().out().hasLabel('Subject').
+    order().dedup().
+    local(
+        __.in().in().hasLabel('Subject').
+        order().dedup().
+        as('b').
+        out().out().hasLabel('Entity-File').has('url')
+    ).
+    select('a').values('startedAtTime').as('TIME').
+    select('a').values('pid').as('PID').
+    select('b').values('ident').as('IDENT').
+    select('TIME', 'PID', 'IDENT')
 """
 
     def get_principal_query(self):
@@ -241,8 +224,8 @@ g.V().has('startedAtTime', between(%d, %d))
         self.procs = {}  # A pqueue should trim this down to fixed size.
         for q_getter in [
                 self.get_event_query,
-                self.get_principal_query,
-                ]:
+                self.get_timestampless_event_query,
+                self.get_principal_query]:
             self.gen_pid_segments1(q_getter(), debug)
 
     def gen_pid_segments1(self, pid_query, debug, end_stamp=None):
@@ -266,7 +249,7 @@ g.V().has('startedAtTime', between(%d, %d))
         boring = set([
             cdm.enums.Event.MMAP,
             cdm.enums.Event.READ,
-            ])
+        ])
         for p in self.gremlin.fetch_data(q_subj):
             stamp = datetime.datetime.utcfromtimestamp(p['TIME'] / 1e6)
             proc = '%d%05d' % (p['TIME'], p['PID'])
@@ -308,7 +291,7 @@ class SegNode:
     def add_edge(self, ident):
         q = ("g.V().has('segment:name', 's%s').next()"
              ".addEdge('segment:includes', g.V().has('ident','%s').next())" % (
-                     self.proc, ident))
+                 self.proc, ident))
         return q
 
 

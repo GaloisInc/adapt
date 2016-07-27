@@ -26,7 +26,6 @@ The foreground classifier is a kafka producer.
 '''
 import argparse
 import classify
-import inspect
 import kafka
 import logging
 import os
@@ -34,7 +33,6 @@ import parsley
 import struct
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
-import adapt
 import gremlin_query
 
 __author__ = 'John.Hanley@parc.com'
