@@ -32,6 +32,51 @@
             }).fail(failHandler)
         }
 
+        function collapsedQuery(starting_node_id, floating_query, edge_name) {
+            var query_string = "g.V(" + starting_node_id + ")" + floating_query //+ ".bothE().path()"
+            console.log(query_string)
+            $.post("/query", {"query": query_string}, function(node_results) {
+                // var node_edge_list_list = _.map(path_results, function(p) { return p.objects })
+                // var node_edge_list = _.flatten(node_edge_list_list, true)
+                // var new_nodes = _.filter(node_edge_list, function(n) {
+                //     return n.type === "vertex" && ! _.contains(existing_nodes, n.id) })
+                // var new_edges = _.filter(node_edge_list, function(e) { 
+                //     return e.type === "edge" && ! _.contains(existing_edges, e.id) })
+
+
+                console.log(node_results)
+                var existing_nodes = node_data_set.getIds()
+                var existing_edges = edge_data_set.getIds()
+                var new_nodes = _.filter(node_results, function(n){ return n.type === "vertex" && ! _.contains(existing_nodes, n.id) })
+                console.log(new_nodes)
+                var nodes_text_string = _.map(new_nodes, function(n) { return n['id'] }).join(",")
+                var edge_query_string = "g.V([" + nodes_text_string + "].toArray()).bothE().dedup()"
+                console.log(edge_query_string)
+                $.post("/query", {"query": edge_query_string}, function(edge_results) {
+                    var new_edges = _.filter(edge_results, function(e) { 
+                        return e.type === "edge" && ! _.contains(existing_edges, e.id) })
+
+                    var special_edges = _.map(new_nodes, function(n) {
+                        return {
+                            id: "COLLAPSED-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23),
+                            inV: n.id,
+                            type: "edge",
+                            outV: starting_node_id,
+                            inVLabel: n.label,
+                            outVLabel: node_data_set.get(starting_node_id).label,
+                            label: floating_query + "\n" + edge_name
+                        }
+                    })
+                    var all_edges = new_edges.concat(special_edges)
+                    var data = { 
+                        "nodes" : formatNodes(uniqueFromId(new_nodes)), 
+                        "edges" : formatEdges(uniqueFromId(all_edges, function(e){return String(e.outV) +"->"+ String(e.inV)} )) }
+                    updateNetwork(starting_node_id, data)
+
+                })
+            })
+        }
+
 
         function failHandler(response) {
             $('#query-string').css("background-color", "pink")
