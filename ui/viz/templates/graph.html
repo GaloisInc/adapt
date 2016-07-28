@@ -120,21 +120,24 @@
             network.on("oncontext", function (props) {
                 $("#node-query-menu ul").empty()
                 var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
-                $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
-                    var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
-                    collapsedQuery_params =  []
-                    var idx = 0
-                    _.map(relevant_saved_queries, function(q) {
-                        collapsedQuery_params.push([node_id, q.floating_query, q.name])
-                        $("#node-query-menu ul").append(
-                            '<li title="'+ q.floating_query +'" onclick="collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])">' + q.name + '</li>'
-                        )
-                        idx++
+                console.log(typeof node_id)
+                if (typeof node_id == 'number') {
+                    $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
+                        var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
+                        collapsedQuery_params =  []
+                        var idx = 0
+                        _.map(relevant_saved_queries, function(q) {
+                            collapsedQuery_params.push([node_id, q.floating_query, q.name])
+                            $("#node-query-menu ul").append(
+                                '<li title="'+ q.floating_query +'" onclick="collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])">' + q.name + '</li>'
+                            )
+                            idx++
+                        })
+                        document.getElementById("node-query-menu").style.top =  props['pointer']['DOM']['y'] + 'px'
+                        document.getElementById("node-query-menu").style.left = props['pointer']['DOM']['x'] + 'px'
+                        document.getElementById("node-query-menu").className = "show"  
                     })
-                    document.getElementById("node-query-menu").style.top =  props['pointer']['DOM']['y'] + 'px'
-                    document.getElementById("node-query-menu").style.left = props['pointer']['DOM']['x'] + 'px'
-                    document.getElementById("node-query-menu").className = "show"  
-                })
+                }
             })
         }
 
