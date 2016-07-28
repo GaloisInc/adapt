@@ -13,6 +13,6 @@ var saved_queries = [
     {
         "name" : "Who owns it?",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        "floating_query" : ".outE('EDGE_OBJECT_PREV_VERSION out').inV().outE('EDGE_OBJECT_PREV_VERSION in').inV()"
+        "floating_query" : ".both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out()"
     }
 ]
