@@ -22,36 +22,36 @@ var saved_queries = [
     },
     {
         "name" : "affectedEvent",
-        "is_relevant" : function(n) {return n.label === "Entity_File"},
+        "is_relevant" : function(n) {return n.label === "Entity-File"},
         "floating_query" : ".in().hasLabel('EDGE_FILE_AFFECTS_EVENT').both().hasLabel('Subject').has('subjectType',4)"
     },
     {
         "name" : "readers",
         "is_relevant" : function(n) {return n.label === "Entity-File"},
-        "floating_query" : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',20).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid’)"
+        "floating_query" : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',20).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
     },
     {
         "name" : "writer",
         "is_relevant" : function(n) {return n.label === "Entity-File"},
-        "floating_query" : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',20).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid’)"
+        "floating_query" : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',20).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
     },
     {
-        "name" : parentProcess,
+        "name" : "parentProcess",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         "floating_query" : ".as('child').in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().has('pid',select('child').values('ppid'))"
     },
     {
-        "name" : affectedBy,
+        "name" : "affectedBy",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0}, 
         "floating_query" : ".in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out()"
     },
     {
-        "name" : urlsWritten,
+        "name" : "urlsWritten",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0}, 
         "floating_query" : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',21).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"
     },
     {
-        "name" : urlsRead,
+        "name" : "urlsRead",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0}, 
         "floating_query" : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',20).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"       
     }
