@@ -16,7 +16,7 @@
 
         function queryClick() { 
             $('#query-string').css("background-color", "white")
-            var query_string = document.getElementById('query-string').value
+            var query_string = document.getElementById('query-string').value + "dedup()"
             
             $.post("/query", {"query": query_string}, function(node_results) {
                 var nodes = formatNodes(node_results)
@@ -142,7 +142,7 @@
 
 
         function collapsedQuery(starting_node_id, floating_query, edge_name=null) {
-            var query_string = "g.V(" + starting_node_id + ")" + floating_query
+            var query_string = "g.V(" + starting_node_id + ")" + floating_query + ".dedup()"
             console.log(query_string)
             $.post("/query", {"query": query_string}, function(node_results) {
                 var existing_nodes = node_data_set.getIds()
@@ -167,8 +167,8 @@
                     })
                     var all_edges = new_edges.concat(special_edges)
                     var data = { 
-                        "nodes" : formatNodes(uniqueFromId(new_nodes)), 
-                        "edges" : formatEdges(uniqueFromId(all_edges, function(e){return String(e.outV) +"->"+ String(e.inV)} )) }
+                        "nodes" : formatNodes(uniqueFromValue(new_nodes)), 
+                        "edges" : formatEdges(uniqueFromValue(all_edges, function(e){return String(e.outV) +"->"+ String(e.inV)} )) }
                     updateNetwork(starting_node_id, data)
                 })
             })
@@ -247,7 +247,7 @@
         }
 
 
-        function uniqueFromId(array, function_object_to_unique_value=function(x){ return x.id }) {
+        function uniqueFromValue(array, function_object_to_unique_value=function(x){ return x.id }) {
             var id_list = _.map(array, function_object_to_unique_value )
             var unique_ids = Array.from(new Set(id_list))
             var unique_data_by_id = _.map(unique_ids, function(id) {
