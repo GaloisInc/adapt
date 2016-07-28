@@ -120,7 +120,6 @@
             network.on("oncontext", function (props) {
                 $("#node-query-menu ul").empty()
                 var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
-                console.log(typeof node_id)
                 if (typeof node_id == 'number') {
                     $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
                         var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
