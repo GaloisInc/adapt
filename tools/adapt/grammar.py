@@ -21,31 +21,41 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 
-from enum import Enum
-from parsley import makeGrammar
+import ometa.runtime
+import parsley
+import re
 
 
-def any_(*args):
-    return ' | '.join([str(arg)
-                       for arg in args])
+class Grammar:
 
+    @staticmethod
+    def get_grammar():
+        gr = """
+# Declare some terminals.
 
-# from https://docs.python.org/3/library/enum.html#autonumber
-class AutoNumber(Enum):
-    def __new__(cls):
-        value = len(cls.__members__) + 1
-        obj = object.__new__(cls)
-        obj._value_ = value
-        return obj
+access_sensitive_file = LEAF
+http_post_activity = LEAF
+ssh_post_activity = LEAF
+tcp_activity = LEAF
+scanning = LEAF
 
+exfil_channel =   http_post_activity
+                | ssh_activity
+exfil_execution = exfil_channel tcp_activity
+exfil_format = compress_activity? encrypt_activity?
+"""
+        # Turn abbreviated declarations of foo = LEAF into: foo = 'foo'
+        leaf_re = re.compile(r'^(\w+)(\s*=\s*)LEAF$', flags=re.MULTILINE)
+        return parsley.makeGrammar(leaf_re.sub("\\1\\2'\\1'", gr), {})
 
-class Grammar(Enum):
-    '''
-    Terminals of our APT Attack Grammar.
-    They are simply unique symbols; numeric value is ignored.
-    '''
-    http_post_activity = 1
-    ssh_activity = 2
-    exfil_channel = makeGrammar('x = ' + any_(http_post_activity, ssh_activity), {})
-# exfil_execution = exfil_channel 'TCP'
-# exfil_format = 'compress_activity'? 'encrypt_activity'?
+    @staticmethod
+    def parsley_demo(apt_grammar):
+        terminal = 'access_sensitive_file'  # An example matching the grammar.
+        g = apt_grammar(terminal)
+        assert terminal == g.access_sensitive_file()
+
+        g = apt_grammar('random junk ' + terminal)
+        try:
+            print(g.access_sensitive_file())
+        except ometa.runtime.ParseError:
+            pass  # The parsed string didn't match the grammar, as expected.
