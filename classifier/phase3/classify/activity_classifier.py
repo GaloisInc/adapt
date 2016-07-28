@@ -78,29 +78,15 @@ class ActivityClassifier(object):
         for seg_id in seg_ids:
             for query in queries:
                 # print(query % seg_id)
-                self.classify1(query, seg_id)
+                seg_props = self.gremlin.fetch_data(query % seg_id)
+                self.num_nodes_fetched += len(seg_props)
+                self.classify_one_seg(seg_id, seg_props)
 
-    def classify1(self, query, seg_id):
-
-        for prop in self.gremlin.fetch_data(query % seg_id):
-            self.num_nodes_fetched += 1
-            if prop['label'] == 'zEntity-File':
-                print(prop)
-            for detector in self.detectors:
-                try:
-                    property = prop[detector.name_of_input_property()][0]
-                except KeyError:
-                    continue  # We don't have an input to offer this detector.
-                property = property.strip('"')  # THEIA says "/tmp", not /tmp.
-                # print(seg_id, detector.name_of_input_property(), property)
-                if detector.finds_feature(property):
-                    ident = prop['ident'][0]
-                    detector.insert_activity_classification(ident, seg_id)
-                    self.num_classifications_inserted += 1
-                    t = str(type(detector)).replace('.', ' ').strip("'>")
-                    self.log.info('%3d %s %s %s' % (
-                        self.num_classifications_inserted,
-                        seg_id, property, t.split()[3]))
+    def classify_one_seg(self, seg_id, props):
+        for detector in self.detectors:
+            activities = detector.find_activities(seg_id, props)
+            detector.insert_activity_classifications(seg_id, activities)
+            self.num_classifications_inserted += len(activities)
 
     #
     # example Activity node:
@@ -112,11 +98,3 @@ class ActivityClassifier(object):
     # gremlin> g.V().has(label, 'Activity').out().limit(1).valueMap()
     # ==>[ident:[...], source:[0], file-version:[0], url:[file:///etc/shadow]]
     #
-
-    def fetch1(self, query):
-        '''Return a single query result.'''
-        ret = 0
-        for msg in self.gremlin.fetch(query):
-            for item in msg.data:
-                ret = item
-        return ret

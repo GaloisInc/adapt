@@ -32,8 +32,7 @@ class Detector:
     Descendents of this class may implement activity_suspicion_score(), and
     must implement:
     - name_of_input_property()
-    - name_of_output_classification()
-    - finds_feature() - a predicate
+    - find_activities() - maps a segment's properties to a set of activities
     '''
 
     def __init__(self, gremlin):
@@ -43,17 +42,31 @@ class Detector:
         default = 0.1
         return default
 
-    def insert_activity_classification(self, base_node_id, seg_id):
-        cmds = ["act = graph.addVertex(label, 'Activity',"
-                "  'activity:type', '%s',"
-                "  'activity:suspicionScore', %f)" % (
-                    self.name_of_output_classification(),
-                    self.activity_suspicion_score())]
-        cmds.append("g.V().has('segment:name', '%s').next()"
-                    ".addEdge('segment:includes', act)" % seg_id)
-        cmds.append("act.addEdge('activity:includes',"
-                    " g.V().has('ident', '%s').next())" % base_node_id)
-        self.gremlin.fetch_data(';  '.join(cmds))
+    def find_activities(self, seg_id, seg_props):
+        activities = []
+        for prop in seg_props:
+            try:
+                property = prop[self.name_of_input_property()][0]
+            except KeyError:
+                continue  # We don't have an input to offer this detector.
+            property = property.strip('"')  # THEIA says "/tmp", not /tmp.
+            if self.finds_feature(property):
+                ident = prop['ident'][0]
+                activities.append((ident, self.name_of_output_classification()))
+        return activities
+
+    def insert_activity_classifications(self, seg_id, activities):
+        for base_node_ident, classification in activities:
+            cmds = ["act = graph.addVertex(label, 'Activity',"
+                    "  'activity:type', '%s',"
+                    "  'activity:suspicionScore', %f)" % (
+                        classification,
+                        self.activity_suspicion_score())]
+            cmds.append("g.V().has('segment:name', '%s').next()"
+                        ".addEdge('segment:includes', act)" % seg_id)
+            cmds.append("act.addEdge('activity:includes',"
+                        " g.V().has('ident', '%s').next())" % base_node_ident)
+            self.gremlin.fetch_data(';  '.join(cmds))
 
     def fetch1(self, query):
         '''Return a single query result.'''

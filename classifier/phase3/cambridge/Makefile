@@ -10,6 +10,8 @@
 
 TRACE ?= ta5attack2_units.avro
 
+SHELL=bash -o pipefail
+
 
 all: check_daemons /tmp/3_classified.txt
 
@@ -45,12 +47,11 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
 	@echo '~/adapt/tools/label_count.py'
-	csh -c 'time ~/adapt/classifier/phase3/simple_segments_by_pid.py --debug --drop'
-	touch $@
+	csh -c 'time ~/adapt/classifier/phase3/simple_segments_by_pid.py --debug --drop' 2>&1 | tee $@
 
 
 /tmp/3_classified.txt: /tmp/2_segmented.txt
-	csh -c 'time ../fg_classifier.py' 2>&1 | tee $@
+	csh -c 'time ../fg_classifier.py --drop' 2>&1 | tee $@
 
 
 /tmp/tests.json:
