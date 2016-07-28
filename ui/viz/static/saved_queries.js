@@ -9,5 +9,10 @@ var saved_queries = [
         "name" : "Previous File Version",
         "is_relevant" : function(n) {return n.label === "Entity-File" && n['properties']['file-version'][0]['value'] > 1},
         "floating_query" : ".outE('EDGE_OBJECT_PREV_VERSION out').inV().outE('EDGE_OBJECT_PREV_VERSION in').inV()"
+    },
+    {
+        "name" : "Who owns it?",
+        "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        "floating_query" : ".outE('EDGE_OBJECT_PREV_VERSION out').inV().outE('EDGE_OBJECT_PREV_VERSION in').inV()"
     }
 ]
