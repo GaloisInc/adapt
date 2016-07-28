@@ -75,7 +75,7 @@ class ExfilDetector(Detector):
         return 'url'
 
     def name_of_output_classification(self):
-        return 'exfiltration'
+        return 'access_sensitive_file'
 
     def finds_feature(self, event):
         return self._is_exfil(event)

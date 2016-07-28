@@ -35,8 +35,9 @@ class ActivityClassifier(object):
     Classifies activities found in segments of a CDM13 trace.
     '''
 
-    def __init__(self, gremlin):
+    def __init__(self, gremlin, grammar):
         self.gremlin = gremlin
+        self.grammar = grammar
         self.num_nodes_fetched = 0
         self.num_classifications_inserted = 0
         # At present we have only tackled challenge problems for a few threats:
@@ -84,9 +85,18 @@ class ActivityClassifier(object):
 
     def classify_one_seg(self, seg_id, props):
         for detector in self.detectors:
-            activities = detector.find_activities(seg_id, props)
+            activities = self.verify_c(detector.find_activities(seg_id, props))
             detector.insert_activity_classifications(seg_id, activities)
             self.num_classifications_inserted += len(activities)
+
+    def verify_c(self, activities):
+        '''Validates each classification against the grammar.
+        This keeps the various detectors honest.
+        '''
+        valid_rules = set(dir(self.grammar._grammarClass))
+        for ident, classification in activities:
+            assert 'rule_' + classification in valid_rules, classification
+        return activities
 
     #
     # example Activity node:

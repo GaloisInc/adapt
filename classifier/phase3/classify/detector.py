@@ -52,7 +52,8 @@ class Detector:
             property = property.strip('"')  # THEIA says "/tmp", not /tmp.
             if self.finds_feature(property):
                 ident = prop['ident'][0]
-                activities.append((ident, self.name_of_output_classification()))
+                classification = self.name_of_output_classification()
+                activities.append((ident, classification))
         return activities
 
     def insert_activity_classifications(self, seg_id, activities):
@@ -67,11 +68,3 @@ class Detector:
             cmds.append("act.addEdge('activity:includes',"
                         " g.V().has('ident', '%s').next())" % base_node_ident)
             self.gremlin.fetch_data(';  '.join(cmds))
-
-    def fetch1(self, query):
-        '''Return a single query result.'''
-        ret = 0
-        for msg in self.gremlin.fetch(query):
-            for item in msg.data:
-                ret = item
-        return ret

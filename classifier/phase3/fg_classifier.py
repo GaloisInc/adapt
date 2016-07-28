@@ -28,8 +28,10 @@ import argparse
 import classify
 import kafka
 import logging
+import ometa.runtime
 import os
 import parsley
+import re
 import struct
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
@@ -50,12 +52,35 @@ STATUS_DONE = b'\x01'
 
 
 def get_grammar():
-    return """
-exfil_channel = 'http_post_activity'
-                | 'ssh_activity'
-exfil_execution = exfil_channel 'TCP'
-exfil_format = 'compress_activity'? 'encrypt_activity'?
+    gr = """
+# Declare some terminals.
+
+access_sensitive_file = LEAF
+http_post_activity = LEAF
+ssh_post_activity = LEAF
+tcp_activity = LEAF
+scanning = LEAF
+
+exfil_channel =   http_post_activity
+                | ssh_activity
+exfil_execution = exfil_channel tcp_activity
+exfil_format = compress_activity? encrypt_activity?
 """
+    # Turn abbreviated declarations of foo = LEAF into: foo = 'foo'
+    leaf_re = re.compile(r'^(\w+)(\s*=\s*)LEAF$', flags=re.MULTILINE)
+    return leaf_re.sub("\\1\\2'\\1'", gr)
+
+
+def parsley_demo(apt_grammar):
+    terminal = 'access_sensitive_file'  # An example that matches the grammar.
+    g = apt_grammar(terminal)
+    assert terminal == g.access_sensitive_file()
+
+    g = apt_grammar('random junk ' + terminal)
+    try:
+        print(g.access_sensitive_file())
+    except ometa.runtime.ParseError:
+        pass  # The parsed string didn't match the grammar, as expected.
 
 
 def report_status(status, downstreams='dx ui'.split()):
@@ -85,11 +110,12 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    gr = parsley.makeGrammar(get_grammar(), {})
+    grammar = parsley.makeGrammar(get_grammar(), {})
+    parsley_demo(grammar)
     with gremlin_query.Runner() as gremlin:
         if args.drop_all_existing_activities:
             drop_activities(gremlin)
-        ac = classify.ActivityClassifier(gremlin)
+        ac = classify.ActivityClassifier(gremlin, grammar)
         ac.classify(ac.find_new_segments('s'))
         log.info('Fetched %d base nodes.' % ac.num_nodes_fetched)
         log.info('Inserted %d activity classifications.' %
