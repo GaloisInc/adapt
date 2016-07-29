@@ -35,4 +35,4 @@ def graph():
 	return render_template('graph.html')
 
 
-app.run(host='0.0.0.0', port=8180)
+app.run(host='0.0.0.0', port=8180, processes=4)
