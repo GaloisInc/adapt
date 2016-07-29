@@ -259,19 +259,47 @@
 
 
         function makeNodeLabel(node) {
+            // attempting to improve readability of node labels by translating enums
+            var keys = Object.keys(node['properties'])
+            // define enum translation function
+            function translateEnum(prop_key, ordered_list) {
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+
             if (node['label'] == "Subject") {
+                // translate subject properties to text
+                translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
                 var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+                translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
                 var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
                 var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
-                return "(S) T: " + t + ", E: " + e + ", PID: " + pid
+                if (t == "Process") {return t + " " + pid}
+                if (t == "Event" && (e == "Write" || e == "Read"))   
+                    {return t + " " + e + ", size " + node['properties']['size'][0]['value']}
+                else 
+                    {return t + " " + e}
+                if (t == "Thread")  {return t + " of " + pid}
+                if (t == "Unit")    {return t}
+                if (t == "Block")   {return t}
+//                return t + ", E: " + e + ", PID: " + pid
             } else if (node['label'] == "Entity-File") {
                 var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
                 var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-                return "(F) " + url + " : " + file_version
+                return "File " + url + " : " + file_version
             } else if (node['label'] == "Entity-NetFlow") {
                 var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
                 var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-                return "(N) " + dest + " : " + port
+                return "Net " + dest + " : " + port
+            } else if (node['label'] == "Agent") {
+                translateEnum("agentType", ["Local","Remote"])
+                var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
+                return at + " Agent, uid " + node['properties']['userID'][0]['value']
             } else {
                 return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
             }
