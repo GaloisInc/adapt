@@ -34,9 +34,8 @@ class Grammar:
 # Declare some terminals.
 
 access_sensitive_file = LEAF
-http_post_activity = LEAF
-ssh_post_activity = LEAF
-tcp_activity = LEAF
+internet_access = LEAF
+exfil_execution = access_sensitive_file internet_access
 
 # Looking at `arp -a` or sending intranet packet probes.
 possible_network_scan = LEAF
@@ -48,7 +47,6 @@ system_scan = LEAF
 
 exfil_channel =   http_post_activity
                 | ssh_activity
-exfil_execution = exfil_channel tcp_activity
 exfil_format = compress_activity? encrypt_activity?
 """
         # Turn abbreviated declarations of foo = LEAF into: foo = 'foo'

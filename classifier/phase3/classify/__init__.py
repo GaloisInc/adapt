@@ -26,8 +26,9 @@ Classifies a PG segment.
 '''
 
 from .activity_classifier import ActivityClassifier
+from .across_firewall_detector import AcrossFirewallDetector
 from .detector import Detector
 from .escalation import Escalation
-from .exfil_detector import ExfilDetector
 from .fs_proxy import FsProxy
 from .scan_detector import ScanDetector
+from .sensitive_file_detector import SensitiveFileDetector

@@ -41,10 +41,11 @@ class ActivityClassifier(object):
         self.num_nodes_fetched = 0
         self.num_classifications_inserted = 0
         # At present we have only tackled challenge problems for a few threats:
-        self.detectors = [
-            classify.ExfilDetector(gremlin),
-            classify.ScanDetector(gremlin),
-        ]
+        self.detectors = [detector(gremlin) for detector in [
+            classify.AcrossFirewallDetector,
+            classify.SensitiveFileDetector,
+            classify.ScanDetector,
+        ]]
         unused = classify.Escalation(gremlin, classify.FsProxy(self.gremlin))
         assert cdm.enums.Event.UNLINK.value == 12
         assert cdm.enums.Event.UNLINK == cdm.enums.Event(12)
@@ -94,7 +95,7 @@ class ActivityClassifier(object):
         This keeps the various detectors honest.
         '''
         valid_rules = set(dir(self.grammar._grammarClass))
-        cs = set([classification  for ident, classification in activities])
+        cs = set([classification for ident, classification in activities])
         for c in cs:
             assert 'rule_' + c in valid_rules, c
         return activities

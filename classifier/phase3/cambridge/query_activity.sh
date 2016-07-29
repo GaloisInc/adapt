@@ -14,21 +14,24 @@ graph = TitanFactory.open('cassandra:localhost'); g = graph.traversal();
 
 g.V().count()
 
+g.V().hasLabel('Segment').has('pid', 5141).out().groupCount().by(label)
+
 g.V().hasLabel('Activity').count()
 
-g.V().hasLabel('Activity').out().label().groupCount()
-
-g.V().hasLabel('Activity').out().values('url').groupCount()
+g.V().hasLabel('Activity').out().groupCount().by(label)
 
 g.E().hasLabel('activity:includes').count()
 
-g.V().hasLabel('Segment').has('segment:name', 's146661651612025305573').out('segment:includes').
-hasLabel('Subject').has('subjectType', 4).has('eventType', 13).
-count()
+g.E().hasLabel('activity:includes').inV().label().groupCount()
+
+g.V().hasLabel('Subject').has('eventType').groupCount().by('eventType')
+
+g.V().hasLabel('Subject').has('subjectType').groupCount().by('subjectType')
 EOF
 echo
 
 cat > /dev/null <<EOF
+cameragrab1:
 g.V().hasLabel('Segment').has('segment:name', 's146661651612025305573').out('segment:includes').
 hasLabel('Subject').has('subjectType', 4).as('a').
 values('startedAtTime').as('startedAtTime').select('a').values('eventType').as('eventType').select('startedAtTime', 'eventType')

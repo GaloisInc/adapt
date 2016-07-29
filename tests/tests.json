@@ -286,7 +286,7 @@
             ],
         "se": [
             {
-                "query": "g.V().hasLabel('Segment').out().has('pid', 5141).count()",
+                "query": "g.V().hasLabel('Segment').has('pid', 5141).count()",
                 "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify we segmented a certain type of subject."
