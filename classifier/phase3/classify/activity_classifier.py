@@ -94,8 +94,9 @@ class ActivityClassifier(object):
         This keeps the various detectors honest.
         '''
         valid_rules = set(dir(self.grammar._grammarClass))
-        for ident, classification in activities:
-            assert 'rule_' + classification in valid_rules, classification
+        cs = set([classification  for ident, classification in activities])
+        for c in cs:
+            assert 'rule_' + c in valid_rules, c
         return activities
 
     #

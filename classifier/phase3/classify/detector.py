@@ -32,7 +32,8 @@ class Detector:
     Descendents of this class may implement activity_suspicion_score(), and
     must implement:
     - name_of_input_property()
-    - find_activities() - maps a segment's properties to a set of activities
+    - name_of_output_classification()
+    - finds_feature() - a predicate
     '''
 
     def __init__(self, gremlin):

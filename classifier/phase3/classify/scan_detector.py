@@ -45,7 +45,7 @@ class ScanDetector(Detector):
         return 'url'
 
     def name_of_output_classification(self):
-        return 'scanning'
+        return 'possible_system_scan'
 
     def finds_feature(self, event):
         return self._is_part_of_scan(event)
@@ -53,3 +53,13 @@ class ScanDetector(Detector):
     def _is_part_of_scan(self, url):
         '''Predicate is True for url access that could be part of scan.'''
         return self._scan_url_re.search(url)
+
+    def find_activities(self, seg_id, seg_props, threshold=12):
+        # First find individual stand-alone 'possible' scan features.
+        ret = super().find_activities(seg_id, seg_props)
+        # Now summarize.
+        if len(ret) >= threshold:
+            # Pick an arbitrary representative base node.
+            ident, c = ret[0]
+            ret.append((ident, 'system_scan'))
+        return ret

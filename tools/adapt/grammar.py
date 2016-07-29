@@ -37,7 +37,14 @@ access_sensitive_file = LEAF
 http_post_activity = LEAF
 ssh_post_activity = LEAF
 tcp_activity = LEAF
-scanning = LEAF
+
+# Looking at `arp -a` or sending intranet packet probes.
+possible_network_scan = LEAF
+network_scan = LEAF
+
+# Looking at other principals on the current system, e.g. `ps`.
+possible_system_scan = LEAF
+system_scan = LEAF
 
 exfil_channel =   http_post_activity
                 | ssh_activity
