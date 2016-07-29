@@ -174,7 +174,7 @@ def get_canned_reports():
               ' EDGE_OBJECT_PREV_VERSION'
               ' EDGE_SRCSINK_AFFECTS_EVENT'
               ' EDGE_SUBJECT_HASLOCALPRINCIPAL')
-    labels = 'Agent Entity-File Entity-Memory Entity-Netflow Resource Subject'
+    labels = 'Agent Entity-File Entity-Memory Entity-NetFlow Resource Subject'
     for label in labels.split():
         name = re.sub(r'^Entity-', '', label).lower()
         ret[name] = "g.V().hasLabel('%s').limit(5000)" % label
