@@ -42,6 +42,7 @@ class ActivityClassifier(object):
         self.num_classifications_inserted = 0
         # At present we have only tackled challenge problems for a few threats:
         self.detectors = [detector(gremlin) for detector in [
+            classify.UnusualFileAccessDetector,
             classify.AcrossFirewallDetector,
             classify.SensitiveFileDetector,
             classify.ScanDetector,

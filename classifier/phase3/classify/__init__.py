@@ -32,3 +32,4 @@ from .escalation import Escalation
 from .fs_proxy import FsProxy
 from .scan_detector import ScanDetector
 from .sensitive_file_detector import SensitiveFileDetector
+from .unusual_file_access_detector import UnusualFileAccessDetector
