@@ -58,6 +58,7 @@ class UnusualFileAccessDetector(Detector):
         return 'unusual_file_access'  # Usual access is simply suppressed.
 
     def find_activities(self, seg_id, seg_props, threshold=12):
+        print(seg_id)
         activities = []
         prog = self._get_prog(seg_props)
         if prog is None:
@@ -99,6 +100,12 @@ class UnusualFileAccessDetector(Detector):
     def _find_files(self, seg_props):
         '''Gives segment's set of distinct filenames, with right censoring.'''
         # return set((self._extract_name(prop['properties'][0])
+        from pprint import pprint
+        print(7)
+        for prop in seg_props:
+            if 'url' in prop or 'commandLine' in prop:
+                pprint(prop)
+        print('')
         return set((prop['url']
                     for prop in seg_props[:self.max_files]
                     if 'url' in prop))

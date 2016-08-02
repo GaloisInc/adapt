@@ -68,19 +68,42 @@ class ActivityClassifier(object):
 
     def classify(self, seg_ids):
         queries = [
-            "g.V().has('segment:name', '%s').out('segment:includes')"
-            " .where(or(hasLabel('Subject'), hasLabel('Agent')))"
-            " .valueMap(true)",
+
+            "g.V().has('segment:name', '%s').out('segment:includes').as('a')"
+            " .hasLabel('Subject').has('startedAtTime')"
+            " .order().dedup().as('b')"
+            " .local("
+            "     out().out().hasLabel('Entity-File').has('url')"
+            "     .order().dedup().as('c')"
+            " )"
+            " .select('a').values('pid').as('pid')"
+            " .select('b').values('startedAtTime').as('startedAtTime')"
+            " .select('b').values('commandLine').as('commandLine')"
+            " .select('b').values('properties').as('properties')"
+            " .select('c').values('url').as('url')"
+            " .select('c').values('ident').as('ident')"
+            " .select('startedAtTime', 'pid', 'url', 'ident')",
+
+gremlin> g.V().has('pid', 5123).has('commandLine')  .in().in() .has('startedAtTime') .as('a') .out().out().hasLabel('Entity-File').has('url') .select('a').valueMap(true)
+
+
+g.V().has('startedAtTime') .as('a') .out().out() .has('pid', 5123).has('commandLine') .as('b') .out().out().hasLabel('Entity-File').has('url') .as('c') .valueMap(true)
+
+
+            #"g.V().has('segment:name', '%s').out('segment:includes')"
+            #" .where(or(hasLabel('Subject'), hasLabel('Agent')))"
+            #" .order().dedup()"
+            #" .valueMap(true)",
 
             # Sadly there's no pid on middle subject with eventType:9 execute.
-            "g.V().has('segment:name', '%s')"
-            " .out('segment:includes').hasLabel('Subject')"
-            " .out().out().hasLabel('Entity-File').has('url')"
-            " .valueMap(true)",
+            #"g.V().has('segment:name', '%s')"
+            #" .out('segment:includes').hasLabel('Subject')"
+            #" .out().out().hasLabel('Entity-File').has('url')"
+            #" .valueMap(true)",
         ]
         for seg_id in seg_ids:
             for query in queries:
-                # print(query % seg_id)
+                print(query % seg_id)
                 seg_props = self.gremlin.fetch_data(query % seg_id)
                 self.num_nodes_fetched += len(seg_props)
                 self.classify_one_seg(seg_id, seg_props)

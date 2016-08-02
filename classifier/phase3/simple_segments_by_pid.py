@@ -197,18 +197,19 @@ g.V().has('pid').has('startedAtTime', between(%d, %d)).
         # Would it be so hard for TA1 to uniformly supply pid + timestamp?
         # Tested with ta5attack2.
         return """
-g.V().has('startedAtTime', between(%d, %d)).
-    order().dedup().
-    as('a').
-    local(
-        out().out().hasLabel('Subject').has('commandLine').has('pid').
-        order().dedup().
-        as('b')
-    ).
-    select('a').values('startedAtTime').as('TIME').
-    select('b').values('pid').as('PID').
-    select('b').values('ident').as('IDENT').
-    select('TIME', 'PID', 'IDENT')
+g.V().
+  hasLabel('Subject').has('pid').has('commandLine').
+  order().dedup().as('a').
+  in().in().hasLabel('Subject').has('startedAtTime', between(%d, %d)).
+  order().dedup().as('b').
+  out().out().hasLabel('Entity-File').has('url').
+  order().dedup().as('c').
+  select('a').values('pid').as('PID').
+  select('a').values('commandLine').as('commandLine').
+  select('b').values('startedAtTime').as('TIME').
+  select('c').values('url').as('url').
+  select('c').values('ident').as('IDENT').
+  select('TIME', 'PID', 'commandLine', 'url', 'IDENT')
 """
 
 
@@ -243,10 +244,10 @@ g.V().has('startedAtTime', between(%d, %d))
     def gen_pid_segments(self, debug=False):
         self.procs = {}  # A pqueue should trim this down to fixed size.
         for q_getter in [
-                self.get_event_query,
-                self.get_timestampless_event_query,
+                #self.get_event_query,
+                #self.get_timestampless_event_query,
                 self.get_pidless_exec_query,
-                self.get_principal_query]:
+                ]:#self.get_principal_query]:
             self.gen_pid_segments1(q_getter(), debug)
 
     def gen_pid_segments1(self, pid_query, debug, end_stamp=None):
