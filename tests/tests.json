@@ -65,12 +65,12 @@
                 "query": "g.V().has(label,'Entity-NetFlow').local(both('segment:includes').count().is(0)).count()",
                 "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "siddiqmd@oregonstate.edu",
-                "explanation": "Verify that all the Entity-NetFlow nodes are contained within at least one segment"
-            },{
-                "query": "g.V().has(label, 'Entity-File').count()",
-                "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify files are stable."
+                "explanation": "Verify that each Entity-NetFlow node is contained within at least one segment"
+            }, {
+                "query": "g.V().has(label,'Subject').has('subjectType',0).local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that each process node is contained within at least one segment"
             }, {
                 "query": "g.V().has(label, 'Subject').count()",
                 "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
@@ -227,12 +227,24 @@
         "se": [
             {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[113], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify that many PID-based segments were found."
             }
         ],
-        "ad": [],
+        "ad": [
+            {
+                "query": "g.V().has(label,'Entity-NetFlow').local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that each Entity-NetFlow node is contained within at least one segment"
+            }, {
+                "query": "g.V().has(label,'Subject').has('subjectType',0).local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that each process node is contained within at least one segment"
+            }
+        ],
         "ac": [
             {
                 "query": "g.V().has(label, 'Entity-File').count()",
@@ -284,15 +296,20 @@
                 "explanation": "Verify there are subjects."
             }
             ],
-        "se": [
+        "se": [],
+        "ad": [
             {
-                "query": "g.V().hasLabel('Segment').has('pid', 5141).count()",
-                "response": "[Message(status_code=200, data=[1], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify we segmented a certain type of subject."
+                "query": "g.V().has(label,'Entity-NetFlow').local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that each Entity-NetFlow node is contained within at least one segment"
+            }, {
+                "query": "g.V().has(label,'Subject').has('subjectType',0).local(both('segment:includes').count().is(0)).count()",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                "requester_email": "siddiqmd@oregonstate.edu",
+                "explanation": "Verify that each process node is contained within at least one segment"
             }
-            ],
-        "ad": [],
+        ],
         "ac": [],
         "dx": []
     }
