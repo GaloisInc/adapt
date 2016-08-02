@@ -4,7 +4,7 @@ unusual file accesses
 
 Files like `/etc/ld.so.preload`, `localtime`, `libc.so.6`, and `resolv.conf`
 may be "usual" for a given program, being accessed every single time it runs.
-In contrast, a reference to`readme.txt` may be "unusual",
+In contrast, a reference to `readme.txt` may be "unusual",
 triggered by argv or some aspect of the environment.
 We report each unusual_file_access event.
 
@@ -41,30 +41,37 @@ algorithm
 
 The approach is very simple.
 We are given program name `prog` and
-a set of filenames it opened, or rather the first `max_file` filenames.
+a set of filenames it opened, or rather the first `max_files` filenames.
 There are two cases.
 
 If we lack historic counts for `prog` we simply copy `files` into the
 history and report empty set, no "unusual" files were found.
 
-    # Creating history[prog] may evict another program from the LRU.
-    if prog not in history:
-        history[prog].instances.append(files)
-        history[prog].counts = { file, 1 for file in files }
-        return set()
+        # Creating prog entry in history may evict another program from the LRU.
+        instances, counts = self.history(prog)
+        n = len(instances)
+        if n == 0:
+            instances.append(files)
+            for file in files:
+                counts[file] = 1
+
 
 Otherwise find unusual files and add to history:
 
-    n = len(history[prog].instances)
-    # A file is "usual" if it appears in every single historic instance.
-    usual = set([file if count == n for file, count in history[prog].counts])
-    unusual = files - usual
-    if n == max_instances:
-        # Oldest instance falls off the end.
-        for file in history[prog].instances[0]:
-            history[prog].counts[file] -= 1
-        history[prog].instances = history[prog].instances[1:]
-    history[prog].instances.append(files)
-    for file in files:
-        history[prog].counts[file] += 1
-    return unusual
+        # A file is "usual" if it appears in every single historic instance.
+        usual = set((file
+                     for file, count in counts.items()
+                     if count == n))
+        unusual = files - usual
+
+        if n == self.max_instance:
+            # Oldest instance falls off the end.
+            for file in instances[0]:
+                counts[file] -= 1
+            instances = instances[1:]
+        instances.append(files)
+        for file in files:
+            counts[file] += 1
+
+Then map each member of `unusual` to `ident` of corresponding base node,
+and report it as an unusual_file_access activity.

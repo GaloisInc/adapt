@@ -33,6 +33,8 @@ class Grammar:
         gr = """
 # Declare some terminals.
 
+unusual_file_access = LEAF
+
 access_sensitive_file = LEAF
 internet_access = LEAF
 exfil_execution = access_sensitive_file internet_access

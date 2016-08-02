@@ -7,6 +7,7 @@ import datetime
 import kafka
 import logging
 import os
+import re
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
@@ -198,7 +199,7 @@ g.V().has('pid').has('startedAtTime', between(%d, %d)).
         # Tested with ta5attack2.
         return """
 g.V().
-  hasLabel('Subject').has('pid').has('commandLine').
+  hasLabel('Subject').has('pid').has('commandLine').has('properties').
   order().dedup().as('a').
   in().in().hasLabel('Subject').has('startedAtTime', between(%d, %d)).
   order().dedup().as('b').
@@ -206,10 +207,11 @@ g.V().
   order().dedup().as('c').
   select('a').values('pid').as('PID').
   select('a').values('commandLine').as('commandLine').
+  select('a').values('properties').as('properties').
   select('b').values('startedAtTime').as('TIME').
   select('c').values('url').as('url').
   select('c').values('ident').as('IDENT').
-  select('TIME', 'PID', 'commandLine', 'url', 'IDENT')
+  select('TIME', 'PID', 'commandLine', 'properties', 'url', 'IDENT')
 """
 
 
@@ -244,10 +246,10 @@ g.V().has('startedAtTime', between(%d, %d))
     def gen_pid_segments(self, debug=False):
         self.procs = {}  # A pqueue should trim this down to fixed size.
         for q_getter in [
-                #self.get_event_query,
-                #self.get_timestampless_event_query,
+                self.get_event_query,
+                self.get_timestampless_event_query,
                 self.get_pidless_exec_query,
-                ]:#self.get_principal_query]:
+                self.get_principal_query]:
             self.gen_pid_segments1(q_getter(), debug)
 
     def gen_pid_segments1(self, pid_query, debug, end_stamp=None):
@@ -267,6 +269,7 @@ g.V().has('startedAtTime', between(%d, %d))
         q_subj = pid_query % (self.begin_stamp, end_stamp)
         if debug:
             print(' '.join(q_subj.split()))
+        name_re = re.compile(r', name=(\w+), ')  # Horrible. Lossy. Wants JSON.
         # These happen often. Very often.
         boring = set([
             cdm.enums.Event.MMAP,
@@ -285,6 +288,12 @@ g.V().has('startedAtTime', between(%d, %d))
                         log.info('%s  %s  %s' % (proc, stamp, event))
             if proc not in self.procs:
                 self.procs[proc] = SegNode(self, p['TIME'], p['PID'], proc)
+                if 'commandLine' in p and 'properties' in p:
+                    m = name_re.search(p['properties'])
+                    if m:
+                        command_name = m.group(1)
+                        self.execute(self.procs[proc].add_command_line(
+                            command_name, p['commandLine']))
             self.execute(self.procs[proc].add_edge(p['IDENT']))
             self.total_edges_inserted += 1
 
@@ -309,6 +318,14 @@ class SegNode:
         assert result['label'] == 'Segment', result
         # self.seg_db_id = result['id']  # Smaller SegNode => we malloc less.
         # Each proc is a 21-byte string, plus 8-byte SegNode object overhead.
+
+    def add_command_line(self, command_name, command_line):
+        if "'" in command_line or "'" in command_name:
+            return  # LittleBobbyTables says this isn't nearly paranoid enough.
+        return ("g.V().has('segment:name', 's%s').next()"
+                " .property('commandName', '%s')"
+                " .property('commandLine', '%s')") % (
+                    self.proc, command_name, command_line)
 
     def add_edge(self, ident):
         q = ("g.V().has('segment:name', 's%s').next()"

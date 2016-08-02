@@ -23,6 +23,7 @@
 #
 
 from .detector import Detector
+import collections
 import functools
 import json
 import re
@@ -44,9 +45,11 @@ class UnusualFileAccessDetector(Detector):
 
         @functools.lru_cache(maxsize=max_prog)
         def _get_history(prog):
+            # A list of recent file sets.
+            instances = []
+            # Maps file to sum of occurrences in all file sets.
+            counts = collections.defaultdict(int)
             # print('get_hist: prog is ' + prog)
-            instances = []  # A list of recent file sets.
-            counts = {}     # Maps file to sum of occurrences in all file sets.
             return (instances, counts)
 
         self.history = _get_history
@@ -57,29 +60,30 @@ class UnusualFileAccessDetector(Detector):
     def name_of_output_classification(self):
         return 'unusual_file_access'  # Usual access is simply suppressed.
 
-    def find_activities(self, seg_id, seg_props, threshold=12):
-        print(seg_id)
+    def find_activities(self, seg_id, seg_props, threshold=12, debug=False):
         activities = []
         prog = self._get_prog(seg_props)
         if prog is None:
             return activities
         files = self._find_files(seg_props)
-        print(prog, files)
 
         instances, counts = self.history(prog)
+        if debug:
+            print(seg_id, prog)
 
         n = len(instances)
         if n == 0:
             instances.append(files)
-            counts = {file: 1 for file in files}
+            for file in files:
+                counts[file] = 1
             return activities
 
         # A file is "usual" if it appears in every single historic instance.
         usual = set((file
                      for file, count in counts.items()
                      if count == n))
-        print(files, usual)
         unusual = files - usual
+
         if n == self.max_instance:
             # Oldest instance falls off the end.
             for file in instances[0]:
@@ -94,18 +98,12 @@ class UnusualFileAccessDetector(Detector):
                 activities.append(
                     (prop['ident'], self.name_of_output_classification()))
                 unusual.remove(prop['url'])  # Report each file just once.
-        print(activities, unusual, usual)
+
         return activities
 
     def _find_files(self, seg_props):
         '''Gives segment's set of distinct filenames, with right censoring.'''
         # return set((self._extract_name(prop['properties'][0])
-        from pprint import pprint
-        print(7)
-        for prop in seg_props:
-            if 'url' in prop or 'commandLine' in prop:
-                pprint(prop)
-        print('')
         return set((prop['url']
                     for prop in seg_props[:self.max_files]
                     if 'url' in prop))
@@ -116,13 +114,7 @@ class UnusualFileAccessDetector(Detector):
 
     def _get_prog(self, seg_props):
         '''Gives the program name being run by the current PID, if known.'''
-        # event_id_re = re.compile(r'^{event id=\d+}$')
-        name_re = re.compile(r', name=(\w+), ')  # Horrible. Lossy. Wants JSON.
         for prop in seg_props:
-            if 'properties' not in prop:
-                continue
-            assert 1 == len(prop['properties']), prop
-            m = name_re.search(prop['properties'][0])
-            if m:
-                return m.group(1)
+            if 'commandName' in prop:
+                return prop['commandName']
         return None
