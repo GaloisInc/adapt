@@ -1,0 +1,35 @@
+{
+    "netflow" : {
+        "node_list_query" : "g.V().hasLabel('Entity-NetFlow').id()",
+        "feature_queries" : {
+            "writeBytes" :
+                "g.V({id}).both().both().has('eventType',21).values('size').sum()",
+            "readBytes" :
+                "g.V({id}).both().both().has('eventType',17).values('size').sum()",
+            "numWrites" :
+                "g.V({id}).both().both().has('eventType',21).count()",
+            "numReads" :
+                "g.V({id}).both().both().has('eventType',17).count()"
+        }
+    },
+
+    "process" : {
+        "node_list_query" : "g.V().has('subjectType',0).id()",
+        "feature_queries" : {
+            "nFilesOpenDuringWrToNetFlow":
+                "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow').select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
+            "numDistDstPortAccess":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstPort').dedup().count()",
+            "numDistSrcPortAccess":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('srcPort').dedup().count()",
+            "tBytesSentToNetFlow":
+                "g.V({id}).both().both().has('eventType',21).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
+            "tBytesRcvFromNetFlow":
+                "g.V({id}).both().both().has('eventType',17).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
+            "numWritesToNetFlow":
+                "g.V({id}).both().both().has('eventType',21).both().both().has(label,'Entity-NetFlow').count()",
+            "numReadsToNetFlow":
+                "g.V({id}).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').count()"
+        }
+    }
+}

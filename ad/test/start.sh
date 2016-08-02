@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-python3 ../feature_extractor/compute_views.py netflow_view_features.csv process_view_features.csv
+python3 ../feature_extractor/compute_views.py ../feature_extractor/view_specification.json
 
 l=`wc -l netflow_view_features.csv | sed 's/^\([0-9]*\).*$/\1/'`
 if [ $l -gt 1 ]

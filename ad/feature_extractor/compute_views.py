@@ -1,8 +1,6 @@
 #! /usr/bin/env python3
 
-import sys
-import os
-import csv
+import sys, os, csv, json
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
@@ -39,8 +37,8 @@ class AnomalyView:
         with gremlin_query.Runner() as gremlin:
             ids = gremlin.fetch_data(self.node_ids_query)
             print("Found " + str(len(ids)) + " " + view_type + " nodes")
+            print("Extracting features...")
             for id in ids:
-                print("Extracting features for: " + str(id))
                 f.write(str(id))
                 for k in sorted(self.features_queries.keys()):
                     res = gremlin.fetch_data( self.features_queries[k].format(id=id) )[0]
@@ -66,38 +64,9 @@ class AnomalyView:
 
 
 if __name__ == '__main__':
-    # netflow view
-    view_type = "netflow"
-    node_list_query = "g.V().hasLabel('Entity-NetFlow').id()"
-    features_queries = {
-        "writeBytes"    : "g.V({id}).both().both().has('eventType',21).values('size').sum()",
-        "readBytes"     : "g.V({id}).both().both().has('eventType',17).values('size').sum()",
-        "numWrites"     : "g.V({id}).both().both().has('eventType',21).count()",
-        "numReads"      : "g.V({id}).both().both().has('eventType',17).count()"
-    }
-    v1 = AnomalyView(view_type, node_list_query, features_queries)
-    v1.compute_view_and_save()
-
-    # process view
-    view_type = "process"
-    node_list_query = "g.V().has('subjectType',0).id()"
-    features_queries = {
-        'nFilesOpenDuringWrToNetFlow':
-            "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow')"
-            ".select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File')"
-            ".select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
-        'numDistDstPortAccess':
-            "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstPort').dedup().count()",
-        'numDistSrcPortAccess':
-            "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('srcPort').dedup().count()",
-        'tBytesSentToNetFlow':
-            "g.V({id}).both().both().has('eventType',21).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
-        'tBytesRcvFromNetFlow':
-            "g.V({id}).both().both().has('eventType',17).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
-        'numWritesToNetFlow':
-            "g.V({id}).both().both().has('eventType',21).both().both().has(label,'Entity-NetFlow').count()",
-        'numReadsToNetFlow':
-            "g.V({id}).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').count()"
-    }
-    v2 = AnomalyView(view_type, node_list_query, features_queries)
-    v2.compute_view_and_save()
+    in_json = sys.argv[1]
+    with open(in_json) as f:
+        views = json.loads(f.read())
+    for view_type,view_data in views.items():
+        view = AnomalyView(view_type, view_data['node_list_query'], view_data['feature_queries'])
+        view.compute_view_and_save()
