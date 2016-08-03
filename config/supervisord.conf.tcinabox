@@ -12,7 +12,7 @@ startsecs=20
 startretries=6
 
 [program:ingestd]
-command=%(ENV_HOME)s/.local/bin/ingestd -e ta3.tc.dev:9092 -i trace-topic -l ingestd-log -f in-finished
+command=%(ENV_HOME)s/.local/bin/ingestd -e ta3-starc-1b.tc.bbn.com:9092 -i TRACE -i FiveDirections -l ingestd-log -f in-finished
 autorestart=yes
 startsecs=20
 
