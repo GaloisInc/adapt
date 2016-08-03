@@ -152,7 +152,11 @@ install_adapt_dependencies() {
     fi
     sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 
-    (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.adaptinabox supervisord.conf)
+    if [ -z "$USE_TC_IN_A_BOX_CONFIG" ]
+        (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.adaptinabox supervisord.conf)
+    else
+        (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.tcinabox supervisord.conf)
+    fi
 }
 
 function install_ingest_dashboard() {
