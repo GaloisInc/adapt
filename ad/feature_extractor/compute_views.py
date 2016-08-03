@@ -68,5 +68,5 @@ if __name__ == '__main__':
     with open(in_json) as f:
         views = json.loads(f.read())
     for view_type,view_data in views.items():
-        view = AnomalyView(view_type, view_data['node_list_query'], view_data['feature_queries'])
+        view = AnomalyView(view_type, view_data['instance_set'], view_data['feature_set'])
         view.compute_view_and_save()

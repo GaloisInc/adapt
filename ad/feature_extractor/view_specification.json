@@ -1,7 +1,7 @@
 {
     "netflow" : {
-        "node_list_query" : "g.V().hasLabel('Entity-NetFlow').id()",
-        "feature_queries" : {
+        "instance_set" : "g.V().hasLabel('Entity-NetFlow').id()",
+        "feature_set" : {
             "writeBytes" :
                 "g.V({id}).both().both().has('eventType',21).values('size').sum()",
             "readBytes" :
@@ -14,8 +14,8 @@
     },
 
     "process" : {
-        "node_list_query" : "g.V().has('subjectType',0).id()",
-        "feature_queries" : {
+        "instance_set" : "g.V().has('subjectType',0).id()",
+        "feature_set" : {
             "nFilesOpenDuringWrToNetFlow":
                 "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow').select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
             "numDistDstPortAccess":
