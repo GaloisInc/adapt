@@ -1,0 +1,59 @@
+diff --git a/malware/cross-platform/simple-apt/simple/src/tcp.c b/malware/cross-platform/simple-apt/simple/src/tcp.c
+index 5d3a9e8..5425880 100644
+--- a/malware/cross-platform/simple-apt/simple/src/tcp.c
++++ b/malware/cross-platform/simple-apt/simple/src/tcp.c
+@@ -11,6 +11,10 @@
+ 
+ #include <stdio.h>
+ #include <assert.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <unistd.h>
+ 
+ 
+ void tcp_init()
+@@ -37,6 +41,25 @@ void tcp_cleanup()
+ #endif
+ }
+ 
++// Wrap a code fragment with Transparent Computing begin / end markers.
++// The target code fragment, tc_int_code, should compute
++// an integer result to be returned immediately.
++// Write a new macro if you merely want to evaluate for side effects.
++#define TC_MARK_RETURN(tc_marker_num, tc_int_code)  do {     \
++    char tc_fspec[40];                                       \
++    TC_MARK1(tc_marker_num, "begin");                        \
++    int tc_ret = tc_int_code;                                \
++    TC_MARK1(tc_marker_num, "end");                          \
++    return tc_ret;                                           \
++  } while (0)
++
++#define TC_MARK1(tc_marker_num, tc_begin_end)                \
++    { sprintf(tc_fspec, "/tmp/tc-marker-%03d-%s.txt",        \
++              tc_marker_num, tc_begin_end);                  \
++      int tc_fd = open(tc_fspec, O_CREAT | O_APPEND, 0644);  \
++      int n = write(tc_fd, ".", 1);                          \
++      close(tc_fd);                                          \
++    }
+ 
+ // Inits a new network comms session.
+ // Returns -1 on failure, 0 on success.
+@@ -45,7 +68,7 @@ int tcp_initSession(const char *ip, unsigned short port)
+ #ifdef WINDOWS
+ 	return tcp_windows_initSession(ip, port);
+ #elif NIX
+-	return tcp_linux_initSession(ip, port);
++	TC_MARK_RETURN(1, tcp_linux_initSession(ip, port));
+ #else
+ 	assert(0);
+ 	return -1;
+@@ -60,7 +83,7 @@ int tcp_startSession()
+ #ifdef WINDOWS
+ 	return tcp_windows_startSession();
+ #elif NIX
+-	return tcp_linux_startSession();
++	TC_MARK_RETURN(2, tcp_linux_startSession());
+ #else
+ 	assert(0);
+ 	return -1;
