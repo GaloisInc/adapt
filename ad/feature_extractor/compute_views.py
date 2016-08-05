@@ -19,8 +19,8 @@ class AnomalyView:
         self.view_type = vt
         self.node_ids_query = nq
         self.features_queries = fq
-        self.feature_file = 'features/' + self.view_type + '_features.csv'
-        self.score_file = 'scores/' + self.view_type + '_features_scores.csv'
+        self.feature_file = 'features/' + self.view_type + '.csv'
+        self.score_file = 'scores/' + self.view_type + '.csv'
 
     def compute_view_and_save(self):
         print("Writing " + self.view_type + " view features to file: " + self.feature_file)
@@ -49,18 +49,20 @@ class AnomalyView:
                 if cnt % math.ceil(total/10) == 0 and cnt != total:
                     print("%.2f%% done" % round(cnt*100/total, 2))
             if total % 10 != 0:
-                print("100% done")
+                print("100.00% done")
         f.close()
-        print("Writing to " + self.feature_file + " Finished")
+        print("Writing " + self.feature_file + " Finished")
 
 
     def compute_anomaly_score(self):
+        print("Computing anomaly scores...")
         with open(self.feature_file) as f:
             for i, l in enumerate(f):
                 if i > 0:
                     break
         if(i > 0):
             os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
+            print("Anomaly scores written to " + self.score_file)
         else:
             print("No features found to score")
 

@@ -61,10 +61,10 @@
         }
     },
 
-    "file_open_close_duration" : {
+    "file_open_close_gap" : {
         "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',16).select('files').both().both().has('eventType',5).select('files').dedup().id()",
         "feature_set": {
-            "open_close_duration":
+            "open_close_gap":
                 "g.V({id}).both().both().has('eventType',5).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',16).values('startedAtTime').min().next()"
         }
     },
@@ -74,6 +74,22 @@
         "feature_set": {
             "dnld_exec_gap":
                 "g.V({id}).both().both().has('eventType',9).values('startedAtTime').min().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next()"
+        }
+    },
+
+    "file_exec_del_gap" : {
+        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',9).select('files').both().both().has('eventType',12).select('files').dedup().id()",
+        "feature_set": {
+            "exec_del_gap":
+                "g.V({id}).both().both().has('eventType',9).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',12).values('startedAtTime').min().next()"
+        }
+    },
+
+    "netflow_open_close_gap" : {
+        "instance_set": "g.V().has(label,'Entity-NetFlow').as('netflow').both().both().has('eventType',16).select('netflow').both().both().has('eventType',5).select('netflow').dedup().id()",
+        "feature_set": {
+            "open_close_gap":
+                "g.V({id}).both().both().has('eventType',5).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',16).values('startedAtTime').min().next()"
         }
     }
 }
