@@ -2,14 +2,18 @@
     "netflow" : {
         "instance_set" : "g.V().hasLabel('Entity-NetFlow').id()",
         "feature_set" : {
-            "writeBytes" :
+            "writeBytes":
                 "g.V({id}).both().both().has('eventType',21).values('size').sum()",
-            "readBytes" :
+            "readBytes":
                 "g.V({id}).both().both().has('eventType',17).values('size').sum()",
-            "numWrites" :
+            "numWrites":
                 "g.V({id}).both().both().has('eventType',21).count()",
-            "numReads" :
-                "g.V({id}).both().both().has('eventType',17).count()"
+            "numReads":
+                "g.V({id}).both().both().has('eventType',17).count()",
+            "numOpen":
+                "g.V({id}).both().both().has('eventType',16).count()",
+            "numClose":
+                "g.V({id}).both().both().has('eventType',5).count()"
         }
     },
 
@@ -30,6 +34,46 @@
                 "g.V({id}).both().both().has('eventType',21).both().both().has(label,'Entity-NetFlow').count()",
             "numReadsToNetFlow":
                 "g.V({id}).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').count()"
+        }
+    },
+
+    "file" : {
+        "instance_set" : "g.V().hasLabel('Entity-File').id()",
+        "feature_set" : {
+            "num_exec":
+                "g.V({id}).both().both().has('eventType',3).count()",
+            "num_close":
+                "g.V({id}).both().both().has('eventType',5).count()",
+            "num_chk_attrib":
+                "g.V({id}).both().both().has('eventType',9).count()",
+            "num_modify_attrib":
+                "g.V({id}).both().both().has('eventType',14).count()",
+            "num_open":
+                "g.V({id}).both().both().has('eventType',16).count()",
+            "num_read":
+                "g.V({id}).both().both().has('eventType',17).count()",
+            "num_rename":
+                "g.V({id}).both().both().has('eventType',20).count()",
+            "num_write":
+                "g.V({id}).both().both().has('eventType',21).count()",
+            "num_uploads":
+                "g.V({id}).both().both().has('eventType',17).as('file_read').both().both().has('subjectType',0).as('process').both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').dedup().count()"
+        }
+    },
+
+    "file_open_close_duration" : {
+        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',16).select('files').both().both().has('eventType',5).select('files').dedup().id()",
+        "feature_set": {
+            "open_close_duration":
+                "g.V({id}).both().both().has('eventType',5).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',16).values('startedAtTime').min().next()"
+        }
+    },
+
+    "file_dnld_exec_gap" : {
+        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',21).both().both().has('subjectType',0).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').select('files').dedup().as('d_files').both().both().has('eventType',9).select('d_files').dedup().id()",
+        "feature_set": {
+            "dnld_exec_gap":
+                "g.V({id}).both().both().has('eventType',9).values('startedAtTime').min().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next()"
         }
     }
 }

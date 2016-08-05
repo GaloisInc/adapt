@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import sys, os, csv, json
+import sys, os, csv, json, math
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
@@ -19,13 +19,12 @@ class AnomalyView:
         self.view_type = vt
         self.node_ids_query = nq
         self.features_queries = fq
-
+        self.feature_file = 'features/' + self.view_type + '_features.csv'
+        self.score_file = 'scores/' + self.view_type + '_features_scores.csv'
 
     def compute_view_and_save(self):
-        out_file = self.view_type + '_view_features.csv'
-
-        print("Writing " + self.view_type + " view features to file: " + out_file)
-        f = open(out_file, "w")
+        print("Writing " + self.view_type + " view features to file: " + self.feature_file)
+        f = open(self.feature_file, "w")
 
         # write feature headers
         f.write("id")
@@ -36,7 +35,9 @@ class AnomalyView:
         # extract and write features
         with gremlin_query.Runner() as gremlin:
             ids = gremlin.fetch_data(self.node_ids_query)
-            print("Found " + str(len(ids)) + " " + view_type + " nodes")
+            cnt = 0
+            total = len(ids)
+            print("Found " + str(total) + " " + view_type + " nodes")
             print("Extracting features...")
             for id in ids:
                 f.write(str(id))
@@ -44,12 +45,24 @@ class AnomalyView:
                     res = gremlin.fetch_data( self.features_queries[k].format(id=id) )[0]
                     f.write("," + str(res))
                 f.write("\n")
+                cnt = cnt + 1
+                if cnt % math.ceil(total/10) == 0 and cnt != total:
+                    print("%.2f%% done" % round(cnt*100/total, 2))
+            if total % 10 != 0:
+                print("100% done")
         f.close()
-        print("Writing to " + out_file + " Finished")
+        print("Writing to " + self.feature_file + " Finished")
 
 
     def compute_anomaly_score(self):
-        os.system('')
+        with open(self.feature_file) as f:
+            for i, l in enumerate(f):
+                if i > 0:
+                    break
+        if(i > 0):
+            os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
+        else:
+            print("No features found to score")
 
 
     def attach_scores_to_db(self):
@@ -70,3 +83,4 @@ if __name__ == '__main__':
     for view_type,view_data in views.items():
         view = AnomalyView(view_type, view_data['instance_set'], view_data['feature_set'])
         view.compute_view_and_save()
+        view.compute_anomaly_score()
