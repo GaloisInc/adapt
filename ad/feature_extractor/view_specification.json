@@ -40,7 +40,7 @@
     },
 
     "files_connected_with_netflow" : {
-        "instance_set" : "g.V().hasLabel('Entity-File').as('files').both().both().has('subjectType',4).both().both().has('subjectType',0).both().both().has    ('subjectType',4).both().both().has(label,'Entity-NetFlow').select(files).dedup().id()",
+        "instance_set" : "g.V().hasLabel('Entity-File').as('files').both().both().has('subjectType',4).both().both().has('subjectType',0).both().both().has    ('subjectType',4).both().both().has(label,'Entity-NetFlow').select('files').dedup().id()",
         "feature_set" : {
             "num_exec":
                 "g.V({id}).both().both().has('eventType',3).count()",
