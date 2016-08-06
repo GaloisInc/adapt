@@ -25,7 +25,7 @@
 # usage:
 #     ./copy_traces_for_knife.sh
 #     ./ta1_edge_analysis.py
-#     avroknife tojson local:/tmp/knife/ta5attack2_units/ | egrep --color -n 'th/ZlTmjO6gUQwVzWmBFZg=='
+#     avroknife tojson local:/tmp/knife/ta5attack2_units/ | egrep --color -n 'R9Loq6TtzuZCv\+DyAftQ3g=='
 #
 '''
 Reports on whether TA1 introduces vertices prior to referencing them.
@@ -47,7 +47,11 @@ class AvroToJson:
         assert os.path.isdir(trace_dir), 'must be a directory: %s' % trace_dir
         assert ' ' not in trace_dir, 'no blanks, please: %s' % trace_dir
         cmd = 'avroknife tojson local:' + trace_dir
-        self.proc = subprocess.Popen(cmd.split(' '), stdout=subprocess.PIPE)
+        bad_uuids = '|'.join(['th/ZlTmjO6gUQwVzWmBFZg==',
+                              'R9Loq6TtzuZCv\+DyAftQ3g==',
+                              'cLL25dfPM6OjDOre3qTqzA=='])
+        filtered = ['bash', '-c', cmd + ' | egrep -v "%s"' % bad_uuids]
+        self.proc = subprocess.Popen(filtered, stdout=subprocess.PIPE)
         # stdout, stderr = self.proc.communicate()
         # self.knife = stdout.decode('utf8')
 
@@ -118,7 +122,6 @@ class EdgeChecker:
                 assert v[v1] >= 0, event
                 if v2 not in v:
                     print(v2, event)
-                assert v[v2] >= 0, event
 
         print('\n'.join('%6d  %s' % (v, k)
                         for k, v in sorted(type_counts.items())))
