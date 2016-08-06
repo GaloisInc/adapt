@@ -203,6 +203,8 @@ class SimpleTitanGremlinSegmenter:
 					return "Nodes created"
 				elif self.store_segment=='Yes':
 					self.createSchemaEdgeLabel(property_segmentEdgeLabel)
+					print('')
+					print(addEdges_query)
 					createFullSegments=self.titanclient.execute(addEdges_query)
 					addSeg2SegEdges=self.titanclient.execute(addSeg2SegEdges_query)
 					sys.stdout.write('Segments (including edges) created\n')
