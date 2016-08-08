@@ -3,7 +3,7 @@ flags:
     integer-simple: false
 packages:
 - '.'
-- '../avro'
+- location: https://github.com/GaloisInc/avro/archive/master.zip
 extra-deps:
 - data-binary-ieee754-0.4.4
 - fingertree-0.1.1.0
