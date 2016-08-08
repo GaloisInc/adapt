@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="{{ url_for('static', filename='jquery.3.1.0.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='underscore.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='vis.4.16.1.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='saved_queries.js') }}"></script>
+    <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript">
+        var node_data_set, edge_data_set, network;  // saved_queries is loaded externally.
+        var journal = []
+        var collapsedQuery_params = []
+
+
+        function queryClick() { 
+            $('#query-string').css("background-color", "white")
+            var query_string = document.getElementById('query-string').value
+            
+            $.post("/query", {"query": query_string}, function(node_results) {
+                var nodes = formatNodes(node_results)
+                var nodes_text_string = _.map(nodes, function(n) { return n['id'] }).join(",")
+                var edge_query = "g.V([" + nodes_text_string + "].toArray()).bothE().dedup()"
+
+                console.log("Found nodes: " + nodes.length)
+
+                setTimeout(function() {  // SUSPICION: race condition in db connection is causing server lockup; about 1 in 20 when no delay
+                    $.post("/query", {"query": edge_query}, function(edge_results) {
+                        edges = formatEdges(edge_results)
+                        console.log("Found edges: " + edges.length)
+                        draw( { "nodes" : nodes, "edges" : edges } )
+                    }).fail(failHandler)
+                }, 200)
+            }).fail(failHandler)
+        }
+
+
+        function failHandler(response) {
+            $('#query-string').css("background-color", "pink")
+        }
+
+
+        function clearInput() {
+            $("#query-string").css("background-color", "white")
+        }
+
+
+        function draw(data) {
+            var container = document.getElementById('graph')
+            var options = {
+                interaction : { hover : true },
+                layout: { 
+                    improvedLayout : false,
+                    randomSeed : 10203040
+                },
+                physics: {
+                    forceAtlas2Based: {
+                        gravitationalConstant: -26,
+                        centralGravity: 0.005,
+                        springLength: 230,
+                        springConstant: 0.18,
+                        avoidOverlap: 1.5
+
+                    },
+                    maxVelocity: 25,
+                    solver: 'forceAtlas2Based',
+                    timestep: 0.25,
+                    stabilization: {
+                        enabled: true,
+                        iterations: 150,
+                        updateInterval: 25
+                    }
+                },
+                nodes : {
+                    shape: 'dot',
+                    size: 15
+                },
+                edges: {
+                    smooth: false
+                }
+            }
+
+            node_data_set = new vis.DataSet(data.nodes)
+            edge_data_set = new vis.DataSet(data.edges)
+            var network_data = { "nodes" : node_data_set, "edges" : edge_data_set}
+            network = new vis.Network(container, network_data, options)
+            journal = [data]
+
+            network.on("stabilizationIterationsDone", function () {
+                setTimeout(function() {
+                    network.setOptions({ physics: false })
+                }, 1000)
+            })
+
+            network.on("doubleClick", function (props) {
+                if (props['nodes'].length == 1) {
+                    var starting_node_id = props['nodes'][0]
+                    var node_query = "g.V(" + starting_node_id + ").bothE().bothV().dedup()"
+                    $.post("/query", {"query": node_query}, function(node_results) {
+                        var node_ids = _.map(node_results, function(n){ return n['id']})
+                        var edge_query = "g.V([" + node_ids.join(",") + "].toArray()).bothE().dedup()"
+                        setTimeout(function() {  // SUSPICION: race condition in db connection is causing server lockup; about 1 in 20 when no delay, especially when done quickly
+                            $.post("/query", {"query": edge_query}, function(edge_results) {
+                                var existing_nodes = node_data_set.getIds()
+                                var new_nodes = _.filter(node_results, function(n) { return ! _.contains(existing_nodes, n['id']) } )
+                                var existing_edges = edge_data_set.getIds()
+                                var new_edges = _.filter(edge_results, function(e) { return ! _.contains(existing_edges, e['id']) } )
+                                
+                                var new_data = { "nodes" : formatNodes(new_nodes), "edges" : formatEdges(new_edges) }
+                                console.log("Adding new nodes and edges:")
+                                console.log(new_data)
+                                updateNetwork(starting_node_id, new_data)
+                            })
+                        }, 100)
+                    })
+                }
+            })
+
+            network.on("oncontext", function (props) {
+                $("#node-query-menu ul").empty()
+                var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
+                if (typeof node_id == 'number') {
+                    $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
+                        var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
+                        collapsedQuery_params =  []
+                        var idx = 0
+                        _.map(relevant_saved_queries, function(q) {
+                            collapsedQuery_params.push([node_id, q.floating_query, q.name])
+                            $("#node-query-menu ul").append(
+                                '<li title="'+ q.floating_query +'" onclick="collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])">' + q.name + '</li>'
+                            )
+                            idx++
+                        })
+                        document.getElementById("node-query-menu").style.top =  props['pointer']['DOM']['y'] + 'px'
+                        document.getElementById("node-query-menu").style.left = props['pointer']['DOM']['x'] + 'px'
+                        document.getElementById("node-query-menu").className = "show"  
+                    })
+                }
+            })
+        }
+
+
+        function collapsedQuery(starting_node_id, floating_query, edge_name=null) {
+            var query_string = "g.V(" + starting_node_id + ")" + floating_query
+            console.log(query_string)
+            $.post("/query", {"query": query_string}, function(node_results) {
+                var existing_nodes = node_data_set.getIds()
+                var existing_edges = edge_data_set.getIds()
+                var new_nodes = _.filter(node_results, function(n){ return n.type === "vertex" && ! _.contains(existing_nodes, n.id) })
+                var nodes_text_string = _.map(new_nodes, function(n) { return n['id'] }).join(",")
+                var edge_query_string = "g.V([" + nodes_text_string + "].toArray()).bothE().dedup()"
+                $.post("/query", {"query": edge_query_string}, function(edge_results) {
+                    var new_edges = _.filter(edge_results, function(e) { 
+                        return e.type === "edge" && ! _.contains(existing_edges, e.id) })
+                    var special_edges = _.map(node_results, function(n) {
+                        return {
+                            id: "COLLAPSED-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23),
+                            inV: n.id,
+                            type: "edge",
+                            outV: starting_node_id,
+                            inVLabel: n.label,
+                            outVLabel: node_data_set.get(starting_node_id).label,
+                            label: edge_name == null ? floating_query : edge_name,
+                            title: floating_query
+                        }
+                    })
+                    var all_edges = new_edges.concat(special_edges)
+                    var data = { 
+                        "nodes" : formatNodes(uniqueFromId(new_nodes)), 
+                        "edges" : formatEdges(uniqueFromId(all_edges, function(e){return String(e.outV) +"->"+ String(e.inV)} )) }
+                    updateNetwork(starting_node_id, data)
+                })
+            })
+        }
+
+
+        function updateNetwork(starting_node_id, additional_data) {
+            journal.push(additional_data)
+            var bbox = network.getBoundingBox(starting_node_id)
+            var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
+            var placed_nodes = _.map(additional_data['nodes'], function(n) {
+                n['x'] = starting_position.x
+                n['y'] = starting_position.y
+                return n
+            })
+            node_data_set.add(placed_nodes)
+            edge_data_set.add(additional_data['edges'])
+            network.setOptions({ physics: true })
+            setTimeout(function() {
+                network.setOptions({ physics: false })
+            }, 1000)
+        }
+
+
+        function undoUpdateNetwork(steps=1) {
+            var to_remove_list = _.last(journal, steps).reverse()
+            _.map(to_remove_list, function(d) {
+                var node_ids_to_remove = _.pluck(d.nodes, "id")
+                var edge_ids_to_remove = _.pluck(d.edges, "id")
+                node_data_set.remove(node_ids_to_remove)
+                edge_data_set.remove(edge_ids_to_remove)
+            })
+            journal.pop()
+            network.setOptions({ physics: true })
+            setTimeout(function() {
+                network.setOptions({ physics: false })
+            }, 1000)
+        }
+
+
+        function formatNodes(raw_results) {
+            var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
+            return _.map(nodes, function(v, i, list) {
+                return {
+                    "id" : v['id'],
+                    "label" : makeNodeLabel(v),
+                    "title" : makeNodeTitle(v),
+                    "font" : {
+                        "strokeWidth" : 3, 
+                        "strokeColor" : 'white'}
+                }
+            })
+        }
+
+
+        function formatEdges(raw_edge_results) {
+            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
+            return _.map(edges, function(e, i, list) {
+                var new_edge = { 
+                    "id" : e['id'],
+                    "from" : e['outV'],
+                    "to" : e['inV'],
+                    // "label" : e['label'],
+                    "arrows" : "to",
+                    "title" : e['label'] 
+                }
+                if (typeof e['id'] === 'string' && 
+                    e['id'].substring(0, 10) === "COLLAPSED-") {
+                    new_edge['label'] = e['label']
+                    new_edge['title'] = e['title']
+                    new_edge['color'] = "green"
+                    new_edge['dashes'] = true
+                }
+                return new_edge
+            })
+        }
+
+
+        function uniqueFromId(array, function_object_to_unique_value=function(x){ return x.id }) {
+            var id_list = _.map(array, function_object_to_unique_value )
+            var unique_ids = Array.from(new Set(id_list))
+            var unique_data_by_id = _.map(unique_ids, function(id) {
+                var idx = _.indexOf(id_list, id)
+                return array[idx]
+            })
+            return unique_data_by_id
+        }
+
+
+        function makeNodeLabel(node) {
+            // attempting to improve readability of node labels by translating enums
+            var keys = Object.keys(node['properties'])
+            // define enum translation function
+            function translateEnum(prop_key, ordered_list) {
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+
+            if (node['label'] == "Subject") {
+                // translate subject properties to text
+                translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+                var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+                translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+                var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+                var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+                if (t == "Process") {return t + " " + pid}
+                if (t == "Event" && (e == "Write" || e == "Read"))   
+                    {return t + " " + e + ", size " + node['properties']['size'][0]['value']}
+                else 
+                    {return t + " " + e}
+                if (t == "Thread")  {return t + " of " + pid}
+                if (t == "Unit")    {return t}
+                if (t == "Block")   {return t}
+//                return t + ", E: " + e + ", PID: " + pid
+            } else if (node['label'] == "Entity-File") {
+                var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
+                var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
+                return "File " + url + " : " + file_version
+            } else if (node['label'] == "Entity-NetFlow") {
+                var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
+                var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
+                return "Net " + dest + " : " + port
+            } else if (node['label'] == "Agent") {
+                translateEnum("agentType", ["Local","Remote"])
+                var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
+                return at + " Agent, uid " + node['properties']['userID'][0]['value']
+            } else {
+                return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
+            }
+        }
+
+
+        function makeNodeTitle(node) {
+            var keys = Object.keys(node['properties'])
+
+            function translateEnum(prop_key, ordered_list) {
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+            
+            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+
+            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+
+            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+
+            translateEnum("agentType", ["Local","Remote"])
+
+            var prop_lines = _.map(keys, function(key, i, list) {
+                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
+            })
+            return"id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+        }
+
+
+        $(document).bind("click", function(event) {
+            document.getElementById("node-query-menu").className = "hide"
+        })
+    </script>
+
+    <style type="text/css">
+        html, body, #graph {
+            padding: 0px;
+            margin: 0px;
+            height: 100%;
+            width: 100%;
+        }
+        .show {
+            z-index: 1;
+            position: absolute;
+            background-color: rgba(234, 236, 53, 0.7);
+            border: 1px solid #424242;
+            padding: 20px;
+            display: block;
+            margin: 0;
+            list-style-type: none;
+            list-style: none;
+            border-radius: 15px;
+        }
+        .hide { display: none; }
+        .show ul { margin: 0px; padding: 0px; }
+        .show li { list-style: none; padding-bottom: 1em; }
+        .show ul li:last-child { padding-bottom: 0em; }
+        .show a { border: 0 !important; text-decoration: none; }
+        .show a:hover { text-decoration: underline !important; }
+    </style>
+</head>
+<body>
+    <input id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=100 />
+    <button id="query-button" onclick="queryClick()">Query</button>
+    <button id="undo-button" onclick="undoUpdateNetwork()">Undo</button>
+    <div id="graph" oncontextmenu="event.preventDefault()"></div>
+    <div class="hide" id="node-query-menu"><ul></ul></div>
+</body>
+</html>
