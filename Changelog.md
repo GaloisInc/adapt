@@ -1,3 +1,10 @@
+
+N.B. Most team members do not update the changelog so it is incomplete!
+
+# 0.5 (unreleased)
+- Lots of ad, dx, and segmenter changes that I can't summarize properly -TMD
+- Update Avro Haskell implementation for performance improvements.
+
 # 0.4
 - Segmenter functions
 - Require Trusty64 >= 06/21/2016
