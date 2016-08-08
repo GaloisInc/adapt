@@ -1,6 +1,6 @@
 {
     "netflow" : {
-        "instance_set" : "g.V().hasLabel('Entity-NetFlow').as('netflow').both().both().has('eventType',6).select('netflow').dedup().id()",
+        "instance_set" : "g.V().has('eventType',6).both().both().hasLabel('Entity-NetFlow').dedup().id()",
         "feature_set" : {
             "write_bytes":
                 "g.V({id}).both().both().has('eventType',21).values('size').sum()",
@@ -20,7 +20,7 @@
     },
 
     "process_connected_with_netflow" : {
-        "instance_set" : "g.V().has('subjectType',0).as('process').both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').select('process').dedup().id()",
+        "instance_set" : "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
         "feature_set" : {
             "num_file_open_during_wr_to_netflow":
                 "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow').select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
@@ -40,7 +40,7 @@
     },
 
     "files_connected_with_netflow" : {
-        "instance_set" : "g.V().hasLabel('Entity-File').as('files').both().both().has('subjectType',4).both().both().has('subjectType',0).both().both().has    ('subjectType',4).both().both().has(label,'Entity-NetFlow').select('files').dedup().id()",
+        "instance_set" : " g.V().has('subjectType',4).as('net_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('net_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
         "feature_set" : {
             "num_exec":
                 "g.V({id}).both().both().has('eventType',3).count()",
@@ -64,7 +64,7 @@
     },
 
     "file_open_close_gap" : {
-        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',16).select('files').both().both().has('eventType',5).select('files').dedup().id()",
+        "instance_set": "g.V().has('eventType',5).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',16).select('files').dedup().id()",
         "feature_set": {
             "open_close_gap":
                 "(g.V({id}).both().both().has('eventType',5).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',16).values('startedAtTime').min().next())/1000000.0"
@@ -72,7 +72,7 @@
     },
 
     "file_dnld_exec_gap" : {
-        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',21).both().both().has('subjectType',0).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').select('files').dedup().as('d_files').both().both().has('eventType',9).select('d_files').dedup().id()",
+        "instance_set": "g.V().has('eventType',9).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',21).select('files').dedup().id()",
         "feature_set": {
             "dnld_exec_gap":
                 "(g.V({id}).both().both().has('eventType',9).values('startedAtTime').min().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next())/1000000.0"
@@ -80,7 +80,7 @@
     },
 
     "file_exec_del_gap" : {
-        "instance_set": "g.V().has(label,'Entity-File').as('files').both().both().has('eventType',9).select('files').both().both().has('eventType',12).select('files').dedup().id()",
+        "instance_set": "g.V().has('eventType',9).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',12).select('files').dedup().id()",
         "feature_set": {
             "exec_del_gap":
                 "(g.V({id}).both().both().has('eventType',9).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',12).values('startedAtTime').min().next())/1000000.0"
@@ -88,7 +88,7 @@
     },
 
     "netflow_connect_last_activity_gap" : {
-        "instance_set": "g.V().has(label,'Entity-NetFlow').as('netflow').both().both().has('eventType',6).select('netflow').dedup().id()",
+        "instance_set": "g.V().has('eventType',6).both().both().has(label,'Entity-NetFlow').dedup().id()",
         "feature_set": {
             "connect_last_activity_gap":
                 "(g.V({id}).both().both().has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',6).values('startedAtTime').min().next())/1000000.0"
