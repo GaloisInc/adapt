@@ -23,7 +23,7 @@ class AnomalyView:
         self.score_file = 'scores/' + self.view_type + '.csv'
 
     def compute_view_and_save(self):
-        print("Writing " + self.view_type + " view features to file: " + self.feature_file)
+        print("\nWriting " + self.view_type + " view features to file: " + self.feature_file)
         f = open(self.feature_file, "w")
 
         # write feature headers
