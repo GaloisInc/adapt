@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE BangPatterns        #-}
 module Data.Avro.Decode
   ( decodeAvro
   , decodeContainer
@@ -13,27 +14,28 @@ module Data.Avro.Decode
   , GetAvro(..)
   ) where
 
-import           Prelude as P
-import           Control.Monad (replicateM,when)
-import qualified Codec.Compression.Zlib as Z
-import qualified Data.Aeson as A
-import qualified Data.Array as Array
-import qualified Data.Binary.Get as G
-import           Data.Binary.Get (Get,runGetOrFail)
+import Prelude as P
+import           Control.Monad              (replicateM,when)
+import qualified Codec.Compression.Zlib     as Z
+import qualified Data.Aeson                 as A
+import qualified Data.Array                 as Array
+import qualified Data.Binary.Get            as G
+import           Data.Binary.Get            (Get,runGetOrFail)
 import           Data.Bits
-import qualified Data.ByteString.Lazy as BL
-import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy       as BL
+import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BC
 import           Data.Int
-import           Data.List (foldl')
-import           Data.Monoid ((<>))
-import qualified Data.Map as Map
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Set as Set
-import           Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Vector as V
+import           Data.List                  (foldl')
+import qualified Data.List.NonEmpty as NE
+import           Data.Monoid                ((<>))
+import qualified Data.Map                   as Map
+import qualified Data.HashMap.Strict        as HashMap
+import qualified Data.Set                   as Set
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
+import qualified Data.Vector                as V
 
 import           Data.Avro.Schema as S
 import qualified Data.Avro.Types as T
@@ -41,9 +43,11 @@ import qualified Data.Avro.Types as T
 -- |Decode bytes into a 'Value' as described by Schema.
 decodeAvro :: Schema -> BL.ByteString -> Either String (T.Value Type)
 decodeAvro sch = either (\(_,_,s) -> Left s) (\(_,_,a) -> Right a) . runGetOrFail (getAvroOf sch)
+{-# INLINABLE decodeAvro #-}
 
 decodeContainer :: BL.ByteString -> Either String (Schema, [[T.Value Type]])
 decodeContainer = decodeContainerWith getAvroOf
+{-# INLINABLE decodeContainer #-}
 
 decodeContainerWith :: (Schema -> Get a)
                     -> BL.ByteString
@@ -52,34 +56,46 @@ decodeContainerWith schemaToGet bs =
   case runGetOrFail (getContainerWith schemaToGet) bs of
     Right (_,_,a) -> Right a
     Left (_,_,s)  -> Left s
+{-# INLINABLE decodeContainerWith #-}
+
+data ContainerHeader = ContainerHeader
+                      { syncBytes       :: !BL.ByteString
+                      , decompress      :: BL.ByteString -> Get BL.ByteString
+                      , containedSchema :: !Schema
+                      }
+
+nrSyncBytes :: Integral sb => sb
+nrSyncBytes = 16
+
+instance GetAvro ContainerHeader where
+  getAvro =
+   do magic <- getFixed avroMagicSize
+      when (BL.fromStrict magic /= avroMagicBytes)
+           (fail "Invalid magic number at start of container.")
+      metadata <- getMap :: Get (Map.Map Text BL.ByteString) -- avro.schema, avro.codec
+      sync  <- BL.fromStrict <$> getFixed nrSyncBytes
+      codec <- getCodec (Map.lookup "avro.codec" metadata)
+      schema <- case Map.lookup "avro.schema" metadata of
+                  Nothing -> fail "Invalid container object: no schema."
+                  Just s  -> case A.eitherDecode' s of
+                                Left e  -> fail ("Can not decode container schema: " <> e)
+                                Right x -> return x
+      return $ ContainerHeader { syncBytes = sync, decompress = codec, containedSchema = schema }
+   where avroMagicSize :: Integral a => a
+         avroMagicSize = 4
+
+         avroMagicBytes :: BL.ByteString
+         avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
+
+         getFixed :: Int -> Get ByteString
+         getFixed = G.getByteString
+
 
 getContainerWith :: (Schema -> Get a) -> Get (Schema, [[a]])
 getContainerWith schemaToGet =
- do magic <- getFixed avroMagicSize
-    when (BL.fromStrict magic /= avroMagicBytes)
-         (fail "Invalid magic number at start of container.")
-    metadata <- getMap :: Get (Map.Map Text BL.ByteString) -- avro.schema, avro.codec
-    sync  <- BL.fromStrict <$> getFixed nrSyncBytes
-    codec <- getCodec (Map.lookup "avro.codec" metadata)
-    schema <- case Map.lookup "avro.schema" metadata of
-                Nothing -> fail "Invalid container object: no schema."
-                Just s  -> case A.eitherDecode' s of
-                              Left e -> fail ("Can not decode container schema: " <> e)
-                              Right (Schema x) -> return x
-    (Schema schema,) <$> getBlocks (schemaToGet (Schema schema)) sync codec
+   do ContainerHeader {..} <- getAvro
+      (containedSchema,) <$> getBlocks (schemaToGet containedSchema) syncBytes decompress
   where
-  nrSyncBytes :: Integral sb => sb
-  nrSyncBytes = 16
-
-  avroMagicSize :: Integral a => a
-  avroMagicSize = 4
-
-  avroMagicBytes :: BL.ByteString
-  avroMagicBytes = BC.pack "Obj" <> BL.pack [1]
-
-  getFixed :: Int -> Get ByteString
-  getFixed = G.getByteString
-
   getBlocks :: Get a -> BL.ByteString -> (BL.ByteString -> Get BL.ByteString) -> Get [[a]]
   getBlocks getValue sync decompress =
    do nrObj    <- sFromIntegral =<< getLong
@@ -95,17 +111,18 @@ getContainerWith schemaToGet =
         then return [r]
         else (r :) <$> getBlocks getValue sync decompress
 
-  getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
-  getCodec code | Just "null"    <- code =
+getCodec :: Monad m => Maybe BL.ByteString -> m (BL.ByteString -> m BL.ByteString)
+getCodec code | Just "null"    <- code =
                      return return
-                | Just "deflate" <- code =
+              | Just "deflate" <- code =
                      return (maybe (fail "Decompression failed.") return . Z.decompress)
-                | Just x <- code =
+              | Just x <- code =
                      fail ("Unrecognized codec: " <> BC.unpack x)
-                | otherwise = return return
+              | otherwise = return return
 
+{-# INLINABLE getAvroOf #-}
 getAvroOf :: Schema -> Get (T.Value Type)
-getAvroOf (Schema ty0) = go ty0
+getAvroOf ty0 = go ty0
  where
  env = S.buildTypeEnvironment envFail ty0
  envFail t = fail $ "Named type not in schema: " <> show t
@@ -113,11 +130,6 @@ getAvroOf (Schema ty0) = go ty0
  go :: Type -> Get (T.Value Type)
  go ty =
   case ty of
-    BasicType bt    -> basic bt
-    DeclaredType dt -> declared dt
- basic :: BasicType -> Get (T.Value Type)
- basic bt =
-   case bt of
     Null    -> return T.Null
     Boolean -> T.Boolean <$> getAvro
     Int     -> T.Int     <$> getAvro
@@ -133,6 +145,21 @@ getAvroOf (Schema ty0) = go ty0
       do kvs <- getKVBlocks t
          return $ T.Map (HashMap.fromList $ mconcat kvs)
     NamedType tn -> env tn >>= go
+    Record {..} ->
+      do let getField (Field {..}) = (fldName,) <$> go fldType
+         T.Record ty . HashMap.fromList <$> mapM getField fields
+    Enum {..} ->
+      do val <- getLong
+         let sym = case symbolLookup val of
+                      Just e  -> e
+                      Nothing -> "" -- empty string for 'missing' symbols (alternative is an error or exception)
+         pure (T.Enum ty (fromIntegral val) sym)
+    Union ts unionLookup ->
+      do i <- getLong
+         case unionLookup i of
+          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName $ NE.toList ts)
+          Just t  -> T.Union ts t <$> go t
+    Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
 
  getKVBlocks :: Type -> Get [[(Text,T.Value Type)]]
  getKVBlocks t =
@@ -141,6 +168,8 @@ getAvroOf (Schema ty0) = go ty0
       then return []
       else do vs <- replicateM (fromIntegral blockLength) ((,) <$> getString <*> go t)
               (vs:) <$> getKVBlocks t
+ {-# INLINE getKVBlocks #-}
+
  getBlocksOf :: Type -> Get [[T.Value Type]]
  getBlocksOf t =
   do blockLength <- abs <$> getLong
@@ -148,26 +177,7 @@ getAvroOf (Schema ty0) = go ty0
       then return []
       else do vs <- replicateM (fromIntegral blockLength) (go t)
               (vs:) <$> getBlocksOf t
-
- declared :: DeclaredType -> Get (T.Value Type)
- declared dt =
-   case dt of
-    Record {..} ->
-      do let getField (Field {..}) = (fldName,) <$> go fldType
-         T.Record . HashMap.fromList <$> mapM getField fields
-    Enum {..} ->
-      do val <- getLong
-         let resolveEnum = flip lookup (zip [0..] symbols)
-         case resolveEnum val of
-          Just e  -> return (T.Enum (DeclaredType dt) e)
-          Nothing -> fail $ "Decoded Avro enumeration is outside the expected range. Value: " <> show val <> " enum name: " <> show name
-    Union ts ->
-      do i <- getLong
-         let resolveUnion = flip lookup (zip [0..] ts)
-         case resolveUnion i of
-          Nothing -> fail $ "Decoded Avro tag is outside the expected range for a Union. Tag: " <> show i <> " union of: " <> show (P.map typeName ts)
-          Just t  -> T.Union ts t <$> go t
-    Fixed {..} -> T.Fixed <$> G.getByteString (fromIntegral size)
+ {-# INLINE getBlocksOf #-}
 
 class GetAvro a where
   getAvro :: Get a
@@ -201,7 +211,6 @@ instance GetAvro a => GetAvro (Maybe a) where
         0 -> return Nothing
         1 -> Just <$> getAvro
         n -> fail $ "Invalid tag for expected {null,a} Avro union, received: " <> show n
-
 
 instance GetAvro a => GetAvro (Array.Array Int a) where
   getAvro =

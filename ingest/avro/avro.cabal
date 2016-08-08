@@ -29,13 +29,14 @@ library
                        Data.Avro
   -- other-modules:       
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <5.0,
                        aeson >=0.11 && <0.12,
                        array,
                        base16-bytestring,
                        binary,
                        bytestring >=0.10 && <0.11,
                        containers,
+                       entropy,
                        fail,
                        hashable,
                        mtl >=2.2 && <2.3,
@@ -43,8 +44,11 @@ library
                        text >=1.2 && <1.3,
                        unordered-containers >=0.2 && <0.3,
                        vector,
-                       pure-zlib
+                       pure-zlib,
+                       semigroups,
+                       tagged
   hs-source-dirs:      src
   default-language:    Haskell2010
+  ghc-options:         -O2
   if flag(dev)
     ghc-options: -Wall -Werror
