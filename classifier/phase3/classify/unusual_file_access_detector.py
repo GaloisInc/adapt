@@ -112,9 +112,11 @@ class UnusualFileAccessDetector(Detector):
     #     name_re = re.compile(r', name=(\w+), ')
     #     return name_re.search(props).group(1)
 
-    def _get_prog(self, seg_props):
+    def _get_prog(self, seg_props, debug=False):
         '''Gives the program name being run by the current PID, if known.'''
         for prop in seg_props:
-            if 'commandName' in prop:
-                return prop['commandName']
+            if 'commandLine' in prop:
+                if debug:
+                    print(prop)  # properties commandName?
+                return prop['commandLine']
         return None

@@ -70,13 +70,15 @@ class ActivityClassifier(object):
     def classify(self, seg_ids):
         queries = [
 
-            "g.V().has('segment:name', '%s').has('commandName').as('a')"
+            "g.V().has('segment:name', '%s')"
+            " .has('commandLine').has('properties').as('a')"
             " .out('segment:includes')"
             " .order().dedup().as('b')"
-            " .select('a').values('commandName').as('commandName')"
+            " .select('a').values('commandLine').as('commandLine')"
+            " .select('a').values('properties').as('properties')"
             " .select('b').values('url').as('url')"  # also file-version & source
             " .select('b').values('ident').as('ident')"
-            " .select('commandName', 'url', 'ident')",
+            " .select('commandLine', 'properties', 'url', 'ident')",
 
             "g.V().has('segment:name', '%s').out('segment:includes')"
             " .where(or(hasLabel('Subject'), hasLabel('Agent')))"

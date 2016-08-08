@@ -46,6 +46,7 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+    asn_re = re.compile('^AS\d+$')
     # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
     filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
@@ -57,10 +58,16 @@ def report(query, threshold=1, debug=False):
         assert ip4_re.search(ip4), ip4
         return ip4
 
+    def dns_query(fqdn):
+        try:
+            return dns.resolver.query(fqdn, 'TXT')
+        except dns.resolver.NXDOMAIN:
+            return []
+
     def get_asn(ip4):
         '''Maps to a BGP Autonomous System Number - cannot be airgapped.'''
         rev = '.'.join(reversed(ip4.split('.')))
-        answers = dns.resolver.query(rev + '.origin.asn.cymru.com', 'TXT')
+        answers = dns_query(rev + '.origin.asn.cymru.com')
         resp = 0
         for rdata in answers:
             resp = int(str(rdata).split()[0].lstrip('"'))
@@ -69,9 +76,8 @@ def report(query, threshold=1, debug=False):
 
     def get_asn_name(asn):
         '''Maps e.g. AS15169 to GOOGLE.'''
-        assert asn.startswith('AS'), asn
-        assert int(asn[2:]) > 0, asn
-        answers = dns.resolver.query(asn + '.asn.cymru.com', 'TXT')
+        assert asn_re.search(asn), asn
+        answers = dns_query(asn + '.asn.cymru.com')
         name = 'unknown'
         for rdata in answers:
             name = str(rdata).split('| ')[4].rstrip('"')
@@ -105,8 +111,12 @@ def report(query, threshold=1, debug=False):
             try:
                 counts['userID_' + prop['userID']] += 1
                 counts['gid_' + prop['gid']] += 1
+                continue
                 # http://tinyurl.com/cdm13-spec says yes, we need this nonsense
                 properties = json.loads(prop['properties'])
+                # The above fails in ta5attack2_units.avro, because
+                # we receive '{euid=0, egid=0}'
+                # rather than '{"euid"=0, "egid"=0}'.
                 counts['euid_%d' % int(properties['euid'])] += 1
                 counts['egid_%d' % int(properties['egid'])] += 1
             except KeyError:
@@ -125,6 +135,9 @@ def report(query, threshold=1, debug=False):
                 pass
 
             try:
+                if (prop['srcAddress'] == 'var/run/dbus/system_bus_socket' or
+                    prop['dstAddress'] == 'var/run/dbus/system_bus_socket'):
+                    continue  # Why does THEIA send corrupt AF_UNIX addresses?
                 counts[validate_ip(prop['dstAddress'])] += 1  # netflow
                 asn = get_asn(prop['dstAddress'])
                 asn += '  ' + get_asn_name(asn)

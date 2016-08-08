@@ -323,9 +323,8 @@ class SegNode:
         if "'" in command_line or "'" in command_name:
             return  # LittleBobbyTables says this isn't nearly paranoid enough.
         return ("g.V().has('segment:name', 's%s').next()"
-                " .property('commandName', '%s')"
                 " .property('commandLine', '%s')") % (
-                    self.proc, command_name, command_line)
+                    self.proc, command_line)
 
     def add_edge(self, ident):
         q = ("g.V().has('segment:name', 's%s').next()"
