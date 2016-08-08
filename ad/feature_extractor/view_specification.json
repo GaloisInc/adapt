@@ -1,0 +1,97 @@
+{
+    "netflow" : {
+        "instance_set" : "g.V().has('eventType',6).both().both().hasLabel('Entity-NetFlow').dedup().id()",
+        "feature_set" : {
+            "write_bytes":
+                "g.V({id}).both().both().has('eventType',21).values('size').sum()",
+            "read_bytes":
+                "g.V({id}).both().both().has('eventType',17).values('size').sum()",
+            "num_writes":
+                "g.V({id}).both().both().has('eventType',21).count()",
+            "num_reads":
+                "g.V({id}).both().both().has('eventType',17).count()",
+            "num_open":
+                "g.V({id}).both().both().has('eventType',16).count()",
+            "num_close":
+                "g.V({id}).both().both().has('eventType',5).count()",
+            "duration":
+                "(g.V({id}).both().both().has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',6).values('startedAtTime').min().next())/1000000.0"
+        }
+    },
+
+    "process_connected_with_netflow" : {
+        "instance_set" : "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "feature_set" : {
+            "num_file_open_during_wr_to_netflow":
+                "g.V({id}).as('process').both().both().has('eventType',21).as('writeNetflow').both().both().has(label,'Entity-NetFlow').select('process').both().both().has('eventType',16).as('openFile').both().both().has(label,'Entity-File').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
+            "num_distinct_dst_port_access":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstPort').dedup().count()",
+            "num_distinct_src_port_access":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('srcPort').dedup().count()",
+            "total_bytes_sent_to_netflow":
+                "g.V({id}).both().both().has('eventType',21).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
+            "total_bytes_rcv_from_netflow":
+                "g.V({id}).both().both().has('eventType',17).as('event').both().both().has(label,'Entity-NetFlow').select('event').by('size').sum()",
+            "num_writes_to_net_flow":
+                "g.V({id}).both().both().has('eventType',21).both().both().has(label,'Entity-NetFlow').count()",
+            "num_reads_to_netflow":
+                "g.V({id}).both().both().has('eventType',17).both().both().has(label,'Entity-NetFlow').count()"
+        }
+    },
+
+    "files_connected_with_netflow" : {
+        "instance_set" : " g.V().has('subjectType',4).as('net_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('net_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "feature_set" : {
+            "num_exec":
+                "g.V({id}).both().both().has('eventType',3).count()",
+            "num_close":
+                "g.V({id}).both().both().has('eventType',5).count()",
+            "num_chk_attrib":
+                "g.V({id}).both().both().has('eventType',9).count()",
+            "num_modify_attrib":
+                "g.V({id}).both().both().has('eventType',14).count()",
+            "num_open":
+                "g.V({id}).both().both().has('eventType',16).count()",
+            "num_read":
+                "g.V({id}).both().both().has('eventType',17).count()",
+            "num_rename":
+                "g.V({id}).both().both().has('eventType',20).count()",
+            "num_write":
+                "g.V({id}).both().both().has('eventType',21).count()",
+            "num_uploads":
+                "g.V({id}).both().both().has('eventType',17).as('file_read').both().both().has('subjectType',0).as('process').both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').dedup().count()"
+        }
+    },
+
+    "file_open_close_gap" : {
+        "instance_set": "g.V().has('eventType',5).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',16).select('files').dedup().id()",
+        "feature_set": {
+            "open_close_gap":
+                "(g.V({id}).both().both().has('eventType',5).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',16).values('startedAtTime').min().next())/1000000.0"
+        }
+    },
+
+    "file_dnld_exec_gap" : {
+        "instance_set": "g.V().has('eventType',9).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',21).select('files').dedup().id()",
+        "feature_set": {
+            "dnld_exec_gap":
+                "(g.V({id}).both().both().has('eventType',9).values('startedAtTime').min().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next())/1000000.0"
+        }
+    },
+
+    "file_exec_del_gap" : {
+        "instance_set": "g.V().has('eventType',9).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',12).select('files').dedup().id()",
+        "feature_set": {
+            "exec_del_gap":
+                "(g.V({id}).both().both().has('eventType',9).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',12).values('startedAtTime').min().next())/1000000.0"
+        }
+    },
+
+    "netflow_connect_last_activity_gap" : {
+        "instance_set": "g.V().has('eventType',6).both().both().has(label,'Entity-NetFlow').dedup().id()",
+        "feature_set": {
+            "connect_last_activity_gap":
+                "(g.V({id}).both().both().has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',6).values('startedAtTime').min().next())/1000000.0"
+        }
+    }
+}
