@@ -118,5 +118,13 @@ class UnusualFileAccessDetector(Detector):
             if 'commandLine' in prop:
                 if debug:
                     print(prop)  # properties commandName?
-                return prop['commandLine']
+                cl = prop['commandLine']
+                assert 1 == len(cl), cl
+                words = cl[0].split()
+                # e.g. "C:\Program Files (x86)\Internet Explorer\IE.EXE" /pre:2
+                if words[0].startswith('"'):
+                    return cl[0].split('"')[1]
+                for word in words:
+                    if '=' not in word:  # Skip environment variables.
+                        return word
         return None
