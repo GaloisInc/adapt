@@ -152,7 +152,7 @@ install_adapt_dependencies() {
     fi
     sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
 
-    if [ -z "$USE_TC_IN_A_BOX_CONFIG" ]
+    if [ -z "$USE_TC_IN_A_BOX_CONFIG" ] ; then
         (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.adaptinabox supervisord.conf)
     else
         (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.tcinabox supervisord.conf)
