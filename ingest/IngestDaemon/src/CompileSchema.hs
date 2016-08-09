@@ -252,26 +252,23 @@ gremlinNum = GremlinNum . fromIntegral
 --------------------------------------------------------------------------------
 --  Gremlin language serialization
 
-serializeOperations :: GraphId a => [Operation a] -> (Text,Env)
+serializeOperations :: [Operation Text] -> (Text,Env)
 serializeOperations ops =
   let (cmds,envs) = unzip $ map (uncurry serializeOperationFrom) (zip [1,1001..] ops)
-  in (T.intercalate " ; " cmds, Map.unions envs)
+  in (T.intercalate ";" cmds, Map.unions envs)
 
-serializeOperation :: GraphId a => Operation a -> (Text,Env)
+serializeOperation :: Operation Text -> (Text,Env)
 serializeOperation = serializeOperationFrom 0
-
-class GraphId a where
-  serializeOperationFrom :: Int -> Operation a -> (Text,Env)
 
 type Env = Map.Map Text A.Value
 
-instance GraphId Text where
-  serializeOperationFrom start (InsertVertex ty l ps) = (cmd,env)
+serializeOperationFrom :: Int -> Operation Text -> (Text,Env)
+serializeOperationFrom start (InsertVertex ty l ps) = (cmd,env)
     where
        cmd = escapeChars call
-       -- g.addV(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
+       -- graph.addVertex(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
        call = T.unwords
-                [ "g.addV(label, " <> tyParamVar <> ", 'ident', " <> identVar
+                [ "graph.addVertex(label, " <> tyParamVar <> ", 'ident', " <> identVar
                 , if (not (null ps)) then "," else ""
                 , T.unwords $ intersperse "," (map mkParams [start+2..start+1+length ps])
                 , ")"
@@ -280,7 +277,7 @@ instance GraphId Text where
        identVar   = "l" <> T.pack (show (start+1))
        env = Map.fromList $ (tyParamVar, A.String ty) : (identVar, A.String l) : mkBinding (start+2) ps
 
-  serializeOperationFrom start (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
+serializeOperationFrom start (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
     where
     cmd = escapeChars call
     call = T.unwords
@@ -300,7 +297,7 @@ instance GraphId Text where
                        , (srcVar, A.String srcId), (dstVar, A.String dstId)
                        ]
 
-  serializeOperationFrom start (InsertEdge l src dst genVerts)   =
+serializeOperationFrom start (InsertEdge l src dst genVerts)   =
      if genVerts
       then (testAndInsertCmd, env)
       else (nonTestCmd, env)
@@ -337,7 +334,7 @@ mkBinding start pvs =
                     | (pstr,vstr) <- lbls
                     | (p,v) <- pvs ]
 
--- Build strin g"param1, val1, param2, val2, ..."
+-- Build string "param1, val1, param2, val2, ..."
 mkParams :: Int -> Text
 mkParams n = T.concat [param n, ",", val n]
 
