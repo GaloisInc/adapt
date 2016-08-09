@@ -70,7 +70,7 @@ def execute_module(module_key, data_key="5d_youtube_ie_output-100.avro"):
         os.system('Trint -f')
         sleep(1)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
-        cmd = ('%s/segment/segmenter/adapt_DBsideSegmenter.py'
+        cmd = ('%s/segment/segmenter/adapt_Segmenter.py'
                ' --broker http://localhost:8182/'
                ' --store-segment Yes --spec %s/config/segmentByPID.json' % (top, top))
         os.system(cmd)
