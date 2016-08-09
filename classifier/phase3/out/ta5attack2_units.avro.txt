@@ -1,4 +1,10 @@
 Sent 18668 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
      8  Entity-NetFlow
     58  EDGE_EVENT_AFFECTS_SUBJECT
     58  EDGE_EVENT_AFFECTS_SUBJECT in
@@ -10,6 +16,8 @@ Sent 18668 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    70  Segment
+   296  segment:edge
    528  EDGE_EVENT_AFFECTS_FILE
    528  EDGE_EVENT_AFFECTS_FILE in
    528  EDGE_EVENT_AFFECTS_FILE out
@@ -31,19 +39,17 @@ Sent 18668 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
   5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
   5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   5272  Subject
- 40129  total
+ 10730  segment:includes
+ 51225  total
+
 
 
 agent
    1   70  InstrumentationSource.LINUX_AUDIT_TRACE
-   2   43  egid_0
-   3   27  egid_1000
-   4   49  euid_0
-   5   21  euid_1000
-   6   43  gid_0
-   7   27  gid_1000
-   8   47  userID_0
-   9   23  userID_1000
+   2   43  gid_0
+   3   27  gid_1000
+   4   47  userID_0
+   5   23  userID_1000
 
 file
    1 1321  InstrumentationSource.LINUX_AUDIT_TRACE
@@ -834,21 +840,69 @@ file
 memory
 
 netflow
+   1    2  127.0.1.1
+   2    1  172.20.10.3
+   3    2  172.217.1.78
+   4    1  192.168.122.38
+   5    2  74.125.22.137
+   6    4  AS0  unknown
+   7    4  AS15169  GOOGLE - Google Inc., US
+   8    8  InstrumentationSource.LINUX_AUDIT_TRACE
 
 resource
    1  542  SrcSink.ACCELEROMETER
 
 subject
    1    2  Event.CLONE
-   2    8  Event.CONNECT
+   2    4  Event.CONNECT
    3    5  Event.CREATE_OBJECT
-   4   18  Event.EXECUTE
+   4   21  Event.EXECUTE
    5   30  Event.FORK
    6    2  Event.KERNEL_UNKNOWN
-   7 1239  Event.OPEN
-   8 2572  Event.READ
+   7 1235  Event.OPEN
+   8 2613  Event.READ
    9    5  Event.RECVMSG
   10    1  Event.SENDMSG
-  11  990  Event.WRITE
-  12 4936  InstrumentationSource.LINUX_AUDIT_TRACE
-  13 4872  Subject.SUBJECT_EVENT
+  11 1013  Event.WRITE
+  12 5000  InstrumentationSource.LINUX_AUDIT_TRACE
+  13 4931  Subject.SUBJECT_EVENT
+
+2016-08-09 08:35:32,786 INFO Fetched 0 base nodes.
+2016-08-09 08:35:32,786 INFO Inserted 0 activity classifications.
+
+     8  Entity-NetFlow
+    58  EDGE_EVENT_AFFECTS_SUBJECT
+    58  EDGE_EVENT_AFFECTS_SUBJECT in
+    58  EDGE_EVENT_AFFECTS_SUBJECT out
+    70  Agent
+    70  EDGE_EVENT_AFFECTS_NETFLOW
+    70  EDGE_EVENT_AFFECTS_NETFLOW in
+    70  EDGE_EVENT_AFFECTS_NETFLOW out
+    70  EDGE_SUBJECT_HASLOCALPRINCIPAL
+    70  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+    70  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    70  Segment
+   296  segment:edge
+   528  EDGE_EVENT_AFFECTS_FILE
+   528  EDGE_EVENT_AFFECTS_FILE in
+   528  EDGE_EVENT_AFFECTS_FILE out
+   530  EDGE_SRCSINK_AFFECTS_EVENT
+   530  EDGE_SRCSINK_AFFECTS_EVENT in
+   530  EDGE_SRCSINK_AFFECTS_EVENT out
+   533  EDGE_EVENT_AFFECTS_SRCSINK
+   533  EDGE_EVENT_AFFECTS_SRCSINK in
+   533  EDGE_EVENT_AFFECTS_SRCSINK out
+   542  Resource
+   938  EDGE_OBJECT_PREV_VERSION
+   938  EDGE_OBJECT_PREV_VERSION in
+   938  EDGE_OBJECT_PREV_VERSION out
+  1321  Entity-File
+  3043  EDGE_FILE_AFFECTS_EVENT
+  3043  EDGE_FILE_AFFECTS_EVENT in
+  3043  EDGE_FILE_AFFECTS_EVENT out
+  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+  5272  Subject
+ 10730  segment:includes
+ 51225  total

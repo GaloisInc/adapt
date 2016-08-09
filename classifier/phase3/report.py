@@ -45,9 +45,9 @@ import gremlin_query
 
 def report(query, threshold=1, debug=False):
 
-    ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
     asn_re = re.compile('^AS\d+$')
-    # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
+    ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+    # In the apt1 trace, why does THEIA think '0x7fc9d5cf4250' is a filespec?
     filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
     def validate_file(file):
@@ -55,6 +55,12 @@ def report(query, threshold=1, debug=False):
         return file
 
     def validate_ip(ip4):
+        # THEIA's recordaudio1 trace contains empty "address" records,
+        # so AF_UNIX IPC events will have attributes like this:
+        # "srcAddress": "/tmp/.X11-unix/X0", "srcPort": 0,
+        # "destAddress": "", "destPort": 0, "ipProtocol": null
+        if ip4 == '':
+            ip4 = '0.0.0.0'
         assert ip4_re.search(ip4), ip4
         return ip4
 
@@ -139,7 +145,7 @@ def report(query, threshold=1, debug=False):
                     prop['dstAddress'] == 'var/run/dbus/system_bus_socket'):
                     continue  # Why does THEIA send corrupt AF_UNIX addresses?
                 counts[validate_ip(prop['dstAddress'])] += 1  # netflow
-                asn = get_asn(prop['dstAddress'])
+                asn = get_asn(validate_ip(prop['dstAddress']))
                 asn += '  ' + get_asn_name(asn)
                 counts[asn] += 1
             except KeyError:
@@ -163,6 +169,7 @@ def report(query, threshold=1, debug=False):
                     if usec != 0:  # Sigh! Why do people insert zeros?
                         assert str(stamp) > '2015-01-01', stamp
 
+                continue  # infoleak AUDIT_TRACE contains: '{event id=65615}'
                 properties = json.loads(prop['properties'])
                 # The seq so nice, gotta say it twice.
                 assert int(properties['event id']) == prop['sequence'], stamp

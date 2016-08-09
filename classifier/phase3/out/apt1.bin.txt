@@ -1,7 +1,15 @@
 Sent 5167 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
     38  EDGE_EVENT_AFFECTS_FILE
     38  EDGE_EVENT_AFFECTS_FILE in
     38  EDGE_EVENT_AFFECTS_FILE out
+    58  segment:edge
+    74  Segment
    119  EDGE_EVENT_AFFECTS_SUBJECT
    119  EDGE_EVENT_AFFECTS_SUBJECT in
    119  EDGE_EVENT_AFFECTS_SUBJECT out
@@ -23,7 +31,8 @@ Sent 5167 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    640  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    714  Subject
    838  Entity-File
- 10731  total
+  1986  segment:includes
+ 12849  total
 
 
 agent

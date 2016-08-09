@@ -1,19 +1,31 @@
 Sent 447 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
      1  Agent
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL in
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+     1  Segment
+     1  segment:edge
      2  Entity-File
      2  Entity-NetFlow
-     4  EDGE_SRCSINK_AFFECTS_EVENT
-     4  EDGE_SRCSINK_AFFECTS_EVENT in
-     4  EDGE_SRCSINK_AFFECTS_EVENT out
+     6  EDGE_EVENT_AFFECTS_SRCSINK
+     6  EDGE_EVENT_AFFECTS_SRCSINK in
+     6  EDGE_EVENT_AFFECTS_SRCSINK out
+    10  EDGE_SRCSINK_AFFECTS_EVENT
+    10  EDGE_SRCSINK_AFFECTS_EVENT in
+    10  EDGE_SRCSINK_AFFECTS_EVENT out
     12  Resource
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
-    29  Subject
-   127  total
+    35  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+    35  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+    35  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+    49  Subject
+    73  segment:includes
+   297  total
 
 
 agent
@@ -28,15 +40,18 @@ file
 memory
 
 netflow
+   1    2  255.255.255.255
+   2    2  AS0  unknown
+   3    2  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
 
 resource
    1   12  SrcSink.HEART_RATE
 
 subject
-   1    1  Event.BIND
-   2    2  Event.CLOSE
-   3    1  Event.OPEN
-   4    5  Event.READ
-   5   21  Event.WRITE
-   6   31  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
-   7   30  Subject.SUBJECT_EVENT
+   1    2  Event.BIND
+   2    3  Event.CLOSE
+   3    2  Event.OPEN
+   4   18  Event.READ
+   5   23  Event.WRITE
+   6   49  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
+   7   48  Subject.SUBJECT_EVENT

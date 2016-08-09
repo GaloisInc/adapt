@@ -18,7 +18,7 @@ OUT = \
 all: $(OUT)
 
 CFG = ~/adapt/config/supervisord.conf
-SEG = ./adapt_DBsideSegmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec /local/home/jhanley/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
+SEG = ./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec /local/home/jhanley/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
 
 %.txt:
 	@! egrep '^command=.*/segmenter/segmentd.py' < $(CFG)  # Remove from config, please.
@@ -27,11 +27,11 @@ SEG = ./adapt_DBsideSegmenter.py --broker ws://localhost:8182/ --criterion pid -
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
 	Trint -p ~/adapt/trace/current/$(subst .txt,,$@) > $@
-	sleep 10; Trint -f; sleep 10
+	sleep 20; Trint -f; sleep 20
 	bash -c "echo reading $@ >> /tmp/ingestd-stderr---supervisor-*.log"
-	(cd ~/adapt/segment/segmenter && time $(SEG); true) >> $@
-	time ~/adapt/classifier/phase3/fg_classifier.py >> $@
-	(~/adapt/tools/label_count.py --with-edges; echo) >> $@
+	(cd ~/adapt/segment/segmenter && time $(SEG); echo) >> $@
+	time ~/adapt/classifier/phase3/fg_classifier.py 2>&1 >> $@
+	(echo; ~/adapt/tools/label_count.py --with-edges; echo) >> $@
 	../report.py --all >> $@
 
 clean:

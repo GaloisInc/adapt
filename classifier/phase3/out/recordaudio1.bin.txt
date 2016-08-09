@@ -1,8 +1,18 @@
 Sent 4898 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+     2  Activity
+     2  activity:includes
+    28  segment:edge
     32  EDGE_NETFLOW_AFFECTS_EVENT
     32  EDGE_NETFLOW_AFFECTS_EVENT in
     32  EDGE_NETFLOW_AFFECTS_EVENT out
     32  Entity-NetFlow
+    56  Segment
    128  EDGE_EVENT_AFFECTS_FILE
    128  EDGE_EVENT_AFFECTS_FILE in
    128  EDGE_EVENT_AFFECTS_FILE out
@@ -27,7 +37,8 @@ Sent 4898 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    709  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
    709  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    765  Subject
- 10276  total
+  2431  segment:includes
+ 12795  total
 
 
 agent
@@ -279,18 +290,3 @@ memory
  141  269  InstrumentationSource.LINUX_THEIA
 
 netflow
-
-resource
-
-subject
-   1    5  Event.CLONE
-   2    3  Event.EXECUTE
-   3  206  Event.MMAP
-   4   62  Event.MPROTECT
-   5  304  Event.READ
-   6   10  Event.RECVFROM
-   7   22  Event.RECVMSG
-   8    1  Event.SHM
-   9   96  Event.WRITE
-  10  765  InstrumentationSource.LINUX_THEIA
-  11  709  Subject.SUBJECT_EVENT

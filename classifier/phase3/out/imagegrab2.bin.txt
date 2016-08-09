@@ -1,4 +1,10 @@
 Sent 604 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
      1  EDGE_EVENT_AFFECTS_NETFLOW
      1  EDGE_EVENT_AFFECTS_NETFLOW in
      1  EDGE_EVENT_AFFECTS_NETFLOW out
@@ -10,9 +16,11 @@ Sent 604 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
      8  EDGE_SUBJECT_HASLOCALPRINCIPAL
      8  EDGE_SUBJECT_HASLOCALPRINCIPAL in
      8  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+     9  Segment
     10  EDGE_OBJECT_PREV_VERSION
     10  EDGE_OBJECT_PREV_VERSION in
     10  EDGE_OBJECT_PREV_VERSION out
+    35  segment:edge
     54  EDGE_EVENT_AFFECTS_FILE
     54  EDGE_EVENT_AFFECTS_FILE in
     54  EDGE_EVENT_AFFECTS_FILE out
@@ -24,7 +32,8 @@ Sent 604 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    163  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
    163  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    172  Subject
-  1245  total
+   351  segment:includes
+  1640  total
 
 
 agent
@@ -100,6 +109,11 @@ file
 memory
 
 netflow
+   1    2  192.168.101.137
+   2    1  192.168.101.2
+   3    1  AS0  unknown
+   4    2  AS4565  MEGAPATH2-US - MegaPath Networks Inc., US
+   5    3  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
 
 resource
 

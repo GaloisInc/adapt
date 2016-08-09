@@ -1,4 +1,9 @@
 Sent 18164 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
     42  EDGE_NETFLOW_AFFECTS_EVENT
     42  EDGE_NETFLOW_AFFECTS_EVENT in
     42  EDGE_NETFLOW_AFFECTS_EVENT out
@@ -1597,6 +1602,7 @@ memory
 1467    1  e5797000
 
 netflow
+   1  112  InstrumentationSource.LINUX_THEIA
 
 resource
 
