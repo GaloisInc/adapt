@@ -57,15 +57,18 @@ class Detector:
                 activities.append((ident, classification))
         return activities
 
-    def insert_activity_classifications(self, seg_id, activities):
+    def insert_activity_classifications(self, seg_id, activities, debug=False):
+        seg_id = 0 + seg_id  # An integer, please, it's no longer sNNN.
         for base_node_ident, classification in activities:
             cmds = ["act = graph.addVertex(label, 'Activity',"
                     "  'activity:type', '%s',"
                     "  'activity:suspicionScore', %f)" % (
                         classification,
                         self.activity_suspicion_score())]
-            cmds.append("g.V().has('segment:name', '%s').next()"
+            cmds.append("g.V(%d).hasLabel('Segment').next()"
                         ".addEdge('segment:includes', act)" % seg_id)
             cmds.append("act.addEdge('activity:includes',"
                         " g.V().has('ident', '%s').next())" % base_node_ident)
+            if debug:
+                print('\n'.join(cmds))
             self.gremlin.fetch_data(';  '.join(cmds))

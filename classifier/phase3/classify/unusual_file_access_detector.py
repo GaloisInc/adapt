@@ -25,7 +25,6 @@
 from .detector import Detector
 import collections
 import functools
-import json
 import re
 
 __author__ = 'John.Hanley@parc.com'
@@ -39,6 +38,7 @@ class UnusualFileAccessDetector(Detector):
     '''
 
     def __init__(self, gremlin, max_files=1000, max_instance=6, max_prog=128):
+        self.command_name_re = re.compile(r', name=(\w+), ')  # We need JSON!
         self.gremlin = gremlin
         self.max_files = max_files  # Ignore what a PID does after this many.
         self.max_instance = max_instance  # Retain this many process file sets.
@@ -115,16 +115,10 @@ class UnusualFileAccessDetector(Detector):
     def _get_prog(self, seg_props, debug=False):
         '''Gives the program name being run by the current PID, if known.'''
         for prop in seg_props:
-            if 'commandLine' in prop:
+            if 'commandLine' in prop and 'properties' in prop:
                 if debug:
                     print(prop)  # properties commandName?
-                cl = prop['commandLine']
-                assert 1 == len(cl), cl
-                words = cl[0].split()
-                # e.g. "C:\Program Files (x86)\Internet Explorer\IE.EXE" /pre:2
-                if words[0].startswith('"'):
-                    return cl[0].split('"')[1]
-                for word in words:
-                    if '=' not in word:  # Skip environment variables.
-                        return word
+                m = self.command_name_re.search(prop['properties'])
+                if m:
+                    return m.group(1)
         return None

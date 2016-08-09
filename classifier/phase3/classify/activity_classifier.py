@@ -58,10 +58,14 @@ class ActivityClassifier(object):
         self.log.setLevel(logging.INFO)
 
     def find_new_segments(self, last_previously_processed_seg):
-        q = ("g.V().has(label, 'Segment')"
-             " .values('segment:name').is(gt('%s'))"
-             " .order().dedup()"
+        q = ("g.V().has(label, 'Segment')."
+             " values('segment:name').is(gt('%s'))."
+             " order().dedup()"
              % last_previously_processed_seg)
+        # Ummm, unique segment:name recently became more of a segment "type".
+        # During testing we simply return *all* segments.
+        q = ("g.V().has(label, 'Segment').has('segment:name', 'byPID')."
+             " order().dedup().id()")
         for msg in self.gremlin.fetch(q):
             if msg.data is not None:
                 for seg_db_id in msg.data:
@@ -72,26 +76,41 @@ class ActivityClassifier(object):
     def classify(self, seg_ids):
         queries = [
 
-            "g.V().has('segment:name', '%s')"
-            " .has('commandLine').has('properties').as('a')"
-            " .out('segment:includes')"
-            " .order().dedup().as('b')"
-            " .select('a').values('commandLine').as('commandLine')"
-            " .select('a').values('properties').as('properties')"
-            " .select('b').values('url').as('url')"  # also file-version & source
-            " .select('b').values('ident').as('ident')"
-            " .select('commandLine', 'properties', 'url', 'ident')",
-
-            "g.V().has('segment:name', '%s').out('segment:includes')"
-            " .where(or(hasLabel('Subject'), hasLabel('Agent')))"
-            " .order().dedup()"
-            " .valueMap(true)",
+            # 1st subj prop: '{uid=0, name=wget, gid=0, cwd=/tmp/victim}'
+            # Typically 1st edge is EDGE_EVENT_AFFECTS_SUBJECT
+            # or EDGE_EVENT_ISGENERATEDBY_SUBJECT.
+            # Url is also accompanied by file-version & source.
+            """
+g.V(%d).hasLabel('Segment').out().order().dedup().
+        hasLabel('Subject').has('commandLine').has('properties').
+        order().dedup().as('a').
+        in().in().order().dedup().
+        hasLabel('Subject').has('startedAtTime').order().dedup().as('b').
+        out().order().dedup().
+        hasLabel('EDGE_FILE_AFFECTS_EVENT').out().order().dedup().
+        hasLabel('Entity-File').has('url').order().dedup().as('c').
+        select('a').values('commandLine').as('commandLine').
+        select('a').values('properties').as('properties').
+        select('b').values('startedAtTime').as('startedAtTime').
+        select('c').values('url').as('url').
+        select('c').values('ident').as('ident').
+        select('commandLine', 'properties', 'startedAtTime', 'url', 'ident')
+            """,
 
             # Sadly there's no pid on middle subject with eventType:9 execute.
-            "g.V().has('segment:name', '%s')"
-            " .out('segment:includes').hasLabel('Subject')"
-            " .out().out().hasLabel('Entity-File').has('url')"
-            " .valueMap(true)",
+            """
+g.V(%d).hasLabel('Segment').out().order().dedup().
+        hasLabel('Subject').has('startedAtTime').out().order().dedup().
+        hasLabel('EDGE_FILE_AFFECTS_EVENT').out().order().dedup().
+        hasLabel('Entity-File').has('url').order().dedup().
+        valueMap(true)
+            """,
+
+            """
+g.V(%d).hasLabel('Segment').out().order().dedup().
+        hasLabel('Agent').has('userID').order().dedup().
+        valueMap(true)
+            """,
         ]
         for seg_id in seg_ids:
             for query in queries:

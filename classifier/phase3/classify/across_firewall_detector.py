@@ -62,5 +62,5 @@ class AcrossFirewallDetector(Detector):
         activities = super().find_activities(seg_id, seg_props)
         if len(activities) > 0:
             # Leave a note for the SensitiveFileDetector.
-            seg_props[name_of_output_classification()] = True
+            seg_props[self.name_of_output_classification()] = True
         return activities
