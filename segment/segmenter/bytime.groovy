@@ -14,15 +14,34 @@ def addTimeSegments(graph,g,delta) {
   segments =  g.V().has('startedAtTime')
                .values('startedAtTime')
                .is(gt(0))
-               .map{t = it.get(); t - t % delta}.dedup();
+               .map{t = it.get(); t - t % delta}.dedup().order();
+  vtime = 0;
+  v = graph.addVertex(label,'Segment',
+                      'segment:name','byTime',
+                      'startedAtTime',0);
+  content = g.V().has('startedAtTime').has(label,neq('Segment')).as('a').values('startedAtTime').is(gte(vtime).and(lt(vtime+delta))).select('a');
+  for(z in content) {
+    v.addEdge('segment:includes',z) 
+  }    
   for(s in segments) {
-    graph.addVertex(label,'Segment','startedAtTime',s)
+    w = graph.addVertex(label,'Segment',                                                                'segment:name','byTime',
+                        'startedAtTime',s);
+    v.addEdge('segment:edge',w);
+ 
+    v = w;
+    vtime = s
+    content = g.V().has('startedAtTime').has(label,neq('Segment')).as('a').values('startedAtTime').is(gte(vtime).and(lt(vtime+delta))).select('a');
+    for(z in content) {
+      v.addEdge('segment:includes',z) 
+    } 
   }
+  
 }
 
 
-def removeSegments(g) {
+
+def removeTimeSegments(g) {
   g.V().has(label,'Segment').has('segment:name','byTime').drop().iterate()
 }
 
-:> @script3
+addTimeSegments(graph,g,1000*1000*60)
