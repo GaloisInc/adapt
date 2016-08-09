@@ -67,6 +67,8 @@ class ActivityClassifier(object):
                 for seg_db_id in msg.data:
                     yield seg_db_id
 
+    # g.V().has('segment:name').out().groupCount().by(label())
+
     def classify(self, seg_ids):
         queries = [
 
