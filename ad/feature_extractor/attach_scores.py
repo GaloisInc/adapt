@@ -12,5 +12,5 @@ if __name__ == '__main__':
         with open(in_file, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                gremlin.fetch_data("g.V(" + str(row['id']) + ").property('anomalyScore'," + str(row['anomaly_score']) + ")")
-            print('Anomaly scores attached')
+                gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
+            print('Anomaly scores attached from ' + in_file)

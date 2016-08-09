@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TypeOperators         #-}
 module Main where
 
 import           Control.Concurrent (forkIO, threadDelay)
@@ -41,6 +42,8 @@ import           Servant.Server
 import           SimpleGetOpt
 import           System.IO (stderr)
 import           System.Exit (exitSuccess)
+
+import Paths_adapt_dashboard
 
 data Config =
   Config { inTopic :: TopicName
@@ -148,7 +151,12 @@ defaultStatus :: Status
 defaultStatus = Status Seq.empty "" "" "" "" ""
 
 dashboard :: Config -> MVar Status -> Application
-dashboard c curr = serve dashboardAPI (lonePage c curr)
+dashboard c curr = serve dashboardAPI (lonePage c curr :<|> rawStuff)
+
+rawStuff :: Application
+rawStuff a b =
+  do x <- getDataFileName "static"
+     serveDirectory x a b 
 
 lonePage :: Config -> MVar Status -> ExceptT ServantErr IO (Html ())
 lonePage c stMV =
@@ -192,6 +200,7 @@ lonePage c stMV =
                 (toHtml dxStat)
       h2_ "UI"
       a_ [href_ "http://localhost:8181"] "Segment Graph Viewer"
+      a_ [href_ "http://localhost:8181/graph"] "General Graph Viewer"
       return ()
 
 updateStatus :: Channels -> MVar Status -> IO ()
@@ -199,7 +208,8 @@ updateStatus (Channels {..}) stMV = forever (go >> threadDelay 100000)
  where
   go :: IO ()
   go = mapM_ (uncurry doMod)
-             [ (igChan, (\st x -> st { igStat = Seq.take 1000 (igStat st Seq.|> x) }))
+             [ (igChan, (\st x -> st { igStat = let len = Seq.length (igStat st)
+                                                in Seq.drop (len-1000) (igStat st Seq.|> x) }))
              , (pxChan, (\st x -> st { pxStat = x }))
              , (seChan, (\st x -> st { seStat = x }))
              , (adChan, (\st x -> st { adStat = x }))
@@ -215,6 +225,7 @@ updateStatus (Channels {..}) stMV = forever (go >> threadDelay 100000)
 --  Servant type absurdity
 
 type DashboardAPI = Get '[HTMLLucid] (Html ())
+                 :<|> "ext" :> Raw
 
 data HTMLLucid
 

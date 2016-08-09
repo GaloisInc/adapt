@@ -8,7 +8,6 @@ from aiogremlin import GremlinClient
 import graphviz
 
 sys.path.append(os.path.expanduser('~/adapt/tools'))
-import cdm.enums
 import gremlin_properties
 import gremlin_query
 
@@ -40,28 +39,29 @@ def toDot(graph, label='Segmentation Graph'):
 
     return dot
 
-if __name__ == '__main__':
-
+def renderSegments(verbose = False):
     with gremlin_query.Runner() as gremlin:
 
-        vertices = gremlin.fetch(QUERYV)[0].data
-        if vertices:
-            graph = {}
-            for v in vertices:
-                val = {}
-                val['criteria'] = v['properties']['pid'][0]['value']
-                val['name'] = v['properties']['segment:name'][0]['value']
+        vertices = gremlin_properties.fetch(gremlin, QUERYV)
+        graph = {}
+        for v in vertices:
+            val = {}
+            val['criteria'] = v['pid']
+            val['name'] = v['segment:name']
 
-                edges = gremlin.fetch(QUERYE.format(v['id']))[0].data
-                out = []
-                if edges:
-                    for e in edges:
-                        out.append(edges[0]['id'])
-                val['edges_out'] = out
+            edges = gremlin_properties.fetch(gremlin, QUERYE.format(v.getId()))
+            val['edges_out'] = [e.getId() for e in edges]
 
-                graph[v['id']] = val
+            graph[v.getId()] = val
 
-            gremlin.close()
+    dot = toDot(graph)
 
-            dot = toDot(graph)
-            print(dot)
+    if verbose:
+        print(dot)
+
+    dot.format = 'svg'
+    dot.render('static/seggraph.dot', view=False)
+
+
+if __name__ == '__main__':
+    renderSegments()

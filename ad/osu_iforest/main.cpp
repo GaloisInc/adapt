@@ -267,8 +267,8 @@ void sortByFeature(int fid, doubleframe* dt, ntstringframe* metadata) {
 		tp[i].q = metadata->data[i];
 	}
 	qsort(tp, dt->nrow, sizeof(tp[0]),
-			(int (*)(const void *, const void *))cmp);for
-(	int i = 0; i < dt->nrow; ++i) {
+			(int (*)(const void *, const void *))cmp);
+    for(int i = 0; i < dt->nrow; ++i) {
 		dt->data[i] = tp[i].p;
 		metadata->data[i] = tp[i].q;
 	}
@@ -304,7 +304,17 @@ void printScoreToFile(vector<double> &scores, const ntstringframe* metadata,
 	outscore.close();
 }
 
-void printScoreToFile(vector<double> &scores, ntstringframe* csv,
+struct Obj{
+    int idx;
+    double score;
+};
+int ObjCmp(Obj *a, Obj *b){
+    if(a->score < b->score) return 1;
+    if(a->score > b->score) return -1;
+    return 0;
+}
+
+void printScoreToFile(const vector<double> &scores, ntstringframe* csv,
 		const ntstringframe* metadata, const doubleframe *dt, char fName[]) {
 	ofstream outscore;
 	outscore.open(fName);
@@ -315,12 +325,21 @@ void printScoreToFile(vector<double> &scores, ntstringframe* csv,
         outscore << csv->colnames[i] << ",";
 
 	outscore << "anomaly_score\n";
+
+    Obj idx[scores.size()];
+	for (int i = 0; i < (int) scores.size(); i++) {
+        idx[i].idx = i;
+        idx[i].score = scores[i];
+    }
+    qsort(idx, scores.size(), sizeof(idx[0]),
+			(int (*)(const void *, const void *))ObjCmp);
+
 	for (int i = 0; i < (int) scores.size(); i++) {
 		for(int j = 0; j < metadata->ncol; ++j)
-			outscore << metadata->data[i][j] << ",";
+			outscore << metadata->data[idx[i].idx][j] << ",";
 		for(int j = 0; j < dt->ncol; ++j)
-			outscore << dt->data[i][j] << ",";
-		outscore << scores[i] << "\n";
+			outscore << dt->data[idx[i].idx][j] << ",";
+		outscore << scores[idx[i].idx] << "\n";
 	}
 	outscore.close();
 }

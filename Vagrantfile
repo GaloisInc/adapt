@@ -22,5 +22,5 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", run: "always", privileged: false, path: "start_daemons.sh"
 
   #config.ssh.private_key_path = "~/.ssh/id_rsa"
-  #config.ssh.forward_agent = true
+  config.ssh.forward_agent = true
 end
