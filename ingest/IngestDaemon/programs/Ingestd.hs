@@ -29,7 +29,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import           Data.Time (getCurrentTime)
+import           Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import           MonadLib        hiding (handle)
 import           Network.Kafka as K
 import           Network.Kafka.Protocol as K
@@ -197,17 +197,17 @@ mainLoop cfg =
     logIpt "startup" ("System up at: " <> T.pack (show now))
     persistant "TitanManager" logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
   where
+  maxAge = 0 -- 1 retry at age 0, dead at age 1
   garbageCollectFailures :: (Text -> IO ()) -> FailedInsertionDB -> TBChan Input -> IO (Either () ())
-  garbageCollectFailures logGC fidb inputs = forever $ do
+  garbageCollectFailures _logGC fidb inputs = forever $ do
        threadDelay 10000000 -- 10 seconds
        es <- resetDB fidb
        let ageOperations :: OperationRecord -> IO [Maybe Input]
            ageOperations (OpRecord ipts _) = mapM ageOperation ipts
-           ageOperation (Input orig stmt cnt)
-              | cnt > 2   =
-                 do logGC $ T.pack $ printf "Dropping a statement: %s" (show orig)
-                    return Nothing
-              | otherwise = return $ Just (Input orig stmt (cnt + 1))
+           ageOperation ipt@(Input {..})
+              | inputAge > maxAge   = return Nothing
+                 -- XXX ^^^ dropping the statement, increment a statistic counter?
+              | otherwise = return $ Just ipt { inputAge = inputAge + 1 }
        T.hPutStrLn stderr $ T.pack $ printf "GC collected %d elements" (length es)
        is <- catMaybes . concat <$> mapM ageOperations es
        mapM_ (atomically . TB.writeTBChan inputs) is
@@ -258,65 +258,64 @@ titanManager :: Config
              -> TBChan Input
              -> FailedInsertionDB
              -> IO (Either ConnectionException ())
-titanManager _cfg logTitan svr inputs reqStatus =
+titanManager _cfg logTitan svr inputs fidb =
  do logTitan "Connecting to titan..."
     dbc <- GC.connect svr
     case dbc of
-      Left e   -> return (Left e)
-      Right db -> runDB logTitan inputs reqStatus db >> return (Right ())
+      Left e     -> return (Left e)
+      Right conn ->
+        do runDB logTitan inputs fidb conn
+           return (Right ())
 
 runDB :: (Text -> IO ())
       -> TBChan Input
       -> FailedInsertionDB
       -> DBConnection
       -> IO ()
-runDB logTitan inputs db conn =
+runDB logTitan inputs fidb conn =
   do logTitan "Connected to titan."
-     go reportInterval (0,0)
+     now <- getCurrentTime
+     go now reportInterval (0,0)
  where
- reportInterval = 1000
- nrInBulk       = 4 --  Number of commands to handle in bulk
+ reportInterval = 20000
+ nrInBulk       = 100 --  Number of commands to handle in bulk
 
- go :: Int -> (Int64,Int64) -> IO ()
- go ri !cnts@(!nrE,!nrV)
+ go :: UTCTime -> Int -> (Int64,Int64) -> IO ()
+ go prev ri !cnts@(!nrE,!nrV)
    | ri <= 0 =
-      do logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies." nrE nrV)
-         go reportInterval cnts
+      do now <- getCurrentTime
+         let rate :: Double
+             rate = fromIntegral reportInterval / realToFrac (diffUTCTime now prev)
+         logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies. %f statements per second" nrE nrV rate)
+         go now reportInterval cnts
    | otherwise =
-  do T.hPutStrLn stderr "In 'go' routine"
-     oprs <- atomically $ catMaybes <$> replicateM nrInBulk (TB.tryReadTBChan inputs)
-     if null oprs
-      then threadDelay 500000 >> go ri cnts
-      else do T.hPutStrLn stderr (T.pack $ printf "Titan manager received %d operations" (length oprs))
-              let (operVS,operES) = L.partition (isVertex . statement) oprs
+  do let readCh ch = catMaybes <$> replicateM nrInBulk (TB.tryReadTBChan ch)
+     oprsAndRetries <- atomically (readCh inputs)
+     if null oprsAndRetries
+      then threadDelay 100000 >> go prev ri cnts
+      else do let (oprs,operRS) = L.partition (\x -> inputAge x == 0) oprsAndRetries
+                  (operVS,operES) = L.partition (isVertex . statement) oprs
                   (vs,es)   = (map statement operVS, map statement operES)
+                  rs        = map statement operRS
                   nrVS      = length vs
                   nrES      = length es
+                  nrRS      = length rs
                   vsCmdEnv  = serializeOperations vs
-                  -- esCmdEnv  = serializeOperations es
+                  esCmdEnv  = serializeOperations es
+                  rsCmdEnvs = map serializeOperation rs
                   vsReq     = uncurry mkRequest vsCmdEnv
-                  -- esReq     = uncurry mkRequest esCmdEnv
+                  esReq     = uncurry mkRequest esCmdEnv
+                  rsReqs    = map (uncurry mkRequest) rsCmdEnvs
+                  sendReq x o = GC.sendOn conn x (recover o)
+                  recover :: [Input] -> Response -> IO ()
                   recover xs resp
-                     | respStatus resp /= 200 = insertDB (respRequestId resp) xs db
+                     | respStatus resp /= 200 = insertDB (respRequestId resp) xs fidb
                      | otherwise              = return ()
-              when (nrVS > 0) $ GC.sendOn conn vsReq (recover operVS)
-              T.hPutStrLn stderr "Sent VS"
-              -- when (nrES > 0) $ GC.sendOn conn esReq (recover operES)
-              -- mapM_ (\oe -> let (cmd,env) = serializeOperation (statement oe) in sendOn conn (mkRequest cmd env) (recover [oe])) operES
-              -- T.hPutStrLn stderr "Sent ES"
+              when (nrVS > 0) $ sendReq vsReq operVS
+              when (nrES > 0) $ sendReq esReq operES
+              when (nrRS > 0) $ mapM_ (\(r,o) -> sendReq r [o]) (zip rsReqs operRS)
               let (nrE2,nrV2) = (nrE + fromIntegral nrES,nrV + fromIntegral nrVS)
-              go (ri - nrES - nrVS) (nrE2,nrV2)
-
-  -- do opr <- atomically (TB.readTBChan inputs)
-  --    let (cmd,env) = serializeOperation stmt
-  --        stmt = statement opr
-  --        req  = mkRequest cmd env
-  --        recover resp
-  --           | respStatus resp /= 200 = insertDB (respRequestId resp) opr db
-  --           | otherwise              = return ()
-  --    GC.sendOn conn req recover
-  --    let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
-  --    go (ri - 1) (nrE2,nrV2)
+              go prev (ri - nrES - nrVS) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
 --  Utils
