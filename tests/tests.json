@@ -5,8 +5,13 @@
     "5d_youtube_ie_output-100.avro": {
         "pre": [
             {
-                "query": "g.V().drop()",
-                "response": "[Message(status_code=204, data=None, message='', metadata={})]",
+                "query": "g.E().drop().iterate() ; graph.tx().commit()",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                "requester_email": "jcheney@inf.ed.ac.uk",
+                "explanation": "Drop all edges so that we have a clean starting point for remaining tests."
+            }, {
+                "query": "g.V().drop().iterate() ; graph.tx().commit()",
+                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
                 "requester_email": "ryan@galois.com",
                 "explanation": "Drop all data so that we have a clean starting point for remaining tests."
             }, {
@@ -58,7 +63,7 @@
             },
 			{
                 "query": "g.E().hasLabel('segment:includes').count()",
-                "response": "[Message(status_code=200, data=[58], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[56], message='', metadata={})]",
                 "requester_email": "fake@email.com",
                 "explanation": "Sample test. To be deleted (or claimed) later."
             },
