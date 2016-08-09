@@ -10,10 +10,13 @@ def endMin(t) { endWindow(t,1000*1000*60) }
 
 def getTimes(g) { g.V().has('startedAtTime').values('startedAtTime').is(gt(0)) }
 
-def addTimeSegments(g,delta) {
-  segments = getTimes(g).map{startWindow((long)it.get(),delta)}.dedup()
+def addTimeSegments(graph,g,delta) {
+  segments =  g.V().has('startedAtTime')
+               .values('startedAtTime')
+               .is(gt(0))
+               .map{t = it.get(); t - t % delta}.dedup();
   for(s in segments) {
-    graph.addVertex(label,'Segment','segment:name','byTime','startedAtTime',s)
+    graph.addVertex(label,'Segment','startedAtTime',s)
   }
 }
 
