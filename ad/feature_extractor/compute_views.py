@@ -72,16 +72,16 @@ class AnomalyView:
 
     def attach_scores_to_db(self, percentage = 5.0):
         cutoff = math.ceil(self.total_nodes * (percentage / 100.0))
-        print("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (" + str(percentage) + "%)...")
+        print("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
         cnt = 0
         with gremlin_query.Runner() as gremlin:
             with open(self.score_file, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    gremlin.fetch_data("g.V({id}).property('anomalyType',{type})".format(id=row['id'], type=self.view_type))
+                    gremlin.fetch_data("g.V({id}).property('anomalyType','{type}')".format(id=row['id'], type=self.view_type))
                     gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
                     cnt = cnt + 1
-                    if(cnt >= cutoff)
+                    if cnt >= cutoff:
                         break
                 print('Anomaly score attachment done for view ' + self.view_type)
 
