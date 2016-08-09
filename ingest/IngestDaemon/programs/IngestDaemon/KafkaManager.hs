@@ -3,12 +3,13 @@ module IngestDaemon.KafkaManager where
 
 import           Control.Concurrent
 import           Control.Concurrent.STM.TBChan as TB
-import           Control.Concurrent.STM (atomically)
+import           Control.Concurrent.STM (atomically,retry)
 import           Control.Monad (forever)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
+import           Data.Maybe (catMaybes)
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import           System.IO (hPutStrLn, stderr)
@@ -20,6 +21,7 @@ import           Network.Kafka.Protocol as Kafka
 
 import           CompileSchema
 import           CommonDataModel as CDM
+import           CommonDataModel.Types as CDM
 import qualified Data.Avro as Avro
 import qualified Data.Avro.Schema as Avro
 import           IngestDaemon.Types
@@ -97,21 +99,35 @@ kafkaInput logK host topic cdmSchema chan =
  process :: Offset -> Kafka ()
  process offset =
   do bs <- getMessage topic offset
-     let handleMsg b =
+     let decodeMsg b =
           case Avro.decode cdmSchema (BL.fromStrict b) of
-            Avro.Success cdmFmt -> insertCDM cdmFmt
-            Avro.Error err      -> emit (show err)
-     liftIO $ hPutStrLn stderr ("Kafka input received " ++ show (length bs) ++ " messages!") 
-     mapM_ handleMsg bs
+            Avro.Success cdmFmt -> return (Just cdmFmt)
+            Avro.Error err      -> emit (show err) >> return Nothing
+     ms   <- catMaybes <$> mapM decodeMsg bs
+     ipts <- concat <$> liftIO (mapM convertToSchema ms)
+     liftIO $ addToWorkQueue ipts
      if null bs
       then liftIO (threadDelay 100000) >> process offset
       else process (offset + fromIntegral (length bs))
 
- insertCDM cdmFmt =
-   liftIO $ do let nses = CDM.toSchema [cdmFmt]
-               operations <- compile nses
-               let ipts = map (\o -> Input cdmFmt o 0) operations
-               atomically $ mapM_ (TB.writeTBChan chan) ipts
+ addToWorkQueue :: [Input] -> IO ()
+ addToWorkQueue ipts = do
+   rest <- atomically $ do
+            nr <- estimateFreeSlotsTBChan chan
+            if nr <= 0
+               then retry
+               else do let (out,rest) = splitAt nr ipts
+                       mapM_ (TB.writeTBChan chan) out
+                       return rest
+   if null rest
+      then return ()
+      else addToWorkQueue rest
+
+ convertToSchema :: CDM.TCCDMDatum -> IO [Input]
+ convertToSchema cdmFmt = do
+   let nses = CDM.toSchema [cdmFmt]
+   operations <- compile nses
+   return $ map (\o -> Input cdmFmt o 0) operations
 
 emit :: String -> Kafka ()
 emit = liftIO . hPutStrLn stderr
