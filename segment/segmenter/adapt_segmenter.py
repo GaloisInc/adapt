@@ -7,7 +7,7 @@ JSON specification handling
 
 '''
 from aiogremlin import GremlinClient
-from bareBonesTitanDB import BareBonesTitanClient as tclient
+from titanDB import titanClient as tclient
 import argparse
 import logging
 import os
@@ -69,7 +69,7 @@ class SimpleTitanGremlinSegmenter:
 		-for each such vertex, creates a segment vertex s_n and gives it property P with value v_n
 		'''
 		print('Constructing query\n')
-		query="for (i in g.V().has('"+self.criterion+"').id()) graph.addVertex(label,'segment','"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())"
+		query="for (i in g.V().has('"+self.criterion+"').id()) graph.addVertex(label,'segment','"+property_segmentNodeName+"','byPID','"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())"
 		print('Query sent for execution\n')
 		return self.titanclient.execute(query)
 
@@ -92,13 +92,6 @@ class SimpleTitanGremlinSegmenter:
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
 		query="g.V().has('"+self.criterion+"').id().fold().next()"
-		return self.titanclient.execute(query)
-
-	def getSegmentNodeFromVertexId(self,vertexId):
-		'''
-		query Titan to get the segment node corresponding to a vertex identified by its id (assumes the name of the segment (i.e 'segment:name') is of the format 's'+id e.g s1)
-		'''
-		query="g.V().has('"+property_segmentNodeName+"','s'+g.V("+str(vertexId)+").id().next().toString())"
 		return self.titanclient.execute(query)
 
 	def getSubgraphFromVertexId(self,vertexId):
@@ -193,9 +186,9 @@ class SimpleTitanGremlinSegmenter:
 				self.createSchemaVertexProperty(property_segmentNodeName,'String','SINGLE')
 				self.createSchemaVertexProperty('parentVertexId','Integer','SINGLE')
 				self.createSchemaVertexProperty(self.criterion,type_criterion,'SINGLE')
-				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','s'+i.toString(),'"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
+				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','byPID','"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
 				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
-				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','s'+i.toString(),\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
+				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','byPID',\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
 				addSeg2SegEdges_query="""for (snode in g.V().hasLabel('Segment').id().fold().next()){linkedSeg=g.V(snode).as('a').out(\'"""+property_segmentEdgeLabel+"""\').out().in(\'"""+property_segmentEdgeLabel+"""\').dedup().where(neq('a')).id().fold().next()-g.V(snode).out(\'"""+property_seg2segEdgeLabel+"""\').id().fold().next();for (s in linkedSeg){g.V(snode).next().addEdge(\'"""+property_seg2segEdgeLabel+"""\',g.V(s).next())}}"""
 				if self.store_segment=='OnlyNodes':
 					createSegmentNodes=self.titanclient.execute(createVertices_query)
