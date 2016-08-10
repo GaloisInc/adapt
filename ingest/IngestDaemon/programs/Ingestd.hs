@@ -21,6 +21,7 @@ import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
 import           Data.Int (Int64)
+import qualified Data.List as L
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import           Data.String
@@ -28,7 +29,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import           Data.Time (getCurrentTime)
+import           Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import           MonadLib        hiding (handle)
 import           Network.Kafka as K
 import           Network.Kafka.Protocol as K
@@ -59,7 +60,7 @@ data Config =
 makeLenses ''Config
 
 inputQueueSize  :: Int
-inputQueueSize  = 1000
+inputQueueSize  = 100000
 
 outputQueueSize :: Int
 outputQueueSize = 1000
@@ -111,7 +112,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                     $ ReqArg "host:port" $
                         \str s ->
                             let svr = do (h,p) <- parseHostPort str
-                                         return (ServerInfo h p 128)
+                                         return (ServerInfo h p 512)
                             in case svr of
                                 Just res -> Right (s & titanServer .~ res)
                                 Nothing  -> Left "Could not parse host:port string."
@@ -182,31 +183,33 @@ mainLoop cfg =
         logGC    = logMsg . ("ingestd[Retry thread]:    " <>)
         logIpt t = logMsg . (("ingestd[KafkaTopic:" <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
-        forkPersist lg = void . forkIO . persistant lg
-    forkPersist logMsg $
+        forkPersist name lg = void . forkIO . persistant name lg
+    forkPersist "Finisher" logMsg $
       finishIngestSignal (finisher reqStatus inputs) srvInt outTopic triTopic
-    _ <- maybe (forkPersist logStderr
+    _ <- maybe (forkPersist "StderrLogger" logStderr
                        (Left <$> channelToStderr logChan :: IO (Either () ())))
-               (forkPersist logStderr . channelToKafka  logChan srvInt)
+               (forkPersist "KafkaLogger" logStderr . channelToKafka  logChan srvInt)
                (cfg ^. logTopic)
     inputSchema <- CDM.getAvroSchema
-    mapM_ (\t -> forkPersist (logIpt t) $ kafkaInput (logIpt t) srvExt t inputSchema inputs) inTopics
-    forkPersist logMsg (garbageCollectFailures logGC reqStatus inputs)
+    mapM_ (\t -> forkPersist "TA1-input" (logIpt t) $ kafkaInput (logIpt t) srvExt t inputSchema inputs) inTopics
+    forkPersist "GC" logMsg (garbageCollectFailures logGC reqStatus inputs)
     now <- getCurrentTime
     logIpt "startup" ("System up at: " <> T.pack (show now))
-    persistant logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
+    persistant "TitanManager" logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
   where
+  maxAge = 0 -- 1 retry at age 0, dead at age 1
   garbageCollectFailures :: (Text -> IO ()) -> FailedInsertionDB -> TBChan Input -> IO (Either () ())
-  garbageCollectFailures logGC fidb inputs = forever $ do
+  garbageCollectFailures _logGC fidb inputs = forever $ do
        threadDelay 10000000 -- 10 seconds
        es <- resetDB fidb
-       let ageOperation :: OperationRecord -> IO (Maybe Input)
-           ageOperation (OpRecord (Input orig stmt cnt) _)
-              | cnt > 2   =
-                 do logGC $ T.pack $ printf "Dropping a statement: %s" (show orig)
-                    return Nothing
-              | otherwise = return $ Just (Input orig stmt (cnt + 1))
-       is <- catMaybes <$> mapM ageOperation es
+       let ageOperations :: OperationRecord -> IO [Maybe Input]
+           ageOperations (OpRecord ipts _) = mapM ageOperation ipts
+           ageOperation ipt@(Input {..})
+              | inputAge > maxAge   = return Nothing
+                 -- XXX ^^^ dropping the statement, increment a statistic counter?
+              | otherwise = return $ Just ipt { inputAge = inputAge + 1 }
+       T.hPutStrLn stderr $ T.pack $ printf "GC collected %d elements" (length es)
+       is <- catMaybes . concat <$> mapM ageOperations es
        mapM_ (atomically . TB.writeTBChan inputs) is
 
   finisher :: FailedInsertionDB -> TBChan Input -> IO ()
@@ -214,36 +217,36 @@ mainLoop cfg =
    do es <- resetDB fidb
       let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
       T.hPutStrLn stderr msg
-      let newOperations = catMaybes $ map updateOperation es
+      let newOperations = concatMap updateOperation es
       mapM_ (atomically . TB.writeTBChan inputs) newOperations
       delayWhileNonEmpty inputs
 
   -- Given a failed operation and an HTTP error code from Titan,
   -- build a new operation suitable for re-trying (or not) the operation.
-  updateOperation :: OperationRecord -> Maybe Input
-  updateOperation (OpRecord ipt@(Input orig stmt cnt) code) =
-    Just $ case stmt of
-            InsertEdge {}
-              | code == Just 597 -> Input orig stmt { generateVertices = True } cnt
-              | otherwise        -> ipt
-            InsertReifiedEdge {} -> ipt
-            InsertVertex {}      -> ipt
+  updateOperation :: OperationRecord -> [Input]
+  updateOperation (OpRecord ipts code)
+              | code == Just 597 = map genVerts ipts
+              | otherwise        = ipts
+  genVerts ipt@(Input orig stmt cnt) =
+    case stmt of
+      InsertEdge {}        -> Input orig stmt { generateVertices = True } cnt
+      InsertReifiedEdge {} -> ipt
+      InsertVertex {}      -> ipt
 
-persistant :: (Show a, Show e) => (Text -> IO ()) -> IO (Either e a) -> IO ()
-persistant logMsg io =
+persistant :: (Show a, Show e) => Text -> (Text -> IO ()) -> IO (Either e a) -> IO ()
+persistant name logMsg io =
   do ex <- X.catch (Right <$> io) (pure . Left)
-     case ex of
-      Right (Right r) ->
-        do logMsg ("Operation completed: " <> T.pack (show r))
-           persistant logMsg io
-      Right (Left e) ->
-        do logMsg ("Operation failed (retry in 5s): " <> T.pack (show e))
-           threadDelay 5000000
-           persistant logMsg io
-      Left (e::SomeException) ->
-        do logMsg ("Operation had an exception (retry in 5s): " <> T.pack (show e))
-           threadDelay 5000000
-           persistant logMsg io
+     ( do T.hPutStrLn stderr ("Thread " <> name <> " had an exception: " <> T.pack (show ex))
+          case ex of
+           Right (Right r) ->
+             do logMsg ("Operation completed: " <> T.pack (show r))
+           Right (Left e) ->
+             do logMsg ("Operation failed (retry in 5s): " <> T.pack (show e))
+                threadDelay 5000000
+           Left (e::SomeException) ->
+             do logMsg ("Operation had an exception (retry in 5s): " <> T.pack (show e))
+                threadDelay 5000000
+         ) `X.finally` persistant name logMsg io
 
 
 --------------------------------------------------------------------------------
@@ -255,39 +258,64 @@ titanManager :: Config
              -> TBChan Input
              -> FailedInsertionDB
              -> IO (Either ConnectionException ())
-titanManager _cfg logTitan svr inputs reqStatus =
+titanManager _cfg logTitan svr inputs fidb =
  do logTitan "Connecting to titan..."
     dbc <- GC.connect svr
     case dbc of
-      Left e   -> return (Left e)
-      Right db -> runDB logTitan inputs reqStatus db >> return (Right ())
+      Left e     -> return (Left e)
+      Right conn ->
+        do runDB logTitan inputs fidb conn
+           return (Right ())
 
 runDB :: (Text -> IO ())
       -> TBChan Input
       -> FailedInsertionDB
       -> DBConnection
       -> IO ()
-runDB logTitan inputs db conn =
+runDB logTitan inputs fidb conn =
   do logTitan "Connected to titan."
-     go reportInterval (0,0)
+     now <- getCurrentTime
+     go now reportInterval (0,0)
  where
- reportInterval = 1000
+ reportInterval = 20000
+ nrInBulk       = 100 --  Number of commands to handle in bulk
 
- go :: Int -> (Int64,Int64) -> IO ()
- go 0 !cnts@(!nrE,!nrV) =
-  do logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies." nrE nrV)
-     go reportInterval cnts
- go ri !(!nrE,!nrV) =
-  do opr <- atomically (TB.readTBChan inputs)
-     let (cmd,env) = serializeOperation stmt
-         stmt = statement opr
-         req  = mkRequest cmd env
-         recover resp
-            | respStatus resp /= 200 = insertDB (respRequestId resp) opr db
-            | otherwise              = return ()
-     GC.sendOn conn req recover
-     let (nrE2,nrV2) = if isVertex stmt then (nrE,nrV+1) else (nrE+1,nrV)
-     go (ri - 1) (nrE2,nrV2)
+ go :: UTCTime -> Int -> (Int64,Int64) -> IO ()
+ go prev ri !cnts@(!nrE,!nrV)
+   | ri <= 0 =
+      do now <- getCurrentTime
+         let rate :: Double
+             rate = fromIntegral reportInterval / realToFrac (diffUTCTime now prev)
+         logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies. %f statements per second" nrE nrV rate)
+         go now reportInterval cnts
+   | otherwise =
+  do let readCh ch = catMaybes <$> replicateM nrInBulk (TB.tryReadTBChan ch)
+     oprsAndRetries <- atomically (readCh inputs)
+     if null oprsAndRetries
+      then threadDelay 100000 >> go prev ri cnts
+      else do let (oprs,operRS) = L.partition (\x -> inputAge x == 0) oprsAndRetries
+                  (operVS,operES) = L.partition (isVertex . statement) oprs
+                  (vs,es)   = (map statement operVS, map statement operES)
+                  rs        = map statement operRS
+                  nrVS      = length vs
+                  nrES      = length es
+                  nrRS      = length rs
+                  vsCmdEnv  = serializeOperations vs
+                  esCmdEnv  = serializeOperations es
+                  rsCmdEnvs = map serializeOperation rs
+                  vsReq     = uncurry mkRequest vsCmdEnv
+                  esReq     = uncurry mkRequest esCmdEnv
+                  rsReqs    = map (uncurry mkRequest) rsCmdEnvs
+                  sendReq x o = GC.sendOn conn x (recover o)
+                  recover :: [Input] -> Response -> IO ()
+                  recover xs resp
+                     | respStatus resp /= 200 = insertDB (respRequestId resp) xs fidb
+                     | otherwise              = return ()
+              when (nrVS > 0) $ sendReq vsReq operVS
+              when (nrES > 0) $ sendReq esReq operES
+              when (nrRS > 0) $ mapM_ (\(r,o) -> sendReq r [o]) (zip rsReqs operRS)
+              let (nrE2,nrV2) = (nrE + fromIntegral nrES,nrV + fromIntegral nrVS)
+              go prev (ri - nrES - nrVS) (nrE2,nrV2)
 
 --------------------------------------------------------------------------------
 --  Utils
