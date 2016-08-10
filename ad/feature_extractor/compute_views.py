@@ -21,9 +21,10 @@ class AnomalyView:
         self.features_queries = fq
         self.feature_file = 'features/' + self.view_type + '.csv'
         self.score_file = 'scores/' + self.view_type + '.csv'
+        self.total_nodes = 0
 
     def compute_view_and_save(self):
-        print("Writing " + self.view_type + " view features to file: " + self.feature_file)
+        print("\nWriting " + self.view_type + " view features to file: " + self.feature_file)
         f = open(self.feature_file, "w")
 
         # write feature headers
@@ -36,8 +37,8 @@ class AnomalyView:
         with gremlin_query.Runner() as gremlin:
             ids = gremlin.fetch_data(self.node_ids_query)
             cnt = 0
-            total = len(ids)
-            print("Found " + str(total) + " " + view_type + " nodes")
+            self.total_nodes = len(ids)
+            print("Found " + str(self.total_nodes) + " " + view_type + " nodes")
             print("Extracting features...")
             for id in ids:
                 f.write(str(id))
@@ -46,9 +47,9 @@ class AnomalyView:
                     f.write("," + str(res))
                 f.write("\n")
                 cnt = cnt + 1
-                if cnt % math.ceil(total/10) == 0 and cnt != total:
-                    print("%.2f%% done" % round(cnt*100/total, 2))
-            if total % 10 != 0:
+                if cnt % math.ceil(self.total_nodes/10) == 0 and cnt != self.total_nodes:
+                    print("%.2f%% done" % round(cnt*100/self.total_nodes, 2))
+            if self.total_nodes % 10 != 0:
                 print("100.00% done")
         f.close()
         print("Writing " + self.feature_file + " Finished")
@@ -63,18 +64,26 @@ class AnomalyView:
         if(i > 0):
             os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
             print("Anomaly scores written to " + self.score_file)
+            return True
         else:
             print("No features found to score")
+            return False
 
 
-    def attach_scores_to_db(self):
-        in_file = self.view_type + '_view_features.csv'
+    def attach_scores_to_db(self, percentage = 5.0):
+        cutoff = math.ceil(self.total_nodes * (percentage / 100.0))
+        print("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
+        cnt = 0
         with gremlin_query.Runner() as gremlin:
-            with open(in_file, 'r') as csvfile:
+            with open(self.score_file, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
+                    gremlin.fetch_data("g.V({id}).property('anomalyType','{type}')".format(id=row['id'], type=self.view_type))
                     gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
-                print('Anomaly scores attached for view ' + self.view_type)
+                    cnt = cnt + 1
+                    if cnt >= cutoff:
+                        break
+                print('Anomaly score attachment done for view ' + self.view_type)
 
 
 
@@ -85,4 +94,6 @@ if __name__ == '__main__':
     for view_type,view_data in views.items():
         view = AnomalyView(view_type, view_data['instance_set'], view_data['feature_set'])
         view.compute_view_and_save()
-        view.compute_anomaly_score()
+        success = view.compute_anomaly_score()
+        if success == True:
+            view.attach_scores_to_db()
