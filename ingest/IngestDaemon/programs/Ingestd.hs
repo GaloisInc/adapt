@@ -13,16 +13,17 @@
 -- Titan, and pushes node IDs to PE via Kafka.
 module Main where
 
-import           Control.Concurrent (forkIO)
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Concurrent (threadDelay)
-import           Control.Concurrent.STM.TBChan as TB
-import           Control.Concurrent.STM (atomically)
-import           Control.Exception as X
+-- import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
-import           Data.Int (Int64)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
+import qualified System.IO as SIO
+-- import           Data.Int (Int64)
 import qualified Data.List as L
-import           Data.Monoid ((<>))
+-- import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import           Data.String
 import           Data.Text (Text)
@@ -31,19 +32,28 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import           Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import           MonadLib        hiding (handle)
-import           Network.Kafka as K
-import           Network.Kafka.Protocol as K
+-- import           Network.Kafka as K
+-- import           Network.Kafka.Protocol as K
 import           Prelude
 import           SimpleGetOpt
 import           System.IO (stderr)
 import           Text.Printf
 import           Text.Read (readMaybe)
+import           Network.Kafka.Consumer
+-- import           Network.Kafka.Producer
+import           Network.Kafka
+import           Network.Kafka.Protocol
 
+import           System.Random.TF
+import           System.Random
 import           Gremlin.Client as GC
 import           CompileSchema
 import           CommonDataModel as CDM
-import           IngestDaemon.KafkaManager
+import           CommonDataModel.Types as CDM
+import qualified Data.Avro as Avro
+import qualified Data.Avro.Schema as Avro
 import           IngestDaemon.Types
+import Schema (UID)
 
 data Config =
       Config { _logTopic      :: Maybe TopicName
@@ -170,152 +180,120 @@ main =
 --                 not received a success message.
 mainLoop :: Config -> IO ()
 mainLoop cfg =
- do inputs  <- newTBChanIO inputQueueSize
-    logChan <- newTBChanIO 100
-    reqStatus <- newDB
-    let srvInt   = cfg ^. kafkaInternal
+ do let -- srvInt   = cfg ^. kafkaInternal
         srvExt   = cfg ^. kafkaExternal
         inTopics = cfg ^. inputTopics
-        outTopic = cfg ^. outputTopic
-        triTopic = cfg ^. triggerTopic
-        logMsg   = void . atomically . TB.tryWriteTBChan logChan
-        logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
-        logGC    = logMsg . ("ingestd[Retry thread]:    " <>)
-        logIpt t = logMsg . (("ingestd[KafkaTopic:" <> kafkaString t <> "]") <>)
+        -- outTopic = cfg ^. outputTopic
+        -- triTopic = cfg ^. triggerTopic
+        -- logMsg   = void . atomically . TB.tryWriteTBChan logChan
+        -- logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
+        -- logGC    = logMsg . ("ingestd[Retry thread]:    " <>)
+        -- logIpt t = logMsg . (("ingestd[KafkaTopic:" <> kafkaString t <> "]") <>)
         logStderr = T.hPutStrLn stderr
-        forkPersist name lg = void . forkIO . persistant name lg
-    forkPersist "Finisher" logMsg $
-      finishIngestSignal (finisher reqStatus inputs) srvInt outTopic triTopic
-    _ <- maybe (forkPersist "StderrLogger" logStderr
-                       (Left <$> channelToStderr logChan :: IO (Either () ())))
-               (forkPersist "KafkaLogger" logStderr . channelToKafka  logChan srvInt)
-               (cfg ^. logTopic)
+        -- forkPersist name lg = void . forkIO . persistant name lg
+
+    dbconn <- connectToTitan (cfg ^. titanServer)
+    let [it] = inTopics -- XXX
     inputSchema <- CDM.getAvroSchema
-    mapM_ (\t -> forkPersist "TA1-input" (logIpt t) $ kafkaInput (logIpt t) srvExt t inputSchema inputs) inTopics
-    forkPersist "GC" logMsg (garbageCollectFailures logGC reqStatus inputs)
-    now <- getCurrentTime
-    logIpt "startup" ("System up at: " <> T.pack (show now))
-    persistant "TitanManager" logTitan (titanManager cfg logTitan (cfg ^. titanServer) inputs reqStatus)
-  where
-  maxAge = 0 -- 1 retry at age 0, dead at age 1
-  garbageCollectFailures :: (Text -> IO ()) -> FailedInsertionDB -> TBChan Input -> IO (Either () ())
-  garbageCollectFailures _logGC fidb inputs = forever $ do
-       threadDelay 10000000 -- 10 seconds
-       es <- resetDB fidb
-       let ageOperations :: OperationRecord -> IO [Maybe Input]
-           ageOperations (OpRecord ipts _) = mapM ageOperation ipts
-           ageOperation ipt@(Input {..})
-              | inputAge > maxAge   = return Nothing
-                 -- XXX ^^^ dropping the statement, increment a statistic counter?
-              | otherwise = return $ Just ipt { inputAge = inputAge + 1 }
-       T.hPutStrLn stderr $ T.pack $ printf "GC collected %d elements" (length es)
-       is <- catMaybes . concat <$> mapM ageOperations es
-       mapM_ (atomically . TB.writeTBChan inputs) is
+    _ <- kafkaInputToDB srvExt it inputSchema (runDB logStderr dbconn)
+    return ()
 
-  finisher :: FailedInsertionDB -> TBChan Input -> IO ()
-  finisher fidb inputs =
-   do es <- resetDB fidb
-      let msg = T.pack $ printf "Re-trying %d insertions before signaling PE." (length es)
-      T.hPutStrLn stderr msg
-      let newOperations = concatMap updateOperation es
-      mapM_ (atomically . TB.writeTBChan inputs) newOperations
-      delayWhileNonEmpty inputs
+-- | Acquire CDM from a given kafka host/topic and place values a channel.
+kafkaInputToDB :: KafkaAddress
+           -> TopicName
+           -> Avro.Schema
+           -> ([Input] -> IO ())
+           -> IO (Either KafkaClientError ())
+kafkaInputToDB host topic cdmSchema handleTranslatedData =
+  do r <- runKafka state oper
+     return r
+ where
+ state = mkKafkaState "adapt-ingest" host
+ oper  = do
+   off  <- getLastOffset LatestTime 0 topic
+   uids <- randomUIDs <$> liftIO newTFGen
+   now <- liftIO getCurrentTime
+   process now 0 uids off
 
-  -- Given a failed operation and an HTTP error code from Titan,
-  -- build a new operation suitable for re-trying (or not) the operation.
-  updateOperation :: OperationRecord -> [Input]
-  updateOperation (OpRecord ipts code)
-              | code == Just 597 = map genVerts ipts
-              | otherwise        = ipts
-  genVerts ipt@(Input orig stmt cnt) =
-    case stmt of
-      InsertEdge {}        -> Input orig stmt { generateVertices = True } cnt
-      InsertReifiedEdge {} -> ipt
-      InsertVertex {}      -> ipt
+ -- Read data, compile to our schema, and send to Gremlin
+ process :: UTCTime -> Int -> [UID] -> Offset -> Kafka ()
+ process start !cnt uids offset =
+  do bs <- getMessage topic offset
+     -- liftIO (SIO.hPutStrLn stderr (printf "Receiving %d kafka messages." (length bs)))
+     let decodeMsg b =
+          case Avro.decode cdmSchema (BL.fromStrict b) of
+            Avro.Success cdmFmt -> return (Just cdmFmt)
+            Avro.Error err      -> liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
+     ms   <- catMaybes <$> mapM decodeMsg bs
+     let (ipts,newUIDs) = convertToSchemas uids ms []
+     liftIO $ handleTranslatedData ipts
+     if null bs
+      then do liftIO (reportRate start cnt)
+              liftIO (threadDelay 100000)
+              now <- liftIO getCurrentTime
+              process now 0 uids offset
+      else process start (cnt+length bs) newUIDs (offset + fromIntegral (length bs))
 
-persistant :: (Show a, Show e) => Text -> (Text -> IO ()) -> IO (Either e a) -> IO ()
-persistant name logMsg io =
-  do ex <- X.catch (Right <$> io) (pure . Left)
-     ( do T.hPutStrLn stderr ("Thread " <> name <> " had an exception: " <> T.pack (show ex))
-          case ex of
-           Right (Right r) ->
-             do logMsg ("Operation completed: " <> T.pack (show r))
-           Right (Left e) ->
-             do logMsg ("Operation failed (retry in 5s): " <> T.pack (show e))
-                threadDelay 5000000
-           Left (e::SomeException) ->
-             do logMsg ("Operation had an exception (retry in 5s): " <> T.pack (show e))
-                threadDelay 5000000
-         ) `X.finally` persistant name logMsg io
+reportRate :: UTCTime -> Int -> IO ()
+reportRate start cnt
+  | cnt < 10000 = return ()
+  | otherwise =
+ do now <- getCurrentTime
+    let delta = realToFrac (diffUTCTime now start)
+        rate = (fromIntegral cnt) / delta  :: Double
+    liftIO $ T.hPutStrLn stderr (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
 
+convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> [[Input]] -> ([Input],[UID])
+convertToSchemas uids [] acc = (concat acc,uids)
+convertToSchemas uids (m:ms) acc =
+   let (is,rest) = convertToSchema uids m
+   in convertToSchemas rest ms (is:acc)
+
+convertToSchema :: [UID] -> CDM.TCCDMDatum -> ([Input],[UID])
+convertToSchema uids cdmFmt =
+   let (ns,es) = CDM.toSchema [cdmFmt]
+       esAndUID = zip es uids
+       operations = compile (ns,esAndUID)
+   in (map (\o -> Input cdmFmt o 0) operations, drop (length es) uids)
+
+connectToTitan :: GC.ServerInfo -> IO GC.DBConnection
+connectToTitan svr =
+ do dbc <- GC.connect svr { maxOutstandingRequests = 64 }
+    case dbc of
+      Left _  -> error "Could not connect to Titan!" -- XXX retry
+      Right c -> return c
 
 --------------------------------------------------------------------------------
 --  Titan Manager
 
-titanManager :: Config
-             -> (Text -> IO ())
-             -> GC.ServerInfo
-             -> TBChan Input
-             -> FailedInsertionDB
-             -> IO (Either ConnectionException ())
-titanManager _cfg logTitan svr inputs fidb =
- do logTitan "Connecting to titan..."
-    dbc <- GC.connect svr
-    case dbc of
-      Left e     -> return (Left e)
-      Right conn ->
-        do runDB logTitan inputs fidb conn
-           return (Right ())
-
 runDB :: (Text -> IO ())
-      -> TBChan Input
-      -> FailedInsertionDB
       -> DBConnection
+      -> [Input]
       -> IO ()
-runDB logTitan inputs fidb conn =
-  do logTitan "Connected to titan."
-     now <- getCurrentTime
-     go now reportInterval (0,0)
+runDB _ _ [] = return ()
+runDB emit conn inputOps = do
+  let (sendThese,waitThese) = L.splitAt 100 inputOps
+  go sendThese
+  runDB emit conn waitThese
  where
- reportInterval = 20000
- nrInBulk       = 100 --  Number of commands to handle in bulk
-
- go :: UTCTime -> Int -> (Int64,Int64) -> IO ()
- go prev ri !cnts@(!nrE,!nrV)
-   | ri <= 0 =
-      do now <- getCurrentTime
-         let rate :: Double
-             rate = fromIntegral reportInterval / realToFrac (diffUTCTime now prev)
-         logTitan (T.pack $ printf "Sent commands for: %d edges triples, %d verticies. %f statements per second" nrE nrV rate)
-         go now reportInterval cnts
-   | otherwise =
-  do let readCh ch = catMaybes <$> replicateM nrInBulk (TB.tryReadTBChan ch)
-     oprsAndRetries <- atomically (readCh inputs)
-     if null oprsAndRetries
-      then threadDelay 100000 >> go prev ri cnts
-      else do let (oprs,operRS) = L.partition (\x -> inputAge x == 0) oprsAndRetries
-                  (operVS,operES) = L.partition (isVertex . statement) oprs
-                  (vs,es)   = (map statement operVS, map statement operES)
-                  rs        = map statement operRS
-                  nrVS      = length vs
-                  nrES      = length es
-                  nrRS      = length rs
-                  vsCmdEnv  = serializeOperations vs
-                  esCmdEnv  = serializeOperations es
-                  rsCmdEnvs = map serializeOperation rs
-                  vsReq     = uncurry mkRequest vsCmdEnv
-                  esReq     = uncurry mkRequest esCmdEnv
-                  rsReqs    = map (uncurry mkRequest) rsCmdEnvs
-                  sendReq x o = GC.sendOn conn x (recover o)
-                  recover :: [Input] -> Response -> IO ()
-                  recover xs resp
-                     | respStatus resp /= 200 = insertDB (respRequestId resp) xs fidb
-                     | otherwise              = return ()
-              when (nrVS > 0) $ sendReq vsReq operVS
-              when (nrES > 0) $ sendReq esReq operES
-              when (nrRS > 0) $ mapM_ (\(r,o) -> sendReq r [o]) (zip rsReqs operRS)
-              let (nrE2,nrV2) = (nrE + fromIntegral nrES,nrV + fromIntegral nrVS)
-              go prev (ri - nrES - nrVS) (nrE2,nrV2)
+ go oprs =
+  do let (operVS,operES) = L.partition (isVertex . statement) oprs
+         (vs,es)   = (map statement operVS, map statement operES)
+         nrVS      = length vs
+         nrES      = length es
+         vsCmdEnv  = serializeOperations vs
+         esCmdEnv  = serializeOperations es
+         vsReq     = uncurry mkRequest vsCmdEnv
+         esReq     = uncurry mkRequest esCmdEnv
+         sendReq x o = GC.sendOn conn x (recover o)
+         recover :: [Input] -> Response -> IO ()
+         recover _xs resp
+            | respStatus resp /= 200 = return () -- XXX insertDB (respRequestId resp) xs fidb
+            | otherwise              = return ()
+     -- now <- getCurrentTime
+     -- emit (T.pack $ printf "[%s] Sending %d nodes, %d edges" (show now) nrVS nrES)
+     when (nrVS > 0) $ sendReq vsReq operVS
+     when (nrES > 0) $ sendReq esReq operES
 
 --------------------------------------------------------------------------------
 --  Utils
@@ -324,14 +302,22 @@ isVertex :: Operation a -> Bool
 isVertex (InsertVertex {}) = True
 isVertex _                  = False
 
-channelToStderr :: TBChan Text -> IO ()
-channelToStderr ch = forever $ atomically (TB.readTBChan ch) >>= T.hPutStrLn stderr
-
 kafkaString :: TopicName -> Text
 kafkaString (TName (KString s)) = T.decodeUtf8 s
 
-delayWhileNonEmpty :: TBChan a -> IO ()
-delayWhileNonEmpty ch =
-  do b <- atomically (isEmptyTBChan ch)
-     if b then return ()
-          else threadDelay 100000 >> delayWhileNonEmpty ch
+randomUIDs :: TFGen -> [UID]
+randomUIDs g =
+  let (u,g2) = randomUID g
+  in u : randomUIDs g2
+
+randomUID :: TFGen -> (UID,TFGen)
+randomUID g1 =
+  let (w1,g2) = next g1
+      (w2,g3) = next g2
+      (w3,g4) = next g3
+      (w4,g5) = next g4
+  in ((fromIntegral w1,fromIntegral w2,fromIntegral w3,fromIntegral w4),g5)
+
+getMessage :: TopicName -> Offset -> Kafka [B.ByteString]
+getMessage topicNm offset =
+  map tamPayload . fetchMessages <$> withAnyHandle (\h -> fetch' h =<< fetchRequest offset 0 topicNm)
