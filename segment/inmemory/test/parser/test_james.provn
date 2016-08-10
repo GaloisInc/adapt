@@ -1,0 +1,37 @@
+document
+
+prefix prov <http://www.w3.org/ns/prov#>
+prefix prov-tc <http://adapt.org/prov-tc#>
+prefix ex <http://www.example.com/>
+
+entity(ex:file1v1, [prov-tc:path="/etc/passwd"] )
+entity(ex:file1v2, [prov-tc:path="/etc/passwd"] )
+entity(ex:file2, [prov-tc:path="/home/alice/foo"])
+entity(ex:file3v1, [prov-tc:path="/home/alice/bar"])
+entity(ex:file3v2, [prov-tc:path="/home/alice/bar"])
+
+activity(ex:process1, [prov-tc:pid="1"])
+activity(ex:process2, [prov-tc:pid="2"])
+activity(ex:process3, [prov-tc:pid="3"])
+
+agent(ex:Bob, [prov:type="user"])
+agent(ex:Alice, [prov:type="admin"])
+
+wasGeneratedBy(ex:file3v2, ex:process3)
+used(ex:process2, ex:file1v2, 2013-03-18T11:10:00)
+used(ex:process2, ex:file2, 2013-03-18T11:10:01)
+
+wasGeneratedBy(ex:file1v2, ex:process1, 2013-03-17T00:10:00)
+wasInvalidatedBy(ex:file1v1, ex:process1, 2013-03-17T00:09:59)
+
+wasGeneratedBy(ex:file3v1, ex:process2, 2013-03-16T11:10:02)
+used(ex:process2, ex:file1v1, 2013-03-16T11:10:00)
+used(ex:process2, ex:file2, 2013-03-16T11:10:01)
+
+
+wasAssociatedWith(ex:process1, ex:Bob, -)
+wasAssociatedWith(ex:process2, ex:Alice, -)
+wasAssociatedWith(ex:process3, ex:Alice, -)
+
+
+endDocument

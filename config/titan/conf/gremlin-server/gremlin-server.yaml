@@ -1,9 +1,9 @@
 host: localhost
 port: 8182
-threadPoolWorker: 1
+threadPoolWorker: 4
 gremlinPool: 8
-scriptEvaluationTimeout: 30000
-serializedResponseTimeout: 30000
+scriptEvaluationTimeout: 3600000
+serializedResponseTimeout: 3600000
 channelizer: org.apache.tinkerpop.gremlin.server.channel.WebSocketChannelizer
 graphs: {
   graph: conf/gremlin-server/titan-cassandra-server.properties}

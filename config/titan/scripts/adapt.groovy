@@ -63,12 +63,17 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
 
 // We index the 'ident' field, which matches CDM 'UUID' but as a Base64 string.
 makeNodeIndex('byIdent','ident',true,String.class)
-makeNodeIndex('bySegmentName', 'segment:name', true, String.class)
+makeNodeIndex('bySegmentName', 'segment:name', false, String.class)
 
 
 // URL index use ElasticSearch which provides richer queries
 // including regex
 makeElasticSearchIndex('byURL','url',String.class)
+
+// index PIDs and timestamps for numeric queries
+makeElasticSearchIndex('byPID','pid',Integer.class)
+makeElasticSearchIndex('byTime','startedAtTime',Long.class)
+
 
 // The graph traverser captured by variable 'g' is useful to many of
 // the insertion and query commands used in normal operation.
