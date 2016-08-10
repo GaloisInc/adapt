@@ -1,9 +1,9 @@
 resolver: lts-6.1
 packages:
 - '.'
-- ../avro
 - ../Ingest
 - ../GremlinClient
+- location: https://github.com/GaloisInc/avro/archive/master.zip
 extra-deps:
 - dotgen-0.4.2
 - simple-get-opt-0.1.0.0

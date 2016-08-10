@@ -332,4 +332,4 @@ mutexDec :: Mutex -> IO ()
 mutexDec m@(Mutex ref) =
   do success <- atomicModifyIORef ref (\v -> if v > 0 then (v-1,True) else (v,False))
      if success then return ()
-                else threadDelay 1000 >> mutexDec m
+                else threadDelay 50000 >> mutexDec m
