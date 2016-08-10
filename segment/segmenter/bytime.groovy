@@ -24,8 +24,7 @@ def addTimeSegments(graph,g,delta) {
     v.addEdge('segment:includes',z) 
   }    
   for(s in segments) {
-    w = graph.addVertex(label,'Segment',                                                                'segment:name','byTime',
-                        'startedAtTime',s);
+    w = graph.addVertex(label,'Segment','segment:name','byTime','startedAtTime',s);
     v.addEdge('segment:edge',w);
  
     v = w;
