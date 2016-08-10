@@ -33,6 +33,7 @@ import argparse
 import collections
 import datetime
 import dns.resolver
+import ipaddress
 import json
 import os
 import re
@@ -46,7 +47,8 @@ import gremlin_query
 def report(query, threshold=1, debug=False):
 
     asn_re = re.compile('^AS\d+$')
-    ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+    # ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+
     # In the apt1 trace, why does THEIA think '0x7fc9d5cf4250' is a filespec?
     filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
@@ -54,15 +56,16 @@ def report(query, threshold=1, debug=False):
         assert filespec_re.search(file), file
         return file
 
-    def validate_ip(ip4):
+    def validate_ip(ip):
+        '''Raise ValueError exception if ip is not a valid internet address.'''
         # THEIA's recordaudio1 trace contains empty "address" records,
         # so AF_UNIX IPC events will have attributes like this:
         # "srcAddress": "/tmp/.X11-unix/X0", "srcPort": 0,
         # "destAddress": "", "destPort": 0, "ipProtocol": null
-        if ip4 == '':
-            ip4 = '0.0.0.0'
-        assert ip4_re.search(ip4), ip4
-        return ip4
+        if ip == '':
+            ip = '0.0.0.0'
+        ipaddress.ip_address(ip)
+        return ip
 
     def dns_query(fqdn):
         try:

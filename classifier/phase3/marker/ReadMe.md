@@ -24,6 +24,6 @@ such as names of files outside of `/usr/bin`,
 substituting a nonce value instead.
 
 For marker number 1, the begin event shows up in
-the trace as a write to `/tmp/marker-001-begin.txt`.
+the trace as a write to `/tmp/tc-marker-001-begin.txt`.
 This is followed by events of interest,
-and then a write to `/tmp/marker-001-end.txt`.
+and then a write to `/tmp/tc-marker-001-end.txt`.
