@@ -408,13 +408,19 @@ readKafka :: KafkaClientId
           -> (B.ByteString -> IO ())
           -> IO ()
 readKafka name svr topic putMsg =
- do _ <- runKafka (mkKafkaState name svr) (withLastOffset op topic)
+ do _ <- runKafka (mkKafkaState name svr) (withLastOffset (op baseDelay)  topic)
     return ()
   where
-  op off =
+  baseDelay = 50000
+  maxDelay  = 1000000
+  op delayTime off =
     do bs <- getMessage topic off
-       liftIO (mapM_ putMsg bs)
-       op (off + fromIntegral (length bs))
+       if null bs
+          then do liftIO $ threadDelay delayTime
+                  let newDelay = min (delayTime * 2) maxDelay
+                  op newDelay off
+          else do liftIO (mapM_ putMsg bs)
+                  op baseDelay (off + fromIntegral (length bs))
 
 -- Helper routine for writing to kafka topics
 writeKafka :: KafkaClientId
