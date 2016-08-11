@@ -1,0 +1,35 @@
+{
+	"segmentation_specification": {
+		"segment": {
+			"name": "byPID",
+			"args": [{
+				"property": "pid",
+				"value": {
+					"var": "X"
+				}
+			}],
+			"specifications": [{
+				"radius": {
+					"r": 2,
+					"from": {
+						"property": "pid",
+						"var": "X"
+					},
+				    "edges": ["EDGE_EVENT_AFFECTS_FILE out",
+					      "EDGE_EVENT_AFFECTS_FILE in",
+					      "EDGE_EVENT_AFFECTS_NETFLOW out",
+					      "EDGE_EVENT_AFFECTS_NETFLOW in",
+					      "EDGE_EVENT_AFFECTS_CAUSES_EVENT out",
+					      "EDGE_EVENT_AFFECTS_CAUSES_EVENT in",
+					      "EDGE_FILE_AFFECTS_EVENT out",
+					      "EDGE_FILE_AFFECTS_EVENT in",
+					      "EDGE_SUBJECT_HASPARENT_SUBJECT out",
+					      "EDGE_SUBJECT_HASPARENT_SUBJECT in",
+					      "EDGE_SUBJECT_RUNSON out",
+					      "EDGE_SUBJECT_RUNSON in"
+					     ]
+				}
+			}]
+		}
+	}
+}
