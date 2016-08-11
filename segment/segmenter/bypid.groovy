@@ -11,6 +11,10 @@ def createVertices(graph,g,criterion) {
   }
 }
 
+def segmentNodesCreated(g) {
+  g.V().has('segment:name','byPID').valueMap(true)
+}
+
 
 def createVerticesAndEdges(graph,g,criterion,radius) {
   idWithProp = g.V().has(criterion).has(label,neq('Segment')).id().fold().next(); 
@@ -32,9 +36,7 @@ def createVerticesAndEdges(graph,g,criterion,radius) {
   }
 }
 
-def segmentNodesCreated(g) {
-  g.V().has('segment:name','byPID').valueMap(true)
-}
+
 
 def createSeg2SegEdges(graph,g) {
   for (snode in g.V().has('segment:name','byPID').id().fold().next()) {
