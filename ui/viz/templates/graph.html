@@ -36,11 +36,327 @@
         }
 
 
+        function execQuery(query_object, success_function) {
+            UI.loadingUIStart()
+            var query_string;
+            if (typeof query_object === "string") {
+                query_string = query_object
+                query_object = { "is_collapsed" : false }
+            } else {
+                query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
+            }
+            document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
+            $.post("/query", {"query": query_string}, function(node_results) {
+                if ( ! _.isEmpty(node_results)) {
+                    var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
+                    var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
+                    $.post("/query", {"query": edge_query}, function(edge_results) {
+                        var data = { "nodes" : node_results, "edges" : edge_results }
+                        if (query_object.is_collapsed) {
+                            data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
+                        }
+                        success_function(data)
+                        UI.loadingUIStop()
+                    }).fail(UI.failHandler)
+                } else {
+                    UI.loadingUIStop()
+                }
+            }).fail(UI.failHandler)
+        }
+
+
+        function getQueryObjectFromNode(node_id, query_name) {
+            var queries_from_node = node_data_set.get(node_id).queries
+            var query_object = _.filter(queries_from_node, function(q){ 
+                if (typeof query_name === "string") {
+                    return q.name === query_name
+                } else {
+                    return q.is_default
+                }})[0]
+            query_object['starting_node_id'] = node_id
+            return query_object
+        }
+
+
+        function addCollapsedEdges(data, starting_node_id, floating_query, edge_name) {
+            var special_edges = _.map(data['nodes'], function(n) {
+                return {
+                    id: "COLLAPSED-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23),
+                    inV: n.id,
+                    type: "edge",
+                    outV: starting_node_id,
+                    inVLabel: n.label,
+                    outVLabel: node_data_set.get(starting_node_id).label,
+                    label: typeof edge_name !== 'string' ? floating_query : edge_name,
+                    title: floating_query
+                }
+            })
+            var all_edges = data['edges'].concat(special_edges)
+            var new_data = {
+                "nodes" : uniqueBy(data['nodes']),
+                "edges" : uniqueBy(all_edges, function(e){ return String(e.outV)+e.title+String(e.inV) } ) 
+            }
+            return new_data
+        }
+
+
+        function collapsedQuery(starting_node_id, floating_query, edge_name) {
+            var query_string = "x = "+starting_node_id+"; g.V(x)" + floating_query
+            var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
+            var addCollapsedEdgesFunc = _.partial(addCollapsedEdges, _, starting_node_id, floating_query, edge_name)
+            var addCollapsedAndUpdate = _.compose(updateNetworkAtId, addCollapsedEdgesFunc)
+            makeQuery(query_string, addCollapsedAndUpdate)
+        }
+
+
+        function updateNetwork(additional_data, starting_node_id) {
+            var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
+            var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
+            journal.push({"nodes": new_nodes, "edges": new_edges})
+            // Add position, if needed:
+            if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
+                var bbox = network.getBoundingBox(starting_node_id)
+                var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
+                new_nodes = _.map(new_nodes, function(n) {
+                    n['x'] = starting_position.x
+                    n['y'] = starting_position.y
+                    return n
+                })
+            }
+            node_data_set.add(formatNodes(new_nodes))
+            edge_data_set.add(formatEdges(new_edges))
+            UI.animate()
+        }
+
+
+        function undoUpdateNetwork(steps) {
+            var steps = typeof steps === "number" ? steps : 1
+            var to_remove_list = _.last(journal, steps).reverse()
+            _.map(to_remove_list, function(d) {
+                var node_ids_to_remove = _.pluck(d.nodes, "id")
+                var edge_ids_to_remove = _.pluck(d.edges, "id")
+                node_data_set.remove(node_ids_to_remove)
+                edge_data_set.remove(edge_ids_to_remove)
+            })
+            journal.pop()
+            UI.animate()
+        }
+
+
+        function networkDoubleClickBehavior (props) {
+            if (props['nodes'].length == 1) {
+                var starting_node_id = props['nodes'][0]
+                // var node_queries = node_data_set.get(starting_node_id).queries
+                // var query = _.filter(node_queries, function(q){ return q.is_default })[0]
+                // var default_query = "g.V(" + starting_node_id + ")" + query.floating_query + ".dedup()"
+                // var node_query = "g.V(" + starting_node_id + ").bothE().bothV().dedup()"
+                // if (default_query.is_collapsed) {
+                //     // collapsedQuery_params =  [[starting_node_id, query.floating_query, query.name]]
+                //     collapsedQuery(starting_node_id, query.floating_query, query.name)
+                // } else {
+                //     makeQuery(default_query, _.partial(updateNetwork, _, starting_node_id))
+                // }
+                var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
+                var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
+                execQuery(query, updateNetworkAtId)
+            }
+        }
+
+
+        function networkRightClickBehavior(props) {
+            $("#node-query-menu ul").empty()
+            var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
+            if (typeof node_id == 'number') {
+                var relevant_saved_queries = node_data_set.get(node_id).queries
+
+                // $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
+                //     var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
+                    collapsedQuery_params =  []
+                    var idx = 0
+                    _.map(relevant_saved_queries, function(q) {
+                        q['starting_node_id'] = node_id
+                        
+                        var default_string = q.is_default ? "  (default)" : ""
+                        var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
+                        collapsedQuery_params.push([q, updateNetworkAtId])
+                        var onclick_function_call = "execQuery(collapsedQuery_params["+idx+"][0], collapsedQuery_params["+idx+"][1])"
+                        var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                        $("#node-query-menu ul").append(list_item)
+                        idx++
+
+                        // if (q.is_collapsed){
+                        //     collapsedQuery_params.push([node_id, q.floating_query, q.name])
+                        //     var default_string = q.is_default ? " (default)" : ""
+                        //     var onclick_function_call = 'collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])'
+                        //     var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                        //     $("#node-query-menu ul").append(list_item)
+                        //     idx++
+                        // } else {
+                        //     collapsedQuery_params.push([node_id, q.floating_query, q.name])
+                        //     var default_string = q.is_default ? " (default)" : ""
+                        //     var onclick_function_call = 'makeQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1], _.partial(updateNetwork, _, '+ node_id +'))'
+                        //     var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                        //     $("#node-query-menu ul").append(list_item)
+                        //     idx++
+                        // }
+                    })
+                    var query_menu = document.getElementById("node-query-menu")
+                    query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
+                    query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
+                    query_menu.className = "show"  
+                // })
+            }
+        }
+
+
+        function formatNodes(raw_results) {
+            var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
+            return _.map(nodes, function(n) {
+
+                
+                n['queries'] = getRelevantQueries(n)  
+
+                // TODO: should test for 'is_relevant' in 'saved_queries' refer to the raw data or to the translatedEnum data??
+                
+
+                translateAllEnums(n)
+                n["label"] = makeNodeLabel(n)
+                n["title"] = makeNodeTitle(n)
+                n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
+                return n
+            })
+        }
+
+
+        function getRelevantQueries(node) {
+            var adjacent_query = {
+                "name" : "Adjacent Nodes",
+                "floating_query" : ".bothE().bothV()",
+                "is_collapsed" : false,
+                "is_default" : true,  // Will be overridden by any default already defined.
+            }
+            var relevant_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node) })
+            var node_queries = _.map(relevant_queries, function(q) {q.is_collapsed = true; return q})
+            node_queries.push(adjacent_query)
+            var found_one_default = false
+            return _.map(node_queries, function(q){
+                var new_q = {
+                    "name" : q.name,
+                    "floating_query" : q.floating_query,
+                    "is_collapsed" : q.is_collapsed
+                }
+                if (q['is_default'] && ! found_one_default) {
+                    found_one_default = true
+                    new_q['is_default'] = true
+                } else {
+                    new_q['is_default'] = false
+                }
+                return new_q
+            })
+        }
+
+
+        function formatEdges(raw_edge_results) {
+            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
+            return _.map(edges, function(e, i, list) {
+                var new_edge = { 
+                    "id" : e['id'],
+                    "from" : e['outV'],
+                    "to" : e['inV'],
+                    // "label" : e['label'],
+                    "arrows" : "to",
+                    "title" : e['label'] 
+                }
+                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+                    new_edge['label'] = e['label']
+                    new_edge['title'] = e['title']
+                    new_edge['color'] = "green"
+                    new_edge['dashes'] = true
+                }
+                return new_edge
+            })
+        }
+
+
+        function uniqueBy(array, function_object_to_unique_value) {
+            var f = typeof function_object_to_unique_value === "function" ? function_object_to_unique_value : function(x){ return x.id }
+            var id_list = _.map(array, f)
+            var unique_ids = Array.from(new Set(id_list))
+            var unique_data_by_id = _.map(unique_ids, function(id) {
+                var idx = _.indexOf(id_list, id)
+                return array[idx]
+            })
+            return unique_data_by_id
+        }
+
+
+        function translateAllEnums(node) {  // Mutates 'node' in place.
+            var translateEnum = function(prop_key, ordered_list) {
+                var keys = Object.keys(node['properties'])
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+            translateEnum("agentType", ["Local","Remote"])
+        }
+        
+
+
+        function makeNodeLabel(node) {
+            switch(node['label']) {
+                case "Subject":
+                    var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+                    var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+                    var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+                    switch(t) {
+                        case "Process":
+                            return t + " " + pid
+                        case "Thread":
+                            return t + " of " + pid
+                        case "Event":
+                            if (e === "Write" || e === "Read") {
+                                return t + " " + e + " (" + node['properties']['size'][0]['value'] + ")" 
+                            } else { return t + " " + e }
+                        default:
+                            return t
+                    }
+                case "Entity-File":
+                    var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
+                    var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
+                    return "File " + url + " : " + file_version
+                case "Entity-NetFlow":
+                    var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
+                    var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
+                    return "Net " + dest + " : " + port
+                case "Agent":
+                    var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
+                    return at + " Agent, uid " + node['properties']['userID'][0]['value']
+                default:
+                    return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
+            }
+        }
+
+        function makeNodeTitle(node) {
+            var keys = Object.keys(node['properties'])
+            var prop_lines = _.map(keys, function(key, i, list) {
+                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
+            })
+            return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+        }
+
+
         var UI = {
             queryClick : function() {
                 $('#query-string').css("background-color", "white")
                 var query_string = document.getElementById('query-string').value + ".dedup()"
-                makeQuery(query_string, updateNetwork)
+                execQuery(query_string, updateNetwork)
             },
             failHandler : function(response) {
                 $('#query-string').css("background-color", "pink")
@@ -84,276 +400,51 @@
                     $("#animate-button").html("Animate")
                     $("#animate-button").click(function(){ UI.animateButton(true) })
                 }
-            }
-        }
-
-
-        function draw(data) {
-            var container = document.getElementById('graph')
-            var options = {
-                interaction : { hover : true },
-                layout: { 
-                    improvedLayout : false,
-                    randomSeed : 10203040
-                },
-                physics: {
-                    forceAtlas2Based: {
-                        gravitationalConstant: -26,
-                        centralGravity: 0.005,
-                        springLength: 230,
-                        springConstant: 0.18,
-                        avoidOverlap: 1.5
-
+            },
+            draw : function(data) {
+                var container = document.getElementById('graph')
+                var options = {
+                    interaction : { hover : true },
+                    layout: { 
+                        improvedLayout : false,
+                        randomSeed : 10203040
                     },
-                    maxVelocity: 25,
-                    solver: 'forceAtlas2Based',
-                    timestep: 0.25,
-                    stabilization: {
-                        enabled: true,
-                        iterations: 150,
-                        updateInterval: 25
-                    }
-                },
-                nodes : {
-                    shape: 'dot',
-                    size: 15
-                },
-                edges: {
-                    smooth: false
-                }
-            }
+                    physics: {
+                        forceAtlas2Based: {
+                            gravitationalConstant: -26,
+                            centralGravity: 0.005,
+                            springLength: 230,
+                            springConstant: 0.18,
+                            avoidOverlap: 1.5
 
-            node_data_set = new vis.DataSet(data.nodes)
-            edge_data_set = new vis.DataSet(data.edges)
-            var network_data = { "nodes" : node_data_set, "edges" : edge_data_set}
-            network = new vis.Network(container, network_data, options)
-            journal = [data]
-
-            network.on("doubleClick", networkDoubleClickBehavior)
-            network.on("oncontext", networkRightClickBehavior)
-        }
-
-
-        function collapsedQuery(starting_node_id, floating_query, edge_name) {
-            var query_string = "x = "+starting_node_id+"; g.V(x)" + floating_query
-            var addSpecialEdges = function(data) {
-                var special_edges = _.map(data['nodes'], function(n) {
-                    return {
-                        id: "COLLAPSED-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23),
-                        inV: n.id,
-                        type: "edge",
-                        outV: starting_node_id,
-                        inVLabel: n.label,
-                        outVLabel: node_data_set.get(starting_node_id).label,
-                        label: typeof edge_name !== 'string' ? floating_query : edge_name,
-                        title: floating_query
-                    }
-                })
-                var all_edges = data['edges'].concat(special_edges)
-                var new_data = { 
-                    "nodes" : uniqueFromValue(data['nodes']),
-                    "edges" : uniqueFromValue(all_edges, function(e){ return String(e.outV)+e.title+String(e.inV) } ) 
-                }
-                return new_data
-            }
-            var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
-            var addAndUpdate = _.compose(updateNetworkAtId, addSpecialEdges)
-            makeQuery(query_string, addAndUpdate)
-        }
-
-
-        function updateNetwork(additional_data, starting_node_id) {
-            var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
-            var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
-            journal.push({"nodes": new_nodes, "edges": new_edges})
-            // Add position, if needed:
-            if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
-                var bbox = network.getBoundingBox(starting_node_id)
-                var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
-                new_nodes = _.map(new_nodes, function(n) {
-                    n['x'] = starting_position.x
-                    n['y'] = starting_position.y
-                    return n
-                })
-            }
-            node_data_set.add(formatNodes(new_nodes))
-            edge_data_set.add(formatEdges(new_edges))
-            UI.animate()
-        }
-
-
-        function undoUpdateNetwork(steps) {
-            var steps = typeof steps === "number" ? steps : 1
-            var to_remove_list = _.last(journal, steps).reverse()
-            _.map(to_remove_list, function(d) {
-                var node_ids_to_remove = _.pluck(d.nodes, "id")
-                var edge_ids_to_remove = _.pluck(d.edges, "id")
-                node_data_set.remove(node_ids_to_remove)
-                edge_data_set.remove(edge_ids_to_remove)
-            })
-            journal.pop()
-            UI.animate()
-        }
-
-
-        function networkDoubleClickBehavior (props) {
-            if (props['nodes'].length == 1) {
-                var starting_node_id = props['nodes'][0]
-                var node_query = "g.V(" + starting_node_id + ").bothE().bothV().dedup()"
-                makeQuery(node_query, _.partial(updateNetwork, _, starting_node_id))
-            }
-        }
-
-
-        function networkRightClickBehavior(props) {
-            $("#node-query-menu ul").empty()
-            var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
-            if (typeof node_id == 'number') {
-                $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
-                    var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
-                    collapsedQuery_params =  []
-                    var idx = 0
-                    _.map(relevant_saved_queries, function(q) {
-                        collapsedQuery_params.push([node_id, q.floating_query, q.name])
-                        $("#node-query-menu ul").append(
-                            '<li title="'+ q.floating_query +'" onclick="collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])">' + q.name + '</li>'
-                        )
-                        idx++
-                    })
-                    document.getElementById("node-query-menu").style.top =  props['pointer']['DOM']['y'] + 'px'
-                    document.getElementById("node-query-menu").style.left = props['pointer']['DOM']['x'] + 'px'
-                    document.getElementById("node-query-menu").className = "show"  
-                })
-            }
-        }
-
-
-        function formatNodes(raw_results) {
-            var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
-            return _.map(nodes, function(n) {
-                // return {
-                //     "id" : n['id'],
-                //     "label" : makeNodeLabel(n),
-                //     "title" : makeNodeTitle(n),
-                //     "font" : {
-                //         "strokeWidth" : 3, 
-                //         "strokeColor" : 'white'}
-                // }
-                n["label"] = makeNodeLabel(n),
-                n["title"] = makeNodeTitle(n),
-                n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
-                return n
-            })
-        }
-
-
-        function formatEdges(raw_edge_results) {
-            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
-            return _.map(edges, function(e, i, list) {
-                var new_edge = { 
-                    "id" : e['id'],
-                    "from" : e['outV'],
-                    "to" : e['inV'],
-                    // "label" : e['label'],
-                    "arrows" : "to",
-                    "title" : e['label'] 
-                }
-                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
-                    new_edge['label'] = e['label']
-                    new_edge['title'] = e['title']
-                    new_edge['color'] = "green"
-                    new_edge['dashes'] = true
-                }
-                return new_edge
-            })
-        }
-
-
-        function uniqueFromValue(array, function_object_to_unique_value) {
-            var f = typeof function_object_to_unique_value === "function" ? function_object_to_unique_value : function(x){ return x.id }
-            var id_list = _.map(array, f)
-            var unique_ids = Array.from(new Set(id_list))
-            var unique_data_by_id = _.map(unique_ids, function(id) {
-                var idx = _.indexOf(id_list, id)
-                return array[idx]
-            })
-            return unique_data_by_id
-        }
-
-
-        function makeNodeLabel(node) {
-            // attempting to improve readability of node labels by translating enums
-            var keys = Object.keys(node['properties'])
-            // define enum translation function
-            function translateEnum(prop_key, ordered_list) {
-                var node_has_prop = $.inArray(prop_key, keys) >= 0
-                if (node_has_prop) {
-                    var idx = node['properties'][prop_key][0]['value']
-                    if (ordered_list.length > idx) { 
-                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                        },
+                        maxVelocity: 25,
+                        solver: 'forceAtlas2Based',
+                        timestep: 0.25,
+                        stabilization: {
+                            enabled: true,
+                            iterations: 150,
+                            updateInterval: 25
+                        }
+                    },
+                    nodes : {
+                        shape: 'dot',
+                        size: 15
+                    },
+                    edges: {
+                        smooth: false
                     }
                 }
+
+                node_data_set = new vis.DataSet(data.nodes)
+                edge_data_set = new vis.DataSet(data.edges)
+                var network_data = { "nodes" : node_data_set, "edges" : edge_data_set}
+                network = new vis.Network(container, network_data, options)
+                journal = [data]
+
+                network.on("doubleClick", networkDoubleClickBehavior)
+                network.on("oncontext", networkRightClickBehavior)
             }
-
-            if (node['label'] == "Subject") {
-                // translate subject properties to text
-                translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
-                var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-                translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
-                var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-                var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
-                if (t == "Process") {return t + " " + pid}
-                if (t == "Event" && (e == "Write" || e == "Read"))   
-                    {return t + " " + e + ", size " + node['properties']['size'][0]['value']}
-                else 
-                    {return t + " " + e}
-                if (t == "Thread")  {return t + " of " + pid}
-                if (t == "Unit")    {return t}
-                if (t == "Block")   {return t}
-//                return t + ", E: " + e + ", PID: " + pid
-            } else if (node['label'] == "Entity-File") {
-                var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-                var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-                return "File " + url + " : " + file_version
-            } else if (node['label'] == "Entity-NetFlow") {
-                var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
-                var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-                return "Net " + dest + " : " + port
-            } else if (node['label'] == "Agent") {
-                translateEnum("agentType", ["Local","Remote"])
-                var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
-                return at + " Agent, uid " + node['properties']['userID'][0]['value']
-            } else {
-                return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
-            }
-        }
-
-
-        function makeNodeTitle(node) {
-            var keys = Object.keys(node['properties'])
-
-            function translateEnum(prop_key, ordered_list) {
-                var node_has_prop = $.inArray(prop_key, keys) >= 0
-                if (node_has_prop) {
-                    var idx = node['properties'][prop_key][0]['value']
-                    if (ordered_list.length > idx) { 
-                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
-                    }
-                }
-            }
-            
-            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
-
-            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
-
-            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
-
-            translateEnum("agentType", ["Local","Remote"])
-
-            var prop_lines = _.map(keys, function(key, i, list) {
-                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
-            })
-            return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
         }
 
 
@@ -361,7 +452,7 @@
             document.getElementById("node-query-menu").className = "hide"
         })
         $(function(){
-            draw( { "nodes" : [], "edges" : [] } )
+            UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
         })
     </script>
