@@ -1,3 +1,10 @@
+Trace was obtained by running these commands on the Monitored Host:
+
+1. `./1_run_simple_apt.sh`
+2. `date; /tmp/simple 13.1.102.2 4000`
+3. `date; sudo spade stop`
+4. `rsync -av /tmp/simple_apt.cdm adapt@seaside.galois.com:trace/2016-08-11/simple_with_marker_3.avro`
+
 sample output
 =============
 
@@ -119,7 +126,7 @@ sample output
 
 
 corresponding session in Shanghai
-=================================
+---------------------------------
 
     galaxy1:~/Documents/TransparentComputing/malware/cross-platform/simple-apt/oc1$  python ocMain.py 13.1.102.2 4000
     [*] Listening for new connections on 13.1.102.2:4000
@@ -149,7 +156,7 @@ corresponding session in Shanghai
 
 
 logs retained by Unit 61398
-===========================
+---------------------------
 
     galaxy1:~/Documents/TransparentComputing/malware/cross-platform/simple-apt/oc1$  head -99 logs/20160811_112857/*.log
     ==> logs/20160811_112857/L1.log <==

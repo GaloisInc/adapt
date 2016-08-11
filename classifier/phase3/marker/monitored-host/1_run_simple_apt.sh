@@ -22,15 +22,22 @@
 # the software.
 #
 
-if [ `hostname` != zhangang ]
+if [ `hostname` != hangang ]
 then
     echo Running on unusual Monitored Host. Proceding...
 fi
+
+comma_to_S() {
+    echo $1 | sed 's;,; -S ;g'
+}
+
+
 sudo rm -f /tmp/simple_apt.cdm
+echo sudo auditctl -D
 echo /tmp/simple 13.1.102.2 4000
 set -ex
 
-sudo auditctl -a exit,always -F arch=b64 -S socket -S bind -S listen -S accept
+sudo auditctl -a exit,always -F arch=b64 -S `comma_to_S write,open,socket,accept,bind,listen`
 sudo auditctl -l
 sudo auditctl -b 8000
 
