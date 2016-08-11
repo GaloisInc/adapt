@@ -25,6 +25,8 @@ def json_query_post():
 
 @app.route('/query/<gremlin_query_string>', methods=["GET"])
 def json_query_get(gremlin_query_string):
+	app.logger.info("Received query: %s" % gremlin_query_string)
+	result = "db.execute(%s) never returned a good result!" % gremlin_query_string
 	try:
 		result = db.execute(gremlin_query_string)
 		return Response(response=json.dumps(result), status=200, mimetype="application/json")
