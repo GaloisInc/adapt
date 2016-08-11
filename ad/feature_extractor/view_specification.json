@@ -103,7 +103,7 @@
             "num_modify_attrib":
                 "g.V({id}).both().both().has('eventType',14).count()"
         }
-    }
+    },
 
     "files_connected_with_netflow" : {
         "description" : "Analyze files that have connection with netflow (potential downloaded files)",
