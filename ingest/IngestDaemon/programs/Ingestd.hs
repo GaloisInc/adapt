@@ -14,6 +14,7 @@
 module Main where
 
 import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad (void)
 import           Control.Concurrent (threadDelay)
 -- import           Control.Exception as X
 import           Lens.Micro
@@ -296,10 +297,12 @@ runDB :: (Text -> IO ())
       -> IO ()
 runDB _ _ [] = return ()
 runDB emit conn inputOps = do
-  let (sendThese,waitThese) = L.splitAt 100 inputOps
+  let (sendThese,waitThese) = L.splitAt nrBulk inputOps
   go sendThese
   runDB emit conn waitThese
  where
+ nrBulk = 100
+ deadAt = 2 -- retry age zero and one inputs, drop on third failure.
  go oprs =
   do let (operVS,operES) = L.partition (isVertex . statement) oprs
          (vs,es)   = (map statement operVS, map statement operES)
@@ -311,16 +314,27 @@ runDB emit conn inputOps = do
          esReq     = uncurry mkRequest esCmdEnv
          sendReq x o = GC.sendOn conn x (recover o)
          recover :: [Input] -> Response -> IO ()
-         recover _xs resp
-            | respStatus resp /= 200 = return () -- XXX insertDB (respRequestId resp) xs fidb
+         recover xs@(x:_) resp
+            | respStatus resp /= 200 =
+                -- Retry by simply calling runDB on the individual
+                -- inputs instead of the bulk set of inputs.
+                let live = filter ((<deadAt) . inputAge) (map ageInput xs)
+                    batches
+                      | inputAge x < (deadAt-1)  =
+                          let (a,b) = L.splitAt (length xs `div` 2) live
+                          in [a,b]
+                      | otherwise      = live
+                in void $ forkIO (mapM_ (runDB emit conn) batches)
+                   -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
-     -- now <- getCurrentTime
-     -- emit (T.pack $ printf "[%s] Sending %d nodes, %d edges" (show now) nrVS nrES)
      when (nrVS > 0) $ sendReq vsReq operVS
      when (nrES > 0) $ sendReq esReq operES
 
 --------------------------------------------------------------------------------
 --  Utils
+
+ageInput :: Input -> Input
+ageInput i = i { inputAge = inputAge + 1 }
 
 isVertex :: Operation a -> Bool
 isVertex (InsertVertex {}) = True
