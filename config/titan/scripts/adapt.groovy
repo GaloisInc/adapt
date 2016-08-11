@@ -114,7 +114,7 @@ def makeIndex = { String indexName, String indexKey, indexType, indexBuilder ->
 def makeNumericSearchIndex = {
   makeIndex(indexName,indexKey,indexType, { mgmt, indexName,idKey -> 
     mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildMixedIndex('search')
-  }
+  })
 }
 
 
@@ -129,7 +129,7 @@ makeElasticSearchIndex('byURL','url',String.class)
 
 // index PIDs and timestamps for numeric queries
 makeNumericSearchIndex('byPID','pid',Integer.class)
-makeElasticSearchIndex('byTime','startedAtTime',Long.class)
+makeNumericSearchIndex('byTime','startedAtTime',Long.class)
 
 
 // The graph traverser captured by variable 'g' is useful to many of
