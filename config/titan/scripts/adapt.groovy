@@ -40,17 +40,17 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
     mgmt = graph.openManagement()
     i = mgmt.getGraphIndex(indexName)
     if(! i) {
-      ixKey = mgmt.getPropertyKey(indexKey)
-      ixKey = ixKey ? ixKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
-      mgmt.buildIndex(indexName, Vertex.class).addKey(ixKey, Mapping.STRING.asParameter()).buildMixedIndex('search')
+      idKey = mgmt.getPropertyKey(indexKey)
+      idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
+      mgmt.buildIndex(indexName, Vertex.class).addKey(idKey, Mapping.STRING.asParameter()).buildMixedIndex('search')
       mgmt.commit()
       graph.tx().commit()
     
       mgmt  = graph.openManagement()
-      ixKey = mgmt.getPropertyKey(indexKey)
+      idKey = mgmt.getPropertyKey(indexKey)
       idx   = mgmt.getGraphIndex(indexName)
       // Wait for index availability
-      if ( idx.getIndexStatus(ixKey).equals(SchemaStatus.INSTALLED) ) {
+      if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
@@ -65,17 +65,17 @@ def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
     mgmt = graph.openManagement()
     i = mgmt.getGraphIndex(indexName)
     if(! i) {
-      Key = mgmt.getPropertyKey(indexKey)
-      ixKey = ixKey ? ixKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
-      mgmt.buildIndex(indexName, Vertex.class).addKey(ixKey).buildMixedIndex('search')
+      idKey = mgmt.getPropertyKey(indexKey)
+      idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
+      mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildMixedIndex('search')
       mgmt.commit()
       graph.tx().commit()
     
       mgmt  = graph.openManagement()
-      ixKey = mgmt.getPropertyKey(indexKey)
+      idKey = mgmt.getPropertyKey(indexKey)
       idx   = mgmt.getGraphIndex(indexName)
       // Wait for index availability
-      if ( idx.getIndexStatus(ixKey).equals(SchemaStatus.INSTALLED) ) {
+      if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
