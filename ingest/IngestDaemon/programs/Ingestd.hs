@@ -14,8 +14,7 @@
 module Main where
 
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad (void)
-import           Control.Concurrent (threadDelay)
+import           Control.Concurrent (threadDelay, forkIO)
 import qualified Control.Concurrent.Chan as Ch
 -- import           Control.Exception as X
 import           Lens.Micro
@@ -63,6 +62,7 @@ data Config =
              , _kafkaInternal :: KafkaAddress
              , _kafkaExternal :: KafkaAddress
              , _startingOffset :: Maybe Integer
+             , _stopAfterCount :: Maybe Integer
              , _inputTopics   :: [TopicName]
              , _outputTopic   :: TopicName
              , _triggerTopic  :: TopicName
@@ -191,17 +191,17 @@ mainLoop cfg =
         mkFromKafka :: TopicName -> FromKafkaSettings
         mkFromKafka t = FKS { sourceServer  = cfg ^. kafkaExternal
                             , sourceSchema  = inputSchema
-                            , initialOffset = fromIntegral (cfg ^. initialOffset)
+                            , initialOffset = fromIntegral <$> cfg ^. startingOffset
                             , maximumCount  = cfg ^. stopAfterCount
                             , sendInputs    = liftIO . sendToDB
-                            , logKafkaMessage = liftIO . logMsg
+                            , logKafkaMsg   = logMsg
                             , sourceTopic   = t
                             }
         fks = map mkFromKafka (cfg ^. inputTopics)
     case fks of
       [] -> T.putStrLn "No input sources specified."
       fs ->
-        do mapM_ forkIO (kafkaInputToDB fs)
+        do mapM_ (\f -> forkIO (kafkaInputToDB f >> return ())) fs
            forwardFinishSignal (cfg ^. kafkaExternal)
                                (cfg ^. triggerTopic)
                                (cfg ^. kafkaInternal)
@@ -217,7 +217,7 @@ forwardFinishSignal inSvr inTopic outSvr outTopic=
      writeKafka "ingest-sig-producer" outSvr outTopic (Ch.readChan ch)
 
 -- Thread that pushes log message to dashboard or stderr.
-emitLogData :: Config -> Ch.Chan ByteString -> IO ()
+emitLogData :: Config -> Ch.Chan B.ByteString -> IO ()
 emitLogData cfg logChan =
   case cfg ^. logTopic of
     Just ltop -> writeKafka "ingest-log-producer"
@@ -232,13 +232,13 @@ emitLogData cfg logChan =
 -- Information needed by each thread that pulls from a kafka topic of TA1
 -- sources.
 data FromKafkaSettings =
-  FKS { sourceServer :: KafkaAddress
-      , sourceSchema :: Avro.Schema
+  FKS { sourceServer  :: KafkaAddress
+      , sourceSchema  :: Avro.Schema
       , initialOffset :: Maybe Offset
-      , maximumCount   :: Maybe Integer
-      , sendInputs     :: [Input] -> Kafka ()
-      , logKafkaMessage :: Text -> IO ()
-      , sourceTopic  :: TopicName
+      , maximumCount  :: Maybe Integer
+      , sendInputs    :: [Input] -> Kafka ()
+      , logKafkaMsg   :: Text -> IO ()
+      , sourceTopic   :: TopicName
       }
 
 -- | Acquire CDM from a given kafka host/topic, compile to Adapt Schema,
@@ -247,35 +247,36 @@ data FromKafkaSettings =
 -- Normal operation: one thread per input topic
 kafkaInputToDB :: FromKafkaSettings
            -> IO (Either KafkaClientError ())
-kafkaInputToDB cfg handleTranslatedData =
+kafkaInputToDB cfg =
   do r <- runKafka state oper
      case r of
-       Left err -> logKafkaMsg ("Error reading kafka topic '"
-                                 <> topicStr <> "':" <> T.pack (show r))
+       Left err -> logKafkaMsg cfg ("Error reading kafka topic '"
+                                    <> topicStr <> "':" <> T.pack (show err))
        Right () -> return ()
-     kafkaInputToDB cfg handleTranslatedData
+     kafkaInputToDB cfg
  where
- topicStr = T.decodeUtf8 (_kString (sourceTopic cfg))
+ src = sourceTopic cfg
+ topicStr = T.decodeUtf8 (_kString $ _tName src)
  state = mkKafkaState "adapt-ingest" (sourceServer cfg)
  oper  = do
-   off  <- maybe (getLastOffset LatestTime 0 topic) pure (initialOffset cfg)
+   off  <- maybe (getLastOffset LatestTime 0 src) pure (initialOffset cfg)
    uids <- randomUIDs <$> liftIO newTFGen
    now  <- liftIO getCurrentTime
-   logKafkaMsg cfg ("Connected to Kafka for reading topic " <> topicStr)
-   process now 0 uids off
+   liftIO $ logKafkaMsg cfg ("Connected to Kafka for reading topic " <> topicStr)
+   process now 0 0 uids off
 
  -- Read data, compile to our schema, and send to Gremlin
  -- Bail after `maximumCount`, if non-Nothing.
  process :: UTCTime -> Int -> Integer -> [UID] -> Offset -> Kafka ()
  process start !cnt total uids offset
-  | maybe (total >=) False (maximumCount cfg) = return ()
+  | maybe False (total >=) (maximumCount cfg) = return ()
   | otherwise =
    do bs0 <- getMessage (sourceTopic cfg) offset
-      let bs = maybe (\x -> take (x - total) bs0) bs0 (maximumCount cfg)
+      let bs = maybe bs0 (\x -> take (fromIntegral $ x - total) bs0) (maximumCount cfg)
           nr = length bs
           newTotal = total + fromIntegral nr
           decodeMsg b =
-           case Avro.decode cdmSchema (BL.fromStrict b) of
+           case Avro.decode (sourceSchema cfg) (BL.fromStrict b) of
              Avro.Success cdmFmt ->
                return (Just cdmFmt)
              Avro.Error err      ->
@@ -314,13 +315,13 @@ convertToSchema uids cdmFmt =
        operations = compile (ns,esAndUID)
    in (map (\o -> Input cdmFmt o 0) operations, drop (length es) uids)
 
-connectToTitan :: GC.ServerInfo -> IO GC.DBConnection
-connectToTitan svr =
+connectToTitan :: (Text -> IO()) -> GC.ServerInfo -> IO GC.DBConnection
+connectToTitan logMsg svr =
  do dbc <- GC.connect svr { maxOutstandingRequests = 64 }
     case dbc of
       Left _  -> do logMsg "Could not connect to Titan."
                     threadDelay 1000000
-                    connectToTitan svr
+                    connectToTitan logMsg svr
       Right c -> return c
 
 --------------------------------------------------------------------------------
@@ -352,6 +353,7 @@ runDB emit conn inputOps = do
          esReq     = uncurry mkRequest esCmdEnv
          sendReq x o = GC.sendOn conn x (recover o)
          recover :: [Input] -> Response -> IO ()
+         recover [] _ = error "BUG: failed insertion on an empty batch."
          recover xs@(x:_) resp
             | respStatus resp /= 200 =
                 -- Retry by simply calling runDB on the individual
@@ -361,7 +363,7 @@ runDB emit conn inputOps = do
                       | inputAge x < (deadAt-1)  =
                           let (a,b) = L.splitAt (length xs `div` 2) live
                           in [a,b]
-                      | otherwise      = live
+                      | otherwise      = map (\y -> [y]) live
                 in void $ forkIO (mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
@@ -372,7 +374,7 @@ runDB emit conn inputOps = do
 --  Utils
 
 ageInput :: Input -> Input
-ageInput i = i { inputAge = inputAge + 1 }
+ageInput i = i { inputAge = inputAge i + 1 }
 
 isVertex :: Operation a -> Bool
 isVertex (InsertVertex {}) = True
@@ -401,28 +403,32 @@ getMessage topicNm offset =
 -- Helper routine for reading from kafka topics
 readKafka :: KafkaClientId
           -> KafkaAddress -> TopicName
-          -> (ByteString -> IO ())
+          -> (B.ByteString -> IO ())
           -> IO ()
-readKafka name svr topic putMsg = runKafka (mkKafkaState name svr) (withLastOffset op)
+readKafka name svr topic putMsg =
+ do _ <- runKafka (mkKafkaState name svr) (withLastOffset op topic)
+    return ()
   where
   op off =
     do bs <- getMessage topic off
        liftIO (mapM_ putMsg bs)
-       op (off + length bs)
+       op (off + fromIntegral (length bs))
 
 -- Helper routine for writing to kafka topics
 writeKafka :: KafkaClientId
           -> KafkaAddress -> TopicName
-          -> IO ByteString
+          -> IO B.ByteString
           -> IO ()
-writeKafka name srv topic getMsg = runKafka (mkKafkaState name srv) (forever op)
+writeKafka name srv topic getMsg =
+ do _ <- runKafka (mkKafkaState name srv) (forever op)
+    return ()
   where
   op =
-    do m <- getMsg
+    do m <- liftIO getMsg
        produceMessages [TopicAndMessage topic $ makeMessage m]
 
-withLastOffset :: (Offset -> Kafka a) -> Kafka a
-withLastOffset op =
+withLastOffset :: (Offset -> Kafka a) -> TopicName -> Kafka a
+withLastOffset op topic =
     do off <- getLastOffset LatestTime 0 topic
        op off
 
