@@ -112,7 +112,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['i'] ["inputTopic"]
                     "Set a TA-1 topic to be used as input"
                     $ ReqArg "Topic" $
-                        \str s -> Right $ s & inputTopics %~ (fromString str:)
+                        \str s -> Right $ s & inputTopics %~ (L.nub . (fromString str:))
                   , Option ['o'] ["outputTopic"]
                     "Set a PE topic to be used as output"
                     $ ReqArg "Topic" $
@@ -184,6 +184,8 @@ mainLoop cfg =
  do logChan <- Ch.newChan
     let logMsg m = void (Ch.writeChan logChan (T.encodeUtf8 m))
     _ <- forkIO (emitLogData cfg logChan)
+    startTime <- getCurrentTime
+    logMsg $ "Starting Ingestd at " <> T.pack (show startTime)
     dbconn <- connectToTitan logMsg (cfg ^. titanServer)
     logMsg "Connected to Titan."
     inputSchema <- CDM.getAvroSchema
