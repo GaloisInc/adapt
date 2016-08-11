@@ -61,7 +61,7 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
     } else { mgmt.commit() }
 }
 
-def makeNumericSearchIndexOld = { String indexName, String indexKey, indexType ->
+def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
     mgmt = graph.openManagement()
     i = mgmt.getGraphIndex(indexName)
     if(! i) {
@@ -84,37 +84,6 @@ def makeNumericSearchIndexOld = { String indexName, String indexKey, indexType -
       mgmt.commit()
       mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.ENABLED).call()
     } else { mgmt.commit() }
-}
-
-def makeIndex = { String indexName, String indexKey, indexType, indexBuilder ->
-    mgmt = graph.openManagement()
-    i = mgmt.getGraphIndex(indexName)
-    if(! i) {
-      idKey = mgmt.getPropertyKey(indexKey)
-      idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
-      indexBuilder(mgmt,indexName,idKey)
-      mgmt.commit()
-      graph.tx().commit()
-    
-      mgmt  = graph.openManagement()
-      idKey = mgmt.getPropertyKey(indexKey)
-      idx   = mgmt.getGraphIndex(indexName)
-      // Wait for index availability
-      if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
-        mgmt.commit()
-        mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
-      } else { mgmt.commit() }
-      mgmt  = graph.openManagement()
-      mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
-      mgmt.commit()
-      mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.ENABLED).call()
-    } else { mgmt.commit() }
-}
-
-def makeNumericSearchIndex = {
-  makeIndex(indexName,indexKey,indexType, { mgmt, indexName,idKey -> 
-    mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildMixedIndex('search')
-  })
 }
 
 
