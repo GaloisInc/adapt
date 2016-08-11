@@ -24,14 +24,17 @@
 #
 # usage:
 #     ./copy_traces_for_knife.sh
-#     ./time_span.py
+#     ./time_span_avro.py
 #
 '''
-Reports on elapsed time during a trace, read from a forensic avro file.
+Reports on time elapsed during a trace,
+which is read from a forensic avro file.
 '''
 import argparse
+import collections
 import datetime
 import io
+import ipaddress
 import json
 import math
 import os
@@ -64,6 +67,33 @@ class AvroToJson:
             yield line
 
 
+def ip(addr46):
+    '''Converts address like 10.0.0.1 to 010.000.000.001, for sorting.'''
+    if addr46 == '':
+        addr46 = '0.0.0.0'
+    addr = ipaddress.ip_address(addr46)
+    if isinstance(addr, ipaddress.IPv6Address):
+        # Convert short address like ::1 to constant length address.
+        assert len(addr.packed) == 16, addr
+        p = addr.packed
+        ws = [256 * p[i] + p[i + 1]
+              for i in range(0, 15, 2)]
+        return '[%s]' % ':'.join(['%02x' % v for v in ws])
+    else:
+        return '.'.join(['%03d' % b for b in addr.packed])
+
+
+def fmt_addr(s):
+    if s.startswith('port '):
+        return s
+    # Compress zeros.
+    if s.startswith('['):
+        return '[%s]' % ipaddress.ip_address(s.strip('[]'))
+    # Strip leading zeros from e.g. 127.000.000.001.
+    ip4 = '.'.join([str(int(b)) for b in s.split('.')])
+    return str(ipaddress.ip_address(ip4))
+
+
 class TimeSpan:
 
     def __init__(self, json_src):
@@ -76,9 +106,15 @@ class TimeSpan:
             assert 13 == int(datum['CDMVersion']), datum
             yield datum['datum']
 
-    def report(self):
+    def report(self, show_commands=False):
+        cmds = collections.defaultdict(int)
+        pids = collections.defaultdict(int)
+        addrs = collections.defaultdict(int)
+
         b, e, n, m = math.inf, 0, 0, 0
+
         for event in self.get_events():
+
             try:
                 n += 1
                 ts = event['startTimestampMicros']
@@ -90,22 +126,51 @@ class TimeSpan:
             except KeyError:
                 pass
 
+            try:
+                pids[event['pid']] += 1  # Typically has only one occurence.
+                if 'cmdLine' in event:   # Grrr, ta5attack2 has cmdLine: None.
+                    p = event['properties']
+                    cmds[p['name']] += 1
+            except KeyError:
+                pass
+
+            try:
+                addrs[ip(event['srcAddress'])] += 1
+                addrs[ip(event['destAddress'])] += 1
+                if event['destPort'] > 0:
+                    addrs['port %d' % event['destPort']] += 1
+                del(addrs['000.000.000.000'])
+            except KeyError:
+                pass
+
         b = datetime.datetime.utcfromtimestamp(b / 1e6)
         e = datetime.datetime.utcfromtimestamp(e / 1e6)
         print('begin:  ', b, '\nend:    ', e, '\nelapsed:', e - b)
         print(n, 'records, of which', m, 'were timestamped.')
 
+        if show_commands:
+            print('\n')
+            print('\n'.join(['%4d  %s' % (v, k)
+                             for k, v in sorted(cmds.items())]))
+            print('\n%d PIDs appear in the trace:' % len(pids))
+            print(', '.join(map(str, sorted(pids))))
+            print('\n')
+            print('\n'.join(['%4d  %s' % (v, fmt_addr(k))
+                             for k, v in sorted(addrs.items())]))
+
 
 def arg_parser():
-    d = 'Reports on elapsed time during a trace, read from a forensic file.'
+    d = 'Reports on time elapsed during a trace, read from a forensic file.'
     p = argparse.ArgumentParser(description=d)
     p.add_argument(
         '--trace-dir', default='/tmp/knife/ta5attack2_units/',
         help='directory containing exactly one forensic source file')
+    p.add_argument('--commands', action='store_true',
+                   help='Also report on commands executed and PIDs seen.')
     return p
 
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
     with AvroToJson(args.trace_dir) as src:
-        TimeSpan(src).report()
+        TimeSpan(src).report(args.commands)
