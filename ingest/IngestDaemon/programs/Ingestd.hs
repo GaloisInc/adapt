@@ -148,12 +148,14 @@ opts = OptSpec { progDefaults  = defaultConfig
                                 Nothing  -> Left "Could not parse host:port string."
                   , Option ['s'] ["starting-offset"]
                     "Start reading input from a given Kafka offset"
+                    $ ReqArg "INT" $
                       \str s ->
                         case readMaybe str of
                           Just n  -> Right (s & startingOffset .~ n)
                           Nothing -> Left "Could not parse starting offset."
                   , Option ['c'] ["count"]
                     "Stop reading input after consuming a particular number of statements (each input topic will read this many statements!)."
+                    $ ReqArg "INT" $
                       \str s ->
                         case readMaybe str of
                           Just n  -> Right (s & stopAfterCount .~ n)
@@ -248,7 +250,8 @@ kafkaInputToDB :: FromKafkaSettings
 kafkaInputToDB cfg handleTranslatedData =
   do r <- runKafka state oper
      case r of
-       Left err -> logKafkaMsg ("Error reading kafka topic '" <> topicStr <> "':" <> T.pack (show r))
+       Left err -> logKafkaMsg ("Error reading kafka topic '"
+                                 <> topicStr <> "':" <> T.pack (show r))
        Right () -> return ()
      kafkaInputToDB cfg handleTranslatedData
  where
