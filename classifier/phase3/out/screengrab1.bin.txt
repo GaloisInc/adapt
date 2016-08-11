@@ -1,17 +1,40 @@
 Sent 1458 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
 Segmenter ready to run
 
 ******************************
 Running DB side segmenter
 ******************************
 Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f80677335f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+AttributeError: 'NoneType' object has no attribute 'info'
+0.30user 0.01system 2:59.49elapsed 0%CPU (0avgtext+0avgdata 25804maxresident)k
+0inputs+24outputs (0major+8173minor)pagefaults 0swaps
+
+2016-08-10 20:44:06,795 INFO Fetched 0 base nodes.
+2016-08-10 20:44:06,796 INFO Inserted 0 activity classifications.
+0.53user 0.02system 0:02.69elapsed 20%CPU (0avgtext+0avgdata 32144maxresident)k
+0inputs+0outputs (0major+10586minor)pagefaults 0swaps
+
      4  EDGE_EVENT_AFFECTS_NETFLOW
      4  EDGE_EVENT_AFFECTS_NETFLOW in
      4  EDGE_EVENT_AFFECTS_NETFLOW out
+    20  segment:edge
     28  EDGE_EVENT_AFFECTS_FILE
     28  EDGE_EVENT_AFFECTS_FILE in
     28  EDGE_EVENT_AFFECTS_FILE out
-    32  segment:edge
     34  Segment
     44  EDGE_NETFLOW_AFFECTS_EVENT
     44  EDGE_NETFLOW_AFFECTS_EVENT in
@@ -39,7 +62,7 @@ Segments (including edges) created
    212  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    246  Subject
    713  segment:includes
-  3801  total
+  3789  total
 
 
 agent

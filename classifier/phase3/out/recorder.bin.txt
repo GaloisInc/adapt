@@ -1,10 +1,35 @@
 Sent 744 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
 Segmenter ready to run
 
 ******************************
 Running DB side segmenter
 ******************************
 Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f454f7a85f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.29user 0.02system 1:01.22elapsed 0%CPU (0avgtext+0avgdata 25812maxresident)k
+0inputs+24outputs (0major+8131minor)pagefaults 0swaps
+
+2016-08-10 20:37:01,257 INFO Fetched 9 base nodes.
+2016-08-10 20:37:01,258 INFO Inserted 0 activity classifications.
+0.41user 0.03system 0:01.54elapsed 29%CPU (0avgtext+0avgdata 32120maxresident)k
+0inputs+0outputs (0major+10602minor)pagefaults 0swaps
+
      2  Agent
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL in
@@ -13,7 +38,7 @@ Segments (including edges) created
     12  EDGE_OBJECT_PREV_VERSION
     12  EDGE_OBJECT_PREV_VERSION in
     12  EDGE_OBJECT_PREV_VERSION out
-    41  segment:edge
+    32  segment:edge
     71  EDGE_EVENT_AFFECTS_FILE
     71  EDGE_EVENT_AFFECTS_FILE in
     71  EDGE_EVENT_AFFECTS_FILE out
@@ -26,7 +51,7 @@ Segments (including edges) created
    204  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    213  Subject
    435  segment:includes
-  2040  total
+  2031  total
 
 
 agent

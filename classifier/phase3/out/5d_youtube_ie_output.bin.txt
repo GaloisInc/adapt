@@ -15,22 +15,22 @@ Segments (including edges) created
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fe2b373a630>>
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f90a4ecf5f8>>
 Traceback (most recent call last):
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
-  File "/usr/lib/python3.5/logging/__init__.py", line 1279, in info
-  File "/usr/lib/python3.5/logging/__init__.py", line 1403, in _log
-  File "/usr/lib/python3.5/logging/__init__.py", line 1360, in findCaller
-AttributeError: 'NoneType' object has no attribute 'normcase'
-0.28user 0.02system 0:55.71elapsed 0%CPU (0avgtext+0avgdata 25788maxresident)k
-0inputs+24outputs (0major+8167minor)pagefaults 0swaps
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.27user 0.04system 1:02.76elapsed 0%CPU (0avgtext+0avgdata 27284maxresident)k
+0inputs+32outputs (0major+8133minor)pagefaults 0swaps
 
-2016-08-10 09:38:17,525 INFO Fetched 9 base nodes.
-2016-08-10 09:38:17,525 INFO Inserted 0 activity classifications.
-0.42user 0.02system 0:10.26elapsed 4%CPU (0avgtext+0avgdata 32372maxresident)k
-0inputs+0outputs (0major+10592minor)pagefaults 0swaps
+2016-08-10 19:21:23,612 INFO Fetched 9 base nodes.
+2016-08-10 19:21:23,613 INFO Inserted 0 activity classifications.
+0.41user 0.04system 0:09.25elapsed 4%CPU (0avgtext+0avgdata 32484maxresident)k
+0inputs+8outputs (0major+10604minor)pagefaults 0swaps
 
+     6  segment:edge
      9  Agent
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL in
@@ -55,7 +55,7 @@ AttributeError: 'NoneType' object has no attribute 'normcase'
   2973  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   2982  Subject
   5973  segment:includes
- 28885  total
+ 28891  total
 
 
 agent
@@ -908,26 +908,27 @@ netflow
   68    2  93.184.215.200
   69    2  AS0  unknown
   70    2  AS10913  INTERNAP-BLK - Internap Network Services Corporation, US
-  71    2  AS13789  INTERNAP-BLK3 - Internap Network Services Corporation, US
+  71    1  AS13789  INTERNAP-BLK3 - Internap Network Services Corporation, US
   72    9  AS14618  AMAZON-AES - Amazon.com, Inc., US
   73    6  AS15133  EDGECAST - MCI Communications Services, Inc. d/b/a Verizon Business, US
   74   90  AS15169  GOOGLE - Google Inc., US
   75    3  AS16477  ACNIELSEN-AS - ACNIELSEN, US
   76    1  AS174  COGENT-174 - Cogent Communications, US
   77    4  AS20940  AKAMAI-ASN1 , US
-  78    2  AS2914  NTT-COMMUNICATIONS-2914 - NTT America, Inc., US
-  79   10  AS29990  ASN-APPNEXUS - AppNexus, Inc, US
-  80    3  AS32934  FACEBOOK - Facebook, Inc., US
-  81    1  AS3356  LEVEL3 - Level 3 Communications, Inc., US
-  82    4  AS35994  AKAMAI-AS - Akamai Technologies, Inc., US
-  83    1  AS36089  OPENX-AS1 - OPENX TECHNOLOGIES, INC., US
-  84    2  AS36408  CDNETWORKSUS-02 - CDNetworks Inc., US
-  85    1  AS7415  ADSAFE-1 - Integral Ad Science, Inc., US
-  86    2  AS7843  TWCABLE-BACKBONE - Time Warner Cable Internet LLC, US
-  87    4  AS7922  COMCAST-7922 - Comcast Cable Communications, Inc., US
-  88    9  AS8068  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
-  89   12  AS8075  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
-  90  170  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
+  78    1  AS26558  FREEWHEEL - Freewheel Media Inc., US
+  79    2  AS2914  NTT-COMMUNICATIONS-2914 - NTT America, Inc., US
+  80   10  AS29990  ASN-APPNEXUS - AppNexus, Inc, US
+  81    3  AS32934  FACEBOOK - Facebook, Inc., US
+  82    1  AS3356  LEVEL3 - Level 3 Communications, Inc., US
+  83    4  AS35994  AKAMAI-AS - Akamai Technologies, Inc., US
+  84    1  AS36089  OPENX-AS1 - OPENX TECHNOLOGIES, INC., US
+  85    2  AS36408  CDNETWORKSUS-02 - CDNetworks Inc., US
+  86    1  AS7415  ADSAFE-1 - Integral Ad Science, Inc., US
+  87    2  AS7843  TWCABLE-BACKBONE - Time Warner Cable Internet LLC, US
+  88    4  AS7922  COMCAST-7922 - Comcast Cable Communications, Inc., US
+  89    9  AS8068  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
+  90   12  AS8075  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
+  91  170  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
 
 resource
 

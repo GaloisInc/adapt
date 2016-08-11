@@ -15,14 +15,18 @@ Segments (including edges) created
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-INFO:kafka.producer.kafka:Kafka producer closed
-0.29user 0.02system 5:45.18elapsed 0%CPU (0avgtext+0avgdata 25612maxresident)k
-0inputs+16outputs (0major+8186minor)pagefaults 0swaps
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fb1194c1630>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+AttributeError: 'NoneType' object has no attribute 'info'
+0.30user 0.01system 8:52.66elapsed 0%CPU (0avgtext+0avgdata 25900maxresident)k
+184inputs+24outputs (0major+8164minor)pagefaults 0swaps
 
-2016-08-10 10:41:37,177 INFO Fetched 2491 base nodes.
-2016-08-10 10:41:37,178 INFO Inserted 843 activity classifications.
-1.71user 0.10system 0:47.69elapsed 3%CPU (0avgtext+0avgdata 32872maxresident)k
-0inputs+16outputs (0major+15493minor)pagefaults 0swaps
+2016-08-11 08:23:03,471 INFO Fetched 2494 base nodes.
+2016-08-11 08:23:03,472 INFO Inserted 843 activity classifications.
+1.72user 0.07system 0:38.19elapsed 4%CPU (0avgtext+0avgdata 32888maxresident)k
+184inputs+16outputs (2major+15573minor)pagefaults 0swaps
 
      8  Entity-NetFlow
     58  EDGE_EVENT_AFFECTS_SUBJECT
@@ -36,7 +40,7 @@ INFO:kafka.producer.kafka:Kafka producer closed
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL out
     70  Segment
-   520  segment:edge
+   420  segment:edge
    528  EDGE_EVENT_AFFECTS_FILE
    528  EDGE_EVENT_AFFECTS_FILE in
    528  EDGE_EVENT_AFFECTS_FILE out
@@ -61,7 +65,7 @@ INFO:kafka.producer.kafka:Kafka producer closed
   5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   5272  Subject
  11573  segment:includes
- 53978  total
+ 53878  total
 
 
 agent
@@ -874,15 +878,15 @@ resource
 
 subject
    1    2  Event.CLONE
-   2    6  Event.CONNECT
-   3    4  Event.CREATE_OBJECT
+   2    7  Event.CONNECT
+   3    5  Event.CREATE_OBJECT
    4   21  Event.EXECUTE
    5   33  Event.FORK
    6    1  Event.KERNEL_UNKNOWN
-   7 1224  Event.OPEN
-   8 2597  Event.READ
-   9    5  Event.RECVMSG
+   7 1239  Event.OPEN
+   8 2625  Event.READ
+   9    4  Event.RECVMSG
   10    1  Event.SENDMSG
-  11  979  Event.WRITE
-  12 4936  InstrumentationSource.LINUX_AUDIT_TRACE
-  13 4873  Subject.SUBJECT_EVENT
+  11  996  Event.WRITE
+  12 5000  InstrumentationSource.LINUX_AUDIT_TRACE
+  13 4934  Subject.SUBJECT_EVENT

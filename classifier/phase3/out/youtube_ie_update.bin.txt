@@ -15,14 +15,20 @@ Segments (including edges) created
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-INFO:kafka.producer.kafka:Kafka producer closed
-0.28user 0.02system 0:54.26elapsed 0%CPU (0avgtext+0avgdata 25916maxresident)k
-0inputs+24outputs (0major+8144minor)pagefaults 0swaps
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fec1cd405f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.31user 0.02system 3:39.76elapsed 0%CPU (0avgtext+0avgdata 27556maxresident)k
+0inputs+16outputs (0major+8140minor)pagefaults 0swaps
 
-2016-08-10 07:05:11,060 INFO Fetched 19 base nodes.
-2016-08-10 07:05:11,061 INFO Inserted 0 activity classifications.
-0.53user 0.02system 0:16.57elapsed 3%CPU (0avgtext+0avgdata 32416maxresident)k
-0inputs+0outputs (0major+10578minor)pagefaults 0swaps
+2016-08-10 22:00:35,925 INFO Fetched 19 base nodes.
+2016-08-10 22:00:35,925 INFO Inserted 0 activity classifications.
+0.51user 0.02system 0:16.76elapsed 3%CPU (0avgtext+0avgdata 32228maxresident)k
+0inputs+0outputs (0major+10601minor)pagefaults 0swaps
 
      3  Agent
      8  EDGE_NETFLOW_AFFECTS_EVENT
@@ -1271,13 +1277,13 @@ netflow
   75    2  93.184.215.200
   76    7  AS0  unknown
   77    2  AS10913  INTERNAP-BLK - Internap Network Services Corporation, US
-  78    2  AS13789  INTERNAP-BLK3 - Internap Network Services Corporation, US
-  79    9  AS14618  AMAZON-AES - Amazon.com, Inc., US
-  80    6  AS15133  EDGECAST - MCI Communications Services, Inc. d/b/a Verizon Business, US
-  81   90  AS15169  GOOGLE - Google Inc., US
-  82    3  AS16477  ACNIELSEN-AS - ACNIELSEN, US
-  83    1  AS174  COGENT-174 - Cogent Communications, US
-  84    4  AS20940  AKAMAI-ASN1 , US
+  78    9  AS14618  AMAZON-AES - Amazon.com, Inc., US
+  79    6  AS15133  EDGECAST - MCI Communications Services, Inc. d/b/a Verizon Business, US
+  80   90  AS15169  GOOGLE - Google Inc., US
+  81    3  AS16477  ACNIELSEN-AS - ACNIELSEN, US
+  82    1  AS174  COGENT-174 - Cogent Communications, US
+  83    4  AS20940  AKAMAI-ASN1 , US
+  84    2  AS26558  FREEWHEEL - Freewheel Media Inc., US
   85    2  AS2914  NTT-COMMUNICATIONS-2914 - NTT America, Inc., US
   86   10  AS29990  ASN-APPNEXUS - AppNexus, Inc, US
   87    3  AS32934  FACEBOOK - Facebook, Inc., US
@@ -1297,15 +1303,15 @@ netflow
 resource
 
 subject
-   1    4  Event.ACCEPT
-   2 1713  Event.CHECK_FILE_ATTRIBUTES
-   3  233  Event.CONNECT
-   4   15  Event.CREATE_OBJECT
-   5  290  Event.EXECUTE
-   6    8  Event.EXIT
-   7   66  Event.MODIFY_FILE_ATTRIBUTES
-   8 1815  Event.READ
-   9  158  Event.UNLINK
-  10  678  Event.WRITE
+   1    7  Event.ACCEPT
+   2 1705  Event.CHECK_FILE_ATTRIBUTES
+   3  227  Event.CONNECT
+   4   14  Event.CREATE_OBJECT
+   5  289  Event.EXECUTE
+   6    7  Event.EXIT
+   7   71  Event.MODIFY_FILE_ATTRIBUTES
+   8 1819  Event.READ
+   9  148  Event.UNLINK
+  10  688  Event.WRITE
   11 5000  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
-  12 4980  Subject.SUBJECT_EVENT
+  12 4975  Subject.SUBJECT_EVENT
