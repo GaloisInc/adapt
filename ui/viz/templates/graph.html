@@ -14,26 +14,7 @@
     <script type="text/javascript">
         var node_data_set, edge_data_set, network, ui_spinner_timeout;  // saved_queries is loaded externally.
         var journal = []
-        var collapsedQuery_params = []
-
-
-        function makeQuery(query_string, success_function) {
-            UI.loadingUIStart()
-            document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
-            $.post("/query", {"query": query_string}, function(node_results) {
-                if ( ! _.isEmpty(node_results)) {
-                    var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
-                    var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
-                    $.post("/query", {"query": edge_query}, function(edge_results) {
-                        var data = { "nodes" : node_results, "edges" : edge_results }
-                        success_function(data)
-                        UI.loadingUIStop()
-                    }).fail(UI.failHandler)
-                } else {
-                    UI.loadingUIStop()
-                }
-            }).fail(UI.failHandler)
-        }
+        var execQuery_params = []
 
 
         function execQuery(query_object, success_function) {
@@ -100,15 +81,6 @@
         }
 
 
-        function collapsedQuery(starting_node_id, floating_query, edge_name) {
-            var query_string = "x = "+starting_node_id+"; g.V(x)" + floating_query
-            var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
-            var addCollapsedEdgesFunc = _.partial(addCollapsedEdges, _, starting_node_id, floating_query, edge_name)
-            var addCollapsedAndUpdate = _.compose(updateNetworkAtId, addCollapsedEdgesFunc)
-            makeQuery(query_string, addCollapsedAndUpdate)
-        }
-
-
         function updateNetwork(additional_data, starting_node_id) {
             var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
             var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
@@ -146,16 +118,6 @@
         function networkDoubleClickBehavior (props) {
             if (props['nodes'].length == 1) {
                 var starting_node_id = props['nodes'][0]
-                // var node_queries = node_data_set.get(starting_node_id).queries
-                // var query = _.filter(node_queries, function(q){ return q.is_default })[0]
-                // var default_query = "g.V(" + starting_node_id + ")" + query.floating_query + ".dedup()"
-                // var node_query = "g.V(" + starting_node_id + ").bothE().bothV().dedup()"
-                // if (default_query.is_collapsed) {
-                //     // collapsedQuery_params =  [[starting_node_id, query.floating_query, query.name]]
-                //     collapsedQuery(starting_node_id, query.floating_query, query.name)
-                // } else {
-                //     makeQuery(default_query, _.partial(updateNetwork, _, starting_node_id))
-                // }
                 var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
                 var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
                 execQuery(query, updateNetworkAtId)
@@ -168,43 +130,22 @@
             var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
             if (typeof node_id == 'number') {
                 var relevant_saved_queries = node_data_set.get(node_id).queries
-
-                // $.post("/query", {"query": "g.V(" + node_id + ")"}, function(node_result) {
-                //     var relevant_saved_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node_result[0])})
-                    collapsedQuery_params =  []
-                    var idx = 0
-                    _.map(relevant_saved_queries, function(q) {
-                        q['starting_node_id'] = node_id
-                        
-                        var default_string = q.is_default ? "  (default)" : ""
-                        var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
-                        collapsedQuery_params.push([q, updateNetworkAtId])
-                        var onclick_function_call = "execQuery(collapsedQuery_params["+idx+"][0], collapsedQuery_params["+idx+"][1])"
-                        var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
-                        $("#node-query-menu ul").append(list_item)
-                        idx++
-
-                        // if (q.is_collapsed){
-                        //     collapsedQuery_params.push([node_id, q.floating_query, q.name])
-                        //     var default_string = q.is_default ? " (default)" : ""
-                        //     var onclick_function_call = 'collapsedQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1],collapsedQuery_params['+idx+'][2])'
-                        //     var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
-                        //     $("#node-query-menu ul").append(list_item)
-                        //     idx++
-                        // } else {
-                        //     collapsedQuery_params.push([node_id, q.floating_query, q.name])
-                        //     var default_string = q.is_default ? " (default)" : ""
-                        //     var onclick_function_call = 'makeQuery(collapsedQuery_params['+idx+'][0],collapsedQuery_params['+idx+'][1], _.partial(updateNetwork, _, '+ node_id +'))'
-                        //     var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
-                        //     $("#node-query-menu ul").append(list_item)
-                        //     idx++
-                        // }
-                    })
-                    var query_menu = document.getElementById("node-query-menu")
-                    query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
-                    query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
-                    query_menu.className = "show"  
-                // })
+                execQuery_params =  []
+                var idx = 0
+                _.map(relevant_saved_queries, function(q) {
+                    q['starting_node_id'] = node_id
+                    var default_string = q.is_default ? "  (default)" : ""
+                    var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
+                    execQuery_params.push([q, updateNetworkAtId])
+                    var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1])"
+                    var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                    $("#node-query-menu ul").append(list_item)
+                    idx++
+                })
+                var query_menu = document.getElementById("node-query-menu")
+                query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
+                query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
+                query_menu.className = "show"  
             }
         }
 
@@ -216,7 +157,7 @@
                 
                 n['queries'] = getRelevantQueries(n)  
 
-                // TODO: should test for 'is_relevant' in 'saved_queries' refer to the raw data or to the translatedEnum data??
+                // TODO: should test for 'is_relevant' in 'saved_queries' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
                 
 
                 translateAllEnums(n)
@@ -308,7 +249,6 @@
         }
         
 
-
         function makeNodeLabel(node) {
             switch(node['label']) {
                 case "Subject":
@@ -342,6 +282,7 @@
                     return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
             }
         }
+
 
         function makeNodeTitle(node) {
             var keys = Object.keys(node['properties'])
@@ -383,9 +324,11 @@
                 } else {
                     var millis = typeof millisOrBool === "number" ? millisOrBool : 1000
                     network.setOptions({ physics: true })
+                    $("#animate-button").removeClass("play").addClass("pause")
+                    $("#animate-button").click(function(){ UI.animateButton(false) })
                     setTimeout(function() {
                         network.setOptions({ physics: false })
-                        $("#animate-button").html("Animate")
+                        $("#animate-button").removeClass("pause").addClass("play")
                         $("#animate-button").click(function(){ UI.animateButton(true) })
                     }, millis)
                 }
@@ -393,11 +336,11 @@
             animateButton : function(should) {
                 if (should) {
                     UI.animate(true)
-                    $("#animate-button").html("Pause")
+                    $("#animate-button").removeClass("play").addClass("pause")
                     $("#animate-button").click(function(){ UI.animateButton(false) })
                 } else {
                     UI.animate(false)
-                    $("#animate-button").html("Animate")
+                    $("#animate-button").removeClass("pause").addClass("play")
                     $("#animate-button").click(function(){ UI.animateButton(true) })
                 }
             },
@@ -490,7 +433,7 @@
     <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=80 />
     <button class="ui" id="query-button" onclick="UI.queryClick()">Query</button>
     <button class="ui" id="undo-button" onclick="undoUpdateNetwork()">Undo</button>
-    <button class="ui" id="animate-button">Animate</button>
+    <i class="ui large play icon" id="animate-button" style="color: gray;"></i>
     <div id="loader" class="ui inline loader small"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
