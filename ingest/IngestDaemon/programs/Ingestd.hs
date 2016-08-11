@@ -287,20 +287,20 @@ kafkaInputToDB cfg =
       let (ipts,newUIDs) = convertToSchemas uids ms
       sendInputs cfg ipts
       if null bs
-       then do now <- liftIO $ do reportRate start cnt
+       then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
                                   threadDelay 100000
                                   getCurrentTime
                process now 0 total uids offset
        else process start (cnt+nr) newTotal newUIDs (offset + fromIntegral nr)
 
-reportRate :: UTCTime -> Int -> IO ()
-reportRate start cnt
+reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
+reportRate sendOutput start cnt
   | cnt < 10000 = return ()
   | otherwise =
  do now <- getCurrentTime
     let delta = realToFrac (diffUTCTime now start)
         rate = (fromIntegral cnt) / delta  :: Double
-    liftIO $ T.hPutStrLn stderr (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
+    liftIO $ sendOutput (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
 
 convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> ([Input],[UID])
 convertToSchemas us xs = go us xs []
