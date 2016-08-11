@@ -61,6 +61,7 @@ data Config =
              , _help          :: Bool
              , _kafkaInternal :: KafkaAddress
              , _kafkaExternal :: KafkaAddress
+             , _startingOffset :: Maybe Integer
              , _inputTopics   :: [TopicName]
              , _outputTopic   :: TopicName
              , _triggerTopic  :: TopicName
@@ -80,15 +81,17 @@ defaultKafka = ("localhost", 9092)
 
 defaultConfig :: Config
 defaultConfig = Config
-  { _logTopic      = Nothing
-  , _verbose       = False
-  , _help          = False
-  , _kafkaInternal = defaultKafka
-  , _kafkaExternal = defaultKafka
-  , _inputTopics   = []
-  , _outputTopic   = "pe"
-  , _triggerTopic  = "in-finished"
-  , _titanServer   = GC.defaultServer
+  { _logTopic       = Nothing
+  , _verbose        = False
+  , _help           = False
+  , _kafkaInternal  = defaultKafka
+  , _kafkaExternal  = defaultKafka
+  , _startingOffset = Nothing
+  , _stopAfterCount = Nothing
+  , _inputTopics    = []
+  , _outputTopic    = "pe"
+  , _triggerTopic   = "in-finished"
+  , _titanServer    = GC.defaultServer
   }
 
 opts :: OptSpec Config
@@ -142,6 +145,18 @@ opts = OptSpec { progDefaults  = defaultConfig
                             in case svr of
                                 Just res -> Right (s & kafkaExternal .~ res)
                                 Nothing  -> Left "Could not parse host:port string."
+                  , Option ['s'] ["starting-offset"]
+                    "Start reading input from a given Kafka offset"
+                      \str s ->
+                        case readMaybe str of
+                          Just n  -> Right (s & startingOffset .~ n)
+                          Nothing -> Left "Could not parse starting offset."
+                  , Option ['c'] ["count"]
+                    "Stop reading input after consuming a particular number of statements."
+                      \str s ->
+                        case readMaybe str of
+                          Just n  -> Right (s & stopAfterCount .~ n)
+                          Nothing -> Left "Could not parse starting offset."
                   ]
                }
 
@@ -161,28 +176,9 @@ main =
       then dumpUsage opts
       else mainLoop c
 
--- The main loop of ingestd is admittedly a little hairy.  The tasks are:
---
---  * Fork off threads to receive from Kafka
---    * Inputs channel: decode the input from ta1, put that data on a more
---                      convenient channel. Inputs might be from an
---                      internal Kafka server (on this same machine) or
---                      external/ta3 machine.
---    * Trigger: The trigger is a one-byte message from the user to
---               indicate all the data has been ingested into the database.
---               Once received, the 'finisher' checks the list of failed
---               operations, retry these operations, then returns to allow
---               signaling of PE via the Kafka 'outTopic'.
---    * Logs: Much of the logging is shunted, via Kafka 'in-log' topic,
---            to the dashboard.  In adapt-in-a-box, stderr is sent to a
---            log file (/tmp/ingestd-stderr*).
---    * reqStatus: This is the mutable map of UUID->operations that have
---                 not received a success message.
 mainLoop :: Config -> IO ()
 mainLoop cfg =
  do let -- srvInt   = cfg ^. kafkaInternal
-        srvExt   = cfg ^. kafkaExternal
-        inTopics = cfg ^. inputTopics
         -- outTopic = cfg ^. outputTopic
         -- triTopic = cfg ^. triggerTopic
         -- logMsg   = void . atomically . TB.tryWriteTBChan logChan
@@ -193,46 +189,72 @@ mainLoop cfg =
         -- forkPersist name lg = void . forkIO . persistant name lg
 
     dbconn <- connectToTitan (cfg ^. titanServer)
-    let [it] = inTopics -- XXX
     inputSchema <- CDM.getAvroSchema
-    _ <- kafkaInputToDB srvExt it inputSchema (runDB logStderr dbconn)
-    return ()
+    let sendToDB = runDB logStderr dbconn
+        mkFromKafka :: TopicName -> FromKafkaSettings
+        mkFromKafka t = FKS { sourceServer  = cfg ^. kafkaExternal
+                            , sourceSchema  = inputSchema
+                            , initialOffset = fromIntegral (cfg ^. initialOffset)
+                            , maximumCount  = cfg ^. stopAfterCount
+                            , sendInputs    = liftIO . sendToDB
+                            , sourceTopic   = t
+                            }
+        fks = map mkFromKafka (cfg ^. inputTopics)
+    case fks of
+      []     -> T.putStrLn "No input sources specified."
+      (f:fs) ->
+        do mapM_ forkIO (kafkaInputToDB fs)
+           kafkaInputToDB f
+           return ()
+
+data FromKafkaSettings =
+  FKS { sourceServer :: KafkaAddress
+      , sourceSchema :: Avro.Schema
+      , initialOffset :: Maybe Offset
+      , maximumCount   :: Maybe Integer
+      , sendInputs     :: [Input] -> Kafka ()
+      , sourceTopic  :: TopicName
+      }
 
 -- | Acquire CDM from a given kafka host/topic and place values a channel.
-kafkaInputToDB :: KafkaAddress
-           -> TopicName
-           -> Avro.Schema
-           -> ([Input] -> IO ())
+kafkaInputToDB :: FromKafkaSettings
            -> IO (Either KafkaClientError ())
-kafkaInputToDB host topic cdmSchema handleTranslatedData =
+kafkaInputToDB cfg handleTranslatedData =
   do r <- runKafka state oper
      return r
  where
- state = mkKafkaState "adapt-ingest" host
+ state = mkKafkaState "adapt-ingest" (sourceServer cfg)
  oper  = do
-   off  <- getLastOffset LatestTime 0 topic
+   off  <- maybe (getLastOffset LatestTime 0 topic) pure (initialOffset cfg)
    uids <- randomUIDs <$> liftIO newTFGen
-   now <- liftIO getCurrentTime
+   now  <- liftIO getCurrentTime
    process now 0 uids off
 
  -- Read data, compile to our schema, and send to Gremlin
- process :: UTCTime -> Int -> [UID] -> Offset -> Kafka ()
- process start !cnt uids offset =
-  do bs <- getMessage topic offset
-     -- liftIO (SIO.hPutStrLn stderr (printf "Receiving %d kafka messages." (length bs)))
-     let decodeMsg b =
-          case Avro.decode cdmSchema (BL.fromStrict b) of
-            Avro.Success cdmFmt -> return (Just cdmFmt)
-            Avro.Error err      -> liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
-     ms   <- catMaybes <$> mapM decodeMsg bs
-     let (ipts,newUIDs) = convertToSchemas uids ms []
-     liftIO $ handleTranslatedData ipts
-     if null bs
-      then do liftIO (reportRate start cnt)
-              liftIO (threadDelay 100000)
-              now <- liftIO getCurrentTime
-              process now 0 uids offset
-      else process start (cnt+length bs) newUIDs (offset + fromIntegral (length bs))
+ -- Bail after `maximumCount`, if non-Nothing.
+ process :: UTCTime -> Int -> Integer -> [UID] -> Offset -> Kafka ()
+ process start !cnt total uids offset
+  | maybe (total >=) False (maximumCount cfg) = return ()
+  | otherwise =
+   do bs0 <- getMessage (inputTopic cfg) offset
+      let bs = maybe (\x -> take (x - total) bs0) bs0 (maximumCount cfg)
+          nr = length bs
+          newTotal = total + fromIntegral nr
+          decodeMsg b =
+           case Avro.decode cdmSchema (BL.fromStrict b) of
+             Avro.Success cdmFmt ->
+               return (Just cdmFmt)
+             Avro.Error err      ->
+               liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
+      ms   <- catMaybes <$> mapM decodeMsg bs
+      let (ipts,newUIDs) = convertToSchemas uids ms
+      sendInputs cfg ipts
+      if null bs
+       then do now <- liftIO $ do reportRate start cnt
+                                  threadDelay 100000
+                                  getCurrentTime
+               process now 0 total uids offset
+       else process start (cnt+nr) newTotal newUIDs (offset + fromIntegral nr)
 
 reportRate :: UTCTime -> Int -> IO ()
 reportRate start cnt
@@ -243,11 +265,13 @@ reportRate start cnt
         rate = (fromIntegral cnt) / delta  :: Double
     liftIO $ T.hPutStrLn stderr (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
 
-convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> [[Input]] -> ([Input],[UID])
-convertToSchemas uids [] acc = (concat acc,uids)
-convertToSchemas uids (m:ms) acc =
+convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> ([Input],[UID])
+convertToSchemas us xs = go us xs []
+ where
+  go uids [] acc = (concat acc,uids)
+  go uids (m:ms) acc =
    let (is,rest) = convertToSchema uids m
-   in convertToSchemas rest ms (is:acc)
+   in go rest ms (is:acc)
 
 convertToSchema :: [UID] -> CDM.TCCDMDatum -> ([Input],[UID])
 convertToSchema uids cdmFmt =
