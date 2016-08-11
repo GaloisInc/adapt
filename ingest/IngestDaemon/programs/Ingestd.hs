@@ -16,6 +16,7 @@ module Main where
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad (void)
 import           Control.Concurrent (threadDelay)
+import qualified Control.Concurrent.Chan as Ch
 -- import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
@@ -179,10 +180,7 @@ main =
 
 mainLoop :: Config -> IO ()
 mainLoop cfg =
- do let -- srvInt   = cfg ^. kafkaInternal
-        -- outTopic = cfg ^. outputTopic
-        -- triTopic = cfg ^. triggerTopic
-        -- logMsg   = void . atomically . TB.tryWriteTBChan logChan
+ do let -- logMsg   = void . atomically . TB.tryWriteTBChan logChan
         -- logTitan = logMsg . ("ingestd[Titan thread]:    " <>)
         -- logGC    = logMsg . ("ingestd[Retry thread]:    " <>)
         -- logIpt t = logMsg . (("ingestd[KafkaTopic:" <> kafkaString t <> "]") <>)
@@ -202,11 +200,21 @@ mainLoop cfg =
                             }
         fks = map mkFromKafka (cfg ^. inputTopics)
     case fks of
-      []     -> T.putStrLn "No input sources specified."
-      (f:fs) ->
+      [] -> T.putStrLn "No input sources specified."
+      fs ->
         do mapM_ forkIO (kafkaInputToDB fs)
-           kafkaInputToDB f
-           return ()
+           forwardFinishSignal (cfg ^. kafkaExternal)
+                               (cfg ^. triggerTopic)
+                               (cfg ^. kafkaInternal)
+                               (cfg ^. outputTopic)
+
+forwardFinishSignal :: KafkaAddress -> TopicName -- Input
+                    -> KafkaAddress -> TopicName -- Output
+                    -> IO ()
+forwardFinishSignal inSvr inTopic outSvr outTopic=
+  do ch <- Ch.newChan
+     _ <- forkIO (readKafka "ingest-sig-consumer" inSvr inTopic (Ch.writeChan ch))
+     writeKafka "ingest-sig-producer" outSvr outTopic (Ch.readChan ch)
 
 data FromKafkaSettings =
   FKS { sourceServer :: KafkaAddress
@@ -216,6 +224,33 @@ data FromKafkaSettings =
       , sendInputs     :: [Input] -> Kafka ()
       , sourceTopic  :: TopicName
       }
+
+readKafka :: KafkaClientId
+          -> KafkaAddress -> TopicName
+          -> (ByteString -> IO ())
+          -> IO ()
+readKafka name svr topic putMsg = runKafka (mkKafkaState name svr) (withLastOffset op)
+  where
+  op off =
+    do bs <- getMessage topic off
+       liftIO (mapM_ putMsg bs)
+       op (off + length bs)
+
+writeKafka :: KafkaClientId
+          -> KafkaAddress -> TopicName
+          -> IO ByteString
+          -> IO ()
+writeKafka name srv topic getMsg = runKafka (mkKafkaState name srv) (forever op)
+  where
+  op =
+    do m <- getMsg
+       produceMessages [TopicAndMessage topic $ makeMessage m]
+
+
+withLastOffset :: (Offset -> Kafka a) -> Kafka a
+withLastOffset op =
+    do off <- getLastOffset LatestTime 0 topic
+       op off
 
 -- | Acquire CDM from a given kafka host/topic and place values a channel.
 kafkaInputToDB :: FromKafkaSettings
