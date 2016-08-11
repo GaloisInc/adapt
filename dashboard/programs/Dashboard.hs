@@ -259,7 +259,7 @@ kafkaInput host topic chan = runKafka state oper
      mapM_ handleMsg bs
      if null bs
       then liftIO (threadDelay 100000) >> process offset
-      else process (offset+1)
+      else process (offset+length bs)
 
  getMessage :: Offset -> Kafka [ByteString]
  getMessage offset =
