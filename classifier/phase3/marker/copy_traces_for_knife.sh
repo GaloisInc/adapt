@@ -43,6 +43,9 @@ DIRS="
  ta5attack1_units
  ta5attack2_units
  youtube_ie_update
+ simple_with_marker_1
+ simple_with_marker_2
+ simple_with_marker_3
 "
 
 for DIR in $DIRS
