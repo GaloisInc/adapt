@@ -1,17 +1,6 @@
-graph = TitanFactory.open('cassandra:localhost'); g = graph.traversal();
 
-def startWindow(t,d) { return t - t % d }
-def endWindow(t,d) { return t + d - t % d }
-
-def startHour(t) { startWindow(t,1000*1000*60*60) }
-def endHour(t) { endWindow(t,1000*1000*60*60) }
-def startMin(t) { startWindow(t,1000*1000*60) }
-def endMin(t) { endWindow(t,1000*1000*60) }
-
-def getTimes(g) { g.V().has('startedAtTime').values('startedAtTime') }
-
-def addTimeSegmentsFromTo(graph,g,delta) {
- 
+def addTimeSegments(graph,g,delta) {
+  t1 = new Date().getTime();
   segments =  g.V().has('startedAtTime',gte(0)).values('startedAtTime').map{t = it.get(); t - t % delta}.dedup().order();
   for(s in segments) {
     v = graph.addVertex(label,'Segment','segment:name','byTime','startedAtTime',s,'endedAtTime',s+delta);
@@ -20,9 +9,12 @@ def addTimeSegmentsFromTo(graph,g,delta) {
       v.addEdge('segment:includes',z) 
     } 
   }
+  t2 = new Date().getTime();
+  return t2 - t1
 }
 
-def addTimeSegmentsFromTo(graph,g,Integer delta,Long start,Long end} =
+def addTimeSegmentsFromTo(graph,g,Integer delta,Long start,Long end) {
+  t1 = new Date().getTime();
   start = start - start % delta;
   end = end - end % delta + delta;
   segments =  g.V().has('startedAtTime',gte(start).and(lt(end))).values('startedAtTime').map{t = it.get(); t - t % delta}.dedup().order();
@@ -33,6 +25,8 @@ def addTimeSegmentsFromTo(graph,g,Integer delta,Long start,Long end} =
       v.addEdge('segment:includes',z) 
     } 
   }
+  t2 = new Date().getTime();
+  return t2 - t1
 }
 
 
@@ -41,4 +35,4 @@ def removeTimeSegments(g) {
   g.V().has('segment:name','byTime').has(label,'Segment').drop().iterate()
 }
 
-addTimeSegments(graph,g,1000*1000*60)
+// ts  = new Long[5]; for (int i = 0; i < 5; i++) { ts[i] = addTimeSegments(graph,g,1000*1000*60); removeTimeSegments(g) } 
