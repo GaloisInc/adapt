@@ -1,7 +1,20 @@
+
+
+def removePIDSegments(g) {
+  g.V().has('segment:name','byPID').has(label,'Segment').drop().iterate()
+}
+
+def getPIDSegments(g) {
+  g.V().has('segment:name','byPID').has(label,'Segment')
+}
+
 // creates segment vertices for PID nodes, excluding already-existing ones
 
+
+
 def createVertices(graph,g,criterion) {
-  idWithProp = g.V().has(criterion).has(label,neq('Segment')).id().fold().next();
+  t1 = new Date().getTime();
+  idWithProp = g.V().has(criterion,gte(0)).has(label,neq('Segment')).id().fold().next();
   existingSegNodes_parentIds = g.V().has('segment:name','byPID').values('parentVertexId').fold().next();
   idsToStore = idWithProp-existingSegNodes_parentIds; 
   if (idsToStore!=[]) { 
@@ -9,7 +22,12 @@ def createVertices(graph,g,criterion) {
       graph.addVertex(label,'Segment','parentVertexId',i,'segment:name','byPID',criterion,g.V(i).values(criterion).next())
     }
   }
+  t2 = new Date().getTime();
+  return t2 - t1
 }
+
+ts = new Long[5]; for (int i = 0; i < 5; i++) { ts[i] = createVertices(graph,g,'pid'); removePIDSegments(g) } 
+
 
 def segmentNodesCreated(g) {
   g.V().has('segment:name','byPID').valueMap(true)
@@ -17,7 +35,8 @@ def segmentNodesCreated(g) {
 
 
 def createVerticesAndEdges(graph,g,criterion,radius) {
-  idWithProp = g.V().has(criterion).has(label,neq('Segment')).id().fold().next(); 
+  t1 = new Date().getTime();
+  idWithProp = g.V().has(criterion,gte(0)).has(label,neq('Segment')).id().fold().next(); 
   existingSegNodes_parentIds = g.V().has('segment:name','byPID').values('parentVertexId').fold().next();
   idsToStore = idWithProp - existingSegNodes_parentIds; 
   for (i in idWithProp) {
@@ -29,11 +48,13 @@ def createVerticesAndEdges(graph,g,criterion,radius) {
       s = g.V().has('segment:name','byPID').has('parentVertexId',i).next()
     }; 
     idNonLinkedNodes = subtr.V().id().fold().next()
-                     - g.V().hasLabel('Segment').has('parentVertexId',i).outE('segment:includes').inV().id().fold().next();
+                     - g.V().has('segment:name','byPID').has('parentVertexId',i).outE('segment:includes').inV().id().fold().next();
     for (node in idNonLinkedNodes) {
       s.addEdge('segment:includes',g.V(node).next())
     }
   }
+  t2 = new Date().getTime();
+  return t2 - t1;
 }
 
 
