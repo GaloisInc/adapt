@@ -26,6 +26,14 @@ def makeNodeIndex = { String indexName, String indexKey, Boolean mkUnique, index
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
+
+      // force initial index
+      mgmt = graph.openManagement()
+      i = mgmt.getGraphIndex(indexName)
+      mgmt.updateIndex(i, SchemaAction.REINDEX)
+      mgmt.commit()
+
+      // enable and wait for enabled status
       mgmt  = graph.openManagement()
       mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
       mgmt.commit()
@@ -54,6 +62,14 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
+
+      // force initial index
+      mgmt = graph.openManagement()
+      i = mgmt.getGraphIndex(indexName)
+      mgmt.updateIndex(i, SchemaAction.REINDEX)
+      mgmt.commit()
+
+      // enable and wait for enabled status
       mgmt  = graph.openManagement()
       mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
       mgmt.commit()
@@ -79,6 +95,14 @@ def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
+
+      // force initial index
+      mgmt = graph.openManagement()
+      i = mgmt.getGraphIndex(indexName)
+      mgmt.updateIndex(i, SchemaAction.REINDEX)
+      mgmt.commit()
+
+      // enable and wait for enabled status
       mgmt  = graph.openManagement()
       mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
       mgmt.commit()
