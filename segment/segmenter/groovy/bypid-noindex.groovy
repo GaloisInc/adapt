@@ -57,7 +57,7 @@ def createVerticesAndEdges(graph,g,criterion,radius) {
   return t2 - t1;
 }
 
-
+// ts = new Long[5]; for (int i = 0; i < 5; i++) { ts[i] = createVerticesAndEdges(graph,g,'pid',2); removePIDSegments(g) } 
 
 def createSeg2SegEdges(graph,g) {
   t1 = new Date().getTime();
