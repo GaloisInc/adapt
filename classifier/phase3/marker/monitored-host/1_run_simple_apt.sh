@@ -33,16 +33,17 @@ comma_to_S() {
 
 
 sudo rm -f /tmp/simple_apt.cdm
+mkdir -p /tmp/adapt
 echo sudo auditctl -D
 echo /tmp/simple 13.1.102.2 4000
+# sudo auditctl -a exit,always -F arch=b64 -S `comma_to_S write,close,open,socket,accept,bind,listen`
 set -ex
-
-sudo auditctl -a exit,always -F arch=b64 -S `comma_to_S write,close,open,socket,accept,bind,listen`
-sudo auditctl -l
-sudo auditctl -b 98000
+sudo auditctl -D
+sudo auditctl -b 8000
 
 sudo spade start
 sleep 4
+sudo auditctl -l
 # list all
 # add storage CDM output=/tmp/simple_apt.cdm
 # add reporter Audit arch=64 units=false fileIO=true netIO=true
