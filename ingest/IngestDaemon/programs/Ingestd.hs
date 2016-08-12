@@ -16,7 +16,7 @@ module Main where
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Concurrent (threadDelay, forkIO)
 import qualified Control.Concurrent.Chan as Ch
--- import           Control.Exception as X
+import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
 import qualified Data.ByteString.Lazy as BL
@@ -180,7 +180,7 @@ main =
       else neverFail (mainLoop c)
  where
  neverFail op =
-   do X.catch op (\(e::X.SomeException) -> T.hPutStrLn $ "Retrying because: " <> T.pack (show e))
+   do X.catch op (\(e::X.SomeException) -> T.hPutStrLn stderr $ "Retrying because: " <> T.pack (show e))
       neverFail op
 
 mainLoop :: Config -> IO ()
@@ -448,5 +448,5 @@ forkIOsafe :: Text -> IO () -> IO ()
 forkIOsafe threadName op = forkIO go >> return ()
  where
  go =
-  do X.catch op (\(e :: SomeException) -> T.hPutStrLn $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
+  do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
      go
