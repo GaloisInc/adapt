@@ -13,7 +13,7 @@ module CompileSchema
   ) where
 
 import qualified Data.Aeson as A
-import           Data.Binary (encode)
+import           Data.Binary (encode,decode)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as ByteString
@@ -32,6 +32,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Word
 import           Schema hiding (Env)
+import           System.Entropy (getEntropy)
 
 -- Operations represent gremlin-groovy commands such as:
 -- assume: graph = TinkerGraph.open()
@@ -70,19 +71,20 @@ instance A.ToJSON GremlinValue where
       GremlinList vs  -> A.toJSON vs
 
 
-compile :: ([Node], [(Edge,UID)]) -> [Operation Text]
+compile :: ([Node], [Edge]) -> IO [Operation Text]
 compile (ns,es) =
-  let v = map compileNode ns
-      e = map compileEdge es
-  in concat [v,e]
+  do let vertOfNodes = concatMap compileNode ns
+     (concat -> vertOfEdges, concat -> edgeOfEdges) <- unzip <$> mapM compileEdge es
+     pure $ concat [vertOfNodes , vertOfEdges , edgeOfEdges]
 
-compileNode :: Node -> Operation Text
-compileNode n = InsertVertex ty (nodeUID_base64 n) props
+compileNode :: Node -> [Operation Text]
+compileNode n = [InsertVertex ty (nodeUID_base64 n) props]
  where
   (ty,props) = propertiesAndTypeOf n
 
-compileEdge :: (Edge,UID) -> Operation Text
-compileEdge (e,euid) =
+compileEdge :: Edge -> IO ([Operation Text], [Operation Text])
+compileEdge e =
+  do euid <- newUID
      let e1Lbl = vLbl <> " out"
          e2Lbl = vLbl <> " in"
          eNode   = uidToBase64 euid
@@ -93,7 +95,7 @@ compileEdge (e,euid) =
            in T.take 1 str <> T.concatMap go (T.drop 1 str)
          vLbl  = fixCamelCase $ T.pack $ show (edgeRelationship e)
          eTriple = InsertReifiedEdge vLbl e1Lbl e2Lbl eNode esrc edst
-     in eTriple
+     return ([], [eTriple])
 
 class PropertiesOf a where
   propertiesOf :: a -> [(Text,GremlinValue)]
@@ -240,6 +242,9 @@ nodeUID_base64 = uidToBase64 . nodeUID
 
 uidToBase64 :: UID -> Text
 uidToBase64 = T.decodeUtf8 . B64.encode . ByteString.toStrict . encode
+
+newUID :: IO UID
+newUID = (decode . ByteString.fromStrict) <$> getEntropy (8 * 4)
 
 gremlinNum :: Integral i => i -> GremlinValue
 gremlinNum = GremlinNum . fromIntegral
