@@ -71,8 +71,8 @@ makeNodeIndex('bySegmentName', 'segment:name', false, String.class)
 makeElasticSearchIndex('byURL','url',String.class)
 
 // index PIDs and timestamps for numeric queries
-makeElasticSearchIndex('byPID','pid',Integer.class)
-makeElasticSearchIndex('byTime','startedAtTime',Long.class)
+//makeElasticSearchIndex('byPID','pid',Integer.class)
+//makeElasticSearchIndex('byTime','startedAtTime',Long.class)
 
 
 // The graph traverser captured by variable 'g' is useful to many of
