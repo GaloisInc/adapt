@@ -47,6 +47,6 @@ autorestart=yes
 startsecs=20
 
 [program:uid]
-command=%(ENV_HOME)s/adapt/ui/viz/UId.sh %(ENV_HOME)s/adapt/ui/viz
+command=bash -c 'export FLASK_APP=server.py; cd $0; exec python3 -m flask run' %(ENV_HOME)s/adapt/ui/viz
 autorestart=yes
 startsecs=20

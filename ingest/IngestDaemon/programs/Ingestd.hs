@@ -16,7 +16,7 @@ module Main where
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Concurrent (threadDelay, forkIO)
 import qualified Control.Concurrent.Chan as Ch
--- import           Control.Exception as X
+import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
 import qualified Data.ByteString.Lazy as BL
@@ -177,13 +177,17 @@ main =
   do c <- getOpts opts
      if c ^. help
       then dumpUsage opts
-      else mainLoop c
+      else neverFail (mainLoop c)
+ where
+ neverFail op =
+   do X.catch op (\(e::X.SomeException) -> T.hPutStrLn stderr $ "Retrying because: " <> T.pack (show e))
+      neverFail op
 
 mainLoop :: Config -> IO ()
 mainLoop cfg =
  do logChan <- Ch.newChan
     let logMsg m = void (Ch.writeChan logChan (T.encodeUtf8 m))
-    _ <- forkIO (emitLogData cfg logChan)
+    forkIOsafe "Logs2Kafka" (emitLogData cfg logChan)
     startTime <- getCurrentTime
     logMsg $ "Starting Ingestd at " <> T.pack (show startTime)
     dbconn <- connectToTitan logMsg (cfg ^. titanServer)
@@ -203,7 +207,7 @@ mainLoop cfg =
     case fks of
       [] -> T.putStrLn "No input sources specified."
       fs ->
-        do mapM_ (\f -> forkIO (kafkaInputToDB f >> return ())) fs
+        do mapM_ (\f -> forkIOsafe "KafkaConsumer" (kafkaInputToDB f >> return ())) fs
            forwardFinishSignal (cfg ^. kafkaExternal)
                                (cfg ^. triggerTopic)
                                (cfg ^. kafkaInternal)
@@ -215,7 +219,7 @@ forwardFinishSignal :: KafkaAddress -> TopicName -- Input
                     -> IO ()
 forwardFinishSignal inSvr inTopic outSvr outTopic=
   do ch <- Ch.newChan
-     _ <- forkIO (readKafka "ingest-sig-consumer" inSvr inTopic (Ch.writeChan ch))
+     forkIOsafe "finishSignalReader" (readKafka "ingest-sig-consumer" inSvr inTopic (Ch.writeChan ch))
      writeKafka "ingest-sig-producer" outSvr outTopic (Ch.readChan ch)
 
 -- Thread that pushes log message to dashboard or stderr.
@@ -440,3 +444,9 @@ withLastOffset op topic =
     do off <- getLastOffset LatestTime 0 topic
        op off
 
+forkIOsafe :: Text -> IO () -> IO ()
+forkIOsafe threadName op = forkIO go >> return ()
+ where
+ go =
+  do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
+     go
