@@ -40,4 +40,5 @@ git status
 patch -p5 < ~/adapt/classifier/phase3/marker/tcp_patch.txt
 which cmake || sudo apt-get install -y cmake gcc-multilib g++-multilib
 python cmake.py build
-rsync -av bin/linux/release/x64/simple /tmp/
+rsync -a  bin/linux/release/x64/simple /tmp/
+rsync -av bin/linux/debug/x64/simple   /tmp/
