@@ -71,6 +71,11 @@ data Config =
 
 makeLenses ''Config
 
+-- | Report ingests when the ingester was processed at least this this many
+-- CDM statements.
+minReportCount :: Int
+minReportCount = 50
+
 inputQueueSize  :: Int
 inputQueueSize  = 100000
 
@@ -299,12 +304,14 @@ kafkaInputToDB cfg =
 
 reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
 reportRate sendOutput start cnt
-  | cnt < 10000 = return ()
+  | cnt < minReportCount = return ()
   | otherwise =
  do now <- getCurrentTime
     let delta = realToFrac (diffUTCTime now start)
-        rate = (fromIntegral cnt) / delta  :: Double
-    liftIO $ sendOutput (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
+        rate = if delta <= 0.0001
+                  then "infinite"
+                  else show ((fromIntegral cnt) / delta  :: Double)
+    liftIO $ sendOutput (T.pack $ printf "Ingested %d statments at %s stmt/sec" cnt rate)
 
 convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> ([Input],[UID])
 convertToSchemas us xs = go us xs []
