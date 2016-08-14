@@ -354,7 +354,7 @@ runDB emit conn inputOps = do
   runDB emit conn waitThese
  where
  nrBulk = 100
- deadAt = 2 -- retry age zero and one inputs, drop on third failure.
+ deadAt = 3
  go oprs =
   do let (operVS,operES) = L.partition (isVertex . statement) oprs
          (vs,es)   = (map statement operVS, map statement operES)
@@ -377,7 +377,7 @@ runDB emit conn inputOps = do
                           let (a,b) = L.splitAt (length xs `div` 2) live
                           in [a,b]
                       | otherwise      = map (\y -> [y]) live
-                in void $ forkIO (mapM_ (runDB emit conn) batches)
+                in void $ forkIO (threadDelay (500*1000) >> mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
      when (nrVS > 0) $ sendReq vsReq operVS
