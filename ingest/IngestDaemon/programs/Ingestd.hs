@@ -32,8 +32,6 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import           Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import           MonadLib        hiding (handle)
--- import           Network.Kafka as K
--- import           Network.Kafka.Protocol as K
 import           Prelude
 import           SimpleGetOpt
 import           System.IO (stderr)
@@ -75,12 +73,6 @@ makeLenses ''Config
 -- CDM statements.
 minReportCount :: Int
 minReportCount = 50
-
-inputQueueSize  :: Int
-inputQueueSize  = 100000
-
-outputQueueSize :: Int
-outputQueueSize = 1000
 
 defaultKafka :: KafkaAddress
 defaultKafka = ("localhost", 9092)
@@ -294,6 +286,10 @@ kafkaInputToDB cfg =
                liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
       ms   <- catMaybes <$> mapM decodeMsg bs
       let (ipts,newUIDs) = convertToSchemas uids ms
+      when (not (null bs0)) $ liftIO $ do
+        T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
+        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ipts)) <> " compiled inputs."
+        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ms)) <> " decoded CDM stmts."
       sendInputs cfg ipts
       if null bs
        then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
@@ -354,7 +350,7 @@ runDB emit conn inputOps = do
   runDB emit conn waitThese
  where
  nrBulk = 100
- deadAt = 3
+ deadAt = 4
  go oprs =
   do let (operVS,operES) = L.partition (isVertex . statement) oprs
          (vs,es)   = (map statement operVS, map statement operES)
@@ -371,13 +367,14 @@ runDB emit conn inputOps = do
             | respStatus resp /= 200 =
                 -- Retry by simply calling runDB on the individual
                 -- inputs instead of the bulk set of inputs.
-                let live = filter ((<deadAt) . inputAge) (map ageInput xs)
+                let (live,dead) = L.partition ((<deadAt) . inputAge) (map ageInput xs)
                     batches
                       | inputAge x < (deadAt-1)  =
                           let (a,b) = L.splitAt (length xs `div` 2) live
                           in [a,b]
                       | otherwise      = map (\y -> [y]) live
-                in void $ forkIO (threadDelay (500*1000) >> mapM_ (runDB emit conn) batches)
+                in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping " <> T.pack (show (length dead)) <> "statements")
+                      void $ forkIO (threadDelay (500*1000) >> mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
      when (nrVS > 0) $ sendReq vsReq operVS
