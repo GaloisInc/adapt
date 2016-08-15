@@ -62,6 +62,7 @@ class SimpleTitanGremlinSegmenter:
 		self.broker = args.broker
 		self.titanclient=tclient(self.broker)
 		self.criterion=args.criterion
+		self.type_criterion=None
 		self.radius=args.radius
 		self.verbose=args.verbose
 		self.directionEdges=args.directionEdges
@@ -88,22 +89,20 @@ graph.addVertex(label,'segment',\
 }""" % {'criterion': self.criterion, 
         'segmentNodeName': property_segmentNodeName}
 		return self.titanclient.execute(query)
-asdf
+
 	def getVerticesWithProperty(self):
             '''
             query to Titan that retrieves all the nodes that have 
             a certain property (segmentation criterion)
             '''
-            query="g.V().has('%(criterion)s')" 
-                    % {'criterion' : self.criterion}
+            query="g.V().has('%(criterion)s')" % {'criterion' : self.criterion}
             return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
             '''
             query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
             '''
-            query="g.V().has('%(criterion)s').count()"
-                    % {'criterion' : self.criterion}
+            query="g.V().has('%(criterion)s').count()" % {'criterion' : self.criterion}
             return self.titanclient.execute(query)
 
 	def getVerticesWithPropertyIds(self):
@@ -154,9 +153,7 @@ return result\
        "subgraphQuery" : subgraphQuery,
        "segmentInfo" : segmentInfo}
             return self.titanclient.execute(query)
-            else:
-                res=0
-            return res
+
 	def printSegments(self):
             '''
             prints the results of segmentation
@@ -182,66 +179,68 @@ return result\
                             print(subn)
                             sys.stdout.write('\n')
                             sys.stdout.write('*'*30+'\n')
-                 return "segmentation summary printed"
+                return "segmentation summary printed"
                         
 	def createSchemaVertexLabel(self,vertexLabel):
-            query="""
-mgmt=graph.openManagement();
-if (mgmt.getVertexLabel(\'%(vertexLabel)s\')==null) {
-  test=mgmt.makeVertexLabel(\'%(vertexLabel)\').make();
-  mgmt.commit();
-  mgmt.close()
+            query="""\
+mgmt=graph.openManagement();\
+if (mgmt.getVertexLabel(\'%(vertexLabel)s\')==null) {\
+test=mgmt.makeVertexLabel(\'%(vertexLabel)s\').make();\
+mgmt.commit();\
+mgmt.close()\
 }""" % {"vertexLabel": vertexLabel}
             self.titanclient.execute(query)
 
 	def createSchemaVertexProperty(self,vertexProperty,vertexType,cardinality):
-            query="""
-mgmt=graph.openManagement();
-if (mgmt.getPropertyKey(\'%(vertexProperty)s\')==null) {
-  test=mgmt.makePropertyKey(\'%(vertexProperty)s\').dataType(%(vertexType)s.class).cardinality(Cardinality.$(cardinality)s).make();
-  mgmt.commit();
-  mgmt.close()
+            query="""\
+mgmt=graph.openManagement();\
+if (mgmt.getPropertyKey(\'%(vertexProperty)s\')==null) {\
+test=mgmt.makePropertyKey(\'%(vertexProperty)s\')\
+.dataType(%(vertexType)s.class)\
+.cardinality(Cardinality.%(cardinality)s).make();\
+mgmt.commit();\
+mgmt.close()\
 }""" % {"vertexProperty":vertexProperty,
         "vertexType": vertexType,
         "cardinality": cardinality}
             self.titanclient.execute(query)
 
 	def createSchemaEdgeLabel(self,edgeLabel):
-            query="""
-mgmt=graph.openManagement();
-if (mgmt.getEdgeLabel(\'%(edgeLabel)s\')==null) {
-  test=mgmt.makeEdgeLabel(\'%(edgeLabel)s\').make();
-  mgmt.commit();
-mgmt.close()
+            query="""\
+mgmt=graph.openManagement();\
+if (mgmt.getEdgeLabel(\'%(edgeLabel)s\')==null) {\
+test=mgmt.makeEdgeLabel(\'%(edgeLabel)s\').make();\
+mgmt.commit();\
+mgmt.close()\
 }""" % {"edgeLabel" : edgeLabel}
             self.titanclient.execute(query)
 
-        def createSchemaElements(self):
+	def createSchemaElements(self):
              self.createSchemaVertexLabel('Segment')
              self.createSchemaVertexProperty(property_segmentNodeName,
                                              'String','SINGLE')
              self.createSchemaVertexProperty('parentVertexId',
                                              'Integer','SINGLE')
              self.createSchemaVertexProperty(self.criterion,
-                                             type_criterion,'SINGLE')
+                                             self.type_criterion,'SINGLE')
              self.createSchemaEdgeLabel(property_segmentEdgeLabel)
 
-        def checkCriterionType():
+	def checkCriterionType(self):
              if isinstance(self.criterion,str):
-                 type_criterion='String'
+                 self.type_criterion='String'
              elif isinstance(self.criterion,int):
-                 type_criterion='Integer'
+                 self.type_criterion='Integer'
              elif isinstance(self.criterion,float):
-                 type_criterion='Float'
+                 self.type_criterion='Float'
              elif isinstance(self.criterion,datetime.datetime):
-                 type_criterion='Date'
+                 self.type_criterion='Date'
              else:
-                 type_criterion=None
+                 self.type_criterion=None
                  return False
              return True
 
 
-        def storeSegments(self):
+	def storeSegments(self):
             '''
             creates segments in the database (only segment nodes 
             when '--store-segment' is equal to 'OnlyNodes' and 
@@ -274,10 +273,10 @@ mgmt.close()
                         sys.stdout.write('No segment to store.\n')
                         return "No segment"
             else: # count == 0
-                sys.stdout.write("No node with property: $s. Nothing to store.\n" % self.criterion)
+                sys.stdout.write("No node with property: %s. Nothing to store.\n" % self.criterion)
                 return "Unknown segmentation criterion"
             
-       def log(self,type_log,text):
+	def log(self,type_log,text):
            if type_log=='info':
                self.logger.info(text)
            if type_log=='error':
