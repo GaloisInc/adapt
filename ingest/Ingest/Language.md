@@ -1137,4 +1137,4 @@ This edge relates two segmentssuch that there is an edge in the raw
 graph from a node in the first to a node in the second.
 
 [schema]: #
-makeEdgeLabel('segment:edge').multiplicity(SIMPLE)
+makeEdgeLabel('segment:edge').multiplicity(MULTI)
