@@ -261,7 +261,7 @@ graph.addVertex(label,'Segment',\
 	def addEdges_query(self):
 		addEdges_query ="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().has('%(segmentNodeName)','%(segmentName)s').values('parentVertexId').fold().next();\
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('parentVertexId').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
@@ -273,7 +273,7 @@ s=graph.addVertex(label,'Segment',\
 } else {\
 s = g.V().has('segment:name','%(segmentName)s').has('parentVertexId',i).next()
 }; \
-idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)','%(segmentName)s').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
+idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)s','%(segmentName)s').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
 for (node in idNonLinkedNodes) {
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
@@ -281,7 +281,7 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
         'segmentNodeName': property_segmentNodeName,
 	'segmentEdgeLabel': property_segmentEdgeLabel,
 	'directionEdges': self.directionEdges,
-	'radius' : self.radius}
+	'radius' : self.radius,
 	'segmentName' : self.segmentName}
 		return addEdges_query
 
