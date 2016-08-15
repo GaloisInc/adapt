@@ -35,7 +35,7 @@ test -d TransparentComputing ||
 set -x
 cd TransparentComputing/malware/cross-platform/simple-apt/simple/
 (cd src && etags *.c linux/*.c)
-git checkout -- src/tcp.c
+git checkout -- src/{main,msg,tcp}.c
 git status
 cp          ~/adapt/classifier/phase3/marker/tc_marker.h    src/
 patch -p5 < ~/adapt/classifier/phase3/marker/kudu_patch.txt
