@@ -369,7 +369,7 @@ runDB emit conn inputOps = do
                 -- inputs instead of the bulk set of inputs.
                 let (live,dead) = L.partition ((<deadAt) . inputAge) (map ageInput xs)
                     batches
-                      | inputAge x < (deadAt-1)  =
+                      | inputAge x < (deadAt-2)  =
                           let (a,b) = L.splitAt (length xs `div` 2) live
                           in [a,b]
                       | otherwise      = map (\y -> [y]) live
