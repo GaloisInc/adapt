@@ -4,71 +4,18 @@
 (cd TransparentComputing/malware/cross-platform/simple-apt/simple && python cmake.py build && cp -p bin/linux/release/x64/simple /tmp/)
 
 diff --git a/malware/cross-platform/simple-apt/simple/src/tcp.c b/malware/cross-platform/simple-apt/simple/src/tcp.c
-index 5d3a9e8..91fe987 100644
+index 5d3a9e8..f5037ad 100644
 --- a/malware/cross-platform/simple-apt/simple/src/tcp.c
 +++ b/malware/cross-platform/simple-apt/simple/src/tcp.c
-@@ -11,6 +11,15 @@
+@@ -11,6 +11,7 @@
  
  #include <stdio.h>
  #include <assert.h>
-+#include <errno.h>
-+#include <fcntl.h>
-+#include <sys/stat.h>
-+#include <sys/types.h>
-+#include <unistd.h>
-+#include <string.h>
-+#include <netdb.h>
-+#include <sys/socket.h>
-+#include <netinet/in.h>
++#include "tc_marker.h"
  
  
  void tcp_init()
-@@ -37,6 +46,44 @@ void tcp_cleanup()
- #endif
- }
- 
-+// Wrap a code fragment with Transparent Computing begin / end markers.
-+// The target code fragment, tc_int_code, should compute
-+// an integer result to be returned immediately.
-+// Write a new macro if you merely want to evaluate for side effects.
-+#define TC_MARK_RETURN(tc_marker_num, tc_int_code)  do {           \
-+    char tc_fspec[40];                                             \
-+    TC_MARK1(tc_marker_num, "begin");                              \
-+    int tc_ret = tc_int_code;                                      \
-+    TC_MARK1(tc_marker_num, "end");                                \
-+    return tc_ret;                                                 \
-+  } while (0)
-+
-+#define TC_MARK1(tc_marker_num, tc_begin_end)                      \
-+    { sprintf(tc_fspec, "/tmp/adapt/tc-marker-%03d-%s.txt",        \
-+              tc_marker_num, tc_begin_end);                        \
-+      int tc_flags = O_WRONLY | O_APPEND | O_CREAT;                \
-+      int tc_fd = open(tc_fspec, tc_flags, 0644);                  \
-+      int n = write(tc_fd, ".", 1);                                \
-+      close(tc_fd);                                                \
-+      struct addrinfo hints;                                       \
-+      memset(&hints, 0, sizeof(hints));                            \
-+      hints.ai_family = AF_INET;                                   \
-+      hints.ai_socktype = SOCK_DGRAM;                              \
-+      struct addrinfo* res;                                        \
-+      int s = getaddrinfo("sector6.net", "4000", &hints, &res);    \
-+      if (s != 0) {                                                \
-+          perror("lookup failed");                                 \
-+          printf("err: %d\n", s);                                  \
-+      }                                                            \
-+      int fd = socket(AF_INET, SOCK_DGRAM, 0);                     \
-+      if (fd < 0) {                                                \
-+          perror("socket");                                        \
-+      }                                                            \
-+                                                                   \
-+                                                                   \
-+                                                                   \
-+                                                                   \
-+    }
- 
- // Inits a new network comms session.
- // Returns -1 on failure, 0 on success.
-@@ -45,7 +92,7 @@ int tcp_initSession(const char *ip, unsigned short port)
+@@ -45,7 +46,7 @@ int tcp_initSession(const char *ip, unsigned short port)
  #ifdef WINDOWS
  	return tcp_windows_initSession(ip, port);
  #elif NIX
@@ -77,7 +24,7 @@ index 5d3a9e8..91fe987 100644
  #else
  	assert(0);
  	return -1;
-@@ -60,7 +107,7 @@ int tcp_startSession()
+@@ -60,7 +61,7 @@ int tcp_startSession()
  #ifdef WINDOWS
  	return tcp_windows_startSession();
  #elif NIX
@@ -86,3 +33,12 @@ index 5d3a9e8..91fe987 100644
  #else
  	assert(0);
  	return -1;
+@@ -88,7 +89,7 @@ void tcp_endSession()
+ #ifdef WINDOWS
+ 	tcp_windows_endSession();
+ #elif NIX
+-	tcp_linux_endSession();
++	TC_MARK_VOID(3, tcp_linux_endSession());
+ #else
+ 	assert(0);
+ #endif

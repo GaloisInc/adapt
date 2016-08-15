@@ -37,7 +37,8 @@ cd TransparentComputing/malware/cross-platform/simple-apt/simple/
 (cd src && etags *.c linux/*.c)
 git checkout -- src/tcp.c
 git status
-patch -p5 < ~/adapt/classifier/phase3/marker/tcp_patch.txt
+cp          ~/adapt/classifier/phase3/marker/tc_marker.h    src/
+patch -p5 < ~/adapt/classifier/phase3/marker/kudu_patch.txt
 which cmake || sudo apt-get install -y cmake gcc-multilib g++-multilib
 python cmake.py build
 rsync -a  bin/linux/release/x64/simple /tmp/
