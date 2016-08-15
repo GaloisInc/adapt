@@ -264,7 +264,7 @@ for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub'
 subtr=sub.traversal(); \
 if (i in idsToStore) {\
 s=graph.addVertex(label,'Segment',\
-'%(property_segmentNodeName)s','byPID',\
+'%(segmentNodeName)s','byPID',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 'parentVertexId',i)\
 } else {\
@@ -278,7 +278,7 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
         'segmentNodeName': property_segmentNodeName,
 	'segmentEdgeLabel': property_segmentEdgeLabel,
 	'directionEdges': self.directionEdges,
-	'radius' : radius}
+	'radius' : self.radius}
 		return addEdges_query
 
 	def addSeg2SegEdges_query(self): 
@@ -286,7 +286,7 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 for (snode in g.V().hasLabel('Segment').id().fold().next()){\
 linkedSeg=g.V(snode).as('a').out('%(segmentEdgeLabel)s').out()\
 .in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
-g.V(snode).out('%(seg2segEdgeLabel)').id().fold().next();\
+g.V(snode).out('%(seg2segEdgeLabel)s').id().fold().next();\
 for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
@@ -317,8 +317,8 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 					return "Nodes created"
 				elif self.store_segment=='Yes':
 					
-					createFullSegments=self.titanclient.execute(self.addEdges_query)
-					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query)
+					createFullSegments=self.titanclient.execute(self.addEdges_query())
+					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
 					sys.stdout.write('Segments (including edges) created\n')
 					return "Segments created"
 				else:
