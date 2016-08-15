@@ -1,0 +1,23 @@
+This repository contains both the 'ingest' library as well as the 'ingestd' and
+'Trint' executable code bases.
+
+The Ingest library is used to deserialize data into our internal schema.
+- CDM definition: Ingest/src/CommonDataModel/Types.hs
+- CDM deserializer: Ingest/src/CommonDataModel/Avro.hs
+- Adapt Schema: Ingest/src/Schema.hs
+- CDM->Adapt translation: Ingest/src/CommonData.Model.hs
+
+Excess junk (likely deleted, but exists in repo history if needed):
+
+- Ingest/src/{Types, Util, Typecheck, PP, Parser, Lexer*, Namespaces,
+  Translate,FromProv}.hs  Old ProvN translation.
+- RDF: A triple format translation system
+- Graph: A DOT graph generation system from Prov.
+- Ingest.hs: Top-level read/parse/typecheck/translation for ProvN
+
+The IngestDaemon directory houses the command-line tool 'trint' as well as the
+daemon 'ingestd':
+- Database operations:  IngestDaemon/src/Titan.hs
+- Adapt Schema -> Database command translation: IngestDaemon/src/CompileSchema.hs
+- Trint: IngestDaemon/programs/Trint.hs
+- Ingestd: IngestDaemon/programs/{Ingestd.hs, IngestDaemon/KafkaManager.hs}
