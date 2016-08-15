@@ -62,6 +62,7 @@ class SimpleTitanGremlinSegmenter:
 		self.broker = args.broker
 		self.titanclient=tclient(self.broker)
 		self.criterion=args.criterion
+		self.segmentName='byPID' # TODO: parameterize
 		self.type_criterion=None
 		self.radius=args.radius
 		self.verbose=args.verbose
@@ -84,10 +85,11 @@ class SimpleTitanGremlinSegmenter:
 		query="""\
 for (i in g.V().has('%(criterion)s').id()) {\
 graph.addVertex(label,'segment',\
-'%(segmentNodeName)','byPID',\
+'%(segmentNodeName)','%(segmentName)s',\
 '%(criterion)s+',g.V(i).values('%(criterion)s').next())\
 }""" % {'criterion': self.criterion, 
-        'segmentNodeName': property_segmentNodeName}
+        'segmentNodeName': property_segmentNodeName,
+	'segmentName': self.segmentName}
 		return self.titanclient.execute(query)
 
 	def getVerticesWithProperty(self):
@@ -241,36 +243,37 @@ mgmt.close()\
 
 	def createVertices_query(self):
 		createVertices_query="""\
-idWithProp=g.V().has('%(criterion)s').has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();\
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)','%(segmentName)s').values('parentVertexId').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 if (idsToStore!=[]){\
 for (i in idsToStore) {\
 graph.addVertex(label,'Segment',\
 'parentVertexId',i,\
-'%(segmentNodeName)s','byPID',\
+'%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next())}\
 }\
 """ % {'criterion': self.criterion,
-       'segmentNodeName': property_segmentNodeName}
+       'segmentNodeName': property_segmentNodeName,
+       'segmentName': self.segmentName}
 		return createVertices_query
 
 	def addEdges_query(self):
 		addEdges_query ="""\
-idWithProp=g.V().has('%(criterion)s').has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); \
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)','%(segmentName)s').values('parentVertexId').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
 if (i in idsToStore) {\
 s=graph.addVertex(label,'Segment',\
-'%(segmentNodeName)s','byPID',\
+'%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 'parentVertexId',i)\
 } else {\
-s=g.V().hasLabel('Segment').has('parentVertexId',i).next()\
+s = g.V().has('segment:name','%(segmentName)s').has('parentVertexId',i).next()
 }; \
-idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
+idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)','%(segmentName)s').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
 for (node in idNonLinkedNodes) {
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
@@ -279,6 +282,7 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 	'segmentEdgeLabel': property_segmentEdgeLabel,
 	'directionEdges': self.directionEdges,
 	'radius' : self.radius}
+	'segmentName' : self.segmentName}
 		return addEdges_query
 
 	def addSeg2SegEdges_query(self): 
