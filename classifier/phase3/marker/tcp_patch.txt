@@ -60,10 +60,10 @@ index 5d3a9e8..91fe987 100644
 +      if (fd < 0) {                                                \
 +          perror("socket");                                        \
 +      }                                                            \
-+      if (sendto(fd, ".\n", sizeof(".\n"), 0,                      \
-+                 res->ai_addr, res->ai_addrlen) < 0) {             \
-+          perror("sendto");                                        \
-+      }                                                            \
++                                                                   \
++                                                                   \
++                                                                   \
++                                                                   \
 +    }
  
  // Inits a new network comms session.
