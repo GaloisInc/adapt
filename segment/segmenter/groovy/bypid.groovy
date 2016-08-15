@@ -26,6 +26,7 @@ def createVertices(graph,g,criterion) {
   return t2 - t1
 }
 
+
 // ts = new Long[5]; for (int i = 0; i < 5; i++) { ts[i] = createVertices(graph,g,'pid'); removePIDSegments(g) } 
 
 
@@ -56,6 +57,8 @@ def createVerticesAndEdges(graph,g,criterion,radius) {
   t2 = new Date().getTime();
   return t2 - t1;
 }
+
+
 
 // ts = new Long[5]; for (int i = 0; i < 5; i++) { ts[i] = createVerticesAndEdges(graph,g,'pid',2); removePIDSegments(g) } 
 

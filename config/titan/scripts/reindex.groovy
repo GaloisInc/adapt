@@ -4,6 +4,7 @@ def reindex(graph,idxName) {
   i = mgmt.getGraphIndex(idxName)
   mgmt.updateIndex(i, SchemaAction.REINDEX)
   mgmt.commit()
+  mgmt.awaitGraphIndexStatus(graph, idxName).status(SchemaStatus.ENABLED).call()
 }
 
 

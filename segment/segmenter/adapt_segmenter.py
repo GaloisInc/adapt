@@ -21,13 +21,6 @@ property_segmentNodeName='segment:name'
 property_segmentEdgeLabel='segment:includes'
 property_seg2segEdgeLabel='segment:edge'
 
-def escape(s):
-    """
-    A simple-minded function to escape strings for use in Gremlin queries.
-    Replaces quotes with their escaped versions.  Other escaping
-    may be necessary to avoid problems.
-    """
-    return s.replace("\'", "\\\'").replace("\"", "\\\"")
 
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
@@ -82,27 +75,36 @@ class SimpleTitanGremlinSegmenter:
 	def createSegmentVertices(self):
 		'''
 		sends a query to Titan that:
-		-gets all the nodes n in the graph that have a property (segmentation criterion) P (with value v_n)
-		-for each such vertex, creates a segment vertex s_n and gives it property P with value v_n
+		-  gets all the nodes n in the graph that have a 
+                   property (segmentation criterion) P (with value v_n)
+		-  for each such vertex, creates a segment vertex s_n 
+                   and gives it property P with value v_n
 		'''
-		print('Constructing query\n')
-		query="for (i in g.V().has('"+self.criterion+"').id()) graph.addVertex(label,'segment','"+property_segmentNodeName+"','byPID','"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())"
-		print('Query sent for execution\n')
+		query="""\
+for (i in g.V().has('%(criterion)s').id()) {\
+graph.addVertex(label,'segment',\
+'%(segmentNodeName)','byPID',\
+'%(criterion)s+',g.V(i).values('%(criterion)s').next())\
+}""" % {'criterion': self.criterion, 
+        'segmentNodeName': property_segmentNodeName}
 		return self.titanclient.execute(query)
-
+asdf
 	def getVerticesWithProperty(self):
-		'''
-		query to Titan that retrieves all the nodes that have a certain property (segmentation criterion)
-		'''
-		query="g.V().has('"+self.criterion+"')"
-		return self.titanclient.execute(query)
+            '''
+            query to Titan that retrieves all the nodes that have 
+            a certain property (segmentation criterion)
+            '''
+            query="g.V().has('%(criterion)s')" 
+                    % {'criterion' : self.criterion}
+            return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
-                '''
-                query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
-                '''
-                query="g.V().has('"+self.criterion+"').count()"
-                return self.titanclient.execute(query)
+            '''
+            query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
+            '''
+            query="g.V().has('%(criterion)s').count()"
+                    % {'criterion' : self.criterion}
+            return self.titanclient.execute(query)
 
 	def getVerticesWithPropertyIds(self):
 		'''
@@ -127,110 +129,161 @@ class SimpleTitanGremlinSegmenter:
 		return self.titanclient.execute(query)
 
 	def getSegments(self):
-		count=self.getNumberVerticesWithProperty()[0]
-		if count>0:
-			seedVertices="""g.V().has(\'"""+self.criterion+"""\').id().fold().next()"""
-			subgraphQuery="""sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV()).times("""+str(self.radius)+""").cap('sub').next()"""
-			segmentInfo="""'segment s'+g.V(i).id().next().toString()+ \' """+self.criterion+""" value \' +g.V(i).values(\'"""+self.criterion+"""\').next().toString()"""
-			query="""result=[];for (i in """+seedVertices+""") {"""+subgraphQuery+""";subtr=sub.traversal();result.add(["""+segmentInfo+""",subtr.V().valueMap(true).fold().next()])};return result"""
-			res=self.titanclient.execute(query)
-		else:
-			res=0
-		return res
+            count = self.getNumberVerticesWithProperty()[0]
+            if count == 0:
+                return 0
 
+            seedVertices="""\
+g.V().has(\'%(criterion)s\').id().fold().next()\
+""" % {"criterion" : self.criterion}
+            subgraphQuery="""\
+sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV())\
+.times(%(radius)d).cap('sub').next()\
+""" % {'directionEdges' : self.directionEdges, 'radius': self.radius}
+            segmentInfo="""\
+'segment s'+g.V(i).id().next().toString()+ \' %(criterion)s value \' \
++g.V(i).values(\'%(criterion)s\').next().toString()\
+""" % {"criterion" : self.criterion}
+            query="""\
+result=[];\
+for (i in %(seedVertices)s) {%(subgraphQuery)s;\
+subtr=sub.traversal();\
+result.add([%(segmentInfo)s,subtr.V().valueMap(true).fold().next()])};\
+return result\
+""" % {"seedVertices" : seedVertices, 
+       "subgraphQuery" : subgraphQuery,
+       "segmentInfo" : segmentInfo}
+            return self.titanclient.execute(query)
+            else:
+                res=0
+            return res
 	def printSegments(self):
-		'''
-		prints the results of segmentation
-		'''
-		res=self.getSegments()
-		sys.stdout.write('*'*30+'\n')
-		sys.stdout.write('Summary of segmentation\n')
-		sys.stdout.write('*'*30+'\n')
-		sys.stdout.write('\n')
-		if res==0:
-			sys.stdout.write('No nodes with property: '+self.criterion+'. No segmentation performed.\n')
-			return "segmentation criterion unknown"
-		else:
-			sys.stdout.write('Number of nodes with '+self.criterion+': '+str(len(res))+'\n')
-			reg=re.compile("segment\s*s(?P<id>\d+)\s*"+self.criterion+"\s*value\s*(?P<criterion>\d+)")
-			if len(res)>0:
-				for n in res:
-					sys.stdout.write('*'*30+'\n')
-					sys.stdout.write(n[0]+'\n')
-					r=reg.match(n[0])
-					sys.stdout.write('Number of segment elements centered around node with id '+str(r.group('id'))+' and with '+str(self.criterion)+' '+str(r.group('criterion'))+': '+str(len(n[1]))+'\n')
-					for subn in n[1]:
-						print(subn)
-						sys.stdout.write('\n')
-					sys.stdout.write('*'*30+'\n')
-			return "segmentation summary printed"
-
+            '''
+            prints the results of segmentation
+            '''
+            res=self.getSegments()
+            sys.stdout.write('*'*30+'\n')
+            sys.stdout.write('Summary of segmentation\n')
+            sys.stdout.write('*'*30+'\n')
+            sys.stdout.write('\n')
+            if res==0:
+                sys.stdout.write('No nodes with property: '+self.criterion+'. No segmentation performed.\n')
+                return "segmentation criterion unknown"
+            else:
+                sys.stdout.write('Number of nodes with '+self.criterion+': '+str(len(res))+'\n')
+                reg=re.compile("segment\s*s(?P<id>\d+)\s*"+self.criterion+"\s*value\s*(?P<criterion>\d+)")
+                if len(res)>0:
+                    for n in res:
+                        sys.stdout.write('*'*30+'\n')
+                        sys.stdout.write(n[0]+'\n')
+                        r=reg.match(n[0])
+                        sys.stdout.write('Number of segment elements centered around node with id '+str(r.group('id'))+' and with '+str(self.criterion)+' '+str(r.group('criterion'))+': '+str(len(n[1]))+'\n')
+                        for subn in n[1]:
+                            print(subn)
+                            sys.stdout.write('\n')
+                            sys.stdout.write('*'*30+'\n')
+                 return "segmentation summary printed"
+                        
 	def createSchemaVertexLabel(self,vertexLabel):
-		query="""mgmt=graph.openManagement();if (mgmt.getVertexLabel(\'"""+vertexLabel+"""\')==null) {test=mgmt.makeVertexLabel(\'"""+vertexLabel+"""\').make();mgmt.commit();mgmt.close()}"""
-		self.titanclient.execute(query)
+            query="""
+mgmt=graph.openManagement();
+if (mgmt.getVertexLabel(\'%(vertexLabel)s\')==null) {
+  test=mgmt.makeVertexLabel(\'%(vertexLabel)\').make();
+  mgmt.commit();
+  mgmt.close()
+}""" % {"vertexLabel": vertexLabel}
+            self.titanclient.execute(query)
 
 	def createSchemaVertexProperty(self,vertexProperty,vertexType,cardinality):
-                query="""mgmt=graph.openManagement();if (mgmt.getPropertyKey(\'"""+vertexProperty+"""\')==null) {test=mgmt.makePropertyKey(\'"""+vertexProperty+"""\').dataType("""+vertexType+""".class).cardinality(Cardinality."""+cardinality+""").make();mgmt.commit();mgmt.close()}"""
-                self.titanclient.execute(query)
+            query="""
+mgmt=graph.openManagement();
+if (mgmt.getPropertyKey(\'%(vertexProperty)s\')==null) {
+  test=mgmt.makePropertyKey(\'%(vertexProperty)s\').dataType(%(vertexType)s.class).cardinality(Cardinality.$(cardinality)s).make();
+  mgmt.commit();
+  mgmt.close()
+}""" % {"vertexProperty":vertexProperty,
+        "vertexType": vertexType,
+        "cardinality": cardinality}
+            self.titanclient.execute(query)
 
 	def createSchemaEdgeLabel(self,edgeLabel):
-                query="""mgmt=graph.openManagement();if (mgmt.getEdgeLabel(\'"""+edgeLabel+"""\')==null) {test=mgmt.makeEdgeLabel(\'"""+edgeLabel+"""\').make();mgmt.commit();mgmt.close()}"""
-                self.titanclient.execute(query)
+            query="""
+mgmt=graph.openManagement();
+if (mgmt.getEdgeLabel(\'%(edgeLabel)s\')==null) {
+  test=mgmt.makeEdgeLabel(\'%(edgeLabel)s\').make();
+  mgmt.commit();
+mgmt.close()
+}""" % {"edgeLabel" : edgeLabel}
+            self.titanclient.execute(query)
+
+        def createSchemaElements(self):
+             self.createSchemaVertexLabel('Segment')
+             self.createSchemaVertexProperty(property_segmentNodeName,
+                                             'String','SINGLE')
+             self.createSchemaVertexProperty('parentVertexId',
+                                             'Integer','SINGLE')
+             self.createSchemaVertexProperty(self.criterion,
+                                             type_criterion,'SINGLE')
+             self.createSchemaEdgeLabel(property_segmentEdgeLabel)
+
+        def checkCriterionType():
+             if isinstance(self.criterion,str):
+                 type_criterion='String'
+             elif isinstance(self.criterion,int):
+                 type_criterion='Integer'
+             elif isinstance(self.criterion,float):
+                 type_criterion='Float'
+             elif isinstance(self.criterion,datetime.datetime):
+                 type_criterion='Date'
+             else:
+                 type_criterion=None
+                 return False
+             return True
 
 
-	def storeSegments(self):
-		'''
-		creates segments in the database (only segment nodes when '--store-segment' is equal to 'OnlyNodes' and full segments when it is equal to 'Yes')
-		'''
-		count=self.getNumberVerticesWithProperty()[0]
-		if count>0:
-			if isinstance(self.criterion,str):
-				type_criterion='String'
-			elif isinstance(self.criterion,int):
-				type_criterion='Integer'
-			elif isinstance(self.criterion,float):
-				type_criterion='Float'
-			elif isinstance(self.criterion,datetime.datetime):
-				type_criterion='Date'
-			else:
-		        	type_criterion='Not supported for now'
-		
-			if 'Not supported' in type_criterion:
-				print('The segments cannot be created or stored. The segment criterion type is not defined.')
-				return "Undefined criterion type"
-			else:
-				self.createSchemaVertexLabel('Segment')
-				self.createSchemaVertexProperty(property_segmentNodeName,'String','SINGLE')
-				self.createSchemaVertexProperty('parentVertexId','Integer','SINGLE')
-				self.createSchemaVertexProperty(self.criterion,type_criterion,'SINGLE')
-				createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','byPID','"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
-				segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
-				addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','byPID',\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
-				addSeg2SegEdges_query="""for (snode in g.V().hasLabel('Segment').id().fold().next()){linkedSeg=g.V(snode).as('a').out(\'"""+property_segmentEdgeLabel+"""\').out().in(\'"""+property_segmentEdgeLabel+"""\').dedup().where(neq('a')).id().fold().next()-g.V(snode).out(\'"""+property_seg2segEdgeLabel+"""\').id().fold().next();for (s in linkedSeg){g.V(snode).next().addEdge(\'"""+property_seg2segEdgeLabel+"""\',g.V(s).next())}}"""
-				if self.store_segment=='OnlyNodes':
-					createSegmentNodes=self.titanclient.execute(createVertices_query)
-					sys.stdout.write('Segment nodes created')
-					return "Nodes created"
-				elif self.store_segment=='Yes':
-					self.createSchemaEdgeLabel(property_segmentEdgeLabel)
-					createFullSegments=self.titanclient.execute(addEdges_query)
-					addSeg2SegEdges=self.titanclient.execute(addSeg2SegEdges_query)
-					sys.stdout.write('Segments (including edges) created\n')
-					return "Segments created"
-				else:
-					sys.stdout.write('No segment to store.\n')
-					return "No segment"
-		else:
-			sys.stdout.write("No node with property: "+self.criterion+". Nothing to store.\n" )
-			return "Unknown segmentation criterion"
-	
-	def log(self,type_log,text):
-		if type_log=='info':
-			self.logger.info(text)
-		if type_log=='error':
-			self.logger.error(text)
-		if self.logToKafka:
-			self.producer.send("se-log", str.encode(text))
+        def storeSegments(self):
+            '''
+            creates segments in the database (only segment nodes 
+            when '--store-segment' is equal to 'OnlyNodes' and 
+            full segments when it is equal to 'Yes')
+            '''
+            self.createSchemaElements()
+
+            count=self.getNumberVerticesWithProperty()[0]
+            if count>0:
+                if (self.checkCriterionType() == False):
+                    print('The segments cannot be created or stored. The segment criterion type is not defined.')
+                    return "Undefined criterion type"
+                else:
+                       
+                    createVertices_query="idWithProp=g.V().has('"+self.criterion+"').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next();idsToStore=idWithProp-existingSegNodes_parentIds; if (idsToStore!=[]){for (i in idsToStore) {graph.addVertex(label,'Segment','parentVertexId',i,'"+property_segmentNodeName+"','byPID','"+self.criterion+"',g.V(i).values('"+self.criterion+"').next())}}"
+                    segmentNodes_created="g.V().hasLabel('Segment').valueMap(true)"
+                    addEdges_query="""idWithProp=g.V().has(\'"""+self.criterion+"""\').has(label,neq('Segment')).id().fold().next(); existingSegNodes_parentIds=g.V().hasLabel('Segment').values('parentVertexId').fold().next(); ;idsToStore=idWithProp-existingSegNodes_parentIds; for (i in idWithProp) {sub=g.V(i).repeat(__."""+self.directionEdges+"""E().subgraph('sub').bothV().has(label,neq('Segment'))).times("""+str(self.radius)+""").cap('sub').next();subtr=sub.traversal(); if (i in idsToStore) {s=graph.addVertex(label,'Segment',\'"""+property_segmentNodeName+"""\','byPID',\'"""+self.criterion+"""\',g.V(i).values(\'"""+self.criterion+"""\').next(),'parentVertexId',i)} else {s=g.V().hasLabel('Segment').has('parentVertexId',i).next()}; idNonLinkedNodes=subtr.V().id().fold().next()-g.V().hasLabel('Segment').has('parentVertexId',i).outE(\'"""+property_segmentEdgeLabel+"""\').inV().id().fold().next();for (node in idNonLinkedNodes) {s.addEdge(\'"""+property_segmentEdgeLabel+"""\',g.V(node).next())}}"""
+                    addSeg2SegEdges_query="""for (snode in g.V().hasLabel('Segment').id().fold().next()){linkedSeg=g.V(snode).as('a').out(\'"""+property_segmentEdgeLabel+"""\').out().in(\'"""+property_segmentEdgeLabel+"""\').dedup().where(neq('a')).id().fold().next()-g.V(snode).out(\'"""+property_seg2segEdgeLabel+"""\').id().fold().next();for (s in linkedSeg){g.V(snode).next().addEdge(\'"""+property_seg2segEdgeLabel+"""\',g.V(s).next())}}"""
+                    if self.store_segment=='OnlyNodes':
+                        createSegmentNodes=self.titanclient.execute(createVertices_query)
+                        sys.stdout.write('Segment nodes created')
+                        return "Nodes created"
+                    elif self.store_segment=='Yes':
+                        
+                        createFullSegments=self.titanclient.execute(addEdges_query)
+                        addSeg2SegEdges=self.titanclient.execute(addSeg2SegEdges_query)
+                        sys.stdout.write('Segments (including edges) created\n')
+                        return "Segments created"
+                    else:
+                        sys.stdout.write('No segment to store.\n')
+                        return "No segment"
+            else: # count == 0
+                sys.stdout.write("No node with property: $s. Nothing to store.\n" % self.criterion)
+                return "Unknown segmentation criterion"
+            
+       def log(self,type_log,text):
+           if type_log=='info':
+               self.logger.info(text)
+           if type_log=='error':
+               self.logger.error(text)
+           if self.logToKafka:
+               self.producer.send("se-log", str.encode(text))
 
 	def run(self):
 		sys.stdout.write('*' * 30 + '\n')
