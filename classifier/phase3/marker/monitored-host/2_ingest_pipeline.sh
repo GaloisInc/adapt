@@ -22,7 +22,7 @@
 # the software.
 #
 
-AVRO=~/adapt/trace/current/simple_with_marker_1.avro
+AVRO=~/adapt/trace/current/simple_with_marker_2.avro
 SEG="./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec /local/home/jhanley/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092"
 
 set -e -x
@@ -33,5 +33,5 @@ ls -lL $AVRO
 Trint -p $AVRO
 sleep 10; Trint -f; sleep 10
 (cd ~/adapt/segment/segmenter && time $SEG)
-time ../../fg_classifier.py
+time ~/adapt/classifier/phase3/fg_classifier.py
 ~/adapt/tools/label_count.py

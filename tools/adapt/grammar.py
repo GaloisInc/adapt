@@ -33,6 +33,9 @@ class Grammar:
         gr = """
 # Declare some terminals.
 
+marker_events_begin = LEAF
+marker_events_end = LEAF
+
 unusual_file_access = LEAF
 
 access_sensitive_file = LEAF

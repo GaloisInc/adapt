@@ -42,6 +42,7 @@ class ActivityClassifier(object):
         self.num_classifications_inserted = 0
         # At present we have only tackled challenge problems for a few threats:
         self.detectors = [detector(gremlin) for detector in [
+            classify.MarkerDetector,
             classify.UnusualFileAccessDetector,
             classify.AcrossFirewallDetector,
             classify.SensitiveFileDetector,
@@ -82,34 +83,50 @@ class ActivityClassifier(object):
             # Url is also accompanied by file-version & source.
             """
 g.V(%d).hasLabel('Segment').out().order().dedup().
-        hasLabel('Subject').has('commandLine').has('properties').
-        order().dedup().as('a').
-        in().in().order().dedup().
-        hasLabel('Subject').has('startedAtTime').order().dedup().as('b').
-        out().order().dedup().
-        hasLabel('EDGE_FILE_AFFECTS_EVENT').out().order().dedup().
-        hasLabel('Entity-File').has('url').order().dedup().as('c').
-        select('a').values('commandLine').as('commandLine').
-        select('a').values('properties').as('properties').
-        select('b').values('startedAtTime').as('startedAtTime').
-        select('c').values('url').as('url').
-        select('c').values('ident').as('ident').
-        select('commandLine', 'properties', 'startedAtTime', 'url', 'ident')
+  hasLabel('Subject').has('commandLine').has('properties').
+  order().dedup().as('a').
+  in().in().hasLabel('Subject').has('startedAtTime').has('sequence').
+  order().dedup().as('b').
+  out().hasLabel('EDGE_FILE_AFFECTS_EVENT').order().dedup().
+  out().hasLabel('Entity-File').has('url').order().dedup().as('c').
+  select('a').values('commandLine').as('commandLine').
+  select('a').values('properties').as('properties').
+  select('b').values('startedAtTime').as('startedAtTime').
+  select('b').values('sequence').as('sequence').
+  select('c').values('url').as('url').
+  select('c').values('ident').as('ident').
+  select('commandLine', 'properties',
+         'startedAtTime', 'sequence',
+         'url', 'ident')
             """,
 
             # Sadly there's no pid on middle subject with eventType:9 execute.
             """
-g.V(%d).hasLabel('Segment').out().order().dedup().
-        hasLabel('Subject').has('startedAtTime').out().order().dedup().
-        hasLabel('EDGE_FILE_AFFECTS_EVENT').out().order().dedup().
-        hasLabel('Entity-File').has('url').order().dedup().
-        valueMap(true)
+g.V(%d).hasLabel('Segment').
+  out().hasLabel('Subject').has('startedAtTime').order().dedup().
+  out().hasLabel('EDGE_FILE_AFFECTS_EVENT').order().dedup().
+  out().hasLabel('Entity-File').has('url').order().dedup().
+  valueMap(true)
+            """,
+
+            # This finds e.g. file:///tmp/adapt/tc-marker-001-begin.txt
+            """
+g.V(%d).hasLabel('Segment').
+  out().hasLabel('Subject').has('startedAtTime').has('sequence').
+  order().dedup().as('a').
+  out().hasLabel('EDGE_EVENT_AFFECTS_FILE').order().dedup().
+  out().hasLabel('Entity-File').has('url').order().dedup().as('b').
+  select('a').values('startedAtTime').as('startedAtTime').
+  select('a').values('sequence').as('sequence').
+  select('a').values('ident').as('ident').
+  select('b').values('url').as('url').
+  select('startedAtTime', 'sequence', 'ident', 'url')
             """,
 
             """
-g.V(%d).hasLabel('Segment').out().order().dedup().
-        hasLabel('Agent').has('userID').order().dedup().
-        valueMap(true)
+g.V(%d).hasLabel('Segment').
+  out().hasLabel('Agent').has('userID').order().dedup().
+  valueMap(true)
             """,
         ]
         for seg_id in seg_ids:

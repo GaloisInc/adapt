@@ -21,16 +21,38 @@
 # out of or in connection with the software or the use or other dealings in
 # the software.
 #
-'''
-Classifies a PG segment.
-'''
 
-from .activity_classifier import ActivityClassifier
-from .across_firewall_detector import AcrossFirewallDetector
 from .detector import Detector
-from .escalation import Escalation
-from .fs_proxy import FsProxy
-from .marker_detector import MarkerDetector
-from .scan_detector import ScanDetector
-from .sensitive_file_detector import SensitiveFileDetector
-from .unusual_file_access_detector import UnusualFileAccessDetector
+import re
+
+__author__ = 'John.Hanley@parc.com'
+
+
+class MarkerDetector(Detector):
+    '''Identifies "events of interest" located between begin / end markers.'''
+
+    def __init__(self, gremlin):
+        self.gremlin = gremlin
+        # This regex will need to be adjusted for THEIA. ("/tmp/...")
+        self._marker_re = re.compile(
+            r'^file:///tmp/adapt/tc-marker-(\d{3})-(begin|end)\.txt$')
+
+    def name_of_input_property(self):
+        return 'url'
+
+    def find_activities(self, seg_id, seg_props):
+        activities = []
+        for prop in seg_props:
+            # if seg_id == 1486952:
+            #     print(seg_id, prop)
+            try:
+                url = prop[self.name_of_input_property()]
+            except KeyError:
+                continue  # Url not present.
+            m = self._marker_re.search(url)
+            if m:  # if finds_feature
+                name_of_output_classification = 'marker_events_' + m.group(2)
+                ident = prop['ident']
+                print(prop['sequence'], m.group(1), name_of_output_classification, url)
+                activities.append((ident, name_of_output_classification))
+        return activities
