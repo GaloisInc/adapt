@@ -21,6 +21,18 @@
         ],
         "in": [
             {
+                "query": "g.V().count()",
+                "response": "[Message(status_code=200, data=[101], message='', metadata={})]",
+                "requester_email": "jcheney@inf.ed.ac.uk",
+                "explanation": "Verify 101 nodes ingested."
+            },
+            {
+                "query": "g.E().count()",
+                "response": "[Message(status_code=200, data=[101], message='', metadata={})]",
+                "requester_email": "jcheney@inf.ed.ac.uk",
+                "explanation": "Verify 106 edges ingested."
+            },
+            {
                 "query": "g.V().has(label, 'Entity-File').count()",
                 "response": "[Message(status_code=200, data=[18], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
@@ -37,6 +49,12 @@
                 "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify agents were ingested."
+            },
+            {
+                "query": "g.V().has('pid').count()",
+                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "requester_email": "jcheney@inf.ed.ac.uk",
+                "explanation": "Verify nodes with PID were ingested."
             }
         ],
         "se": [
