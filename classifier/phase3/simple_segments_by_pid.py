@@ -214,7 +214,6 @@ g.V().
   select('TIME', 'PID', 'commandLine', 'properties', 'url', 'IDENT')
 """
 
-
     def get_principal_query(self):
         '''Finds agents.'''
         # Tested with ta5attack2_units (SRI/SPADE) and 5D youtube.

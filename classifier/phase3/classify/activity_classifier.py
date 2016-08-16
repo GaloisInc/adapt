@@ -28,6 +28,7 @@ import os
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
+import gremlin_event
 
 
 class ActivityClassifier(object):
@@ -74,10 +75,11 @@ class ActivityClassifier(object):
 
     # g.V().has('segment:name').out().groupCount().by(label())
 
-    def classify(self, seg_ids):
-        queries = [
+    def _get_queries(self):
+        return [
 
             # 1st subj prop: '{uid=0, name=wget, gid=0, cwd=/tmp/victim}'
+            # Reversed in/out bug: https://github.com/GaloisInc/adapt/issues/57
             # Typically 1st edge is EDGE_EVENT_AFFECTS_SUBJECT
             # or EDGE_EVENT_ISGENERATEDBY_SUBJECT.
             # Url is also accompanied by file-version & source.
@@ -129,16 +131,29 @@ g.V(%d).hasLabel('Segment').
   valueMap(true)
             """,
         ]
+
+    def classify(self, seg_ids, debug=False):
+        stream = gremlin_event.Stream(self.gremlin, seg_ids)
+        for seg_id, seg_props in stream.events_by_seg():
+            self.num_nodes_fetched += len(seg_props)
+            self.classify_one_seg(seg_id, seg_props)
+
+        if debug:
+            nums = (self.num_nodes_fetched, self.num_classifications_inserted)
+            self.log('fetched %d stream events; %d inserts' % nums)
+
         for seg_id in seg_ids:
-            for query in queries:
-                # print(query % seg_id)
+            for query in self._get_queries():
                 seg_props = self.gremlin.fetch_data(query % seg_id)
                 self.num_nodes_fetched += len(seg_props)
                 self.classify_one_seg(seg_id, seg_props)
+                if debug:
+                    print(query % seg_id)
 
-    def classify_one_seg(self, seg_id, props):
+    def classify_one_seg(self, seg_id, seg_props):
         for detector in self.detectors:
-            activities = self.verify_c(detector.find_activities(seg_id, props))
+            activities = self.verify_c(
+                detector.find_activities(seg_id, seg_props))
             detector.insert_activity_classifications(seg_id, activities)
             self.num_classifications_inserted += len(activities)
 

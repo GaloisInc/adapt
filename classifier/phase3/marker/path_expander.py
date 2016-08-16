@@ -25,7 +25,7 @@
 # usage:
 #     ./path_expander.py "==>[v[11174008], v[4014240], v[8515824], v[8507632]]"
 #
-#     bash -xc 'while read line; do marker/path_expander.py "$line"; done' < /tmp/db.txt
+# bash -xc 'while read l; do marker/path_expander.py "$l"; done' < /tmp/db.txt
 #
 '''
 Displays contents of several nodes in a .path() reported by gremlin.

@@ -40,19 +40,21 @@ class MarkerDetector(Detector):
     def name_of_input_property(self):
         return 'url'
 
-    def find_activities(self, seg_id, seg_props):
+    def find_activities(self, seg_id, seg_props, debug=False):
         activities = []
+        if debug and seg_id == 1486952:
+            print(5, seg_id, seg_props)
         for prop in seg_props:
-            # if seg_id == 1486952:
-            #     print(seg_id, prop)
+            if debug and seg_id == 1486952:
+                print(seg_id, prop)
             try:
-                url = prop[self.name_of_input_property()]
+                url = prop[self.name_of_input_property()][0]
             except KeyError:
                 continue  # Url not present.
             m = self._marker_re.search(url)
             if m:  # if finds_feature
+                # print(prop['sequence'][0], m.group(1), '\t', url)
                 name_of_output_classification = 'marker_events_' + m.group(2)
-                ident = prop['ident']
-                print(prop['sequence'], m.group(1), name_of_output_classification, url)
+                ident = prop['ident'][0]
                 activities.append((ident, name_of_output_classification))
         return activities

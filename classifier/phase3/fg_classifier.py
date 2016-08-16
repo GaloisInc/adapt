@@ -80,7 +80,7 @@ if __name__ == '__main__':
         if args.drop_all_existing_activities:
             drop_activities(gremlin)
         ac = classify.ActivityClassifier(gremlin, adapt.Grammar.get_grammar())
-        ac.classify(ac.find_new_segments('s'))
+        ac.classify(list(ac.find_new_segments('s')))
         adapt.Grammar.parsley_demo(ac.grammar)
         log.info('Fetched %d base nodes.' % ac.num_nodes_fetched)
         log.info('Inserted %d activity classifications.' %

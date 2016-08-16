@@ -23,6 +23,9 @@ check_daemons:
 # Don't let zero status from tee mask an earlier failure:
 SHELL = /bin/bash -o pipefail
 
+SDIR = ~/adapt/segment/segmenter
+SEG = ./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec ~/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
+
 RSYNC = ~/adapt/trace/trace_rsync.sh
 
 ~/adapt/trace/current/ta5attack2_units.avro:
@@ -47,7 +50,8 @@ RSYNC = ~/adapt/trace/trace_rsync.sh
 
 /tmp/2_segmented.txt: /tmp/1_trace_loaded.txt
 	@echo '~/adapt/tools/label_count.py'
-	csh -c 'time ~/adapt/classifier/phase3/simple_segments_by_pid.py --debug --drop' 2>&1 | tee $@
+	time ~/adapt/tools/delete_segments.py
+	cd $(SDIR) && csh -c 'time $(SEG)' 2>&1 | tee $@
 
 
 /tmp/3_classified.txt: /tmp/2_segmented.txt

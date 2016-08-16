@@ -18,7 +18,7 @@ OUT = \
 all: $(OUT)
 
 CFG = ~/adapt/config/supervisord.conf
-SEG = ./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec /local/home/jhanley/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
+SEG = ./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec ~/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
 SDIR = ~/adapt/segment/segmenter
 SDIR = /tmp/branch/SegProfiling/adapt/segment/segmenter
 

@@ -93,6 +93,10 @@ def report(query, threshold=1, debug=False):
             # e.g. "15169 | US | arin | 2000-03-30 | GOOGLE - Google Inc., US"
         return name
 
+    def either_address_is(s, prop):
+        return (s == prop['srcAddress'] or
+                s == prop['dstAddress'])
+
     with gremlin_query.Runner() as gremlin:
 
         # Number of times we've seen a given filename or address.
@@ -144,8 +148,7 @@ def report(query, threshold=1, debug=False):
                 pass
 
             try:
-                if (prop['srcAddress'] == 'var/run/dbus/system_bus_socket' or
-                    prop['dstAddress'] == 'var/run/dbus/system_bus_socket'):
+                if either_address_is('var/run/dbus/system_bus_socket', prop):
                     continue  # Why does THEIA send corrupt AF_UNIX addresses?
                 counts[validate_ip(prop['dstAddress'])] += 1  # netflow
                 asn = get_asn(validate_ip(prop['dstAddress']))

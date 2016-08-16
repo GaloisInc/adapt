@@ -25,7 +25,8 @@
 # usage:
 #     ./copy_traces_for_knife.sh
 #     ./ta1_edge_analysis.py
-#     avroknife tojson local:/tmp/knife/ta5attack2_units/ | egrep --color -n 'R9Loq6TtzuZCv\+DyAftQ3g=='
+#     avroknife tojson local:/tmp/knife/ta5attack2_units/ |
+#       egrep --color -n 'R9Loq6TtzuZCv\+DyAftQ3g=='
 #
 '''
 Reports on whether TA1 introduces vertices prior to referencing them.
