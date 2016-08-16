@@ -317,21 +317,21 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 			else:
                        
 				if self.store_segment=='OnlyNodes':
-                    t1 = time.time()
+					t1 = time.time()
 					createSegmentNodes=self.titanclient.execute(self.createVertices_query())
-                    t2 = time.time()
-					sys.stdout.write('Segment nodes created in %fs' % t2 - t1)
+					t2 = time.time()
+					sys.stdout.write('Segment nodes created in %fs' % (t2 - t1))
 					return "Nodes created"
 				elif self.store_segment=='Yes':
 					
 					t1 = time.time()
-                    createFullSegments=self.titanclient.execute(self.addEdges_query())
+					createFullSegments=self.titanclient.execute(self.addEdges_query())
 					t2 = time.time()
-                    sys.stdout.write('Segments created in %fs\n' % t2-t1)
-                    addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+					sys.stdout.write('Segments created in %fs\n' % (t2-t1))
+					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
 					t3 = time.time()
-                    sys.stdout.write('Segment edges created in %fs\n' % t3-t2)
-                    sys.stdout.write('Total segmentation time %fs\n' % t1-t2)
+					sys.stdout.write('Segment edges created in %fs\n' % (t3-t2))
+					sys.stdout.write('Total segmentation time %fs\n' % (t3-t1))
 					return "Segments created"
 				else:
 					sys.stdout.write('No segment to store.\n')
