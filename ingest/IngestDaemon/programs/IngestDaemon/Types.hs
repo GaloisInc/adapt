@@ -27,7 +27,7 @@ data Input = Input { original  :: TCCDMDatum
                     -- ^ Operation we've compiled the CDM into for Titan
                    , inputAge  :: !Int
                     -- ^ Number of times we've tried to run this operation.
-                   }
+                   } deriving (Show)
 
 type Statement = Operation Text
 

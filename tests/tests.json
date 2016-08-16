@@ -28,7 +28,7 @@
             },
             {
                 "query": "g.E().count()",
-                "response": "[Message(status_code=200, data=[101], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[106], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
                 "explanation": "Verify 106 edges ingested."
             },
