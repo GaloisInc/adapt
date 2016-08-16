@@ -26,34 +26,34 @@ property_seg2segEdgeLabel='segment:edge'
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
 	p.add_argument('--broker', '-b', 
-		       help='The broker to the Titan DB',
-		       required=True)
+				   help='The broker to the Titan DB',
+				   required=True)
 	p.add_argument('--criterion', '-c', 
-                       help='The segmentation criterion (e.g PID)',
-                       default='pid')
+				   help='The segmentation criterion (e.g PID)',
+				   default='pid')
 	p.add_argument('--radius', '-r', 
-                       help='The segmentation radius', 
-                       type=int, default=2)
+				   help='The segmentation radius', 
+				   type=int, default=2)
 	p.add_argument('--directionEdges', '-e',
-                       help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
-                       choices=['in','out','both'],default='both')
+				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
+				   choices=['in','out','both'],default='both')
 	p.add_argument('--verbose','-v', 
-                       action='store_true',help='Verbose mode')
+				   action='store_true',help='Verbose mode')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', 
-                           action='store_true',
-                           help='Drop DB and quit, no segmentation performed')
+					   action='store_true',
+					   help='Drop DB and quit, no segmentation performed')
 	group.add_argument('--store-segment', 
-                           help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', 
-                           choices=['Yes','No','OnlyNodes'],
-                           default='Yes')
+					   help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', 
+					   choices=['Yes','No','OnlyNodes'],
+					   default='Yes')
 	p.add_argument('--log-to-kafka', action='store_true',
-                       help='Send logging information to kafka server')
+				   help='Send logging information to kafka server')
 	p.add_argument('--kafka',
-                       help='location of the kafka server',
-                       default='localhost:9092')
+				   help='location of the kafka server',
+				   default='localhost:9092')
 	p.add_argument('--spec',
-		help='A segment specification file in json format')
+				   help='A segment specification file in json format')
 	return p
 
 class SimpleTitanGremlinSegmenter:
@@ -89,8 +89,8 @@ graph.addVertex(label,'segment',\
 '%(segmentNodeName)','%(segmentName)s',\
 '%(criterion)s+',g.V(i).values('%(criterion)s').next())\
 }""" % {'criterion': self.criterion, 
-        'segmentNodeName': property_segmentNodeName,
-	'segmentName': self.segmentName}
+		'segmentNodeName': property_segmentNodeName,
+		'segmentName': self.segmentName}
 		return self.titanclient.execute(query)
 
 	def getVerticesWithProperty(self):
@@ -124,8 +124,8 @@ subGraph=g.V(%(vertexId)d).repeat(__.%(directionEdges)sE()\
 .subgraph('subGraph').bothV())\
 .times(%(radius)d.cap('subGraph').next()\
 """ % {'directionEdges' : self.directionEdges,
-       'vertexId' : vertexId,
-       'radius' : radius}
+	   'vertexId' : vertexId,
+	   'radius' : radius}
 		subgraph_idRetrieval_query="subGraphtr=subGraph.traversal();subGraphtr.V().id().fold().next()"
 		return self.titanclient.execute(subgraph_query+";"+subgraph_idRetrieval_query)
 
@@ -152,8 +152,8 @@ subtr=sub.traversal();\
 result.add([%(segmentInfo)s,subtr.V().valueMap(true).fold().next()])};\
 return result\
 """ % {"seedVertices" : seedVertices, 
-       "subgraphQuery" : subgraphQuery,
-       "segmentInfo" : segmentInfo}
+	   "subgraphQuery" : subgraphQuery,
+	   "segmentInfo" : segmentInfo}
 		return self.titanclient.execute(query)
 
 	def printSegments(self):
@@ -182,7 +182,7 @@ return result\
 						sys.stdout.write('\n')
 						sys.stdout.write('*'*30+'\n')
 		return "segmentation summary printed"
-                        
+
 	def createSchemaVertexLabel(self,vertexLabel):
 		query="""\
 mgmt=graph.openManagement();\
@@ -203,8 +203,8 @@ test=mgmt.makePropertyKey(\'%(vertexProperty)s\')\
 mgmt.commit();\
 mgmt.close()\
 }""" % {"vertexProperty":vertexProperty,
-        "vertexType": vertexType,
-        "cardinality": cardinality}
+		"vertexType": vertexType,
+		"cardinality": cardinality}
 		self.titanclient.execute(query)
 
 	def createSchemaEdgeLabel(self,edgeLabel):
@@ -255,8 +255,8 @@ graph.addVertex(label,'Segment',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next())}\
 }\
 """ % {'criterion': self.criterion,
-       'segmentNodeName': property_segmentNodeName,
-       'segmentName': self.segmentName}
+	   'segmentNodeName': property_segmentNodeName,
+	   'segmentName': self.segmentName}
 		return createVertices_query
 
 	def addEdges_query(self):
@@ -272,25 +272,24 @@ s=graph.addVertex(label,'Segment',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 'parentVertexId',i)\
 } else {\
-s = g.V().has('segment:name','%(segmentName)s').has('parentVertexId',i).next()
+s = g.V().has('%(segmentNodeName)s','%(segmentName)s').has('parentVertexId',i).next()
 }; \
 idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)s','%(segmentName)s').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
 for (node in idNonLinkedNodes) {
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
 }""" % {'criterion': self.criterion,
-        'segmentNodeName': property_segmentNodeName,
-	'segmentEdgeLabel': property_segmentEdgeLabel,
-	'directionEdges': self.directionEdges,
-	'radius' : self.radius,
-	'segmentName' : self.segmentName}
+		'segmentNodeName': property_segmentNodeName,
+		'segmentEdgeLabel': property_segmentEdgeLabel,
+		'directionEdges': self.directionEdges,
+		'radius' : self.radius,
+		'segmentName' : self.segmentName}
 		return addEdges_query
 
 	def addSeg2SegEdges_query(self): 
 		addSeg2SegEdges_query="""\
-for (snode in g.V().hasLabel('Segment').id().fold().next()){\
-linkedSeg=g.V(snode).as('a').out('%(segmentEdgeLabel)s').out()\
-.in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
+for (snode in g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()){\
+linkedSeg=g.V(snode).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
 g.V(snode).out('%(seg2segEdgeLabel)s').id().fold().next();\
 for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
@@ -315,7 +314,6 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 				print('The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-                       
 				if self.store_segment=='OnlyNodes':
 					t1 = time.time()
 					createSegmentNodes=self.titanclient.execute(self.createVertices_query())
