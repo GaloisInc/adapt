@@ -63,7 +63,7 @@
 
 
     "process_connected_with_netflow" : {
-        "description" : "Analyze process nodes that have netowrk activity",
+        "description" : "Analyze process nodes that have network activity",
         "instance_set" : "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
         "feature_set" : {
             "num_file_open_during_wr_to_netflow":
@@ -83,14 +83,43 @@
         }
     },
 
+    "process_connect_many_netflow" : {
+        "description": "Analyze process nodes that have many distinct network activity within same network hosts",
+        "instance_set": "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "feature_set": {
+            "num_distinct_dst_ip_access":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstAddress').dedup().count()"
+        }
+    },
+
+    "process_connect_rare_ip" : {
+        "description": "Analyze process nodes that have rare ip access",
+        "instance_set": "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "feature_set": {
+            "num_distinct_dst_ip_access":
+                "g.V({id}).both().both().has('subjectType',4).both().both().has(label,'Entity-NetFlow').values('dstAddress').dedup().count()"
+        }
+    },
+
     "process_long_write_to_netflow" : {
         "description" : "Identify process nodes with long writing delay (potential exfiltration)",
-        "instance_set": "g.V().has('subjectType',0).as('process').local(both().both().has('eventType',21).count().is(gt(1))).select('process').dedup().id()",
+        "instance_set": "g.V().has('subjectType',0).as('process').local(both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').select('netflow_write').count().is(gt(1))).select('process').dedup().id()",
         "feature_set": {
             "first_last_write_gap":
                 "(g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').min().next())/1000000.0",
             "num_writes":
                 "g.V({id}).both().both().has('eventType',21).count()"
+        }
+    },
+
+    "process_write_rate_to_netflow" : {
+        "description" : "Identify process with slow write rate (potential exfiltration)",
+        "instance_set": "g.V().has('subjectType',0).as('process').local(both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').select('netflow_write').count().is(gt(1))).select('process').dedup().id()",
+        "feature_set": {
+            "write_rate":
+                "g.V({id}).both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').select('netflow_write').values('size').sum().next() / (g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').min().next())/1000000.0",
+            "time_gap_per_writes":
+                "(g.V({id}).both().both().has('eventType',21).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').min().next())/1000000.0 / g.V({id}).both().both().has('eventType',21).count()"
         }
     },
 
@@ -104,6 +133,7 @@
                 "g.V({id}).both().both().has('eventType',14).count()"
         }
     },
+
 
     "files_connected_with_netflow" : {
         "description" : "Analyze files that have connection with netflow (potential downloaded files)",
@@ -200,7 +230,16 @@
         }
     },
 
-    "exec_files_attribute_access" : {
+    "file_last_write_upload_gap" : {
+        "description" : "Detect files that are uploaded right after write (potential exfiltration)",
+        "instance_set": "g.V().has('eventType',21).as('write_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('write_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "feature_set": {
+            "exec_del_gap":
+                "(g.V({id}).both().both().has('eventType',17).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',21).values('startedAtTime').min().next())/1000000.0"
+        }
+    },
+
+    "files_executed_attribute_access" : {
         "description" : "Analyze file attribute access/change for executed files",
         "instance_set": "g.V().has('eventType',9).both().both().has(label,'Entity-File').dedup().id()",
         "feature_set": {
