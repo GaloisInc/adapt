@@ -74,6 +74,14 @@ class SimpleTitanGremlinSegmenter:
 		self.logToKafka = args.log_to_kafka
 		if self.logToKafka:
 			self.producer = kafka.KafkaProducer(bootstrap_servers=[args.kafka])
+		self.params = {'criterion': self.criterion, 
+					   'segmentNodeName': property_segmentNodeName,
+					   'segmentEdgeLabel': property_segmentEdgeLabel,
+					   'seg2segEdgeLabel': property_seg2segEdgeLabel,
+					   'segmentName': self.segmentName,
+					   'directionEdges' : self.directionEdges, 
+					   'radius': self.radius}
+}
 
 	def createSegmentVertices(self):
 		'''
@@ -88,9 +96,7 @@ for (i in g.V().has('%(criterion)s').id()) {\
 graph.addVertex(label,'segment',\
 '%(segmentNodeName)','%(segmentName)s',\
 '%(criterion)s+',g.V(i).values('%(criterion)s').next())\
-}""" % {'criterion': self.criterion, 
-		'segmentNodeName': property_segmentNodeName,
-		'segmentName': self.segmentName}
+}""" % self.params
 		return self.titanclient.execute(query)
 
 	def getVerticesWithProperty(self):
@@ -98,21 +104,21 @@ graph.addVertex(label,'segment',\
 		query to Titan that retrieves all the nodes that have 
 		a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s')" % {'criterion' : self.criterion}
+		query="g.V().has('%(criterion)s')" % self.params
 		return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
 		'''
 		query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s').count()" % {'criterion' : self.criterion}
+		query="g.V().has('%(criterion)s').count()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getVerticesWithPropertyIds(self):
 		'''
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s').id().fold().next()" % {'criterion' : self.criterion}
+		query="g.V().has('%(criterion)s').id().fold().next()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getSubgraphFromVertexId(self,vertexId):
@@ -136,15 +142,15 @@ subGraph=g.V(%(vertexId)d).repeat(__.%(directionEdges)sE()\
 
 		seedVertices="""\
 g.V().has(\'%(criterion)s\').id().fold().next()\
-""" % {"criterion" : self.criterion}
+""" % self.params
 		subgraphQuery="""\
 sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV())\
 .times(%(radius)d).cap('sub').next()\
-""" % {'directionEdges' : self.directionEdges, 'radius': self.radius}
+""" % self.params
 		segmentInfo="""\
 'segment s'+g.V(i).id().next().toString()+ \' %(criterion)s value \' \
 +g.V(i).values(\'%(criterion)s\').next().toString()\
-""" % {"criterion" : self.criterion}
+""" % self.params
 		query="""\
 result=[];\
 for (i in %(seedVertices)s) {%(subgraphQuery)s;\
@@ -202,7 +208,7 @@ test=mgmt.makePropertyKey(\'%(vertexProperty)s\')\
 .cardinality(Cardinality.%(cardinality)s).make();\
 mgmt.commit();\
 mgmt.close()\
-}""" % {"vertexProperty":vertexProperty,
+}""" % {"vertexProperty": vertexProperty,
 		"vertexType": vertexType,
 		"cardinality": cardinality}
 		self.titanclient.execute(query)
@@ -254,9 +260,7 @@ graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next())}\
 }\
-""" % {'criterion': self.criterion,
-	   'segmentNodeName': property_segmentNodeName,
-	   'segmentName': self.segmentName}
+""" % self.params
 		return createVertices_query
 
 	def addEdges_query(self):
@@ -278,12 +282,7 @@ idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)s','%
 for (node in idNonLinkedNodes) {
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
-}""" % {'criterion': self.criterion,
-		'segmentNodeName': property_segmentNodeName,
-		'segmentEdgeLabel': property_segmentEdgeLabel,
-		'directionEdges': self.directionEdges,
-		'radius' : self.radius,
-		'segmentName' : self.segmentName}
+}""" % self.params
 		return addEdges_query
 
 	def addSeg2SegEdges_query(self): 
@@ -294,10 +293,7 @@ g.V(snode).out('%(seg2segEdgeLabel)s').id().fold().next();\
 for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
-}""" % {'segmentEdgeLabel':property_segmentEdgeLabel,
-		'segmentName' : self.segmentName,
-		'segmentNodeName': property_segmentNodeName,
-		'seg2segEdgeLabel':property_seg2segEdgeLabel}
+}""" % self.params
 	
 
 		return addSeg2SegEdges_query
@@ -381,19 +377,6 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 			self.log('info','\nSegmentation finished\n')
 			sys.exit()
 			
-		
-		
-
-		
-
-
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
 	args = arg_parser().parse_args()
