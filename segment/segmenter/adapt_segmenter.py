@@ -245,7 +245,7 @@ mgmt.close()\
 	def createVertices_query(self):
 		createVertices_query="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().has('%(segmentNodeName)','%(segmentName)s').values('parentVertexId').fold().next();\
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('parentVertexId').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 if (idsToStore!=[]){\
 for (i in idsToStore) {\
@@ -295,7 +295,9 @@ for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
 }""" % {'segmentEdgeLabel':property_segmentEdgeLabel,
-	'seg2segEdgeLabel':property_seg2segEdgeLabel}
+		'segmentName' : self.segmentName,
+		'segmentNodeName': property_segmentNodeName,
+		'seg2segEdgeLabel':property_seg2segEdgeLabel}
 	
 
 		return addSeg2SegEdges_query
