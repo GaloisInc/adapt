@@ -16,6 +16,7 @@ module Main where
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Concurrent (threadDelay, forkIO)
 import qualified Control.Concurrent.Chan as Ch
+import qualified Data.IORef as Ref
 import           Control.Exception as X
 import           Lens.Micro
 import           Lens.Micro.TH
@@ -26,14 +27,13 @@ import qualified Data.List as L
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
 import           Data.String
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import           Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import           MonadLib        hiding (handle)
--- import           Network.Kafka as K
--- import           Network.Kafka.Protocol as K
 import           Prelude
 import           SimpleGetOpt
 import           System.IO (stderr)
@@ -71,11 +71,10 @@ data Config =
 
 makeLenses ''Config
 
-inputQueueSize  :: Int
-inputQueueSize  = 100000
-
-outputQueueSize :: Int
-outputQueueSize = 1000
+-- | Report ingests when the ingester was processed at least this this many
+-- CDM statements.
+minReportCount :: Int
+minReportCount = 50
 
 defaultKafka :: KafkaAddress
 defaultKafka = ("localhost", 9092)
@@ -186,41 +185,60 @@ main =
 mainLoop :: Config -> IO ()
 mainLoop cfg =
  do logChan <- Ch.newChan
+    kafkaEmptySignal <- Ref.newIORef (Set.fromList $ cfg ^. inputTopics)
     let logMsg m = void (Ch.writeChan logChan (T.encodeUtf8 m))
     forkIOsafe "Logs2Kafka" (emitLogData cfg logChan)
     startTime <- getCurrentTime
     logMsg $ "Starting Ingestd at " <> T.pack (show startTime)
-    dbconn <- connectToTitan logMsg (cfg ^. titanServer)
     logMsg "Connected to Titan."
     inputSchema <- CDM.getAvroSchema
-    let sendToDB = runDB logMsg dbconn
+    let markEmptyQueue nm =
+          do _ <- Ref.atomicModifyIORef' kafkaEmptySignal (\x -> pure (Set.delete nm x,()))
+             return ()
+        markBusyQueue  nm =
+          do _ <- Ref.atomicModifyIORef' kafkaEmptySignal (\x -> pure (Set.insert nm x,()))
+             return ()
+        blockTillEmpty =
+          do working <- Ref.readIORef kafkaEmptySignal
+             when (0 /= Set.size working) (threadDelay 100000 >> blockTillEmpty)
+        sendToDB = runDB logMsg
         mkFromKafka :: TopicName -> FromKafkaSettings
         mkFromKafka t = FKS { sourceServer  = cfg ^. kafkaExternal
                             , sourceSchema  = inputSchema
                             , initialOffset = fromIntegral <$> cfg ^. startingOffset
                             , maximumCount  = cfg ^. stopAfterCount
-                            , sendInputs    = liftIO . sendToDB
+                            , sendInputs    = \conn -> liftIO . sendToDB conn
                             , logKafkaMsg   = logMsg
                             , sourceTopic   = t
+                            , connectDB     = connectToTitan logMsg (cfg ^. titanServer)
+                            , markEmpty     = liftIO $ markEmptyQueue t
+                            , markBusy      = liftIO $ markBusyQueue t
                             }
         fks = map mkFromKafka (cfg ^. inputTopics)
     case fks of
       [] -> T.putStrLn "No input sources specified."
       fs ->
         do mapM_ (\f -> forkIOsafe "KafkaConsumer" (kafkaInputToDB f >> return ())) fs
-           forwardFinishSignal (cfg ^. kafkaExternal)
+           forwardFinishSignal blockTillEmpty
+                               (cfg ^. kafkaExternal)
                                (cfg ^. triggerTopic)
                                (cfg ^. kafkaInternal)
                                (cfg ^. outputTopic)
 
 -- Thread that reads from finish input signal and propagates it to the output.
-forwardFinishSignal :: KafkaAddress -> TopicName -- Input
+forwardFinishSignal :: IO ()
+                    -> KafkaAddress -> TopicName -- Input
                     -> KafkaAddress -> TopicName -- Output
                     -> IO ()
-forwardFinishSignal inSvr inTopic outSvr outTopic=
+forwardFinishSignal blockOnEmptySignal inSvr inTopic outSvr outTopic=
   do ch <- Ch.newChan
      forkIOsafe "finishSignalReader" (readKafka "ingest-sig-consumer" inSvr inTopic (Ch.writeChan ch))
-     writeKafka "ingest-sig-producer" outSvr outTopic (Ch.readChan ch)
+     let produceFinishSignal =
+          do x <- Ch.readChan ch
+             when (B.unpack x == [0x02]) blockOnEmptySignal
+             let segmenterSignal = B.pack [0x01]
+             return segmenterSignal
+     safe "finishSignalWriter" (writeKafka "ingest-sig-producer" outSvr outTopic produceFinishSignal)
 
 -- Thread that pushes log message to dashboard or stderr.
 emitLogData :: Config -> Ch.Chan B.ByteString -> IO ()
@@ -242,9 +260,12 @@ data FromKafkaSettings =
       , sourceSchema  :: Avro.Schema
       , initialOffset :: Maybe Offset
       , maximumCount  :: Maybe Integer
-      , sendInputs    :: [Input] -> Kafka ()
+      , connectDB     :: IO (GC.DBConnection)
+      , sendInputs    :: GC.DBConnection -> [Input] -> Kafka ()
       , logKafkaMsg   :: Text -> IO ()
       , sourceTopic   :: TopicName
+      , markEmpty     :: Kafka ()
+      , markBusy      :: Kafka ()
       }
 
 -- | Acquire CDM from a given kafka host/topic, compile to Adapt Schema,
@@ -254,7 +275,8 @@ data FromKafkaSettings =
 kafkaInputToDB :: FromKafkaSettings
            -> IO (Either KafkaClientError ())
 kafkaInputToDB cfg =
-  do r <- runKafka state oper
+  do dbconn <- connectDB cfg
+     r <- runKafka state (oper dbconn)
      case r of
        Left err -> logKafkaMsg cfg ("Error reading kafka topic '"
                                     <> topicStr <> "':" <> T.pack (show err))
@@ -264,17 +286,18 @@ kafkaInputToDB cfg =
  src = sourceTopic cfg
  topicStr = T.decodeUtf8 (_kString $ _tName src)
  state = mkKafkaState "adapt-ingest" (sourceServer cfg)
- oper  = do
+ nrKafkaNullsBeforeEmptyQueueSignal = 5
+ oper dbconn = do
    off  <- maybe (getLastOffset LatestTime 0 src) pure (initialOffset cfg)
    uids <- randomUIDs <$> liftIO newTFGen
    now  <- liftIO getCurrentTime
    liftIO $ logKafkaMsg cfg ("Connected to Kafka for reading topic " <> topicStr)
-   process now 0 0 uids off
+   process dbconn now 0 0 uids off 0
 
  -- Read data, compile to our schema, and send to Gremlin
  -- Bail after `maximumCount`, if non-Nothing.
- process :: UTCTime -> Int -> Integer -> [UID] -> Offset -> Kafka ()
- process start !cnt total uids offset
+ process :: GC.DBConnection -> UTCTime -> Int -> Integer -> [UID] -> Offset -> Int -> Kafka ()
+ process dbc start !cnt total uids offset !emptyCount
   | maybe False (total >=) (maximumCount cfg) = return ()
   | otherwise =
    do bs0 <- getMessage (sourceTopic cfg) offset
@@ -289,22 +312,30 @@ kafkaInputToDB cfg =
                liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
       ms   <- catMaybes <$> mapM decodeMsg bs
       let (ipts,newUIDs) = convertToSchemas uids ms
-      sendInputs cfg ipts
+      when (not (null bs0)) $ liftIO $ do
+        T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
+        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ipts)) <> " compiled inputs."
+        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ms)) <> " decoded CDM stmts."
+      sendInputs cfg dbc ipts
       if null bs
        then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
                                   threadDelay 100000
                                   getCurrentTime
-               process now 0 total uids offset
-       else process start (cnt+nr) newTotal newUIDs (offset + fromIntegral nr)
+               when (emptyCount == nrKafkaNullsBeforeEmptyQueueSignal) (markEmpty cfg)
+               process dbc now 0 total uids offset (emptyCount + 1)
+       else do markBusy cfg
+               process dbc start (cnt+nr) newTotal newUIDs (offset + fromIntegral nr) 0
 
 reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
 reportRate sendOutput start cnt
-  | cnt < 10000 = return ()
+  | cnt < minReportCount = return ()
   | otherwise =
  do now <- getCurrentTime
     let delta = realToFrac (diffUTCTime now start)
-        rate = (fromIntegral cnt) / delta  :: Double
-    liftIO $ sendOutput (T.pack $ printf "Ingest complete at %f stmt/sec" rate)
+        rate = if delta <= 0.0001
+                  then "infinite"
+                  else show ((fromIntegral cnt) / delta  :: Double)
+    liftIO $ sendOutput (T.pack $ printf "Ingested %d statments at %s stmt/sec" cnt rate)
 
 convertToSchemas :: [UID] -> [CDM.TCCDMDatum] -> ([Input],[UID])
 convertToSchemas us xs = go us xs []
@@ -347,7 +378,7 @@ runDB emit conn inputOps = do
   runDB emit conn waitThese
  where
  nrBulk = 100
- deadAt = 2 -- retry age zero and one inputs, drop on third failure.
+ deadAt = 4
  go oprs =
   do let (operVS,operES) = L.partition (isVertex . statement) oprs
          (vs,es)   = (map statement operVS, map statement operES)
@@ -362,15 +393,18 @@ runDB emit conn inputOps = do
          recover [] _ = error "BUG: failed insertion on an empty batch."
          recover xs@(x:_) resp
             | respStatus resp /= 200 =
-                -- Retry by simply calling runDB on the individual
-                -- inputs instead of the bulk set of inputs.
-                let live = filter ((<deadAt) . inputAge) (map ageInput xs)
+                let (live,dead) = L.partition ((<deadAt) . inputAge) (map ageInput xs)
                     batches
-                      | inputAge x < (deadAt-1)  =
+                      | inputAge x < (deadAt-2)  =
                           let (a,b) = L.splitAt (length xs `div` 2) live
                           in [a,b]
                       | otherwise      = map (\y -> [y]) live
-                in void $ forkIO (mapM_ (runDB emit conn) batches)
+                    ms500 = 1000 * 500       -- 0.5 seconds
+                    min1  = 1000 * 1000 * 60 -- 1 minute
+                    delayTime = min min1 (ms500 * 4 ^ (inputAge x))
+                    -- ^ exponential back-off
+                in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping statement: " <> T.pack (show dead))
+                      void $ forkIO (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
      when (nrVS > 0) $ sendReq vsReq operVS
@@ -445,8 +479,11 @@ withLastOffset op topic =
        op off
 
 forkIOsafe :: Text -> IO () -> IO ()
-forkIOsafe threadName op = forkIO go >> return ()
+forkIOsafe threadName op = forkIO (safe threadName op) >> return ()
+
+safe :: Text -> IO () -> IO ()
+safe threadName op = go
  where
- go =
-  do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
-     go
+  go =
+    do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
+       go
