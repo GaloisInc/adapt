@@ -26,6 +26,8 @@ def makeNodeIndex = { String indexName, String indexKey, Boolean mkUnique, index
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
+
+      // enable and wait for enabled status
       mgmt  = graph.openManagement()
       mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
       mgmt.commit()
@@ -40,20 +42,21 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
     mgmt = graph.openManagement()
     i = mgmt.getGraphIndex(indexName)
     if(! i) {
-      urlKey = mgmt.getPropertyKey(indexKey)
-      urlKey = urlKey ? urlKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
-      mgmt.buildIndex(indexName, Vertex.class).addKey(urlKey, Mapping.STRING.asParameter()).buildMixedIndex('search')
+      idKey = mgmt.getPropertyKey(indexKey)
+      idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
+      mgmt.buildIndex(indexName, Vertex.class).addKey(idKey, Mapping.STRING.asParameter()).buildMixedIndex('search')
       mgmt.commit()
       graph.tx().commit()
     
       mgmt  = graph.openManagement()
-      urlKey = mgmt.getPropertyKey(indexKey)
+      idKey = mgmt.getPropertyKey(indexKey)
       idx   = mgmt.getGraphIndex(indexName)
       // Wait for index availability
-      if ( idx.getIndexStatus(urlKey).equals(SchemaStatus.INSTALLED) ) {
+      if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
         mgmt.commit()
         mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
       } else { mgmt.commit() }
+
       mgmt  = graph.openManagement()
       mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
       mgmt.commit()
@@ -61,18 +64,45 @@ def makeElasticSearchIndex = { String indexName, String indexKey, indexType ->
     } else { mgmt.commit() }
 }
 
+def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
+    mgmt = graph.openManagement()
+    i = mgmt.getGraphIndex(indexName)
+    if(! i) {
+      idKey = mgmt.getPropertyKey(indexKey)
+      idKey = idKey ? idKey : mgmt.makePropertyKey(indexKey).dataType(indexType).make()
+      mgmt.buildIndex(indexName, Vertex.class).addKey(idKey).buildMixedIndex('search')
+      mgmt.commit()
+      graph.tx().commit()
+    
+      mgmt  = graph.openManagement()
+      idKey = mgmt.getPropertyKey(indexKey)
+      idx   = mgmt.getGraphIndex(indexName)
+      // Wait for index availability
+      if ( idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED) ) {
+        mgmt.commit()
+        mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
+      } else { mgmt.commit() }
+
+      mgmt  = graph.openManagement()
+      mgmt.updateIndex(mgmt.getGraphIndex(indexName),SchemaAction.ENABLE_INDEX).get()
+      mgmt.commit()
+      mgmt.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.ENABLED).call()
+    } else { mgmt.commit() }
+}
+
+
 // We index the 'ident' field, which matches CDM 'UUID' but as a Base64 string.
 makeNodeIndex('byIdent','ident',true,String.class)
 makeNodeIndex('bySegmentName', 'segment:name', false, String.class)
-
+makeNodeIndex('byParentId','parentVertexId',false,Integer.class)
 
 // URL index use ElasticSearch which provides richer queries
 // including regex
 makeElasticSearchIndex('byURL','url',String.class)
 
 // index PIDs and timestamps for numeric queries
-//makeElasticSearchIndex('byPID','pid',Integer.class)
-//makeElasticSearchIndex('byTime','startedAtTime',Long.class)
+makeNumericSearchIndex('byPID','pid',Integer.class)
+makeNumericSearchIndex('byTime','startedAtTime',Long.class)
 
 
 // The graph traverser captured by variable 'g' is useful to many of
