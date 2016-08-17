@@ -81,7 +81,6 @@ class SimpleTitanGremlinSegmenter:
 					   'segmentName': self.segmentName,
 					   'directionEdges' : self.directionEdges, 
 					   'radius': self.radius}
-}
 
 	def createSegmentVertices(self):
 		'''
