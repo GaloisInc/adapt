@@ -21,16 +21,16 @@
         ],
         "in": [
             {
-                "query": "g.V().count()",
+                "query": "g.V().has(label,not('Segment')).count()",
                 "response": "[Message(status_code=200, data=[101], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
-                "explanation": "Verify 101 nodes ingested."
+                "explanation": "Verify 101 non-segment nodes ingested."
             },
             {
-                "query": "g.E().count()",
+                "query": "g.E().has(label,neq('segment:edge').and(neq('segment:includes'))).count()",
                 "response": "[Message(status_code=200, data=[106], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
-                "explanation": "Verify 106 edges ingested."
+                "explanation": "Verify 106 non-segment edges ingested."
             },
             {
                 "query": "g.V().has(label, 'Entity-File').count()",
@@ -51,7 +51,7 @@
                 "explanation": "Verify agents were ingested."
             },
             {
-                "query": "g.V().has('pid').count()",
+                "query": "g.V().has('pid').has(label,neq('Segment')).count()",
                 "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
                 "explanation": "Verify nodes with PID were ingested."
@@ -59,7 +59,7 @@
         ],
         "se": [
             {
-                "query": "g.V().has(label, 'Segment').count()",
+                "query": "g.V().hasLabel('Segment').count()",
                 "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify segment nodes were inserted."
@@ -80,7 +80,7 @@
                 "query": "g.V().as('a').out('segment:includes').out().in('segment:includes').dedup().where(neq('a')).count().next() == g.E().hasLabel('segment:edge').count().next()",
                 "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
                 "requester_email": "rui@parc.com",
-                "explanation": "Ensure that segment edges connect two different segment nodes. Works fine in SegProfiling commit d0c61."
+                "explanation": "Ensure that segment edges connect two different segment nodes."
             }
         ],
         "ad": [
