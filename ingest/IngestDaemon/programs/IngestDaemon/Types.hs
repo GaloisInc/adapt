@@ -17,7 +17,7 @@ newtype FailedInsertionDB =
 
 type HttpCode = Int
 data OperationRecord = OpRecord
-                          { input    :: Input
+                          { input    :: [Input]
                           , code     :: Maybe HttpCode
                           }
 
@@ -27,16 +27,16 @@ data Input = Input { original  :: TCCDMDatum
                     -- ^ Operation we've compiled the CDM into for Titan
                    , inputAge  :: !Int
                     -- ^ Number of times we've tried to run this operation.
-                   }
+                   } deriving (Show)
 
 type Statement = Operation Text
 
 
 --  Mutations on the map
 
-insertDB :: UUID.UUID -> Input -> FailedInsertionDB -> IO ()
-insertDB key ipt (FIDB mv) = modifyMVar_ mv (pure . HMap.insert key rec)
- where rec = OpRecord ipt Nothing
+insertDB :: UUID.UUID -> [Input] -> FailedInsertionDB -> IO ()
+insertDB key ipts (FIDB mv) = modifyMVar_ mv (pure . HMap.insert key rec)
+ where rec = OpRecord ipts Nothing
 
 lookupDB :: UUID.UUID -> FailedInsertionDB -> IO (Maybe OperationRecord)
 lookupDB uid fdb =
@@ -48,6 +48,9 @@ deleteDB k (FIDB mv) = modifyMVar_ mv (pure . HMap.delete k)
 
 resetDB :: FailedInsertionDB -> IO [OperationRecord]
 resetDB (FIDB mv) = HMap.elems <$> modifyMVar mv (pure . (HMap.empty,))
+
+sizeDB :: FailedInsertionDB -> IO Int
+sizeDB (FIDB mv) = HMap.size <$> readMVar mv
 
 -- Sets the HTTP code for the OperationRecord indicated by a particular map
 -- key.
