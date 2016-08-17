@@ -133,6 +133,9 @@ install_adapt_dependencies() {
         flake8 \
         gremlinrestclient \
         networkx \
+        numpy \
+        sklearn \
+        scipy \
         parsley \
         pyparsing \
         flask \
