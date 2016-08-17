@@ -57,11 +57,19 @@ class Stream:
                         if 'properties' in x:  # Sigh! No JSON for props.
                             assert len(x['properties']) == 1, x
                             props.append(x['properties'][0].strip('{}'))
-                    d = {**seg, **subj, **edge, **ae}
+                    # d = {**seg, **subj, **edge, **ae} (xenial python3.5 only)
+                    d = self._merge_dicts(seg, subj, edge, ae)
                     if len(props) > 0:
                         d['properties'] = '{%s}' % ', '.join(props)
                     # d = self._truncate_lists(d)
                     yield seg_id, d
+
+    def _merge_dicts(self, *dicts):
+        '''Allow trusty python3.4 to do what xenial 3.5 does natively.'''
+        ret = {}
+        for dict in dicts:
+            ret.update(dict)
+        return ret
 
     def _truncate_lists(self, d):
         already_good = set('id label properties'.split())
