@@ -180,6 +180,7 @@ main =
  where
  neverFail op =
    do X.catch op (\(e::X.SomeException) -> T.hPutStrLn stderr $ "Retrying because: " <> T.pack (show e))
+      threadDelay 1000000 -- 1 second
       neverFail op
 
 mainLoop :: Config -> IO ()
@@ -486,4 +487,5 @@ safe threadName op = go
  where
   go =
     do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
+       threadDelay 500000 -- 500 ms
        go
