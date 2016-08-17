@@ -15,7 +15,7 @@ Vagrant.configure(2) do |config|
   #
   #   # Customize the amount of memory on the VM:
      vb.memory = "4096"
-     vb.cpus   = 2
+     vb.cpus   = 4
   end
 
   config.vm.provision "shell", privileged: false, path: "install/bootstrap.sh"
