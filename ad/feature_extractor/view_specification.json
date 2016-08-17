@@ -62,6 +62,7 @@
     },
 
 
+
     "process_connected_with_netflow" : {
         "description" : "Analyze process nodes that have network activity",
         "instance_set" : "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
@@ -133,6 +134,7 @@
                 "g.V({id}).both().both().has('eventType',14).count()"
         }
     },
+
 
 
     "files_connected_with_netflow" : {
@@ -227,6 +229,15 @@
         "feature_set": {
             "exec_del_gap":
                 "(g.V({id}).both().both().has('eventType',9).values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',12).values('startedAtTime').min().next())/1000000.0"
+        }
+    },
+
+    "file_upload_del_gap" : {
+        "description" : "Detect files that are deleted right after upload",
+        "instance_set": "g.V().has('eventType',12).both().both().has(label,'Entity-File').dedup().as('files').both().both().has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().both().both().has('eventType',21).both().both().has(label,'Entity-NetFlow').select('files').dedup().id()",
+        "feature_set": {
+            "upload_del_gap":
+                "(g.V({id}).both().both().has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().both().both().has('eventType',21).as('netflow_write').both().both().has(label,'Entity-NetFlow').select('netflow_write').values('startedAtTime').max().next() - g.V({id}).both().both().has('eventType',12).values('startedAtTime').min().next())/1000000.0"
         }
     },
 
