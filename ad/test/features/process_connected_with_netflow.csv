@@ -1,4 +1,0 @@
-id,num_distinct_dst_port_access,num_distinct_src_port_access,num_file_open_during_wr_to_netflow,num_reads_to_netflow,num_writes_to_net_flow,total_bytes_rcv_from_netflow,total_bytes_sent_to_netflow
-2736168,3,1,211,320,8,141754.0,1754.0
-41607392,1,1,2160,158,53,10338.0,4939.0
-5238784,1,1,0,0,0,0.0,0.0
