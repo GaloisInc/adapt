@@ -1126,9 +1126,9 @@ This property specifies the string name of a segment.
 makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 [schema]: #
-makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.LIST)
 [schema]: #
-makePropertyKey('anomalyType').dataType(Float.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('anomalyType').dataType(String.class).cardinality(Cardinality.LIST)
 
 
 segment:edge (not in CDM)

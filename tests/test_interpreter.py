@@ -72,7 +72,11 @@ def execute_module(module_key, data_path="~/adapt/example/5d_youtube_ie_output-1
     if module_key is "in":
         os.system('Trint -p ' + data_path)
         sleep(25)  # no way to know when Trint is finished?
+<<<<<<< HEAD
         os.system('Trint -f')
+=======
+        os.system('Trint -F')
+>>>>>>> c34a13d95ac58471806a15f2250641caa0b6bd72
         sleep(1)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
         cmd = ('%s/segment/segmenter/adapt_segmenter.py'
