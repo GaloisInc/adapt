@@ -107,6 +107,7 @@ def report(query, threshold=1, debug=False):
             source = prop.source()
             assert source in [
                 cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
+                cdm.enums.InstrumentationSource.FREEBSD_DTRACE_CADETS,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_THEIA,
@@ -138,7 +139,8 @@ def report(query, threshold=1, debug=False):
             # Remove strip() once this issue is closed:
             # https://git.tc.bbn.com/ta1-theia/ta1-integration-theia/issues/5
             try:
-                counts[validate_file(prop['url'].strip('"'))] += 1  # file
+                if len(prop['url']) > 0:  # cf the CADETS remove_dir trace.
+                    counts[validate_file(prop['url'].strip('"'))] += 1  # file
             except KeyError:
                 pass
 
