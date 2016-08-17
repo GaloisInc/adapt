@@ -45,7 +45,8 @@ class Stream:
             seg_props.append(event)
 
     def _events(self):
-        for msg in self.gremlin.fetch(self._get_query()):
+        ids = ', '.join([str(n) for n in self.seg_ids])
+        for msg in self.gremlin.fetch(self._get_query() % ids):
             if msg.data:
                 for event in msg.data:
                     seg, subj, edge, ae = [event[x]
@@ -76,12 +77,12 @@ class Stream:
 
     def _get_query(self):
         return """
-g.V().hasLabel('Segment').as('SEG').
-  out().hasLabel('Subject').order().dedup().as('SUBJ').
-  out().order().dedup().as('EDGE').
+g.V(%s).hasLabel('Segment').order().by(id(), incr).as('SEG').
+  out().hasLabel('Subject').dedup().as('SUBJ').
+  out().dedup().as('EDGE').
   out().or(hasLabel('Agent'),
            hasLabel('Entity-File'),
            hasLabel('Entity-NetFlow'),
-           hasLabel('Entity-Memory')).order().dedup().as('AE').
+           hasLabel('Entity-Memory')).dedup().as('AE').
   select('SEG', 'SUBJ', 'EDGE', 'AE').by(valueMap(true))
 """
