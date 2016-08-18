@@ -71,9 +71,11 @@ def execute_module(module_key, data_path="~/adapt/example/5d_youtube_ie_output-1
     top = os.path.expanduser('~/adapt')
     if module_key is "in":
         os.system('Trint -p ' + data_path)
-        sleep(25)  # no way to know when Trint is finished?
-        os.system('Trint -F')
-        sleep(1)  # currently no way to know when other services are complete with their respective processing.
+        sleep(5)  # no way to know when Trint is finished?
+# Trint -F signals the segmenter to start, but this is done again 
+# explicitly by the segmenter test below, which causes a race condition.
+#        os.system('Trint -F')
+#        sleep(1)  # currently no way to know when other services are complete with their respective processing.
     elif module_key is "se":
         cmd = ('%s/segment/segmenter/adapt_segmenter.py'
                ' --broker http://localhost:8182/'
