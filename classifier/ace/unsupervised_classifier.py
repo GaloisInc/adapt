@@ -2,6 +2,7 @@
 
 from sklearn import cluster
 import numpy
+import pprint
 
 class UnsupervisedClassifier(object):
     def __init__(self, provenanceGraph, featureExtractor):
@@ -17,6 +18,8 @@ class UnsupervisedClassifier(object):
             features.append(self.featureExtractor.run(G))
         
         X = numpy.array(features)
+        if len(X) == 0:
+            return ()
             
         # Create a clustering estimator
 #        estimator = cluster.AffinityPropagation() # doesn't work very well for some reason
