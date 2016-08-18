@@ -13,4 +13,5 @@ reindex(graph,'bySegmentName')
 reindex(graph,'byURL')
 reindex(graph,'byPID')
 reindex(graph,'byTime')
+reindex(graph,'byParentId')
 
