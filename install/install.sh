@@ -165,7 +165,7 @@ function install_ingest_dashboard() {
     mkdir -p $ADAPT_DIR/.stack-adapt                          || handle_error $LINENO
     cp $ADAPT_DIR/install/stack.yaml $ADAPT_DIR/.stack-adapt/ || handle_error $LINENO
     cd $ADAPT_DIR/.stack-adapt                                || handle_error $LINENO
-    stack install                                        || handle_error $LINENO
+    stack install                                             || handle_error $LINENO
     cd $CWD
 }
 
