@@ -104,7 +104,12 @@ class UnusualFileAccessDetector(Detector):
     def _find_files(self, seg_props):
         '''Gives segment's set of distinct filenames, with right censoring.'''
         # return set((self._extract_name(prop['properties'][0])
-        return set((prop['url']
+        for prop in seg_props[:self.max_files]:
+            if 'url' in prop:
+                url = prop['url'][0]
+                assert str == type(url), (repr(url))
+
+        return set((prop['url'][0]
                     for prop in seg_props[:self.max_files]
                     if 'url' in prop))
 

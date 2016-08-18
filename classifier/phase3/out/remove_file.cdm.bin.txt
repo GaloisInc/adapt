@@ -11,13 +11,13 @@ Segmenter ready to run
 ******************************
 Running DB side segmenter
 ******************************
-Segments created in 1.150929s
-Segment edges created in 0.057796s
-Total segmentation time 1.208725s
+Segments created in 60.041391s
+Segment edges created in 0.007760s
+Total segmentation time 60.049151s
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f4d2d2cc780>>
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fb68ebc37b8>>
 Traceback (most recent call last):
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
@@ -25,13 +25,13 @@ Traceback (most recent call last):
   File "/usr/lib/python3.5/logging/__init__.py", line 1403, in _log
   File "/usr/lib/python3.5/logging/__init__.py", line 1360, in findCaller
 AttributeError: 'NoneType' object has no attribute 'normcase'
-0.32user 0.01system 0:01.93elapsed 17%CPU (0avgtext+0avgdata 25608maxresident)k
-80inputs+8outputs (0major+8061minor)pagefaults 0swaps
+0.29user 0.02system 1:00.70elapsed 0%CPU (0avgtext+0avgdata 25856maxresident)k
+0inputs+24outputs (0major+8077minor)pagefaults 0swaps
 
-2016-08-17 16:04:38,491 INFO Fetched 2 base nodes.
-2016-08-17 16:04:38,491 INFO Inserted 0 activity classifications.
-0.44user 0.03system 0:01.46elapsed 32%CPU (0avgtext+0avgdata 35656maxresident)k
-856inputs+0outputs (0major+10006minor)pagefaults 0swaps
+2016-08-18 14:23:38,407 INFO Fetched 2 base nodes.
+2016-08-18 14:23:38,407 INFO Inserted 0 activity classifications.
+0.39user 0.04system 0:00.83elapsed 52%CPU (0avgtext+0avgdata 33736maxresident)k
+0inputs+0outputs (0major+10035minor)pagefaults 0swaps
 
      1  Agent
      1  EDGE_EVENT_AFFECTS_FILE
