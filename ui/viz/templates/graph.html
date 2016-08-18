@@ -6,22 +6,26 @@
     <script type="text/javascript" src="{{ url_for('static', filename='underscore.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='vis.4.16.1.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='saved_queries.js') }}"></script>
-    <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
 
-    <script type="text/javascript" src="{{ url_for('static', filename='semantic-2.2.2/semantic.js') }}"></script>
-    <link href="{{ url_for('static', filename='semantic-2.2.2/semantic.css') }}" rel="stylesheet" type="text/css" />
+    <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='ionicons.2.0.1.min.css') }}">
 
     <script type="text/javascript">
         var node_data_set, edge_data_set, network, ui_spinner_timeout;  // saved_queries is loaded externally.
-        var journal = []
         var execQuery_params = []
+        var journal = []
+        var right_journal =[]
 
 
         function execQuery(query_object, success_function) {
+            if (query_object.name === "Collapse Nodes (selected)") {
+                makeCluster()
+                return true
+            }
             UI.loadingUIStart()
             var query_string;
             if (typeof query_object === "string") {
-                query_string = query_object
+                query_string = query_object + ".dedup()"
                 query_object = { "is_collapsed" : false }
             } else {
                 query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
@@ -32,7 +36,7 @@
                     var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
                     var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
                     $.post("/query", {"query": edge_query}, function(edge_results) {
-                        var data = { "nodes" : node_results, "edges" : edge_results }
+                        var data = { "type" : "add", "nodes" : node_results, "edges" : edge_results }
                         if (query_object.is_collapsed) {
                             data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
                         }
@@ -74,6 +78,7 @@
             })
             var all_edges = data['edges'].concat(special_edges)
             var new_data = {
+                "type" : "add",
                 "nodes" : uniqueBy(data['nodes']),
                 "edges" : uniqueBy(all_edges, function(e){ return String(e.outV)+e.title+String(e.inV) } ) 
             }
@@ -81,72 +86,151 @@
         }
 
 
+        function makeCluster(){
+            function getClusteringData(node_ids, cluster_node_id, name) { return {
+                type : "collapse",
+                node_ids : node_ids,
+                id : cluster_node_id,
+                name : name,
+                joinCondition : function(node_props) {
+                    return _.contains(this.node_ids, node_props.id)
+                },
+                processProperties: function (cluster_node, child_nodes, child_edges) {
+                    cluster_node['child_nodes'] = child_nodes
+                    cluster_node['child_edges'] = child_edges
+                    cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
+                    cluster_node.id = this.id
+                    cluster_node.label = this.name
+                    cluster_node.queries = [{ 
+                        name : "Expand Cluster",
+                        id : this.id
+                    }]
+                    return cluster_node
+                },
+                clusterNodeProperties : {
+                    // shape: "dot",
+                    // size: 20,
+                    // color: "red"
+                    icon: {
+                        code: '\uf413',  // http://ionicons.com/cheatsheet.html
+                        color: "red",
+                        size: 54
+                    }
+                },
+                clusterEdgeProperties : {
+                    color : "red"
+                }
+            }}
+            var name = prompt("Name your cluster:")
+            var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
+            if (_.isEmpty(name)) { name = cluster_node_id }
+            var cluster_data = getClusteringData(network.getSelectedNodes(), cluster_node_id, name)
+            updateNetwork(cluster_data)
+        }
+
+
         function updateNetwork(additional_data, starting_node_id) {
-            var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
-            var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
-            journal.push({"nodes": new_nodes, "edges": new_edges})
-            // Add position, if needed:
-            if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
-                var bbox = network.getBoundingBox(starting_node_id)
-                var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
-                new_nodes = _.map(new_nodes, function(n) {
-                    n['x'] = starting_position.x
-                    n['y'] = starting_position.y
-                    return n
-                })
+            if (additional_data !== right_journal[0]) {
+                right_journal = []
+                $("#redo-button").addClass("disabled")
             }
-            node_data_set.add(formatNodes(new_nodes))
-            edge_data_set.add(formatEdges(new_edges))
-            UI.animate()
+            switch (additional_data.type) {
+                case "add":
+                    var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
+                    var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
+                    var data = { "type" : "add", "nodes": new_nodes, "edges": new_edges}
+                    journal.push(data)
+                    // Add position, if needed:
+                    if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
+                        var bbox = network.getBoundingBox(starting_node_id)
+                        var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
+                        new_nodes = _.map(new_nodes, function(n) {
+                            n.x = starting_position.x
+                            n.y = starting_position.y
+                            return n
+                        })
+                    }
+                    applyJournalEvent(data)
+                    UI.animate()
+                    break
+                case "subtract":
+                    journal.push(additional_data)
+                    applyJournalEvent(additional_data)
+                    UI.animate()
+                    break
+                case "collapse":
+                    journal.push(additional_data)
+                    applyJournalEvent(additional_data)
+                    UI.animate()
+                    break
+                case "expand":
+                    journal.push(additional_data)
+                    applyJournalEvent(additional_data)
+                    UI.animate()
+                    break
+            }
         }
 
 
-        function undoUpdateNetwork(steps) {
-            var steps = typeof steps === "number" ? steps : 1
-            var to_remove_list = _.last(journal, steps).reverse()
-            _.map(to_remove_list, function(d) {
-                var node_ids_to_remove = _.pluck(d.nodes, "id")
-                var edge_ids_to_remove = _.pluck(d.edges, "id")
-                node_data_set.remove(node_ids_to_remove)
-                edge_data_set.remove(edge_ids_to_remove)
-            })
-            journal.pop()
-            UI.animate()
-        }
-
-
-        function networkDoubleClickBehavior (props) {
-            if (props['nodes'].length == 1) {
-                var starting_node_id = props['nodes'][0]
-                var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
-                var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
-                execQuery(query, updateNetworkAtId)
+        function applyJournalEvent(event) {
+            switch (event.type) {
+                case "add":
+                    node_data_set.add(formatNodes(event.nodes))
+                    edge_data_set.add(formatEdges(event.edges))
+                    break
+                case "subtract":
+                    var node_ids_to_remove = _.pluck(event.nodes, "id")
+                    var edge_ids_to_remove = _.pluck(event.edges, "id")
+                    node_data_set.remove(node_ids_to_remove)
+                    edge_data_set.remove(edge_ids_to_remove)
+                    break
+                case "collapse":
+                    network.clustering.cluster(event)
+                    break
+                case "expand":
+                    network.openCluster(event.id)
+                    break
             }
         }
 
 
-        function networkRightClickBehavior(props) {
-            $("#node-query-menu ul").empty()
-            var node_id = network.getNodeAt({x: props['pointer']['DOM']['x'], y: props['pointer']['DOM']['y']})
-            if (typeof node_id == 'number') {
-                var relevant_saved_queries = node_data_set.get(node_id).queries
-                execQuery_params =  []
-                var idx = 0
-                _.map(relevant_saved_queries, function(q) {
-                    q['starting_node_id'] = node_id
-                    var default_string = q.is_default ? "  (default)" : ""
-                    var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
-                    execQuery_params.push([q, updateNetworkAtId])
-                    var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1])"
-                    var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
-                    $("#node-query-menu ul").append(list_item)
-                    idx++
-                })
-                var query_menu = document.getElementById("node-query-menu")
-                query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
-                query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
-                query_menu.className = "show"  
+        function invertJournalEvent(event) {
+            switch (event.type) {
+                case "add":
+                    event.type = "subtract"
+                    return event
+                case "subtract":
+                    event.type = "add"
+                    return event
+                case "collapse":
+                    event.type = "expand"
+                    return event
+                case "expand":
+                    event.type = "collapse"
+                    return event
             }
+        }
+
+
+        function undoUpdateNetwork() {
+            if (journal.length > 0) {
+                var to_remove = journal.pop()
+                right_journal.unshift(to_remove)
+                applyJournalEvent(invertJournalEvent(to_remove))
+                $("#redo-button").removeClass("disabled")
+                UI.animate()
+            }
+            if (journal.length == 0) { $("#undo-button").addClass("disabled") }
+        }
+
+
+        function redoUpdateNetwork() {
+            if (right_journal.length > 0) {
+                updateNetwork(invertJournalEvent(right_journal[0]))  // do not alter the right journal until updateNetwork can compare. Need to disable redo button when forking the path.
+                right_journal.shift()
+            }
+            if (right_journal.length == 0) { $("#redo-button").addClass("disabled") }
+            if (journal.length > 0) { $("#undo-button").removeClass("disabled") }
         }
 
 
@@ -296,7 +380,7 @@
         var UI = {
             queryClick : function() {
                 $('#query-string').css("background-color", "white")
-                var query_string = document.getElementById('query-string').value + ".dedup()"
+                var query_string = document.getElementById('query-string').value
                 execQuery(query_string, updateNetwork)
             },
             failHandler : function(response) {
@@ -309,13 +393,13 @@
             ajax_in_progress_count : 0,
             loadingUIStart : function() {
                 UI.ajax_in_progress_count++
-                $("#loader").state("activate")
+                $("#loader").show()
             },
             loadingUIStop : function() {
                 UI.ajax_in_progress_count--
                 if (UI.ajax_in_progress_count <= 0) {
                     UI.ajax_in_progress_count = 0
-                    $('#loader').state('deactivate')
+                    $('#loader').hide()
                 }
             },
             animate : function(millisOrBool) {
@@ -324,11 +408,11 @@
                 } else {
                     var millis = typeof millisOrBool === "number" ? millisOrBool : 1000
                     network.setOptions({ physics: true })
-                    $("#animate-button").removeClass("play").addClass("pause")
+                    $("#animate-button").removeClass("ion-ios-play").addClass("ion-ios-pause")
                     $("#animate-button").click(function(){ UI.animateButton(false) })
                     setTimeout(function() {
                         network.setOptions({ physics: false })
-                        $("#animate-button").removeClass("pause").addClass("play")
+                        $("#animate-button").removeClass("ion-ios-pause").addClass("ion-ios-play")
                         $("#animate-button").click(function(){ UI.animateButton(true) })
                     }, millis)
                 }
@@ -336,20 +420,129 @@
             animateButton : function(should) {
                 if (should) {
                     UI.animate(true)
-                    $("#animate-button").removeClass("play").addClass("pause")
+                    $("#animate-button").removeClass("ion-ios-play").addClass("ion-ios-pause")
                     $("#animate-button").click(function(){ UI.animateButton(false) })
                 } else {
                     UI.animate(false)
-                    $("#animate-button").removeClass("pause").addClass("play")
+                    $("#animate-button").removeClass("ion-ios-pause").addClass("ion-ios-play")
                     $("#animate-button").click(function(){ UI.animateButton(true) })
                 }
+            },
+            networkDoubleClickBehavior : function(props) {
+                if (props.nodes.length === 1 && network.isCluster(props.nodes[0])) {
+                    var data = { type: "expand", id: props.nodes[0]}
+                    var cluster_event = _.find(journal, function(j) { return j.id == props.nodes[0] })
+                    if (cluster_event) { 
+                        updateNetwork(invertJournalEvent(cluster_event))
+                        UI.animate()
+                    }
+                } else if (props.nodes.length === 1 && ! props.event.changedPointers[0].shiftKey) {
+                    var starting_node_id = props.nodes[0]
+                    var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
+                    var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
+                    execQuery(query, updateNetworkAtId)
+                }
+            },
+            networkRightClickBehavior : function(props) {
+                $("#node-query-menu ul").empty()
+                var node_id = network.getNodeAt({x: props.pointer.DOM.x, y: props.pointer.DOM.y})
+                if (typeof node_id == 'number') {
+                    var query_list = node_data_set.get(node_id).queries
+                    if (network.getSelectedNodes().length > 1) {
+                        var collapse_query = { 
+                            name : "Collapse Nodes (selected)"
+                        }
+                        query_list = [collapse_query].concat(query_list)
+                    }
+                    execQuery_params =  []
+                    var idx = 0
+                    _.map(query_list, function(q) {
+                        q['starting_node_id'] = node_id
+                        var default_string = q.is_default ? "  (default)" : ""
+                        var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
+                        execQuery_params.push([q, updateNetworkAtId])
+                        var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1])"
+                        var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                        $("#node-query-menu ul").append(list_item)
+                        idx++
+                    })
+                    var query_menu = document.getElementById("node-query-menu")
+                    query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
+                    query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
+                    query_menu.className = "show"  
+                }
+            },
+            toggleNode : function(props) {
+                // Calling `.getNodeAt()` inside this event handler always returns undefined. 
+                // Workaround/hack: setTimeout at 0 to move this to the end of the call chain.
+                // Downsides: broken call chain order consistency, flash in the UI.
+                setTimeout(function(props) {
+                    var new_selection = props.nodes.concat(props.previousSelection.nodes)
+                    var node_id = network.getNodeAt(props.pointer.DOM)
+                    if (typeof node_id === 'number') {
+                        if (_.contains(props.previousSelection.nodes, node_id)) {
+                            new_selection = _.without(new_selection, node_id)
+                        } else {
+                            new_selection = new_selection.concat([node_id])
+                        }
+                    }
+                    network.selectNodes(new_selection)
+                }, 0, props)
+            },
+            startDrawSelection : function(props) {
+                UI.drawing = props.pointer.canvas
+                network.setOptions({ 
+                    interaction : {
+                        dragView : false,
+                        zoomView : false
+                    }
+                })
+                $('#node-selection-box').show()
+            },
+            endDrawSelection : function(props) {
+                    network.setOptions({interaction: {
+                        dragView : true,
+                        zoomView : true
+                    }})
+                    var nps = network.getPositions()
+                    var end_canvas_point = props.pointer.canvas
+                    var xs = _.sortBy([UI.drawing.x, end_canvas_point.x])
+                    var ys = _.sortBy([UI.drawing.y, end_canvas_point.y])
+                    var selected_nodes = network.getSelectedNodes()
+                    for (var n in nps) {
+                        if (nps[n].x >= xs[0] && nps[n].x <= xs[1] && nps[n].y >= ys[0] && nps[n].y <= ys[1]) {
+                            selected_nodes.push(n)
+                        }
+                    }
+                    network.selectNodes(selected_nodes)
+                    UI.drawing = false
+                $('#node-selection-box').hide().css({"width": 0, "height": 0})
+            },
+            updateSelectionBox : function(e) {
+                var coords = network.canvasToDOM(UI.drawing)
+                var element_bounds = document.getElementById("graph").getBoundingClientRect()
+                coords.x = coords.x + element_bounds.left  // element offset
+                coords.y = coords.y + element_bounds.top   // element offset
+                var width  = Math.abs(e.pageX - coords.x)
+                var height = Math.abs(e.pageY - coords.y)
+                var new_x  = (e.pageX < coords.x) ? (coords.x - width) : coords.x
+                var new_y  = (e.pageY < coords.y) ? (coords.y - height) : coords.y
+                $('#node-selection-box').css({
+                  'width': width,
+                  'height': height,
+                  'top': new_y,
+                  'left': new_x
+                })
             },
             draw : function(data) {
                 var container = document.getElementById('graph')
                 var options = {
-                    interaction : { hover : true },
+                    interaction : { 
+                        hover: true,
+                        tooltipDelay: 700
+                    },
                     layout: { 
-                        improvedLayout : false,
+                        improvedLayout : true,
                         randomSeed : 10203040
                     },
                     physics: {
@@ -371,8 +564,14 @@
                         }
                     },
                     nodes : {
-                        shape: 'dot',
-                        size: 15
+                        // shape: 'dot',
+                        // size: 15,
+                        shape: 'icon',
+                        icon: {
+                            face: 'Ionicons',
+                            code: '\uf3a6',  // http://ionicons.com/cheatsheet.html
+                            size: 30,
+                        }
                     },
                     edges: {
                         smooth: false
@@ -381,12 +580,29 @@
 
                 node_data_set = new vis.DataSet(data.nodes)
                 edge_data_set = new vis.DataSet(data.edges)
-                var network_data = { "nodes" : node_data_set, "edges" : edge_data_set}
+                var network_data = { "type" : "add", "nodes" : node_data_set, "edges" : edge_data_set}
                 network = new vis.Network(container, network_data, options)
-                journal = [data]
+                if (data.nodes.length > 0 || data.edges.length > 0) {
+                    journal = [data]
+                }
 
-                network.on("doubleClick", networkDoubleClickBehavior)
-                network.on("oncontext", networkRightClickBehavior)
+                network.on("doubleClick", UI.networkDoubleClickBehavior)
+                network.on("oncontext", UI.networkRightClickBehavior)
+                network.on("deselectNode", function(props) {
+                    if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
+                })
+                network.on("dragEnd", function(props){
+                    if (UI.drawing) { UI.endDrawSelection(props) }
+                })
+                network.on("dragStart", function(props){
+                    if (props.event.changedPointers[0].shiftKey && props.nodes.length === 0) {
+                        UI.startDrawSelection(props)
+                    }
+                })
+                $("#graph").on("mousemove", function(e) {  // Cannot use network 'dragging' event
+                    if (UI.drawing) { UI.updateSelectionBox(e) }
+                })
+                        
             }
         }
 
@@ -406,11 +622,12 @@
             margin: 0px;
             height: 100%;
             width: 100%;
+            overflow: hidden;
         }
         .show {
             z-index: 1;
             position: absolute;
-            background-color: rgba(234, 236, 53, 0.7);
+            background-color: rgba(234, 236, 53, 0.9);
             border: 1px solid #424242;
             padding: 20px;
             display: block;
@@ -423,19 +640,69 @@
         .show ul { margin: 0px; padding: 0px; }
         .show li { list-style: none; padding-bottom: 1em; }
         .show ul li:last-child { padding-bottom: 0em; }
-        .show a { border: 0 !important; text-decoration: none; }
-        .show a:hover { text-decoration: underline !important; }
-        #loader, #checkmark { float: right; }
+        /*.show a { border: 0 !important; text-decoration: none; }*/
+        /*.show a:hover { text-decoration: underline !important; }*/
+        #loader { float: right; }
+        .large.icon { 
+            color: gray; 
+            margin-left: 0.5em;
+            margin-right: 0;
+        }
+
+        .loader {
+            border: .2em solid #f3f3f3;
+            border-top: .2em solid #c5c5c5;
+            border-radius: 50%;
+            width: 3em;
+            height: 3em;
+            animation: spin 0.5s linear infinite;
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #node-selection-box {
+            position: absolute;
+            pointer-events: none;
+            background-color: rgba(53, 211, 236, 0.13);
+        }
+
+        i {
+            font-size: 1.5em;
+            color: gray;
+            margin-left: 1.5em;
+            display: block;
+            float: left;
+        }
+        input, button {
+            font-size: 1em;
+            line-height: normal;
+            display: block;
+            float: left;
+        }
+        .disabled {
+            color: lightgray;
+        }
 
     </style>
 </head>
 <body>
-    <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=80 />
-    <button class="ui" id="query-button" onclick="UI.queryClick()">Query</button>
-    <button class="ui" id="undo-button" onclick="undoUpdateNetwork()">Undo</button>
-    <i class="ui large play icon" id="animate-button" style="color: gray;"></i>
-    <div id="loader" class="ui inline loader small"></div>
+    <div style="display: block;">
+        <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=80 />
+        <button id="query-button" onclick="UI.queryClick()">Query</button>
+        <i class="ion-ios-skipbackward" id="undo-button" onclick="undoUpdateNetwork()"></i>
+        <i class="ion-ios-play" id="animate-button"></i>
+        <i class="ion-ios-skipforward disabled" id="redo-button" onclick="redoUpdateNetwork()"></i>
+    </div>
+    <div id="loader" class="loader"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
+    <div id="node-selection-box" style="display: none;"></div>
 </body>
 </html>
