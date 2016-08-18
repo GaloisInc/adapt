@@ -28,21 +28,28 @@ g.V(X).out('activity:includes')
 ```
 where X is a comma separated list of segment identifiers.
 
-Get the suspiscious score of an activity A:
+Get the suspiscion score of an activity:
 ```groovy
-g.V(A).property('activity:suspicionScore')
+g.V(X).property('activity:suspicionScore')
 ```
+where X is the activity node.
 
-This property specifies a value from 0 (benign) to 1 (evil). It is intended to aid DX in prioritizing interesting symptoms. When in doubt, a value of 0.1 shall be used.
+This property specifies a value from 0 (benign) to 1 (suspicios). It
+is intended to aid DX in prioritizing interesting symptoms. When in
+doubt, a value of 0.1 shall be used.
 
 
 ## Graph Annotation
 
 Add an activity node and link it to a segment X:
 ```groovy
-activity = g.addV(label, 'Activity', 'activity:type', 'Name of Activity in APT Grammar', 'activity:suspicionScore', 0.12345)
-g.V(X).next().addEdge('segment:includes', activity)
+segmentNode = g.V({}).next();
+activityNode = graph.addVertex(label, 'Activity', 'activity:type', 'TYPE', 'activity:suspicionScore', SUSPICION);
+edge = segmentNode.addEdge('activity:includes', activityNode);
+activityNode
 ```
+where TYPE is the activity type and SUSPICION is a real value between
+0.0 and 1.0 denoting the acitivty suspicion score.
 
 ## Miscellaneous queries
 
