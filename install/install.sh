@@ -67,7 +67,7 @@ install_titan() {
     sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     sudo chmod g+w $TITAN_SERVER_DIR
     cd $CONFIG_DIR/titan || handle_error $LINENO
-    $ADAPT_DIR/tools/GenerateSchema.py || handle_error $LINENO
+    sudo $ADAPT_DIR/tools/GenerateSchema.py || handle_error $LINENO
     cd $CWD || handle_error $LINENO
 }
 
@@ -165,7 +165,7 @@ function install_ingest_dashboard() {
     mkdir -p $ADAPT_DIR/.stack-adapt                          || handle_error $LINENO
     cp $ADAPT_DIR/install/stack.yaml $ADAPT_DIR/.stack-adapt/ || handle_error $LINENO
     cd $ADAPT_DIR/.stack-adapt                                || handle_error $LINENO
-    stack install                                             || handle_error $LINENO
+    stack install                                        || handle_error $LINENO
     cd $CWD
 }
 
