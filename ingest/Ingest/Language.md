@@ -1133,8 +1133,15 @@ makePropertyKey('anomalyType').dataType(String.class).cardinality(Cardinality.LI
 
 segment:edge (not in CDM)
 -----------
-This edge relates two segmentssuch that there is an edge in the raw
+This edge relates two segments such that there is an edge in the raw
 graph from a node in the first to a node in the second.
 
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(MULTI)
+
+segment:parentId (not in CDM)
+-----------
+This property is associated with a radius segment and contains the node ID of the starting vertex of the segment in the raw graph.
+
+[schema]: #
+makePropertyKey('segment:parentId').dataType(Integer.class).cardinality(SINGLE)

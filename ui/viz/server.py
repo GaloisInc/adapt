@@ -1,5 +1,5 @@
 import os, sys, json, re
-sys.path.append(os.path.expanduser('~/adapt/segment/segmenter'))
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
 from bareBonesTitanDB import BareBonesTitanClient
 from flask import Flask, render_template, url_for, request, Response
 import logging
