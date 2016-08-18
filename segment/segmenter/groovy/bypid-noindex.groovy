@@ -15,11 +15,11 @@ def getPIDSegments(g) {
 def createVertices(graph,g,criterion) {
   t1 = new Date().getTime();
   idWithProp = g.V().has(criterion).has(label,neq('Segment')).id().fold().next();
-  existingSegNodes_parentIds = g.V().hasLabel('Segment').values('parentVertexId').fold().next();
+  existingSegNodes_parentIds = g.V().hasLabel('Segment').values('segment:parentId').fold().next();
   idsToStore = idWithProp-existingSegNodes_parentIds; 
   if (idsToStore!=[]) { 
     for (i in idsToStore) {
-      graph.addVertex(label,'Segment','parentVertexId',i,'segment:name','byPID',criterion,g.V(i).values(criterion).next())
+      graph.addVertex(label,'Segment','segment:parentId',i,'segment:name','byPID',criterion,g.V(i).values(criterion).next())
     }
   }
   t2 = new Date().getTime();
@@ -37,17 +37,17 @@ def segmentNodesCreated(g) {
 def createVerticesAndEdges(graph,g,criterion,radius) {
   t1 = new Date().getTime();
   idWithProp = g.V().has(criterion).has(label,neq('Segment')).id().fold().next(); 
-  existingSegNodes_parentIds = g.V().hasLabel('Segment').values('parentVertexId').fold().next();
+  existingSegNodes_parentIds = g.V().hasLabel('Segment').values('segment:parentId').fold().next();
   idsToStore = idWithProp - existingSegNodes_parentIds; 
   for (i in idWithProp) {
     sub = g.V(i).emit().repeat(__.bothE().subgraph('sub').bothV().has(label,neq('Segment'))).times(radius).cap('sub').next();
     subtr = sub.traversal(); 
     if (i in idsToStore) { 
-      s = graph.addVertex(label,'Segment','segment:name','byPID','pid',g.V(i).values('pid').next(),'parentVertexId',i)
+      s = graph.addVertex(label,'Segment','segment:name','byPID','pid',g.V(i).values('pid').next(),'segment:parentId',i)
     } else {
-      s = g.V().hasLabel('Segment').has('parentVertexId',i).next()
+      s = g.V().hasLabel('Segment').has('segment:parentId',i).next()
     }; 
-    idNonLinkedNodes = subtr.V().id().fold().next()- g.V().hasLabel('Segment').has('parentVertexId',i).outE('segment:includes').inV().id().fold().next();
+    idNonLinkedNodes = subtr.V().id().fold().next()- g.V().hasLabel('Segment').has('segment:parentId',i).outE('segment:includes').inV().id().fold().next();
     for (node in idNonLinkedNodes) {
       s.addEdge('segment:includes',g.V(node).next())
     }
