@@ -1,0 +1,4 @@
+id,duration,num_close,num_open,num_reads,num_writes,read_bytes,write_bytes,anomaly_score
+2138248,0,0,0,0,0,0,0,0.904791
+2953440,0,0,0,0,0,0,0,0.904791
+7712896,0,0,0,0,0,0,0,0.904791
