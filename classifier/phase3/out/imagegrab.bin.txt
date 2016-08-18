@@ -11,43 +11,43 @@ Segmenter ready to run
 ******************************
 Running DB side segmenter
 ******************************
-Segments created in 65.365110s
-Segment edges created in 0.258559s
-Total segmentation time 65.623668s
+Segments created in 60.378778s
+Segment edges created in 0.087839s
+Total segmentation time 60.466617s
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
 INFO:kafka.producer.kafka:Kafka producer closed
-0.30user 0.01system 1:10.83elapsed 0%CPU (0avgtext+0avgdata 25596maxresident)k
-3680inputs+16outputs (0major+8069minor)pagefaults 0swaps
+0.30user 0.01system 1:01.32elapsed 0%CPU (0avgtext+0avgdata 25812maxresident)k
+48inputs+24outputs (0major+8082minor)pagefaults 0swaps
 
-2016-08-17 20:36:59,408 INFO Fetched 7 base nodes.
-2016-08-17 20:36:59,409 INFO Inserted 0 activity classifications.
-0.44user 0.03system 0:02.64elapsed 18%CPU (0avgtext+0avgdata 33816maxresident)k
-1136inputs+8outputs (0major+10026minor)pagefaults 0swaps
+2016-08-18 10:42:48,789 INFO Fetched 9 base nodes.
+2016-08-18 10:42:48,789 INFO Inserted 0 activity classifications.
+0.44user 0.02system 0:01.45elapsed 31%CPU (0avgtext+0avgdata 33788maxresident)k
+872inputs+0outputs (1major+10013minor)pagefaults 0swaps
 
      2  Agent
      2  EDGE_OBJECT_PREV_VERSION
      2  EDGE_OBJECT_PREV_VERSION in
      2  EDGE_OBJECT_PREV_VERSION out
      4  Segment
-     4  segment:edge
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    12  segment:edge
     30  EDGE_EVENT_AFFECTS_FILE
     30  EDGE_EVENT_AFFECTS_FILE in
     30  EDGE_EVENT_AFFECTS_FILE out
+    32  segment:includes
     43  Entity-File
     52  EDGE_FILE_AFFECTS_EVENT
     52  EDGE_FILE_AFFECTS_EVENT in
     52  EDGE_FILE_AFFECTS_EVENT out
-    68  segment:includes
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    104  Subject
-   789  total
+   761  total
 
 
 agent

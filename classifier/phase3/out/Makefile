@@ -20,6 +20,9 @@ OUT = \
 
 all: $(OUT)
 
+# In e.g. 5D's imagegrab In discards EDGE_OBJECT_PREV_VERSION
+# & EDGE_EVENT_AFFECTS_REGISTRYKEY (PART_OF_PATTERN).
+
 CFG = ~/adapt/config/supervisord.conf
 SEG = ./adapt_segmenter.py --broker ws://localhost:8182/ --criterion pid --radius 2 --store-segment Yes --spec ~/adapt/config/segmentByPID.json --log-to-kafka --kafka localhost:9092
 SDIR = ~/adapt/segment/segmenter
