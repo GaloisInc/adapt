@@ -77,7 +77,7 @@ minReportCount :: Int
 minReportCount = 50
 
 defaultKafka :: KafkaAddress
-defaultKafka = ("localhost", 9092)
+defaultKafka = ("127.0.0.1", 9092)
 
 defaultConfig :: Config
 defaultConfig = Config
