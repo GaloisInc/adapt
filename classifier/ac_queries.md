@@ -24,8 +24,10 @@ g.V().has(label, 'Activity')
 
 Get the activity nodes associated with a list of segments nodes:
 ```groovy
-g.V(X_1, X_2, ..., X_n).out('activity:includes')
+g.V(X).in('activity:includes')
 ```
+
+where X is a comma separated list of segment identifiers.
 
 ## Graph Annotation
 

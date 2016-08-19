@@ -19,15 +19,11 @@ class ProvenanceGraph(object):
         self.titanClient.close()
 
     def createActivity(self, segmentId, name):
-        # @todo: figure out transactions or do it in one query
-        nodeQuery = "graph.addVertex(label, 'Activity', 'activity:type', '{}')".format(name)
-        node = self.titanClient.execute(nodeQuery)
-        activityId = node[0]['id']
-        edgeQuery = "g.V({}).next().addEdge('{}', g.V({}).next())".format(segmentId, 'activity:includes', activityId)
-        edge = self.titanClient.execute(edgeQuery)
+        query  = "node = graph.addVertex(label, 'Activity', 'activity:type', '{}'); edge = node.addEdge('activity:includes', g.V({}).next()); node".format(name, segmentId)
+        node = self.titanClient.execute(query)
 
-        return node, edge
-
+        return node[0]
+        
     def deleteActivities(self):
         query = "g.V().has(label, 'Activity').drop().iterate()"
         # Removing a vertex removes all its incident edges as well.
@@ -45,7 +41,7 @@ class ProvenanceGraph(object):
         for node in nodes:
             yield node
 
-    def segments(self):
+    def getSegments(self):
         query = "g.V().has(label, 'Segment')"
         nodes = self.titanClient.execute(query)
         for node in nodes:
@@ -54,7 +50,7 @@ class ProvenanceGraph(object):
             nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).as('a').out('segment:includes').out().in('segment:includes').where(neq('a'))"
+            query = "g.V({}).out('segment:includes')"
             adjacentNodes = self.titanClient.execute(query.format(nodeId))
             for adjacentNode in adjacentNodes:
                 adjacentNodeId = adjacentNode['id']
@@ -66,10 +62,49 @@ class ProvenanceGraph(object):
     def getActivityTypes(self, segmentIds):
         result = []
 
-        query = "g.V({}).out('activity:includes')".format(", ".join(str(segmentId) for segmentId in segmentIds))
+        query = "g.V({}).in('activity:includes')".format(", ".join(str(segmentId) for segmentId in segmentIds))
         nodes = self.titanClient.execute(query)
 
         for node in nodes:
             result.append(node['properties']['activity:type'][0]['value'])
 
         return result
+
+    def getSegmentActivities(self):
+        pass
+
+    def getUnclassifiedSegments(self):
+        query = "g.V().hasLabel('Segment').where(__.not(inE('activity:includes')))"
+        nodes = self.titanClient.execute(query)
+        for node in nodes:
+            G = networkx.Graph()
+
+            nodeId = node['id']
+            G.add_node(nodeId)
+
+            query = "g.V({}).out('segment:includes')"
+            adjacentNodes = self.titanClient.execute(query.format(nodeId))
+            for adjacentNode in adjacentNodes:
+                adjacentNodeId = adjacentNode['id']
+                G.add_node(adjacentNodeId)
+                G.add_edge(nodeId, adjacentNodeId)
+
+            yield(nodeId, G)
+
+    def getClassifiedSegments(self):
+        query = "g.V().hasLabel('Segment').where(inE('activity:includes'))"
+        nodes = self.titanClient.execute(query)
+        for node in nodes:
+            G = networkx.Graph()
+
+            nodeId = node['id']
+            G.add_node(nodeId)
+
+            query = "g.V({}).out('segment:includes')"
+            adjacentNodes = self.titanClient.execute(query.format(nodeId))
+            for adjacentNode in adjacentNodes:
+                adjacentNodeId = adjacentNode['id']
+                G.add_node(adjacentNodeId)
+                G.add_edge(nodeId, adjacentNodeId)
+
+            yield(nodeId, G)

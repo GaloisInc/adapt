@@ -26,7 +26,7 @@ class TitanDatabase(object):
                 result = yield from response.stream.read()
                 if result is None:
                     break
-                assert(result.status_code in [206, 200, 204], result.status_code)
+                assert(result.status_code in [206, 200, 204])
                 if not result.status_code == 204:
                     result_data += result.data
             return result_data
