@@ -10,6 +10,8 @@
     <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='ionicons.2.0.1.min.css') }}">
 
+    <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
+
     <script type="text/javascript">
         var node_data_set, edge_data_set, network, ui_spinner_timeout;  // saved_queries is loaded externally.
         var execQuery_params = []
@@ -548,7 +550,7 @@
                         tooltipDelay: 700
                     },
                     layout: { 
-                        improvedLayout : true,
+                        improvedLayout : false,
                         randomSeed : 10203040
                     },
                     physics: {
@@ -612,6 +614,14 @@
             }
         }
 
+        function downloadJournal() {
+            var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
+            var dlAnchorElem = document.getElementById('downloadAnchorElem')
+            dlAnchorElem.setAttribute("href", dataStr)
+            dlAnchorElem.setAttribute("download", "history.json")
+            dlAnchorElem.click()
+        }
+
 
         $(document).bind("click", function(event) {
             document.getElementById("node-query-menu").className = "hide"
@@ -624,6 +634,11 @@
         $(function(){
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
+            $("#dropzone").on("complete", function(one, two) {
+                console.log(one)
+                console.log(two)
+            })
+            
         })
     </script>
 
@@ -651,9 +666,6 @@
         .show ul { margin: 0px; padding: 0px; }
         .show li { list-style: none; padding-bottom: 1em; }
         .show ul li:last-child { padding-bottom: 0em; }
-        /*.show a { border: 0 !important; text-decoration: none; }*/
-        /*.show a:hover { text-decoration: underline !important; }*/
-        #loader { float: right; }
         .large.icon { 
             color: gray; 
             margin-left: 0.5em;
@@ -700,6 +712,26 @@
         .disabled {
             color: lightgray;
         }
+        #upload-box {
+            left: 50%;
+            top: 50%;
+            width: 400px;
+            margin-left: -200px;
+            height: 300px;
+            margin-top: -150px;
+            background-color: yellow;
+            position: absolute;
+            z-index: 20;
+            display: none;
+        }
+        #upload-box form {
+            width: 100%; 
+            height: 100%; 
+            position: absolute;
+        }
+        #download-button, #upload-button {
+            display: none;
+        }
 
     </style>
 </head>
@@ -710,6 +742,12 @@
         <i class="ion-ios-skipbackward" id="undo-button" onclick="undoUpdateNetwork()"></i>
         <i class="ion-ios-play" id="animate-button"></i>
         <i class="ion-ios-skipforward disabled" id="redo-button" onclick="redoUpdateNetwork()"></i>
+        <a id="downloadAnchorElem" style="display:none"></a>
+        <i class="ion-ios-cloud-download-outline" id="download-button" onclick="downloadJournal()"></i>
+        <i class="ion-ios-cloud-upload-outline" id="upload-button" onclick="""></i>
+    </div>
+    <div id="upload-box">
+        <form action="/echo" class="dropzone" id="dropzone"></form>
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>

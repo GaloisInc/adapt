@@ -25,7 +25,6 @@ def json_query_post():
 
 @app.route('/query/<gremlin_query_string>', methods=["GET"])
 def json_query_get(gremlin_query_string):
-	# timestamp = datetime.tzinfo.fromutc(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
 	timestamp = strftime('%Y-%m-%d %H:%M:%S', localtime())
 	app.logger.info("%s -- Received query: %s <br/>\n" % (timestamp, gremlin_query_string))
 	result = "db.execute(%s) never returned a good result! <br/>\n" % gremlin_query_string
@@ -42,9 +41,15 @@ def json_query_get(gremlin_query_string):
 def graph():
 	return render_template('graph.html')
 
+
 @app.route("/log")
 def log():
 	return render_template('flask.log')
+
+
+@app.route("/echo", methods=["POST"])
+def echo():
+	return request.files['file'].read()
 
 
 log_handler = FileHandler(os.path.expanduser('~/adapt/ui/viz/templates/flask.log'), "w")  # https://docs.python.org/dev/library/logging.handlers.html#logging.FileHandler
