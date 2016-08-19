@@ -226,7 +226,7 @@
 
         function redoUpdateNetwork() {
             if (right_journal.length > 0) {
-                updateNetwork(invertJournalEvent(right_journal[0]))  // do not alter the right journal until updateNetwork can compare. Need to disable redo button when forking the path.
+                updateNetwork(invertJournalEvent(right_journal[0]))  // do not alter the right journal until updateNetwork can compare. Needed to disable redo button when forking the path.
                 right_journal.shift()
             }
             if (right_journal.length == 0) { $("#redo-button").addClass("disabled") }
@@ -534,6 +534,12 @@
                   'left': new_x
                 })
             },
+            deleteSelectedNodes : function() {
+                var node_ids = network.getSelectedNodes()
+                var nodes = node_data_set.get(node_ids)
+                var journal_event = { type: "subtract", nodes: nodes, edges: [] }
+                updateNetwork(journal_event)
+            },
             draw : function(data) {
                 var container = document.getElementById('graph')
                 var options = {
@@ -609,6 +615,11 @@
 
         $(document).bind("click", function(event) {
             document.getElementById("node-query-menu").className = "hide"
+        })
+        $(document).bind("keydown", function(event) { 
+            if (event.keyCode == 8 || event.keyCode == 46) {
+                UI.deleteSelectedNodes()
+            }
         })
         $(function(){
             UI.draw( { "nodes" : [], "edges" : [] } )
