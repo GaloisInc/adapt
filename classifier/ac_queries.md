@@ -7,6 +7,11 @@ Get all segment nodes:
 g.V().hasLabel('Segment')
 ```
 
+Get all unclassified segment nodes:
+```groovy
+g.V().hasLabel('Segment').where(__.not(inE('activity:includes')))
+```
+
 Get a segment:
 ```groovy
 g.V(X).out('segment:includes')
