@@ -4,11 +4,11 @@
 
 # Keep /opt/titan/scripts/schema.groovy in sync.
 cd ~/adapt
-tools/GenerateSchema.py  # This is fast, just 100ms.
+sudo tools/GenerateSchema.py  # This is fast, just 100ms.
 rsync -av config/titan/scripts/adapt.groovy /opt/titan/scripts/
 cd /tmp
 
-jps | grep GremlinServer > /dev/null || /opt/titan/bin/titan.sh start
+jps | grep GremlinServer > /dev/null || sudo /opt/titan/bin/titan.sh start
 
 # If supervisord is already running we avoid re-running.
 #
