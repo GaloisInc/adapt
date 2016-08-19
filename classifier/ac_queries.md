@@ -34,16 +34,18 @@ g.V(X).out('activity:includes')
 ```
 where X is a comma separated list of segment identifiers.
 
-Get the suspiscion score of an activity:
+Get the suspicion score of an activity:
 ```groovy
 g.V(X).property('activity:suspicionScore')
 ```
 where X is the activity node.
 
-This property specifies a value from 0 (benign) to 1 (suspicios). It
+This property specifies a value from 0 (benign) to 1 (suspicious). It
 is intended to aid DX in prioritizing interesting symptoms. When in
 doubt, a value of 0.1 shall be used.
 
+
+where X is a comma separated list of segment identifiers.
 
 ## Graph Annotation
 
@@ -55,7 +57,7 @@ edge = segmentNode.addEdge('activity:includes', activityNode);
 activityNode
 ```
 where TYPE is the activity type and SUSPICION is a real value between
-0.0 and 1.0 denoting the acitivty suspicion score.
+0.0 and 1.0 denoting the activity suspicion score.
 
 ## Miscellaneous queries
 

@@ -145,14 +145,3 @@ class ProvenanceGraph(object):
                 G.add_edge(nodeId, adjacentNodeId)
 
             yield(nodeId, G)
-
-    def getActivityTypes(self, segmentIds):
-        result = []
-
-        query = "g.V({}).out('activity:includes')".format(", ".join(str(segmentId) for segmentId in segmentIds))
-        nodes = self.titanClient.execute(query)
-
-        for node in nodes:
-            result.append(node['properties']['activity:type'][0]['value'])
-
-        return result
