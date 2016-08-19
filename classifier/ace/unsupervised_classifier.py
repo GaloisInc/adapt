@@ -9,11 +9,11 @@ class UnsupervisedClassifier(object):
         self.provenanceGraph = provenanceGraph
         self.featureExtractor = featureExtractor
 
-    def run(self):
+    def classifyNew(self):
         segmentIds = []
         features = []
 
-        for segmentId, G in self.provenanceGraph.segments():
+        for segmentId, G in self.provenanceGraph.getUnclassifiedSegments():
             segmentIds.append(segmentId)
             features.append(self.featureExtractor.run(G))
         
