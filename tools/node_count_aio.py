@@ -2,6 +2,8 @@
 
 import asyncio
 from aiogremlin import GremlinClient
+import sys
+import time
 
 QUERYV = "g.V().count()"
 QUERYE = "g.E().count()"
@@ -28,10 +30,10 @@ class GremlinQueryRunner:
     def fetch(self, query):
         return self.loop.run_until_complete(self.gc.execute(query))
 
-    def fetch_many(self, queries):
+    def fetch_many(self, queries,sem_num):
         sem=asyncio.Semaphore(sem_num)
         @asyncio.coroutine
-        def fetch(name,query,sem_num): 
+        def fetch(name,query): 
             with (yield from sem):
                 print("Starting: %s" % name)
                 t1 = time.time()
@@ -54,7 +56,7 @@ if __name__ == '__main__':
     gremlin = GremlinQueryRunner()
     
     if len(sys.argv) > 1:
-        processors = sys.argv[1]
+        processors = int(sys.argv[1])
     else:
         processors = 1
 
