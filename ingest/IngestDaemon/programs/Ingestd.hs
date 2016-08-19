@@ -326,7 +326,7 @@ kafkaInputToDB cfg =
                when (emptyCount == nrKafkaNullsBeforeEmptyQueueSignal) (markEmpty cfg)
                process dbc now 0 total uids offset (emptyCount + 1)
        else do markBusy cfg
-               now <- getCurrentTime
+               now <- liftIO getCurrentTime
                let elapsed = diffUTCTime now start
                (baseTime,newCnt) <- if (elapsed > 5*60)
                                      then liftIO $ do
