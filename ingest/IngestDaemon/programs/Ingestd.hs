@@ -173,7 +173,8 @@ parseHostPort str =
 
 main :: IO ()
 main =
-  do c <- getOpts opts
+  do threadDelay 5000000 -- wait 5 seconds to let Kafka start
+     c <- getOpts opts
      if c ^. help
       then dumpUsage opts
       else neverFail (mainLoop c)
