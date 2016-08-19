@@ -13,7 +13,7 @@ scriptEngines: {
   gremlin-groovy: {
     imports: [java.lang.Math],
     staticImports: [java.lang.Math.PI],
-    scripts: [scripts/schema.groovy, scripts/adapt.groovy]},
+    scripts: [scripts/schema.groovy, scripts/adapt.groovy, scripts/reindex.groovy]},
   nashorn: {
       imports: [java.lang.Math],
       staticImports: [java.lang.Math.PI]}}
