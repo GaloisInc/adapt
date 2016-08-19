@@ -88,9 +88,10 @@ class Stream:
 g.V(%s).hasLabel('Segment').order().by(id(), incr).as('SEG').
   out().hasLabel('Subject').dedup().as('SUBJ').
   out().dedup().as('EDGE').
-  out().or(hasLabel('Agent'),
-           hasLabel('Entity-File'),
-           hasLabel('Entity-NetFlow'),
-           hasLabel('Entity-Memory')).dedup().as('AE').
+  out().has(label, within('Entity-File',
+                          'Entity-NetFlow',
+                          'Entity-Memory',
+                          'Subject',
+                          'Agent')).dedup().as('AE').
   select('SEG', 'SUBJ', 'EDGE', 'AE').by(valueMap(true))
 """

@@ -11,31 +11,33 @@ Segmenter ready to run
 ******************************
 Running DB side segmenter
 ******************************
-Segments created in 60.205151s
-Segment edges created in 0.080252s
-Total segmentation time 60.285403s
+Segments created in 60.159924s
+Segment edges created in 0.067233s
+Total segmentation time 60.227157s
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fe336f217b8>>
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fc17a44f780>>
 Traceback (most recent call last):
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
-AttributeError: 'NoneType' object has no attribute 'info'
-0.29user 0.02system 7:20.99elapsed 0%CPU (0avgtext+0avgdata 25764maxresident)k
-8inputs+24outputs (0major+8075minor)pagefaults 0swaps
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.28user 0.03system 1:00.84elapsed 0%CPU (0avgtext+0avgdata 25816maxresident)k
+0inputs+16outputs (0major+8073minor)pagefaults 0swaps
 
-2016-08-18 14:20:51,400 INFO Fetched 59 base nodes.
-2016-08-18 14:20:51,400 INFO Inserted 0 activity classifications.
-0.42user 0.04system 0:01.44elapsed 32%CPU (0avgtext+0avgdata 33784maxresident)k
-8inputs+0outputs (0major+10055minor)pagefaults 0swaps
+2016-08-19 14:47:51,544 INFO Fetched 63 base nodes.
+2016-08-19 14:47:51,544 INFO Inserted 0 activity classifications.
+0.44user 0.01system 0:01.36elapsed 33%CPU (0avgtext+0avgdata 35736maxresident)k
+0inputs+8outputs (0major+10023minor)pagefaults 0swaps
 
      2  Agent
      2  EDGE_OBJECT_PREV_VERSION
      2  EDGE_OBJECT_PREV_VERSION in
      2  EDGE_OBJECT_PREV_VERSION out
-     5  Segment
-     8  segment:edge
+     4  Segment
+     4  segment:edge
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL out
@@ -50,8 +52,8 @@ AttributeError: 'NoneType' object has no attribute 'info'
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    104  Subject
-   133  segment:includes
-   859  total
+   114  segment:includes
+   835  total
 
 
 agent
