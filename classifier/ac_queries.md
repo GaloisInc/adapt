@@ -31,9 +31,10 @@ where X is a comma separated list of segment identifiers.
 
 ## Graph Annotation
 
-Add an activty node and link it to a segment:
+Add an activity node and link it to a segment X:
 ```groovy
-graph.addVertex(label, 'Activity', 'activity:type', X).addEdge('activity:includes', g.V(Y).next())
+activity = g.addV(label, 'Activity', 'activity:type', 'Name of Activity in APT Grammar')
+g.V(X).next().addEdge('activity:includes', activity)
 ```
 where X is the activity type and Y is the segment identifier.
 
