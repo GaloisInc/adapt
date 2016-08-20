@@ -34,6 +34,7 @@ SDIR = ~/adapt/segment/segmenter
 	@echo; cd ../out  # Verify we're in the right place.
 	killall ingestd; sleep 1  # Background writers can interfere with drop.
 	~/adapt/tools/delete_nodes.py  # During drop supervisor respawns.
+	test -r  ~/adapt/trace/current/$(subst .txt,,$@) || ~/adapt/trace/trace_rsync.sh
 	Trint -p ~/adapt/trace/current/$(subst .txt,,$@) > $@
 	sleep 30; Trint -f; sleep 30; Trint -F; sleep 30
 	bash -c "echo reading $@ >> /tmp/ingestd-stderr---supervisor-*.log"
