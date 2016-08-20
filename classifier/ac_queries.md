@@ -9,12 +9,12 @@ g.V().hasLabel('Segment')
 
 Get all unclassified segment nodes:
 ```groovy
-g.V().hasLabel('Segment').where(__.not(outE('activity:includes')))
+g.V().hasLabel('Segment').where(__.not(out('segment:includes').hasLabel('Activity')))
 ```
 
-Get a segment:
+Get segment X:
 ```groovy
-g.V(X).out('segment:includes')
+g.V(X)
 ```
 
 Get all activity nodes:
