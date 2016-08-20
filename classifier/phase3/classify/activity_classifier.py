@@ -25,6 +25,7 @@
 import classify
 import logging
 import os
+import pprint
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import cdm.enums
@@ -132,13 +133,12 @@ g.V(%d).hasLabel('Segment').
             """,
         ]
 
-    def classify(self, seg_ids, debug=True):
+    def classify(self, seg_ids, debug=False):
         stream = gremlin_event.Stream(self.gremlin, seg_ids)
         for seg_id, seg_props in stream.events_by_seg():
             self.num_nodes_fetched += len(seg_props)
             self.classify_one_seg(seg_id, seg_props)
             if debug:
-                import pprint
                 pprint.pprint(seg_id)
                 pprint.pprint([p
                                for p in seg_props

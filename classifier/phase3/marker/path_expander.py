@@ -36,6 +36,7 @@ import pprint
 import re
 import sys
 sys.path.append(os.path.expanduser('~/adapt/tools'))
+import cdm.enums
 import gremlin_query
 
 
@@ -57,7 +58,19 @@ class PathExpander:
         for id_ in self.get_node_ids():
             query = 'g.V(%d).valueMap(true)' % id_
             print('')
-            pp.pprint(gremlin.fetch_data(query))
+            pp.pprint(self._add_types(gremlin.fetch_data(query)))
+
+    def _add_types(self, items):
+        for item in items:
+            self._add_type(item, 'eventType', cdm.enums.Event)
+            self._add_type(item, 'subjectType', cdm.enums.Subject)
+        return items
+
+    def _add_type(self, item, key, klass):
+        try:
+            item[key].append(str(klass(item[key][0])))
+        except KeyError:
+            pass
 
 
 def arg_parser():
