@@ -17,13 +17,13 @@
         ],
         "in": [
             {
-                "query": "Thread.sleep(75000)",
+                "query": "Thread.sleep(240000)",
                 "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
             },
             {
-                "query": "g.V().hasLabel('Subject').count().next() > 600",
+                "query": "g.V().hasLabel('Subject').count().next() > 100",
                 "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify there are subjects."

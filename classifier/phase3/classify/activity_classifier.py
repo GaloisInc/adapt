@@ -169,7 +169,8 @@ g.V(%d).hasLabel('Segment').
         This keeps the various detectors honest.
         '''
         valid_rules = set(dir(self.grammar._grammarClass))
-        cs = set([classification for ident, classification in activities])
+        # activity is (ident, classification, optional_marker_type).
+        cs = set([activity[1] for activity in activities])
         for c in cs:
             assert 'rule_' + c in valid_rules, c
         return activities

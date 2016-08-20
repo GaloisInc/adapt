@@ -43,6 +43,11 @@ class Detector:
         default = 0.1
         return default
 
+    def optional_marker_type(self, activity):
+        if len(activity) == 2:
+            return ''
+        return " 'activity:markerType', %d, " % activity[2]
+
     def find_activities(self, seg_id, seg_props):
         activities = []
         for prop in seg_props:
@@ -59,11 +64,13 @@ class Detector:
 
     def insert_activity_classifications(self, seg_id, activities, debug=False):
         seg_id = 0 + seg_id  # An integer, please, it's no longer sNNN.
-        for base_node_ident, classification in activities:
+        for activity in activities:
+            base_node_ident, classification = activity[:2]
             cmds = ["act = graph.addVertex(label, 'Activity',"
-                    "  'activity:type', '%s',"
+                    "  'activity:type', '%s', %s"
                     "  'activity:suspicionScore', %f)" % (
                         classification,
+                        self.optional_marker_type(activity),
                         self.activity_suspicion_score())]
             cmds.append("g.V(%d).hasLabel('Segment').next()"
                         ".addEdge('segment:includes', act)" % seg_id)

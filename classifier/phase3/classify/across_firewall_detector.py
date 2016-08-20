@@ -54,6 +54,8 @@ class AcrossFirewallDetector(Detector):
         return self._is_internet_access(event)
 
     def _is_internet_access(self, address):
+        if address == '':
+            return False  # Might be AF_UNIX.
         assert self._ip4.search(address), address  # Please supply an IP.
         m = self._rfc1597.search(address)
         return m is not None

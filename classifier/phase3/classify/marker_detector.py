@@ -53,8 +53,8 @@ class MarkerDetector(Detector):
                 continue  # Url not present.
             m = self._marker_re.search(url)
             if m:  # if finds_feature
-                # print(prop['sequence'][0], m.group(1), '\t', url)
                 name_of_output_classification = 'marker_events_' + m.group(2)
                 ident = prop['ident'][0]
-                activities.append((ident, name_of_output_classification))
+                activities.append(
+                    (ident, name_of_output_classification, int(m.group(1))))
         return activities
