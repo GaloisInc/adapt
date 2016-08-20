@@ -137,18 +137,25 @@ g.V(%d).hasLabel('Segment').
         for seg_id, seg_props in stream.events_by_seg():
             self.num_nodes_fetched += len(seg_props)
             self.classify_one_seg(seg_id, seg_props)
+            if debug:
+                import pprint
+                pprint.pprint(seg_id)
+                pprint.pprint([p
+                               for p in seg_props
+                               if p['label'] != 'Entity-Memory'])
 
         if debug:
             nums = (self.num_nodes_fetched, self.num_classifications_inserted)
-            self.log('fetched %d stream events; %d inserts' % nums)
+            self.log.info('fetched %d stream events; %d inserts' % nums)
 
         for seg_id in seg_ids:
             for query in self._get_queries():
                 seg_props = self.gremlin.fetch_data(query % seg_id)
                 self.num_nodes_fetched += len(seg_props)
                 self.classify_one_seg(seg_id, seg_props)
-                if debug:
+                if debug and False:
                     print(query % seg_id)
+                    print(seg_props)
 
     def classify_one_seg(self, seg_id, seg_props):
         for detector in self.detectors:
