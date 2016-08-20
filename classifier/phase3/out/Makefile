@@ -43,5 +43,11 @@ SDIR = ~/adapt/segment/segmenter
 	(~/adapt/tools/label_count.py --with-edges; echo) >> $@
 	../report.py --all >> $@
 
+test:
+	~/adapt/tests/test_interpreter.py \
+            -m ac \
+            -t ../marker/tests.json \
+            -d ~/adapt/trace/current/simple_with_marker_3.avro
+
 clean:
 	rm -f $(OUT)

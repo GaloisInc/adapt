@@ -132,7 +132,7 @@ g.V(%d).hasLabel('Segment').
             """,
         ]
 
-    def classify(self, seg_ids, debug=False):
+    def classify(self, seg_ids, debug=True):
         stream = gremlin_event.Stream(self.gremlin, seg_ids)
         for seg_id, seg_props in stream.events_by_seg():
             self.num_nodes_fetched += len(seg_props)
@@ -153,7 +153,7 @@ g.V(%d).hasLabel('Segment').
                 seg_props = self.gremlin.fetch_data(query % seg_id)
                 self.num_nodes_fetched += len(seg_props)
                 self.classify_one_seg(seg_id, seg_props)
-                if debug and False:
+                if debug:
                     print(query % seg_id)
                     print(seg_props)
 

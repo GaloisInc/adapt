@@ -44,7 +44,9 @@ Sample output, for simple_with_marker_3.avro:
     2016-08-19 19:45:54,286 INFO Fetched 1319 base nodes.
     2016-08-19 19:45:54,286 INFO Inserted 377 activity classifications.
 
-Pipeline components after In are run in the foreground, so they do not appear in the local supervisord.conf.
+Pipeline components after In are run in the foreground,
+so they do not appear in the local supervisord.conf.
+Races are bad.
 
 Several [detectors](https://github.com/GaloisInc/adapt/blob/ac-dev/classifier/phase3/classify/activity_classifier.py#L46-L50)
 run during classification of each segment:
@@ -54,6 +56,10 @@ run during classification of each segment:
 - ScanDetector
 - SensitiveFileDetector
 - UnusualFileAccessDetector
+
+To execute automated tests, use:
+
+    $ make test
 
 To instrument Kudu's `simple` APT application, use the supplied script:
 
