@@ -1,0 +1,30 @@
+
+digraph Event {
+
+  ESA     [shape=point]
+
+  Entity  [shape=point]
+
+  Seg -> Subj -> EDGE_foo
+  EDGE_foo -> ESA    [arrowhead=none]
+  EDGE_foo -> Agent  [style="invis"]
+
+  subgraph cluster_0 {
+    label="ESA"
+    color=blue
+    ESA -> Entity  [arrowhead=none]
+
+    subgraph cluster_1 {
+      label=""
+      color=none
+      Entity -> EntityFile
+      Entity -> EntityNetFlow
+      Entity -> EntityMemory
+    }
+
+    ESA -> Subject
+    ESA -> Agent
+    Entity -> Subject  [style="invis"]
+    Entity -> Agent    [style="invis"]
+  }
+}

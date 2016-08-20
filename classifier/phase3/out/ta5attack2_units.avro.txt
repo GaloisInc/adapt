@@ -1,6 +1,7 @@
 Sent 18668 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
 INFO:kafka.conn:Broker version identifed as 0.9
 INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+WARNING:kafka.client:Node bootstrap connection failed -- refreshing metadata
 INFO:__main__:Full segments (nodes and edges) stored in Titan DB
 
 INFO:__main__:
@@ -11,24 +12,32 @@ Segmenter ready to run
 ******************************
 Running DB side segmenter
 ******************************
-Segments (including edges) created
+Segments created in 297.521831s
+Segment edges created in 2.119173s
+Total segmentation time 299.641004s
 INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
 INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
 WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
-Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fb1194c1630>>
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fdb9cc21780>>
 Traceback (most recent call last):
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
   File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
-AttributeError: 'NoneType' object has no attribute 'info'
-0.30user 0.01system 8:52.66elapsed 0%CPU (0avgtext+0avgdata 25900maxresident)k
-184inputs+24outputs (0major+8164minor)pagefaults 0swaps
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.31user 0.02system 12:24.56elapsed 0%CPU (0avgtext+0avgdata 27628maxresident)k
+0inputs+32outputs (0major+8085minor)pagefaults 0swaps
 
-2016-08-11 08:23:03,471 INFO Fetched 2494 base nodes.
-2016-08-11 08:23:03,472 INFO Inserted 843 activity classifications.
-1.72user 0.07system 0:38.19elapsed 4%CPU (0avgtext+0avgdata 32888maxresident)k
-184inputs+16outputs (2major+15573minor)pagefaults 0swaps
+2016-08-18 12:45:52,166 INFO Fetched 254 base nodes.
+2016-08-18 12:45:52,166 INFO Inserted 2 activity classifications.
+0.58user 0.03system 0:04.38elapsed 14%CPU (0avgtext+0avgdata 33972maxresident)k
+0inputs+0outputs (0major+10098minor)pagefaults 0swaps
 
+
+     2  Activity
+     2  activity:includes
      8  Entity-NetFlow
+    25  Segment
     58  EDGE_EVENT_AFFECTS_SUBJECT
     58  EDGE_EVENT_AFFECTS_SUBJECT in
     58  EDGE_EVENT_AFFECTS_SUBJECT out
@@ -39,33 +48,30 @@ AttributeError: 'NoneType' object has no attribute 'info'
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     70  EDGE_SUBJECT_HASLOCALPRINCIPAL out
-    70  Segment
-   420  segment:edge
+    70  segment:edge
+   483  EDGE_SRCSINK_AFFECTS_EVENT
+   483  EDGE_SRCSINK_AFFECTS_EVENT in
+   483  EDGE_SRCSINK_AFFECTS_EVENT out
    528  EDGE_EVENT_AFFECTS_FILE
    528  EDGE_EVENT_AFFECTS_FILE in
    528  EDGE_EVENT_AFFECTS_FILE out
-   530  EDGE_SRCSINK_AFFECTS_EVENT
-   530  EDGE_SRCSINK_AFFECTS_EVENT in
-   530  EDGE_SRCSINK_AFFECTS_EVENT out
    533  EDGE_EVENT_AFFECTS_SRCSINK
    533  EDGE_EVENT_AFFECTS_SRCSINK in
    533  EDGE_EVENT_AFFECTS_SRCSINK out
    542  Resource
-   843  Activity
-   843  activity:includes
-   938  EDGE_OBJECT_PREV_VERSION
-   938  EDGE_OBJECT_PREV_VERSION in
-   938  EDGE_OBJECT_PREV_VERSION out
+   543  segment:includes
+   932  EDGE_OBJECT_PREV_VERSION
+   932  EDGE_OBJECT_PREV_VERSION in
+   932  EDGE_OBJECT_PREV_VERSION out
   1321  Entity-File
-  3043  EDGE_FILE_AFFECTS_EVENT
-  3043  EDGE_FILE_AFFECTS_EVENT in
-  3043  EDGE_FILE_AFFECTS_EVENT out
-  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
-  5202  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+  3031  EDGE_FILE_AFFECTS_EVENT
+  3031  EDGE_FILE_AFFECTS_EVENT in
+  3031  EDGE_FILE_AFFECTS_EVENT out
+  4647  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+  4647  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+  4647  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   5272  Subject
- 11573  segment:includes
- 53878  total
+ 38911  total
 
 
 agent
@@ -878,15 +884,15 @@ resource
 
 subject
    1    2  Event.CLONE
-   2    7  Event.CONNECT
+   2    8  Event.CONNECT
    3    5  Event.CREATE_OBJECT
-   4   21  Event.EXECUTE
-   5   33  Event.FORK
-   6    1  Event.KERNEL_UNKNOWN
-   7 1239  Event.OPEN
-   8 2625  Event.READ
-   9    4  Event.RECVMSG
+   4   20  Event.EXECUTE
+   5   32  Event.FORK
+   6    2  Event.KERNEL_UNKNOWN
+   7 1229  Event.OPEN
+   8 2627  Event.READ
+   9    5  Event.RECVMSG
   10    1  Event.SENDMSG
-  11  996  Event.WRITE
+  11 1001  Event.WRITE
   12 5000  InstrumentationSource.LINUX_AUDIT_TRACE
-  13 4934  Subject.SUBJECT_EVENT
+  13 4932  Subject.SUBJECT_EVENT

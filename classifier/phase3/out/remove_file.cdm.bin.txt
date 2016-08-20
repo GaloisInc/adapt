@@ -11,6 +11,7 @@ Segmenter ready to run
 ******************************
 Running DB side segmenter
 ******************************
+<<<<<<< HEAD
 Segments created in 60.058388s
 Segment edges created in 0.012045s
 Total segmentation time 60.070433s
@@ -31,6 +32,26 @@ TypeError: unorderable types: int() >= NoneType()
 2016-08-18 10:52:51,800 INFO Inserted 0 activity classifications.
 0.43user 0.03system 0:00.89elapsed 52%CPU (0avgtext+0avgdata 33644maxresident)k
 0inputs+0outputs (0major+10005minor)pagefaults 0swaps
+=======
+Segments created in 0.056552s
+Segment edges created in 0.006783s
+Total segmentation time 0.063335s
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f6d9c88e780>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+AttributeError: 'NoneType' object has no attribute 'info'
+0.28user 0.03system 0:00.55elapsed 56%CPU (0avgtext+0avgdata 25768maxresident)k
+0inputs+8outputs (0major+8078minor)pagefaults 0swaps
+
+2016-08-19 14:54:20,064 INFO Fetched 2 base nodes.
+2016-08-19 14:54:20,064 INFO Inserted 0 activity classifications.
+0.42user 0.03system 0:00.86elapsed 52%CPU (0avgtext+0avgdata 33720maxresident)k
+0inputs+0outputs (0major+10012minor)pagefaults 0swaps
+>>>>>>> jh-dev
 
      1  Agent
      1  EDGE_EVENT_AFFECTS_FILE
