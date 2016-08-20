@@ -43,7 +43,6 @@ Add an activity node and link it to a segment X:
 activity = g.addV(label, 'Activity', 'activity:type', 'Name of Activity in APT Grammar', 'activity:suspicionScore', 0.12345)
 g.V(X).next().addEdge('segment:includes', activity)
 ```
-where X is the activity type and Y is the segment identifier.
 
 ## Miscellaneous queries
 
