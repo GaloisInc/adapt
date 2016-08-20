@@ -34,7 +34,7 @@ where X is a comma separated list of segment identifiers.
 Add an activity node and link it to a segment X:
 ```groovy
 activity = g.addV(label, 'Activity', 'activity:type', 'Name of Activity in APT Grammar')
-g.V(X).next().addEdge('activity:includes', activity)
+g.V(X).next().addEdge('segment:includes', activity)
 ```
 where X is the activity type and Y is the segment identifier.
 
