@@ -62,11 +62,10 @@ class ProvenanceGraph(object):
     def getActivityTypes(self, segmentIds):
         result = []
 
-        query = "g.V({}).in('activity:includes')".format(", ".join(str(segmentId) for segmentId in segmentIds))
-        nodes = self.titanClient.execute(query)
-
-        for node in nodes:
-            result.append(node['properties']['activity:type'][0]['value'])
+        for segmentId in segmentIds:
+            query = "g.V({}).in('activity:includes')".format(segmentId)
+            node = self.titanClient.execute(query)
+            result.append(node[0]['properties']['activity:type'][0]['value'])
 
         return result
 
