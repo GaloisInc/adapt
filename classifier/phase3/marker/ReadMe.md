@@ -4,8 +4,8 @@
 marker injection
 ================
 
-We will focus on `ta5attack2` using PID-based segmentation,
-injecting begin / end markers for grammar terminals into
+We have focused initially on the  `simple_with_marker_3` trace using PID-based segmentation,
+injecting begin / end markers for source code locations into
 the sequence of logged events:
 
 1. preamble events
@@ -14,19 +14,19 @@ the sequence of logged events:
 4. marker: end 1
 5. postamble events
 
-Our sklearn.ensemble.RandomForestClassifier model will
+Our sklearn-based model will
 identify segments with region 3 events of interest,
 even after markers are removed.
 
-During training we deliberately blind the learner
-to attributes easily controlled by an attacker,
-such as names of files outside of `/usr/bin`,
-substituting a nonce value instead.
-
-For marker number 1, the begin event shows up in
-the trace as a write to `/tmp/tc-marker-001-begin.txt`.
+For marker type 1, the begin event shows up in
+the trace as a write to `/tmp/adapt/tc-marker-001-begin.txt`.
 This is followed by events of interest,
-and then a write to `/tmp/tc-marker-001-end.txt`.
+and then a write to `/tmp/adapt/tc-marker-001-end.txt`.
+
+In future work we will perform a many-to-one mapping
+from specific marker types to APT grammar terminals,
+and work to generalize our results across versions of an application
+and perhaps across similar applications.
 
 example output
 --------------
