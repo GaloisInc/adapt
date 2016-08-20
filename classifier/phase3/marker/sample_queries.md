@@ -9,8 +9,8 @@ These gremlin queries demonstrate Ac annotations to the DB.
 Show all classification nodes with their attributes:
 
     gremlin> g.V().hasLabel('Activity').limit(2).valueMap(true)
-    ==>[activity:type:[marker_events_end], activity:suspicionScore:[0.1], id:8626280, label:Activity]
-    ==>[activity:type:[marker_events_begin], activity:suspicionScore:[0.1], id:17256512, label:Activity]
+    ==>[activity:type:[marker_events_end], activity:suspicionScore:[0.1], label:Activity, activity:markerType:[4], id:33566784]
+    ==>[activity:type:[marker_events_begin], activity:suspicionScore:[0.1], label:Activity, activity:markerType:[4], id:33894528]
 
 
 Classification counts per base node type:
@@ -22,10 +22,9 @@ Selected paths from a recent segment to classified base nodes:
 
     gremlin> g.V(8589400).hasLabel('Segment').
         out().hasLabel('Activity').
-        out().hasLabel('Entity-File').limit(3).path()
+        out().hasLabel('Entity-File').limit(2).path()
     ==>[v[8589400], v[8487040], v[475200]]
     ==>[v[8589400], v[8491136], v[118816]]
-    ==>[v[8589400], v[8495232], v[221288]]
 
 Such paths may be fed to `marker/path_expander.py`.
 
