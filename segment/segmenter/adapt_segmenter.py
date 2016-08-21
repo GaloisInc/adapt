@@ -21,7 +21,10 @@ import time
 property_segmentNodeName='segment:name'
 property_segmentEdgeLabel='segment:includes'
 property_seg2segEdgeLabel='segment:edge'
-
+property_segmentParentId='segment:parentId'
+property_startedAtTime='startedAtTime'
+property_endedAtTime='endedAtTime'
+property_time='time'
 
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
@@ -34,7 +37,12 @@ def arg_parser():
 	p.add_argument('--radius', '-r', 
 				   help='The segmentation radius', 
 				   type=int, default=2)
-	p.add_argument('--directionEdges', '-e',
+	p.add_argument('--window', '-w', 
+				   help='The segmentation time window in seconds', 
+				   type=int, default=60)
+	p.add_argument('--time', '-t',
+				   help='Segment by time', action='store_true')
+    p.add_argument('--directionEdges', '-e',
 				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
 				   choices=['in','out','both'],default='both')
 	p.add_argument('--verbose','-v', 
@@ -67,20 +75,26 @@ class SimpleTitanGremlinSegmenter:
 		self.type_criterion=None
 		self.radius=args.radius
 		self.verbose=args.verbose
+        self.time=args.time
 		self.directionEdges=args.directionEdges
 		self.store_segment = args.store_segment
+        self.window = int(args.window)*1000*1000
 		logging.basicConfig(level=logging.INFO)
 		self.logger = logging.getLogger(__name__)
 		self.logToKafka = args.log_to_kafka
 		if self.logToKafka:
 			self.producer = kafka.KafkaProducer(bootstrap_servers=[args.kafka])
-		self.params = {'criterion': self.criterion, 
-					   'segmentNodeName': property_segmentNodeName,
+		self.params = {'segmentNodeName': property_segmentNodeName,
 					   'segmentEdgeLabel': property_segmentEdgeLabel,
 					   'seg2segEdgeLabel': property_seg2segEdgeLabel,
+					   'segmentParentId': property_segmentParentId,
+					   'startedAtTime': property_startedAtTime,
+					   'endedAtTime': property_endedAtTime,
+					   'criterion': self.criterion, 
 					   'segmentName': self.segmentName,
 					   'directionEdges' : self.directionEdges, 
-					   'radius': self.radius}
+					   'radius': self.radius,
+					   'window': self.window}
 
 	def createSegmentVertices(self):
 		'''
@@ -226,7 +240,7 @@ mgmt.close()\
 		self.createSchemaVertexLabel('Segment')
 		self.createSchemaVertexProperty(property_segmentNodeName,
 						'String','SINGLE')
-		self.createSchemaVertexProperty('parentVertexId',
+		self.createSchemaVertexProperty(property_segmentParentId,
 						'Integer','SINGLE')
 		self.createSchemaVertexProperty(self.criterion,
 						self.type_criterion,'SINGLE')
@@ -250,12 +264,12 @@ mgmt.close()\
 	def createVertices_query(self):
 		createVertices_query="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('parentVertexId').fold().next();\
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('%(segmentParentId)s').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 if (idsToStore!=[]){\
 for (i in idsToStore) {\
 graph.addVertex(label,'Segment',\
-'parentVertexId',i,\
+'%(segmentParentId)s',i,\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next())}\
 }\
@@ -265,7 +279,7 @@ graph.addVertex(label,'Segment',\
 	def addEdges_query(self):
 		addEdges_query ="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
-existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('parentVertexId').fold().next();\
+existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('%(segmentParentId)s').fold().next();\
 idsToStore=idWithProp-existingSegNodes_parentIds; \
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
@@ -273,11 +287,11 @@ if (i in idsToStore) {\
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
-'parentVertexId',i)\
+'%(segmentParentId)s',i)\
 } else {\
-s = g.V().has('%(segmentNodeName)s','%(segmentName)s').has('parentVertexId',i).next()
+s = g.V().has('%(segmentNodeName)s','%(segmentName)s').has('%(segmentParentId)s',i).next()
 }; \
-idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)s','%(segmentName)s').has('parentVertexId',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
+idNonLinkedNodes=subtr.V().id().fold().next()-g.V().has('%(segmentNodeName)s','%(segmentName)s').has('%(segmentParentId)s',i).outE('%(segmentEdgeLabel)s').inV().id().fold().next();\
 for (node in idNonLinkedNodes) {
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
@@ -297,6 +311,19 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 
 		return addSeg2SegEdges_query
 
+    def createTimeSegment_query(self):
+        timeSegment_query = """\
+segments = g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t % %(window)d}.dedup().order();\
+for(s in segments) {\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','byTime','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
+content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
+for(z in content) {\
+v.addEdge(%(segmentEdgeLabel)s),z) \
+}\
+}\       
+""" % self.params
+        return timeSegment_query
+    
 	def storeSegments(self):
 		'''
 		creates segments in the database (only segment nodes 
@@ -311,16 +338,24 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 				print('The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				if self.store_segment=='OnlyNodes':
+				if self.time==True:
+                    t1 = time.time()
+                    self.titanclient.execute(self.createTimeSegment_query())
+                    t2 = time.time()
+                    sys.stdout.write('Time segment nodes created in %fs' % (t2-t1))
+                    return "Time segments created"
+                
+                if self.store_segment=='OnlyNodes':
 					t1 = time.time()
-					createSegmentNodes=self.titanclient.execute(self.createVertices_query())
+					self.titanclient.execute(self.createVertices_query())
 					t2 = time.time()
 					sys.stdout.write('Segment nodes created in %fs' % (t2 - t1))
 					return "Nodes created"
+                
 				elif self.store_segment=='Yes':
 					
 					t1 = time.time()
-					createFullSegments=self.titanclient.execute(self.addEdges_query())
+					self.titanclient.execute(self.addEdges_query())
 					t2 = time.time()
 					sys.stdout.write('Segments created in %fs\n' % (t2-t1))
 					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
