@@ -41,9 +41,7 @@ def arg_parser():
 	p.add_argument('--window', '-w', 
 				   help='The segmentation time window in seconds', 
 				   type=int, default=60)
-	p.add_argument('--time', '-t',
-				   help='Segment by time', action='store_true')
-    p.add_argument('--directionEdges', '-e',
+	p.add_argument('--directionEdges', '-e',
 				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
 				   choices=['in','out','both'],default='both')
 	p.add_argument('--verbose','-v', 
@@ -56,6 +54,8 @@ def arg_parser():
 					   help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', 
 					   choices=['Yes','No','OnlyNodes'],
 					   default='Yes')
+	group.add_argument('--time-segment',
+				   help='Segment by time', action='store_true')
 	p.add_argument('--log-to-kafka', action='store_true',
 				   help='Send logging information to kafka server')
 	p.add_argument('--kafka',
@@ -76,10 +76,10 @@ class SimpleTitanGremlinSegmenter:
 		self.type_criterion=None
 		self.radius=args.radius
 		self.verbose=args.verbose
-        self.time=args.time
+		self.time_segment=args.time_segment
 		self.directionEdges=args.directionEdges
 		self.store_segment = args.store_segment
-        self.window = int(args.window)*1000*1000
+		self.window = int(args.window)*1000*1000
 		logging.basicConfig(level=logging.INFO)
 		self.logger = logging.getLogger(__name__)
 		self.logToKafka = args.log_to_kafka
@@ -312,18 +312,18 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 
 		return addSeg2SegEdges_query
 
-    def createTimeSegment_query(self):
-        timeSegment_query = """\
-segments = g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t % %(window)d}.dedup().order();\
+	def createTimeSegment_query(self):
+		timeSegment_query = """\
+segments = g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t %% %(window)d}.dedup().order();\
 for(s in segments) {\
 v = graph.addVertex(label,'Segment','%(segmentNodeName)s','byTime','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
 content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
 for(z in content) {\
-v.addEdge(%(segmentEdgeLabel)s),z) \
+v.addEdge('%(segmentEdgeLabel)s',z) \
 }\
-}\       
+}\
 """ % self.params
-        return timeSegment_query
+		return timeSegment_query
     
 	def storeSegments(self):
 		'''
@@ -339,21 +339,21 @@ v.addEdge(%(segmentEdgeLabel)s),z) \
 				print('The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				if self.time==True:
-                    t1 = time.time()
-                    self.titanclient.execute(self.createTimeSegment_query())
-                    t2 = time.time()
-                    sys.stdout.write('Time segment nodes created in %fs' % (t2-t1))
-                    return "Time segments created"
+				if self.time_segment == True:
+					t1 = time.time()
+					self.titanclient.execute(self.createTimeSegment_query())
+					t2 = time.time()
+					sys.stdout.write('Time segment nodes created in %fs' % (t2-t1))
+					return "Time segments created"
                 
-                if self.store_segment=='OnlyNodes':
+				if self.store_segment == 'OnlyNodes':
 					t1 = time.time()
 					self.titanclient.execute(self.createVertices_query())
 					t2 = time.time()
 					sys.stdout.write('Segment nodes created in %fs' % (t2 - t1))
 					return "Nodes created"
                 
-				elif self.store_segment=='Yes':
+				elif self.store_segment == 'Yes':
 					
 					t1 = time.time()
 					self.titanclient.execute(self.addEdges_query())
