@@ -10,6 +10,7 @@ def reindex(graph,idxName) {
 
 reindex(graph,'byIdent')
 reindex(graph,'bySegmentName')
+reindex(graph,'byParentId')
 reindex(graph,'byURL')
 reindex(graph,'byPID')
 reindex(graph,'byTime')

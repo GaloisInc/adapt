@@ -7,7 +7,8 @@ JSON specification handling
 
 '''
 from aiogremlin import GremlinClient
-from titanDB import titanClient as tclient
+
+from titanDB import TitanClient as tclient
 import argparse
 import logging
 import os

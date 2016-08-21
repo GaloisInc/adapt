@@ -2,7 +2,7 @@
 ### Anomaly View
 An anomaly view has two components:
 
-##### 1.  Instance Specification:
+##### 1. Instance Specification:
 	Defines a set of objects/nodes to be scored (e.g. netflow nodes)
 ##### 2. Feature Specification
 	Defines the set of features for each instance (e.g. number of read/write events associated with a netflow node)
@@ -13,6 +13,7 @@ An anomaly view can be specified using the following JSON file format:
 ```json
 {
     "view_name" : {
+        "description" : "A high level description of this view",
         "instance_set" : "gremlin query returning set of node ids",
         "feature_set" : {
             "feature_1" :
@@ -34,6 +35,7 @@ An example of JSON file for netflow anomaly view is given below:
 ```json
 {
     "netflow" : {
+        "description" : "Analyze netflow nodes i.e. network sockets for possible anomalous behavior",
         "instance_set" : "g.V().hasLabel('Entity-NetFlow').id()",
         "feature_set" : {
             "writeBytes" :

@@ -94,7 +94,7 @@ def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
 // We index the 'ident' field, which matches CDM 'UUID' but as a Base64 string.
 makeNodeIndex('byIdent','ident',true,String.class)
 makeNodeIndex('bySegmentName', 'segment:name', false, String.class)
-makeNodeIndex('byParentId','parentVertexId',false,Integer.class)
+makeNodeIndex('byParentId','segment:parentId',false,Integer.class)
 
 // URL index use ElasticSearch which provides richer queries
 // including regex

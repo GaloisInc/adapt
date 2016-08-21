@@ -44,6 +44,7 @@ data Config = Config { lintOnly   :: Bool
                      , pushKafka  :: Bool
                      , files      :: [File]
                      , finished   :: Bool
+                     , finishedButBlock :: Bool
                      , ta1_to_ta2_kafkaTopic :: TopicName
                      , ingest_control_topic :: TopicName
                      } deriving (Show)
@@ -62,6 +63,7 @@ defaultConfig = Config
   , pushKafka = False
   , files = []
   , finished = False
+  , finishedButBlock = False
   , ta1_to_ta2_kafkaTopic = "ta2"
   , ingest_control_topic = "in-finished"
   }
@@ -99,6 +101,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['f'] ["finished"]
                     "Send the 'finished' signal to ingestd"
                     $ NoArg $ \s -> Right s { finished = True }
+                  , Option ['F'] ["finished-but-block-till-queues-are-empty"]
+                    "Send the 0x02 'finished' signal to ingestd"
+                    $ NoArg $ \s -> Right s { finished = True }
                   , Option [] ["ingest-control-topic"]
                     "Set the kafka topic for ingester control messages."
                     $ ReqArg "Topic" $
@@ -124,7 +129,8 @@ main =
      if help c
       then dumpUsage opts
       else do mapM_ (handleFile c) (files c)
-              when  (finished c)  (sendFinishedSignal c)
+              when  (finished c)  (sendStatus c Done)
+              when  (finishedButBlock c)  (sendStatus c DoneAfterEmptyQueues)
 
 handleFile :: Config -> File -> IO ()
 handleFile c fl = do
@@ -158,18 +164,18 @@ processStmts c fp res stmtBS
       when  (ast c)       (handleAstGeneration c fp res)
       when  (pushKafka c) (handleKafkaIngest c stmtBS)
 
-sendFinishedSignal :: Config -> IO ()
-sendFinishedSignal c =
- do result <- sendStatus (ingest_control_topic c) Done
+sendStatus :: Config -> ProcessingStatus -> IO ()
+sendStatus c stat =
+ do result <- doSendForStatus (ingest_control_topic c) stat
     either (calmly . show) (dbg . show) result
  where
   calmly s = unless (quiet c) (putStrLn s)
   dbg s    = when (verbose c) (putStrLn s)
 
-data ProcessingStatus = Working | Done deriving (Enum)
+data ProcessingStatus = Working | Done | DoneAfterEmptyQueues deriving (Enum)
 
-sendStatus :: TopicName -> ProcessingStatus -> IO (Either KafkaClientError [ProduceResponse])
-sendStatus topic stat =
+doSendForStatus :: TopicName -> ProcessingStatus -> IO (Either KafkaClientError [ProduceResponse])
+doSendForStatus topic stat =
   do let encStat = BS.pack [fromIntegral (fromEnum stat)]
          msg     = TopicAndMessage topic (makeMessage encStat)
      runKafka (mkKafkaState "adapt-trint" ("localhost", 9092))

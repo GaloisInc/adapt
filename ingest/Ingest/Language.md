@@ -1126,15 +1126,22 @@ This property specifies the string name of a segment.
 makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.SINGLE)
 
 [schema]: #
-makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.LIST)
 [schema]: #
-makePropertyKey('anomalyType').dataType(Float.class).cardinality(Cardinality.SINGLE)
+makePropertyKey('anomalyType').dataType(String.class).cardinality(Cardinality.LIST)
 
 
 segment:edge (not in CDM)
 -----------
-This edge relates two segmentssuch that there is an edge in the raw
+This edge relates two segments such that there is an edge in the raw
 graph from a node in the first to a node in the second.
 
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(MULTI)
+
+segment:parentId (not in CDM)
+-----------
+This property is associated with a radius segment and contains the node ID of the starting vertex of the segment in the raw graph.
+
+[schema]: #
+makePropertyKey('segment:parentId').dataType(Integer.class).cardinality(SINGLE)

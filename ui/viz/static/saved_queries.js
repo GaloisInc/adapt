@@ -13,7 +13,8 @@ var saved_queries = [
     {
         "name" : "owner",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        "floating_query" : ".both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out()"
+        "floating_query" : ".both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out()",
+        "is_default" : true
     },
     {
         "name" : "next",

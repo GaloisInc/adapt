@@ -1,0 +1,8 @@
+id,num_distinct_dst_port_access,num_distinct_src_port_access,num_file_open_during_wr_to_netflow,num_reads_to_netflow,num_writes_to_net_flow,total_bytes_rcv_from_netflow,total_bytes_sent_to_netflow,anomaly_score
+274488,2,166,0,0,0,0,0,0.867162
+233608,1,89,0,0,0,0,0,0.833347
+13680864,2,2,0,0,0,0,0,0.825101
+295160,1,4,0,0,0,0,0,0.770259
+6828152,1,1,0,0,0,0,0,0.695193
+7630904,1,1,0,0,0,0,0,0.695193
+7790784,1,1,0,0,0,0,0,0.695193
