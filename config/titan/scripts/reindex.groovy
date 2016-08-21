@@ -14,5 +14,4 @@ reindex(graph,'byParentId')
 reindex(graph,'byURL')
 reindex(graph,'byPID')
 reindex(graph,'byTime')
-reindex(graph,'byParentId')
 
