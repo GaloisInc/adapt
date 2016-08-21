@@ -5,18 +5,20 @@
     <script type="text/javascript" src="{{ url_for('static', filename='jquery.3.1.0.min.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='underscore.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='vis.4.16.1.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='saved_queries.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='ui_language.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='jscolor-2.0.4.min.js') }}"></script>    
 
     <link href="{{ url_for('static', filename='vis.4.16.1.css') }}" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='ionicons.2.0.1.min.css') }}">
-
     <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
 
     <script type="text/javascript">
-        var node_data_set, edge_data_set, network, ui_spinner_timeout;  // saved_queries is loaded externally.
+        var node_data_set, edge_data_set, network, ui_spinner_timeout;
+        // saved_queries and saved_icons are loaded externally.
         var execQuery_params = []
         var journal = []
         var right_journal =[]
+        var default_node_color = "#97c2fc"
 
 
         function execQuery(query_object, success_function) {
@@ -33,11 +35,15 @@
                 query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
+            // var color = $("#query-color").value
             $.post("/query", {"query": query_string}, function(node_results) {
                 if ( ! _.isEmpty(node_results)) {
                     var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
                     var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
                     $.post("/query", {"query": edge_query}, function(edge_results) {
+                        var query_color = document.getElementById("query-color").jscolor.value
+                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})
                         var data = { "type" : "add", "nodes" : node_results, "edges" : edge_results }
                         if (query_object.is_collapsed) {
                             data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
@@ -89,40 +95,43 @@
 
 
         function makeCluster(){
-            function getClusteringData(node_ids, cluster_node_id, name) { return {
-                type : "collapse",
-                node_ids : node_ids,
-                id : cluster_node_id,
-                name : name,
-                joinCondition : function(node_props) {
-                    return _.contains(this.node_ids, node_props.id)
-                },
-                processProperties: function (cluster_node, child_nodes, child_edges) {
-                    cluster_node['child_nodes'] = child_nodes
-                    cluster_node['child_edges'] = child_edges
-                    cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
-                    cluster_node.id = this.id
-                    cluster_node.label = this.name
-                    cluster_node.queries = [{ 
-                        name : "Expand Cluster",
-                        id : this.id
-                    }]
-                    return cluster_node
-                },
-                clusterNodeProperties : {
-                    // shape: "dot",
-                    // size: 20,
-                    // color: "red"
-                    icon: {
-                        code: '\uf413',  // http://ionicons.com/cheatsheet.html
-                        color: "red",
-                        size: 54
+            function getClusteringData(node_ids, cluster_node_id, name) { 
+                var cluster_spec = _.find(saved_icons, function(n){return n.name.toLowerCase() === "cluster"})
+                return {
+                    type : "collapse",
+                    node_ids : node_ids,
+                    id : cluster_node_id,
+                    name : name,
+                    joinCondition : function(node_props) {
+                        return _.contains(this.node_ids, node_props.id)
+                    },
+                    processProperties: function (cluster_node, child_nodes, child_edges) {
+                        cluster_node['child_nodes'] = child_nodes
+                        cluster_node['child_edges'] = child_edges
+                        cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
+                        cluster_node.id = this.id
+                        cluster_node.label = this.name
+                        cluster_node.queries = [{ 
+                            name : "Expand Cluster",
+                            id : this.id
+                        }]
+                        return cluster_node
+                    },
+                    clusterNodeProperties : {
+                        // shape: "dot",
+                        // size: 20,
+                        // color: "red"
+                        icon: { 
+                            code: cluster_spec.icon_unicode, // '\uf413',  // http://ionicons.com/cheatsheet.html
+                            color: "red",
+                            size: cluster_spec.size
+                        }
+                    },
+                    clusterEdgeProperties : {
+                        color : "red"
                     }
-                },
-                clusterEdgeProperties : {
-                    color : "red"
                 }
-            }}
+            }
             var name = prompt("Name your cluster:")
             var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
             if (_.isEmpty(name)) { name = cluster_node_id }
@@ -140,7 +149,11 @@
                 case "add":
                     var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
                     var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
-                    var data = { "type" : "add", "nodes": new_nodes, "edges": new_edges}
+                    var data = { 
+                        "type" : "add", 
+                        "nodes": formatNodes(new_nodes), 
+                        "edges": formatEdges(new_edges)
+                    }
                     journal.push(data)
                     // Add position, if needed:
                     if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
@@ -177,8 +190,8 @@
         function applyJournalEvent(event) {
             switch (event.type) {
                 case "add":
-                    node_data_set.add(formatNodes(event.nodes))
-                    edge_data_set.add(formatEdges(event.edges))
+                    node_data_set.add(event.nodes)
+                    edge_data_set.add(event.edges)
                     break
                 case "subtract":
                     var node_ids_to_remove = _.pluck(event.nodes, "id")
@@ -245,11 +258,20 @@
 
                 // TODO: should test for 'is_relevant' in 'saved_queries' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
                 
+                node_spec = _.find(saved_icons, function(i){return i.is_relevant(n)})
+                if (typeof node_spec === "object") {
+                    n['icon'] = {
+                        color : UI.selectedColor(),
+                        code : node_spec.icon_unicode,
+                        size : getOrElse(node_spec.size, 30)
+                    }
+                }
 
                 translateAllEnums(n)
                 n["label"] = makeNodeLabel(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
+                // n.icon = { color: "black" } 
                 return n
             })
         }
@@ -317,6 +339,18 @@
         }
 
 
+        function getOrElse(value, _) {
+            var args = Array.prototype.slice.call(arguments);
+            for (var i = 0; i < args.length; i++) {
+                var arg = args[i];
+                if(typeof arg != "undefined" && arg != null && !isNaN(arg)) {
+                    return arg;
+                }
+            }
+            return null;
+        }
+
+
         function translateAllEnums(node) {  // Mutates 'node' in place.
             var translateEnum = function(prop_key, ordered_list) {
                 var keys = Object.keys(node['properties'])
@@ -330,7 +364,8 @@
             }
             translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
             translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
-            translateEnum("source", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+            translateEnum("srcSinkType", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+            translateEnum("source", ["LINUX_AUDIT_TRACE","LINUX_PROC_TRACE","LINUX_BEEP_TRACE","FREEBSD_OPENBSM_TRACE","ANDROID_JAVA_CLEARSCOPE","ANDROID_NATIVE_CLEARSCOPE","LINUX_AUDIT_CADETS","WINDOWS_DIFT_FAROS"])
             translateEnum("agentType", ["Local","Remote"])
         }
         
@@ -383,6 +418,7 @@
             queryClick : function() {
                 $('#query-string').css("background-color", "white")
                 var query_string = document.getElementById('query-string').value
+                // var color = $("#query-color").value
                 execQuery(query_string, updateNetwork)
             },
             failHandler : function(response) {
@@ -542,8 +578,22 @@
                 var journal_event = { type: "subtract", nodes: nodes, edges: [] }
                 updateNetwork(journal_event)
             },
+            colorNodes : function(node_ids, color_string) {
+                node_data_set.update(
+                    _.map(node_ids, function(n) {
+                        return { id: n, icon: {"color": color_string} }
+                    })
+                )
+            },
+            setQueryColor: function(element) {
+                document.getElementById("query-color").jscolor.value = element.toHEXString()
+            },
+            selectedColor: function() {
+                return document.getElementById("query-color").jscolor.value
+            },
             draw : function(data) {
                 var container = document.getElementById('graph')
+                node_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
                 var options = {
                     interaction : { 
                         hover: true,
@@ -577,12 +627,14 @@
                         shape: 'icon',
                         icon: {
                             face: 'Ionicons',
-                            code: '\uf3a6',  // http://ionicons.com/cheatsheet.html
-                            size: 30,
+                            code: node_spec.icon_unicode, //'\uf3a6',
+                            size: node_spec.size, // 30,
+                            color: default_node_color
                         }
                     },
                     edges: {
-                        smooth: false
+                        smooth: false,
+                        color: default_node_color
                     }
                 }
 
@@ -634,6 +686,7 @@
         $(function(){
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
+            document.getElementById("query-color").jscolor.value = default_node_color
             $("#dropzone").on("complete", function(one, two) {
                 console.log(one)
                 console.log(two)
@@ -737,7 +790,8 @@
 </head>
 <body>
     <div style="display: block;">
-        <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=80 />
+        <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
+        <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2>
         <button id="query-button" onclick="UI.queryClick()">Query</button>
         <i class="ion-ios-skipbackward" id="undo-button" onclick="undoUpdateNetwork()"></i>
         <i class="ion-ios-play" id="animate-button"></i>
