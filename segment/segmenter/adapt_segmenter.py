@@ -56,6 +56,7 @@ def arg_parser():
 					   default='Yes')
 	group.add_argument('--time-segment',
 				   help='Segment by time', action='store_true')
+	p.add_argument('--name', help="Segment name (value of property segment:name)",required=True)
 	p.add_argument('--log-to-kafka', action='store_true',
 				   help='Send logging information to kafka server')
 	p.add_argument('--kafka',
@@ -72,7 +73,7 @@ class SimpleTitanGremlinSegmenter:
 		self.broker = args.broker
 		self.titanclient=tclient(self.broker)
 		self.criterion=args.criterion
-		self.segmentName='byPID' # TODO: parameterize
+		self.segmentName=args.name
 		self.type_criterion=None
 		self.radius=args.radius
 		self.verbose=args.verbose
@@ -316,7 +317,7 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 		timeSegment_query = """\
 segments = g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t %% %(window)d}.dedup().order();\
 for(s in segments) {\
-v = graph.addVertex(label,'Segment','%(segmentNodeName)s','byTime','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
 content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
 for(z in content) {\
 v.addEdge('%(segmentEdgeLabel)s',z) \
@@ -333,18 +334,21 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		'''
 		self.createSchemaElements()
 		
+		if self.time_segment == True:
+			t1 = time.time()
+			self.titanclient.execute(self.createTimeSegment_query())
+			t2 = time.time()
+			sys.stdout.write('Time segments created in %fs\n' % (t2-t1))
+			return "Time segments created"
+		t1 = time.time()
 		count=self.getNumberVerticesWithProperty()[0]
+		t2 = time.time()
+		sys.stdout.write('%d parent nodes with criterion %s found in %fs\n' % (count, self.criterion, (t2-t1)))
 		if count>0:
 			if (self.checkCriterionType() == False):
 				print('The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				if self.time_segment == True:
-					t1 = time.time()
-					self.titanclient.execute(self.createTimeSegment_query())
-					t2 = time.time()
-					sys.stdout.write('Time segment nodes created in %fs' % (t2-t1))
-					return "Time segments created"
                 
 				if self.store_segment == 'OnlyNodes':
 					t1 = time.time()
