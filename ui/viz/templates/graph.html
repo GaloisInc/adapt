@@ -136,7 +136,15 @@
             var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
             if (_.isEmpty(name)) { name = cluster_node_id }
             var cluster_data = getClusteringData(network.getSelectedNodes(), cluster_node_id, name)
-            updateNetwork(cluster_data)
+            updateNetwork(formatAllData(cluster_data))
+        }
+
+
+        function formatAllData(node_and_edge_data) {
+            var data = copy(node_and_edge_data)
+            data.nodes = formatNodes(data.nodes)
+            data.edges = formatEdges(data.edges)
+            return data
         }
 
 
@@ -151,8 +159,8 @@
                     var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
                     var data = { 
                         "type" : "add", 
-                        "nodes": formatNodes(new_nodes), 
-                        "edges": formatEdges(new_edges)
+                        "nodes": new_nodes,
+                        "edges": new_edges,
                     }
                     journal.push(data)
                     // Add position, if needed:
@@ -271,8 +279,29 @@
                 n["label"] = makeNodeLabel(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
-                // n.icon = { color: "black" } 
                 return n
+            })
+        }
+
+
+        function formatEdges(raw_edge_results) {
+            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
+            return _.map(edges, function(e, i, list) {
+                var new_edge = { 
+                    "id" : e['id'],
+                    "from" : e['outV'],
+                    "to" : e['inV'],
+                    // "label" : e['label'],
+                    "arrows" : "to",
+                    "title" : e['label'] 
+                }
+                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+                    new_edge['label'] = e['label']
+                    new_edge['title'] = e['title']
+                    new_edge['color'] = "green"
+                    new_edge['dashes'] = true
+                }
+                return new_edge
             })
         }
 
@@ -305,28 +334,6 @@
         }
 
 
-        function formatEdges(raw_edge_results) {
-            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
-            return _.map(edges, function(e, i, list) {
-                var new_edge = { 
-                    "id" : e['id'],
-                    "from" : e['outV'],
-                    "to" : e['inV'],
-                    // "label" : e['label'],
-                    "arrows" : "to",
-                    "title" : e['label'] 
-                }
-                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
-                    new_edge['label'] = e['label']
-                    new_edge['title'] = e['title']
-                    new_edge['color'] = "green"
-                    new_edge['dashes'] = true
-                }
-                return new_edge
-            })
-        }
-
-
         function uniqueBy(array, function_object_to_unique_value) {
             var f = typeof function_object_to_unique_value === "function" ? function_object_to_unique_value : function(x){ return x.id }
             var id_list = _.map(array, f)
@@ -349,6 +356,9 @@
             }
             return null;
         }
+
+
+        function copy(object) { return $.extend(true, {}, object) }
 
 
         function translateAllEnums(node) {  // Mutates 'node' in place.
@@ -419,7 +429,8 @@
                 $('#query-string').css("background-color", "white")
                 var query_string = document.getElementById('query-string').value
                 // var color = $("#query-color").value
-                execQuery(query_string, updateNetwork)
+                var formatAndUpdate = _.compose(updateNetwork, formatAllData)
+                execQuery(query_string, formatAndUpdate)
             },
             failHandler : function(response) {
                 $('#query-string').css("background-color", "pink")
@@ -478,7 +489,8 @@
                     var starting_node_id = props.nodes[0]
                     var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
                     var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
-                    execQuery(query, updateNetworkAtId)
+                    var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
+                    execQuery(query, formatAndUpdateAtId)
                 }
             },
             networkRightClickBehavior : function(props) {
@@ -498,7 +510,8 @@
                         q['starting_node_id'] = node_id
                         var default_string = q.is_default ? "  (default)" : ""
                         var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
-                        execQuery_params.push([q, updateNetworkAtId])
+                        var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
+                        execQuery_params.push([q, formatAndUpdateAtId])
                         var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1])"
                         var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
                         $("#node-query-menu ul").append(list_item)
