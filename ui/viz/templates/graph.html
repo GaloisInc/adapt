@@ -150,7 +150,7 @@
                         "nodes": new_nodes,
                         "edges": new_edges,
                     }
-                    journal.push(data)
+                    persistJournal(data)
                     // Add position, if needed:
                     if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
                         var bbox = network.getBoundingBox(starting_node_id)
@@ -164,12 +164,18 @@
                     applyJournalEvent(data)
                     break
                 default:
-                    journal.push(additional_data)
+                    persistJournal(additional_data)
                     applyJournalEvent(additional_data)
                     break
             }
             UI.animate()
             UI.updateButtonStates()
+        }
+
+
+        function persistJournal(event) {
+            journal.push(event)
+            localStorage.setItem("previous_journal", JSON.stringify(journal))
         }
 
 
@@ -231,6 +237,7 @@
                 right_journal.unshift(to_remove)
                 applyJournalEvent(invertJournalEvent(to_remove))
                 UI.animate()
+                localStorage.setItem("previous_journal", JSON.stringify(journal))
             }
             UI.updateButtonStates()
         }
@@ -667,6 +674,11 @@
                 network = new vis.Network(container, network_data, options)
                 if (data.nodes.length > 0 || data.edges.length > 0) {
                     journal = [data]
+                }
+                var previous_journal = localStorage.getItem("previous_journal")
+                if (previous_journal != null) {
+                    right_journal = JSON.parse(previous_journal)
+                    UI.updateButtonStates()
                 }
 
                 network.on("doubleClick", UI.networkDoubleClickBehavior)
