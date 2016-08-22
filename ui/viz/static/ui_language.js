@@ -50,15 +50,17 @@ var saved_queries = [
 
 var saved_icons = [
     {   // Icon codes:  http://ionicons.com/cheatsheet.html   
-        // NOTE: the insertion of 'u' to make code prefixes of '\uf...' below, because javascript.
+        // NOTE: the insertion of 'u' to make code prefixes of '\uf...' as below; because javascript.
         name : "Cluster",
         is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
         icon_unicode : "\uf413",
+        color : "red",  // setting color here will always override query-specific colors.
         size: 54
     }, {
         name : "File",   // This will override anything below here!!!!
         is_relevant : function(n) { return n.label === "Entity-File" },
-        icon_unicode : "\uf381"
+        icon_unicode : "\uf41b",
+        size: 40
     }, {
         name : "Agent",   // This will override anything below here!!!!
         is_relevant : function(n) { return n.label === "Agent" },
@@ -69,5 +71,6 @@ var saved_icons = [
         is_relevant : function(n) { return true },
         icon_unicode : "\uf3a6",
         size: 30
+     // color : do not set a color for default values, or it will always override query-time color choice.
     }
 ]

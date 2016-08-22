@@ -13,8 +13,8 @@
     <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
 
     <script type="text/javascript">
-        var node_data_set, edge_data_set, network, ui_spinner_timeout;
-        // saved_queries and saved_icons are loaded externally.
+        var node_data_set, edge_data_set, network;
+        // saved_queries and saved_icons are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
@@ -22,6 +22,7 @@
 
 
         function execQuery(query_object, success_function) {
+            right_journal = []
             if (query_object.name === "Collapse Nodes (selected)") {
                 makeCluster()
                 return true
@@ -35,7 +36,6 @@
                 query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
-            // var color = $("#query-color").value
             $.post("/query", {"query": query_string}, function(node_results) {
                 if ( ! _.isEmpty(node_results)) {
                     var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
@@ -111,19 +111,12 @@
                         cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
                         cluster_node.id = this.id
                         cluster_node.label = this.name
-                        cluster_node.queries = [{ 
-                            name : "Expand Cluster",
-                            id : this.id
-                        }]
                         return cluster_node
                     },
                     clusterNodeProperties : {
-                        // shape: "dot",
-                        // size: 20,
-                        // color: "red"
                         icon: { 
-                            code: cluster_spec.icon_unicode, // '\uf413',  // http://ionicons.com/cheatsheet.html
-                            color: "red",
+                            code: cluster_spec.icon_unicode,
+                            color: cluster_spec.color,
                             size: cluster_spec.size
                         }
                     },
@@ -149,10 +142,6 @@
 
 
         function updateNetwork(additional_data, starting_node_id) {
-            if (additional_data !== right_journal[0]) {
-                right_journal = []
-                $("#redo-button").addClass("disabled")
-            }
             switch (additional_data.type) {
                 case "add":
                     var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
@@ -174,24 +163,14 @@
                         })
                     }
                     applyJournalEvent(data)
-                    UI.animate()
                     break
-                case "subtract":
+                default:
                     journal.push(additional_data)
                     applyJournalEvent(additional_data)
-                    UI.animate()
-                    break
-                case "collapse":
-                    journal.push(additional_data)
-                    applyJournalEvent(additional_data)
-                    UI.animate()
-                    break
-                case "expand":
-                    journal.push(additional_data)
-                    applyJournalEvent(additional_data)
-                    UI.animate()
                     break
             }
+            UI.animate()
+            UI.updateButtonStates()
         }
 
 
@@ -208,6 +187,17 @@
                     edge_data_set.remove(edge_ids_to_remove)
                     break
                 case "collapse":
+                    event.joinCondition = function(node_props) {
+                        return _.contains(this.node_ids, node_props.id)
+                    },
+                    event.processProperties = function (cluster_node, child_nodes, child_edges) {
+                        cluster_node['child_nodes'] = child_nodes
+                        cluster_node['child_edges'] = child_edges
+                        cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
+                        cluster_node.id = this.id
+                        cluster_node.label = this.name
+                        return cluster_node
+                    }
                     network.clustering.cluster(event)
                     break
                 case "expand":
@@ -217,7 +207,8 @@
         }
 
 
-        function invertJournalEvent(event) {
+        function invertJournalEvent(initial_event) {
+            var event = copy(initial_event)
             switch (event.type) {
                 case "add":
                     event.type = "subtract"
@@ -240,20 +231,27 @@
                 var to_remove = journal.pop()
                 right_journal.unshift(to_remove)
                 applyJournalEvent(invertJournalEvent(to_remove))
-                $("#redo-button").removeClass("disabled")
                 UI.animate()
             }
-            if (journal.length == 0) { $("#undo-button").addClass("disabled") }
+            UI.updateButtonStates()
         }
 
 
         function redoUpdateNetwork() {
             if (right_journal.length > 0) {
-                updateNetwork(invertJournalEvent(right_journal[0]))  // do not alter the right journal until updateNetwork can compare. Needed to disable redo button when forking the path.
-                right_journal.shift()
+                updateNetwork(right_journal.shift())
             }
-            if (right_journal.length == 0) { $("#redo-button").addClass("disabled") }
-            if (journal.length > 0) { $("#undo-button").removeClass("disabled") }
+            UI.updateButtonStates()
+        }
+
+
+        function undoAll() {
+            while (journal.length > 0) { undoUpdateNetwork() }
+        }
+
+
+        function redoAll() {
+            while (right_journal.length > 0) { redoUpdateNetwork() }
         }
 
 
@@ -264,16 +262,18 @@
                 
                 n['queries'] = getRelevantQueries(n)  
 
-                // TODO: should test for 'is_relevant' in 'saved_queries' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
-                
                 node_spec = _.find(saved_icons, function(i){return i.is_relevant(n)})
+                default_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
                     n['icon'] = {
-                        color : UI.selectedColor(),
-                        code : node_spec.icon_unicode,
-                        size : getOrElse(node_spec.size, 30)
+                        color : getOrElse(node_spec.color, UI.selectedColor()),
+                        code : getOrElse(node_spec.icon_unicode, default_spec.icon_unicode),
+                        size : getOrElse(node_spec.size, default_spec.size),
                     }
                 }
+
+                // CONSIDER: should test for 'is_relevant' in 'saved_queries' and 'saved_icons' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+
 
                 translateAllEnums(n)
                 n["label"] = makeNodeLabel(n)
@@ -346,15 +346,12 @@
         }
 
 
-        function getOrElse(value, _) {
-            var args = Array.prototype.slice.call(arguments);
-            for (var i = 0; i < args.length; i++) {
-                var arg = args[i];
-                if(typeof arg != "undefined" && arg != null && !isNaN(arg)) {
-                    return arg;
-                }
+        function getOrElse(value, alternate) {
+            if (typeof value != "undefined" && value != null) {
+                return value
+            } else {
+                return alternate
             }
-            return null;
         }
 
 
@@ -428,7 +425,6 @@
             queryClick : function() {
                 $('#query-string').css("background-color", "white")
                 var query_string = document.getElementById('query-string').value
-                // var color = $("#query-color").value
                 var formatAndUpdate = _.compose(updateNetwork, formatAllData)
                 execQuery(query_string, formatAndUpdate)
             },
@@ -476,6 +472,19 @@
                     $("#animate-button").removeClass("ion-ios-pause").addClass("ion-ios-play")
                     $("#animate-button").click(function(){ UI.animateButton(true) })
                 }
+            },
+            updateButtonStates : function() {
+                if (journal.length == 0) { $("#undo-button").addClass("disabled") } 
+                else { $("#undo-button").removeClass("disabled") }
+                
+                if (journal.length < 2) { $("#undo-all-button").addClass("disabled") } 
+                else { $("#undo-all-button").removeClass("disabled") }
+
+                if (right_journal.length == 0) { $("#redo-button").addClass("disabled") }
+                else { $("#redo-button").removeClass("disabled") }
+                
+                if (right_journal.length < 2) { $("#redo-all-button").addClass("disabled") }
+                else { $("#redo-all-button").removeClass("disabled") }
             },
             networkDoubleClickBehavior : function(props) {
                 if (props.nodes.length === 1 && network.isCluster(props.nodes[0])) {
@@ -579,10 +588,10 @@
                 var new_x  = (e.pageX < coords.x) ? (coords.x - width) : coords.x
                 var new_y  = (e.pageY < coords.y) ? (coords.y - height) : coords.y
                 $('#node-selection-box').css({
-                  'width': width,
-                  'height': height,
-                  'top': new_y,
-                  'left': new_x
+                    width: width,
+                    height: height,
+                    top: new_y,
+                    left: new_x
                 })
             },
             deleteSelectedNodes : function() {
@@ -608,7 +617,7 @@
             },
             draw : function(data) {
                 var container = document.getElementById('graph')
-                node_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
+                default_node_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
                 var options = {
                     interaction : { 
                         hover: true,
@@ -642,8 +651,8 @@
                         shape: 'icon',
                         icon: {
                             face: 'Ionicons',
-                            code: node_spec.icon_unicode, //'\uf3a6',
-                            size: node_spec.size, // 30,
+                            code: default_node_spec.icon_unicode,
+                            size: default_node_spec.size,
                             color: default_node_color
                         }
                     },
@@ -681,12 +690,35 @@
             }
         }
 
+
         function downloadJournal() {
-            var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
-            var dlAnchorElem = document.getElementById('downloadAnchorElem')
-            dlAnchorElem.setAttribute("href", dataStr)
-            dlAnchorElem.setAttribute("download", "history.json")
-            dlAnchorElem.click()
+            var data_str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
+            var anchor = document.getElementById('download-anchor')
+            anchor.setAttribute("href", data_str)
+            anchor.setAttribute("download", "history.json")
+            anchor.click()
+            $("#download-button").addClass("ion-checkmark-round").removeClass("ion-ios-cloud-download-outline")
+            setTimeout(function(){
+                $("#download-button").addClass("ion-ios-cloud-download-outline").removeClass("ion-checkmark-round")
+            }, 2000)
+        }
+
+
+        function uploadFile(event) {
+            var files = event.target.files
+            _.map(files, function(f){
+                if (f.type === "application/json") {
+                    var reader = new FileReader()
+                    reader.onload = function(e) {
+                        var data = JSON.parse(e.target.result)
+                        right_journal = right_journal.concat(data)
+                        UI.updateButtonStates()
+                    }
+                    reader.readAsText(f)
+                } else {
+                    UI.failHandler()
+                }
+            })
         }
 
 
@@ -702,11 +734,7 @@
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
             document.getElementById("query-color").jscolor.value = default_node_color
-            $("#dropzone").on("complete", function(one, two) {
-                console.log(one)
-                console.log(two)
-            })
-            
+            document.getElementById('choose-upload').addEventListener('change', uploadFile, false);
         })
     </script>
 
@@ -734,11 +762,6 @@
         .show ul { margin: 0px; padding: 0px; }
         .show li { list-style: none; padding-bottom: 1em; }
         .show ul li:last-child { padding-bottom: 0em; }
-        .large.icon { 
-            color: gray; 
-            margin-left: 0.5em;
-            margin-right: 0;
-        }
 
         .loader {
             border: .2em solid #f3f3f3;
@@ -780,25 +803,9 @@
         .disabled {
             color: lightgray;
         }
-        #upload-box {
-            left: 50%;
-            top: 50%;
-            width: 400px;
-            margin-left: -200px;
-            height: 300px;
-            margin-top: -150px;
-            background-color: yellow;
-            position: absolute;
-            z-index: 20;
-            display: none;
-        }
-        #upload-box form {
-            width: 100%; 
-            height: 100%; 
-            position: absolute;
-        }
-        #download-button, #upload-button {
-            display: none;
+        .ion-checkmark-round {
+            width: 21px;
+            color: green;
         }
 
     </style>
@@ -808,15 +815,15 @@
         <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
         <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2>
         <button id="query-button" onclick="UI.queryClick()">Query</button>
-        <i class="ion-ios-skipbackward" id="undo-button" onclick="undoUpdateNetwork()"></i>
+        <i class="ion-ios-rewind disabled" id="undo-all-button" onclick="undoAll()"></i>
+        <i class="ion-ios-skipbackward disabled" id="undo-button" onclick="undoUpdateNetwork()"></i>
         <i class="ion-ios-play" id="animate-button"></i>
         <i class="ion-ios-skipforward disabled" id="redo-button" onclick="redoUpdateNetwork()"></i>
-        <a id="downloadAnchorElem" style="display:none"></a>
+        <i class="ion-ios-fastforward disabled" id="redo-all-button" onclick="redoAll()"></i>
         <i class="ion-ios-cloud-download-outline" id="download-button" onclick="downloadJournal()"></i>
-        <i class="ion-ios-cloud-upload-outline" id="upload-button" onclick="""></i>
-    </div>
-    <div id="upload-box">
-        <form action="/echo" class="dropzone" id="dropzone"></form>
+        <i class="ion-ios-cloud-upload-outline" id="upload-button" onclick="document.getElementById('choose-upload').click()"></i>
+        <a id="download-anchor" style="display:none"></a>
+        <input type="file" id="choose-upload" name="files[]" style="display: none;" multiple />
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>
