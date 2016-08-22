@@ -1,0 +1,87 @@
+
+# for gcc4.9:  sudo apt-get install g++-4.9-multilib libc6-dev-i386 libx32gcc-4.9-dev
+
+(cd TransparentComputing/malware/cross-platform/simple-apt/simple && python cmake.py build && cp -p bin/linux/release/x64/simple /tmp/)
+
+diff --git a/malware/cross-platform/simple-apt/simple/src/main.c b/malware/cross-platform/simple-apt/simple/src/main.c
+index e75ce45..31117cf 100644
+--- a/malware/cross-platform/simple-apt/simple/src/main.c
++++ b/malware/cross-platform/simple-apt/simple/src/main.c
+@@ -19,6 +19,7 @@
+ #include "loader.h"
+ #include "simple.pb.h"
+ #include "simple.h"
++#include "tc_marker.h"
+ 
+ // Display usage string
+ void usage()
+@@ -114,7 +115,8 @@ int main(int argc, char* argv[])
+         msgNum = 0;
+ 
+         // Check for a complete message ready to be processed.
+-        msgType = msg_getReadyMessage(&pMsgData, &msgDataSize, &msgNum);
++        TC_MARK_VOID(4, \
++        msgType = msg_getReadyMessage(&pMsgData, &msgDataSize, &msgNum););
+ 
+         if (msgDataSize <= 0 || !pMsgData)
+         {
+diff --git a/malware/cross-platform/simple-apt/simple/src/msg.c b/malware/cross-platform/simple-apt/simple/src/msg.c
+index a1c83ae..e6a9e4b 100644
+--- a/malware/cross-platform/simple-apt/simple/src/msg.c
++++ b/malware/cross-platform/simple-apt/simple/src/msg.c
+@@ -9,6 +9,7 @@
+ #include "msg.h"
+ #include "file.h"
+ #include "shell.h"
++#include "tc_marker.h"
+ 
+ #ifndef WINDOWS
+ #include <sys/utsname.h>
+@@ -83,7 +84,7 @@ int msg_init(const char *ip, int port)
+ 	strcpy(newConnInfo.osInfo, osInfo.szCSDVersion);
+ 
+ #else
+-    uname(&osInfo);
++    TC_MARK_VOID(5, uname(&osInfo));
+ 	strcpy(newConnInfo.osName, osInfo.sysname);
+     strcpy(newConnInfo.osVersion, osInfo.version);
+     strcpy(newConnInfo.osInfo, osInfo.release);
+diff --git a/malware/cross-platform/simple-apt/simple/src/tcp.c b/malware/cross-platform/simple-apt/simple/src/tcp.c
+index 5d3a9e8..1d6ef2b 100644
+--- a/malware/cross-platform/simple-apt/simple/src/tcp.c
++++ b/malware/cross-platform/simple-apt/simple/src/tcp.c
+@@ -11,6 +11,7 @@
+ 
+ #include <stdio.h>
+ #include <assert.h>
++#include "tc_marker.h"
+ 
+ 
+ void tcp_init()
+@@ -45,7 +46,7 @@ int tcp_initSession(const char *ip, unsigned short port)
+ #ifdef WINDOWS
+ 	return tcp_windows_initSession(ip, port);
+ #elif NIX
+-	return tcp_linux_initSession(ip, port);
++	TC_MARK_RETURN(1, tcp_linux_initSession(ip, port));
+ #else
+ 	assert(0);
+ 	return -1;
+@@ -60,7 +61,7 @@ int tcp_startSession()
+ #ifdef WINDOWS
+ 	return tcp_windows_startSession();
+ #elif NIX
+-	return tcp_linux_startSession();
++	TC_MARK_RETURN(2, tcp_linux_startSession());
+ #else
+ 	assert(0);
+ 	return -1;
+@@ -88,7 +89,7 @@ void tcp_endSession()
+ #ifdef WINDOWS
+ 	tcp_windows_endSession();
+ #elif NIX
+-	tcp_linux_endSession();
++	TC_MARK_VOID(3, tcp_linux_endSession());
+ #else
+ 	assert(0);
+ #endif

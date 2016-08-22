@@ -44,7 +44,7 @@ class Escalation(Detector):
         return 'privilege_escalation'
 
     def finds_feature(self, event):
-        return is_escalation(event)
+        return self.is_escalation(event)
 
     def is_escalation(self, event):
         assert event['vertexType'][0]['value'] == 'unitOfExecution', event

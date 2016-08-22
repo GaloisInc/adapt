@@ -1,8 +1,41 @@
 Sent 4898 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f0675fb05f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.28user 0.03system 4:43.49elapsed 0%CPU (0avgtext+0avgdata 25796maxresident)k
+0inputs+24outputs (0major+8152minor)pagefaults 0swaps
+
+2016-08-10 20:34:12,634 INFO Fetched 0 base nodes.
+2016-08-10 20:34:12,634 INFO Inserted 0 activity classifications.
+0.62user 0.03system 0:05.42elapsed 12%CPU (0avgtext+0avgdata 32492maxresident)k
+0inputs+0outputs (0major+10601minor)pagefaults 0swaps
+
+    16  segment:edge
     32  EDGE_NETFLOW_AFFECTS_EVENT
     32  EDGE_NETFLOW_AFFECTS_EVENT in
     32  EDGE_NETFLOW_AFFECTS_EVENT out
     32  Entity-NetFlow
+    56  Segment
    128  EDGE_EVENT_AFFECTS_FILE
    128  EDGE_EVENT_AFFECTS_FILE in
    128  EDGE_EVENT_AFFECTS_FILE out
@@ -27,7 +60,8 @@ Sent 4898 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    709  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
    709  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    765  Subject
- 10276  total
+  2429  segment:includes
+ 12777  total
 
 
 agent
@@ -279,6 +313,9 @@ memory
  141  269  InstrumentationSource.LINUX_THEIA
 
 netflow
+   1   32  0.0.0.0
+   2   32  AS0  unknown
+   3   32  InstrumentationSource.LINUX_THEIA
 
 resource
 

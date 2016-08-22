@@ -22,8 +22,6 @@
 # the software.
 #
 
-import os
-
 __author__ = 'John.Hanley@parc.com'
 
 
@@ -45,22 +43,39 @@ class Detector:
         default = 0.1
         return default
 
-    def insert_activity_classification(self, base_node_id, seg_id):
-        cmds = ["act = graph.addVertex(label, 'Activity',"
-                "  'activity:type', '%s',"
-                "  'activity:suspicionScore', %f)" % (
-                    self.name_of_output_classification(),
-                    self.activity_suspicion_score())]
-        cmds.append("g.V().has('segment:name', '%s').next()"
-                    ".addEdge('segment:includes', act)" % seg_id)
-        cmds.append("act.addEdge('activity:includes',"
-                    " g.V().has('ident', '%s').next())" % base_node_id)
-        self.gremlin.fetch_data(';  '.join(cmds))
+    def optional_marker_type(self, activity):
+        if len(activity) == 2:
+            return ''
+        return " 'activity:markerType', %d, " % activity[2]
 
-    def fetch1(self, query):
-        '''Return a single query result.'''
-        ret = 0
-        for msg in self.gremlin.fetch(query):
-            for item in msg.data:
-                ret = item
-        return ret
+    def find_activities(self, seg_id, seg_props):
+        activities = []
+        for prop in seg_props:
+            try:
+                property = prop[self.name_of_input_property()][0]
+            except KeyError:
+                continue  # We don't have an input to offer this detector.
+            property = property.strip('"')  # THEIA says "/tmp", not /tmp.
+            if self.finds_feature(property):
+                ident = prop['ident'][0]
+                classification = self.name_of_output_classification()
+                activities.append((ident, classification))
+        return activities
+
+    def insert_activity_classifications(self, seg_id, activities, debug=False):
+        seg_id = 0 + seg_id  # An integer, please, it's no longer sNNN.
+        for activity in activities:
+            base_node_ident, classification = activity[:2]
+            cmds = ["act = graph.addVertex(label, 'Activity',"
+                    "  'activity:type', '%s', %s"
+                    "  'activity:suspicionScore', %f)" % (
+                        classification,
+                        self.optional_marker_type(activity),
+                        self.activity_suspicion_score())]
+            cmds.append("g.V(%d).hasLabel('Segment').next()"
+                        ".addEdge('segment:includes', act)" % seg_id)
+            cmds.append("act.addEdge('activity:includes',"
+                        " g.V().has('ident', '%s').next())" % base_node_ident)
+            if debug:
+                print('\n'.join(cmds))
+            self.gremlin.fetch_data(';  '.join(cmds))
