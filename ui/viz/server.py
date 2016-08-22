@@ -47,11 +47,6 @@ def log():
 	return render_template('flask.log')
 
 
-@app.route("/echo", methods=["POST"])
-def echo():
-	return request.files['file'].read()
-
-
 log_handler = FileHandler(os.path.expanduser('~/adapt/ui/viz/templates/flask.log'), "w")  # https://docs.python.org/dev/library/logging.handlers.html#logging.FileHandler
 log_handler.setLevel(logging.INFO)
 app.logger.addHandler(log_handler)
