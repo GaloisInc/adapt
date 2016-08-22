@@ -587,9 +587,11 @@
             },
             deleteSelectedNodes : function() {
                 var node_ids = network.getSelectedNodes()
-                var nodes = node_data_set.get(node_ids)
-                var journal_event = { type: "subtract", nodes: nodes, edges: [] }
-                updateNetwork(journal_event)
+                if ( ! _.isEmpty(node_ids)) {
+                    var nodes = node_data_set.get(node_ids)
+                    var journal_event = { type: "subtract", nodes: nodes, edges: [] }
+                    updateNetwork(journal_event)
+                }
             },
             colorNodes : function(node_ids, color_string) {
                 node_data_set.update(
@@ -692,7 +694,7 @@
             document.getElementById("node-query-menu").className = "hide"
         })
         $(document).bind("keydown", function(event) { 
-            if (event.keyCode == 8 || event.keyCode == 46) {
+            if (event.keyCode == 8 || event.keyCode == 46 && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()
             }
         })
