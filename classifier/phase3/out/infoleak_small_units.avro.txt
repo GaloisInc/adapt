@@ -1,4 +1,29 @@
 Sent 3764 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+INFO:kafka.producer.kafka:Kafka producer closed
+0.29user 0.02system 8:49.30elapsed 0%CPU (0avgtext+0avgdata 25920maxresident)k
+0inputs+24outputs (0major+8143minor)pagefaults 0swaps
+
+2016-08-10 20:27:40,943 INFO Fetched 734 base nodes.
+2016-08-10 20:27:40,944 INFO Inserted 138 activity classifications.
+1.08user 0.05system 0:11.66elapsed 9%CPU (0avgtext+0avgdata 32688maxresident)k
+0inputs+0outputs (0major+16465minor)pagefaults 0swaps
+
      2  EDGE_EVENT_AFFECTS_SRCSINK
      2  EDGE_EVENT_AFFECTS_SRCSINK in
      2  EDGE_EVENT_AFFECTS_SRCSINK out
@@ -16,6 +41,7 @@ Sent 3764 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
     56  EDGE_EVENT_AFFECTS_MEMORY in
     56  EDGE_EVENT_AFFECTS_MEMORY out
     82  Entity-Memory
+    88  segment:edge
     89  EDGE_OBJECT_PREV_VERSION
     89  EDGE_OBJECT_PREV_VERSION in
     89  EDGE_OBJECT_PREV_VERSION out
@@ -23,9 +49,12 @@ Sent 3764 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    112  EDGE_SUBJECT_HASLOCALPRINCIPAL
    112  EDGE_SUBJECT_HASLOCALPRINCIPAL in
    112  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+   112  Segment
    121  EDGE_EVENT_AFFECTS_FILE
    121  EDGE_EVENT_AFFECTS_FILE in
    121  EDGE_EVENT_AFFECTS_FILE out
+   138  Activity
+   138  activity:includes
    324  Entity-File
    750  EDGE_FILE_AFFECTS_EVENT
    750  EDGE_FILE_AFFECTS_EVENT in
@@ -34,20 +63,17 @@ Sent 3764 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    968  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
    968  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   1080  Subject
-  8078  total
+  2437  segment:includes
+ 10991  total
 
 
 agent
    1   26  InstrumentationSource.LINUX_AUDIT_TRACE
    2   86  InstrumentationSource.LINUX_BEEP_TRACE
-   3    5  egid_0
-   4  107  egid_1003
-   5   11  euid_0
-   6  101  euid_1003
-   7    5  gid_0
-   8  107  gid_1003
-   9    9  userID_0
-  10  103  userID_1003
+   3    5  gid_0
+   4  107  gid_1003
+   5    9  userID_0
+   6  103  userID_1003
 
 file
    1  324  InstrumentationSource.LINUX_AUDIT_TRACE

@@ -1,7 +1,38 @@
 Sent 5167 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fc03faf2630>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+AttributeError: 'NoneType' object has no attribute 'info'
+0.29user 0.03system 8:27.95elapsed 0%CPU (0avgtext+0avgdata 25908maxresident)k
+504inputs+24outputs (0major+8160minor)pagefaults 0swaps
+
+2016-08-11 08:11:26,850 INFO Fetched 0 base nodes.
+2016-08-11 08:11:26,850 INFO Inserted 0 activity classifications.
+0.69user 0.03system 0:05.50elapsed 13%CPU (0avgtext+0avgdata 32160maxresident)k
+0inputs+0outputs (0major+10605minor)pagefaults 0swaps
+
+    34  segment:edge
     38  EDGE_EVENT_AFFECTS_FILE
     38  EDGE_EVENT_AFFECTS_FILE in
     38  EDGE_EVENT_AFFECTS_FILE out
+    74  Segment
    119  EDGE_EVENT_AFFECTS_SUBJECT
    119  EDGE_EVENT_AFFECTS_SUBJECT in
    119  EDGE_EVENT_AFFECTS_SUBJECT out
@@ -23,7 +54,8 @@ Sent 5167 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
    640  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    714  Subject
    838  Entity-File
- 10731  total
+  1986  segment:includes
+ 12825  total
 
 
 agent

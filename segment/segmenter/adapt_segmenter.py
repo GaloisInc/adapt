@@ -119,21 +119,21 @@ graph.addVertex(label,'segment',\
 		query to Titan that retrieves all the nodes that have 
 		a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s')" % self.params
+		query="g.V().has('%(criterion)s',gte(0))" % self.params
 		return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
 		'''
 		query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s').count()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).count()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getVerticesWithPropertyIds(self):
 		'''
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s').id().fold().next()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).id().fold().next()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getSubgraphFromVertexId(self,vertexId):
