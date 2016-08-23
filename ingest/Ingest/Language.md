@@ -1095,6 +1095,13 @@ This property specifies the string type of an Activity instance, which shall app
 [schema]: #
 makePropertyKey('activity:type').dataType(String.class).cardinality(Cardinality.SINGLE)
 
+activity:markerType (not in CDM)
+-----------
+This property specifies the integer marker type of a marker begin / end Activity instance.
+
+[schema]: #
+makePropertyKey('activity:markerType').dataType(Integer.class).cardinality(Cardinality.SINGLE)
+
 activity:suspicionScore (not in CDM)
 -----------
 This property specifies a value from 0 (benign) to 1 (evil).
