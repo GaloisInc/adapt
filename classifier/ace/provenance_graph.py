@@ -18,8 +18,11 @@ class ProvenanceGraph(object):
     def close(self):
         self.titanClient.close()
 
-    def createActivity(self, segmentId, name):
-        query  = "node = graph.addVertex(label, 'Activity', 'activity:type', '{}'); edge = node.addEdge('activity:includes', g.V({}).next()); node".format(name, segmentId)
+    def createActivity(self, segmentId, name, suspicionScore = 0):
+        query  = ("segmentNode = g.V({}).next();"
+                  "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
+                  "edge = segmentNode.addEdge('activity:includes', activityNode);"
+                  "activityNode").format(segmentId, name, suspicionScore)
         node = self.titanClient.execute(query)
 
         return node[0]
@@ -63,17 +66,14 @@ class ProvenanceGraph(object):
         result = []
 
         for segmentId in segmentIds:
-            query = "g.V({}).in('activity:includes')".format(segmentId)
+            query = "g.V({}).out('activity:includes')".format(segmentId)
             node = self.titanClient.execute(query)
             result.append(node[0]['properties']['activity:type'][0]['value'])
 
         return result
 
-    def getSegmentActivities(self):
-        pass
-
     def getUnclassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(__.not(inE('activity:includes')))"
+        query = "g.V().hasLabel('Segment').where(__.not(outE('activity:includes')))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
@@ -91,7 +91,7 @@ class ProvenanceGraph(object):
             yield(nodeId, G)
 
     def getClassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(inE('activity:includes'))"
+        query = "g.V().hasLabel('Segment').where(outE('activity:includes'))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
