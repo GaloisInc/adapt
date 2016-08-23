@@ -13,7 +13,7 @@
 
     <script type="text/javascript">
         var node_data_set, edge_data_set, network;
-        // saved_queries and saved_icons are loaded externally from ui_language.js
+        // saved_queries and saved_nodes are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
@@ -22,6 +22,7 @@
 
         function execQuery(query_object, success_function) {
             right_journal = []
+            UI.updateButtonStates()
             if (query_object.name === "Collapse Nodes (selected)") {
                 makeCluster()
                 return true
@@ -29,7 +30,8 @@
             UI.loadingUIStart()
             var query_string;
             if (typeof query_object === "string") {
-                query_string = query_object + ".dedup()"
+                append_str = query_object.split(";").slice(-1)[0].trim().substring(0,2) == "g." ? ".dedup()" : ""
+                query_string = query_object + append_str
                 query_object = { "is_collapsed" : false }
             } else {
                 query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
@@ -95,7 +97,7 @@
 
         function makeCluster(){
             function getClusteringData(node_ids, cluster_node_id, name) { 
-                var cluster_spec = _.find(saved_icons, function(n){return n.name.toLowerCase() === "cluster"})
+                var cluster_spec = _.find(saved_nodes, function(n){return n.name.toLowerCase() === "cluster"})
                 return {
                     type : "collapse",
                     node_ids : node_ids,
@@ -208,6 +210,8 @@
                 case "expand":
                     network.openCluster(event.id)
                     break
+                case "checkpoint":
+                    break
             }
         }
 
@@ -226,6 +230,8 @@
                     return event
                 case "expand":
                     event.type = "collapse"
+                    return event
+                case "checkpoint":
                     return event
             }
         }
@@ -251,13 +257,34 @@
         }
 
 
-        function undoAll() {
-            while (journal.length > 0) { undoUpdateNetwork() }
+        function addCheckpoint() {
+            var name = prompt("Name your checkpoint:")
+            if (! _.isEmpty(name)) {
+                var journal_event = {
+                    name : name,
+                    type : "checkpoint"
+                }
+                journal.push(journal_event)
+                UI.checkpointFeedback()
+            }
         }
 
 
-        function redoAll() {
-            while (right_journal.length > 0) { redoUpdateNetwork() }
+        function undoMany() {
+            while (journal.length > 0) {
+                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
+                undoUpdateNetwork()
+                if (is_checkpoint) { break }
+            }
+        }
+
+
+        function redoMany() {
+            while (right_journal.length > 0) {
+                var is_checkpoint = right_journal[0].type === "checkpoint"
+                redoUpdateNetwork()
+                if (is_checkpoint) { break }
+            }
         }
 
 
@@ -268,8 +295,8 @@
                 
                 n['queries'] = getRelevantQueries(n)  
 
-                node_spec = _.find(saved_icons, function(i){return i.is_relevant(n)})
-                default_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
+                node_spec = _.find(saved_nodes, function(i){return i.is_relevant(n)})
+                default_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
                     n['icon'] = {
                         color : getOrElse(node_spec.color, UI.selectedColor()),
@@ -278,11 +305,11 @@
                     }
                 }
 
-                // CONSIDER: should test for 'is_relevant' in 'saved_queries' and 'saved_icons' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+                // CONSIDER: should test for 'is_relevant' in 'saved_queries' and 'saved_nodes' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
 
 
                 translateAllEnums(n)
-                n["label"] = makeNodeLabel(n)
+                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n
@@ -383,41 +410,6 @@
         }
         
 
-        function makeNodeLabel(node) {
-            switch(node['label']) {
-                case "Subject":
-                    var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-                    var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
-                    var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-                    switch(t) {
-                        case "Process":
-                            return t + " " + pid
-                        case "Thread":
-                            return t + " of " + pid
-                        case "Event":
-                            if (e === "Write" || e === "Read") {
-                                return t + " " + e + " (" + node['properties']['size'][0]['value'] + ")" 
-                            } else { return t + " " + e }
-                        default:
-                            return t
-                    }
-                case "Entity-File":
-                    var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-                    var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-                    return "File " + url + " : " + file_version
-                case "Entity-NetFlow":
-                    var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
-                    var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-                    return "Net " + dest + " : " + port
-                case "Agent":
-                    var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
-                    return at + " Agent, uid " + node['properties']['userID'][0]['value']
-                default:
-                    return node['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
-            }
-        }
-
-
         function makeNodeTitle(node) {
             var keys = Object.keys(node['properties'])
             var prop_lines = _.map(keys, function(key, i, list) {
@@ -491,6 +483,12 @@
                 
                 if (right_journal.length < 2) { $("#redo-all-button").addClass("disabled") }
                 else { $("#redo-all-button").removeClass("disabled") }
+            },
+            checkpointFeedback : function() {
+                $("#checkpoint-button").addClass("ion-ios-location").removeClass("ion-ios-location-outline")
+                setTimeout(function(){
+                    $("#checkpoint-button").addClass("ion-ios-location-outline").removeClass("ion-ios-location")
+                }, 2000)
             },
             networkDoubleClickBehavior : function(props) {
                 if (props.nodes.length === 1 && network.isCluster(props.nodes[0])) {
@@ -623,7 +621,7 @@
             },
             draw : function(data) {
                 var container = document.getElementById('graph')
-                default_node_spec = _.find(saved_icons, function(i){return i.name.toLowerCase() === "default"})
+                default_node_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
                 var options = {
                     interaction : { 
                         hover: true,
@@ -686,6 +684,9 @@
                 network.on("deselectNode", function(props) {
                     if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
                 })
+                network.on("hold", function(props) {
+                    console.log(props)
+                })
                 network.on("dragEnd", function(props){
                     if (UI.drawing) { UI.endDrawSelection(props) }
                 })
@@ -733,6 +734,49 @@
         }
 
 
+        function createSavedQueries() {
+            var arg_idx = 0
+            _.map(starting_queries, function(q){
+                var replacement_indices = []
+                var replaced_query_string = q.base_query
+                _.map(q.default_values, function(v){
+                    var val = String(v)
+                    idx = replaced_query_string.indexOf("{_}")
+                    if (idx >= 0) {
+                        replacement_indices.push({pos: idx, len: val.length})
+                        replaced_query_string = replaced_query_string.slice(0,idx) + val + replaced_query_string.slice(idx+3)
+                    }
+                })
+                highlight_points.push(replacement_indices)
+                var query_item = '<option value="'+replaced_query_string+'">'+ q.name + '</option>'
+                arg_idx++
+                $("#starting-queries").append(query_item)
+            })
+        }
+
+        function setSelectedQuery(e) {
+            var input = e.target
+            var list = input.getAttribute('list')
+            var options = document.getElementById(list).childNodes
+            for(var i = 0; i < options.length; i++) {
+                if(options[i].value === input.value) {
+                    original_query_string_length = input.value.length
+                    highlight_coords = { row: i, col: 0 }
+                    var pos = highlight_points[highlight_coords.row][highlight_coords.col]
+                    if (typeof pos !== "undefined") {
+                        input.setSelectionRange(pos.pos, pos.pos + pos.len) 
+                        highlight_coords.col = highlight_coords.col + 1
+                    }
+                    break;
+                }
+            }
+        }
+
+        var highlight_points = []
+        var highlight_coords = {row: 0, col: 0}
+        var original_query_string_length = 0
+
+
         $(document).bind("click", function(event) {
             document.getElementById("node-query-menu").className = "hide"
         })
@@ -740,12 +784,24 @@
             if (event.keyCode == 8 || event.keyCode == 46 && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()
             }
+            // TAB key for highlighting positions in queries.
+            if (event.keyCode == 9 && $("#query-string").is(':focus') && highlight_coords.col < highlight_points[highlight_coords.row].length) {
+                event.preventDefault()
+                var pos = highlight_points[highlight_coords.row][highlight_coords.col]
+                var input = document.getElementById("query-string")
+                var position_change = input.value.length - original_query_string_length
+                input.setSelectionRange(pos.pos + position_change, pos.pos + pos.len + position_change)
+                highlight_coords.col = highlight_coords.col + 1
+            }
         })
         $(function(){
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
             document.getElementById("query-color").jscolor.value = default_node_color
             document.getElementById('choose-upload').addEventListener('change', uploadFile, false);
+            
+            createSavedQueries()
+            document.querySelector('input[list="starting-queries"]').addEventListener('input', setSelectedQuery)
         })
     </script>
 
@@ -801,7 +857,7 @@
         i {
             font-size: 1.5em;
             color: gray;
-            margin-left: 1.5em;
+            margin-left: 1.3em;
             display: block;
             float: left;
         }
@@ -818,27 +874,31 @@
             width: 21px;
             color: green;
         }
+        .ion-ios-location { color: green; }
+
 
     </style>
 </head>
 <body>
     <div style="display: block;">
-        <input class="ui" id="query-string" value="g.V().limit(10)" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
-        <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2>
-        <button id="query-button" onclick="UI.queryClick()">Query</button>
-        <i class="ion-ios-rewind disabled" id="undo-all-button" onclick="undoAll()"></i>
-        <i class="ion-ios-skipbackward disabled" id="undo-button" onclick="undoUpdateNetwork()"></i>
-        <i class="ion-ios-play" id="animate-button"></i>
-        <i class="ion-ios-skipforward disabled" id="redo-button" onclick="redoUpdateNetwork()"></i>
-        <i class="ion-ios-fastforward disabled" id="redo-all-button" onclick="redoAll()"></i>
-        <i class="ion-ios-cloud-download-outline" id="download-button" onclick="downloadJournal()"></i>
-        <i class="ion-ios-cloud-upload-outline" id="upload-button" onclick="document.getElementById('choose-upload').click()"></i>
-        <a id="download-anchor" style="display:none"></a>
-        <input type="file" id="choose-upload" name="files[]" style="display: none;" multiple />
+        <input id="query-string" list="starting-queries" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
+        <datalist id="starting-queries"></datalist>
+        <button id="query-button" title="Add nodes found with the entered query to the existing graph" onclick="UI.queryClick()">Query</button>
+        <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2 title="Choose the color for the next added nodes" >
+        <i class="ion-ios-rewind disabled" id="undo-all-button" title="Undo until previous checkpoint" onclick="undoMany()"></i>
+        <i class="ion-ios-skipbackward disabled" id="undo-button" title="Undo previous change" onclick="undoUpdateNetwork()"></i>
+        <i class="ion-ios-play" id="animate-button" title="Animate graph until you press again to pause" ></i>
+        <i class="ion-ios-skipforward disabled" id="redo-button" title="Redo or apply next change" onclick="redoUpdateNetwork()"></i>
+        <i class="ion-ios-fastforward disabled" id="redo-all-button" title="Redo until next checkpoint" onclick="redoMany()"></i>
+        <i class="ion-ios-location-outline" id="checkpoint-button" title="Create a checkpoint" onclick="addCheckpoint()"></i>
+        <i class="ion-ios-cloud-download-outline" id="download-button" title="Download the history log up to this point" onclick="downloadJournal()"></i>
+        <i class="ion-ios-cloud-upload-outline" id="upload-button" title="Upload a history log to be replayed through Redo" onclick="document.getElementById('choose-upload').click()"></i>
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
     <div id="node-selection-box" style="display: none;"></div>
+    <a id="download-anchor" style="display:none"></a>
+    <input type="file" id="choose-upload" name="files[]" style="display: none;" multiple />
 </body>
 </html>
