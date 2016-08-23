@@ -16,7 +16,7 @@ import asyncio
 import kafka
 import time
 sys.path.append(os.path.expanduser('~/adapt/pylib'))
-from bareBonesTitanDB import BareBonesTitanClient as tclient
+from titanDB import TitanClient as tclient
 
 
 property_segmentNodeName='segment:name'
