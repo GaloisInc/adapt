@@ -98,9 +98,22 @@ makeNodeIndex('byParentId','segment:parentId',false,Integer.class)
 makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
 makeNodeIndex('byEventType', 'eventType', false, Short.class)
 
+<<<<<<< HEAD
+makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
+makeNodeIndex('byEventType', 'eventType', false, Short.class)
+=======
+makeNodeIndex('byUrlExact','url',false,String.class)
+makeNodeIndex('byDstPort','dstPort',false,Integer.class)
+makeNodeIndex('bySrcPort','srcPort',false,Integer.class)
+makeNodeIndex('bySrcAddressExact','srcAddress',false,String.class)
+makeNodeIndex('byDstAddressExact','dstAddress',false,String.class)
+>>>>>>> master
+
 // URL index use ElasticSearch which provides richer queries
 // including regex
 makeElasticSearchIndex('byURL','url',String.class)
+makeElasticSearchIndex('bySrcAddress','srcAddress',String.class)
+makeElasticSearchIndex('byDstAddress','dstAddress',String.class)
 
 // index PIDs and timestamps for numeric queries
 makeNumericSearchIndex('byPID','pid',Integer.class)
