@@ -1,4 +1,34 @@
 Sent 18164 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+WARNING:kafka.client:Node bootstrap connection failed -- refreshing metadata
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f8b0134d5f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+AttributeError: 'NoneType' object has no attribute 'info'
+0.30user 0.02system 12:22.43elapsed 0%CPU (0avgtext+0avgdata 25620maxresident)k
+0inputs+32outputs (0major+8186minor)pagefaults 0swaps
+
+2016-08-10 19:41:32,126 INFO Fetched 0 base nodes.
+2016-08-10 19:41:32,126 INFO Inserted 0 activity classifications.
+1.20user 0.06system 0:16.93elapsed 7%CPU (0avgtext+0avgdata 34264maxresident)k
+0inputs+0outputs (0major+16354minor)pagefaults 0swaps
+
     42  EDGE_NETFLOW_AFFECTS_EVENT
     42  EDGE_NETFLOW_AFFECTS_EVENT in
     42  EDGE_NETFLOW_AFFECTS_EVENT out
@@ -6,6 +36,8 @@ Sent 18164 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
     70  EDGE_EVENT_AFFECTS_NETFLOW in
     70  EDGE_EVENT_AFFECTS_NETFLOW out
    112  Entity-NetFlow
+   144  segment:edge
+   199  Segment
    390  EDGE_EVENT_AFFECTS_FILE
    390  EDGE_EVENT_AFFECTS_FILE in
    390  EDGE_EVENT_AFFECTS_FILE out
@@ -30,7 +62,8 @@ Sent 18164 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
   2584  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
   2584  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   2783  Subject
- 37572  total
+  8073  segment:includes
+ 45988  total
 
 
 agent
@@ -1597,6 +1630,7 @@ memory
 1467    1  e5797000
 
 netflow
+   1  112  InstrumentationSource.LINUX_THEIA
 
 resource
 

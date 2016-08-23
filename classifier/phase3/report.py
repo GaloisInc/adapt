@@ -33,6 +33,7 @@ import argparse
 import collections
 import datetime
 import dns.resolver
+import ipaddress
 import json
 import os
 import re
@@ -45,22 +46,37 @@ import gremlin_query
 
 def report(query, threshold=1, debug=False):
 
-    ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
-    # Excuse me? Come on, people. Who thinks '0x7fc9d5cf4250' is a filespec?
+    asn_re = re.compile('^AS\d+$')
+    # ip4_re = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$')
+
+    # In the apt1 trace, why does THEIA think '0x7fc9d5cf4250' is a filespec?
     filespec_re = re.compile('^(C:|[A-Z]:|/|file://|0x\w{12}$|\w|\.)')
 
     def validate_file(file):
         assert filespec_re.search(file), file
         return file
 
-    def validate_ip(ip4):
-        assert ip4_re.search(ip4), ip4
-        return ip4
+    def validate_ip(ip):
+        '''Raise ValueError exception if ip is not a valid internet address.'''
+        # THEIA's recordaudio1 trace contains empty "address" records,
+        # so AF_UNIX IPC events will have attributes like this:
+        # "srcAddress": "/tmp/.X11-unix/X0", "srcPort": 0,
+        # "destAddress": "", "destPort": 0, "ipProtocol": null
+        if ip == '':
+            ip = '0.0.0.0'
+        ipaddress.ip_address(ip)
+        return ip
+
+    def dns_query(fqdn):
+        try:
+            return dns.resolver.query(fqdn, 'TXT')
+        except dns.resolver.NXDOMAIN:
+            return []
 
     def get_asn(ip4):
         '''Maps to a BGP Autonomous System Number - cannot be airgapped.'''
         rev = '.'.join(reversed(ip4.split('.')))
-        answers = dns.resolver.query(rev + '.origin.asn.cymru.com', 'TXT')
+        answers = dns_query(rev + '.origin.asn.cymru.com')
         resp = 0
         for rdata in answers:
             resp = int(str(rdata).split()[0].lstrip('"'))
@@ -69,14 +85,17 @@ def report(query, threshold=1, debug=False):
 
     def get_asn_name(asn):
         '''Maps e.g. AS15169 to GOOGLE.'''
-        assert asn.startswith('AS'), asn
-        assert int(asn[2:]) > 0, asn
-        answers = dns.resolver.query(asn + '.asn.cymru.com', 'TXT')
+        assert asn_re.search(asn), asn
+        answers = dns_query(asn + '.asn.cymru.com')
         name = 'unknown'
         for rdata in answers:
             name = str(rdata).split('| ')[4].rstrip('"')
             # e.g. "15169 | US | arin | 2000-03-30 | GOOGLE - Google Inc., US"
         return name
+
+    def either_address_is(s, prop):
+        return (s == prop['srcAddress'] or
+                s == prop['dstAddress'])
 
     with gremlin_query.Runner() as gremlin:
 
@@ -88,6 +107,7 @@ def report(query, threshold=1, debug=False):
             source = prop.source()
             assert source in [
                 cdm.enums.InstrumentationSource.ANDROID_JAVA_CLEARSCOPE,
+                cdm.enums.InstrumentationSource.FREEBSD_DTRACE_CADETS,
                 cdm.enums.InstrumentationSource.LINUX_AUDIT_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_BEEP_TRACE,
                 cdm.enums.InstrumentationSource.LINUX_THEIA,
@@ -105,8 +125,12 @@ def report(query, threshold=1, debug=False):
             try:
                 counts['userID_' + prop['userID']] += 1
                 counts['gid_' + prop['gid']] += 1
+                continue
                 # http://tinyurl.com/cdm13-spec says yes, we need this nonsense
                 properties = json.loads(prop['properties'])
+                # The above fails in ta5attack2_units.avro, because
+                # we receive '{euid=0, egid=0}'
+                # rather than '{"euid"=0, "egid"=0}'.
                 counts['euid_%d' % int(properties['euid'])] += 1
                 counts['egid_%d' % int(properties['egid'])] += 1
             except KeyError:
@@ -115,7 +139,8 @@ def report(query, threshold=1, debug=False):
             # Remove strip() once this issue is closed:
             # https://git.tc.bbn.com/ta1-theia/ta1-integration-theia/issues/5
             try:
-                counts[validate_file(prop['url'].strip('"'))] += 1  # file
+                if len(prop['url']) > 0:  # cf the CADETS remove_dir trace.
+                    counts[validate_file(prop['url'].strip('"'))] += 1  # file
             except KeyError:
                 pass
 
@@ -125,8 +150,10 @@ def report(query, threshold=1, debug=False):
                 pass
 
             try:
+                if either_address_is('var/run/dbus/system_bus_socket', prop):
+                    continue  # Why does THEIA send corrupt AF_UNIX addresses?
                 counts[validate_ip(prop['dstAddress'])] += 1  # netflow
-                asn = get_asn(prop['dstAddress'])
+                asn = get_asn(validate_ip(prop['dstAddress']))
                 asn += '  ' + get_asn_name(asn)
                 counts[asn] += 1
             except KeyError:
@@ -150,6 +177,7 @@ def report(query, threshold=1, debug=False):
                     if usec != 0:  # Sigh! Why do people insert zeros?
                         assert str(stamp) > '2015-01-01', stamp
 
+                continue  # infoleak AUDIT_TRACE contains: '{event id=65615}'
                 properties = json.loads(prop['properties'])
                 # The seq so nice, gotta say it twice.
                 assert int(properties['event id']) == prop['sequence'], stamp
@@ -174,7 +202,7 @@ def get_canned_reports():
               ' EDGE_OBJECT_PREV_VERSION'
               ' EDGE_SRCSINK_AFFECTS_EVENT'
               ' EDGE_SUBJECT_HASLOCALPRINCIPAL')
-    labels = 'Agent Entity-File Entity-Memory Entity-Netflow Resource Subject'
+    labels = 'Agent Entity-File Entity-Memory Entity-NetFlow Resource Subject'
     for label in labels.split():
         name = re.sub(r'^Entity-', '', label).lower()
         ret[name] = "g.V().hasLabel('%s').limit(5000)" % label
@@ -204,5 +232,5 @@ if __name__ == '__main__':
         if args.report:
             args.query = get_canned_reports()[args.report]
         if args.query is None:
-            arg_parser().error('Please specify a query or choose a canned report.')
+            arg_parser().error('Please give a query or a canned report name.')
         report(args.query, debug=args.debug)

@@ -173,7 +173,8 @@ parseHostPort str =
 
 main :: IO ()
 main =
-  do c <- getOpts opts
+  do threadDelay 5000000 -- wait 5 seconds to let Kafka start
+     c <- getOpts opts
      if c ^. help
       then dumpUsage opts
       else neverFail (mainLoop c)
@@ -325,7 +326,14 @@ kafkaInputToDB cfg =
                when (emptyCount == nrKafkaNullsBeforeEmptyQueueSignal) (markEmpty cfg)
                process dbc now 0 total uids offset (emptyCount + 1)
        else do markBusy cfg
-               process dbc start (cnt+nr) newTotal newUIDs (offset + fromIntegral nr) 0
+               now <- liftIO getCurrentTime
+               let elapsed = diffUTCTime now start
+               (baseTime,newCnt) <- if (elapsed > 5*60)
+                                     then liftIO $ do
+                                           reportRate (logKafkaMsg cfg) start (cnt+nr)
+                                           return (now,0)
+                                     else return (start, cnt+nr)
+               process dbc baseTime newCnt newTotal newUIDs (offset + fromIntegral nr) 0
 
 reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
 reportRate sendOutput start cnt

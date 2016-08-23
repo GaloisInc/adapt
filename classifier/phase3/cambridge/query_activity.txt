@@ -1,0 +1,123 @@
+make: '/tmp/test_interpreter.py' is up to date.
+
+ ==> Running tests from: /tmp/tests.json
+ ==> ...using data file: ~/adapt/trace/current/ta5attack2_units.avro
+ ==> ....through module: dx
+
+======================================================================
+Executing module: pre
+======================================================================
+Running module tests: pre
+..
+======================================================================
+Executing module: in
+Sent 18668 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+======================================================================
+Running module tests: in
+
+----------------------------------------------------------------------
+Ran 2 tests in 20.645s
+
+OK
+..
+======================================================================
+Executing module: se
+2016-07-29 14:15:32,470 WARNING Dropping any existing segments.
+2016-07-29 14:16:25,144 INFO Inserted 3768 edges.
+======================================================================
+Running module tests: se
+
+----------------------------------------------------------------------
+Ran 2 tests in 21.892s
+
+OK
+.
+======================================================================
+Executing module: ad
+======================================================================
+Running module tests: ad
+
+======================================================================
+Executing module: ac
+2016-07-29 14:16:55,561 INFO Fetched 7138 base nodes.
+2016-07-29 14:16:55,561 INFO Inserted 1828 activity classifications.
+======================================================================
+Running module tests: ac
+
+======================================================================
+Executing module: dx
+======================================================================
+Running module tests: dx
+
+----------------------------------------------------------------------
+Ran 1 test in 6.786s
+
+OK
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+
+real	2m13.332s
+user	0m6.908s
+sys	0m0.496s
+graph = TitanFactory.open('cassandra:localhost'); g = graph.traversal();
+
+         \,,,/
+         (o o)
+-----oOOo-(3)-oOOo-----
+plugin activated: aurelius.titan
+plugin activated: tinkerpop.server
+plugin activated: tinkerpop.utilities
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/opt/titan/lib/slf4j-log4j12-1.7.5.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/opt/titan/lib/logback-classic-1.1.2.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+log4j:WARN No appenders could be found for logger (org.apache.hadoop.security.Groups).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+plugin activated: tinkerpop.hadoop
+plugin activated: tinkerpop.tinkergraph
+gremlin> graph = TitanFactory.open('cassandra:localhost'); g = graph.traversal();
+==>graphtraversalsource[standardtitangraph[cassandra:[localhost]], standard]
+gremlin> 
+gremlin> g.V().count()
+==>20048
+gremlin> 
+gremlin> g.V().hasLabel('Segment').has('pid', 5141).out().groupCount().by(label)
+==>[Agent:1, Activity:427, Subject:432]
+gremlin> 
+gremlin> g.V().hasLabel('Activity').count()
+==>1828
+gremlin> 
+gremlin> g.V().hasLabel('Activity').out().groupCount().by(label)
+==>[Entity-File:1828]
+gremlin> 
+gremlin> g.E().hasLabel('activity:includes').count()
+==>1828
+gremlin> 
+gremlin> g.E().hasLabel('activity:includes').inV().label().groupCount()
+==>[Entity-File:1828]
+gremlin> 
+gremlin> g.V().hasLabel('Subject').has('eventType').groupCount().by('eventType')
+==>[16:1303, 17:2766, 34:1, 19:5, 4:2, 21:1056, 6:8, 7:5, 9:21, 10:33, 26:2]
+gremlin> 
+gremlin> g.V().hasLabel('Subject').has('subjectType').groupCount().by('subjectType')
+==>[0:70, 4:5202]
+gremlin> 
+real	1m14.492s
+user	1m39.068s
+sys	0m7.276s
+

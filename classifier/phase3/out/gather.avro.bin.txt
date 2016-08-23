@@ -1,19 +1,54 @@
 Sent 447 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fce7ae345f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1279, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1414, in _log
+  File "/usr/lib/python3.5/logging/__init__.py", line 1384, in makeRecord
+  File "/usr/lib/python3.5/logging/__init__.py", line 248, in __init__
+TypeError: 'NoneType' object is not callable
+0.28user 0.02system 0:16.74elapsed 1%CPU (0avgtext+0avgdata 25884maxresident)k
+0inputs+16outputs (0major+8147minor)pagefaults 0swaps
+
+2016-08-10 19:44:04,650 INFO Fetched 1 base nodes.
+2016-08-10 19:44:04,650 INFO Inserted 0 activity classifications.
+0.37user 0.04system 0:00.84elapsed 49%CPU (0avgtext+0avgdata 32480maxresident)k
+0inputs+0outputs (0major+10587minor)pagefaults 0swaps
+
      1  Agent
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL in
      1  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+     1  Segment
      2  Entity-File
      2  Entity-NetFlow
      4  EDGE_SRCSINK_AFFECTS_EVENT
      4  EDGE_SRCSINK_AFFECTS_EVENT in
      4  EDGE_SRCSINK_AFFECTS_EVENT out
     12  Resource
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
-    22  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
-    29  Subject
-   127  total
+    17  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+    17  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+    17  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+    21  Subject
+    37  segment:includes
+   142  total
 
 
 agent
@@ -28,15 +63,17 @@ file
 memory
 
 netflow
+   1    2  255.255.255.255
+   2    2  AS0  unknown
+   3    2  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
 
 resource
    1   12  SrcSink.HEART_RATE
 
 subject
-   1    1  Event.BIND
-   2    2  Event.CLOSE
-   3    1  Event.OPEN
-   4    5  Event.READ
-   5   21  Event.WRITE
-   6   31  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
-   7   30  Subject.SUBJECT_EVENT
+   1    2  Event.CLOSE
+   2    5  Event.OPEN
+   3    5  Event.READ
+   4    8  Event.WRITE
+   5   21  InstrumentationSource.ANDROID_JAVA_CLEARSCOPE
+   6   20  Subject.SUBJECT_EVENT

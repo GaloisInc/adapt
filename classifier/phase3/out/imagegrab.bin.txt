@@ -1,14 +1,67 @@
 Sent 362 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+<<<<<<< HEAD
+Segments created in 60.378778s
+Segment edges created in 0.087839s
+Total segmentation time 60.466617s
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+INFO:kafka.producer.kafka:Kafka producer closed
+0.30user 0.01system 1:01.32elapsed 0%CPU (0avgtext+0avgdata 25812maxresident)k
+48inputs+24outputs (0major+8082minor)pagefaults 0swaps
+
+2016-08-18 10:42:48,789 INFO Fetched 9 base nodes.
+2016-08-18 10:42:48,789 INFO Inserted 0 activity classifications.
+0.44user 0.02system 0:01.45elapsed 31%CPU (0avgtext+0avgdata 33788maxresident)k
+872inputs+0outputs (1major+10013minor)pagefaults 0swaps
+=======
+Segments created in 60.159924s
+Segment edges created in 0.067233s
+Total segmentation time 60.227157s
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7fc17a44f780>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.28user 0.03system 1:00.84elapsed 0%CPU (0avgtext+0avgdata 25816maxresident)k
+0inputs+16outputs (0major+8073minor)pagefaults 0swaps
+
+2016-08-19 14:47:51,544 INFO Fetched 63 base nodes.
+2016-08-19 14:47:51,544 INFO Inserted 0 activity classifications.
+0.44user 0.01system 0:01.36elapsed 33%CPU (0avgtext+0avgdata 35736maxresident)k
+0inputs+8outputs (0major+10023minor)pagefaults 0swaps
+>>>>>>> jh-dev
+
      2  Agent
      2  EDGE_OBJECT_PREV_VERSION
      2  EDGE_OBJECT_PREV_VERSION in
      2  EDGE_OBJECT_PREV_VERSION out
+     4  Segment
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL in
     10  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    12  segment:edge
     30  EDGE_EVENT_AFFECTS_FILE
     30  EDGE_EVENT_AFFECTS_FILE in
     30  EDGE_EVENT_AFFECTS_FILE out
+    32  segment:includes
     43  Entity-File
     52  EDGE_FILE_AFFECTS_EVENT
     52  EDGE_FILE_AFFECTS_EVENT in
@@ -17,7 +70,12 @@ Sent 362 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
     94  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
    104  Subject
-   713  total
+<<<<<<< HEAD
+   761  total
+=======
+   114  segment:includes
+   835  total
+>>>>>>> jh-dev
 
 
 agent

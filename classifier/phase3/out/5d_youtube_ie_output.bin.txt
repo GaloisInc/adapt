@@ -1,8 +1,41 @@
 Sent 11106 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments (including edges) created
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+Exception ignored in: <bound method KafkaProducer.__del__ of <kafka.producer.kafka.KafkaProducer object at 0x7f90a4ecf5f8>>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 291, in __del__
+  File "/usr/local/lib/python3.5/dist-packages/kafka/producer/kafka.py", line 296, in close
+  File "/usr/lib/python3.5/logging/__init__.py", line 1278, in info
+  File "/usr/lib/python3.5/logging/__init__.py", line 1519, in isEnabledFor
+TypeError: unorderable types: int() >= NoneType()
+0.27user 0.04system 1:02.76elapsed 0%CPU (0avgtext+0avgdata 27284maxresident)k
+0inputs+32outputs (0major+8133minor)pagefaults 0swaps
+
+2016-08-10 19:21:23,612 INFO Fetched 9 base nodes.
+2016-08-10 19:21:23,613 INFO Inserted 0 activity classifications.
+0.41user 0.04system 0:09.25elapsed 4%CPU (0avgtext+0avgdata 32484maxresident)k
+0inputs+8outputs (0major+10604minor)pagefaults 0swaps
+
+     6  segment:edge
      9  Agent
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL in
      9  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+     9  Segment
    170  EDGE_EVENT_AFFECTS_NETFLOW
    170  EDGE_EVENT_AFFECTS_NETFLOW in
    170  EDGE_EVENT_AFFECTS_NETFLOW out
@@ -21,7 +54,8 @@ Sent 11106 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
   2973  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
   2973  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
   2982  Subject
- 22903  total
+  5973  segment:includes
+ 28891  total
 
 
 agent
@@ -804,6 +838,97 @@ file
 memory
 
 netflow
+   1    1  104.68.137.248
+   2    1  104.85.117.106
+   3    1  104.85.124.22
+   4    1  104.85.161.63
+   5    2  104.87.154.136
+   6    3  131.253.61.100
+   7    5  137.116.81.24
+   8    3  138.108.6.20
+   9    1  167.8.226.10
+  10    1  167.8.226.54
+  11    8  173.194.121.10
+  12    2  173.194.121.13
+  13    2  173.194.121.2
+  14    2  173.194.121.25
+  15    7  173.194.121.26
+  16    2  173.194.121.28
+  17   14  173.194.121.34
+  18    2  173.194.121.4
+  19    2  173.194.121.41
+  20    1  173.194.121.59
+  21    2  173.194.121.6
+  22    1  173.194.121.7
+  23    4  173.194.123.97
+  24    2  173.194.204.147
+  25    2  173.194.204.95
+  26    2  173.194.7.206
+  27    1  173.241.242.220
+  28    2  184.29.104.200
+  29    1  184.31.123.32
+  30    2  184.73.174.158
+  31    7  204.79.197.200
+  32    2  204.79.197.203
+  33    6  216.58.217.130
+  34    2  216.58.217.131
+  35    2  216.58.217.134
+  36    2  216.58.217.141
+  37    4  216.58.217.142
+  38    7  216.58.219.206
+  39    8  216.58.219.238
+  40    1  23.0.160.56
+  41    1  23.0.160.74
+  42    2  23.3.13.9
+  43    2  23.47.27.27
+  44    1  23.47.39.90
+  45    3  31.13.69.197
+  46    1  4.26.67.144
+  47    1  50.7.70.146
+  48    1  52.1.194.124
+  49    1  54.165.74.156
+  50    1  54.225.95.177
+  51    2  54.235.186.223
+  52    2  54.235.247.125
+  53    1  65.52.108.11
+  54    2  65.52.108.251
+  55    1  65.55.83.123
+  56    2  66.114.52.15
+  57    1  68.67.152.132
+  58    1  68.67.152.67
+  59    2  68.67.152.82
+  60    2  68.67.176.128
+  61    4  68.67.176.34
+  62    1  69.172.216.55
+  63    4  72.21.91.29
+  64    2  74.125.226.7
+  65    2  74.125.228.217
+  66    2  74.217.253.60
+  67    2  75.98.70.31
+  68    2  93.184.215.200
+  69    2  AS0  unknown
+  70    2  AS10913  INTERNAP-BLK - Internap Network Services Corporation, US
+  71    1  AS13789  INTERNAP-BLK3 - Internap Network Services Corporation, US
+  72    9  AS14618  AMAZON-AES - Amazon.com, Inc., US
+  73    6  AS15133  EDGECAST - MCI Communications Services, Inc. d/b/a Verizon Business, US
+  74   90  AS15169  GOOGLE - Google Inc., US
+  75    3  AS16477  ACNIELSEN-AS - ACNIELSEN, US
+  76    1  AS174  COGENT-174 - Cogent Communications, US
+  77    4  AS20940  AKAMAI-ASN1 , US
+  78    1  AS26558  FREEWHEEL - Freewheel Media Inc., US
+  79    2  AS2914  NTT-COMMUNICATIONS-2914 - NTT America, Inc., US
+  80   10  AS29990  ASN-APPNEXUS - AppNexus, Inc, US
+  81    3  AS32934  FACEBOOK - Facebook, Inc., US
+  82    1  AS3356  LEVEL3 - Level 3 Communications, Inc., US
+  83    4  AS35994  AKAMAI-AS - Akamai Technologies, Inc., US
+  84    1  AS36089  OPENX-AS1 - OPENX TECHNOLOGIES, INC., US
+  85    2  AS36408  CDNETWORKSUS-02 - CDNetworks Inc., US
+  86    1  AS7415  ADSAFE-1 - Integral Ad Science, Inc., US
+  87    2  AS7843  TWCABLE-BACKBONE - Time Warner Cable Internet LLC, US
+  88    4  AS7922  COMCAST-7922 - Comcast Cable Communications, Inc., US
+  89    9  AS8068  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
+  90   12  AS8075  MICROSOFT-CORP-MSN-AS-BLOCK - Microsoft Corporation, US
+  91  170  InstrumentationSource.WINDOWS_FIVEDIRECTIONS
 
 resource
 

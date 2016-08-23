@@ -17,7 +17,7 @@ import aiohttp
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class titanClient:
+class TitanClient:
 	def __init__(self, broker='ws://localhost:8182/'):
 		self.broker = broker
 		self.loop = asyncio.get_event_loop()

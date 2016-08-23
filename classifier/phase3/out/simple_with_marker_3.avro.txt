@@ -1,0 +1,301 @@
+Sent 18166 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
+INFO:kafka.conn:Broker version identifed as 0.9
+INFO:kafka.conn:Set configuration api_version='0.9' to skip auto check_version requests on startup
+WARNING:kafka.client:Node bootstrap connection failed -- refreshing metadata
+INFO:__main__:Full segments (nodes and edges) stored in Titan DB
+
+INFO:__main__:
+Segmentation finished
+
+Segmenter ready to run
+
+******************************
+Running DB side segmenter
+******************************
+Segments created in 180.145457s
+Segment edges created in 119.600538s
+Total segmentation time 299.745995s
+INFO:kafka.producer.kafka:Closing the Kafka producer with 0 secs timeout.
+INFO:kafka.producer.kafka:Proceeding to force close the producer since pending requests could not be completed within timeout 0.
+WARNING:kafka.client:Node 0 connection failed -- refreshing metadata
+INFO:kafka.producer.kafka:Kafka producer closed
+0.33user 0.02system 16:20.46elapsed 0%CPU (0avgtext+0avgdata 25556maxresident)k
+232inputs+32outputs (0major+8104minor)pagefaults 0swaps
+
+2016-08-18 16:25:53,298 INFO Fetched 2 base nodes.
+2016-08-18 16:25:53,298 INFO Inserted 0 activity classifications.
+0.46user 0.02system 25:00.81elapsed 0%CPU (0avgtext+0avgdata 35204maxresident)k
+184inputs+16outputs (0major+9810minor)pagefaults 0swaps
+
+     3  Segment
+     7  EDGE_EVENT_AFFECTS_SUBJECT
+     7  EDGE_EVENT_AFFECTS_SUBJECT in
+     7  EDGE_EVENT_AFFECTS_SUBJECT out
+     8  segment:includes
+    13  Agent
+    13  EDGE_SUBJECT_HASLOCALPRINCIPAL
+    13  EDGE_SUBJECT_HASLOCALPRINCIPAL in
+    13  EDGE_SUBJECT_HASLOCALPRINCIPAL out
+    30  EDGE_OBJECT_PREV_VERSION
+    31  EDGE_NETFLOW_AFFECTS_EVENT
+    31  Entity-NetFlow
+    34  EDGE_NETFLOW_AFFECTS_EVENT in
+    34  EDGE_NETFLOW_AFFECTS_EVENT out
+    34  EDGE_OBJECT_PREV_VERSION in
+    34  EDGE_OBJECT_PREV_VERSION out
+    60  EDGE_SRCSINK_AFFECTS_EVENT
+    60  EDGE_SRCSINK_AFFECTS_EVENT in
+    60  EDGE_SRCSINK_AFFECTS_EVENT out
+    61  EDGE_EVENT_AFFECTS_FILE
+    68  EDGE_EVENT_AFFECTS_FILE in
+    69  EDGE_EVENT_AFFECTS_FILE out
+    83  EDGE_EVENT_AFFECTS_NETFLOW
+    83  EDGE_EVENT_AFFECTS_SRCSINK
+    84  EDGE_EVENT_AFFECTS_SRCSINK out
+    85  EDGE_EVENT_AFFECTS_SRCSINK in
+    89  Resource
+    93  EDGE_EVENT_AFFECTS_NETFLOW in
+    93  EDGE_EVENT_AFFECTS_NETFLOW out
+    98  Entity-File
+   151  EDGE_EVENT_AFFECTS_MEMORY
+   151  EDGE_EVENT_AFFECTS_MEMORY in
+   151  EDGE_EVENT_AFFECTS_MEMORY out
+   151  Entity-Memory
+   414  EDGE_FILE_AFFECTS_EVENT
+   435  EDGE_FILE_AFFECTS_EVENT in
+   435  EDGE_FILE_AFFECTS_EVENT out
+   810  EDGE_EVENT_ISGENERATEDBY_SUBJECT
+   826  Subject
+   856  EDGE_EVENT_ISGENERATEDBY_SUBJECT in
+   856  EDGE_EVENT_ISGENERATEDBY_SUBJECT out
+  6634  total
+
+
+agent
+   1   13  InstrumentationSource.LINUX_AUDIT_TRACE
+   2   13  gid_1001
+   3   13  userID_1001
+
+file
+   1  110  InstrumentationSource.LINUX_AUDIT_TRACE
+   2    1  file:///dev/tty
+   3    1  file:///etc/host.conf
+   4    1  file:///etc/hosts
+   5    1  file:///etc/ld.so.cache
+   6    1  file:///etc/nsswitch.conf
+   7    1  file:///etc/passwd
+   8    1  file:///etc/resolv.conf
+   9    2  file:///home/jhanley/Documents/TransparentComputing/malware/cross-platform/simple-apt/oc1/logs/20160817_001152/L2.log
+  10    1  file:///home/jhanley/bin/simple
+  11    1  file:///proc/24284/stat
+  12    1  file:///proc/sys/kernel/ngroups_max
+  13    2  file:///tmp/adapt/tc-marker-001-begin.txt
+  14    2  file:///tmp/adapt/tc-marker-001-end.txt
+  15    2  file:///tmp/adapt/tc-marker-002-begin.txt
+  16    2  file:///tmp/adapt/tc-marker-002-end.txt
+  17   19  file:///tmp/adapt/tc-marker-004-begin.txt
+  18   19  file:///tmp/adapt/tc-marker-004-end.txt
+  19    2  file:///tmp/adapt/tc-marker-005-begin.txt
+  20    2  file:///tmp/adapt/tc-marker-005-end.txt
+  21    1  file:///usr/bin/sudo
+  22    1  file:///usr/lib/locale/en_US.utf8/LC_ADDRESS
+  23    1  file:///usr/lib/locale/en_US.utf8/LC_COLLATE
+  24    1  file:///usr/lib/locale/en_US.utf8/LC_CTYPE
+  25    1  file:///usr/lib/locale/en_US.utf8/LC_IDENTIFICATION
+  26    1  file:///usr/lib/locale/en_US.utf8/LC_MEASUREMENT
+  27    1  file:///usr/lib/locale/en_US.utf8/LC_MESSAGES
+  28    1  file:///usr/lib/locale/en_US.utf8/LC_MESSAGES/SYS_LC_MESSAGES
+  29    1  file:///usr/lib/locale/en_US.utf8/LC_MONETARY
+  30    1  file:///usr/lib/locale/en_US.utf8/LC_NAME
+  31    1  file:///usr/lib/locale/en_US.utf8/LC_NUMERIC
+  32    1  file:///usr/lib/locale/en_US.utf8/LC_PAPER
+  33    1  file:///usr/lib/locale/en_US.utf8/LC_TELEPHONE
+  34    1  file:///usr/lib/locale/en_US.utf8/LC_TIME
+  35    1  file:///usr/lib64/gconv/gconv-modules.cache
+  36    1  file:///usr/lib64/ld-2.23.so
+  37    1  file:///usr/lib64/libaudit.so.1.0.0
+  38    1  file:///usr/lib64/libc-2.23.so
+  39    1  file:///usr/lib64/libcap-ng.so.0.0.0
+  40    1  file:///usr/lib64/libcrypt-2.23.so
+  41    1  file:///usr/lib64/libdl-2.23.so
+  42    1  file:///usr/lib64/libfreebl3.so
+  43    1  file:///usr/lib64/libgcc_s-6.1.1-20160621.so.1
+  44    1  file:///usr/lib64/liblber-2.4.so.2.10.7
+  45    1  file:///usr/lib64/libldap-2.4.so.2.10.7
+  46    1  file:///usr/lib64/libm-2.23.so
+  47    1  file:///usr/lib64/libnspr4.so
+  48    1  file:///usr/lib64/libnss_dns-2.23.so
+  49    1  file:///usr/lib64/libnss_files-2.23.so
+  50    1  file:///usr/lib64/libnssutil3.so
+  51    1  file:///usr/lib64/libpam.so.0.84.1
+  52    1  file:///usr/lib64/libpcre.so.1.2.7
+  53    1  file:///usr/lib64/libplc4.so
+  54    1  file:///usr/lib64/libplds4.so
+  55    1  file:///usr/lib64/libpthread-2.23.so
+  56    1  file:///usr/lib64/libresolv-2.23.so
+  57    1  file:///usr/lib64/librt-2.23.so
+  58    1  file:///usr/lib64/libsasl2.so.3.0.0
+  59    1  file:///usr/lib64/libselinux.so.1
+  60    1  file:///usr/lib64/libssl3.so
+  61    1  file:///usr/lib64/libstdc++.so.6.0.22
+  62    1  file:///usr/lib64/libutil-2.23.so
+  63    1  file:///usr/lib64/libz.so.1.2.8
+  64    1  file:///usr/libexec/sudo/libsudo_util.so.0.0.0
+  65    1  file:///usr/libexec/sudo/sudoers.so
+  66    1  file:///usr/share/locale/locale.alias
+  67    1  file:///usr/share/zoneinfo/Etc/UTC
+  68    1  file://pipe[3-4]
+
+memory
+   1    1  0060c000
+   2    1  5652d8a15000
+   3    1  7f1a66502000
+   4    1  7f1a66d03000
+   5    1  7f1a66d1a000
+   6    2  7f1a66f19000
+   7    1  7f1a66f1d000
+   8    1  7f1a66f22000
+   9    2  7f1a67121000
+  10    1  7f1a67123000
+  11    1  7f1a6712e000
+  12    2  7f1a6732d000
+  13    1  7f1a67335000
+  14    1  7f1a674ee000
+  15    2  7f1a676ed000
+  16    1  7f1a676f7000
+  17    1  7f1a6770d000
+  18    2  7f1a6790c000
+  19    1  7f1a6790e000
+  20    1  7f1a67a17000
+  21    2  7f1a67c16000
+  22    1  7f1a67c18000
+  23    1  7f1a67d90000
+  24    2  7f1a67f8f000
+  25    1  7f1a67f9f000
+  26    1  7f1a67fb6000
+  27    2  7f1a681b5000
+  28    3  7f1a683d6000
+  29    1  7f1a683de000
+  30    1  7fcdf8944000
+  31    1  7fcdf8946000
+  32    2  7fcdf8b45000
+  33    1  7fcdf8b47000
+  34    1  7fcdf8b4e000
+  35    2  7fcdf8d4d000
+  36    1  7fcdf8d4f000
+  37    1  7fcdf8d56000
+  38    2  7fcdf8f55000
+  39    1  7fcdf8f85000
+  40    1  7fcdf8fc0000
+  41    2  7fcdf91bf000
+  42    1  7fcdf91c4000
+  43    1  7fcdf91c8000
+  44    2  7fcdf93c7000
+  45    1  7fcdf93c9000
+  46    1  7fcdf93cc000
+  47    2  7fcdf95cb000
+  48    1  7fcdf95cd000
+  49    1  7fcdf95f3000
+  50    2  7fcdf97f3000
+  51    1  7fcdf9b1b000
+  52    1  7fcdf9d47000
+  53    1  7fcdf9d4b000
+  54    1  7fcdf9d8e000
+  55    1  7fcdf9f8d000
+  56    1  7fcdf9f93000
+  57    1  7fcdf9faf000
+  58    1  7fcdfa1ae000
+  59    1  7fcdfa1b0000
+  60    1  7fcdfa1c7000
+  61    1  7fcdfa3c6000
+  62    1  7fcdfa3ca000
+  63    1  7fcdfa3df000
+  64    2  7fcdfa5de000
+  65    1  7fcdfa5e0000
+  66    1  7fcdfa5ee000
+  67    1  7fcdfa7ed000
+  68    1  7fcdfa7ef000
+  69    1  7fcdfa83d000
+  70    1  7fcdfaa3c000
+  71    1  7fcdfaa40000
+  72    1  7fcdfaa4e000
+  73    1  7fcdfac4d000
+  74    1  7fcdfac4f000
+  75    1  7fcdfaca6000
+  76    1  7fcdfaea6000
+  77    1  7fcdfaeab000
+  78    1  7fcdfaeb6000
+  79    2  7fcdfb0b5000
+  80    1  7fcdfb0bd000
+  81    1  7fcdfb0d4000
+  82    2  7fcdfb2d3000
+  83    1  7fcdfb2d9000
+  84    1  7fcdfb34b000
+  85    2  7fcdfb54a000
+  86    1  7fcdfb54c000
+  87    1  7fcdfb550000
+  88    2  7fcdfb750000
+  89    1  7fcdfb752000
+  90    1  7fcdfb90b000
+  91    2  7fcdfbb0a000
+  92    1  7fcdfbb14000
+  93    1  7fcdfbb17000
+  94    2  7fcdfbd16000
+  95    1  7fcdfbd18000
+  96    1  7fcdfbd2a000
+  97    2  7fcdfbf2a000
+  98    1  7fcdfbf2c000
+  99    1  7fcdfbf2e000
+ 100    2  7fcdfc12d000
+ 101    1  7fcdfc12f000
+ 102    1  7fcdfc152000
+ 103    2  7fcdfc352000
+ 104    1  7fcdfc356000
+ 105    1  7fcdfc373000
+ 106    2  7fcdfc572000
+ 107    2  7fcdfc604000
+ 108    1  7fcdfc60b000
+ 109    1  7fcdfc659000
+ 110    1  7fcdfc65a000
+ 111    1  7fcdfc65b000
+ 112    1  7fcdfc78b000
+ 113    1  7fcdfc78c000
+ 114    2  7fcdfc799000
+ 115    1  7fcdfc79a000
+ 116    1  7fcdfc79b000
+ 117    1  7fcdfc79c000
+ 118    1  7fcdfc79d000
+ 119    1  7fcdfc79e000
+ 120    1  7fcdfc79f000
+ 121    1  7fcdfc7a1000
+ 122  151  InstrumentationSource.LINUX_AUDIT_TRACE
+
+netflow
+   1    1  0.0.0.0
+   2    1  127.0.0.1
+   3   48  72.3.128.241
+   4    2  AS0  unknown
+   5   48  AS33070  RMH-14 - Rackspace Hosting, US
+   6   50  InstrumentationSource.LINUX_AUDIT_TRACE
+
+resource
+   1   89  SrcSink.ACCELEROMETER
+
+subject
+   1    1  Event.ACCEPT
+   2    3  Event.CLONE
+   3  237  Event.CLOSE
+   4   57  Event.CONNECT
+   5    1  Event.CREATE_OBJECT
+   6    2  Event.EXECUTE
+   7    1  Event.EXIT
+   8    2  Event.FORK
+   9   85  Event.MMAP
+  10   66  Event.MPROTECT
+  11  175  Event.OPEN
+  12  215  Event.READ
+  13   63  Event.RECVMSG
+  14   59  Event.SENDMSG
+  15  140  Event.WRITE
+  16 1120  InstrumentationSource.LINUX_AUDIT_TRACE
+  17 1107  Subject.SUBJECT_EVENT
