@@ -95,19 +95,13 @@ def makeNumericSearchIndex = { String indexName, String indexKey, indexType ->
 makeNodeIndex('byIdent','ident',true,String.class)
 makeNodeIndex('bySegmentName', 'segment:name', false, String.class)
 makeNodeIndex('byParentId','segment:parentId',false,Integer.class)
-makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
-makeNodeIndex('byEventType', 'eventType', false, Short.class)
-
-<<<<<<< HEAD
-makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
-makeNodeIndex('byEventType', 'eventType', false, Short.class)
-=======
 makeNodeIndex('byUrlExact','url',false,String.class)
 makeNodeIndex('byDstPort','dstPort',false,Integer.class)
 makeNodeIndex('bySrcPort','srcPort',false,Integer.class)
 makeNodeIndex('bySrcAddressExact','srcAddress',false,String.class)
 makeNodeIndex('byDstAddressExact','dstAddress',false,String.class)
->>>>>>> master
+makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
+makeNodeIndex('byEventType', 'eventType', false, Short.class)
 
 // URL index use ElasticSearch which provides richer queries
 // including regex
