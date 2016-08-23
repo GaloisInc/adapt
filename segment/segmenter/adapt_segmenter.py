@@ -6,9 +6,6 @@ TODO: code refactoring to eliminate duplication and preserve in-memory implement
 JSON specification handling
 
 '''
-from aiogremlin import GremlinClient
-
-from titanDB import TitanClient as tclient
 import argparse
 import logging
 import os
@@ -18,6 +15,9 @@ import sys
 import asyncio
 import kafka
 import time
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+from titanDB import TitanClient as tclient
+
 
 property_segmentNodeName='segment:name'
 property_segmentEdgeLabel='segment:includes'
