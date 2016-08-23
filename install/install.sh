@@ -68,6 +68,7 @@ install_titan() {
     sudo chmod g+w $TITAN_SERVER_DIR
     cd $CONFIG_DIR/titan || handle_error $LINENO
     sudo $ADAPT_DIR/tools/GenerateSchema.py || handle_error $LINENO
+    sudo chown --recursive vagrant:vagrant $TITAN_SERVER_DIR
     cd $CWD || handle_error $LINENO
 }
 
