@@ -82,8 +82,8 @@ class AnomalyView:
                 for row in reader:
                     gremlin.fetch_data("g.V({id}).property('anomalyType','{type}')".format(id=row['id'], type=self.view_type))
                     gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
-                    if row['anomaly_score'] > max_score:
-                        max_score = row['anomaly_score']
+                    if float(row['anomaly_score']) > max_score:
+                        max_score = float(row['anomaly_score'])
                         max_id = row['id']
                     cnt = cnt + 1
                     if cnt >= cutoff:
