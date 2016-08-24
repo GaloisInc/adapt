@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     result = gremlin.execute_many(QUERIES,processors)
 
-	result = gremlin.execute_many_param('g.V().has(label,x).count()',
+    result = gremlin.execute_many_param('g.V().has(label,x).count()',
 										[{'x':'Entity-File'},
 										 {'x':'Entity-NetFlow'},
 										 {'x':'Entity-Memory'},
