@@ -24,35 +24,6 @@ QUERIES = [
 ]
 
 
-class GremlinQueryRunner:
-
-    def __init__(self):
-        self.loop = asyncio.get_event_loop()
-        self.gc = GremlinClient(loop=self.loop)
-
-    def fetch(self, query):
-        return self.loop.run_until_complete(self.gc.execute(query))
-
-    def fetch_many(self, queries, sem_num):
-        sem=asyncio.Semaphore(sem_num)
-        @asyncio.coroutine
-        def fetch(name,query): 
-            with (yield from sem):
-                print("Starting: %s" % name)
-                t1 = time.time()
-                result = yield from self.gc.execute(query)
-                t2 = time.time()
-                print("Finished: %s in %fs" % (name,t2-t1))
-                return (name,query,result)
-            
-        
-        jobs = [fetch(name,query) for (name,query) in queries]
-        results = self.loop.run_until_complete(asyncio.gather(*jobs))
-        return results
-
-    def close(self):
-        self.loop.run_until_complete(self.gc.close())
-
 
 if __name__ == '__main__':
 
@@ -63,7 +34,7 @@ if __name__ == '__main__':
     else:
         processors = 1
 
-    result = gremlin.fetch_many(QUERIES,processors)
+    result = gremlin.execute_many(QUERIES,processors)
 
     for (n,q,r) in result:
         print(n,"\t",q,"\n\t",r)
