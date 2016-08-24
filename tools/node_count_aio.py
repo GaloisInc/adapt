@@ -38,7 +38,7 @@ if __name__ == '__main__':
                                 'Subject',
                                 'Host',
                                 'Agent',
-                                'Segment']
+                                'Segment']]
     result2 = gremlin.execute_many_params(query,params,processors)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
