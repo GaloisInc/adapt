@@ -34,21 +34,22 @@ if __name__ == '__main__':
     else:
         processors = 1
 
-    result = gremlin.execute_many(QUERIES,processors)
+    result1 = gremlin.execute_many(QUERIES,processors)
+    for (n,q,r) in result1:
+        print(n,"\t",q,"\n\t",r)
 
-    result = gremlin.execute_many_param('g.V().has(label,x).count()',
-										[{'x':'Entity-File'},
-										 {'x':'Entity-NetFlow'},
-										 {'x':'Entity-Memory'},
-										 {'x':'Resources'},
-										 {'x':'Subjects'},
-										 {'x':'Hosts'},
-										 {'x':'Agents'},
-										 {'x':'Segments'}])
+    result2 = gremlin.execute_many_params('g.V().has(label,x).count()',
+										 [{'x':'Entity-File'},
+										  {'x':'Entity-NetFlow'},
+										  {'x':'Entity-Memory'},
+										  {'x':'Resources'},
+										  {'x':'Subjects'},
+										  {'x':'Hosts'},
+										  {'x':'Agents'},
+										  {'x':'Segments'}])
 										 
 
-    for (n,q,r) in result:
-        print(n,"\t",q,"\n\t",r)
+
 
 
     gremlin.close()
