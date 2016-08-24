@@ -38,15 +38,16 @@ if __name__ == '__main__':
     for (n,q,r) in result1:
         print(n,"\t",q,"\n\t",r)
 
+    params = [{'x':'Entity-File'},
+			  {'x':'Entity-NetFlow'},
+			  {'x':'Entity-Memory'},
+			  {'x':'Resources'},
+			  {'x':'Subjects'},
+			  {'x':'Hosts'},
+			  {'x':'Agents'},
+			  {'x':'Segments'}]
     result2 = gremlin.execute_many_params('g.V().has(label,x).count()',
-										 [{'x':'Entity-File'},
-										  {'x':'Entity-NetFlow'},
-										  {'x':'Entity-Memory'},
-										  {'x':'Resources'},
-										  {'x':'Subjects'},
-										  {'x':'Hosts'},
-										  {'x':'Agents'},
-										  {'x':'Segments'}])
+										 params,processors)
 										 
 
 
