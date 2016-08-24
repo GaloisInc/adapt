@@ -351,7 +351,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
     
 	def makeTimeSegmentsParallel(self):
 		self.log('error','Parallel segmentation NYI')
-		return "NYI"
+		return "Undefined"
 
 	def makeTimeSegments(self):
 		t1 = time.time()
@@ -401,13 +401,13 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 
 	def makeRadiusSegmentsParallel(self):
 		self.log('error','Parallel segmentation NYI')
-		return "NYI"
+		return "Undefined"
 
 	def makeRadiusSegments(self):
 		if self.processes == 1:
 			self.makeRadiusSegmentsSequential()
 		else:
-			self.makeTimeSegmentsParallel()
+			self.makeRadiusSegmentsParallel()
 		
 
 	def storeSegments(self):
