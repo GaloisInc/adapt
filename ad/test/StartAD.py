@@ -71,13 +71,13 @@ class AD:
             self.consumer.commit()
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Segmenter
-                self.producer.send("ad-log", b'starting processing')
+                self.producer.send("ad-log", b'Running Anomaly Detection...')
                 self.report_status(STATUS_IN_PROGRESS)
                 cmd = './start.sh'
                 log.info(cmd)
                 os.system(cmd)
                 self.report_status(STATUS_DONE)
-                self.producer.send("ad-log", b'done processing')
+                self.producer.send("ad-log", b'Done Anomaly Detection')
                 log.info(start_msg)  # Go back and do it all again.
 
     def report_status(self, status):
