@@ -51,9 +51,9 @@ class TitanClient:
 		result = self.loop.run_until_complete(stream(self.gc))
 		return result
 
-	def execute_many(self,queries, sem_num):
+	def execute_many(self,numprocs,queries):
 		'''
-		Execute many queries simultaneously, with up to sem_num 
+		Execute many queries simultaneously, with up to numprocs 
 		concurrent requests.
 		'''
 		sem=asyncio.Semaphore(sem_num)
@@ -71,10 +71,10 @@ class TitanClient:
 		results = self.loop.run_until_complete(asyncio.gather(*jobs))
 		return results   
 
-	def execute_many_params(self,query,params, sem_num):
+	def execute_many_params(self,numprocs,query,params):
 		'''
 		Execute many variants of the same query simultaneously, 
-		with up to sem_num concurrent requests, using the parameter bindings
+		with up to numprocs concurrent requests, using the parameter bindings
 		given in the list params.
 		'''
 		sem=asyncio.Semaphore(sem_num)

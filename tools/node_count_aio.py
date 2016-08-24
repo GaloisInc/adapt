@@ -11,14 +11,6 @@ from titanDB import TitanClient
 QUERYV = "g.V().count()"
 QUERYE = "g.E().count()"
 QUERIES = [
-    ('Entity-File',"g.V().has(label, 'Entity-File').count()"),
-    ('Entity-NetFlow',"g.V().has(label, 'Entity-NetFlow').count()"),
-    ('Entity-Memory',"g.V().has(label, 'Entity-Memory').count()"),
-    ('Resources',"g.V().has(label, 'Resource').count()"),
-    ('Subjects',"g.V().has(label, 'Subject').count()"),
-    ('Hosts',"g.V().has(label, 'Host').count()"),
-    ('Agents',"g.V().has(label, 'Agent').count()"),
-    ('Segments',"g.V().has(label, 'Segment').count()"),
     ('Nodes',QUERYV),
     ('Edges',QUERYE)
 ]
@@ -39,14 +31,14 @@ if __name__ == '__main__':
         print(n,"\t",q,"\n\t",r)
 
     query = 'g.V().has(label,x).count()'
-    params = [{'x':'Entity-File'},
-              {'x':'Entity-NetFlow'},
-              {'x':'Entity-Memory'},
-              {'x':'Resource'},
-              {'x':'Subject'},
-              {'x':'Host'},
-              {'x':'Agent'},
-              {'x':'Segment'}]
+    params = [{'x':x} for x in ['Entity-File',
+								'Entity-NetFlow',
+								'Entity-Memory',
+								'Resource',
+								'Subject',
+								'Host',
+								'Agent',
+								'Segment']
     result2 = gremlin.execute_many_params(query,params,processors)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
