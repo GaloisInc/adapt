@@ -26,7 +26,7 @@ if __name__ == '__main__':
     else:
         processors = 1
 
-    result1 = gremlin.execute_many(QUERIES,processors)
+    result1 = gremlin.execute_many(processors,QUERIES)
     for (n,q,r) in result1:
         print(n,"\t",q,"\n\t",r)
 
@@ -39,7 +39,7 @@ if __name__ == '__main__':
                                 'Host',
                                 'Agent',
                                 'Segment']]
-    result2 = gremlin.execute_many_params(query,params,processors)
+    result2 = gremlin.execute_many_params(processors,query,params)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
                                      

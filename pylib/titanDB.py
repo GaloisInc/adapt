@@ -56,7 +56,7 @@ class TitanClient:
 		Execute many queries simultaneously, with up to numprocs 
 		concurrent requests.
 		'''
-		sem=asyncio.Semaphore(sem_num)
+		sem=asyncio.Semaphore(numprocs)
 		@asyncio.coroutine
 		def fetch(name,query): 
 			with (yield from sem):
@@ -77,7 +77,7 @@ class TitanClient:
 		with up to numprocs concurrent requests, using the parameter bindings
 		given in the list params.
 		'''
-		sem=asyncio.Semaphore(sem_num)
+		sem=asyncio.Semaphore(numprocs)
 		@asyncio.coroutine
 		def fetch(bindings): 
 			with (yield from sem):
