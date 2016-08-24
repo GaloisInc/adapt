@@ -77,16 +77,17 @@ class TitanClient:
 		'''
 		sem=asyncio.Semaphore(sem_num)
 		@asyncio.coroutine
-		def fetch(name,bindings): 
+		def fetch(bindings): 
 			with (yield from sem):
-				print("Starting: %s %a" % (name,bindings))
+				print("Starting: %a" % (bindings))
 				t1 = time.time()
 				result = yield from self.gc.execute(query,bindings)
 				t2 = time.time()
-				print("Finished: %s %a in %fs" % (name,bindings,t2-t1))
+				print("Finished: %a in %fs" % (bindings,t2-t1))
 				return (name,bindings,result)
 			
-		jobs = [fetch(name,bindings) for (name,params) in params]
+		print("For query: %" % (query))
+		jobs = [fetch(bindings) for (bindings) in params]
 		results = self.loop.run_until_complete(asyncio.gather(*jobs))
 		return results   
 
