@@ -3,6 +3,7 @@
 import asyncio
 from aiogremlin import GremlinClient
 import sys
+import os
 import time
 sys.path.append(os.path.expanduser('~/adapt/pylib'))
 from titanDB import TitanClient 
