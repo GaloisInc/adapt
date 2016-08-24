@@ -86,7 +86,7 @@ class TitanClient:
 				print("Finished: %a in %fs" % (bindings,t2-t1))
 				return (name,bindings,result)
 			
-		print("For query: %" % (query))
+		print("For query: %s" % (query))
 		jobs = [fetch(bindings) for (bindings) in params]
 		results = self.loop.run_until_complete(asyncio.gather(*jobs))
 		return results   
