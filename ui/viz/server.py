@@ -7,7 +7,7 @@ import logging
 import networkx
 
 sys.path.append(os.path.expanduser('~/adapt/pylib'))
-sys.path.append(os.path.expanduser('/vagrant/classifier'))
+sys.path.append(os.path.expanduser('/adapt/classifier'))
 from bareBonesTitanDB import BareBonesTitanClient
 
 from flask import Flask, render_template, url_for, request, Response
@@ -43,7 +43,7 @@ def classification():
                       'activityId' : activityId,
                       'activityType' : activityType,
                       'suspicionScore' : suspicionScore })
-    
+
     return render_template('classification.html', rows = data)
 
 @app.route('/show_segment/<id>')
