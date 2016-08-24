@@ -32,13 +32,13 @@ if __name__ == '__main__':
 
     query = 'g.V().has(label,x).count()'
     params = [{'x':x} for x in ['Entity-File',
-								'Entity-NetFlow',
-								'Entity-Memory',
-								'Resource',
-								'Subject',
-								'Host',
-								'Agent',
-								'Segment']
+                                'Entity-NetFlow',
+                                'Entity-Memory',
+                                'Resource',
+                                'Subject',
+                                'Host',
+                                'Agent',
+                                'Segment']
     result2 = gremlin.execute_many_params(query,params,processors)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
