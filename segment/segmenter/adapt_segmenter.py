@@ -338,15 +338,15 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			t1 = time.time()
 			self.titanclient.execute(self.createTimeSegment_query())
 			t2 = time.time()
-			sys.stdout.write('Time segments created in %fs\n' % (t2-t1))
+			self.log('info','Time segments created in %fs\n' % (t2-t1))
 			return "Time segments created"
 		t1 = time.time()
 		count=self.getNumberVerticesWithProperty()[0]
 		t2 = time.time()
-		sys.stdout.write('%d parent nodes with criterion %s found in %fs\n' % (count, self.criterion, (t2-t1)))
+		self.log('info','%d parent nodes with criterion %s found in %fs\n' % (count, self.criterion, (t2-t1)))
 		if count>0:
 			if (self.checkCriterionType() == False):
-				print('The segments cannot be created or stored. The segment criterion type is not defined.')
+				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
                 
@@ -354,7 +354,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					t1 = time.time()
 					self.titanclient.execute(self.createVertices_query())
 					t2 = time.time()
-					sys.stdout.write('Segment nodes created in %fs' % (t2 - t1))
+					self.log('info','Segment nodes created in %fs' % (t2 - t1))
 					return "Nodes created"
                 
 				elif self.store_segment == 'Yes':
@@ -362,17 +362,17 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					t1 = time.time()
 					self.titanclient.execute(self.addEdges_query())
 					t2 = time.time()
-					sys.stdout.write('Segments created in %fs\n' % (t2-t1))
+					self.log('info','Segments created in %fs\n' % (t2-t1))
 					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
 					t3 = time.time()
-					sys.stdout.write('Segment edges created in %fs\n' % (t3-t2))
-					sys.stdout.write('Total segmentation time %fs\n' % (t3-t1))
+					self.log('info','Segment edges created in %fs\n' % (t3-t2))
+					self.log('info','Total segmentation time %fs\n' % (t3-t1))
 					return "Segments created"
 				else:
-					sys.stdout.write('No segment to store.\n')
+					self.log('info','No segment to store.\n')
 					return "No segment"
 		else: # count == 0
-			sys.stdout.write("No node with property: %s. Nothing to store.\n" % self.criterion)
+			self.log('error',"No node with property: %s. Nothing to store.\n" % self.criterion)
 			return "Unknown segmentation criterion"
 		
 	def log(self,type_log,text):
