@@ -385,7 +385,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 
 	def run(self):
 		self.log('info','*' * 30)
-		self.log('info',Running DB side segmenter')
+		self.log('info','Running DB side segmenter')
 		self.log('info','*' * 30)
 		if self.drop_db:
 			tc=self.titanclient
