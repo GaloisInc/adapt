@@ -85,7 +85,7 @@ class SimpleTitanGremlinSegmenter:
 		self.logger = logging.getLogger(__name__)
 		self.logToKafka = args.log_to_kafka
 		if self.logToKafka:
-			self.producer = kafka.KafkaProducer(version='0.9',bootstrap_servers=[args.kafka])
+			self.producer = kafka.KafkaProducer(api_version='0.9',bootstrap_servers=[args.kafka])
 		self.params = {'segmentNodeName': property_segmentNodeName,
 					   'segmentEdgeLabel': property_segmentEdgeLabel,
 					   'seg2segEdgeLabel': property_seg2segEdgeLabel,
