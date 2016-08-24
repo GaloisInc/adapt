@@ -42,11 +42,11 @@ if __name__ == '__main__':
     params = [{'x':'Entity-File'},
               {'x':'Entity-NetFlow'},
               {'x':'Entity-Memory'},
-              {'x':'Resources'},
-              {'x':'Subjects'},
-              {'x':'Hosts'},
-              {'x':'Agents'},
-              {'x':'Segments'}]
+              {'x':'Resource'},
+              {'x':'Subject'},
+              {'x':'Host'},
+              {'x':'Agent'},
+              {'x':'Segment'}]
     result2 = gremlin.execute_many_params(query,params,processors)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
