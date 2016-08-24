@@ -38,7 +38,8 @@ if __name__ == '__main__':
     for (n,q,r) in result1:
         print(n,"\t",q,"\n\t",r)
 
-    params = [{'x':'Entity-File'},
+    query = 'g.V().has(label,x).count()'
+	params = [{'x':'Entity-File'},
 			  {'x':'Entity-NetFlow'},
 			  {'x':'Entity-Memory'},
 			  {'x':'Resources'},
@@ -46,9 +47,10 @@ if __name__ == '__main__':
 			  {'x':'Hosts'},
 			  {'x':'Agents'},
 			  {'x':'Segments'}]
-    result2 = gremlin.execute_many_params('g.V().has(label,x).count()',
-										 params,processors)
-										 
+    result2 = gremlin.execute_many_params(query,params,processors)
+    for (b,r) in result2:
+        print(query,"\t",b,"\n\t",r)
+									 
 
 
 

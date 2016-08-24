@@ -29,6 +29,8 @@ class TitanClient:
 		self.loop.close()
 
 	def execute(self, gremlin_query_str, bindings={}):
+		'''Run a single gremlin query and collect complete 
+		results, optionally with parameters'''
 		@asyncio.coroutine
 		def stream(gc):
 			result_data = []
@@ -84,7 +86,7 @@ class TitanClient:
 				result = yield from self.gc.execute(query,bindings=bindings)
 				t2 = time.time()
 				print("Finished: %a in %fs" % (bindings,t2-t1))
-				return (name,bindings,result)
+				return (bindings,result)
 			
 		print("For query: %s" % (query))
 		jobs = [fetch(bindings) for (bindings) in params]
