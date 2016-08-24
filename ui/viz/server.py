@@ -8,7 +8,7 @@ import networkx
 
 sys.path.append(os.path.expanduser('~/adapt/pylib'))
 sys.path.append(os.path.expanduser('~/adapt/classifier'))
-from bareBonesTitanDB import BareBonesTitanClient
+from titanDB import TitanClient as BareBonesTitanClient
 
 from flask import Flask, render_template, url_for, request, Response
 from logging import FileHandler
