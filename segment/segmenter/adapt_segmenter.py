@@ -405,9 +405,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 
 	def makeRadiusSegments(self):
 		if self.processes == 1:
-			self.makeRadiusSegmentsSequential()
+			return self.makeRadiusSegmentsSequential()
 		else:
-			self.makeRadiusSegmentsParallel()
+			return self.makeRadiusSegmentsParallel()
 		
 
 	def storeSegments(self):

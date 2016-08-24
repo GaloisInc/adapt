@@ -4,6 +4,8 @@ import asyncio
 from aiogremlin import GremlinClient
 import sys
 import time
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+from titanDB import TitanClient 
 
 QUERYV = "g.V().count()"
 QUERYE = "g.E().count()"
@@ -30,7 +32,7 @@ class GremlinQueryRunner:
     def fetch(self, query):
         return self.loop.run_until_complete(self.gc.execute(query))
 
-    def fetch_many(self, queries,sem_num):
+    def fetch_many(self, queries, sem_num):
         sem=asyncio.Semaphore(sem_num)
         @asyncio.coroutine
         def fetch(name,query): 
@@ -53,7 +55,7 @@ class GremlinQueryRunner:
 
 if __name__ == '__main__':
 
-    gremlin = GremlinQueryRunner()
+    gremlin = TitanClient()
     
     if len(sys.argv) > 1:
         processors = int(sys.argv[1])
