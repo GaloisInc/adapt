@@ -19,8 +19,8 @@ QUERIES = [
     ('Hosts',"g.V().has(label, 'Host').count()"),
     ('Agents',"g.V().has(label, 'Agent').count()"),
     ('Segments',"g.V().has(label, 'Segment').count()"),
-	('Nodes',QUERYV),
-	('Edges',QUERYE)
+    ('Nodes',QUERYV),
+    ('Edges',QUERYE)
 ]
 
 
@@ -39,18 +39,18 @@ if __name__ == '__main__':
         print(n,"\t",q,"\n\t",r)
 
     query = 'g.V().has(label,x).count()'
-	params = [{'x':'Entity-File'},
-			  {'x':'Entity-NetFlow'},
-			  {'x':'Entity-Memory'},
-			  {'x':'Resources'},
-			  {'x':'Subjects'},
-			  {'x':'Hosts'},
-			  {'x':'Agents'},
-			  {'x':'Segments'}]
+    params = [{'x':'Entity-File'},
+              {'x':'Entity-NetFlow'},
+              {'x':'Entity-Memory'},
+              {'x':'Resources'},
+              {'x':'Subjects'},
+              {'x':'Hosts'},
+              {'x':'Agents'},
+              {'x':'Segments'}]
     result2 = gremlin.execute_many_params(query,params,processors)
     for (b,r) in result2:
         print(query,"\t",b,"\n\t",r)
-									 
+                                     
 
 
 
