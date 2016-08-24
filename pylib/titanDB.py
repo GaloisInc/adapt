@@ -49,20 +49,20 @@ class TitanClient:
 		return result
 
 	def fetch_many(self,queries, sem_num):
-			sem=asyncio.Semaphore(sem_num)
-			@asyncio.coroutine
-			def fetch(name,query): 
-				with (yield from sem):
-					print("Starting: %s" % name)
-					t1 = time.time()
-					result = yield from self.gc.execute(query)
-					t2 = time.time()
-					print("Finished: %s in %fs" % (name,t2-t1))
-					return (name,query,result)
-				
-	    jobs = [fetch(name,query) for (name,query) in queries]
-			results = self.loop.run_until_complete(asyncio.gather(*jobs))
-			return results   
+		sem=asyncio.Semaphore(sem_num)
+		@asyncio.coroutine
+		def fetch(name,query): 
+			with (yield from sem):
+				print("Starting: %s" % name)
+				t1 = time.time()
+				result = yield from self.gc.execute(query)
+				t2 = time.time()
+				print("Finished: %s in %fs" % (name,t2-t1))
+				return (name,query,result)
+			
+		jobs = [fetch(name,query) for (name,query) in queries]
+		results = self.loop.run_until_complete(asyncio.gather(*jobs))
+		return results   
 
 
 	def drop_db(self):
