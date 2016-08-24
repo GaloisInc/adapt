@@ -49,7 +49,11 @@ class TitanClient:
 		result = self.loop.run_until_complete(stream(self.gc))
 		return result
 
-	def fetch_many(self,queries, sem_num):
+	def execute_many(self,queries, sem_num):
+		'''
+		Execute many queries simultaneously, with up to sem_num 
+		concurrent requests.
+		'''
 		sem=asyncio.Semaphore(sem_num)
 		@asyncio.coroutine
 		def fetch(name,query): 
@@ -62,6 +66,27 @@ class TitanClient:
 				return (name,query,result)
 			
 		jobs = [fetch(name,query) for (name,query) in queries]
+		results = self.loop.run_until_complete(asyncio.gather(*jobs))
+		return results   
+
+	def execute_many_params(self,query,params, sem_num):
+		'''
+		Execute many variants of the same query simultaneously, 
+		with up to sem_num concurrent requests, using the parameter bindings
+		given in the list params.
+		'''
+		sem=asyncio.Semaphore(sem_num)
+		@asyncio.coroutine
+		def fetch(name,bindings): 
+			with (yield from sem):
+				print("Starting: %s %a" % (name,bindings))
+				t1 = time.time()
+				result = yield from self.gc.execute(query,bindings)
+				t2 = time.time()
+				print("Finished: %s %a in %fs" % (name,bindings,t2-t1))
+				return (name,bindings,result)
+			
+		jobs = [fetch(name,bindings) for (name,params) in params]
 		results = self.loop.run_until_complete(asyncio.gather(*jobs))
 		return results   
 
