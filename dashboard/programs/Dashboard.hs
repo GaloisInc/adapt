@@ -144,11 +144,10 @@ main =
             threadDelay 5000000
 
 data Channels = Channels { igChan, pxChan, seChan, adChan, acChan, dxChan :: TChan Text }
-data Status   = Status   { igStat :: Seq Text
-                         , pxStat, seStat, adStat, acStat, dxStat :: Text }
+data Status   = Status   { igStat, pxStat, seStat, adStat, acStat, dxStat :: Seq Text }
 
 defaultStatus :: Status
-defaultStatus = Status Seq.empty "" "" "" "" ""
+defaultStatus = Status Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty 
 
 dashboard :: Config -> MVar Status -> Application
 dashboard c curr = serve dashboardAPI (lonePage c curr :<|> rawStuff)
@@ -173,34 +172,35 @@ lonePage c stMV =
                 , readonly_ "true"
                 , rows_ "25", cols_ "140"]
                 (toHtml $ T.unlines $ F.toList igStat)
-      h2_ "Pattern Extraction"
-      textarea_ [ id_ "ig_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml pxStat)
+      -- h2_ "Pattern Extraction"
+      -- textarea_ [ id_ "pe_textarea"
+      --           , readonly_ "true"
+      --           , rows_ "25", cols_ "140"]
+      --           (toHtml pxStat)
       h2_ "Segmentation"
-      textarea_ [ id_ "ig_textarea"
+      textarea_ [ id_ "se_textarea"
                 , readonly_ "true"
                 , rows_ "25", cols_ "140"]
-                (toHtml seStat)
+                (toHtml $ T.unlines $ F.toList seStat)
       h2_ "Anomaly Detection"
-      textarea_ [ id_ "ig_textarea"
+      textarea_ [ id_ "ad_textarea"
                 , readonly_ "true"
                 , rows_ "25", cols_ "140"]
-                (toHtml adStat)
+                (toHtml $ T.unlines $ F.toList adStat)
       h2_ "Activity Classification"
-      textarea_ [ id_ "ig_textarea"
+      textarea_ [ id_ "ac_textarea"
                 , readonly_ "true"
                 , rows_ "25", cols_ "140"]
-                (toHtml acStat)
+                (toHtml $ T.unlines $ F.toList acStat)
       h2_ "Diagnostics"
-      textarea_ [ id_ "ig_textarea"
+      textarea_ [ id_ "dx_textarea"
                 , readonly_ "true"
                 , rows_ "25", cols_ "140"]
-                (toHtml dxStat)
+                (toHtml $ T.unlines $ F.toList dxStat)
       h2_ "UI"
       a_ [href_ "http://localhost:8181"] "Segment Graph Viewer"
       a_ [href_ "http://localhost:8181/graph"] "General Graph Viewer"
+      a_ [href_ "http://localhost:8181/log"] "General Graph Viewer log"
       return ()
 
 updateStatus :: Channels -> MVar Status -> IO ()
@@ -210,11 +210,16 @@ updateStatus (Channels {..}) stMV = forever (go >> threadDelay 100000)
   go = mapM_ (uncurry doMod)
              [ (igChan, (\st x -> st { igStat = let len = Seq.length (igStat st)
                                                 in Seq.drop (len-1000) (igStat st Seq.|> x) }))
-             , (pxChan, (\st x -> st { pxStat = x }))
-             , (seChan, (\st x -> st { seStat = x }))
-             , (adChan, (\st x -> st { adStat = x }))
-             , (acChan, (\st x -> st { acStat = x }))
-             , (dxChan, (\st x -> st { dxStat = x }))
+             , (pxChan, (\st x -> st { pxStat = let len = Seq.length (pxStat st)
+                                                in Seq.drop (len-1000) (pxStat st Seq.|> x) }))
+             , (seChan, (\st x -> st { seStat = let len = Seq.length (seStat st)
+                                                in Seq.drop (len-1000) (seStat st Seq.|> x) }))
+             , (adChan, (\st x -> st { adStat = let len = Seq.length (adStat st)
+                                                in Seq.drop (len-1000) (adStat st Seq.|> x) }))
+             , (acChan, (\st x -> st { acStat = let len = Seq.length (acStat st)
+                                                in Seq.drop (len-1000) (acStat st Seq.|> x) }))
+             , (dxChan, (\st x -> st { dxStat = let len = Seq.length (dxStat st)
+                                                in Seq.drop (len-1000) (dxStat st Seq.|> x) }))
              ]
 
   doMod ch setter =
