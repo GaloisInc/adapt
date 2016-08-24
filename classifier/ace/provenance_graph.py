@@ -62,6 +62,23 @@ class ProvenanceGraph(object):
 
             yield(nodeId, G)
 
+    def getSegment(self, segmentId):
+        query = "g.V({}).has(label, 'Segment')".format(segmentId)
+        node = self.titanClient.execute(query)[0]
+        G = networkx.Graph()
+
+        nodeId = node['id']
+        G.add_node(nodeId)
+
+        query = "g.V({}).out('segment:includes')"
+        adjacentNodes = self.titanClient.execute(query.format(nodeId))
+        for adjacentNode in adjacentNodes:
+            adjacentNodeId = adjacentNode['id']
+            G.add_node(adjacentNodeId)
+            G.add_edge(nodeId, adjacentNodeId)
+
+        return G
+            
     def getActivityTypes(self, segmentIds):
         result = []
 
@@ -72,6 +89,15 @@ class ProvenanceGraph(object):
 
         return result
 
+    def getActivity(self, segmentId):
+        result = []
+
+        query = "g.V({}).out('activity:includes')".format(segmentId)
+        node = self.titanClient.execute(query)
+        return (node[0]['id'],
+                node[0]['properties']['activity:type'][0]['value'],
+                node[0]['properties']['activity:suspicionScore'][0]['value'])
+    
     def getUnclassifiedSegments(self):
         query = "g.V().hasLabel('Segment').where(__.not(outE('activity:includes')))"
         nodes = self.titanClient.execute(query)
