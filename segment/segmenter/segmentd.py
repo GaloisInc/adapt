@@ -103,7 +103,7 @@ def arg_parser():
                    default='localhost:9092')
     p.add_argument('--spec', help='Segmentation specification to use',
                    default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
-	p.add_argument('--processes', help='Number of transactions to spawn in parallel', default=1)
+    p.add_argument('--processes', help='Number of transactions to spawn in parallel', default=1)
     return p
 
 
