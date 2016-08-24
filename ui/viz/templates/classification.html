@@ -1,0 +1,23 @@
+<html>
+  <body>
+    <h1>Classification Visualizer</h1>
+    <table border="1">
+      <thead>
+        <th>Segment Id</th>
+        <th>Activty Id</th>
+        <th>Activty Name</th>
+        <th>Suspicion Score</th>
+      </thead>
+      <tbody>
+        {%- for row in rows %}
+        <tr>
+          <td><a href="/show_segment/{{ row['segmentId'] }}">{{ row['segmentId'] }}</a></td>
+          <td>{{ row['activityId'] }}</td>
+          <td contentEditable>{{ row['activityType'] }}</td>
+          <td contentEditable>{{ row['suspicionScore'] }}</td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

@@ -133,6 +133,7 @@ install_adapt_dependencies() {
         flake8 \
         gremlinrestclient \
         networkx \
+        pydot \
         numpy \
         sklearn \
         scipy \
