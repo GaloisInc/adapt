@@ -377,9 +377,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		
 	def log(self,type_log,text):
 		if type_log=='info':
-			self.logger.info(text+"\n")
+			self.logger.info(text)
 		if type_log=='error':
-			self.logger.error(text+"\n")
+			self.logger.error(text)
 		if self.logToKafka:
 			self.producer.send("se-log", str.encode(text))
 
