@@ -349,20 +349,21 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 """ % self.params
 		return timeSegment_query
     
-	def storeSegments(self):
-		'''
-		creates segments in the database (only segment nodes 
-		when '--store-segment' is equal to 'OnlyNodes' and 
-		full segments when it is equal to 'Yes')
-		'''
-		self.createSchemaElements()
-		
-		if self.time_segment == True:
-			t1 = time.time()
+	def makeTimeSegmentsParallel(self):
+		self.log('error','Parallel segmentation NYI')
+		return "NYI"
+
+	def makeTimeSegments(self):
+		t1 = time.time()
+		if self.processes == 1:
 			self.titanclient.execute(self.createTimeSegment_query())
-			t2 = time.time()
-			self.log('info','Time segments created in %fs' % (t2-t1))
-			return "Time segments created"
+		else:
+			self.makeTimeSegmentsParallel()
+		t2 = time.time()
+		self.log('info','Time segments created in %fs' % (t2-t1))
+		return "Time segments created"
+
+	def makeRadiusSegmentsSequential(self):
 		t1 = time.time()
 		count=self.getNumberVerticesWithProperty()[0]
 		t2 = time.time()
@@ -397,6 +398,31 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		else: # count == 0
 			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
 			return "Unknown segmentation criterion"
+
+	def makeRadiusSegmentsParallel(self):
+		self.log('error','Parallel segmentation NYI')
+		return "NYI"
+
+	def makeRadiusSegments(self):
+		if self.processes == 1:
+			self.makeRadiusSegmentsSequential()
+		else:
+			self.makeTimeSegmentsParallel()
+		
+
+	def storeSegments(self):
+		'''
+		creates segments in the database (only segment nodes 
+		when '--store-segment' is equal to 'OnlyNodes' and 
+		full segments when it is equal to 'Yes')
+		'''
+		self.createSchemaElements()
+		
+		if self.time_segment == True:
+			return self.makeTimeSegments()
+		else:
+			return self.makeRadiusSegments()
+
 		
 	def log(self,type_log,text):
 		if type_log=='info':
