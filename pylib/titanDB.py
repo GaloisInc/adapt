@@ -60,6 +60,22 @@ class TitanClient:
 		@asyncio.coroutine
 		def fetch(name,query): 
 			with (yield from sem):
+				result = yield from self.gc.execute(query)
+				return (name,query,result)
+			
+		jobs = [fetch(name,query) for (name,query) in queries]
+		results = self.loop.run_until_complete(asyncio.gather(*jobs))
+		return results   
+
+	def execute_many_dbg(self,numprocs,queries):
+		'''
+		Debugging version of execute_many.  Prints start, end and timing 
+		information for each job.
+		'''
+		sem=asyncio.Semaphore(numprocs)
+		@asyncio.coroutine
+		def fetch(name,query): 
+			with (yield from sem):
 				print("Starting: %s" % name)
 				t1 = time.time()
 				result = yield from self.gc.execute(query)
@@ -81,6 +97,22 @@ class TitanClient:
 		@asyncio.coroutine
 		def fetch(bindings): 
 			with (yield from sem):
+				result = yield from self.gc.execute(query,bindings=bindings)
+				return (bindings,result)
+			
+		jobs = [fetch(bindings) for (bindings) in params]
+		results = self.loop.run_until_complete(asyncio.gather(*jobs))
+		return results   
+
+	def execute_many_params_dbg(self,numprocs,query,params):
+		'''
+        Debugging version of execute_many_params. Prints job start and 
+		end messages with times.
+		'''
+		sem=asyncio.Semaphore(numprocs)
+		@asyncio.coroutine
+		def fetch(bindings): 
+			with (yield from sem):
 				print("Starting: %a" % (bindings))
 				t1 = time.time()
 				result = yield from self.gc.execute(query,bindings=bindings)
@@ -92,7 +124,6 @@ class TitanClient:
 		jobs = [fetch(bindings) for (bindings) in params]
 		results = self.loop.run_until_complete(asyncio.gather(*jobs))
 		return results   
-
 
 	def drop_db(self):
 		r = self.execute('g.V().drop().iterate()')
