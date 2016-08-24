@@ -157,7 +157,7 @@ opts = OptSpec { progDefaults  = defaultConfig
                     $ ReqArg "INT" $
                       \str s ->
                         case readMaybe str of
-                          Just n  -> Right (s & stopAfterCount .~ n)
+                          Just n  -> Right (s & stopAfterCount .~ Just n)
                           Nothing -> Left "Could not parse starting offset."
                   ]
                }
