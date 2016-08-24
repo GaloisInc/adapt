@@ -81,7 +81,7 @@ class TitanClient:
 			with (yield from sem):
 				print("Starting: %a" % (bindings))
 				t1 = time.time()
-				result = yield from self.gc.execute(query,bindings)
+				result = yield from self.gc.execute(query,bindings=bindings)
 				t2 = time.time()
 				print("Finished: %a in %fs" % (bindings,t2-t1))
 				return (name,bindings,result)
