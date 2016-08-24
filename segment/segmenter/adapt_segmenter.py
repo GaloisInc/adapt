@@ -400,8 +400,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('info','Segmentation done')
 			else:
 				self.log('error','Unknown segmentation criterion')
-			self.producer.flush()
-			self.producer.close(2)
+			if self.logToKafka:
+				self.producer.flush()
+				self.producer.close(2)
 			sys.exit()
 		else:
 			if self.verbose:
@@ -416,8 +417,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					self.log('info','Segment nodes stored in Titan DB')
 			self.titanclient.close()
 			self.log('info','Segmentation finished')
-			self.producer.flush()
-			self.producer.close(2)
+			if self.logToKafka:
+				self.producer.flush()
+				self.producer.close(2)
 			sys.exit()
 			
 
