@@ -400,6 +400,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('info','Segmentation done\n')
 			else:
 				self.log('error','Unknown segmentation criterion\n')
+			self.producer.flush()
 			sys.exit()
 		else:
 			if self.verbose:
@@ -414,6 +415,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					self.log('info','Segment nodes stored in Titan DB\n')
 			self.titanclient.close()
 			self.log('info','\nSegmentation finished\n')
+			self.producer.flush()
 			sys.exit()
 			
 
