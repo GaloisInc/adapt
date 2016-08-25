@@ -135,7 +135,7 @@ class SimpleTitanGremlinSegmenter:
 		and gives it property P with value v_n
 		'''
 		query="""\
-for (i in g.V().has('%(criterion)s').id()) {\
+for (i in g.V().has('%(criterion)s').has(label,neq('Segment')).id()) {\
 graph.addVertex(label,'segment',\
 '%(segmentNodeName)','%(segmentName)s',\
 '%(criterion)s+',g.V(i).values('%(criterion)s').next())\
@@ -191,7 +191,7 @@ subGraph=g.V(%(vertexId)d).repeat(__.%(directionEdges)sE()\
 			return 0
 
 		seedVertices="""\
-g.V().has(\'%(criterion)s\').id().fold().next()\
+g.V().has(\'%(criterion)s\').has(label,neq('Segment')).id().fold().next()\
 """ % self.params
 		subgraphQuery="""\
 sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV())\
