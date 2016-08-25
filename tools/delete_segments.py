@@ -15,9 +15,7 @@ def drop_all():
     # in which case verify no background tasks are inserting,
     # and if necessary then: stop, /opt/titan/bin/titan.sh clean, start.
     with gremlin_query.Runner() as gremlin:
-        for x in ['E().has(label,\'segment:edge\')', 
-                  'E().has(label,\'segment:includes\')',
-                  'V().has(label,\'Segment\')']:
+        for x in ['V().has(\'segment:name\',within(\'byPID\',\'byTime\')).has(label,\'Segment\')']:
             for q in ['g.%s.drop().iterate()  ' % x,
                       'graph.tx().commit()     ']:
                 print(q, gremlin.fetch(q))
