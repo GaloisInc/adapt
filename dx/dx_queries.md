@@ -4,7 +4,7 @@
 
 Start the traversal - any segmentation node without ancestors:
 ```groovy
-g.V().hasLabel('Segment').where(__.in('segment:edge').count().is(0))
+g.V().has('segment:name','byPID').where(__.in('segment:edge').count().is(0))
 ```
 
 Finding a segment `X`'s successors:
