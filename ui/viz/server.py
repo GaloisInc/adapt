@@ -7,8 +7,8 @@ import logging
 
 import networkx
 
-sys.path.append(os.path.expanduser('/vagrant/pylib'))
-sys.path.append(os.path.expanduser('/vagrant/classifier'))
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+sys.path.append(os.path.expanduser('~/adapt/classifier'))
 from titanDB import TitanClient as BareBonesTitanClient
 
 from flask import Flask, render_template, url_for, request, Response
