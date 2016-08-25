@@ -125,18 +125,22 @@ install_adapt_dependencies() {
         kafka-python \
         tornado \
       || handle_error $LINENO
-    sudo -H pip3 install \
-        Arpeggio \
-        avroknife \
-        aiogremlin \
-        coverage \
-        dnspython \
-        flake8 \
-        gremlinrestclient \
-        networkx \
-        parsley \
-        pyparsing \
-        flask \
+      sudo -H pip3 install \
+          Arpeggio \
+          avroknife \
+          aiogremlin \
+          coverage \
+          dnspython \
+          flake8 \
+          gremlinrestclient \
+          networkx \
+          pydot \
+          numpy \
+          sklearn \
+          scipy \
+          parsley \
+          pyparsing \
+          flask \
       || handle_error $LINENO
 
     sudo -H pip3 install -r $ADAPT_DIR/dx/simulator/config/requirements.txt
