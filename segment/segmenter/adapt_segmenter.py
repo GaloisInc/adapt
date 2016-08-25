@@ -418,15 +418,19 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		return timeSegment_query
 	 
 	def makeTimeSegmentsParallel(self):
-		starts = self.titanclient.execute(self.timeSegmentStarts_query())
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
+		t1 = time.time()
 		starts = self.titanclient.execute(self.timeSegmentStarts_query())
+		t2 = time.time()
+		self.log('info','Got segment starts in %fs' % (t2-t1))
 		count = len(starts)
 		if count > 0:
 			params = [{'s':start} for start in starts]
 			self.titanclient.execute_many_params_dbg(self.processes,
 													 self.makeTimeSegmentStarting_query(),
 													 params)
+			t3 = time.time()
+			self.log('info','Created segments in %fs' % (t3-t2))
 		else:
 			return "No time segments to create"
 	
