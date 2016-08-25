@@ -2,12 +2,13 @@ import os
 import sys
 import json
 import re
+import flask
 import logging
 
 import networkx
 
-sys.path.append(os.path.expanduser('~/adapt/pylib'))
-sys.path.append(os.path.expanduser('~/adapt/classifier'))
+sys.path.append(os.path.expanduser('/vagrant/pylib'))
+sys.path.append(os.path.expanduser('/vagrant/classifier'))
 from titanDB import TitanClient as BareBonesTitanClient
 
 from flask import Flask, render_template, url_for, request, Response
@@ -45,6 +46,21 @@ def classification():
                       'suspicionScore' : suspicionScore })
 
     return render_template('classification.html', rows = data)
+
+@app.route('/edit_activity/<id>', methods = ['GET'])
+def edit_activity(id):
+    id = int(id)
+    name = flask.request.args['name']
+    value = flask.request.args['value']
+    value = value.replace('<br>', '')
+    if name == 'type':
+        provenanceGraph.changeActivityType(id, value)
+    elif name == 'score':
+        provenanceGraph.changeActivitySuspicionScore(id, value)
+    else:
+        return "FAIL"
+    
+    return "OK"
 
 @app.route('/show_segment/<id>')
 def show_segment(id):

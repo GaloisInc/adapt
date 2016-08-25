@@ -26,6 +26,18 @@ class ProvenanceGraph(object):
         node = self.titanClient.execute(query)
 
         return node[0]
+
+    def changeActivityType(self, activityId, value):
+        query  = "g.V({}).property('activity:type', '{}')".format(activityId, value)
+        node = self.titanClient.execute(query)
+
+    def changeActivitySuspicionScore(self, activityId, value):
+        query  = "g.V({}).property('activity:suspicionScore', '{}')".format(activityId, value)
+        node = self.titanClient.execute(query)
+
+    def changeAcitivitySuspicionScore(self, acitivityId, value):
+        query  = "x"
+        node = self.titanClient.execute(query)
         
     def deleteActivities(self):
         query = "g.V().has(label, 'Activity').drop().iterate()"
