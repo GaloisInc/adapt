@@ -77,7 +77,7 @@ def arg_parser():
 	p.add_argument('--directionEdges', '-e',
 				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
 				   choices=['in','out','both'],default='both')
-p.add_argument('--window', '-w', 
+	p.add_argument('--window', '-w', 
 				   help='The segmentation time window in seconds', 
 				   type=int, default=60)
 	p.add_argument('--verbose','-v', 
@@ -439,7 +439,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		
 		if self.time_segment == True:
 			return self.makeTimeSegments()
-		else if self.radius_segment == True:
+		elif self.radius_segment == True:
 			return self.makeRadiusSegments()
 
 		
