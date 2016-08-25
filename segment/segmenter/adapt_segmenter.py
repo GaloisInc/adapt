@@ -357,6 +357,22 @@ s.addEdge('%(segmentEdgeLabel)s',node)\
 }""" % self.params
 		return addEdgesInitially_query
 
+	def addEdgesId_query(self):
+		addEdgesIds_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id()" % self.params
+		return addEdgesIds_query
+
+	def addEdgesIter_query(self):
+		addEdgesIter_query="""
+sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+subtr=sub.traversal(); \
+s=graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(i).values('%(criterion)s').next(),\
+'%(segmentParentId)s',i);\
+for (node in subtr.V()) {\
+s.addEdge('%(segmentEdgeLabel)s',node)\
+}""" % self.params
+		return addEdgesIter_query
 
 	def addSeg2SegEdges_query(self): 
 		addSeg2SegEdges_query="""\
@@ -367,8 +383,6 @@ for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
 }""" % self.params
-	
-
 		return addSeg2SegEdges_query
 
 	def createTimeSegment_query(self):
