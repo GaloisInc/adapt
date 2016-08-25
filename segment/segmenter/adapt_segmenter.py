@@ -161,7 +161,7 @@ graph.addVertex(label,'segment',\
 		'''
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0)).id().fold().next()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).id()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getSubgraphFromVertexId(self,vertexId):
@@ -328,6 +328,7 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }""" % self.params
 		return addEdges_query
 
+
 	def addSeg2SegEdges_query(self): 
 		addSeg2SegEdges_query="""\
 for (snode in g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()){\
@@ -353,16 +354,34 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 }\
 """ % self.params
 		return timeSegment_query
-    
+
+	def timeSegmentStarts_query(self):
+		timeSegmentStarts_query = """\
+g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t %% %(window)d}.dedup().order()\
+""" % self.params
+		return timeSegmentStarts_query
+
+	# TODO: Make variable naem a parameter and extend dictionary with it...
+		def makeTimeSegmentStarting_query(self):
+		timeSegment_query = """\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
+content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
+for(z in content) {\
+v.addEdge('%(segmentEdgeLabel)s',z) \
+}\
+""" % self.params
+		return timeSegment_query
+	 
 	def makeTimeSegmentsParallel(self):
-		t1 = time.time()
-		if self.processes == 1:
-			self.titanclient.execute(self.createTimeSegment_query())
+		starts = self.titanclient.execute(self.timeSegmentStarts_query())
+		count = len(starts)
+		if count > 0:
+			params = [{'s':start} for start in starts]
+			self.titanclient.execute_many_params_dbg(self.processes,
+													 self.makeTimeSegmentStarting_query(),
+													 params)
 		else:
-			self.makeTimeSegmentsParallel()
-		t2 = time.time()
-		self.log('info','Time segments created in %fs' % (t2-t1))
-		return "Time segments created"
+			return "No time segments to create"
 	
 	def makeTimeSegments(self):
 		t1 = time.time()
