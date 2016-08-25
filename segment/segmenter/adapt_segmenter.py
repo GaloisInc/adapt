@@ -155,7 +155,7 @@ graph.addVertex(label,'segment',\
 		query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
 		'''
 		query="g.V().has('%(criterion)s',gte(0)).count()" %  self.params
-		return self.titanclient.execute(query)
+		return self.titanclient.execute(query)[0]
 
 	def getVerticesWithPropertyIds(self):
 		'''
@@ -164,13 +164,13 @@ graph.addVertex(label,'segment',\
 		query="g.V().has('%(criterion)s',gte(0)).id()" %  self.params
 		return self.titanclient.execute(query)
 
-    def getSegmentCount(self):
-        '''return the number of segments already in the graph with
-        segmentName.
-        '''
-        query="g.V().has('%(segmentNodeName)s','%(segmentName)s').count()"
-        return self.titanclient.execute(query)
-    
+	def getSegmentCount(self):
+		'''return the number of segments already in the graph with
+		segmentName.
+		'''
+		query="g.V().has('%(segmentNodeName)s','%(segmentName)s').count()" % self.params
+		return self.titanclient.execute(query)[0]
+
 	def getSubgraphFromVertexId(self,vertexId):
 		'''
 		query Titan to retrieve the ids of nodes within a set radius of the node with id vertexId
@@ -186,7 +186,7 @@ subGraph=g.V(%(vertexId)d).repeat(__.%(directionEdges)sE()\
 		return self.titanclient.execute(subgraph_query+";"+subgraph_idRetrieval_query)
 
 	def getSegments(self):
-		count = self.getNumberVerticesWithProperty()[0]
+		count = self.getNumberVerticesWithProperty()
 		if count == 0:
 			return 0
 
@@ -314,9 +314,9 @@ graph.addVertex(label,'Segment',\
 		return createVertices_query
 
 	def addEdges_query(self):
-        '''
-        Creates segment nodes and segment:includes edges, checking for pre-existing nodes and edges.
-        '''
+		'''
+		Creates segment nodes and segment:includes edges, checking for pre-existing nodes and edges.
+		'''
 		addEdges_query ="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
 existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('%(segmentParentId)s').fold().next();\
@@ -338,11 +338,11 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }""" % self.params
 		return addEdges_query
 
-    	def addEdgesInitially_query(self):
-            '''
-            Creates radius segment nodes and edges, assuming that there are no
-            radius segments of this type in the database already.
-            '''
+	def addEdgesInitially_query(self):
+		'''
+		Creates radius segment nodes and edges, assuming that there are no
+		radius segments of this type in the database already.
+		'''
 		addEdgesInitially_query ="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
@@ -350,13 +350,13 @@ subtr=sub.traversal(); \
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
-'%(segmentParentId)s',i)\
+'%(segmentParentId)s',i);\
 idNonLinkedNodes=subtr.V().id().fold().next();\
 for (node in idNonLinkedNodes) {\
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
 }\
 }""" % self.params
-		return addEdges_query
+		return addEdgesInitially_query
 
 
 	def addSeg2SegEdges_query(self): 
@@ -427,7 +427,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 
 	def makeRadiusSegmentsSequential(self):
 		t1 = time.time()
-		count=self.getNumberVerticesWithProperty()[0]
+		count=self.getNumberVerticesWithProperty()
 		t2 = time.time()
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
@@ -450,9 +450,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			return "Unknown segmentation criterion"
 
 	def makeRadiusSegmentsParallel(self):
-        self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
+		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
-		count=self.getNumberVerticesWithProperty()[0]
+		count=self.getNumberVerticesWithProperty()
 		t2 = time.time()
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
