@@ -91,7 +91,7 @@ class TopLevelSegmenter:
 
         log.info("reporting %d", to_int(status))
         # Segmenter only talks to AD
-        s = self.producer.send("ac", status).get()
+        s = self.producer.send("ad", status).get()
         log.info("sent: %s", s)
 
 
