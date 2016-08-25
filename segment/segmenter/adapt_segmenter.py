@@ -147,21 +147,21 @@ graph.addVertex(label,'segment',\
 		query to Titan that retrieves all the nodes that have 
 		a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0))" % self.params
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment'))" % self.params
 		return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
 		'''
 		query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0)).count()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).count()" %  self.params
 		return self.titanclient.execute(query)[0]
 
 	def getVerticesWithPropertyIds(self):
 		'''
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0)).id()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id()" %  self.params
 		return self.titanclient.execute(query)
 
 	def getSegmentCount(self):
@@ -344,22 +344,23 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 		radius segments of this type in the database already.
 		'''
 		addEdgesInitially_query ="""\
-idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id(); \
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next();\
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 '%(segmentParentId)s',i);\
-for (node in subtr.V()) {\
-s.addEdge('%(segmentEdgeLabel)s',node)\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {\
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
 }\
 }""" % self.params
 		return addEdgesInitially_query
 
 	def addEdgesId_query(self):
-		addEdgesIds_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id()" % self.params
-		return addEdgesIds_query
+		addEdgesId_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
+		return addEdgesId_query
 
 	def addEdgesIter_query(self):
 		addEdgesIter_query="""
@@ -369,8 +370,9 @@ s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 '%(segmentParentId)s',i);\
-for (node in subtr.V()) {\
-s.addEdge('%(segmentEdgeLabel)s',node)\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {\
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
 }""" % self.params
 		return addEdgesIter_query
 
@@ -465,7 +467,8 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 	def makeRadiusSegmentsParallel(self):
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
-		count=self.getNumberVerticesWithProperty()
+		ids = self.titanclient.execute(self.addEdgesId_query())
+		count = len(ids)
 		t2 = time.time()
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
@@ -474,7 +477,8 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				return "Undefined criterion type"
 			else:
 				t1 = time.time()
-				self.titanclient.execute(self.addEdgesInitially_query())
+				params = [{'i':i} for i in ids]
+				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query(),params)
 				t2 = time.time()
 				self.log('info','Segments created in %fs' % (t2-t1))
 				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
