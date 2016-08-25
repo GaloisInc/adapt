@@ -36,51 +36,77 @@ class AnomalyView:
         self.total_nodes = 0
 
     def compute_view_and_save(self):
-        log.info("Writing " + self.view_type + " view features to file: " + self.feature_file)
-        f = open(self.feature_file, "w")
-
-        # write feature headers
-        f.write("id")
-        for k in sorted(self.features_queries.keys()):
-            f.write("," + k)
-        f.write("\n")
-
-        # extract and write features
+        # extract features
+        keys = sorted(self.features_queries.keys())
         with gremlin_query.Runner() as gremlin:
-            ids = gremlin.fetch_data(self.node_ids_query)
-            cnt = 0
+            try:
+                ids = gremlin.fetch_data(self.node_ids_query)
+            except:
+                log.exception("Exception query:" + self.node_ids_query)
+                return False
+
             self.total_nodes = len(ids)
             log.info("Found " + str(self.total_nodes) + " " + view_type + " nodes")
+            if self.total_nodes == 0:
+                return False
             log.info("Extracting features...")
-            for id in ids:
-                f.write(str(id))
-                for k in sorted(self.features_queries.keys()):
-                    res = gremlin.fetch_data( self.features_queries[k].format(id=id) )[0]
-                    f.write("," + str(res))
-                f.write("\n")
-                cnt = cnt + 1
-                if cnt % math.ceil(self.total_nodes/10) == 0 and cnt != self.total_nodes:
-                    log.info("%.2f%% done" % round(cnt*100/self.total_nodes, 2))
-            if self.total_nodes % 10 != 0:
-                log.info("100.00% done")
+            res = {}
+            for k in keys:
+                if type(self.features_queries[k]) == type(dict()):
+                    try:
+                        first = gremlin.fetch_data(self.node_ids_query[:-4] + self.features_queries[k]['first'])
+                    except:
+                        log.exception("Exception at query:" + self.node_ids_query[:-4] + self.features_queries[k]['first'])
+                        return False
+
+                    try:
+                        second = gremlin.fetch_data(self.node_ids_query[:-4] + self.features_queries[k]['second'])
+                    except:
+                        log.exception("Exception at query:" + self.node_ids_query[:-4] + self.features_queries[k]['second'])
+                        return False
+                    try:
+                        if self.features_queries[k]['operator'] == 'subTime':
+                            res[k] = [(i - j) / 1.0e6 for i,j in zip(first,second)]
+                        elif self.features_queries[k]['operator'] ==  'div(SubTime)':
+                            third = gremlin.fetch_data(self.node_ids_query[:-4] + self.features_queries[k]['third'])
+                            res[k] = [(i / ((j - k) / 1.0e6)) for i,j,k in zip(first,second,third)]
+                        elif self.features_queries[k]['operator'] ==  '(SubTime)div':
+                            third = gremlin.fetch_data(self.node_ids_query[:-4] + self.features_queries[k]['third'])
+                            res[k] = [(((i - j) / 1.0e6) / k) for i,j,k in zip(first,second,third)]
+                        else:
+                            log.info("Unknown operator" + self.features_queries[k]['operator'])
+                    except:
+                        log.exception("Exception at query:" + self.node_ids_query[:-4] + self.features_queries[k]['third'])
+                        return False
+                else:
+                    try:
+                        res[k] = gremlin.fetch_data(self.node_ids_query[:-4] + self.features_queries[k])
+                    except:
+                        log.exception("Exception at query:" + self.node_ids_query[:-4] + self.features_queries[k])
+                        return False
+
+        log.info("Writing " + self.view_type + " view features to file: " + self.feature_file)
+        f = open(self.feature_file, "w")
+        f.write("id")
+        for k in keys:
+            f.write("," + k)
+        f.write("\n")
+        for i in range(0,self.total_nodes):
+            start = True
+            for k in keys:
+                if start == False:
+                    f.write(',')
+                start = False
+                f.write(str(res[k][i]))
+            f.write('\n')
         f.close()
         log.info("Writing " + self.feature_file + " Finished")
-
+        return True
 
     def compute_anomaly_score(self):
         log.info("Computing anomaly scores...")
-        with open(self.feature_file) as f:
-            for i, l in enumerate(f):
-                if i > 0:
-                    break
-        if(i > 0):
-            os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
-            log.info("Anomaly scores written to " + self.score_file)
-            return True
-        else:
-            log.info("No features found to score")
-            return False
-
+        os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
+        log.info("Anomaly scores written to " + self.score_file)
 
     def attach_scores_to_db(self, percentage = 5.0):
         cutoff = math.ceil(self.total_nodes * (percentage / 100.0))
@@ -88,31 +114,34 @@ class AnomalyView:
         max_score = 0
         max_id = 0
         cnt = 0
-        with gremlin_query.Runner() as gremlin:
-            with open(self.score_file, 'r') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    gremlin.fetch_data("g.V({id}).property('anomalyType','{type}')".format(id=row['id'], type=self.view_type))
-                    gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
-                    if float(row['anomaly_score']) > max_score:
-                        max_score = float(row['anomaly_score'])
-                        max_id = row['id']
-                    cnt = cnt + 1
-                    if cnt >= cutoff:
-                        break
-                gremlin.fetch_data("g.V({id}).in('segment:includes').property('anomalyType','{type}')".format(id=max_id, type=self.view_type))
-                gremlin.fetch_data("g.V({id}).in('segment:includes').property('anomalyScore',{score})".format(id=max_id, score=max_score))
-                log.info('Anomaly score attachment done for view ' + self.view_type)
-
+        try:
+            with gremlin_query.Runner() as gremlin:
+                with open(self.score_file, 'r') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        gremlin.fetch_data("g.V({id}).property('anomalyType','{type}')".format(id=row['id'], type=self.view_type))
+                        gremlin.fetch_data("g.V({id}).property('anomalyScore',{score})".format(id=row['id'], score=row['anomaly_score']))
+                        if float(row['anomaly_score']) > max_score:
+                            max_score = float(row['anomaly_score'])
+                            max_id = row['id']
+                        cnt = cnt + 1
+                        if cnt >= cutoff:
+                            break
+                    gremlin.fetch_data("g.V({id}).in('segment:includes').property('anomalyType','{type}')".format(id=max_id, type=self.view_type))
+                    gremlin.fetch_data("g.V({id}).in('segment:includes').property('anomalyScore',{score})".format(id=max_id, score=max_score))
+                    log.info('Anomaly score attachment done for view ' + self.view_type)
+        except:
+            log.exception("Exception ataching score")
 
 
 if __name__ == '__main__':
     in_json = sys.argv[1]
     with open(in_json) as f:
         views = json.loads(f.read())
-    for view_type,view_data in views.items():
+    for view_type in sorted(views.keys()):
+        view_data = views[view_type]
         view = AnomalyView(view_type, view_data['instance_set'], view_data['feature_set'])
-        view.compute_view_and_save()
-        success = view.compute_anomaly_score()
+        success = view.compute_view_and_save()
         if success == True:
+            view.compute_anomaly_score()
             view.attach_scores_to_db()
