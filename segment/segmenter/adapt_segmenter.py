@@ -53,31 +53,35 @@ def arg_parser():
 	p.add_argument('--broker', '-b', 
 				   help='The broker to the Titan DB',
 				   required=True)
-	p.add_argument('--criterion', '-c', 
-				   help='The segmentation criterion (e.g PID)',
-				   default='pid')
-	p.add_argument('--radius', '-r', 
-				   help='The segmentation radius', 
-				   type=int, default=2)
-	p.add_argument('--window', '-w', 
-				   help='The segmentation time window in seconds', 
-				   type=int, default=60)
-	p.add_argument('--directionEdges', '-e',
-				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
-				   choices=['in','out','both'],default='both')
-	p.add_argument('--verbose','-v', 
-				   action='store_true',help='Verbose mode')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', 
 					   action='store_true',
 					   help='Drop DB and quit, no segmentation performed')
-	group.add_argument('--store-segment', 
-					   help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', 
-					   choices=['Yes','No','OnlyNodes'],
-					   default='Yes')
+	group.add_argument('--radius-segment', 
+					   help='Segment by radius',
+					   action='store_true',
+					   default='True')
 	group.add_argument('--time-segment',
-				   help='Segment by time', action='store_true')
+					   help='Segment by time',
+					   action='store_true')
+	group.add_argument('--print-segment',
+					   help='Print segments',
+					   action='store_true')
 	p.add_argument('--name', help="Segment name (value of property segment:name)",required=True)
+	p.add_argument('--radius', '-r', 
+				   help='The segmentation radius', 
+				   type=int, default=2)
+	p.add_argument('--criterion', '-c', 
+				   help='The radius segmentation criterion (e.g PID)',
+				   default='pid')
+	p.add_argument('--directionEdges', '-e',
+				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
+				   choices=['in','out','both'],default='both')
+p.add_argument('--window', '-w', 
+				   help='The segmentation time window in seconds', 
+				   type=int, default=60)
+	p.add_argument('--verbose','-v', 
+				   action='store_true',help='Verbose mode')
 	p.add_argument('--log-to-kafka', action='store_true',
 				   help='Send logging information to kafka server')
 	p.add_argument('--kafka',
@@ -101,7 +105,8 @@ class SimpleTitanGremlinSegmenter:
 		self.verbose=args.verbose
 		self.time_segment=args.time_segment
 		self.directionEdges=args.directionEdges
-		self.store_segment = args.store_segment
+		self.radius_segment = args.radius_segment
+		self.print_segment = args.print_segment
 		self.window = int(args.window)*1000*1000
 		self.processes = int(args.processes)
 		logging.basicConfig(level=logging.INFO)
@@ -350,9 +355,15 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		return timeSegment_query
     
 	def makeTimeSegmentsParallel(self):
-		self.log('error','Parallel segmentation NYI')
-		return "Undefined"
-
+		t1 = time.time()
+		if self.processes == 1:
+			self.titanclient.execute(self.createTimeSegment_query())
+		else:
+			self.makeTimeSegmentsParallel()
+		t2 = time.time()
+		self.log('info','Time segments created in %fs' % (t2-t1))
+		return "Time segments created"
+	
 	def makeTimeSegments(self):
 		t1 = time.time()
 		if self.processes == 1:
@@ -373,35 +384,43 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-                
-				if self.store_segment == 'OnlyNodes':
-					t1 = time.time()
-					self.titanclient.execute(self.createVertices_query())
-					t2 = time.time()
-					self.log('info','Segment nodes created in %fs' % (t2 - t1))
-					return "Nodes created"
-                
-				elif self.store_segment == 'Yes':
-					
-					t1 = time.time()
-					self.titanclient.execute(self.addEdges_query())
-					t2 = time.time()
-					self.log('info','Segments created in %fs' % (t2-t1))
-					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
-					t3 = time.time()
-					self.log('info','Segment edges created in %fs' % (t3-t2))
-					self.log('info','Total segmentation time %fs' % (t3-t1))
-					return "Segments created"
-				else:
-					self.log('info','No segment to store.')
-					return "No segment"
+				t1 = time.time()
+				self.titanclient.execute(self.addEdges_query())
+				t2 = time.time()
+				self.log('info','Segments created in %fs' % (t2-t1))
+				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+				t3 = time.time()
+				self.log('info','Segment edges created in %fs' % (t3-t2))
+				self.log('info','Total segmentation time %fs' % (t3-t1))
+				return "Segments created"
+			
 		else: # count == 0
 			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
 			return "Unknown segmentation criterion"
 
 	def makeRadiusSegmentsParallel(self):
-		self.log('error','Parallel segmentation NYI')
-		return "Undefined"
+		t1 = time.time()
+		count=self.getNumberVerticesWithProperty()[0]
+		t2 = time.time()
+		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
+		if count>0:
+			if (self.checkCriterionType() == False):
+				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
+				return "Undefined criterion type"
+			else:
+				t1 = time.time()
+				self.titanclient.execute(self.addEdges_query())
+				t2 = time.time()
+				self.log('info','Segments created in %fs' % (t2-t1))
+				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+				t3 = time.time()
+				self.log('info','Segment edges created in %fs' % (t3-t2))
+				self.log('info','Total segmentation time %fs' % (t3-t1))
+				return "Segments created"
+			
+		else: # count == 0
+			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
+			return "Unknown segmentation criterion"
 
 	def makeRadiusSegments(self):
 		if self.processes == 1:
@@ -420,7 +439,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		
 		if self.time_segment == True:
 			return self.makeTimeSegments()
-		else:
+		else if self.radius_segment == True:
 			return self.makeRadiusSegments()
 
 		
@@ -442,7 +461,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			self.log('info','Database dropped')
 			tc.close()
 			sys.exit()
-		if self.store_segment=='No':
+		if self.print_segment==True:
 			printres=self.printSegments()
 			self.titanclient.close()
 			if "summary printed" in printres:
@@ -450,7 +469,6 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			else:
 				self.log('error','Unknown segmentation criterion')
 			if self.logToKafka:
-				self.producer.flush()
 				self.producer.close(2)
 			sys.exit()
 		else:
@@ -460,14 +478,10 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			if ("Unknown" in storageres) or ("Undefined" in storageres):
 				self.log('error',storageres+"\n")
 			else:
-				if self.store_segment=='Yes':
-					self.log('info','Full segments (nodes and edges) stored in Titan DB')
-				elif self.store_segment=='OnlyNodes':
-					self.log('info','Segment nodes stored in Titan DB')
+				self.log('info','Segments stored in Titan DB')
 			self.titanclient.close()
 			self.log('info','Segmentation finished')
 			if self.logToKafka:
-				self.producer.flush()
 				self.producer.close(2)
 			sys.exit()
 			
