@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>ADAPT Classification Visualizer</title>
+    <script>
+      function enterKey(event, id, activityId, name)
+      {
+          if (event.keyCode == 13) {				
+              event.preventDefault();
+              var element = document.getElementById(id);
+              var content = element.innerHTML;
+              var xhttp = new XMLHttpRequest();
+              xhttp.open("GET", "/edit_activity/" + activityId + "?name=" + name + "&value=" + content);
+              xhttp.send();
+              element.style.backgroundColor = "green";
+              element.blur();
+          }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>ADAPT Classification Visualizer</h1>
+    <table border="1">
+      <thead>
+        <th>Segment Id</th>
+        <th>Activty Id</th>
+        <th>Activty Name</th>
+        <th>Suspicion Score</th>
+      </thead>
+      <tbody>
+        {%- for row in rows %}
+        <tr>
+          <td><a href="/show_segment/{{ row['segmentId'] }}">{{ row['segmentId'] }}</a></td>
+          <td>{{ row['activityId'] }}</td>
+          <td id="type_{{ row['segmentId'] }}" contentEditable onkeydown="enterKey(event, this.id, {{ row['activityId'] }}, 'type')">{{ row['activityType'] }}</td>
+          <td id="score_{{ row['segmentId'] }}" contentEditable onkeydown="enterKey(event, this.id, {{ row['activityId'] }}, 'score')">{{ row['suspicionScore'] }}</td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
