@@ -26,6 +26,7 @@ Displays number of occurences of each distinct node label.
 
 import argparse
 import gremlin_query
+import cdm.enums
 
 __author__ = 'John.Hanley@parc.com'
 
@@ -50,6 +51,39 @@ def get_label_counts(with_edges=False):
                    for k in cnt.keys()])
 
 
+def get_subjectType_counts():
+    queries = ["g.V().has('subjectType').groupCount().by('subjectType')"]
+
+    cnt = {}
+    with gremlin_query.Runner() as gremlin:
+        for query in queries:
+            for msg in gremlin.fetch(query):
+                if msg.data:
+                    assert len(msg.data) == 1
+                    cnt.update(msg.data[0])
+
+    cnt['total'] = sum(cnt.values())
+
+    return sorted(['%6d  %s' % (cnt[k], k if k == 'total' else cdm.enums.Subject(int(k)).name)
+                   for k in cnt.keys()])
+
+def get_eventType_counts():
+    queries = ["g.V().has('eventType').groupCount().by('eventType')"]
+
+    cnt = {}
+    with gremlin_query.Runner() as gremlin:
+        for query in queries:
+            for msg in gremlin.fetch(query):
+                if msg.data:
+                    assert len(msg.data) == 1
+                    cnt.update(msg.data[0])
+
+    cnt['total'] = sum(cnt.values())
+
+    return sorted(['%6d  %s' % (cnt[k], k if k == 'total' else cdm.enums.Event(int(k)).name)
+                   for k in cnt.keys()])
+
+
 def arg_parser():
     p = argparse.ArgumentParser(
         description='Reports on number of distinct labels (and edges).')
@@ -61,3 +95,8 @@ def arg_parser():
 if __name__ == '__main__':
     args = arg_parser().parse_args()
     print('\n'.join(get_label_counts(args.with_edges)))
+    print('\n')
+    print('\n'.join(get_subjectType_counts()))
+    print('\n')    
+    print('\n'.join(get_eventType_counts()))
+
