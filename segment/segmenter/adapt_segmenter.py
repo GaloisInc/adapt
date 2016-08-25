@@ -344,16 +344,15 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 		radius segments of this type in the database already.
 		'''
 		addEdgesInitially_query ="""\
-idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id(); \
 for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(i).values('%(criterion)s').next(),\
 '%(segmentParentId)s',i);\
-idNonLinkedNodes=subtr.V().id().fold().next();\
-for (node in idNonLinkedNodes) {\
-s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
+for (node in subtr.V()) {\
+s.addEdge('%(segmentEdgeLabel)s',node)\
 }\
 }""" % self.params
 		return addEdgesInitially_query
