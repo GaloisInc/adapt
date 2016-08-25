@@ -72,11 +72,11 @@ class TopLevelSegmenter:
             if msg.value == STATUS_DONE:  # from Ingest
                 self.producer.send("se-log", b'starting processing')
                 self.report_status(STATUS_IN_PROGRESS)
-                cmd = './adapt_segmenter.py --broker %s --criterion pid --radius 2 --store-segment Yes --name byPID --spec %s --log-to-kafka --kafka %s --processes %d' % (
+                cmd = './adapt_segmenter.py --broker %s --radius-segment --criterion pid --radius 2 --name byPID --spec %s --log-to-kafka --kafka %s --processes %d' % (
                         broker, spec, kafkaUrl, processes)
                 log.info(cmd)
                 os.system(cmd)
-                cmd = './adapt_segmenter.py --broker %s --time-segment --name byTime --spec %s --log-to-kafka --kafka %s --processes %d' % (
+                cmd = './adapt_segmenter.py --broker %s --time-segment --window 60 --name byTime --spec %s --log-to-kafka --kafka %s --processes %d' % (
                         broker, spec, kafkaUrl, processes)
                 log.info(cmd)
                 os.system(cmd)
