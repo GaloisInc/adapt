@@ -100,6 +100,8 @@ makeNodeIndex('byDstPort','dstPort',false,Integer.class)
 makeNodeIndex('bySrcPort','srcPort',false,Integer.class)
 makeNodeIndex('bySrcAddressExact','srcAddress',false,String.class)
 makeNodeIndex('byDstAddressExact','dstAddress',false,String.class)
+makeNodeIndex('bySubjectType', 'subjectType', false, Short.class)
+makeNodeIndex('byEventType', 'eventType', false, Short.class)
 
 // URL index use ElasticSearch which provides richer queries
 // including regex
