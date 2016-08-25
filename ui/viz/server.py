@@ -7,8 +7,8 @@ import logging
 
 import networkx
 
-sys.path.append(os.path.expanduser('/vagrant/pylib'))
-sys.path.append(os.path.expanduser('/vagrant/classifier'))
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+sys.path.append(os.path.expanduser('~/adapt/classifier'))
 from titanDB import TitanClient as BareBonesTitanClient
 
 from flask import Flask, render_template, url_for, request, Response
@@ -59,7 +59,7 @@ def edit_activity(id):
         provenanceGraph.changeActivitySuspicionScore(id, value)
     else:
         return "FAIL"
-    
+
     return "OK"
 
 @app.route('/show_segment/<id>')
