@@ -362,7 +362,7 @@ g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get
 		return timeSegmentStarts_query
 
 	# TODO: Make variable naem a parameter and extend dictionary with it...
-		def makeTimeSegmentStarting_query(self):
+	def makeTimeSegmentStarting_query(self):
 		timeSegment_query = """\
 v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
 content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
