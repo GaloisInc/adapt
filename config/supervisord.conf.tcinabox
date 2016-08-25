@@ -32,7 +32,7 @@ autorestart=yes
 startsecs=10
 
 [program:classifyd]
-command=%(ENV_HOME)s/adapt/classifier/phase3/classifyd.py
+command=%(ENV_HOME)s/adapt/classifier/classifyd.py
 autorestart=yes
 startsecs=20
 
