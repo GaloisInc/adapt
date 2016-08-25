@@ -85,7 +85,7 @@ class SimpleTitanGremlinSegmenter:
 		self.logger = logging.getLogger(__name__)
 		self.logToKafka = args.log_to_kafka
 		if self.logToKafka:
-			self.producer = kafka.KafkaProducer(bootstrap_servers=[args.kafka])
+			self.producer = kafka.KafkaProducer(api_version='0.9',bootstrap_servers=[args.kafka])
 		self.params = {'segmentNodeName': property_segmentNodeName,
 					   'segmentEdgeLabel': property_segmentEdgeLabel,
 					   'seg2segEdgeLabel': property_seg2segEdgeLabel,
@@ -338,15 +338,15 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			t1 = time.time()
 			self.titanclient.execute(self.createTimeSegment_query())
 			t2 = time.time()
-			sys.stdout.write('Time segments created in %fs\n' % (t2-t1))
+			self.log('info','Time segments created in %fs' % (t2-t1))
 			return "Time segments created"
 		t1 = time.time()
 		count=self.getNumberVerticesWithProperty()[0]
 		t2 = time.time()
-		sys.stdout.write('%d parent nodes with criterion %s found in %fs\n' % (count, self.criterion, (t2-t1)))
+		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
 			if (self.checkCriterionType() == False):
-				print('The segments cannot be created or stored. The segment criterion type is not defined.')
+				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
                 
@@ -354,7 +354,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					t1 = time.time()
 					self.titanclient.execute(self.createVertices_query())
 					t2 = time.time()
-					sys.stdout.write('Segment nodes created in %fs' % (t2 - t1))
+					self.log('info','Segment nodes created in %fs' % (t2 - t1))
 					return "Nodes created"
                 
 				elif self.store_segment == 'Yes':
@@ -362,17 +362,17 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 					t1 = time.time()
 					self.titanclient.execute(self.addEdges_query())
 					t2 = time.time()
-					sys.stdout.write('Segments created in %fs\n' % (t2-t1))
+					self.log('info','Segments created in %fs' % (t2-t1))
 					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
 					t3 = time.time()
-					sys.stdout.write('Segment edges created in %fs\n' % (t3-t2))
-					sys.stdout.write('Total segmentation time %fs\n' % (t3-t1))
+					self.log('info','Segment edges created in %fs' % (t3-t2))
+					self.log('info','Total segmentation time %fs' % (t3-t1))
 					return "Segments created"
 				else:
-					sys.stdout.write('No segment to store.\n')
+					self.log('info','No segment to store.')
 					return "No segment"
 		else: # count == 0
-			sys.stdout.write("No node with property: %s. Nothing to store.\n" % self.criterion)
+			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
 			return "Unknown segmentation criterion"
 		
 	def log(self,type_log,text):
@@ -384,22 +384,25 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			self.producer.send("se-log", str.encode(text))
 
 	def run(self):
-		sys.stdout.write('*' * 30 + '\n')
-		sys.stdout.write('Running DB side segmenter\n')
-		sys.stdout.write('*' * 30 + '\n')
+		self.log('info','*' * 30)
+		self.log('info','Running DB side segmenter')
+		self.log('info','*' * 30)
 		if self.drop_db:
 			tc=self.titanclient
 			tc.drop_db()
-			self.log('info','Database dropped\n')
+			self.log('info','Database dropped')
 			tc.close()
 			sys.exit()
 		if self.store_segment=='No':
 			printres=self.printSegments()
 			self.titanclient.close()
 			if "summary printed" in printres:
-				self.log('info','Segmentation done\n')
+				self.log('info','Segmentation done')
 			else:
-				self.log('error','Unknown segmentation criterion\n')
+				self.log('error','Unknown segmentation criterion')
+			if self.logToKafka:
+				self.producer.flush()
+				self.producer.close(2)
 			sys.exit()
 		else:
 			if self.verbose:
@@ -409,11 +412,14 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('error',storageres+"\n")
 			else:
 				if self.store_segment=='Yes':
-					self.log('info','Full segments (nodes and edges) stored in Titan DB\n')
+					self.log('info','Full segments (nodes and edges) stored in Titan DB')
 				elif self.store_segment=='OnlyNodes':
-					self.log('info','Segment nodes stored in Titan DB\n')
+					self.log('info','Segment nodes stored in Titan DB')
 			self.titanclient.close()
-			self.log('info','\nSegmentation finished\n')
+			self.log('info','Segmentation finished')
+			if self.logToKafka:
+				self.producer.flush()
+				self.producer.close(2)
 			sys.exit()
 			
 

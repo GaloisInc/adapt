@@ -98,7 +98,8 @@ var saved_nodes = [
                     return t + " of " + pid
                 case "Event":
                     if (e === "Write" || e === "Read") {
-                        return t + " " + e + " (" + node['properties']['size'][0]['value'] + ")" 
+                        temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
+                        return t + " " + e + " (" + temp + ")" 
                     } else { return t + " " + e }
                 default:
                     return t
@@ -117,13 +118,26 @@ var saved_nodes = [
 ]
 
 var starting_queries = [
+/*
     {
-        name : "Example",
-        base_query : "g.V({_}).limit({_})",
-        default_values : ["", "10"]  // These will be converted to strings and replace all `{_}` that appear in the base query with these defaults.
-    }, {
-        name : "delete this",
-        base_query : "g.V({_}).limit({_}).another({_}).andAnother({_})",
-        default_values : [1234, "five", "supercalafragilisticexpialadocious!", 12]
+        name : "find file by name & version",
+        base_query : "g.V().has('label','Entity-File').has('url',{_}).has('file-version',{_})",
+        default_values : ["myfile.txt",1]
+    },
+    {
+        name : "find process by pid",
+        base_query : "g.V().has('label','Subject').has('subjectType',0).has('pid',{_})",
+        default_values : [1001]
+    },
+    {
+        name : "find up to n processes of an owner",
+        base_query : "g.V().has('label','localPrincipal').has('userID',{_}).both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out().has('label','Subject').has('subjectType',0).limit({_})",
+        default_values : [1234,10]
+    },
+    {
+        name : "find NetFlow by dstAddress & port",
+        base_query : "g.V().has('label','Entity_NetFlow').has('dstAddress',{_}).has('port',{_})",
+        default_values : ["127.0.0.1",80]
     }
+    */
 ]
