@@ -48,6 +48,13 @@ property_startedAtTime='startedAtTime'
 property_endedAtTime='endedAtTime'
 property_time='time'
 
+
+def extend(d,k,v): 
+	''' return a copy of dictionary d extended with k:v'''
+	e = d.copy()
+	e.update({k:v})
+	return e
+
 def arg_parser():
 	p = argparse.ArgumentParser(description='A simple DB-side segmenter')
 	p.add_argument('--broker', '-b', 
@@ -343,18 +350,18 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 		return addEdgesInit_query
 
 # TODO: Parameterize "i"
-	def addEdgesIter_query(self):
+	def addEdgesIter_query(self,i):
 		addEdgesIter_query="""
-sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+sub=g.V(%(i)s).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
-'%(criterion)s',g.V(i).values('%(criterion)s').next(),\
-'%(segmentParentId)s',i);\
+'%(criterion)s',g.V(%(i)s).values('%(criterion)s').next(),\
+'%(segmentParentId)s',(%i)s);\
 idNonLinkedNodes=subtr.V().id().fold().next();\
 for (node in idNonLinkedNodes) {\
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
-}""" % self.params
+}""" % extend(self.params,'i',i)
 		return addEdgesIter_query
 
 	def addSeg2SegEdges_query(self): 
@@ -375,13 +382,13 @@ g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
 		return addSeg2SegEdgesInit_query
 
 # TODO: Parameterize "snode"
-	def addSeg2SegEdgesIter_query(self): 
+	def addSeg2SegEdgesIter_query(self,snode): 
 		addSeg2SegEdgesIter_query="""\
-linkedSeg=g.V(snode).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
-g.V(snode).out('%(seg2segEdgeLabel)s').id().fold().next();\
+linkedSeg=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
+g.V(%(snode)s).out('%(seg2segEdgeLabel)s').id().fold().next();\
 for (s in linkedSeg){\
-g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
-}""" % self.params
+g.V(%(snode)s).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
+}""" % extend(self.params,'snode',snode)
 		return addSeg2SegEdgesIter_query
 
 	def createTimeSegment_query(self):
@@ -397,34 +404,34 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 """ % self.params
 		return timeSegment_query
 
-	def timeSegmentStarts_query(self):
+	def timeSegmentInit_query(self):
 		timeSegmentStarts_query = """\
 g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t %% %(window)d}.dedup().order()\
 """ % self.params
 		return timeSegmentStarts_query
 
 	# TODO: Make variable naem a parameter and extend dictionary with it...
-	def makeTimeSegmentStarting_query(self):
+	def makeTimeSegmentIter_query(self,s):
 		timeSegment_query = """\
-v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
-content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',%(s)s+%(window)d);\
+content = g.V().has('%(startedAtTime)s',gte(%(s)s).and(lt(%(s)s+%(window)d))).has(label,neq('Segment'));\
 for(z in content) {\
 v.addEdge('%(segmentEdgeLabel)s',z) \
 }\
-""" % self.params
+""" % extend(self.params,'s',s)
 		return timeSegment_query
 	 
 	def makeTimeSegmentsParallel(self):
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
-		starts = self.titanclient.execute(self.timeSegmentStarts_query())
+		starts = self.titanclient.execute(self.timeSegmentInit_query())
 		t2 = time.time()
 		self.log('info','Got segment starts in %fs' % (t2-t1))
 		count = len(starts)
 		if count > 0:
-			params = [{'s':start} for start in starts]
+			params = [{'st':start} for start in starts]
 			self.titanclient.execute_many_params_dbg(self.processes,
-													 self.makeTimeSegmentStarting_query(),
+													 self.makeTimeSegmentIter_query('st'),
 													 params)
 			t3 = time.time()
 			self.log('info','Created segments in %fs' % (t3-t2))
@@ -478,15 +485,15 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				return "Undefined criterion type"
 			else:
 				t1 = time.time()
-				params = [{'i':i} for i in ids]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query(),params)
+				params = [{'j':i} for i in ids]
+				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query('j'),params)
 				t2 = time.time()
 				self.log('info','Segments created in %fs' % (t2-t1))
 				snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
 				t3 = time.time()
 				self.log('info','Segment nodes found in %fs' % (t3-t2))
-				sparams = [{'snode':snode} for snode in snodes]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addSeg2SegEdgesIter_query(),sparams)
+				sparams = [{'sn':snode} for snode in snodes]
+				self.titanclient.execute_many_params_dbg(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
 				t4 = time.time()
 				self.log('info','Segment edges created in %fs' % (t4-t3))
 				self.log('info','Total segmentation time %fs' % (t4-t1))
