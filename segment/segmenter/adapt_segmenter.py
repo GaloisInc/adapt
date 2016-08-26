@@ -427,9 +427,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		count = len(starts)
 		if count > 0:
 			params = [{'st':start} for start in starts]
-			self.titanclient.execute_many_params_dbg(self.processes,
-													 self.makeTimeSegmentIter_query('st'),
-													 params)
+			self.titanclient.execute_many_params(self.processes,
+												 self.makeTimeSegmentIter_query('st'),
+												 params)
 			t3 = time.time()
 			self.log('info','Created segments in %fs' % (t3-t2))
 		else:
@@ -483,14 +483,14 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			else:
 				t1 = time.time()
 				params = [{'j':i} for i in ids]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query('j'),params)
+				self.titanclient.execute_many_params(self.processes,self.addEdgesIter_query('j'),params)
 				t2 = time.time()
 				self.log('info','Segments created in %fs' % (t2-t1))
 				snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
 				t3 = time.time()
 				self.log('info','Segment nodes found in %fs' % (t3-t2))
 				sparams = [{'sn':snode} for snode in snodes]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
+				self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
 				t4 = time.time()
 				self.log('info','Segment edges created in %fs' % (t4-t3))
 				self.log('info','Total segmentation time %fs' % (t4-t1))
