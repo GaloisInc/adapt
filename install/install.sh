@@ -155,7 +155,7 @@ install_adapt_dependencies() {
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
-    sudo chown vagrant:vagrant /opt/* || handle_error $LINENO
+    sudo chown --recusive vagrant:vagrant /opt/* || handle_error $LINENO
 
     if [ -z "$USE_TC_IN_A_BOX_CONFIG" ] ; then
         (cd ~/adapt/config && test -r supervisord.conf || ln -s supervisord.conf.adaptinabox supervisord.conf)
