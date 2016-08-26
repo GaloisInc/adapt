@@ -1,4 +1,25 @@
 #! /usr/bin/env python3
+# Copyright 2016, University of Edinburgh
+# Developed with sponsorship of DARPA.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# The software is provided "AS IS", without warranty of any kind, express or
+# implied, including but not limited to the warranties of merchantability,
+# fitness for a particular purpose and noninfringement. In no event shall the
+# authors or copyright holders be liable for any claim, damages or other
+# liability, whether in an action of contract, tort or otherwise, arising from,
+# out of or in connection with the software or the use or other dealings in
+# the software.
+#
 '''
 Naive implementation of a DB-side segmenter (only the segmentation by PID-like properties is supported for now)
 Based on parts of TitanClient (by Adria Gascon)
@@ -32,31 +53,35 @@ def arg_parser():
 	p.add_argument('--broker', '-b', 
 				   help='The broker to the Titan DB',
 				   required=True)
-	p.add_argument('--criterion', '-c', 
-				   help='The segmentation criterion (e.g PID)',
-				   default='pid')
-	p.add_argument('--radius', '-r', 
-				   help='The segmentation radius', 
-				   type=int, default=2)
-	p.add_argument('--window', '-w', 
-				   help='The segmentation time window in seconds', 
-				   type=int, default=60)
-	p.add_argument('--directionEdges', '-e',
-				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
-				   choices=['in','out','both'],default='both')
-	p.add_argument('--verbose','-v', 
-				   action='store_true',help='Verbose mode')
 	group = p.add_mutually_exclusive_group()
 	group.add_argument('--drop-db', 
 					   action='store_true',
 					   help='Drop DB and quit, no segmentation performed')
-	group.add_argument('--store-segment', 
-					   help='Possible values: Yes,No,OnlyNodes. If No, only prints the details of the segments without creating them in Titan DB. If Yes, also stores the segments (nodes and edges) in Titan DB. If OnlyNodes, only stores the segment nodes in Titan DB (does not create segment edges) and prints the segment details', 
-					   choices=['Yes','No','OnlyNodes'],
-					   default='Yes')
+	group.add_argument('--radius-segment', 
+					   help='Segment by radius',
+					   action='store_true',
+					   default='True')
 	group.add_argument('--time-segment',
-				   help='Segment by time', action='store_true')
+					   help='Segment by time',
+					   action='store_true')
+	group.add_argument('--print-segment',
+					   help='Print segments',
+					   action='store_true')
 	p.add_argument('--name', help="Segment name (value of property segment:name)",required=True)
+	p.add_argument('--radius', '-r', 
+				   help='The segmentation radius', 
+				   type=int, default=2)
+	p.add_argument('--criterion', '-c', 
+				   help='The radius segmentation criterion (e.g PID)',
+				   default='pid')
+	p.add_argument('--directionEdges', '-e',
+				   help='Direction of the edges to be traversed (incoming, outgoing or both). Possible values: in, out, both. Default value: both', 
+				   choices=['in','out','both'],default='both')
+	p.add_argument('--window', '-w', 
+				   help='The segmentation time window in seconds', 
+				   type=int, default=60)
+	p.add_argument('--verbose','-v', 
+				   action='store_true',help='Verbose mode')
 	p.add_argument('--log-to-kafka', action='store_true',
 				   help='Send logging information to kafka server')
 	p.add_argument('--kafka',
@@ -64,6 +89,7 @@ def arg_parser():
 				   default='localhost:9092')
 	p.add_argument('--spec',
 				   help='A segment specification file in json format')
+	p.add_argument('--processes', help='Number of transactions to spawn in parallel', default=1)
 	return p
 
 class SimpleTitanGremlinSegmenter:
@@ -79,8 +105,10 @@ class SimpleTitanGremlinSegmenter:
 		self.verbose=args.verbose
 		self.time_segment=args.time_segment
 		self.directionEdges=args.directionEdges
-		self.store_segment = args.store_segment
+		self.radius_segment = args.radius_segment
+		self.print_segment = args.print_segment
 		self.window = int(args.window)*1000*1000
+		self.processes = int(args.processes)
 		logging.basicConfig(level=logging.INFO)
 		self.logger = logging.getLogger(__name__)
 		self.logToKafka = args.log_to_kafka
@@ -107,7 +135,7 @@ class SimpleTitanGremlinSegmenter:
 		and gives it property P with value v_n
 		'''
 		query="""\
-for (i in g.V().has('%(criterion)s').id()) {\
+for (i in g.V().has('%(criterion)s').has(label,neq('Segment')).id()) {\
 graph.addVertex(label,'segment',\
 '%(segmentNodeName)','%(segmentName)s',\
 '%(criterion)s+',g.V(i).values('%(criterion)s').next())\
@@ -119,22 +147,29 @@ graph.addVertex(label,'segment',\
 		query to Titan that retrieves all the nodes that have 
 		a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0))" % self.params
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment'))" % self.params
 		return self.titanclient.execute(query)
 
 	def getNumberVerticesWithProperty(self):
 		'''
 		query to Titan that retrieves the number of nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0)).count()" %  self.params
-		return self.titanclient.execute(query)
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).count()" %  self.params
+		return self.titanclient.execute(query)[0]
 
 	def getVerticesWithPropertyIds(self):
 		'''
 		query to Titan that retrieves the ids of all the nodes that have a certain property (segmentation criterion)
 		'''
-		query="g.V().has('%(criterion)s',gte(0)).id().fold().next()" %  self.params
+		query="g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id()" %  self.params
 		return self.titanclient.execute(query)
+
+	def getSegmentCount(self):
+		'''return the number of segments already in the graph with
+		segmentName.
+		'''
+		query="g.V().has('%(segmentNodeName)s','%(segmentName)s').count()" % self.params
+		return self.titanclient.execute(query)[0]
 
 	def getSubgraphFromVertexId(self,vertexId):
 		'''
@@ -151,12 +186,12 @@ subGraph=g.V(%(vertexId)d).repeat(__.%(directionEdges)sE()\
 		return self.titanclient.execute(subgraph_query+";"+subgraph_idRetrieval_query)
 
 	def getSegments(self):
-		count = self.getNumberVerticesWithProperty()[0]
+		count = self.getNumberVerticesWithProperty()
 		if count == 0:
 			return 0
 
 		seedVertices="""\
-g.V().has(\'%(criterion)s\').id().fold().next()\
+g.V().has(\'%(criterion)s\').has(label,neq('Segment')).id().fold().next()\
 """ % self.params
 		subgraphQuery="""\
 sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV())\
@@ -279,6 +314,9 @@ graph.addVertex(label,'Segment',\
 		return createVertices_query
 
 	def addEdges_query(self):
+		'''
+		Creates segment nodes and segment:includes edges, checking for pre-existing nodes and edges.
+		'''
 		addEdges_query ="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
 existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('%(segmentParentId)s').fold().next();\
@@ -300,6 +338,44 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }""" % self.params
 		return addEdges_query
 
+	def addEdgesInitially_query(self):
+		'''
+		Creates radius segment nodes and edges, assuming that there are no
+		radius segments of this type in the database already.
+		'''
+		addEdgesInitially_query ="""\
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next();\
+for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+subtr=sub.traversal(); \
+s=graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(i).values('%(criterion)s').next(),\
+'%(segmentParentId)s',i);\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {\
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
+}\
+}""" % self.params
+		return addEdgesInitially_query
+
+	def addEdgesId_query(self):
+		addEdgesId_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
+		return addEdgesId_query
+
+	def addEdgesIter_query(self):
+		addEdgesIter_query="""
+sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+subtr=sub.traversal(); \
+s=graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(i).values('%(criterion)s').next(),\
+'%(segmentParentId)s',i);\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {\
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
+}""" % self.params
+		return addEdgesIter_query
+
 	def addSeg2SegEdges_query(self): 
 		addSeg2SegEdges_query="""\
 for (snode in g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()){\
@@ -309,8 +385,6 @@ for (s in linkedSeg){\
 g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
 }""" % self.params
-	
-
 		return addSeg2SegEdges_query
 
 	def createTimeSegment_query(self):
@@ -325,7 +399,109 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 }\
 """ % self.params
 		return timeSegment_query
-    
+
+	def timeSegmentStarts_query(self):
+		timeSegmentStarts_query = """\
+g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get(); t - t %% %(window)d}.dedup().order()\
+""" % self.params
+		return timeSegmentStarts_query
+
+	# TODO: Make variable naem a parameter and extend dictionary with it...
+	def makeTimeSegmentStarting_query(self):
+		timeSegment_query = """\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',s+%(window)d);\
+content = g.V().has('%(startedAtTime)s',gte(s).and(lt(s+%(window)d))).has(label,neq('Segment'));\
+for(z in content) {\
+v.addEdge('%(segmentEdgeLabel)s',z) \
+}\
+""" % self.params
+		return timeSegment_query
+	 
+	def makeTimeSegmentsParallel(self):
+		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
+		t1 = time.time()
+		starts = self.titanclient.execute(self.timeSegmentStarts_query())
+		t2 = time.time()
+		self.log('info','Got segment starts in %fs' % (t2-t1))
+		count = len(starts)
+		if count > 0:
+			params = [{'s':start} for start in starts]
+			self.titanclient.execute_many_params_dbg(self.processes,
+													 self.makeTimeSegmentStarting_query(),
+													 params)
+			t3 = time.time()
+			self.log('info','Created segments in %fs' % (t3-t2))
+		else:
+			return "No time segments to create"
+	
+	def makeTimeSegments(self):
+		t1 = time.time()
+		if self.processes == 1:
+			self.titanclient.execute(self.createTimeSegment_query())
+		else:
+			self.makeTimeSegmentsParallel()
+		t2 = time.time()
+		self.log('info','Time segments created in %fs' % (t2-t1))
+		return "Time segments created"
+
+	def makeRadiusSegmentsSequential(self):
+		t1 = time.time()
+		count=self.getNumberVerticesWithProperty()
+		t2 = time.time()
+		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
+		if count>0:
+			if (self.checkCriterionType() == False):
+				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
+				return "Undefined criterion type"
+			else:
+				t1 = time.time()
+				self.titanclient.execute(self.addEdges_query())
+				t2 = time.time()
+				self.log('info','Segments created in %fs' % (t2-t1))
+				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+				t3 = time.time()
+				self.log('info','Segment edges created in %fs' % (t3-t2))
+				self.log('info','Total segmentation time %fs' % (t3-t1))
+				return "Segments created"
+			
+		else: # count == 0
+			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
+			return "Unknown segmentation criterion"
+
+	def makeRadiusSegmentsParallel(self):
+		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
+		t1 = time.time()
+		ids = self.titanclient.execute(self.addEdgesId_query())
+		count = len(ids)
+		t2 = time.time()
+		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
+		if count>0:
+			if (self.checkCriterionType() == False):
+				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
+				return "Undefined criterion type"
+			else:
+				t1 = time.time()
+				params = [{'i':i} for i in ids]
+				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query(),params)
+				t2 = time.time()
+				self.log('info','Segments created in %fs' % (t2-t1))
+				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+				t3 = time.time()
+				self.log('info','Segment edges created in %fs' % (t3-t2))
+				self.log('info','Total segmentation time %fs' % (t3-t1))
+				return "Segments created"
+			
+		else: # count == 0
+			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
+			return "Unknown segmentation criterion"
+
+	def makeRadiusSegments(self):
+		if self.processes == 1 or self.getSegmentCount() > 0:
+			return self.makeRadiusSegmentsSequential()
+		else:
+			return self.makeRadiusSegmentsParallel()
+		
+
 	def storeSegments(self):
 		'''
 		creates segments in the database (only segment nodes 
@@ -335,45 +511,10 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		self.createSchemaElements()
 		
 		if self.time_segment == True:
-			t1 = time.time()
-			self.titanclient.execute(self.createTimeSegment_query())
-			t2 = time.time()
-			self.log('info','Time segments created in %fs' % (t2-t1))
-			return "Time segments created"
-		t1 = time.time()
-		count=self.getNumberVerticesWithProperty()[0]
-		t2 = time.time()
-		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
-		if count>0:
-			if (self.checkCriterionType() == False):
-				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
-				return "Undefined criterion type"
-			else:
-                
-				if self.store_segment == 'OnlyNodes':
-					t1 = time.time()
-					self.titanclient.execute(self.createVertices_query())
-					t2 = time.time()
-					self.log('info','Segment nodes created in %fs' % (t2 - t1))
-					return "Nodes created"
-                
-				elif self.store_segment == 'Yes':
-					
-					t1 = time.time()
-					self.titanclient.execute(self.addEdges_query())
-					t2 = time.time()
-					self.log('info','Segments created in %fs' % (t2-t1))
-					addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
-					t3 = time.time()
-					self.log('info','Segment edges created in %fs' % (t3-t2))
-					self.log('info','Total segmentation time %fs' % (t3-t1))
-					return "Segments created"
-				else:
-					self.log('info','No segment to store.')
-					return "No segment"
-		else: # count == 0
-			self.log('error',"No node with property: %s. Nothing to store." % self.criterion)
-			return "Unknown segmentation criterion"
+			return self.makeTimeSegments()
+		elif self.radius_segment == True:
+			return self.makeRadiusSegments()
+
 		
 	def log(self,type_log,text):
 		if type_log=='info':
@@ -393,7 +534,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			self.log('info','Database dropped')
 			tc.close()
 			sys.exit()
-		if self.store_segment=='No':
+		if self.print_segment==True:
 			printres=self.printSegments()
 			self.titanclient.close()
 			if "summary printed" in printres:
@@ -401,7 +542,6 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			else:
 				self.log('error','Unknown segmentation criterion')
 			if self.logToKafka:
-				self.producer.flush()
 				self.producer.close(2)
 			sys.exit()
 		else:
@@ -411,14 +551,10 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			if ("Unknown" in storageres) or ("Undefined" in storageres):
 				self.log('error',storageres+"\n")
 			else:
-				if self.store_segment=='Yes':
-					self.log('info','Full segments (nodes and edges) stored in Titan DB')
-				elif self.store_segment=='OnlyNodes':
-					self.log('info','Segment nodes stored in Titan DB')
+				self.log('info','Segments stored in Titan DB')
 			self.titanclient.close()
 			self.log('info','Segmentation finished')
 			if self.logToKafka:
-				self.producer.flush()
 				self.producer.close(2)
 			sys.exit()
 			

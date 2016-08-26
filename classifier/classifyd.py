@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-# Copyright 2016, University of Edinburgh
+# Copyright 2016, Palo Alto Research Center.
 # Developed with sponsorship of DARPA.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,16 +22,20 @@
 # the software.
 #
 '''
-The segmenter daemon - a kafka consumer.
+The classifier daemon - a kafka consumer.
 '''
 import argparse
 import kafka
 import logging
-import os
 import struct
 import time
 
-__author__ = 'jcheney@inf.ed.ac.uk'
+from ace.titan_database import TitanDatabase
+from ace.provenance_graph import ProvenanceGraph
+from ace.unsupervised_classifier import UnsupervisedClassifier
+from ace.feature_extractor import FeatureExtractor
+
+__author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -40,13 +44,10 @@ handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
 
-
 STATUS_IN_PROGRESS = b'\x00'
 STATUS_DONE = b'\x01'
 
-
-class TopLevelSegmenter:
-
+class TopLevelClassifier(object):
     def __init__(self, url):
         # Kafka might not be availble yet, due to supervisord race.
         retries = 6  # Eventually we may signal fatal error; this is a feature.
@@ -54,59 +55,60 @@ class TopLevelSegmenter:
         while retries >= 0 and self.consumer is None:
             try:
                 retries -= 1
-                self.consumer = kafka.KafkaConsumer(
-                    'se', bootstrap_servers=[url])
+                self.consumer = kafka.KafkaConsumer('ac', bootstrap_servers = [url])
             except kafka.errors.NoBrokersAvailable:
                 log.warn('Kafka not yet available.')
                 time.sleep(2)
                 log.warn('retrying')
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
-        self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
+        self.producer = kafka.KafkaProducer(bootstrap_servers = [url])
 
-    def await_ingest(self, broker, spec, kafkaUrl, processes,start_msg='Awaiting ingested data.'):
-        os.chdir(os.path.expanduser('~/adapt/segment/segmenter'))
+        self.provenanceGraph = ProvenanceGraph()
+        self.featureExtractor = FeatureExtractor()
+        self.activityClassifier = UnsupervisedClassifier(self.provenanceGraph, self.featureExtractor)
+
+    def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
         for msg in self.consumer:
-            self.consumer.commit()
             log.info("recvd msg: %s", msg)
-            if msg.value == STATUS_DONE:  # from Ingest
-                self.producer.send("se-log", b'starting processing')
+            if msg.value == STATUS_DONE:  # from Se
                 self.report_status(STATUS_IN_PROGRESS)
-                cmd = './adapt_segmenter.py --broker %s --radius-segment --criterion pid --radius 2 --name byPID --spec %s --log-to-kafka --kafka %s --processes %d' % (
-                        broker, spec, kafkaUrl, processes)
-                log.info(cmd)
-                os.system(cmd)
-                cmd = './adapt_segmenter.py --broker %s --time-segment --window 60 --name byTime --spec %s --log-to-kafka --kafka %s --processes %d' % (
-                        broker, spec, kafkaUrl, processes)
-                log.info(cmd)
-                os.system(cmd)
+                self.cluster_segments()
                 self.report_status(STATUS_DONE)
-                self.producer.send("se-log", b'done processing')
                 log.info(start_msg)  # Go back and do it all again.
 
-    def report_status(self, status):
+    def cluster_segments(self):
+        self.producer.send("ac-log", b'starting processing')
+
+        self.provenanceGraph.deleteActivities()
+
+        classification = self.activityClassifier.classifyNew()
+        for segmentId, label in classification:
+            activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            self.producer.send("ac-log", 
+                               bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
+                                                                                                activity['properties']['activity:type'][0]['value'],
+                                                                                                segmentId),
+                                     'utf-8'))
+
+        self.producer.send("ac-log", b'done processing')
+
+    def report_status(self, status, downstreams = 'dx ui'.split()):
         def to_int(status_byte):
             return struct.unpack("B", status_byte)[0]
 
         log.info("reporting %d", to_int(status))
-        # Segmenter only talks to AD
-        s = self.producer.send("ad", status).get()
-        log.info("sent: %s", s)
-
+        for downstream in downstreams:
+            s = self.producer.send(downstream, status)
+            log.info("sent: %s", s)
 
 def arg_parser():
-    p = argparse.ArgumentParser(
-        description='Perform segmentation according to a given specification.')
-    p.add_argument('--broker', help='location of the database broker',
-                   default='ws://localhost:8182/')
-    p.add_argument('--kafka', help='location of the kafka pub-sub service',
+    p = argparse.ArgumentParser(description = 'Classify activities found in segments of a CDM trace.')
+    p.add_argument('--kafka',
+                   help = 'location of the kafka pub-sub service',
                    default='localhost:9092')
-    p.add_argument('--spec', help='Segmentation specification to use',
-                   default='/home/vagrant/adapt/segment/segmenter/test/spec/segmentByPID.json')
-    p.add_argument('--processes', help='Number of transactions to spawn in parallel', default=1)
     return p
-
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    TopLevelSegmenter(args.kafka).await_ingest(args.broker, args.spec, args.kafka, int(args.processes))
+    TopLevelClassifier(args.kafka).await_segments()

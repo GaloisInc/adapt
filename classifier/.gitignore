@@ -1,12 +1,2 @@
-*~
-.coverage
-TAGS
 __pycache__
-aide_ingest.log
-supervisord.log
-supervisord.pid
-ingest/control.tar.gz
-ingest/md5sums
-ingest/sha256sums
-titan/bad_ls.txt
-titan/infoleak.txt
+classifier.pkl
