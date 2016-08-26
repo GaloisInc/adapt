@@ -410,7 +410,7 @@ g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get
 
 	def makeTimeSegmentIter_query(self,s):
 		timeSegment_query = """\
-v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',%(s)s+%(window)d);\
+v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',%(s)s,'%(endedAtTime)s',%(s)s+%(window)d);\
 content = g.V().has('%(startedAtTime)s',gte(%(s)s).and(lt(%(s)s+%(window)d))).has(label,neq('Segment'));\
 for(z in content) {\
 v.addEdge('%(segmentEdgeLabel)s',z) \
