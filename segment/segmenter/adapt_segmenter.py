@@ -338,30 +338,11 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }""" % self.params
 		return addEdges_query
 
-	def addEdgesInitially_query(self):
-		'''
-		Creates radius segment nodes and edges, assuming that there are no
-		radius segments of this type in the database already.
-		'''
-		addEdgesInitially_query ="""\
-idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next();\
-for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
-subtr=sub.traversal(); \
-s=graph.addVertex(label,'Segment',\
-'%(segmentNodeName)s','%(segmentName)s',\
-'%(criterion)s',g.V(i).values('%(criterion)s').next(),\
-'%(segmentParentId)s',i);\
-idNonLinkedNodes=subtr.V().id().fold().next();\
-for (node in idNonLinkedNodes) {\
-s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
-}\
-}""" % self.params
-		return addEdgesInitially_query
+	def addEdgesInit_query(self):
+		addEdgesInit_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
+		return addEdgesInit_query
 
-	def addEdgesId_query(self):
-		addEdgesId_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
-		return addEdgesId_query
-
+# TODO: Parameterize "i"
 	def addEdgesIter_query(self):
 		addEdgesIter_query="""
 sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
@@ -386,6 +367,22 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }\
 }""" % self.params
 		return addSeg2SegEdges_query
+
+	def addSeg2SegEdgesInit_query(self): 
+		addSeg2SegEdgesInit_query="""\
+g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
+""" % self.params
+		return addSeg2SegEdgesInit_query
+
+# TODO: Parameterize "snode"
+	def addSeg2SegEdgesIter_query(self): 
+		addSeg2SegEdgesIter_query="""\
+linkedSeg=g.V(snode).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
+g.V(snode).out('%(seg2segEdgeLabel)s').id().fold().next();\
+for (s in linkedSeg){\
+g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
+}""" % self.params
+		return addSeg2SegEdgesIter_query
 
 	def createTimeSegment_query(self):
 		timeSegment_query = """\
@@ -471,7 +468,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 	def makeRadiusSegmentsParallel(self):
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
-		ids = self.titanclient.execute(self.addEdgesId_query())
+		ids = self.titanclient.execute(self.addEdgesInit_query())
 		count = len(ids)
 		t2 = time.time()
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
@@ -485,10 +482,14 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query(),params)
 				t2 = time.time()
 				self.log('info','Segments created in %fs' % (t2-t1))
-				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+				snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
 				t3 = time.time()
-				self.log('info','Segment edges created in %fs' % (t3-t2))
-				self.log('info','Total segmentation time %fs' % (t3-t1))
+				self.log('info','Segment nodes found in %fs' % (t3-t2))
+				sparams = [{'snode':snode} for snode in snodes]
+				self.titanclient.execute_many_params_dbg(self.processes,self.addSeg2SegEdgesIter_query(),sparams)
+				t4 = time.time()
+				self.log('info','Segment edges created in %fs' % (t4-t3))
+				self.log('info','Total segmentation time %fs' % (t4-t1))
 				return "Segments created"
 			
 		else: # count == 0
