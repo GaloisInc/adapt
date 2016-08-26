@@ -349,7 +349,6 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 		addEdgesInit_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
 		return addEdgesInit_query
 
-# TODO: Parameterize "i"
 	def addEdgesIter_query(self,i):
 		addEdgesIter_query="""
 sub=g.V(%(i)s).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
@@ -357,11 +356,11 @@ subtr=sub.traversal(); \
 s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(%(i)s).values('%(criterion)s').next(),\
-'%(segmentParentId)s',(%i)s);\
+'%(segmentParentId)s',%(i)s);\
 idNonLinkedNodes=subtr.V().id().fold().next();\
 for (node in idNonLinkedNodes) {\
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
-}""" % extend(self.params,'i',i)
+}""" % (extend(self.params,'i',i))
 		return addEdgesIter_query
 
 	def addSeg2SegEdges_query(self): 
@@ -381,7 +380,6 @@ g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
 """ % self.params
 		return addSeg2SegEdgesInit_query
 
-# TODO: Parameterize "snode"
 	def addSeg2SegEdgesIter_query(self,snode): 
 		addSeg2SegEdgesIter_query="""\
 linkedSeg=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
@@ -410,7 +408,6 @@ g.V().has('%(startedAtTime)s',gte(0)).values('%(startedAtTime)s').map{t = it.get
 """ % self.params
 		return timeSegmentStarts_query
 
-	# TODO: Make variable naem a parameter and extend dictionary with it...
 	def makeTimeSegmentIter_query(self,s):
 		timeSegment_query = """\
 v = graph.addVertex(label,'Segment','%(segmentNodeName)s','%(segmentName)s','%(startedAtTime)s',s,'%(endedAtTime)s',%(s)s+%(window)d);\
