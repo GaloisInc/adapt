@@ -30,6 +30,11 @@ import logging
 import struct
 import time
 
+from ace.titan_database import TitanDatabase
+from ace.provenance_graph import ProvenanceGraph
+from ace.unsupervised_classifier import UnsupervisedClassifier
+from ace.feature_extractor import FeatureExtractor
+
 __author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
@@ -39,13 +44,10 @@ handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
 
-
 STATUS_IN_PROGRESS = b'\x00'
 STATUS_DONE = b'\x01'
 
-
-class TopLevelClassifier:
-
+class TopLevelClassifier(object):
     def __init__(self, url):
         # Kafka might not be availble yet, due to supervisord race.
         retries = 6  # Eventually we may signal fatal error; this is a feature.
@@ -53,26 +55,45 @@ class TopLevelClassifier:
         while retries >= 0 and self.consumer is None:
             try:
                 retries -= 1
-                self.consumer = kafka.KafkaConsumer(
-                    'ac', bootstrap_servers=[url])
+                self.consumer = kafka.KafkaConsumer('ac', bootstrap_servers = [url])
             except kafka.errors.NoBrokersAvailable:
                 log.warn('Kafka not yet available.')
                 time.sleep(2)
                 log.warn('retrying')
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
-        self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
+        self.producer = kafka.KafkaProducer(bootstrap_servers = [url])
 
-    def await_segments(self, start_msg="Awaiting new segments..."):
+        self.provenanceGraph = ProvenanceGraph()
+        self.featureExtractor = FeatureExtractor()
+        self.activityClassifier = UnsupervisedClassifier(self.provenanceGraph, self.featureExtractor)
+
+    def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
         for msg in self.consumer:
             log.info("recvd msg: %s", msg)
             if msg.value == STATUS_DONE:  # from Se
                 self.report_status(STATUS_IN_PROGRESS)
-                # do_stuff()
+                self.cluster_segments()
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
-    def report_status(self, status, downstreams='dx ui'.split()):
+    def cluster_segments(self):
+        self.producer.send("ac-log", b'starting processing')
+
+        self.provenanceGraph.deleteActivities()
+
+        classification = self.activityClassifier.classifyNew()
+        for segmentId, label in classification:
+            activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            self.producer.send("ac-log", 
+                               bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
+                                                                                                activity['properties']['activity:type'][0]['value'],
+                                                                                                segmentId),
+                                     'utf-8'))
+
+        self.producer.send("ac-log", b'done processing')
+
+    def report_status(self, status, downstreams = 'dx ui'.split()):
         def to_int(status_byte):
             return struct.unpack("B", status_byte)[0]
 
@@ -81,14 +102,12 @@ class TopLevelClassifier:
             s = self.producer.send(downstream, status)
             log.info("sent: %s", s)
 
-
 def arg_parser():
-    p = argparse.ArgumentParser(
-        description='Classify activities found in segments of a CDM trace.')
-    p.add_argument('--kafka', help='location of the kafka pub-sub service',
+    p = argparse.ArgumentParser(description = 'Classify activities found in segments of a CDM trace.')
+    p.add_argument('--kafka',
+                   help = 'location of the kafka pub-sub service',
                    default='localhost:9092')
     return p
-
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()

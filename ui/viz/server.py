@@ -2,6 +2,10 @@ import os
 import sys
 import json
 import re
+<<<<<<< HEAD
+=======
+import flask
+>>>>>>> b4a07086e30058268f932ca2a52007f1e1287f41
 import logging
 
 import networkx
@@ -46,6 +50,24 @@ def classification():
 
     return render_template('classification.html', rows = data)
 
+<<<<<<< HEAD
+=======
+@app.route('/edit_activity/<id>', methods = ['GET'])
+def edit_activity(id):
+    id = int(id)
+    name = flask.request.args['name']
+    value = flask.request.args['value']
+    value = value.replace('<br>', '')
+    if name == 'type':
+        provenanceGraph.changeActivityType(id, value)
+    elif name == 'score':
+        provenanceGraph.changeActivitySuspicionScore(id, value)
+    else:
+        return "FAIL"
+    
+    return "OK"
+
+>>>>>>> b4a07086e30058268f932ca2a52007f1e1287f41
 @app.route('/show_segment/<id>')
 def show_segment(id):
     G = provenanceGraph.getSegment(id)
