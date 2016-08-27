@@ -35,10 +35,6 @@ class ProvenanceGraph(object):
         query  = "g.V({}).property('activity:suspicionScore', '{}')".format(activityId, value)
         node = self.titanClient.execute(query)
 
-    def changeAcitivitySuspicionScore(self, acitivityId, value):
-        query  = "x"
-        node = self.titanClient.execute(query)
-
     def deleteActivities(self):
         query = "g.V().has(label, 'Activity').drop().iterate()"
         # Removing a vertex removes all its incident edges as well.
