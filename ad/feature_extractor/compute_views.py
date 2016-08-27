@@ -15,6 +15,39 @@ consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(formatter)
 log.addHandler(consoleHandler)
 
+# varibale bindings for gremlin queries
+bindings = {
+    'ETYPE':'eventType',
+    'STYPE':'subjectType',
+    'SIZE':'size',
+    'STIME':'startedAtTime',
+    'DPORT':'dstPort',
+    'SPORT':'srcPort',
+    'DADDRESS':'dstAddress',
+
+    'PROCESS':0,
+    'EVENT':4,
+
+    'CHECK_FILE_ATTRIBUTES':3,
+    'CLOSE':5,
+    'CONNECT':6,
+    'EXECUTE':9,
+    'UNLINK':12,
+    'MODIFY_FILE_ATTRIBUTES':14,
+    'OPEN':16,
+    'READ':17,
+    'RENAME':20,
+    'WRITE':21,
+    'EXIT':36,
+
+    'E_E_A_F_I':'EDGE_EVENT_AFFECTS_FILE in',
+    'E_E_A_F_O':'EDGE_EVENT_AFFECTS_FILE out',
+    'E_E_A_N_I':'EDGE_EVENT_AFFECTS_NETFLOW in',
+    'E_E_A_N_O':'EDGE_EVENT_AFFECTS_NETFLOW out',
+    'E_E_G_B_S_I':'EDGE_EVENT_ISGENERATEDBY_SUBJECT in',
+    'E_E_G_B_S_O':'EDGE_EVENT_ISGENERATEDBY_SUBJECT out',
+}
+
 """
     fields:
         view_type : string, specifies the name of the view
@@ -62,7 +95,7 @@ class AnomalyView:
 
         log.info("Extracting features for " + self.view_type + "...")
         try:
-            result = self.gremlin.fetch_data(QUERY)
+            result = self.gremlin.fetch_data(QUERY, bindings=bindings)
         except:
             log.exception("Exception at query:" + QUERY)
             return False
@@ -79,18 +112,22 @@ class AnomalyView:
         f.write("\n")
         for i in range(0,len(result[0])):
             f.write(str(result[0][i]))
-            for j in range(1,len(keys)):
+            j = 1
+            for k in keys:
                 res = None
-                if type(self.features_queries[keys[j]]) == type(dict()):
-                    if self.features_queries[keys[j]]['operator'] == 'subTime':
+                if type(self.features_queries[k]) == type(dict()):
+                    if self.features_queries[k]['operator'] == 'subTime':
                         res = (result[j][0][i] - result[j][1][i]) / 1.0e6
-                    elif self.features_queries[keys[j]]['operator'] == 'div(SubTime)':
+                    elif self.features_queries[k]['operator'] == 'div(SubTime)':
                         res = result[j][0][i] / ((result[j][1][i] - result[j][2][i]) / 1.0e6)
-                    elif self.features_queries[keys[j]]['operator'] == '(SubTime)div':
+                    elif self.features_queries[k]['operator'] == '(SubTime)div':
                         res = ((result[j][0][i] - result[j][1][i]) / 1.0e6) / result[j][2][i]
                     else:
-                        res = result[j][i]
+                        log.info("Unrecognized operator: " + self.features_queries[k]['operator'])
+                else:
+                    res = result[j][i]
                 f.write(',' + str(res))
+                j += 1
             f.write('\n')
         f.close()
         log.info("Writing " + self.feature_file + " Finished")
@@ -111,7 +148,7 @@ class AnomalyView:
         max_id = 0
         cnt = 0
         QUERY = ""
-        bindings = {'atype':'anomalyType', 'ascore':'anomalyScore', 'sin':'segment:includes'}
+        binds = {'atype':'anomalyType', 'ascore':'anomalyScore', 'sin':'segment:includes'}
         with open(self.score_file, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
@@ -126,10 +163,11 @@ class AnomalyView:
                     break
             QUERY += "x={id};t='{type}';g.V(x).in(sin).property(atype,t);".format(id=max_id, type=self.view_type)
             QUERY += "x={id};s={score};g.V(x).in(sin).property(ascore,s);".format( id=max_id, score=max_score)
+            log.info("Adding anomaly scores to segment id " + str(max_id) + " (" + self.view_type + ", " + str(max_score) + ")")
         log.info("size of QUERY = " + str(len(QUERY)))
         log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
         try:
-            self.gremlin.fetch_data(QUERY, bindings)
+            self.gremlin.fetch_data(QUERY, binds)
         except:
             log.exception("Exception attaching score")
         log.info('Anomaly score attachment done for view ' + self.view_type)
