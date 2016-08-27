@@ -1152,3 +1152,10 @@ This property is associated with a radius segment and contains the node ID of th
 
 [schema]: #
 makePropertyKey('segment:parentId').dataType(Integer.class).cardinality(SINGLE)
+
+segment:activity (not in CDM)
+-----------
+This relationship connects an Activity instance to a Segment node. No attributes.
+
+[schema]: #
+makeEdgeLabel('segment:activity').multiplicity(SIMPLE)
