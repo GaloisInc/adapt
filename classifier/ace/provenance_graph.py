@@ -19,10 +19,9 @@ class ProvenanceGraph(object):
         self.titanClient.close()
 
     def createActivity(self, segmentId, name, suspicionScore = 0):
-        query  = ("segmentNode = g.V({}).next();"
-                  "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
-                  "edge = segmentNode.addEdge('activity:includes', activityNode);"
-                  "activityNode").format(segmentId, name, suspicionScore)
+        query  = ("segmentNode = g.V(X).next();"
+                  "activityNode = graph.addVertex(label, 'Activity', 'activity:type', 'TYPE', 'activity:suspicionScore', SUSPICION);"
+                  "edge = segmentNode.addEdge('segment:activity', activityNode);").format(segmentId, name, suspicionScore)
         node = self.titanClient.execute(query)
 
         return node[0]
@@ -91,7 +90,7 @@ class ProvenanceGraph(object):
         result = []
 
         for segmentId in segmentIds:
-            query = "g.V({}).out('activity:includes')".format(segmentId)
+            query = "g.V({}).out('segment:activity')".format(segmentId)
             node = self.titanClient.execute(query)
             result.append(node[0]['properties']['activity:type'][0]['value'])
 
@@ -100,14 +99,14 @@ class ProvenanceGraph(object):
     def getActivity(self, segmentId):
         result = []
 
-        query = "g.V({}).out('activity:includes')".format(segmentId)
+        query = "g.V({}).out('segment:activity')".format(segmentId)
         node = self.titanClient.execute(query)
         return (node[0]['id'],
                 node[0]['properties']['activity:type'][0]['value'],
                 node[0]['properties']['activity:suspicionScore'][0]['value'])
 
     def getUnclassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(__.not(outE('activity:includes')))"
+        query = "g.V().hasLabel('Segment').where(__.not(outE('segment:activity')))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
@@ -125,7 +124,7 @@ class ProvenanceGraph(object):
             yield(nodeId, G)
 
     def getClassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(outE('activity:includes'))"
+        query = "g.V().hasLabel('Segment').where(outE('segment:activity'))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
