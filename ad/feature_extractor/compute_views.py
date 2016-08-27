@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
 
-import sys, os, csv, json, math, logging
+import sys, os, csv, json, math, logging, kafka
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-handler = logging.FileHandler(os.path.expanduser('~/adapt/ad/VIEW.log'), "w")
+handler = logging.FileHandler(os.path.expanduser('~/adapt/ad/AD.log'))
 handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
@@ -45,7 +45,7 @@ bindings = {
     'E_E_A_N_I':'EDGE_EVENT_AFFECTS_NETFLOW in',
     'E_E_A_N_O':'EDGE_EVENT_AFFECTS_NETFLOW out',
     'E_E_G_B_S_I':'EDGE_EVENT_ISGENERATEDBY_SUBJECT in',
-    'E_E_G_B_S_O':'EDGE_EVENT_ISGENERATEDBY_SUBJECT out',
+    'E_E_G_B_S_O':'EDGE_EVENT_ISGENERATEDBY_SUBJECT out'
 }
 
 """
@@ -176,13 +176,17 @@ class AnomalyView:
 
 if __name__ == '__main__':
     in_json = sys.argv[1]
+    producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'])
     with open(in_json) as f:
         views = json.loads(f.read())
     with gremlin_query.Runner() as gremlin:
+        i = 1
         for view_type in sorted(views.keys()):
+            producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
             view_data = views[view_type]
             view = AnomalyView(gremlin, view_type, view_data['instance_set'], view_data['feature_set'])
             success = view.compute_view_and_save()
             if success == True:
                 view.compute_anomaly_score()
                 view.attach_scores_to_db()
+            i += 1
