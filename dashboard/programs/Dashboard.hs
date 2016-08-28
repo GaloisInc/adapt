@@ -147,7 +147,7 @@ data Channels = Channels { igChan, pxChan, seChan, adChan, acChan, dxChan :: TCh
 data Status   = Status   { igStat, pxStat, seStat, adStat, acStat, dxStat :: Seq Text }
 
 defaultStatus :: Status
-defaultStatus = Status Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty 
+defaultStatus = Status Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty Seq.empty
 
 dashboard :: Config -> MVar Status -> Application
 dashboard c curr = serve dashboardAPI (lonePage c curr :<|> rawStuff)
@@ -155,7 +155,7 @@ dashboard c curr = serve dashboardAPI (lonePage c curr :<|> rawStuff)
 rawStuff :: Application
 rawStuff a b =
   do x <- getDataFileName "static"
-     serveDirectory x a b 
+     serveDirectory x a b
 
 lonePage :: Config -> MVar Status -> ExceptT ServantErr IO (Html ())
 lonePage c stMV =
@@ -198,8 +198,11 @@ lonePage c stMV =
                 , rows_ "25", cols_ "140"]
                 (toHtml $ T.unlines $ F.toList dxStat)
       h2_ "UI"
-      a_ [href_ "http://localhost:8181"] "Segment Graph Viewer"
+      h3_ "Manual Activity Classifier"
+      a_ [href_ "http://localhost:8181/classification"] "Activity Classifier"
+      h3_ "General Graph Viewer"
       a_ [href_ "http://localhost:8181/graph"] "General Graph Viewer"
+      h3_ "General Graph Viewer log"
       a_ [href_ "http://localhost:8181/log"] "General Graph Viewer log"
       return ()
 

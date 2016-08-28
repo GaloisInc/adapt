@@ -29,6 +29,7 @@ import kafka
 import logging
 import struct
 import time
+import os
 
 from ace.titan_database import TitanDatabase
 from ace.provenance_graph import ProvenanceGraph
@@ -39,7 +40,8 @@ __author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-handler = logging.StreamHandler()
+#handler = logging.StreamHandler()
+handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
 handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
@@ -70,22 +72,23 @@ class TopLevelClassifier(object):
     def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
         for msg in self.consumer:
+            self.consumer.commit()
             log.info("recvd msg: %s", msg)
-            if msg.value == STATUS_DONE:  # from Se
+            if msg.value == STATUS_DONE:  # from Ad
                 self.report_status(STATUS_IN_PROGRESS)
                 self.cluster_segments()
                 self.report_status(STATUS_DONE)
                 log.info(start_msg)  # Go back and do it all again.
 
     def cluster_segments(self):
-        self.producer.send("ac-log", b'starting processing')
+        self.producer.send("ac-log", b'starting processing...')
 
         self.provenanceGraph.deleteActivities()
 
         classification = self.activityClassifier.classifyNew()
         for segmentId, label in classification:
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
-            self.producer.send("ac-log", 
+            self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
                                                                                                 segmentId),
