@@ -81,9 +81,11 @@ class TopLevelClassifier(object):
                 log.info(start_msg)  # Go back and do it all again.
 
     def cluster_segments(self):
+        log.info("starting processing...")
         self.producer.send("ac-log", b'starting processing...')
 
         self.provenanceGraph.deleteActivities()
+        log.info("Deleted current set of activities...")
 
         classification = self.activityClassifier.classifyNew()
         log.info("Classification Segments Object Created (%d)", len(classification))
