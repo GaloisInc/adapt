@@ -46,6 +46,16 @@ class Rule(object):
                     results.append(mr)
         return results
 
+    def generate_fsm(self, fsm, start, end):
+        pass
+
+    def generate_fsm_label(self, fsm, start, end, weight):
+        w = 0
+        if self.matchable:
+            w = weight
+            fsm.add_edge(start, end, label=self.label, weight=w, rule=self)
+        return w
+
 
 class RuleException(Exception):
     def __init__(self, obj, value):
@@ -62,6 +72,9 @@ class Terminal(Rule):
 
     def match(self, matcher_result):
         return self.match_label(matcher_result)
+
+    def generate_fsm(self, fsm, start, end):
+        return self.generate_fsm_label(fsm, start, end, 1)
 
 
 class Sequence(Rule):
@@ -84,6 +97,20 @@ class Sequence(Rule):
         matchers.extend(self.match_label(matcher_result))
         return matchers
 
+    def generate_fsm(self, fsm, start, end):
+        weight, temp_start, last = (0, start, len(self.children) - 1)
+        for i, child in enumerate(self.children):
+            if i == last:
+                temp_end = end
+            else:
+                temp_end = fsm.add_node()
+
+            weight = weight + child.generate_fsm(fsm, temp_start, temp_end)
+            temp_start = temp_end
+
+        self.generate_fsm_label(fsm, start, end, weight)
+        return weight
+
 
 class Choice(Rule):
     def self_check(self):
@@ -98,6 +125,17 @@ class Choice(Rule):
 
         matchers.extend(self.match_label(matcher_result))
         return matchers
+
+    def generate_fsm(self, fsm, start, end):
+        weight, choices = (0, [])
+        for child in self.children:
+            choices.append(child.generate_fsm(fsm, start, end))
+
+        if len(choices) != 0:
+            weight = min(choices)
+
+        self.generate_fsm_label(fsm, start, end, weight)
+        return weight
 
 
 class Optional(Rule):
@@ -114,10 +152,17 @@ class Optional(Rule):
         matchers.extend(self.match_label(matcher_result))
         return matchers
 
+    def generate_fsm(self, fsm, start, end):
+        fsm.add_edge(start, end, weight=0, rule=self)
+        for child in self.children:
+            weight = child.generate_fsm(fsm, start, end)
+        self.generate_fsm_label(fsm, start, end, weight)
+        return 0
+
 
 class OptionalSequence(Sequence):
     def self_check(self):
-        self.children = [Optional(c) for c in children]
+        self.children = [Optional([c]) for c in self.children]
 
 
 class OneOrMore(Rule):
@@ -146,7 +191,7 @@ class OneOrMore(Rule):
 
 class ZeroOrMore(OneOrMore):
     def self_check(self):
-        self.children = [Optional(c) for c in children]
+        self.children = [Optional([c]) for c in self.children]
         if len(self.children) != 1:
             raise RuleException(self, "rule must have one child.")
 
