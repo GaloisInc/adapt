@@ -16,13 +16,13 @@ class UnsupervisedClassifier(object):
         for segmentId, G in self.provenanceGraph.getUnclassifiedSegments():
             segmentIds.append(segmentId)
             features.append(self.featureExtractor.run(G))
-        
+
         X = numpy.array(features)
         if len(X) == 0:
             return ()
-            
+
         # Create a clustering estimator
-#        estimator = cluster.AffinityPropagation() # doesn't work very well for some reason
+        # estimator = cluster.AffinityPropagation() # doesn't work very well for some reason
         estimator = cluster.MeanShift()
         y = estimator.fit_predict(X)
 
