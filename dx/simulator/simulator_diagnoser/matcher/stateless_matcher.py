@@ -12,37 +12,50 @@ class StatelessMatcher(object):
     def state_score(self, state, pointer=None):
         if not state:
             return 0.0
-        if not pointer:
+        if pointer == None:
             pointer = self.fsm.get_end_node()
         return state[pointer]
 
-    def backward_check(self, state, pointer, parent_states):
+    def backward_check(self, graph, current_path, parents, paths, finished_paths):
+        node, pointer, _ = current_path[0]
+
+        parent_states = []
+        for p in parents:
+            ps = graph.get_node_matcher_state(p)
+            if ps:
+                parent_states.append((p,ps))
+
+        state = graph.get_node_matcher_state(node)
         score = self.state_score(state, pointer)
+
+        pointers = self.fsm.get_in_edges(pointer)
+        node_labels = [x[0] for x in graph.get_node_labels(node)]
 
         for parent, pstate in parent_states:
             parent_score = self.state_score(pstate, pointer)
             if parent_score >= score:
-                return pointer, parent, pstate
+                paths.append([(parent, pointer, None)] + current_path)
 
-        pointers = self.fsm.predecessors(pointer)
-        if len(pointers) > 0:
-            best_score = 0.0
-            next_parent = None
-            next_state = None
-            next_pointer = None
+        for po, label, _ in pointers:
+            finished = False
+            if not parent_states:
+                if not finished and po == self.fsm.get_start_node() and label in node_labels:
+                    new_path = current_path[:]
+                    new_path[0] = (node, pointer, label)
+                    finished_paths.append(new_path)
+                    finished = True
 
-            for po in pointers:
-                if po != self.fsm.get_start_node():
-                    for pa, ps in parent_states:
-                        parent_score = self.state_score(ps, po)
-                        if parent_score > best_score:
-                            next_parent = pa
-                            next_state = ps
-                            next_pointer = po
-
-            return next_pointer, next_parent, next_state
-
-        return None, None, None
+            for parent, pstate in parent_states:
+                if label in node_labels:
+                    if self.state_score(pstate, po) > 0.0:
+                        new_path = current_path[:]
+                        new_path[0] = (node, pointer, label)
+                        if not finished and po == self.fsm.get_start_node():
+                            finished_paths.append(new_path)
+                            finished = True
+                        elif not finished:
+                            new_path.insert(0, (parent, po, None))
+                            paths.append(new_path)
 
     def match(self, graph, node, parents):
         node_state = graph.get_node_matcher_state(node)
@@ -121,9 +134,6 @@ class StateMachine(object):
         self.__fsm = nx.DiGraph()
         self.start_node = self.end_node = self.add_node(name='startnode', end=True)
 
-    def predecessors(self, node):
-        return self.__fsm.predecessors(node)
-
     def get_start_node(self):
         return self.start_node
 
@@ -147,6 +157,13 @@ class StateMachine(object):
         for _, out, data in self.__fsm.out_edges(node, data=True):
             for label, weight, _ in data.get('label', []):
                 ret.append((out, label, weight))
+        return ret
+
+    def get_in_edges(self, node):
+        ret = []
+        for innode, _, data in self.__fsm.in_edges(node, data=True):
+            for label, weight, _ in data.get('label', []):
+                ret.append((innode, label, weight))
         return ret
 
     def add(self, rule, node=None):

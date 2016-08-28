@@ -1,29 +1,27 @@
 
 class BackwardAnalysis(object):
 
-    def __init__(self, graph, matcher):
+    def __init__(self, graph, matcher, max_iterations=None):
         self.graph = graph
         self.matcher = matcher
+        self.max_iterations = max_iterations
 
     def analyze(self, node):
         self.explored_edges = set()
         pointer = self.matcher.fsm.get_end_node()
-        state = self.graph.get_node_matcher_state(node)
-        return self.get_path(node, state, pointer, [])
+        paths = [[(node, pointer, None)]]
+        finished_paths = []
 
-    def get_path(self, node, state, pointer, path):
-        parents, edges = self.graph.get_node_parents(node, self.explored_edges)
-        parent_states = []
-        for p in parents:
-            ps = self.graph.get_node_matcher_state(p)
-            if ps:
-                parent_states.append((p,ps))
+        i = 0
+        while True:
+            current_path = paths.pop(0)
+            parents, edges = self.graph.get_node_parents(current_path[0][0], self.explored_edges)
+            self.explored_edges |= set(edges)
 
-        pointer, next_parent, next_state = \
-            self.matcher.backward_check(state, pointer, parent_states)
+            self.matcher.backward_check(self.graph, current_path, parents, paths, finished_paths)
 
-        path.insert(0, node)
-        if next_parent == None:
-            return path
-
-        return self.get_path(next_parent, next_state, pointer, path)
+            i += 1
+            if len(paths) == 0 or \
+               (self.max_iterations != None and i > self.max_iterations):
+                break
+        return finished_paths
