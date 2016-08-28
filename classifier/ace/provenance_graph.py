@@ -2,8 +2,20 @@
 
 import networkx
 import pprint
+import logging
+import struct
+import time
+import os
 
 from ace.titan_database import TitanDatabase
+
+log = logging.getLogger(__name__)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+#handler = logging.StreamHandler()
+handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 class ProvenanceGraph(object):
     def __init__(self):
@@ -19,11 +31,15 @@ class ProvenanceGraph(object):
         self.titanClient.close()
 
     def createActivity(self, segmentId, name, suspicionScore = 0):
+        log.info("createActivity!")
+        
         query  = ("segmentNode = g.V({}).next();"
                   "activityNode = graph.addVertex(label, 'Activity', 'activity:type', {}, 'activity:suspicionScore', {});"
                   "edge = segmentNode.addEdge('segment:activity', activityNode);"
                   "activityNode").format(segmentId, name, suspicionScore)
         node = self.titanClient.execute(query)
+
+        log.info("Activity Created!")
 
         return node[0]
 
