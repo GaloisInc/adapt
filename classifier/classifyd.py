@@ -88,7 +88,7 @@ class TopLevelClassifier(object):
         log.info("Deleted current set of activities...")
 
         classification = self.activityClassifier.classifyNew()
-        log.info("Classification Segments Object Created (%d)", len(classification))
+        log.info("Classification Segments Object Created")
         for segmentId, label in classification:
             log.info("SegmentId %d.", segmentId)
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
