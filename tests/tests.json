@@ -384,7 +384,7 @@
             ],
         "dx": []
     },
-    "infoleak_small_units.avro.avro": {
+    "infoleak_small_units.avro": {
         "pre": [
             {
                 "query": "g.V().drop().iterate(); graph.tx().commit()",
