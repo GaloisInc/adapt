@@ -32,7 +32,7 @@ class ForwardAnalysisTest(unittest.TestCase):
 
         for i, (node, parents) in enumerate(fa, start=1):
             self.assertEqual(i, node)
-            self.assertEqual(parents, self.g1.get_node_parents(i))
+            self.assertEqual(parents, self.g1.get_node_parents(i)[0])
 
 if __name__ == '__main__':
     unittest.main()

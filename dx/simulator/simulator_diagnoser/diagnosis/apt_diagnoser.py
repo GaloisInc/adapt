@@ -1,4 +1,5 @@
-from simulator_diagnoser.graph.traversal import ForwardAnalysis
+from simulator_diagnoser.graph.traversal import ForwardAnalysis,\
+                                                BackwardAnalysis
 from .node_ranker import *
 
 class APTDiagnoser(object):
@@ -15,6 +16,9 @@ class APTDiagnoser(object):
         for node, parents in fa:
             score = self.matcher.match(self.graph, node, parents)
             nr.new_node(node, parents, score)
-            print(node, score, self.graph.get_node_matcher_state(node))
 
         return nr
+
+    def backward_analysis(self, node):
+        ba = BackwardAnalysis(self.graph, self.matcher)
+        return ba.analyze(node)

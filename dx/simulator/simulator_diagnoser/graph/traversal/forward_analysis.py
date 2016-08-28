@@ -19,7 +19,7 @@ class ForwardAnalysis(object):
             raise StopIteration
 
         node = self.queue.pop(0)
-        parents = self.graph.get_node_parents(node, self.explored_edges)
+        parents, parent_edges = self.graph.get_node_parents(node, self.explored_edges)
 
         for parent in parents:
             if parent not in self.explored:
@@ -33,5 +33,6 @@ class ForwardAnalysis(object):
 
         self.explored.add(node)
         self.explored_edges |= set(edges)
+        self.explored_edges |= set(parent_edges)
 
         return node, parents

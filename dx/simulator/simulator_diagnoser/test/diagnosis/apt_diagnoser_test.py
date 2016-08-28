@@ -24,7 +24,7 @@ class APTDiagnoserTest(unittest.TestCase):
             self.g1.add_edge(*edge)
 
 
-        self.g1.add_node_label(3, 'A')
+        self.g1.add_node_label(5, 'A')
         self.g1.add_node_label(7, 'B')
         self.g1.add_node_label(9, 'C')
 
@@ -38,6 +38,12 @@ class APTDiagnoserTest(unittest.TestCase):
     def test_forward_analysis(self):
         result = self.apt_diagnoser.forward_analysis()
         self.assertEqual(9, result.get_rank()[0][0])
+
+    def test_backward_analysis(self):
+        result = self.apt_diagnoser.forward_analysis()
+        node = result.get_rank()[0][0]
+        path = self.apt_diagnoser.backward_analysis(node)
+        self.assertEqual([5,7,9], path)
 
 if __name__ == '__main__':
     unittest.main()

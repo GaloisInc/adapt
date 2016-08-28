@@ -9,10 +9,40 @@ class StatelessMatcher(object):
         self.fsm.add(grammar)
         self.strategy = strategy
 
-    def state_score(self, state):
+    def state_score(self, state, pointer=None):
         if not state:
             return 0.0
-        return state[self.fsm.get_end_node()]
+        if not pointer:
+            pointer = self.fsm.get_end_node()
+        return state[pointer]
+
+    def backward_check(self, state, pointer, parent_states):
+        score = self.state_score(state, pointer)
+
+        for parent, pstate in parent_states:
+            parent_score = self.state_score(pstate, pointer)
+            if parent_score >= score:
+                return pointer, parent, pstate
+
+        pointers = self.fsm.predecessors(pointer)
+        if len(pointers) > 0:
+            best_score = 0.0
+            next_parent = None
+            next_state = None
+            next_pointer = None
+
+            for po in pointers:
+                if po != self.fsm.get_start_node():
+                    for pa, ps in parent_states:
+                        parent_score = self.state_score(ps, po)
+                        if parent_score > best_score:
+                            next_parent = pa
+                            next_state = ps
+                            next_pointer = po
+
+            return next_pointer, next_parent, next_state
+
+        return None, None, None
 
     def match(self, graph, node, parents):
         node_state = graph.get_node_matcher_state(node)
@@ -90,6 +120,9 @@ class StateMachine(object):
     def clear(self):
         self.__fsm = nx.DiGraph()
         self.start_node = self.end_node = self.add_node(name='startnode', end=True)
+
+    def predecessors(self, node):
+        return self.__fsm.predecessors(node)
 
     def get_start_node(self):
         return self.start_node

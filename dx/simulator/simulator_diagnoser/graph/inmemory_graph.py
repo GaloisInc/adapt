@@ -38,7 +38,7 @@ class InmemoryGraph(InmemoryStatesMixin, AbstractGraph):
         return nodes
 
     def get_node_parents(self, node, explored_edges=set()):
-        return self.__G.predecessors(node)
+        return self.__G.predecessors(node), []
 
     def get_node_children(self, node, explored_edges=set()):
         return self.__G.successors(node), []
