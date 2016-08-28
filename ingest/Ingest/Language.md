@@ -1134,9 +1134,12 @@ makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.S
 
 [schema]: #
 makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.LIST)
+
 [schema]: #
 makePropertyKey('anomalyType').dataType(String.class).cardinality(Cardinality.LIST)
 
+[schema]: #
+makePropertyKey('anomalyFeature').dataType(String.class).cardinality(Cardinality.LIST)
 
 segment:edge (not in CDM)
 -----------

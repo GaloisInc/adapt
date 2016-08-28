@@ -146,31 +146,38 @@ class AnomalyView:
         cutoff = math.ceil(total_nodes * (percentage / 100.0))
         max_score = 0
         max_id = 0
+        max_feature = None
         cnt = 0
         QUERY = ""
-        binds = {'atype':'anomalyType', 'ascore':'anomalyScore', 'sin':'segment:includes'}
+        binds = {'atype':'anomalyType', 'ascore':'anomalyScore', 'sin':'segment:includes', 'afeature':'anomalyFeature'}
         with open(self.score_file, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                QUERY += "x={id};t='{type}';g.V(x).property(atype,t);".format(id=row['id'], type=self.view_type)
-                QUERY += "x={id};s={score};g.V(x).property(ascore,s);".format(id=row['id'], score=row['anomaly_score'])
+                QUERY += "x={id};t='{type}';s={score};g.V(x).property(atype,t).next();g.V(x).property(ascore,s).next();".format(id=row['id'], type=self.view_type, score=row['anomaly_score'])
+                feature = "["
+                for k in sorted(row.keys()):
+                    if k != 'id' and k != 'anomaly_score':
+                        if feature != "[":
+                            feature += ","
+                        feature += k + ":" + str(row[k])
+                feature += "]"
+                QUERY += "f='{feat}';g.V(x).property(afeature,f).next();".format(feat=feature)
                 log.info("Adding anomaly scores to id " + row['id'] + " (" + self.view_type + ", " + row['anomaly_score'] + ")")
                 if float(row['anomaly_score']) > max_score:
                     max_score = float(row['anomaly_score'])
                     max_id = row['id']
+                    max_feature = feature
                 cnt = cnt + 1
                 if cnt >= cutoff:
                     break
-            QUERY += "x={id};t='{type}';g.V(x).in(sin).property(atype,t);".format(id=max_id, type=self.view_type)
-            QUERY += "x={id};s={score};g.V(x).in(sin).property(ascore,s);".format( id=max_id, score=max_score)
-            log.info("Adding anomaly scores to segment id " + str(max_id) + " (" + self.view_type + ", " + str(max_score) + ")")
-        log.info("size of QUERY = " + str(len(QUERY)))
-        log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
-        try:
-            self.gremlin.fetch_data(QUERY, binds)
-        except:
-            log.exception("Exception attaching score")
-        log.info('Anomaly score attachment done for view ' + self.view_type)
+            QUERY += "x={id};t='{type}';s={score};f='{feat}';IDS=g.V(x).in(sin).id().toList().toArray();if(IDS!=[]){{g.V(IDS).property(atype,t).next();g.V(IDS).property(ascore,s).next();g.V(IDS).property(afeature,f).next();}};".format(id=max_id, type=self.view_type, score=max_score, feat=max_feature)
+            log.info("size of QUERY = " + str(len(QUERY)))
+            log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
+            try:
+                self.gremlin.fetch_data(QUERY, binds)
+            except:
+                log.exception("Exception attaching score")
+            log.info('Anomaly score attachment done for view ' + self.view_type)
 
 
 
