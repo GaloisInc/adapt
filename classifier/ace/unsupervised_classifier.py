@@ -3,6 +3,18 @@
 from sklearn import cluster
 import numpy
 import pprint
+import logging
+import struct
+import time
+import os
+
+log = logging.getLogger(__name__)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+#handler = logging.StreamHandler()
+handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 class UnsupervisedClassifier(object):
     def __init__(self, provenanceGraph, featureExtractor):
