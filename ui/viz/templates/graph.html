@@ -742,9 +742,15 @@
                 })
                 network.on("hold", function(props) {
                     if ( ! _.isEmpty(props.nodes)) {
-                        var node = node_data_set.get(props.nodes[0])
-                        console.log(node)
-                        debug_node = node
+                        var node_id = props.nodes[0]
+                        var node = node_data_set.get(node_id)
+                        var previous_color = node.icon.color
+                        node_data_set.update({ id: node_id, fixed: ! node.fixed, icon: {color: "black"} })
+                        debug_node = node_data_set.get(node_id)
+                        console.log(debug_node)
+                        setTimeout(function(){
+                            node_data_set.update( {id: node_id, icon: {color: previous_color} } )
+                        }, 500)
                     }
                 })
                 network.on("dragEnd", function(props){
