@@ -19,7 +19,7 @@ class ProvenanceGraph(object):
         self.titanClient.close()
 
     def createActivity(self, segmentId, name, suspicionScore = 0):
-        query  = ("segmentNode = g.V(X).next();"
+        query  = ("segmentNode = g.V({}).next();"
                   "activityNode = graph.addVertex(label, 'Activity', 'activity:type', {}, 'activity:suspicionScore', {});"
                   "edge = segmentNode.addEdge('segment:activity', activityNode);"
                   "activityNode").format(segmentId, name, suspicionScore)
