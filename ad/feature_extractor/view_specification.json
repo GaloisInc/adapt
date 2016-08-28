@@ -1,63 +1,87 @@
 {
     "netflow" : {
         "description" : "Analyze netflow nodes i.e. network sockets for possible anomalous behavior",
-        "instance_set" : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().id()",
+        "instance_set" : "IDS=g.V().has(ETYPE,CONNECT).out(E_E_A_N_O).out(E_E_A_N_I).dedup().id().toList().toArray()",
         "feature_set" : {
             "write_bytes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
             "read_bytes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,READ).values(SIZE).sum())",
             "num_writes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count())",
             "num_reads":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,READ).count())",
             "num_open":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',16).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,OPEN).count())",
             "num_close":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',5).count()",
-            "duration":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',6).values('startedAtTime').min().next())/1000000.0"
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,CLOSE).count())",
+            "duration":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "netflow_connect_process_exec" : {
         "description" : "Analyze netflow nodes that have connection with file execution (potential remote execution command)",
-        "instance_set" : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().as('netflow').in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).select('netflow').dedup().id()",
+        "instance_set" : "IDS=g.V().has(ETYPE,CONNECT).out(E_E_A_N_O).out(E_E_A_N_I).dedup().as('netflow').in(E_E_A_N_I).in(E_E_A_N_O).out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,EXECUTE).select('netflow').dedup().id().toList().toArray()",
         "feature_set" : {
             "write_bytes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
             "read_bytes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,READ).values(SIZE).sum())",
             "num_writes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count())",
             "num_reads":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',17).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,READ).count())",
             "num_open":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',16).count()",
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,OPEN).count())",
             "num_close":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',5).count()",
-            "duration":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',6).values('startedAtTime').min().next())/1000000.0"
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,CLOSE).count())",
+            "duration":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "netflow_connect_last_activity_gap" : {
         "description" : "Identify netflow nodes that are open for long time",
-        "instance_set": "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_E_A_N_O).out(E_E_A_N_I).dedup().id().toList().toArray()",
         "feature_set": {
-            "connect_last_activity_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('subjectType',4).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',6).values('startedAtTime').min().next())/1000000.0"
+            "connect_last_activity_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "netflow_long_write_delay" : {
         "description" : "Identify netflow nodes with long writing delay (potential exfiltration)",
-        "instance_set": "g.V().has(label,'Entity-NetFlow').as('netflow').local(__.in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count().is(gt(1))).select('netflow').dedup().id()",
+        "instance_set": "IDS=g.V().has(DADDRESS,textContains('.')).as('netflow').local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count().is(gt(1))).select('netflow').dedup().id().toList().toArray()",
         "feature_set": {
-            "first_last_write_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).values('startedAtTime').min().next())/1000000.0",
+            "first_last_write_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).values(STIME).min())",
+                "operator":
+                    "subTime"
+            },
             "num_writes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).count()"
+                "g.V(IDS).local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count())"
         }
     },
 
@@ -65,73 +89,95 @@
 
     "process_connected_with_netflow" : {
         "description" : "Analyze process nodes that have network activity",
-        "instance_set" : "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "instance_set" : "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).select('process').dedup().id().toList().toArray()",
         "feature_set" : {
             "num_file_open_during_wr_to_netflow":
-                "g.V({id}).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('writeNetflow').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',16).as('openFile').out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').select('writeNetflow','openFile').by('startedAtTime').where('writeNetflow',gte('openFile')).count()",
+                "g.V(IDS).local(__.as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('writeNetflow').out(E_E_A_N_O).out(E_E_A_N_I).select('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,OPEN).as('openFile').out(E_E_A_F_O).out(E_E_A_F_I).select('writeNetflow','openFile').by(STIME).where('writeNetflow',gte('openFile')).count())",
             "num_distinct_dst_port_access":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').values('dstPort').dedup().count()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).values(DPORT).dedup().count())",
             "num_distinct_src_port_access":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').values('srcPort').dedup().count()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).values(SPORT).dedup().count())",
             "total_bytes_sent_to_netflow":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('event').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('event').has('size').values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('event').out(E_E_A_N_O).out(E_E_A_N_I).select('event').has(SIZE).values(SIZE).sum())",
             "total_bytes_rcv_from_netflow":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).as('event').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('event').has('size').values('size').sum()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,READ).as('event').out(E_E_A_N_O).out(E_E_A_N_I).select('event').has(SIZE).values(SIZE).sum())",
             "num_writes_to_net_flow":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').count()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).out(E_E_A_N_O).out(E_E_A_N_I).count())",
             "num_reads_to_netflow":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').count()"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,READ).out(E_E_A_N_O).out(E_E_A_N_I).count())"
         }
     },
 
     "process_connect_many_netflow" : {
         "description": "Analyze process nodes that have many distinct network activity within same network hosts",
-        "instance_set": "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).select('process').dedup().id().toList().toArray()",
         "feature_set": {
-            "num_distinct_dst_ip_access":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').values('dstAddress').dedup().count()"
+            "max_num_local_net_access":
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',PROCESS)+1))}.next().values().max())"
         }
     },
 
     "process_connect_rare_ip" : {
         "description": "Analyze process nodes that have rare ip access",
-        "instance_set": "g.V().has('subjectType',0).as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('process').dedup().id()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).select('process').dedup().id().toList().toArray()",
         "feature_set": {
             "num_distinct_dst_ip_access":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').values('dstAddress').dedup().count()"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).values(DADDRESS).dedup().count())"
         }
     },
 
     "process_long_write_to_netflow" : {
         "description" : "Identify process nodes with long writing delay (potential exfiltration)",
-        "instance_set": "g.V().has('subjectType',0).as('process').local(__.in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('netflow_write').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('netflow_write').count().is(gt(1))).select('process').dedup().id()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_E_A_N_O).out(E_E_A_N_I).select('netflow_write').count().is(gt(1))).select('process').dedup().id().toList().toArray()",
         "feature_set": {
-            "first_last_write_gap":
-                "(g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').min().next())/1000000.0",
+            "first_last_write_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).min())",
+                "operator":
+                    "subTime"
+            },
             "num_writes":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).count()"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).count())"
         }
     },
 
     "process_write_rate_to_netflow" : {
         "description" : "Identify process with slow write rate (potential exfiltration)",
-        "instance_set": "g.V().has('subjectType',0).as('process').local(__.in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('netflow_write').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('netflow_write').count().is(gt(1))).select('process').dedup().id()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_E_A_N_O).out(E_E_A_N_I).select('netflow_write').count().is(gt(1))).select('process').dedup().id().toList().toArray()",
         "feature_set": {
-            "write_rate":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('netflow_write').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('netflow_write').values('size').sum().next() / (g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').min().next())/1000000.0",
-            "time_gap_per_writes":
-                "(g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).values('startedAtTime').min().next())/1000000.0 / g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).count()"
+            "write_rate":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_E_A_N_O).out(E_E_A_N_I).select('netflow_write').values(SIZE).sum())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).max())",
+                "third":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).min())",
+                "operator":
+                    "div(SubTime)"
+            },
+            "time_gap_per_writes":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).values(STIME).min())",
+                "third":
+                    "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).count())",
+                "operator":
+                    "(SubTime)div"
+            }
         }
     },
 
     "process_access_file_attributes" : {
         "description" : "Analyze process that access attributes of files",
-        "instance_set": "g.V().has('subjectType',0).and(__.in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9),__.in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',14)).id()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).and(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,EXECUTE),__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES)).id().toList().toArray()",
         "feature_set": {
             "num_chk_attrib":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).count()",
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,EXECUTE).count())",
             "num_modify_attrib":
-                "g.V({id}).in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',14).count()"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())"
         }
     },
 
@@ -139,138 +185,180 @@
 
     "files_connected_with_netflow" : {
         "description" : "Analyze files that have connection with netflow (potential downloaded files)",
-        "instance_set" : "g.V().has('subjectType',4).as('net_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('net_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "instance_set" : "IDS=g.V().has(STYPE,EVENT).as('net_events').out(E_E_A_N_O).select('net_events').out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_F_O).out(E_E_A_F_I).dedup().id().toList().toArray()",
         "feature_set" : {
             "num_exec":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',3).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_close":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',5).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CLOSE).count())",
             "num_chk_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_modify_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
             "num_open":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',16).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,OPEN).count())",
             "num_read":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).count())",
             "num_rename":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',20).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,RENAME).count())",
             "num_write":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).count())",
             "num_uploads":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).as('file_read').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').as('process').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('netflow_write').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().count()"
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).as('file_read').out(E_E_G_B_S_O).out(E_E_G_B_S_I).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_E_A_N_O).out(E_E_A_N_I).dedup().count())"
         }
     },
 
     "files_executed" : {
         "description" : "Analyze executed files",
-        "instance_set" : "g.V().has('eventType',9).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "instance_set" : "IDS=g.V().has(ETYPE,EXECUTE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().id().toList().toArray()",
         "feature_set" : {
             "num_exec":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',3).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_close":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',5).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CLOSE).count())",
             "num_chk_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_modify_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
             "num_open":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',16).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,OPEN).count())",
             "num_read":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).count())",
             "num_rename":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',20).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,RENAME).count())",
             "num_write":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).count()"
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).count())"
         }
     },
 
     "file_open_close_gap" : {
         "description" : "Identify files that are open for long time",
-        "instance_set": "g.V().has('eventType',5).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().as('files').in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',16).select('files').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,CLOSE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().as('files').in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,OPEN).select('files').dedup().id().toList().toArray()",
         "feature_set": {
-            "open_close_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',5).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',16).values('startedAtTime').min().next())/1000000.0"
+            "open_close_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CLOSE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,OPEN).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "files_connect_netflow_long_write" : {
         "description" : "Identify files connected with netflow and with long writing delay (potential exfiltration)",
-        "instance_set" : "g.V().has('eventType',21).as('write_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('write_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "instance_set" : "IDS=g.V().has(ETYPE,WRITE).as('write_events').out(E_E_A_N_O).select('write_events').out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().id().toList().toArray()",
         "feature_set": {
-            "first_last_write_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).values('startedAtTime').min().next())/1000000.0",
+            "first_last_write_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).values(STIME).min())",
+                "operator":
+                    "subTime"
+            },
             "num_writes":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).count()"
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).count())"
         }
     },
 
     "file_dnld_exec_gap" : {
         "description" : "Detect files that are executed right after download",
-        "instance_set": "g.V().has('eventType',9).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().as('files').in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).select('files').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().as('files').in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).select('files').dedup().id().toList().toArray()",
         "feature_set": {
-            "dnld_exec_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).values('startedAtTime').min().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).values('startedAtTime').max().next())/1000000.0"
+            "dnld_exec_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).values(STIME).min())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).values(STIME).max())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "file_attrib_change_exec_gap" : {
         "description" : "Detect files that are executed right after permission change",
-        "instance_set": "g.V().has('eventType',9).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().as('files').in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).select('files').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().as('files').in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).select('files').dedup().id().toList().toArray()",
         "feature_set": {
-            "attrib_change_exec_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).values('startedAtTime').min().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).values('startedAtTime').max().next())/1000000.0"
+            "attrib_change_exec_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).values(STIME).min())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).values(STIME).max())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "file_exec_del_gap" : {
         "description" : "Detect files that are deleted right after execution",
-        "instance_set": "g.V().has('eventType',9).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().as('files').in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',12).select('files').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().as('files').in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,UNLINK).select('files').dedup().id().toList().toArray()",
         "feature_set": {
-            "exec_del_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',12).values('startedAtTime').min().next())/1000000.0"
+            "exec_del_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,UNLINK).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "file_upload_del_gap" : {
         "description" : "Detect files that are deleted right after upload",
-        "instance_set": "g.V().has('eventType',12).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().as('files').in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('files').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,UNLINK).out(E_E_A_F_O).out(E_E_A_F_I).dedup().as('files').in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).out(E_E_A_N_O).out(E_E_A_N_I).select('files').dedup().id().toList().toArray()",
         "feature_set": {
-            "upload_del_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).as('netflow_write').out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').select('netflow_write').values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',12).values('startedAtTime').min().next())/1000000.0"
+            "upload_del_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_E_A_N_O).out(E_E_A_N_I).select('netflow_write').values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,UNLINK).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "file_last_write_upload_gap" : {
         "description" : "Detect files that are uploaded right after write (potential exfiltration)",
-        "instance_set": "g.V().has('eventType',21).as('write_events').out('EDGE_EVENT_AFFECTS_NETFLOW out').select('write_events').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,WRITE).as('write_events').out(E_E_A_N_O).select('write_events').out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).has(ETYPE,READ).out(E_E_A_F_O).out(E_E_A_F_I).dedup().id().toList().toArray()",
         "feature_set": {
-            "exec_del_gap":
-                "(g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',17).values('startedAtTime').max().next() - g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',21).values('startedAtTime').min().next())/1000000.0"
+            "exec_del_gap":{
+                "first":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,READ).values(STIME).max())",
+                "second":
+                    "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,WRITE).values(STIME).min())",
+                "operator":
+                    "subTime"
+            }
         }
     },
 
     "files_executed_attribute_access" : {
         "description" : "Analyze file attribute access/change for executed files",
-        "instance_set": "g.V().has('eventType',9).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().id()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).out(E_E_A_F_O).out(E_E_A_F_I).dedup().id().toList().toArray()",
         "feature_set": {
             "num_chk_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_modify_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).count()"
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())"
         }
     },
 
     "files_in_tmp_dir" : {
         "description" : "Analyze the files in temp directory",
-        "instance_set": "g.V().has('url',textContains('/tmp')).id()",
+        "instance_set": "IDS=g.V().has('url',textContains('/tmp')).id().toList().toArray()",
         "feature_set": {
             "num_exec":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',3).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_chk_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',9).count()",
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_modify_attrib":
-                "g.V({id}).in('EDGE_EVENT_AFFECTS_FILE in').in('EDGE_EVENT_AFFECTS_FILE out').has('eventType',14).count()"
+                "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())"
         }
     }
 }
