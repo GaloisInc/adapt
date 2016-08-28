@@ -22,7 +22,6 @@ class UnsupervisedClassifier(object):
         self.featureExtractor = featureExtractor
 
     def classifyNew(self):
-        log.info("ClassifyNew() Starting")
         segmentIds = []
         features = []
 
@@ -40,7 +39,5 @@ class UnsupervisedClassifier(object):
         y = estimator.fit_predict(X)
 
         result = zip(segmentIds, y)
-
-        log.info("ClassifyNew() Return")
 
         return result
