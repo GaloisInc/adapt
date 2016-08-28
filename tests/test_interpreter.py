@@ -29,7 +29,7 @@ class DynamicTestCase(unittest.TestCase):
     def test_json_condition(self):
         result = execute_graph_query(self.query)
         self.assertEqual(result, self.response,
-                         "for test query:\n%s\n\nRequested by: %s\n Explanation: %s" % 
+                         "for test query:\n%s\n\nRequested by: %s\n Explanation: %s" %
                          (self.query, self.requester, self.explanation))
 
 
@@ -38,14 +38,14 @@ def get_test_json(path):
         return json.loads(fd.read())
 
 
-def tests_for_module(module_key, 
+def tests_for_module(module_key,
                      json_path="./tests.json",
                      data_key="5d_youtube_ie_output-100.avro"):
     js = get_test_json(json_path)
     try:
         test_list = js[data_key][module_key]
     except KeyError:
-        print("*** No tests defined for  { %s : %s }  in file: %s ***" % 
+        print("*** No tests defined for  { %s : %s }  in file: %s ***" %
             (data_key, module_key, json_path))
         sys.exit(1)
     return test_list
@@ -56,7 +56,7 @@ def execute_graph_query(query):
         return str(g.fetch(query))
 
 
-def run_tests_for_module(module_key, 
+def run_tests_for_module(module_key,
                          json_path="./tests.json",
                          data_key="5d_youtube_ie_output-100.avro",
                          run_after_failure=False):
@@ -72,7 +72,7 @@ def execute_module(module_key, data_path="~/adapt/example/5d_youtube_ie_output-1
     if module_key is "in":
         os.system('Trint -p ' + data_path)
         sleep(25)  # no way to know when Trint is finished?
-# Trint -F signals the segmenter to start, but this is done again 
+# Trint -F signals the segmenter to start, but this is done again
 # explicitly by the segmenter test below, which causes a race condition.
 #        os.system('Trint -F')
 #        sleep(1)  # currently no way to know when other services are complete with their respective processing.
@@ -80,15 +80,16 @@ def execute_module(module_key, data_path="~/adapt/example/5d_youtube_ie_output-1
         cmd = ('%s/segment/segmenter/adapt_segmenter.py'
                ' --broker http://localhost:8182/'
                ' --radius-segment --name byPID --spec %s/config/segmentByPID.json' % (top, top))
-        # cmd = 'classifier/phase3/simple_segments_by_pid.py --drop'
         os.system(cmd)
     elif module_key is "ad":
         pass
     elif module_key is "ac":
-        cmd = os.path.join(top, 'classifier/phase3/fg_classifier.py')
+        cmd = os.path.join(top, 'classifier/cluster_segments.py')
         os.system(cmd)
     elif module_key is "dx":
-        pass
+        cmd = os.path.join(top, 'dx/simulator/dx.py --no-kafka --single-run')
+        os.system(cmd)
+
     else:
         pass
 
@@ -116,7 +117,7 @@ def get_args():
         help="A gremlin query which will execute AFTER a run of the post-tests"
         " for the chosen module.")
     parser.add_argument(
-        "-d", "--data", type=str, 
+        "-d", "--data", type=str,
         default=os.path.expanduser('~/adapt') + "/example/5d_youtube_ie_output-100.avro",
         help="Path to an Avro data file. This file name (not path) should match one"
         " of the keys listed as top-level keys in the associated JSON file.")

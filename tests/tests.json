@@ -139,14 +139,14 @@
                 "explanation": "Verify agents are stable."
             }, {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify segments are stable."
             }, {
                 "query": "g.V().has(label, 'Activity').count()",
-                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify that no relevant features were found in the very short trace."
+                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification nodes were inserted."
             }, {
                 "query": "g.V().has(label, 'Segment').has('anomalyScore').count()",
                 "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
@@ -282,10 +282,34 @@
                 "explanation": "Verify there are no agents."
             },
             {
-                "query": "g.V().has(label, 'Activity').count()",
-                "response": "[Message(status_code=200, data=[8], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify that no relevant features were found in the very short trace."
+                "query": "g.V().hasLabel('Activity').count()",
+                "response": "[Message(status_code=200, data=[201], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification nodes were inserted."
+            },
+            {
+                "query": "g.E().hasLabel('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[201], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            },
+            {
+                "query": "g.V().outE('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[201], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            },
+            {
+                "query": "g.E().hasLabel('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            },
+            {
+                "query": "g.V().outE('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
             }
         ],
         "dx": []
@@ -333,7 +357,26 @@
                 "explanation": "Verify that each process node is contained within at least one segment"
             }
         ],
-        "ac": [],
+        "ac": [
+            {
+                "query": "g.V().hasLabel('Activity').count()",
+                "response": "[Message(status_code=200, data=[74], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification nodes were inserted."
+            },
+            {
+                "query": "g.E().hasLabel('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[74], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            },
+            {
+                "query": "g.V().outE('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[74], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            }
+        ],
         "dx": []
     },
     "simple_with_marker_3.avro": {
@@ -376,12 +419,24 @@
         "ad": [],
         "ac": [
             {
-                "query": "g.V().hasLabel('Segment').out().hasLabel('Activity').out().hasLabel('Entity-File').count().next() > 0",
-                "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
+                "query": "g.V().hasLabel('Activity').count()",
+                "response": "[Message(status_code=200, data=[25], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
                 "explanation": "Verify activity classification nodes were inserted."
+            },
+            {
+                "query": "g.E().hasLabel('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[25], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
+            },
+            {
+                "query": "g.V().outE('segment:activity').count()",
+                "response": "[Message(status_code=200, data=[25], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify activity classification edges were inserted."
             }
-            ],
+        ],
         "dx": []
     },
     "infoleak_small_units.avro": {

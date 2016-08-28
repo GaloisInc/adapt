@@ -71,9 +71,11 @@ class TopLevelClassifier(object):
 
     def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
+        self.producer.send("ac-log", bytes(start_msg))
         for msg in self.consumer:
             self.consumer.commit()
             log.info("recvd msg: %s", msg)
+            self.producer.send("ac-log", bytes("recvd msg: {}".format(msg)))
             if msg.value == STATUS_DONE:  # from Ad
                 self.report_status(STATUS_IN_PROGRESS)
                 self.cluster_segments()
@@ -85,14 +87,11 @@ class TopLevelClassifier(object):
         self.producer.send("ac-log", b'starting processing...')
 
         self.provenanceGraph.deleteActivities()
-        log.info("Deleted current set of activities...")
+        self.producer.send("ac-log", b'Deleting current set of activities...')
 
         classification = self.activityClassifier.classifyNew()
-        log.info("Classification Segments Object Created")
         for segmentId, label in classification:
-            log.info("SegmentId %d.", segmentId)
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
-            log.info("Created Activity %s", str(label))
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
