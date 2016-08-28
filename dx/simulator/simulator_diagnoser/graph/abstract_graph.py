@@ -16,7 +16,19 @@ class AbstractGraph(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def get_node_labels(self, node):
+        pass
+
+    @abc.abstractmethod
+    def get_node_anomaly_score(self, node):
+        pass
+
+    @abc.abstractmethod
     def get_node_matcher_state(self, node):
+        pass
+
+    @abc.abstractmethod
+    def set_node_matcher_state(self, node, state):
         pass
 
     @abc.abstractmethod

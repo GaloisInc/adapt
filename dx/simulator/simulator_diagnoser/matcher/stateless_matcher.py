@@ -14,6 +14,29 @@ class StatelessMatcher(object):
             return 0.0
         return state[self.fsm.get_end_node()]
 
+    def match(self, graph, node, parents):
+        node_state = graph.get_node_matcher_state(node)
+        parent_states = []
+        for p in parents:
+            p_state = graph.get_node_matcher_state(p)
+            if p_state:
+                parent_states.append(p_state)
+        if not parent_states:
+            parent_states = [self.fsm.initial_state()]
+
+        labels = graph.get_node_labels(node)
+        anomaly_score = graph.get_node_anomaly_score(node)
+
+        for label, confidence in labels:
+            node_state = \
+                self.match_state(label, node_state, parent_states, confidence, anomaly_score)
+
+        if node_state:
+            parent_states.append(node_state)
+        new_state = self.strategy.reduce_states(parent_states)
+        graph.set_node_matcher_state(node, new_state)
+        return self.state_score(new_state)
+
     def match_state(self, label, state=None, parent_states=None, confidence=1.0, anomaly=0.0):
         if not parent_states:
             parent_states = [self.fsm.initial_state()]

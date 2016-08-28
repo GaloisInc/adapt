@@ -9,6 +9,10 @@ class InmemoryStatesMixin(object):
     def get_node_matcher_state(self, node):
         return self.states.get(node, None)
 
+    def set_node_matcher_state(self, node, state):
+        if state:
+            self.states[node] = state
+
     def clear_matcher_states(self):
         self.states = {}
 
@@ -38,3 +42,20 @@ class InmemoryGraph(InmemoryStatesMixin, AbstractGraph):
 
     def get_node_children(self, node, explored_edges=set()):
         return self.__G.successors(node), []
+
+    def get_node_anomaly_score(self, node):
+        return self.__G.node[node].get('anomaly', 1.0)
+
+    def set_node_anomaly_score(self, node, score):
+        self.__G.node[node]['anomaly'] = score
+
+    def get_node_labels(self, node):
+        return self.__G.node[node].get('labels', [])
+
+    def add_node_label(self, node, label, confidence=1.0):
+        labels = self.get_node_labels(node)
+        labels.append((label, confidence))
+        self.__G.node[node]['labels'] = labels
+
+    def clear_node_labels(self, node):
+        self.__G.node[node]['labels'] = []
