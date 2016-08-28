@@ -71,11 +71,10 @@ class TopLevelClassifier(object):
 
     def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
-        self.producer.send("ac-log", bytes(start_msg))
+        self.producer.send("ac-log", bytes(start_msg, encoding='utf-8'))        
         for msg in self.consumer:
             self.consumer.commit()
             log.info("recvd msg: %s", msg)
-            self.producer.send("ac-log", bytes("recvd msg: {}".format(msg)))
             if msg.value == STATUS_DONE:  # from Ad
                 self.report_status(STATUS_IN_PROGRESS)
                 self.cluster_segments()
