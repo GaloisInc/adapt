@@ -92,6 +92,7 @@ class TopLevelClassifier(object):
         for segmentId, label in classification:
             log.info("SegmentId %d.", segmentId)
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            log.info("Created Activity %s", str(label))
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
