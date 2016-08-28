@@ -26,7 +26,7 @@ provenanceGraph = ProvenanceGraph()
 
 @app.route('/')
 def service():
-    return render_template('index.html')
+    return graph()
 
 @app.route('/segmentation')
 def segmentation():

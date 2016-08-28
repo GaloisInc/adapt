@@ -19,7 +19,7 @@ class SupervisedClassifier(object):
         for segmentId, G in self.provenanceGraph.getClassifiedSegments():
             segmentIds.append(segmentId)
             features.append(self.featureExtractor.run(G))
-        
+
         X = numpy.array(features)
 
         labels = self.provenanceGraph.getActivityTypes(segmentIds)
@@ -56,9 +56,9 @@ class SupervisedClassifier(object):
 
         if len(features) == 0:
             return zip()
-            
+
         X = numpy.array(features)
-            
+
         y = classifier.predict(X)
 
         labels = labelEncoder.inverse_transform(y)
