@@ -22,15 +22,13 @@ class UnsupervisedClassifier(object):
         self.featureExtractor = featureExtractor
 
     def classifyNew(self):
+        log.info("ClassifyNew() Starting")
         segmentIds = []
         features = []
 
-        log.info("Starting ClassifyNew")
         for segmentId, G in self.provenanceGraph.getUnclassifiedSegments():
             segmentIds.append(segmentId)
             features.append(self.featureExtractor.run(G))
-
-        log.info("Done loop ClassifyNew")
 
         X = numpy.array(features)
         if len(X) == 0:
@@ -42,5 +40,7 @@ class UnsupervisedClassifier(object):
         y = estimator.fit_predict(X)
 
         result = zip(segmentIds, y)
+
+        log.info("ClassifyNew() Return")
 
         return result
