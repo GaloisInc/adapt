@@ -113,7 +113,7 @@
         "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).select('process').dedup().id().toList().toArray()",
         "feature_set": {
             "max_num_local_net_access":
-                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',PROCESS)+1))}.next().values().max())"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',0)+1))}.mapValues().max())"
         }
     },
 
