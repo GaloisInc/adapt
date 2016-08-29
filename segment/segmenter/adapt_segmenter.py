@@ -123,7 +123,7 @@ class SimpleTitanGremlinSegmenter:
 		self.verbose=args.verbose
 		self.time_segment=args.time_segment
 		self.seg2segedges=args.segment_edges
-		self.timestmaps=args.timestamps
+		self.timestamps=args.timestamps
 		self.directionEdges=args.directionEdges
 		self.radius_segment = args.radius_segment
 		self.print_segment = args.print_segment
@@ -142,8 +142,8 @@ class SimpleTitanGremlinSegmenter:
 					   'endedAtTime': property_endedAtTime,
 					   'segmentStartedAtTime': property_segmentStartedAtTime,
 					   'segmentEndedAtTime': property_segmentEndedAtTime,
-					   'segmentOrigin': property_segmentStartedAtTime,
-					   'segmentDest': property_segmentStartedAtTime,
+					   'segmentOrigin': property_segmentOrigin,
+					   'segmentDest': property_segmentDest,
 					   'criterion': self.criterion, 
 					   'segmentName': self.segmentName,
 					   'directionEdges' : self.directionEdges, 
@@ -409,23 +409,23 @@ g.V(%(snode)s).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 
 	def addSeg2SegEdgesTimestamps_query(self): 
 		addSeg2SegEdgesTimestamps_query="""\
-snodes=g.V().has(%(segmentNodeName)s,%(segmentName)s).id().fold().next();\
+snodes=g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next();\
 for (s in snodes){\
-res=g.V(s).as('a').out(%(segmentEdgeLabel)s).as('b').out().as('c').in(%(segmentEdgeLabel)s).as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
+res=g.V(s).as('a').out('%(segmentEdgeLabel)s').as('b').out().as('c').in('%(segmentEdgeLabel)s').as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
 for (r in res){\
-originTimestamps=g.V(r.b).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
-destTimestamps=g.V(r.c).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
+originTimestamps=g.V(r.b).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+destTimestamps=g.V(r.c).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
 timestamps=(destTimestamps+originTimestamps).sort();\
 len=timestamps.size();\
 switch(len){\
 case 0:\
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c);\
   break;\
 case 1:\
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0]);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0]);\
   break;\
 default:
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0],%(segmentEndedAtTime)s,timestamps[len-1]);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0],'%(segmentEndedAtTime)s',timestamps[len-1]);\
   break;\
 }\
 }\
@@ -434,21 +434,21 @@ default:
 
 	def addSeg2SegEdgesTimestampsIter_query(self,snode): 
 		addSeg2SegEdgesTimestamps_query="""\
-res=g.V(s).as('a').out(%(segmentEdgeLabel)s).as('b').out().as('c').in(%(segmentEdgeLabel)s).as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
+res=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').as('b').out().as('c').in('%(segmentEdgeLabel)s').as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
 for (r in res){\
-originTimestamps=g.V(r.b).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
-destTimestamps=g.V(r.c).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
+originTimestamps=g.V(r.b).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+destTimestamps=g.V(r.c).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
 timestamps=(destTimestamps+originTimestamps).sort();\
 len=timestamps.size();\
 switch(len){\
 case 0:\
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c);\
   break;\
 case 1:\
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0]);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0]);\
   break;\
 default:
-  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0],%(segmentEndedAtTime)s,timestamps[len-1]);\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0],'%(segmentEndedAtTime)s',timestamps[len-1]);\
   break;\
 }\
 }""" % extend(self.params,'snode',snode)
@@ -583,7 +583,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		else: 
 			self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
 		t3 = time.time()
-			self.log('info','Edges created in %fs' % (t3-t2))
+		self.log('info','Edges created in %fs' % (t3-t2))
 		t4 = time.time()
 		self.log('info','Segment edges created in %fs' % (t4-t1))
 		return "Segment edges created"
@@ -607,13 +607,13 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			self.log('info','%s: Segmenting by time with window %d microseconds' % (self.segmentName,self.window))
 			result = self.makeTimeSegments()
 		elif self.radius_segment == True:
-			self.log('info','%s: Segmenting by radius %d with criterion %s"' % (self.segmentName,self.radius,self.criterion))
+			self.log('info','%s: Segmenting by radius %d with criterion "%s"' % (self.segmentName,self.radius,self.criterion))
 			result = self.makeRadiusSegments()
 		elif self.seg2segedges == True:
 			if self.timestamps == True:
-				self.log('info','%s: Creating segment-to-segment edges with timestamps"' % (self.segmentName))
+				self.log('info','%s: Creating segment-to-segment edges with timestamps' % (self.segmentName))
 			else:
-				self.log('info','%s: Creating segment-to-segment edges without timestamps"' % (self.segmentName))
+				self.log('info','%s: Creating segment-to-segment edges without timestamps' % (self.segmentName))
 			result = self.makeSeg2SegEdges()
 		return result
 

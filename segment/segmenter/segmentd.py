@@ -77,7 +77,7 @@ class TopLevelSegmenter:
                         broker, spec, kafkaUrl, processes)
                 log.info(cmd)
                 os.system(cmd)
-                cmd = './adapt_segmenter.py --broker %s --segment-edges --name byPID --spec %s --log-to-kafka --kafka %s --processes %d' % (
+                cmd = './adapt_segmenter.py --broker %s --segment-edges --name byPID --timestamps --spec %s --log-to-kafka --kafka %s --processes %d' % (
                         broker, spec, kafkaUrl, processes)
                 log.info(cmd)
                 os.system(cmd)
