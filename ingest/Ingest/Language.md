@@ -1088,6 +1088,13 @@ This property specifies the order of a phase instance.
 [schema]: #
 makePropertyKey('phase:order').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
+phase:name (not in CDM)
+-----------
+This property specifies the string name of a phase.
+
+[schema]: #
+makePropertyKey('phase:name').dataType(String.class).cardinality(Cardinality.SINGLE)
+
 activity:type (not in CDM)
 -----------
 This property specifies the string type of an Activity instance, which shall appear in the APT grammar.
