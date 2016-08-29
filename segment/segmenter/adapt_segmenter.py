@@ -71,6 +71,9 @@ def arg_parser():
 	group.add_argument('--time-segment',
 					   help='Segment by time',
 					   action='store_true')
+	group.add_argument('--segment-edges',
+					   help='Create edges among segments',
+					   action='store_true')
 	group.add_argument('--print-segment',
 					   help='Print segments',
 					   action='store_true')
@@ -87,6 +90,9 @@ def arg_parser():
 	p.add_argument('--window', '-w', 
 				   help='The segmentation time window in seconds', 
 				   type=int, default=60)
+	p.add_argument('--timestamps',  
+				   help='Create segment:edges with timestamps', 
+				   action='store_true')
 	p.add_argument('--verbose','-v', 
 				   action='store_true',help='Verbose mode')
 	p.add_argument('--log-to-kafka', action='store_true',
@@ -458,11 +464,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				t1 = time.time()
 				self.titanclient.execute(self.addEdges_query())
 				t2 = time.time()
-				self.log('info','Segments created in %fs' % (t2-t1))
-				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
-				t3 = time.time()
-				self.log('info','Segment edges created in %fs' % (t3-t2))
-				self.log('info','Total segmentation time %fs' % (t3-t1))
+				self.log('info','Total segmentation time %fs' % (t2-t1))
 				return "Segments created"
 			
 		else: # count == 0
@@ -473,26 +475,19 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
 		ids = self.titanclient.execute(self.addEdgesInit_query())
-		count = len(ids)
 		t2 = time.time()
+		count = len(ids)
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
 			if (self.checkCriterionType() == False):
 				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				t1 = time.time()
+				t3 = time.time()
 				params = [{'j':i} for i in ids]
 				self.titanclient.execute_many_params(self.processes,self.addEdgesIter_query('j'),params)
-				t2 = time.time()
-				self.log('info','Segments created in %fs' % (t2-t1))
-				snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
-				t3 = time.time()
-				self.log('info','Segment nodes found in %fs' % (t3-t2))
-				sparams = [{'sn':snode} for snode in snodes]
-				self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
 				t4 = time.time()
-				self.log('info','Segment edges created in %fs' % (t4-t3))
+				self.log('info','Segments created in %fs' % (t4-t3))
 				self.log('info','Total segmentation time %fs' % (t4-t1))
 				return "Segments created"
 			
@@ -506,6 +501,31 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		else:
 			return self.makeRadiusSegmentsParallel()
 		
+	def makeSeg2SegEdgesSequential(self):
+		t2 = time.time()
+		self.log('info','Segments created in %fs' % (t2-t1))
+		addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+		t3 = time.time()
+		self.log('info','Segment edges created in %fs' % (t3-t2))
+		return "Segment edges created"
+	
+	def makeSeg2SegEdgesParallel(self):
+		t1 = time.time()
+		snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
+		t2 = time.time()
+		self.log('info','Segment nodes found in %fs' % (t2-t1))
+		sparams = [{'sn':snode} for snode in snodes]
+		self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
+		t3 = time.time()
+		self.log('info','Segment edges created in %fs' % (t3-t2))
+		return "Segment edges created"
+	
+
+	def makeSeg2SegEdges(self):
+		if self.processes == 1:
+			return self.makeSeg2SegEdgesSequential()
+		else:
+			return self.makeSeg2SegEdgesParallel()
 
 	def storeSegments(self):
 		'''
@@ -516,9 +536,12 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		self.createSchemaElements()
 		
 		if self.time_segment == True:
-			return self.makeTimeSegments()
+			result = self.makeTimeSegments()
 		elif self.radius_segment == True:
-			return self.makeRadiusSegments()
+			result = self.makeRadiusSegments()
+		elif self.seg2segedges == True:
+			result = self.makeSeg2SegEdges()
+		return result
 
 		
 	def log(self,type_log,text):
