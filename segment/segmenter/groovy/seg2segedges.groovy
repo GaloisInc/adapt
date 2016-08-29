@@ -23,8 +23,8 @@ def createSeg2SegEdgesWithTimestamps(graph,g) {
             case 1:
                  g.V(r.a).next().addEdge('segment:edge',g.V(r.d).next(),'origin',r.b,'dest',r.c,'segment:startedAtTime',timestamps[0])
                  break
-            case 2:
-                 g.V(r.a).next().addEdge('segment:edge',g.V(r.d).next(),'origin',r.b,'dest',r.c,'segment:startedAtTime',timestamps[0],'segment:endedAtTime',timestamps[1])
+            default:
+                 g.V(r.a).next().addEdge('segment:edge',g.V(r.d).next(),'origin',r.b,'dest',r.c,'segment:startedAtTime',timestamps[0],'segment:endedAtTime',timestamps[len-1])
                  break
             }
         }

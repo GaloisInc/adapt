@@ -1149,6 +1149,27 @@ graph from a node in the first to a node in the second.
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(MULTI)
 
+
+segment:source, segment:dest (not in CDM)
+-----------
+These properties contains the ID of the underlying source and destination vertex related to a segment:edge.
+
+[schema]: #
+makePropertyKey('segment:dest').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+[schema]: #
+makePropertyKey('segment:origin').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+segment:startedAtTime, segment:endedAtTime
+-----------
+These properties record the earliest and latest timestamp associated with a segment:edge.
+
+[schema]: #
+makePropertyKey('segment:startedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+[schema]: #
+makePropertyKey('segment:endedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
 segment:parentId (not in CDM)
 -----------
 This property is associated with a radius segment and contains the node ID of the starting vertex of the segment in the raw graph.
