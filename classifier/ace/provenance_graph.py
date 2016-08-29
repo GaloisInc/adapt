@@ -2,8 +2,20 @@
 
 import networkx
 import pprint
+import logging
+import struct
+import time
+import os
 
 from ace.titan_database import TitanDatabase
+
+log = logging.getLogger(__name__)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+#handler = logging.StreamHandler()
+handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.INFO)
 
 class ProvenanceGraph(object):
     def __init__(self):
@@ -21,10 +33,12 @@ class ProvenanceGraph(object):
     def createActivity(self, segmentId, name, suspicionScore = 0):
         query  = ("segmentNode = g.V({}).next();"
                   "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
-                  "edge = segmentNode.addEdge('activity:includes', activityNode);"
+                  "edge = segmentNode.addEdge('segment:activity', activityNode);"
                   "activityNode").format(segmentId, name, suspicionScore)
-        node = self.titanClient.execute(query)
 
+        log.info('Creating Activity query: %s', query)
+
+        node = self.titanClient.execute(query)
         return node[0]
 
     def changeActivityType(self, activityId, value):
@@ -35,10 +49,6 @@ class ProvenanceGraph(object):
         query  = "g.V({}).property('activity:suspicionScore', '{}')".format(activityId, value)
         node = self.titanClient.execute(query)
 
-    def changeAcitivitySuspicionScore(self, acitivityId, value):
-        query  = "x"
-        node = self.titanClient.execute(query)
-        
     def deleteActivities(self):
         query = "g.V().has(label, 'Activity').drop().iterate()"
         # Removing a vertex removes all its incident edges as well.
@@ -90,12 +100,12 @@ class ProvenanceGraph(object):
             G.add_edge(nodeId, adjacentNodeId)
 
         return G
-            
+
     def getActivityTypes(self, segmentIds):
         result = []
 
         for segmentId in segmentIds:
-            query = "g.V({}).out('activity:includes')".format(segmentId)
+            query = "g.V({}).out('segment:activity')".format(segmentId)
             node = self.titanClient.execute(query)
             result.append(node[0]['properties']['activity:type'][0]['value'])
 
@@ -104,14 +114,14 @@ class ProvenanceGraph(object):
     def getActivity(self, segmentId):
         result = []
 
-        query = "g.V({}).out('activity:includes')".format(segmentId)
+        query = "g.V({}).out('segment:activity')".format(segmentId)
         node = self.titanClient.execute(query)
         return (node[0]['id'],
                 node[0]['properties']['activity:type'][0]['value'],
                 node[0]['properties']['activity:suspicionScore'][0]['value'])
-    
+
     def getUnclassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(__.not(outE('activity:includes')))"
+        query = "g.V().hasLabel('Segment').where(__.not(outE('segment:activity')))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
@@ -129,7 +139,7 @@ class ProvenanceGraph(object):
             yield(nodeId, G)
 
     def getClassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(outE('activity:includes'))"
+        query = "g.V().hasLabel('Segment').where(outE('segment:activity'))"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             G = networkx.Graph()
