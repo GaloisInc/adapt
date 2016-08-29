@@ -391,6 +391,22 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }""" % self.params
 		return addSeg2SegEdges_query
 
+
+	def addSeg2SegEdgesInit_query(self): 
+		addSeg2SegEdgesInit_query="""\
+g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
+""" % self.params
+		return addSeg2SegEdgesInit_query
+
+	def addSeg2SegEdgesIter_query(self,snode): 
+		addSeg2SegEdgesIter_query="""\
+linkedSeg=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
+g.V(%(snode)s).out('%(seg2segEdgeLabel)s').id().fold().next();\
+for (s in linkedSeg){\
+g.V(%(snode)s).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
+}""" % extend(self.params,'snode',snode)
+		return addSeg2SegEdgesIter_query
+
 	def addSeg2SegEdgesTimestamps_query(self): 
 		addSeg2SegEdgesTimestamps_query="""\
 snodes=g.V().has(%(segmentNodeName)s,%(segmentName)s).id().fold().next();\
@@ -416,20 +432,28 @@ default:
 }""" % self.params
 		return addSeg2SegEdgesTimestamps_query
 
-	def addSeg2SegEdgesInit_query(self): 
-		addSeg2SegEdgesInit_query="""\
-g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
-""" % self.params
-		return addSeg2SegEdgesInit_query
-
-	def addSeg2SegEdgesIter_query(self,snode): 
-		addSeg2SegEdgesIter_query="""\
-linkedSeg=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').out().in('%(segmentEdgeLabel)s').dedup().where(neq('a')).id().fold().next()-\
-g.V(%(snode)s).out('%(seg2segEdgeLabel)s').id().fold().next();\
-for (s in linkedSeg){\
-g.V(%(snode)s).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
+	def addSeg2SegEdgesTimestampsIter_query(self,snode): 
+		addSeg2SegEdgesTimestamps_query="""\
+res=g.V(s).as('a').out(%(segmentEdgeLabel)s).as('b').out().as('c').in(%(segmentEdgeLabel)s).as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
+for (r in res){\
+originTimestamps=g.V(r.b).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
+destTimestamps=g.V(r.c).values(%(startedAtTime)s,%(endedAtTime)s).toList();\
+timestamps=(destTimestamps+originTimestamps).sort();\
+len=timestamps.size();\
+switch(len){\
+case 0:\
+  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c);\
+  break;\
+case 1:\
+  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0]);\
+  break;\
+default:
+  g.V(r.a).next().addEdge(%(seg2segEdgeLabel)s,g.V(r.d).next(),%(segmentOrigin)s,r.b,%(segmentDest)s,r.c,%(segmentStartedAtTime)s,timestamps[0],%(segmentEndedAtTime)s,timestamps[len-1]);\
+  break;\
+}\
 }""" % extend(self.params,'snode',snode)
-		return addSeg2SegEdgesIter_query
+		return addSeg2SegEdgesTimestamps_query
+
 
 	def createTimeSegment_query(self):
 		timeSegment_query = """\
@@ -550,15 +574,15 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 	
 	def makeSeg2SegEdgesParallel(self):
 		t1 = time.time()
-			if(self.timestamps):
-			addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdgesTimestamps_query())
+		snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
+		t2 = time.time()
+		self.log('info','Segment nodes found in %fs' % (t2-t1))
+		sparams = [{'sn':snode} for snode in snodes]
+		if(self.timestamps):
+			self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesTimestampsIter_query('sn'),sparams)
 		else: 
-			snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
-			t2 = time.time()
-			self.log('info','Segment nodes found in %fs' % (t2-t1))
-			sparams = [{'sn':snode} for snode in snodes]
 			self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
-			t4 = time.time()
+		t3 = time.time()
 			self.log('info','Edges created in %fs' % (t3-t2))
 		t4 = time.time()
 		self.log('info','Segment edges created in %fs' % (t4-t1))
