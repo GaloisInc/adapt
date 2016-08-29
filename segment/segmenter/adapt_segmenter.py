@@ -564,7 +564,7 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		
 	def makeSeg2SegEdgesSequential(self):
 		t1 = time.time()
-		if(self.timestamps):
+		if self.timestamps:
 			addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdgesTimestamps_query())
 		else: 
 			addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
