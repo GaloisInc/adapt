@@ -117,6 +117,7 @@ class SimpleTitanGremlinSegmenter:
 		self.radius=args.radius
 		self.verbose=args.verbose
 		self.time_segment=args.time_segment
+		self.seg2segedges=args.segment_edges
 		self.directionEdges=args.directionEdges
 		self.radius_segment = args.radius_segment
 		self.print_segment = args.print_segment
