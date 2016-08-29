@@ -1134,9 +1134,12 @@ makePropertyKey('segment:name').dataType(String.class).cardinality(Cardinality.S
 
 [schema]: #
 makePropertyKey('anomalyScore').dataType(Float.class).cardinality(Cardinality.LIST)
+
 [schema]: #
 makePropertyKey('anomalyType').dataType(String.class).cardinality(Cardinality.LIST)
 
+[schema]: #
+makePropertyKey('anomalyFeature').dataType(String.class).cardinality(Cardinality.LIST)
 
 segment:edge (not in CDM)
 -----------
@@ -1152,3 +1155,10 @@ This property is associated with a radius segment and contains the node ID of th
 
 [schema]: #
 makePropertyKey('segment:parentId').dataType(Integer.class).cardinality(SINGLE)
+
+segment:activity (not in CDM)
+-----------
+This relationship connects an Activity instance to a Segment node. No attributes.
+
+[schema]: #
+makeEdgeLabel('segment:activity').multiplicity(SIMPLE)

@@ -36,7 +36,7 @@ __author__ = 'jcheney@inf.ed.ac.uk'
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-handler = logging.FileHandler(os.path.expanduser('~/adapt/ad/AD.log'), "w")
+handler = logging.FileHandler(os.path.expanduser('~/adapt/ad/AD.log'))
 handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
@@ -50,7 +50,7 @@ class AD:
 
     def __init__(self, url):
         # Kafka might not be availble yet, due to supervisord race.
-        retries = 6  # Eventually we may signal fatal error; this is a feature.
+        retries = 10  # Eventually we may signal fatal error; this is a feature.
         self.consumer = None
         while retries >= 0 and self.consumer is None:
             try:
@@ -64,9 +64,10 @@ class AD:
         # The producer relies on kafka-python-1.1.1 (not 0.9.5).
         self.producer = kafka.KafkaProducer(bootstrap_servers=[url])
 
-    def await_segmenter(self, start_msg='Awaiting segmenter to finish.'):
+    def await_segmenter(self, start_msg='Awaiting segmenter to finish...'):
         os.chdir(os.path.expanduser('~/adapt/ad/test/'))
         log.info(start_msg)
+        self.producer.send("ad-log", bytes(start_msg, encoding='utf-8'))
         for msg in self.consumer:
             self.consumer.commit()
             log.info("recvd msg: %s", msg)

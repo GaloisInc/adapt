@@ -98,7 +98,7 @@ var saved_nodes = [
                     return t + " of " + pid
                 case "Event":
                     if (e === "Write" || e === "Read") {
-                        temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
+                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
                         return t + " " + e + " (" + temp + ")" 
                     } else { return t + " " + e }
                 default:
@@ -118,7 +118,7 @@ var saved_nodes = [
 ]
 
 var starting_queries = [
-/*
+
     {
         name : "find file by name & version",
         base_query : "g.V().has('label','Entity-File').has('url',{_}).has('file-version',{_})",
@@ -139,5 +139,5 @@ var starting_queries = [
         base_query : "g.V().has('label','Entity_NetFlow').has('dstAddress',{_}).has('port',{_})",
         default_values : ["127.0.0.1",80]
     }
-    */
+    
 ]

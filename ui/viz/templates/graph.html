@@ -45,7 +45,7 @@
                         var query_color = document.getElementById("query-color").jscolor.value
                         var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                         var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})
-                        var data = { "type" : "add", "nodes" : node_results, "edges" : edge_results }
+                        var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
                         if (query_object.is_collapsed) {
                             data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
                         }
@@ -238,22 +238,69 @@
 
 
         function undoUpdateNetwork() {
+            var journal_event
             if (journal.length > 0) {
-                var to_remove = journal.pop()
-                right_journal.unshift(to_remove)
-                applyJournalEvent(invertJournalEvent(to_remove))
+                journal_event = journal.pop()
+                right_journal.unshift(journal_event)
+                applyJournalEvent(invertJournalEvent(journal_event))
                 UI.animate()
                 localStorage.setItem("previous_journal", JSON.stringify(journal))
             }
             UI.updateButtonStates()
+            // Skip over checkpoints:
+            if (typeof journal_event !== "undefined" && journal_event.type === "checkpoint") { 
+                undoUpdateNetwork()
+            }
         }
 
 
         function redoUpdateNetwork() {
+            var journal_event
             if (right_journal.length > 0) {
-                updateNetwork(right_journal.shift())
+                journal_event = right_journal.shift()
+                updateNetwork(journal_event)
             }
             UI.updateButtonStates()
+            // Skip over checkpoints:
+            if (typeof journal_event !== "undefined" && 
+                    journal_event.type !== "checkpoint" && 
+                    typeof right_journal[0] !== "undefined" &&
+                    right_journal[0].type === "checkpoint") { 
+                redoUpdateNetwork() 
+            }
+        }
+
+
+        function undoMany(optional_name) {
+            var undid_at_least_one = false
+            while (journal.length > 0) {
+                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
+                if (is_checkpoint && undid_at_least_one) { break }
+                if (typeof optional_name === "string" && journal.slice(-1)[0].name === optional_name) { break }
+                undoUpdateNetwork()
+                undid_at_least_one = true
+            }
+            var last_event = journal.slice(-1)[0]
+            if (typeof optional_name === "string" && 
+                    typeof last_event !== "undefined" &&
+                    last_event.name !== optional_name &&
+                    _.contains(_.pluck(journal, "name"), optional_name)) {
+                undoMany(optional_name)
+            }
+        }
+
+
+        function redoMany(optional_name) {
+            while (right_journal.length > 0) {
+                redoUpdateNetwork()
+                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
+                if (is_checkpoint) { break }
+            }
+            var right_names = _.filter(_.pluck(right_journal, "name"), function(n){return typeof n === "string"})
+            if (typeof optional_name === "string" && 
+                _.contains(right_names, optional_name)) { 
+                    redoMany(optional_name) 
+            }
         }
 
 
@@ -266,24 +313,6 @@
                 }
                 journal.push(journal_event)
                 UI.checkpointFeedback()
-            }
-        }
-
-
-        function undoMany() {
-            while (journal.length > 0) {
-                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
-                undoUpdateNetwork()
-                if (is_checkpoint) { break }
-            }
-        }
-
-
-        function redoMany() {
-            while (right_journal.length > 0) {
-                var is_checkpoint = right_journal[0].type === "checkpoint"
-                redoUpdateNetwork()
-                if (is_checkpoint) { break }
             }
         }
 
@@ -412,8 +441,11 @@
 
         function makeNodeTitle(node) {
             var keys = Object.keys(node['properties'])
-            var prop_lines = _.map(keys, function(key, i, list) {
-                return key + " : " + node['properties'][key][0]['value']  // WARNING: this [0] might throw away data somewhere (but not in any data that I see)
+            var prop_lines = _.map(keys, function(key) {
+                x = node['properties'][key]
+                var value_list = _.map(x, function(s){ 
+                    return String(s.value) } )
+                return key + " : " + value_list.join(", ")
             })
             return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
         }
@@ -533,8 +565,32 @@
                     var query_menu = document.getElementById("node-query-menu")
                     query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
                     query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
+                    query_menu.style.removeProperty("right")
                     query_menu.className = "show"  
                 }
+            },
+            checkpointRightClickBehavior : function(e) {
+                e.preventDefault()
+                $("#node-query-menu ul").empty()
+
+                var left_checkpoints = _.filter(journal, function(e){return e.type === "checkpoint"})
+                _.map(left_checkpoints, function(c) {
+                    $("#node-query-menu ul").append(
+                        '<li onclick="undoMany(\''+c.name+'\')">' + c.name + '</li>'
+                    )
+                })
+                $("#node-query-menu ul").append( '<li><b> —> u r here <— </b></li>')
+                var right_checkpoints = _.filter(right_journal, function(e){return e.type === "checkpoint"})
+                _.map(right_checkpoints, function(c) {
+                    $("#node-query-menu ul").append(
+                        '<li onclick="redoMany(\''+c.name+'\')">' + c.name + '</li>'
+                    )
+                })
+                var query_menu = document.getElementById("node-query-menu")
+                query_menu.style.top =  e.clientY + 'px'
+                query_menu.style.removeProperty("left")
+                query_menu.style.right = window.innerWidth - e.screenX + "px"
+                query_menu.className = "show"  
             },
             toggleNode : function(props) {
                 // Calling `.getNodeAt()` inside this event handler always returns undefined. 
@@ -685,7 +741,17 @@
                     if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
                 })
                 network.on("hold", function(props) {
-                    console.log(props)
+                    if ( ! _.isEmpty(props.nodes)) {
+                        var node_id = props.nodes[0]
+                        var node = node_data_set.get(node_id)
+                        var previous_color = node.icon.color
+                        node_data_set.update({ id: node_id, fixed: ! node.fixed, icon: {color: "black"} })
+                        debug_node = node_data_set.get(node_id)
+                        console.log(debug_node)
+                        setTimeout(function(){
+                            node_data_set.update( {id: node_id, icon: {color: previous_color} } )
+                        }, 500)
+                    }
                 })
                 network.on("dragEnd", function(props){
                     if (UI.drawing) { UI.endDrawSelection(props) }
@@ -720,6 +786,7 @@
             var files = event.target.files
             _.map(files, function(f){
                 if (f.type === "application/json") {
+                    right_journal = []
                     var reader = new FileReader()
                     reader.onload = function(e) {
                         var data = JSON.parse(e.target.result)
@@ -798,7 +865,8 @@
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
             document.getElementById("query-color").jscolor.value = default_node_color
-            document.getElementById('choose-upload').addEventListener('change', uploadFile, false);
+            document.getElementById('choose-upload').addEventListener('change', uploadFile, false)
+            document.getElementById("checkpoint-button").addEventListener('contextmenu', UI.checkpointRightClickBehavior)
             
             createSavedQueries()
             document.querySelector('input[list="starting-queries"]').addEventListener('input', setSelectedQuery)
