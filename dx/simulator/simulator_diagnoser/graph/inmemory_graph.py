@@ -20,6 +20,7 @@ class InmemoryStatesMixin(object):
 class InmemoryGraph(InmemoryStatesMixin, AbstractGraph):
     def __init__(self):
         self.clear()
+        self.clear_diagnoses()
 
     def clear(self):
         self.__G = nx.DiGraph()
@@ -59,3 +60,9 @@ class InmemoryGraph(InmemoryStatesMixin, AbstractGraph):
 
     def clear_node_labels(self, node):
         self.__G.node[node]['labels'] = []
+
+    def store_diagnoses(self, path):
+        self.diagnoses.append(path)
+
+    def clear_diagnoses(self):
+        self.diagnoses = []

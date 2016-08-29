@@ -1,8 +1,9 @@
 
 class ForwardAnalysis(object):
 
-    def __init__(self, graph):
+    def __init__(self, graph, avoid_cycles=False):
         self.graph = graph
+        self.avoid_cycles = avoid_cycles
 
     def __iter__(self):
         self.queue = []
@@ -19,6 +20,9 @@ class ForwardAnalysis(object):
             raise StopIteration
 
         node = self.queue.pop(0)
+        if self.avoid_cycles and node in self.explored:
+            return self.__next__()
+        
         parents, parent_edges = self.graph.get_node_parents(node, self.explored_edges)
 
         for parent in parents:

@@ -46,5 +46,9 @@ class APTDiagnoserTest(unittest.TestCase):
         paths = self.apt_diagnoser.backward_analysis(node)
         self.assertEqual(2, len(paths))
 
+    def test_diagnoser(self):
+        self.apt_diagnoser.store_diagnoses()
+        self.assertEqual(2, len(self.g1.diagnoses))
+
 if __name__ == '__main__':
     unittest.main()

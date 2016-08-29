@@ -34,3 +34,11 @@ class AbstractGraph(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def clear_matcher_states(self):
         pass
+
+    @abc.abstractmethod
+    def store_diagnoses(self, path):
+        pass
+
+    @abc.abstractmethod
+    def clear_diagnoses(self):
+        pass
