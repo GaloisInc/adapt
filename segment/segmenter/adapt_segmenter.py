@@ -462,10 +462,11 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				t1 = time.time()
+				t3 = time.time()
 				self.titanclient.execute(self.addEdges_query())
-				t2 = time.time()
-				self.log('info','Total segmentation time %fs' % (t2-t1))
+				t4 = time.time()
+				self.log('info','Segments created in %fs' % (t4-t3))
+				self.log('info','Total segmentation time %fs' % (t4-t1))
 				return "Segments created"
 			
 		else: # count == 0
@@ -503,11 +504,10 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			return self.makeRadiusSegmentsParallel()
 		
 	def makeSeg2SegEdgesSequential(self):
-		t2 = time.time()
-		self.log('info','Segments created in %fs' % (t2-t1))
+		t1 = time.time()
 		addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
-		t3 = time.time()
-		self.log('info','Segment edges created in %fs' % (t3-t2))
+		t2 = time.time()
+		self.log('info','Segment edges created in %fs' % (t2-t1))
 		return "Segment edges created"
 	
 	def makeSeg2SegEdgesParallel(self):
