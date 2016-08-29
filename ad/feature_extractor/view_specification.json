@@ -70,7 +70,7 @@
 
     "netflow_long_write_delay" : {
         "description" : "Identify netflow nodes with long writing delay (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(DADDRESS,textContains('.')).as('netflow').local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count().is(gt(1))).select('netflow').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_E_A_N_O).out(E_E_A_N_I).dedup().as('netflow').local(__.in(E_E_A_N_I).in(E_E_A_N_O).has(ETYPE,WRITE).count().is(gt(1))).select('netflow').dedup().id().toList().toArray()",
         "feature_set": {
             "first_last_write_gap":{
                 "first":
@@ -113,7 +113,7 @@
         "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).select('process').dedup().id().toList().toArray()",
         "feature_set": {
             "max_num_local_net_access":
-                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',PROCESS)+1))}.next().values().max())"
+                "g.V(IDS).local(__.in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_N_O).out(E_E_A_N_I).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',0)+1))}.mapValues().max())"
         }
     },
 
@@ -349,9 +349,9 @@
         }
     },
 
-    "files_in_tmp_dir" : {
-        "description" : "Analyze the files in temp directory",
-        "instance_set": "IDS=g.V().has('url',textContains('/tmp')).id().toList().toArray()",
+    "files_in_tmp_dir_connect_netflow" : {
+        "description" : "Analyze the files in temp directory and have connection with netflow",
+        "instance_set": "IDS=g.V().has(STYPE,EVENT).as('net_events').out(E_E_A_N_O).select('net_events').out(E_E_G_B_S_O).out(E_E_G_B_S_I).dedup().in(E_E_G_B_S_I).in(E_E_G_B_S_O).out(E_E_A_F_O).out(E_E_A_F_I).dedup().has('url',textContains('/tmp')).id().toList().toArray()",
         "feature_set": {
             "num_exec":
                 "g.V(IDS).local(__.in(E_E_A_F_I).in(E_E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
