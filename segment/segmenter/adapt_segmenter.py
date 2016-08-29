@@ -607,13 +607,13 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 			self.log('info','%s: Segmenting by time with window %d microseconds' % (self.segmentName,self.window))
 			result = self.makeTimeSegments()
 		elif self.radius_segment == True:
-			self.log('info','%s: Segmenting by radius %d with criterion %s"' % (self.segmentName,self.radius,self.criterion))
+			self.log('info','%s: Segmenting by radius %d with criterion "%s"' % (self.segmentName,self.radius,self.criterion))
 			result = self.makeRadiusSegments()
 		elif self.seg2segedges == True:
 			if self.timestamps == True:
-				self.log('info','%s: Creating segment-to-segment edges with timestamps"' % (self.segmentName))
+				self.log('info','%s: Creating segment-to-segment edges with timestamps' % (self.segmentName))
 			else:
-				self.log('info','%s: Creating segment-to-segment edges without timestamps"' % (self.segmentName))
+				self.log('info','%s: Creating segment-to-segment edges without timestamps' % (self.segmentName))
 			result = self.makeSeg2SegEdges()
 		return result
 
