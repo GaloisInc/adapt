@@ -19,6 +19,7 @@ import           Control.Monad
 import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.ByteString (ByteString)
+import           Data.Functor.Identity
 import           Data.Monoid
 import qualified Data.Sequence as Seq
 import           Data.Sequence (Seq)
@@ -167,36 +168,17 @@ lonePage c stMV =
   do title_ "ADAPT Dashbaord"
      body_ [] $ do
       meta_ [httpEquiv_ "refresh", content_ "5"]
-      h2_ "Ingestion"
-      textarea_ [ id_ "ig_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml $ T.unlines $ F.toList igStat)
+      renderBox "Ingestion" "ig_textarea" igStat
       -- h2_ "Pattern Extraction"
       -- textarea_ [ id_ "pe_textarea"
       --           , readonly_ "true"
       --           , rows_ "25", cols_ "140"]
       --           (toHtml pxStat)
-      h2_ "Segmentation"
-      textarea_ [ id_ "se_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml $ T.unlines $ F.toList seStat)
-      h2_ "Anomaly Detection"
-      textarea_ [ id_ "ad_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml $ T.unlines $ F.toList adStat)
-      h2_ "Activity Classification"
-      textarea_ [ id_ "ac_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml $ T.unlines $ F.toList acStat)
-      h2_ "Diagnostics"
-      textarea_ [ id_ "dx_textarea"
-                , readonly_ "true"
-                , rows_ "25", cols_ "140"]
-                (toHtml $ T.unlines $ F.toList dxStat)
+      renderBox "Segmentation" "se_textarea" seStat
+      renderBox "Anomaly Detection" "ad_textarea" adStat
+      renderBox "Activity Classification" "ac_textarea" acStat
+
+      renderBox "Diagnostics" "dx_textarea" dxStat
       h2_ "UI"
       h3_ "Manual Activity Classifier"
       a_ [href_ "http://localhost:8181/classification"] "Activity Classifier"
@@ -205,6 +187,14 @@ lonePage c stMV =
       h3_ "General Graph Viewer log"
       a_ [href_ "http://localhost:8181/log"] "General Graph Viewer log"
       return ()
+  where
+  renderBox :: HtmlT Identity () -> Text -> Seq Text -> Html ()
+  renderBox name boxid queue =
+   do h2_ name
+      textarea_ [ id_ boxid
+                , readonly_ "true"
+                , rows_ "25", cols_ "140"]
+                (toHtml $ T.unlines $ reverse $ F.toList queue)
 
 updateStatus :: Channels -> MVar Status -> IO ()
 updateStatus (Channels {..}) stMV = forever (go >> threadDelay 100000)

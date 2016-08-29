@@ -1,7 +1,7 @@
 import logging
 
-IN_PROGRESS = b'0'
-DONE = b'1'
+IN_PROGRESS = b'\x00'
+DONE = b'\x01'
 
 class Messenger(object):
 

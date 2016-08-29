@@ -1088,6 +1088,13 @@ This property specifies the order of a phase instance.
 [schema]: #
 makePropertyKey('phase:order').dataType(Integer.class).cardinality(Cardinality.SINGLE)
 
+phase:name (not in CDM)
+-----------
+This property specifies the string name of a phase.
+
+[schema]: #
+makePropertyKey('phase:name').dataType(String.class).cardinality(Cardinality.SINGLE)
+
 activity:type (not in CDM)
 -----------
 This property specifies the string type of an Activity instance, which shall appear in the APT grammar.
@@ -1148,6 +1155,27 @@ graph from a node in the first to a node in the second.
 
 [schema]: #
 makeEdgeLabel('segment:edge').multiplicity(MULTI)
+
+
+segment:source, segment:dest (not in CDM)
+-----------
+These properties contains the ID of the underlying source and destination vertex related to a segment:edge.
+
+[schema]: #
+makePropertyKey('segment:dest').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+[schema]: #
+makePropertyKey('segment:origin').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+segment:startedAtTime, segment:endedAtTime
+-----------
+These properties record the earliest and latest timestamp associated with a segment:edge.
+
+[schema]: #
+makePropertyKey('segment:startedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
+
+[schema]: #
+makePropertyKey('segment:endedAtTime').dataType(Long.class).cardinality(Cardinality.SINGLE)
 
 segment:parentId (not in CDM)
 -----------
