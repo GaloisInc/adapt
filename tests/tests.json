@@ -7,12 +7,14 @@
                 "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
                 "explanation": "Drop all edges so that we have a clean starting point for remaining tests."
-            }, {
+            },
+            {
                 "query": "g.V().drop().iterate() ; graph.tx().commit()",
                 "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
                 "requester_email": "ryan@galois.com",
                 "explanation": "Drop all data so that we have a clean starting point for remaining tests."
-            }, {
+            },
+            {
                 "query": "g.V().count().next() + g.E().count().next()",
                 "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "ryan@galois.com",
@@ -52,7 +54,7 @@
             },
             {
                 "query": "g.V().has('pid').has(label,neq('Segment')).count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
                 "requester_email": "jcheney@inf.ed.ac.uk",
                 "explanation": "Verify nodes with PID were ingested."
             }
@@ -60,13 +62,13 @@
         "se": [
             {
                 "query": "g.V().hasLabel('Segment').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify segment nodes were inserted."
             },
             {
                 "query": "g.E().hasLabel('segment:includes').count()",
-                "response": "[Message(status_code=200, data=[56], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[28], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify base nodes are included in segments."
             },
@@ -106,7 +108,7 @@
                 "explanation": "Verify agents are stable."
             }, {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify segments are stable."
             }, {
@@ -139,12 +141,12 @@
                 "explanation": "Verify agents are stable."
             }, {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify segments are stable."
             }, {
                 "query": "g.V().has(label, 'Activity').count()",
-                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
                 "requester_email": "rui@parc.com",
                 "explanation": "Verify activity classification nodes were inserted."
             }, {
@@ -177,7 +179,7 @@
                 "explanation": "Verify agents are stable."
             }, {
                 "query": "g.V().hasLabel('Segment').count()",
-                "response": "[Message(status_code=200, data=[2], message='', metadata={})]",
+                "response": "[Message(status_code=200, data=[3], message='', metadata={})]",
                 "requester_email": "rui@parc.com",
                 "explanation": "Verify segments are stable."
             }, {
@@ -241,17 +243,17 @@
                 "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
             },
             {
-                "query": "g.V().has(label, 'Subject').count()",
-                "response": "[Message(status_code=200, data=[2783], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
+                "query": "g.V().has(label, 'Subject').count().next() > 0",
+                "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
                 "explanation": "Verify there are subjects."
             }
             ],
         "se": [
             {
                 "query": "g.V().has(label, 'Segment').count()",
-                "response": "[Message(status_code=200, data=[51], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
+                "response": "[Message(status_code=200, data=[201], message='', metadata={})]",
+                "requester_email": "parc@parc.com",
                 "explanation": "Verify that many PID-based segments were found."
             }
         ],
@@ -329,6 +331,12 @@
                 "response": "[Message(status_code=200, data=[5272], message='', metadata={})]",
                 "requester_email": "john.hanley@parc.com",
                 "explanation": "Verify there are subjects."
+            },
+            {
+                "query": "g.V().has(label, 'Agent').count()",
+                "response": "[Message(status_code=200, data=[70], message='', metadata={})]",
+                "requester_email": "john.hanley@parc.com",
+                "explanation": "Verify there are subjects."
             }
             ],
         "se": [],
@@ -346,6 +354,12 @@
             }
         ],
         "ac": [
+            {
+                "query": "g.V().hasLabel('Segment').count()",
+                "response": "[Message(status_code=200, data=[74], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify number of segment."
+            },
             {
                 "query": "g.V().hasLabel('Activity').count()",
                 "response": "[Message(status_code=200, data=[74], message='', metadata={})]",
@@ -368,44 +382,50 @@
         "dx": []
     },
     "simple_with_marker_3.avro": {
-        "pre": [
-            {
-                "query": "g.V().drop().iterate(); graph.tx().commit()",
-                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Drop all data so that we have a clean starting point for remaining tests."
-            },
-            {
-                "query": "g.V().count().next() + g.E().count().next()",
-                "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Ensure that we have a clean starting point for remaining tests."
-            }
-        ],
-        "in": [
-            {
-                "query": "Thread.sleep(240000)",
-                "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
-            },
-            {
-                "query": "g.V().hasLabel('Subject').count().next() > 100",
-                "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify there are subjects."
-            }
-            ],
-        "se": [
-            {
-                "query": "g.V().hasLabel('Segment').count().next() > 0",
-                "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
-                "requester_email": "john.hanley@parc.com",
-                "explanation": "Verify segment nodes were inserted."
-            }
-	    ],
+          "pre": [
+              {
+                  "query": "g.V().drop().iterate(); graph.tx().commit()",
+                  "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                  "requester_email": "john.hanley@parc.com",
+                  "explanation": "Drop all data so that we have a clean starting point for remaining tests."
+              },
+              {
+                  "query": "g.V().count().next() + g.E().count().next()",
+                  "response": "[Message(status_code=200, data=[0], message='', metadata={})]",
+                  "requester_email": "john.hanley@parc.com",
+                  "explanation": "Ensure that we have a clean starting point for remaining tests."
+              }
+          ],
+          "in": [
+              {
+                  "query": "Thread.sleep(240000)",
+                  "response": "[Message(status_code=200, data=[None], message='', metadata={})]",
+                  "requester_email": "john.hanley@parc.com",
+                  "explanation": "Await ingest completion, as test_interpreter is not yet a kafka consumer."
+              },
+              {
+                  "query": "g.V().hasLabel('Subject').count().next() > 100",
+                  "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
+                  "requester_email": "john.hanley@parc.com",
+                  "explanation": "Verify there are subjects."
+              }
+              ],
+          "se": [
+              {
+                  "query": "g.V().hasLabel('Segment').count().next() > 0",
+                  "response": "[Message(status_code=200, data=[True], message='', metadata={})]",
+                  "requester_email": "john.hanley@parc.com",
+                  "explanation": "Verify segment nodes were inserted."
+              }
+  	    ],
         "ad": [],
         "ac": [
+            {
+                "query": "g.V().hasLabel('Segment').count()",
+                "response": "[Message(status_code=200, data=[25], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify number of segment."
+            },
             {
                 "query": "g.V().hasLabel('Activity').count()",
                 "response": "[Message(status_code=200, data=[25], message='', metadata={})]",
@@ -446,6 +466,12 @@
         "se": [ ],
         "ad": [ ],
         "ac": [
+            {
+                "query": "g.V().hasLabel('Segment').count()",
+                "response": "[Message(status_code=200, data=[115], message='', metadata={})]",
+                "requester_email": "rui@parc.com",
+                "explanation": "Verify segments are stable."
+            },
             {
                 "query": "g.V().hasLabel('Activity').count()",
                 "response": "[Message(status_code=200, data=[115], message='', metadata={})]",
