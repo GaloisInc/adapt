@@ -299,18 +299,6 @@
                 "requester_email": "rui@parc.com",
                 "explanation": "Verify activity classification edges were inserted."
             },
-            {
-                "query": "g.E().hasLabel('segment:activity').count()",
-                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
-                "requester_email": "rui@parc.com",
-                "explanation": "Verify activity classification edges were inserted."
-            },
-            {
-                "query": "g.V().outE('segment:activity').count()",
-                "response": "[Message(status_code=200, data=[4], message='', metadata={})]",
-                "requester_email": "rui@parc.com",
-                "explanation": "Verify activity classification edges were inserted."
-            }
         ],
         "dx": []
     },
