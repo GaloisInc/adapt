@@ -47,6 +47,11 @@ property_segmentParentId='segment:parentId'
 property_startedAtTime='startedAtTime'
 property_endedAtTime='endedAtTime'
 property_time='time'
+property_segmentStartedAtTime='segment:startedAtTime'
+property_segmentEndedAtTime='segment:endedAtTime'
+property_segmentOrigin='segment:origin'
+property_segmentDest='segment:dest'
+
 
 
 def extend(d,k,v): 
@@ -71,6 +76,9 @@ def arg_parser():
 	group.add_argument('--time-segment',
 					   help='Segment by time',
 					   action='store_true')
+	group.add_argument('--segment-edges',
+					   help='Create edges among segments',
+					   action='store_true')
 	group.add_argument('--print-segment',
 					   help='Print segments',
 					   action='store_true')
@@ -87,6 +95,9 @@ def arg_parser():
 	p.add_argument('--window', '-w', 
 				   help='The segmentation time window in seconds', 
 				   type=int, default=60)
+	p.add_argument('--timestamps',  
+				   help='Create segment:edges with timestamps', 
+				   action='store_true')
 	p.add_argument('--verbose','-v', 
 				   action='store_true',help='Verbose mode')
 	p.add_argument('--log-to-kafka', action='store_true',
@@ -111,6 +122,8 @@ class SimpleTitanGremlinSegmenter:
 		self.radius=args.radius
 		self.verbose=args.verbose
 		self.time_segment=args.time_segment
+		self.seg2segedges=args.segment_edges
+		self.timestamps=args.timestamps
 		self.directionEdges=args.directionEdges
 		self.radius_segment = args.radius_segment
 		self.print_segment = args.print_segment
@@ -127,6 +140,10 @@ class SimpleTitanGremlinSegmenter:
 					   'segmentParentId': property_segmentParentId,
 					   'startedAtTime': property_startedAtTime,
 					   'endedAtTime': property_endedAtTime,
+					   'segmentStartedAtTime': property_segmentStartedAtTime,
+					   'segmentEndedAtTime': property_segmentEndedAtTime,
+					   'segmentOrigin': property_segmentOrigin,
+					   'segmentDest': property_segmentDest,
 					   'criterion': self.criterion, 
 					   'segmentName': self.segmentName,
 					   'directionEdges' : self.directionEdges, 
@@ -374,6 +391,7 @@ g.V(snode).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }""" % self.params
 		return addSeg2SegEdges_query
 
+
 	def addSeg2SegEdgesInit_query(self): 
 		addSeg2SegEdgesInit_query="""\
 g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next()
@@ -388,6 +406,54 @@ for (s in linkedSeg){\
 g.V(%(snode)s).next().addEdge('%(seg2segEdgeLabel)s',g.V(s).next())\
 }""" % extend(self.params,'snode',snode)
 		return addSeg2SegEdgesIter_query
+
+	def addSeg2SegEdgesTimestamps_query(self): 
+		addSeg2SegEdgesTimestamps_query="""\
+snodes=g.V().has('%(segmentNodeName)s','%(segmentName)s').id().fold().next();\
+for (s in snodes){\
+res=g.V(s).as('a').out('%(segmentEdgeLabel)s').as('b').out().as('c').in('%(segmentEdgeLabel)s').as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
+for (r in res){\
+originTimestamps=g.V(r.b).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+destTimestamps=g.V(r.c).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+timestamps=(destTimestamps+originTimestamps).sort();\
+len=timestamps.size();\
+switch(len){\
+case 0:\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c);\
+  break;\
+case 1:\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0]);\
+  break;\
+default:
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0],'%(segmentEndedAtTime)s',timestamps[len-1]);\
+  break;\
+}\
+}\
+}""" % self.params
+		return addSeg2SegEdgesTimestamps_query
+
+	def addSeg2SegEdgesTimestampsIter_query(self,snode): 
+		addSeg2SegEdgesTimestamps_query="""\
+res=g.V(%(snode)s).as('a').out('%(segmentEdgeLabel)s').as('b').out().as('c').in('%(segmentEdgeLabel)s').as('d').dedup().where(neq('a')).select('a','b','c','d').by(id).toList();\
+for (r in res){\
+originTimestamps=g.V(r.b).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+destTimestamps=g.V(r.c).values('%(startedAtTime)s','%(endedAtTime)s').toList();\
+timestamps=(destTimestamps+originTimestamps).sort();\
+len=timestamps.size();\
+switch(len){\
+case 0:\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c);\
+  break;\
+case 1:\
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0]);\
+  break;\
+default:
+  g.V(r.a).next().addEdge('%(seg2segEdgeLabel)s',g.V(r.d).next(),'%(segmentOrigin)s',r.b,'%(segmentDest)s',r.c,'%(segmentStartedAtTime)s',timestamps[0],'%(segmentEndedAtTime)s',timestamps[len-1]);\
+  break;\
+}\
+}""" % extend(self.params,'snode',snode)
+		return addSeg2SegEdgesTimestamps_query
+
 
 	def createTimeSegment_query(self):
 		timeSegment_query = """\
@@ -427,9 +493,9 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		count = len(starts)
 		if count > 0:
 			params = [{'st':start} for start in starts]
-			self.titanclient.execute_many_params_dbg(self.processes,
-													 self.makeTimeSegmentIter_query('st'),
-													 params)
+			self.titanclient.execute_many_params(self.processes,
+												 self.makeTimeSegmentIter_query('st'),
+												 params)
 			t3 = time.time()
 			self.log('info','Created segments in %fs' % (t3-t2))
 		else:
@@ -455,14 +521,11 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				t1 = time.time()
-				self.titanclient.execute(self.addEdges_query())
-				t2 = time.time()
-				self.log('info','Segments created in %fs' % (t2-t1))
-				addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
 				t3 = time.time()
-				self.log('info','Segment edges created in %fs' % (t3-t2))
-				self.log('info','Total segmentation time %fs' % (t3-t1))
+				self.titanclient.execute(self.addEdges_query())
+				t4 = time.time()
+				self.log('info','Segments created in %fs' % (t4-t3))
+				self.log('info','Total segmentation time %fs' % (t4-t1))
 				return "Segments created"
 			
 		else: # count == 0
@@ -473,26 +536,19 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		self.log('info', 'Segmenting in parallel with %d processes' % self.processes)
 		t1 = time.time()
 		ids = self.titanclient.execute(self.addEdgesInit_query())
-		count = len(ids)
 		t2 = time.time()
+		count = len(ids)
 		self.log('info','%d parent nodes with criterion %s found in %fs' % (count, self.criterion, (t2-t1)))
 		if count>0:
 			if (self.checkCriterionType() == False):
 				self.log('error','The segments cannot be created or stored. The segment criterion type is not defined.')
 				return "Undefined criterion type"
 			else:
-				t1 = time.time()
-				params = [{'j':i} for i in ids]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addEdgesIter_query('j'),params)
-				t2 = time.time()
-				self.log('info','Segments created in %fs' % (t2-t1))
-				snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
 				t3 = time.time()
-				self.log('info','Segment nodes found in %fs' % (t3-t2))
-				sparams = [{'sn':snode} for snode in snodes]
-				self.titanclient.execute_many_params_dbg(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
+				params = [{'j':i} for i in ids]
+				self.titanclient.execute_many_params(self.processes,self.addEdgesIter_query('j'),params)
 				t4 = time.time()
-				self.log('info','Segment edges created in %fs' % (t4-t3))
+				self.log('info','Segments created in %fs' % (t4-t3))
 				self.log('info','Total segmentation time %fs' % (t4-t1))
 				return "Segments created"
 			
@@ -506,6 +562,38 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		else:
 			return self.makeRadiusSegmentsParallel()
 		
+	def makeSeg2SegEdgesSequential(self):
+		t1 = time.time()
+		if self.timestamps:
+			addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdgesTimestamps_query())
+		else: 
+			addSeg2SegEdges=self.titanclient.execute(self.addSeg2SegEdges_query())
+		t2 = time.time()
+		self.log('info','Segment edges created in %fs' % (t2-t1))
+		return "Segment edges created"
+	
+	def makeSeg2SegEdgesParallel(self):
+		t1 = time.time()
+		snodes = self.titanclient.execute(self.addSeg2SegEdgesInit_query())
+		t2 = time.time()
+		self.log('info','Segment nodes found in %fs' % (t2-t1))
+		sparams = [{'sn':snode} for snode in snodes]
+		if(self.timestamps):
+			self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesTimestampsIter_query('sn'),sparams)
+		else: 
+			self.titanclient.execute_many_params(self.processes,self.addSeg2SegEdgesIter_query('sn'),sparams)
+		t3 = time.time()
+		self.log('info','Edges created in %fs' % (t3-t2))
+		t4 = time.time()
+		self.log('info','Segment edges created in %fs' % (t4-t1))
+		return "Segment edges created"
+	
+
+	def makeSeg2SegEdges(self):
+		if self.processes == 1:
+			return self.makeSeg2SegEdgesSequential()
+		else:
+			return self.makeSeg2SegEdgesParallel()
 
 	def storeSegments(self):
 		'''
@@ -516,9 +604,18 @@ v.addEdge('%(segmentEdgeLabel)s',z) \
 		self.createSchemaElements()
 		
 		if self.time_segment == True:
-			return self.makeTimeSegments()
+			self.log('info','%s: Segmenting by time with window %d microseconds' % (self.segmentName,self.window))
+			result = self.makeTimeSegments()
 		elif self.radius_segment == True:
-			return self.makeRadiusSegments()
+			self.log('info','%s: Segmenting by radius %d with criterion "%s"' % (self.segmentName,self.radius,self.criterion))
+			result = self.makeRadiusSegments()
+		elif self.seg2segedges == True:
+			if self.timestamps == True:
+				self.log('info','%s: Creating segment-to-segment edges with timestamps' % (self.segmentName))
+			else:
+				self.log('info','%s: Creating segment-to-segment edges without timestamps' % (self.segmentName))
+			result = self.makeSeg2SegEdges()
+		return result
 
 		
 	def log(self,type_log,text):
