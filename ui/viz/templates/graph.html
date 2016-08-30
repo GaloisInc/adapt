@@ -38,10 +38,12 @@
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
             $.post("/query", {"query": query_string}, function(node_results) {
+                UI.foundNodes(node_results.length)
                 if ( ! _.isEmpty(node_results)) {
                     var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
                     var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
                     $.post("/query", {"query": edge_query}, function(edge_results) {
+                        UI.foundEdges(edge_results.length)
                         var query_color = document.getElementById("query-color").jscolor.value
                         var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                         var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})
@@ -467,6 +469,8 @@
             },
             ajax_in_progress_count : 0,
             loadingUIStart : function() {
+                $("#found-nodes-icon").hide()
+                $("#found-edges-icon").hide()
                 UI.ajax_in_progress_count++
                 $("#loader").show()
             },
@@ -476,6 +480,12 @@
                     UI.ajax_in_progress_count = 0
                     $('#loader').hide()
                 }
+            },
+            foundNodes : function(count) {
+                $("#found-nodes-icon").html("<span>"+count+"</span>").show()
+            },
+            foundEdges : function(count) {
+                $("#found-edges-icon").html("<span>"+count+"</span>").show()
             },
             animate : function(millisOrBool) {
                 if (typeof millisOrBool === "boolean") {
@@ -934,7 +944,7 @@
         i {
             font-size: 1.5em;
             color: gray;
-            margin-left: 1.3em;
+            margin-left: 1.2em;
             display: block;
             float: left;
         }
@@ -952,6 +962,14 @@
             color: green;
         }
         .ion-ios-location { color: green; }
+        i.right-icon {
+            float: right;
+            margin-right: 1.2em;
+            margin-left: 0em;
+        }
+        i.right-icon span {
+            font-size: small;
+        }
 
 
     </style>
@@ -970,6 +988,8 @@
         <i class="ion-ios-location-outline" id="checkpoint-button" title="Create a checkpoint" onclick="addCheckpoint()"></i>
         <i class="ion-ios-cloud-download-outline" id="download-button" title="Download the history log up to this point" onclick="downloadJournal()"></i>
         <i class="ion-ios-cloud-upload-outline" id="upload-button" title="Upload a history log to be replayed through Redo" onclick="document.getElementById('choose-upload').click()"></i>
+        <i class="ion-android-radio-button-on right-icon hide" id="found-nodes-icon"><span>0</span></i>
+        <i class="ion-arrow-resize right-icon hide" id="found-edges-icon"><span>0</span></i>
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" oncontextmenu="event.preventDefault()"></div>
