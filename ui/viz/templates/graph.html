@@ -684,7 +684,7 @@
                         tooltipDelay: 700
                     },
                     layout: { 
-                        improvedLayout : false,
+                        improvedLayout : true,
                         randomSeed : 10203040
                     },
                     physics: {
@@ -741,16 +741,25 @@
                     if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
                 })
                 network.on("hold", function(props) {
-                    if ( ! _.isEmpty(props.nodes)) {
+                    if ( props.nodes.length == 1) {
                         var node_id = props.nodes[0]
                         var node = node_data_set.get(node_id)
-                        var previous_color = node.icon.color
-                        node_data_set.update({ id: node_id, fixed: ! node.fixed, icon: {color: "black"} })
                         debug_node = node_data_set.get(node_id)
                         console.log(debug_node)
-                        setTimeout(function(){
-                            node_data_set.update( {id: node_id, icon: {color: previous_color} } )
-                        }, 500)
+
+                        if (props.event.srcEvent.shiftKey) {
+                            var previous_color = node.icon.color
+                            var shadow_enabled = node.hasOwnProperty('shadow') && node.shadow.enabled
+                            node_data_set.update({ 
+                                id: node_id, 
+                                fixed: ! node.fixed, 
+                                shadow: { enabled: ! shadow_enabled }, 
+                                icon: { color: "black" }
+                            })
+                            setTimeout(function(){
+                                node_data_set.update( {id: node_id, icon: {color: previous_color} } )
+                            }, 500)
+                        }
                     }
                 })
                 network.on("dragEnd", function(props){
