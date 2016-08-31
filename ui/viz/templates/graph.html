@@ -37,6 +37,7 @@
                 query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
+            if (query_string.length == 0) { return UI.failHandler() }
             $.post("/query", {"query": query_string}, function(node_results) {
                 UI.foundNodes(node_results.length)
                 if ( ! _.isEmpty(node_results)) {
@@ -132,7 +133,10 @@
             var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
             if (_.isEmpty(name)) { name = cluster_node_id }
             var cluster_data = getClusteringData(network.getSelectedNodes(), cluster_node_id, name)
-            updateNetwork(formatAllData(cluster_data))
+        console.log(cluster_data)
+            var formatted_cluster_data = formatAllData(cluster_data)
+            console.log(formatted_cluster_data)
+            updateNetwork(formatted_cluster_data)
         }
 
 
@@ -469,8 +473,7 @@
             },
             ajax_in_progress_count : 0,
             loadingUIStart : function() {
-                $("#found-nodes-icon").hide()
-                $("#found-edges-icon").hide()
+                $("#found-nodes-icon, #found-edges-icon").hide()
                 UI.ajax_in_progress_count++
                 $("#loader").show()
             },
@@ -753,12 +756,15 @@
                 network.on("hold", function(props) {
                     if ( props.nodes.length == 1) {
                         var node_id = props.nodes[0]
-                        var node = node_data_set.get(node_id)
-                        debug_node = node_data_set.get(node_id)
-                        console.log(debug_node)
+                        var is_cluster = network.isCluster(node_id)
+                        if ( ! is_cluster) {
+                            var node = node_data_set.get(node_id)
+                            debug_node = node
+                            console.log(debug_node)
+                        } else { console.log(node_id)}
 
                         if (props.event.srcEvent.shiftKey) {
-                            var previous_color = node.icon.color
+                            var previous_color = is_cluster ? "red" : node.icon.color
                             var shadow_enabled = node.hasOwnProperty('shadow') && node.shadow.enabled
                             node_data_set.update({ 
                                 id: node_id, 
@@ -867,7 +873,8 @@
             document.getElementById("node-query-menu").className = "hide"
         })
         $(document).bind("keydown", function(event) { 
-            if (event.keyCode == 8 || event.keyCode == 46 && ! $("#query-string").is(":focus")) {
+            if ($("#query-string").is(":focus")) { UI.clearInput() }
+            if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()
             }
             // TAB key for highlighting positions in queries.
@@ -964,7 +971,7 @@
         .ion-ios-location { color: green; }
         i.right-icon {
             float: right;
-            margin-right: 1.2em;
+            margin-right: .5em;
             margin-left: 0em;
         }
         i.right-icon span {
@@ -992,7 +999,7 @@
         <i class="ion-arrow-resize right-icon hide" id="found-edges-icon"><span>0</span></i>
     </div>
     <div id="loader" class="loader"></div>
-    <div id="graph" oncontextmenu="event.preventDefault()"></div>
+    <div id="graph" onclick="$('#query-string, #query-color').blur()" oncontextmenu="event.preventDefault()"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
     <div id="node-selection-box" style="display: none;"></div>
     <a id="download-anchor" style="display:none"></a>
