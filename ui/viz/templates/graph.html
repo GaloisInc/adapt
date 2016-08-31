@@ -474,6 +474,7 @@
             ajax_in_progress_count : 0,
             loadingUIStart : function() {
                 $("#found-nodes-icon, #found-edges-icon").hide()
+                UI.clearInput()
                 UI.ajax_in_progress_count++
                 $("#loader").show()
             },
