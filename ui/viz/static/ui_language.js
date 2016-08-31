@@ -45,11 +45,35 @@ var saved_queries = [
         "name" : "Child",
         "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0}, 
         "floating_query" : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',10).outE().inV().hasLabel('Subject')"
+    }, {
+        "name" : "Reader",
+        "is_relevant" : function(n) {return n.label === "Entity-NetFlow"},
+        "floating_query" : ".out('EDGE_NETFLOW_AFFECTS_EVENT out').out('EDGE_NETFLOW_AFFECTS_EVENT in').has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
+    }, {
+        "name" : "Writer",
+        "is_relevant" : function(n) {return n.label === "Entity-NetFlow"},
+        "floating_query" : ".in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
+    }, {
+        "name" : "NetFlow Read",
+        "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        "floating_query" : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).in('EDGE_NETFLOW_AFFECTS_EVENT in').in('EDGE_NETFLOW_AFFECTS_EVENT out').dedup()"
+    }, {
+        "name" : "NetFlow Written",
+        "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        "floating_query" : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup()"
+    }, {
+        "name" : "Executer",
+        "is_relevant" : function(n) {return n.label === "Entity-File"},
+        "floating_query" : ".out('EDGE_FILE_AFFECTS_EVENT out').out('EDGE_FILE_AFFECTS_EVENT in').has('eventType',9).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
+    }, {
+        "name" : "URL Exucuted",
+        "is_relevant" : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        "floating_query" : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).in('EDGE_FILE_AFFECTS_EVENT in').in('EDGE_FILE_AFFECTS_EVENT out').dedup()"
     }
 ]
 
 var saved_nodes = [
-    {   // Icon codes:  http://ionicons.com/cheatsheet.html   
+    {   // Icon codes:  http://ionicons.com/cheatsheet.html
         // NOTE: the insertion of 'u' to make code prefixes of '\uf...' as below; because javascript.
         name : "Cluster",
         is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
@@ -99,7 +123,7 @@ var saved_nodes = [
                 case "Event":
                     if (e === "Write" || e === "Read") {
                         var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ")" 
+                        return t + " " + e + " (" + temp + ")"
                     } else { return t + " " + e }
                 default:
                     return t
@@ -139,5 +163,4 @@ var starting_queries = [
         base_query : "g.V().has('label','Entity_NetFlow').has('dstAddress',{_}).has('port',{_})",
         default_values : ["127.0.0.1",80]
     }
-    
 ]

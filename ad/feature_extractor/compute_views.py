@@ -40,6 +40,10 @@ bindings = {
     'WRITE':21,
     'EXIT':36,
 
+    'E_F_A_E_I':'EDGE_FILE_AFFECTS_EVENT in',
+    'E_F_A_E_O':'EDGE_FILE_AFFECTS_EVENT out',
+    'E_N_A_E_I':'EDGE_NETFLOW_AFFECTS_EVENT in',
+    'E_N_A_E_O':'EDGE_NETFLOW_AFFECTS_EVENT out',
     'E_E_A_F_I':'EDGE_EVENT_AFFECTS_FILE in',
     'E_E_A_F_O':'EDGE_EVENT_AFFECTS_FILE out',
     'E_E_A_N_I':'EDGE_EVENT_AFFECTS_NETFLOW in',
@@ -142,7 +146,7 @@ class AnomalyView:
         with open(self.score_file) as f:
             for i, l in enumerate(f):
                 pass
-        total_nodes = i - 1
+        total_nodes = i
         cutoff = math.ceil(total_nodes * (percentage / 100.0))
         max_score = 0
         max_id = 0
