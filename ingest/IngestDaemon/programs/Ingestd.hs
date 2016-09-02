@@ -194,7 +194,6 @@ mainLoop cfg =
     forkIOsafe "Logs2Kafka" (emitLogData cfg logChan)
     startTime <- getCurrentTime
     logMsg $ "Starting Ingestd at " <> T.pack (show startTime)
-    logMsg "Connected to Titan."
     inputSchema <- CDM.getAvroSchema
     let markEmptyQueue nm =
           do _ <- Ref.atomicModifyIORef' kafkaEmptySignal (\x -> pure (Set.delete nm x,()))
