@@ -134,7 +134,7 @@ class ProvenanceGraph(object):
             try:
 
                 query = "g.V({}).out('segment:includes')"
-                log.info("Query: " + query)
+                log.info("Query: " + query.format(nodeId))
                 adjacentNodes = self.titanClient.execute(query.format(nodeId))
                 log.info("Return Query: " + str(adjacentNodes))
 
