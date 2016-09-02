@@ -348,7 +348,11 @@ instance Hashable InputKey where
 -- Divide the inputs into type (edge, vertex, reified edge) and further group
 -- vertex inputs by number of parameters.
 partitionInputsByType :: [Input] -> [[Input]]
-partitionInputsByType is = HMap.elems $ L.foldl' foldOp HMap.empty is
+partitionInputsByType is = 
+  let mp = L.foldl' foldOp HMap.empty is
+      verts = HMap.elems $ HMap.delete ReifiedEdgeIpt (HMap.delete EdgeIpt mp)
+      es = catMaybes [HMap.lookup EdgeIpt mp, HMap.lookup ReifiedEdgeIpt mp]
+  in verts ++ es
  where
   foldOp mp i = HMap.insertWith (\_new old -> i : old) (keyOf i) [i] mp
   keyOf :: Input -> InputKey
