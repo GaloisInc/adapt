@@ -31,12 +31,9 @@ import struct
 import time
 import os
 
-from ace.titan_database import TitanDatabase
 from ace.provenance_graph import ProvenanceGraph
 from ace.unsupervised_classifier import UnsupervisedClassifier
 from ace.feature_extractor import FeatureExtractor
-
-__author__ = 'John.Hanley@parc.com'
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -69,6 +66,9 @@ class TopLevelClassifier(object):
         self.featureExtractor = FeatureExtractor()
         self.activityClassifier = UnsupervisedClassifier(self.provenanceGraph, self.featureExtractor)
 
+    def close(self):
+        self.producer.close()
+
     def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
         self.producer.send("ac-log", bytes(start_msg, encoding='utf-8'))
@@ -83,22 +83,25 @@ class TopLevelClassifier(object):
 
     def cluster_segments(self):
         log.info("starting processing...")
-        self.producer.send("ac-log", b'starting processing...')
+        self.producer.send("ac-log", b'starting processing (deleting current set of activities)...')
 
         self.provenanceGraph.deleteActivities()
-        self.producer.send("ac-log", b'Deleting current set of activities...')
+        self.producer.send("ac-log", b'Deleting process done.')
 
         classification = self.activityClassifier.classifyNew()
+
+        self.producer.send("ac-log", b'** Adding Activities to DB. **')
         for segmentId, label in classification:
-            self.producer.send("ac-log", bytes('Adding activitiy to Segment {}').format(segmentId))
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
                                                                                                 segmentId),
                                      'utf-8'))
+            self.producer.flush()
 
-        self.producer.send("ac-log", b'done processing')
+        self.producer.send("ac-log", b'** Done Adding Activities to DB. **')
+        self.producer.flush()
 
     def report_status(self, status, downstreams = 'dx ui'.split()):
         def to_int(status_byte):
@@ -118,4 +121,6 @@ def arg_parser():
 
 if __name__ == '__main__':
     args = arg_parser().parse_args()
-    TopLevelClassifier(args.kafka).await_segments()
+    t = TopLevelClassifier(args.kafka)
+    t.await_segments()
+    t.close()
