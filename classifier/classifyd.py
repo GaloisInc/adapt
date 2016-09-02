@@ -39,8 +39,6 @@ from ace.provenance_graph import ProvenanceGraph
 from ace.unsupervised_classifier import UnsupervisedClassifier
 from ace.feature_extractor import FeatureExtractor
 
-__author__ = 'John.Hanley@parc.com'
-
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 #handler = logging.StreamHandler()
