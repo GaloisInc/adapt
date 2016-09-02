@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 module Gremlin.Client
   ( -- * Types
@@ -20,7 +21,7 @@ module Gremlin.Client
   , WS.ConnectionException(..)
   ) where
 
-import           Control.Concurrent (forkIO, threadDelay, killThread)
+import           Control.Concurrent (forkIO, threadDelay, killThread, throwTo, myThreadId)
 import           Control.Concurrent.Async
 import           Control.Concurrent.Async (async,wait)
 import           Control.Concurrent.STM (atomically, retry)
@@ -45,6 +46,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
+import 		 Data.Typeable
 import           Data.UUID (UUID)
 import qualified Data.UUID as UUID
 import           MonadLib
@@ -82,15 +84,18 @@ instance Monad m => StateM (DBT m) DBState where
 instance MonadT DBT where
   lift = DB . lift
 
+data RESET = RESET deriving (Show, Typeable)
+instance X.Exception RESET
+
 withDB :: ServerInfo ->  (WS.Message -> DB ()) -> DB () -> IO (Either WS.ConnectionException ())
 withDB (ServerInfo {..}) recvHdl mainOper =
   do lock <- newMutex maxOutstandingRequests
-     X.catch (WS.runClient host port "/" (fmap Right . loop lock))
-             (return . Left)
+     WS.runClient host port "/" (fmap Right . loop lock)
  where
  loop :: Mutex -> WS.Connection -> IO ()
  loop lock conn =
-  do _ <- forkIO (forever (WS.receive conn >>= responseHandler lock conn))
+  do parent <- myThreadId
+     _ <- forkIO (forever (WS.receive conn >>= responseHandler lock conn) `finally` throwTo parent RESET)
      runM (runDB mainOper) (DBS lock conn)
      return ()
  responseHandler :: Mutex -> WS.Connection -> WS.Message -> IO ()
@@ -196,15 +201,9 @@ connect si =
            -> DB ()
   mainOper respMap reqMVar =
    do DBS lock conn <- get
-      lift $ foreverSafe $
+      lift $ forever $
               do (req,op) <- takeMVar reqMVar
                  sendAsync respMap req op lock conn
-
-  foreverSafe op =
-    X.catch (forever op)
-            (\e -> case X.fromException e of
-                    Just X.ThreadKilled -> X.throw e
-                    Nothing             -> foreverSafe op)
 
   sendAsync :: TVar (HashMap UUID (Response -> IO ()))
             -> Request
