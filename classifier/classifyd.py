@@ -71,7 +71,7 @@ class TopLevelClassifier(object):
 
     def await_segments(self, start_msg = "Awaiting new segments..."):
         log.info(start_msg)
-        self.producer.send("ac-log", bytes(start_msg, encoding='utf-8'))        
+        self.producer.send("ac-log", bytes(start_msg, encoding='utf-8'))
         for msg in self.consumer:
             self.consumer.commit()
             log.info("recvd msg: %s", msg)
@@ -90,6 +90,7 @@ class TopLevelClassifier(object):
 
         classification = self.activityClassifier.classifyNew()
         for segmentId, label in classification:
+            self.producer.send("ac-log", bytes('Adding activitiy to Segment {}').format(segmentId))
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
