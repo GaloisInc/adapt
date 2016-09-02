@@ -28,6 +28,9 @@ class ProvenanceGraph(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
+    def __del__(self):
+        self.close()
+
     def close(self):
         self.titanClient.close()
 
@@ -120,12 +123,10 @@ class ProvenanceGraph(object):
                 node[0]['properties']['activity:suspicionScore'][0]['value'])
 
     def getUnclassifiedSegments(self):
-        query = "g.V().has('segment:name','byPID').where(__.not(outE('segment:activity')))"
+        query = "g.V().has('segment:name','byPID').where(__.not(outE('segment:activity'))).id()"
         nodes = self.titanClient.execute(query)
-        for node in nodes:
+        for nodeId in nodes:
             G = networkx.Graph()
-
-            nodeId = node['id']
             G.add_node(nodeId)
 
             log.info("NodeId = " + str(nodeId))
@@ -145,12 +146,10 @@ class ProvenanceGraph(object):
                 raise
 
     def getClassifiedSegments(self):
-        query = "g.V().has('segment:name','byPID').where(outE('segment:activity'))"
+        query = "g.V().has('segment:name','byPID').where(outE('segment:activity')).id()"
         nodes = self.titanClient.execute(query)
-        for node in nodes:
+        for nodeId in nodes:
             G = networkx.Graph()
-
-            nodeId = node['id']
             G.add_node(nodeId)
 
             query = "g.V({}).out('segment:includes').id()"
