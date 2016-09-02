@@ -70,6 +70,7 @@ executable ingestd
                      , time
                      , transformers
                      , unordered-containers
+                     , hashable
                      , uuid
                      , avro
                      , random, tf-random

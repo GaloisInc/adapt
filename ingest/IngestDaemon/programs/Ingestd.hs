@@ -23,6 +23,8 @@ import           Lens.Micro.TH
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import qualified System.IO as SIO
+import qualified Data.HashMap.Strict as HMap
+import           Data.Hashable
 import qualified Data.List as L
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
@@ -318,7 +320,7 @@ kafkaInputToDB cfg =
         T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
         T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ipts)) <> " compiled inputs."
         T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ms)) <> " decoded CDM stmts."
-      sendInputs cfg dbc ipts
+      mapM_ (sendInputs cfg dbc) (partitionInputsByType ipts)
       if null bs
        then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
                                   threadDelay 100000
@@ -334,6 +336,27 @@ kafkaInputToDB cfg =
                                            return (now,0)
                                      else return (start, cnt+nr)
                process dbc baseTime newCnt newTotal newUIDs (offset + fromIntegral nr) 0
+
+data InputKey = EdgeIpt | ReifiedEdgeIpt | VertexIpt !Int deriving (Eq,Ord,Show)
+instance Hashable InputKey where
+  hashWithSalt s i =
+    case i of
+      EdgeIpt        -> hashWithSalt s (0::Int)
+      ReifiedEdgeIpt -> hashWithSalt s (1::Int)
+      VertexIpt  val -> hashWithSalt s val `hashWithSalt` hashWithSalt s (2::Int)
+
+-- Divide the inputs into type (edge, vertex, reified edge) and further group
+-- vertex inputs by number of parameters.
+partitionInputsByType :: [Input] -> [[Input]]
+partitionInputsByType is = HMap.elems $ L.foldl' foldOp HMap.empty is
+ where
+  foldOp mp i = HMap.insertWith (\_new old -> i : old) (keyOf i) [i] mp
+  keyOf :: Input -> InputKey
+  keyOf ipt =
+    case statement ipt of
+      InsertVertex {..}    -> let l = length properties in l `seq` VertexIpt l
+      InsertEdge {}        -> EdgeIpt
+      InsertReifiedEdge {} -> ReifiedEdgeIpt
 
 reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
 reportRate sendOutput start cnt
