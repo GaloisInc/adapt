@@ -5,6 +5,11 @@ var saved_queries = [
         floating_query : ".out('segment:activity')",
     },
     {
+        name : "Segment Low-level Events",
+        is_relevant : function(n) {return n.label === "Segment"},
+        floating_query : ".out('segment:includes')",
+    },
+    {
         name : "APT Phases",
         is_relevant : function(n) {return n.label === "APT"},
         floating_query : ".out('apt:includes')",
@@ -13,6 +18,11 @@ var saved_queries = [
         name : "APT Phase Segments",
         is_relevant : function(n) {return n.label === "Phase"},
         floating_query : ".out('phase:includes')",
+    },
+    {
+        name : "APT Phase Low-level Events",
+        is_relevant : function(n) {return n.label === "Phase"},
+        floating_query : ".out('phase:includes').out('segment:includes')",
     },
     {
         name : "File Events",
