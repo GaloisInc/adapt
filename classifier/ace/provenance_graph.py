@@ -7,7 +7,8 @@ import struct
 import time
 import os
 
-from ace.titan_database import TitanDatabase
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+from titanDB import TitanClient as TitanDatabase
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -132,15 +133,10 @@ class ProvenanceGraph(object):
             log.info("NodeId = " + str(nodeId))
 
             try:
-
-                query = "g.V({}).out('segment:includes')"
-                log.info("Query: " + query.format(nodeId))
-
+                query = "g.V({}).out('segment:includes').id()"
                 adjacentNodes = self.titanClient.execute(query.format(nodeId))
-                log.info("\treturn (size): " + str(len(adjacentNodes)))
 
-                for adjacentNode in adjacentNodes:
-                    adjacentNodeId = adjacentNode['id']
+                for adjacentNodeId in adjacentNodes:
                     G.add_node(adjacentNodeId)
                     G.add_edge(nodeId, adjacentNodeId)
 
@@ -159,10 +155,9 @@ class ProvenanceGraph(object):
             nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).out('segment:includes')"
+            query = "g.V({}).out('segment:includes').id()"
             adjacentNodes = self.titanClient.execute(query.format(nodeId))
-            for adjacentNode in adjacentNodes:
-                adjacentNodeId = adjacentNode['id']
+            for adjacentNodeId in adjacentNodes:
                 G.add_node(adjacentNodeId)
                 G.add_edge(nodeId, adjacentNodeId)
 

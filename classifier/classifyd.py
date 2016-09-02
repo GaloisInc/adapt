@@ -83,12 +83,14 @@ class TopLevelClassifier(object):
 
     def cluster_segments(self):
         log.info("starting processing...")
-        self.producer.send("ac-log", b'starting processing...')
+        self.producer.send("ac-log", b'starting processing (deleting current set of activities)...')
 
         self.provenanceGraph.deleteActivities()
-        self.producer.send("ac-log", b'Deleting current set of activities...')
+        self.producer.send("ac-log", b'Deleting process done.')
 
         classification = self.activityClassifier.classifyNew()
+
+        self.producer.send("ac-log", b'** Adding Activities to DB. **')
         for segmentId, label in classification:
             self.producer.send("ac-log", bytes('Adding activitiy to Segment {}').format(segmentId))
             activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
@@ -98,7 +100,7 @@ class TopLevelClassifier(object):
                                                                                                 segmentId),
                                      'utf-8'))
 
-        self.producer.send("ac-log", b'done processing')
+        self.producer.send("ac-log", b'** Adding Activities to DB. **')
 
     def report_status(self, status, downstreams = 'dx ui'.split()):
         def to_int(status_byte):
