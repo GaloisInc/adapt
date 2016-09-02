@@ -6,6 +6,7 @@ import logging
 import struct
 import time
 import os
+import sys
 
 sys.path.append(os.path.expanduser('~/adapt/pylib'))
 from titanDB import TitanClient as TitanDatabase
