@@ -23,7 +23,7 @@ class ForwardAnalysis(object):
         if self.avoid_cycles and node in self.explored:
             return self.__next__()
         
-        parents, parent_edges = self.graph.get_node_parents(node, self.explored_edges)
+        parents, parent_edges = self.graph.get_node_parents(node)
 
         for parent in parents:
             if parent not in self.explored:
