@@ -13,7 +13,6 @@ from titanDB import TitanClient as TitanDatabase
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-#handler = logging.StreamHandler()
 handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
 handler.setFormatter(formatter)
 log.addHandler(handler)
