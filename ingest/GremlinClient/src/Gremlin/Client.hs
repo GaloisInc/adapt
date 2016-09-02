@@ -43,11 +43,13 @@ import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import           Data.UUID (UUID)
 import qualified Data.UUID as UUID
 import           MonadLib
 import qualified Network.WebSockets as WS
+import System.IO (stderr)
 
 data ServerInfo = ServerInfo { host     :: String
                              , port     :: Int
@@ -166,7 +168,7 @@ connect si =
      respMap  <- newTVarIO HMap.empty
      let recvResponse = recvHdl respMap
          loop = mainOper respMap reqMVar
-     dbThread <- forkIO (void (withDB si recvResponse loop))
+     dbThread <- forkIO (safe "withDB-connect" (void $ withDB si recvResponse loop))
      let doSend r op = putMVar reqMVar (r,op)
          doClose     = killThread dbThread
      return $ Right $ DBC doSend doClose
@@ -333,3 +335,13 @@ mutexDec m@(Mutex ref) =
   do success <- atomicModifyIORef ref (\v -> if v > 0 then (v-1,True) else (v,False))
      if success then return ()
                 else threadDelay 50000 >> mutexDec m
+
+-- Utility: Catcher
+-- XXX This needs to check for 'ThreadKilled' and not retry.
+safe :: T.Text -> IO () -> IO ()
+safe threadName op = go
+ where
+  go =
+    do X.catch op (\(e :: X.SomeException) -> T.hPutStrLn stderr $ "Thread '" <> threadName <> "' failed because: " <> T.pack (show e))
+       threadDelay 500000 -- 500 ms
+       go
