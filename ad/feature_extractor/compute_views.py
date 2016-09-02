@@ -40,16 +40,16 @@ bindings = {
     'WRITE':21,
     'EXIT':36,
 
-    'E_F_A_E_I':'EDGE_FILE_AFFECTS_EVENT in',
-    'E_F_A_E_O':'EDGE_FILE_AFFECTS_EVENT out',
-    'E_N_A_E_I':'EDGE_NETFLOW_AFFECTS_EVENT in',
-    'E_N_A_E_O':'EDGE_NETFLOW_AFFECTS_EVENT out',
-    'E_E_A_F_I':'EDGE_EVENT_AFFECTS_FILE in',
-    'E_E_A_F_O':'EDGE_EVENT_AFFECTS_FILE out',
-    'E_E_A_N_I':'EDGE_EVENT_AFFECTS_NETFLOW in',
-    'E_E_A_N_O':'EDGE_EVENT_AFFECTS_NETFLOW out',
-    'E_E_G_B_S_I':'EDGE_EVENT_ISGENERATEDBY_SUBJECT in',
-    'E_E_G_B_S_O':'EDGE_EVENT_ISGENERATEDBY_SUBJECT out'
+    'F_A_E_I':'EDGE_FILE_AFFECTS_EVENT in',
+    'F_A_E_O':'EDGE_FILE_AFFECTS_EVENT out',
+    'E_A_F_I':'EDGE_EVENT_AFFECTS_FILE in',
+    'E_A_F_O':'EDGE_EVENT_AFFECTS_FILE out',
+    'N_A_E_I':'EDGE_NETFLOW_AFFECTS_EVENT in',
+    'N_A_E_O':'EDGE_NETFLOW_AFFECTS_EVENT out',
+    'E_A_N_I':'EDGE_EVENT_AFFECTS_NETFLOW in',
+    'E_A_N_O':'EDGE_EVENT_AFFECTS_NETFLOW out',
+    'E_G_B_S_I':'EDGE_EVENT_ISGENERATEDBY_SUBJECT in',
+    'E_G_B_S_O':'EDGE_EVENT_ISGENERATEDBY_SUBJECT out'
 }
 
 """
@@ -118,18 +118,25 @@ class AnomalyView:
             f.write(str(result[0][i]))
             j = 1
             for k in keys:
-                res = None
-                if type(self.features_queries[k]) == type(dict()):
-                    if self.features_queries[k]['operator'] == 'subTime':
-                        res = (result[j][0][i] - result[j][1][i]) / 1.0e6
-                    elif self.features_queries[k]['operator'] == 'div(SubTime)':
-                        res = result[j][0][i] / ((result[j][1][i] - result[j][2][i]) / 1.0e6)
-                    elif self.features_queries[k]['operator'] == '(SubTime)div':
-                        res = ((result[j][0][i] - result[j][1][i]) / 1.0e6) / result[j][2][i]
+                res = 0
+                try:
+                    if type(self.features_queries[k]) == type(dict()):
+                        if self.features_queries[k]['operator'] == 'subTime':
+                            res = (result[j][0][i] - result[j][1][i]) / 1.0e6
+                        elif self.features_queries[k]['operator'] == 'RELUTime':
+                            res = (result[j][0][i] - result[j][1][i]) / 1.0e6
+                            if res < 0:
+                                res = 0
+                        elif self.features_queries[k]['operator'] == 'div(SubTime)':
+                            res = result[j][0][i] / ((result[j][1][i] - result[j][2][i]) / 1.0e6)
+                        elif self.features_queries[k]['operator'] == '(SubTime)div':
+                            res = ((result[j][0][i] - result[j][1][i]) / 1.0e6) / result[j][2][i]
+                        else:
+                            log.info("Unrecognized operator: " + self.features_queries[k]['operator'])
                     else:
-                        log.info("Unrecognized operator: " + self.features_queries[k]['operator'])
-                else:
-                    res = result[j][i]
+                        res = result[j][i]
+                except:
+                    log.exception("Exception: i=" + str(i) + ", j=" + str(j) + ", k=" + k)
                 f.write(',' + str(res))
                 j += 1
             f.write('\n')
@@ -165,6 +172,7 @@ class AnomalyView:
                             feature += ","
                         feature += k + ":" + str(row[k])
                 feature += "]"
+                feature += "Rnk:" + str(cnt+1) + "/" + str(total_nodes) + feature
                 QUERY += "f='{feat}';g.V(x).property(afeature,f).next();".format(feat=feature)
                 log.info("Adding anomaly scores to id " + row['id'] + " (" + self.view_type + ", " + row['anomaly_score'] + ")")
                 if float(row['anomaly_score']) > max_score:
