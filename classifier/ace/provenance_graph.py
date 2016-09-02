@@ -76,10 +76,9 @@ class ProvenanceGraph(object):
             nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).out('segment:includes')"
+            query = "g.V({}).out('segment:includes').id()"
             adjacentNodes = self.titanClient.execute(query.format(nodeId))
-            for adjacentNode in adjacentNodes:
-                adjacentNodeId = adjacentNode['id']
+            for adjacentNodeId in adjacentNodes:
                 G.add_node(adjacentNodeId)
                 G.add_edge(nodeId, adjacentNodeId)
 
@@ -93,10 +92,9 @@ class ProvenanceGraph(object):
         nodeId = node['id']
         G.add_node(nodeId)
 
-        query = "g.V({}).out('segment:includes')"
+        query = "g.V({}).out('segment:includes').id()"
         adjacentNodes = self.titanClient.execute(query.format(nodeId))
-        for adjacentNode in adjacentNodes:
-            adjacentNodeId = adjacentNode['id']
+        for adjacentNodeId in adjacentNodes:
             G.add_node(adjacentNodeId)
             G.add_edge(nodeId, adjacentNodeId)
 
