@@ -390,7 +390,7 @@ convertToSchema uids cdmFmt =
 
 connectToTitan :: (Text -> IO()) -> GC.ServerInfo -> IO GC.DBConnection
 connectToTitan logMsg svr =
- do dbc <- GC.connect svr { maxOutstandingRequests = 64 }
+ do dbc <- GC.connect svr { maxOutstandingRequests = 128 }
     case dbc of
       Left _  -> do logMsg "Could not connect to Titan."
                     threadDelay 1000000
@@ -440,7 +440,7 @@ runDB emit conn inputOps = do
                     delayTime = min min1 (ms500 * 4 ^ (inputAge x))
                     -- ^ exponential back-off
                 in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping statement: " <> T.pack (show dead))
-                      void $ forkIO (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
+                      void $ forkIO $ printException "insert-retry" (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
      when (nrVS > 0) $ sendReq vsReq operVS
@@ -516,6 +516,9 @@ withLastOffset op topic =
 
 forkIOsafe :: Text -> IO () -> IO ()
 forkIOsafe threadName op = forkIO (safe threadName op) >> return ()
+
+printException :: Text -> IO () -> IO ()
+printException label op = X.catch op (\(e::X.SomeException) -> T.hPutStrLn stderr $ "[Failure in:" <> label <> "] " <> T.pack (show e))
 
 safe :: Text -> IO () -> IO ()
 safe threadName op = go
