@@ -30,8 +30,11 @@ import logging
 import struct
 import time
 import os
+import sys
 
-from ace.titan_database import TitanDatabase
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+from titanDB import TitanClient as TitanDatabase
+
 from ace.provenance_graph import ProvenanceGraph
 from ace.unsupervised_classifier import UnsupervisedClassifier
 from ace.feature_extractor import FeatureExtractor
