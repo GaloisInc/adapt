@@ -134,7 +134,9 @@ class ProvenanceGraph(object):
             try:
 
                 query = "g.V({}).out('segment:includes')"
+                log.info("Query: " + query)
                 adjacentNodes = self.titanClient.execute(query.format(nodeId))
+                log.info("Return Query: " + str(adjacentNodes))
 
                 for adjacentNode in adjacentNodes:
                     adjacentNodeId = adjacentNode['id']
@@ -142,9 +144,10 @@ class ProvenanceGraph(object):
                     G.add_edge(nodeId, adjacentNodeId)
 
                 yield(nodeId, G)
-                
+
             except Exception as e:
                 log.info("Exception: " + str(e))
+                raise
 
     def getClassifiedSegments(self):
         query = "g.V().hasLabel('Segment').where(outE('segment:activity'))"
