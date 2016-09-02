@@ -107,6 +107,18 @@ var saved_queries = [
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',2).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
     }, {
+        name : "URL Executed",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).in('EDGE_FILE_AFFECTS_EVENT in').in('EDGE_FILE_AFFECTS_EVENT out').dedup()"
+    }, {
+        name : "NetFlow Read",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).in('EDGE_NETFLOW_AFFECTS_EVENT in').in('EDGE_NETFLOW_AFFECTS_EVENT out').dedup()"
+    }, {
+        name : "NetFlow Written",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup()"
+    }, {
         name : "Receiver",
         is_relevant : function(n) {return n.label === "Entity-NetFlow"},
         floating_query : ".out().hasLabel('EDGE_NETFLOW_AFFECTS_EVENT').out().hasLabel('Subject').has('eventType',19).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
@@ -126,6 +138,14 @@ var saved_queries = [
         name : "Connected to",
         is_relevant : function(n) {return n.label === "Entity-NetFlow"},
         floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_NETFLOW').in().has('eventType',6).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
+    }, {
+        name : "Reader",
+        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
+        floating_query : ".out('EDGE_NETFLOW_AFFECTS_EVENT out').out('EDGE_NETFLOW_AFFECTS_EVENT in').has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
+    }, {
+        name : "Writer",
+        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
+        floating_query : ".in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
     }
 ]
 
