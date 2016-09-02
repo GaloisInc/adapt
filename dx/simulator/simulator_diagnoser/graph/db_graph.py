@@ -16,7 +16,7 @@ class DBGraph(InmemoryStatesMixin, AbstractGraph):
         self.db.close()
 
     def starting_nodes(self):
-        query = "g.V().hasLabel('Segment').where(__.not(inE('segment:edge'))).id()"
+        query = "g.V().has('segment:name','byPID').where(__.not(inE('segment:edge'))).id()"
         result = self.db.execute(query)
         return result
 
