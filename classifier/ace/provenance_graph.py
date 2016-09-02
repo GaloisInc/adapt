@@ -65,7 +65,7 @@ class ProvenanceGraph(object):
             yield node
 
     def segmentNodes(self):
-        query = "g.V().has(label, 'Segment')"
+        query = "g.V().has('segment:name','byPID')"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             yield node
