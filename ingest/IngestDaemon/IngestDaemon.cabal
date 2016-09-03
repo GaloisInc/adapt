@@ -41,6 +41,7 @@ Library
                      , time
                      , milena >= 0.5
                      , avro
+                     , parallel
   hs-source-dirs:       src
   ghc-options:         -O2 -Wall -Werror
 

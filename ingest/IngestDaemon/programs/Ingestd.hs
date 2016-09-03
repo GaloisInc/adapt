@@ -18,11 +18,11 @@ import           Control.Concurrent (threadDelay, forkIO)
 import qualified Control.Concurrent.Chan as Ch
 import qualified Data.IORef as Ref
 import           Control.Exception as X
+import           Control.Parallel.Strategies
 import           Lens.Micro
 import           Lens.Micro.TH
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
-import qualified System.IO as SIO
 import qualified Data.HashMap.Strict as HMap
 import           Data.Hashable
 import qualified Data.List as L
@@ -309,11 +309,9 @@ kafkaInputToDB cfg =
           newTotal = total + fromIntegral nr
           decodeMsg b =
            case Avro.decode (sourceSchema cfg) (BL.fromStrict b) of
-             Avro.Success cdmFmt ->
-               return (Just cdmFmt)
-             Avro.Error err      ->
-               liftIO (SIO.hPutStrLn stderr (show err) >> return Nothing)
-      ms   <- catMaybes <$> mapM decodeMsg bs
+             Avro.Success cdmFmt -> cdmFmt `seq` Just cdmFmt
+             Avro.Error _err     -> Nothing
+          ms = catMaybes (map decodeMsg bs `using` parListChunk 500 rpar)
       let (ipts,newUIDs) = convertToSchemas uids ms
       when (not (null bs0)) $ liftIO $ do
         T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
