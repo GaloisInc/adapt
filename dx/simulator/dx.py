@@ -36,12 +36,16 @@ if __name__ == "__main__":
     configs = sd.ConfigParser(scriptdir + '/dx.yml')
 
     for _ in messaging.receive():
+        log.info('Reading APT grammar')
+        matcher = sd.StatelessMatcher(configs.get_grammar())
+
+        log.info('Clearing previous diagnoses')
         graph = sd.DBGraph()
         graph.clear_diagnoses()
-        matcher = sd.StatelessMatcher(configs.get_grammar())
 
         log.info('Starting diagnoser')
         diagnoser = sd.APTDiagnoser(graph, matcher, avoid_cycles=True)
+        diagnoser.store_diagnoses()
         log.info('Diagnoser has finished')
 
         if args.single_run:
