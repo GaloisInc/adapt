@@ -23,6 +23,8 @@ import           Lens.Micro.TH
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import qualified System.IO as SIO
+import qualified Data.HashMap.Strict as HMap
+import           Data.Hashable
 import qualified Data.List as L
 import           Data.Monoid ((<>))
 import           Data.Maybe (catMaybes)
@@ -192,7 +194,6 @@ mainLoop cfg =
     forkIOsafe "Logs2Kafka" (emitLogData cfg logChan)
     startTime <- getCurrentTime
     logMsg $ "Starting Ingestd at " <> T.pack (show startTime)
-    logMsg "Connected to Titan."
     inputSchema <- CDM.getAvroSchema
     let markEmptyQueue nm =
           do _ <- Ref.atomicModifyIORef' kafkaEmptySignal (\x -> pure (Set.delete nm x,()))
@@ -318,7 +319,7 @@ kafkaInputToDB cfg =
         T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
         T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ipts)) <> " compiled inputs."
         T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ms)) <> " decoded CDM stmts."
-      sendInputs cfg dbc ipts
+      mapM_ (sendInputs cfg dbc) (partitionInputsByType ipts)
       if null bs
        then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
                                   threadDelay 100000
@@ -334,6 +335,31 @@ kafkaInputToDB cfg =
                                            return (now,0)
                                      else return (start, cnt+nr)
                process dbc baseTime newCnt newTotal newUIDs (offset + fromIntegral nr) 0
+
+data InputKey = EdgeIpt | ReifiedEdgeIpt | VertexIpt !Int deriving (Eq,Ord,Show)
+instance Hashable InputKey where
+  hashWithSalt s i =
+    case i of
+      EdgeIpt        -> hashWithSalt s (0::Int)
+      ReifiedEdgeIpt -> hashWithSalt s (1::Int)
+      VertexIpt  val -> hashWithSalt s val `hashWithSalt` hashWithSalt s (2::Int)
+
+-- Divide the inputs into type (edge, vertex, reified edge) and further group
+-- vertex inputs by number of parameters.
+partitionInputsByType :: [Input] -> [[Input]]
+partitionInputsByType is = 
+  let mp = L.foldl' foldOp HMap.empty is
+      verts = HMap.elems $ HMap.delete ReifiedEdgeIpt (HMap.delete EdgeIpt mp)
+      es = catMaybes [HMap.lookup EdgeIpt mp, HMap.lookup ReifiedEdgeIpt mp]
+  in verts ++ es
+ where
+  foldOp mp i = HMap.insertWith (\_new old -> i : old) (keyOf i) [i] mp
+  keyOf :: Input -> InputKey
+  keyOf ipt =
+    case statement ipt of
+      InsertVertex {..}    -> let l = length properties in l `seq` VertexIpt l
+      InsertEdge {}        -> EdgeIpt
+      InsertReifiedEdge {} -> ReifiedEdgeIpt
 
 reportRate :: (Text -> IO ()) -> UTCTime -> Int -> IO ()
 reportRate sendOutput start cnt
@@ -363,7 +389,7 @@ convertToSchema uids cdmFmt =
 
 connectToTitan :: (Text -> IO()) -> GC.ServerInfo -> IO GC.DBConnection
 connectToTitan logMsg svr =
- do dbc <- GC.connect svr { maxOutstandingRequests = 64 }
+ do dbc <- GC.connect svr { maxOutstandingRequests = 128 }
     case dbc of
       Left _  -> do logMsg "Could not connect to Titan."
                     threadDelay 1000000
@@ -413,7 +439,7 @@ runDB emit conn inputOps = do
                     delayTime = min min1 (ms500 * 4 ^ (inputAge x))
                     -- ^ exponential back-off
                 in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping statement: " <> T.pack (show dead))
-                      void $ forkIO (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
+                      void $ forkIO $ printException "insert-retry" (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
                    -- ^^^ XXX consider a channel and long-lived thread here
             | otherwise              = return ()
      when (nrVS > 0) $ sendReq vsReq operVS
@@ -489,6 +515,9 @@ withLastOffset op topic =
 
 forkIOsafe :: Text -> IO () -> IO ()
 forkIOsafe threadName op = forkIO (safe threadName op) >> return ()
+
+printException :: Text -> IO () -> IO ()
+printException label op = X.catch op (\(e::X.SomeException) -> T.hPutStrLn stderr $ "[Failure in:" <> label <> "] " <> T.pack (show e))
 
 safe :: Text -> IO () -> IO ()
 safe threadName op = go
