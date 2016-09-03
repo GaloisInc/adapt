@@ -1,30 +1,156 @@
-var saved_queries = [
+var starting_queries = [
+    {
+        name : "find file by name & version",
+        base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_})",
+        default_values : ["file:///tmp/zqxf1",1]
+    }, {
+        name : "find process by pid",
+        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_})",
+        default_values : [1001]
+    }, {
+        name : "find up to n processes of an owner",
+        base_query : "g.V().has(label,'localPrincipal').has('userID',{_}).both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out().has('label','Subject').has('subjectType',0).limit({_})",
+        default_values : [1234,10]
+    }, {
+        name : "find NetFlow by dstAddress & port",
+        base_query : "g.V().has(label,'Entity_NetFlow').has('dstAddress','{_}').has('port',{_})",
+        default_values : ["127.0.0.1",80]
+    }, {
+        name : "find APTs labeled by DX",
+        base_query : "g.V().has(label,'APT')",
+        default_values : []
+    }
+]
+
+var node_appearance = [
+    {   // Icon codes:  http://ionicons.com/cheatsheet.html
+        // NOTE: the insertion of 'u' to make code prefixes of '\uf...' as below; because javascript.
+        name : "Cluster",
+        is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
+        icon_unicode : "\uf413",
+        color : "red",  // setting color here will always override query-specific colors.
+        size: 54
+        // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
+    }, {
+        name : "File",
+        is_relevant : function(n) { return n.label === "Entity-File" },
+        icon_unicode : "\uf41b",
+        size: 40,
+        make_node_label : function(node) {
+            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
+            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
+            return url + " ; " + file_version
+        }
+    }, {
+        name : "Memory",
+        is_relevant : function(n) { return n.label === "Entity-Memory" },
+        icon_unicode : "\uf376",
+        size: 40,
+        make_node_label : function(node) {
+            var addr = (node['properties'].hasOwnProperty('address') ? node['properties']['address'][0]['value'] : "None")
+            var size = (node['properties'].hasOwnProperty('properties') ? node['properties']['properties'][0]['value'] : "None")
+            return size + "@" + addr
+        }
+    }, {
+        name : "Agent",
+        is_relevant : function(n) { return n.label === "Agent" },
+        icon_unicode : "\uf25d",
+        size: 50,
+        make_node_label : function(node) {
+            var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
+            return at + " userID " + node['properties']['userID'][0]['value']
+        }
+    }, {
+        name : "Entity-NetFlow",
+        is_relevant : function(n) { return n.label === "Entity-NetFlow" },
+        icon_unicode : "\uf262",
+        make_node_label : function(node) {
+            var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
+            var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
+            return dest + " : " + port
+        }
+    }, {
+        name : "Subject",
+        is_relevant : function(n) { return n.label === "Subject" },
+        icon_unicode : "\uf375",
+        make_node_label : function(node) {
+            var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+            var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+            var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
+            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? node['properties']['startedAtTime'][0]['value'] : "no timestamp")
+            switch(t) {
+                case "Process":
+                    return t + " " + pid + " " + timestamp
+                case "Thread":
+                    return t + " of " + pid + " " + timestamp
+                case "Event":
+                    if (e === "Write" || e === "Read") {
+                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
+                        return t + " " + e + " (" + temp + ") #" + seq
+                    } else { return t + " " + e + " #" + seq}
+                default:
+                    return t + " seq:" + seq + ", @" + timestamp
+            }
+        }
+    }, {
+        name : "Activity",
+        is_relevant : function(n) { return n.label === "Activity" },
+        icon_unicode : "\uf29a",
+        size: 30,
+        make_node_label : function(node) {
+            return addr = (node['properties'].hasOwnProperty('activity:type') ? node['properties']['activity:type'][0]['value'] : "None")
+        }
+    }, {
+        name : "Phase",
+        is_relevant : function(n) { return n.label === "Phase" },
+        icon_unicode : "\uf228",
+        size: 30,
+        make_node_label : function(node) {
+            return addr = (node['properties'].hasOwnProperty('phase:name') ? node['properties']['phase:name'][0]['value'] : "None")
+        }
+    }, {
+        name : "APT",
+        is_relevant : function(n) { return n.label === "APT" },
+        icon_unicode : "\uf229",
+        size: 30,
+        make_node_label : function(node) {
+            return "APT"
+        }
+    }, {
+        name : "Default",   // This will override anything below here!!!!
+        is_relevant : function(n) { return true },
+        icon_unicode : "\uf3a6",
+        size: 30,
+        make_node_label : function(n) {
+            return n['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
+        }
+     // color : do not set a color for default values, or it will always override query-time color choice.
+    }
+]
+
+var predicates = [
     {
         name : "Annotated Activities",
         is_relevant : function(n) {return n.label === "Segment"},
         floating_query : ".out('segment:activity')",
-    },
-    {
+    }, {
         name : "Segment Low-level Events",
         is_relevant : function(n) {return n.label === "Segment"},
         floating_query : ".out('segment:includes')",
-    },
-    {
+    }, {
         name : "APT Phases",
         is_relevant : function(n) {return n.label === "APT"},
         floating_query : ".out('apt:includes')",
-    },
-    {
+    }, {
         name : "APT Phase Segments",
         is_relevant : function(n) {return n.label === "Phase"},
         floating_query : ".out('phase:includes')",
-    },
-    {
+    }, {
         name : "APT Phase Low-level Events",
         is_relevant : function(n) {return n.label === "Phase"},
         floating_query : ".out('phase:includes').out('segment:includes')",
-    },
-    {
+    }, {
         name : "File Events",
         is_relevant : function(n) {return n.label === "Entity-File"},
         floating_query : ".out().or(hasLabel('EDGE_EVENT_AFFECTS_FILE'),hasLabel('EDGE_FILE_AFFECTS_EVENT')).out()",
@@ -157,141 +283,4 @@ var saved_queries = [
         is_relevant : function(n) {return n.label === "Entity-NetFlow"},
         floating_query : ".in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
     }
-]
-
-var saved_nodes = [
-    {   // Icon codes:  http://ionicons.com/cheatsheet.html
-        // NOTE: the insertion of 'u' to make code prefixes of '\uf...' as below; because javascript.
-        name : "Cluster",
-        is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
-        icon_unicode : "\uf413",
-        color : "red",  // setting color here will always override query-specific colors.
-        size: 54
-        // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
-    }, {
-        name : "File",
-        is_relevant : function(n) { return n.label === "Entity-File" },
-        icon_unicode : "\uf41b",
-        size: 40,
-        make_node_label : function(node) {
-            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-            return url + " ; " + file_version
-        }
-    }, {
-        name : "Memory",
-        is_relevant : function(n) { return n.label === "Entity-Memory" },
-        icon_unicode : "\uf376",
-        size: 40,
-        make_node_label : function(node) {
-            var addr = (node['properties'].hasOwnProperty('address') ? node['properties']['address'][0]['value'] : "None")
-            var size = (node['properties'].hasOwnProperty('properties') ? node['properties']['properties'][0]['value'] : "None")
-            return size + "@" + addr
-        }
-    }, {
-        name : "Agent",
-        is_relevant : function(n) { return n.label === "Agent" },
-        icon_unicode : "\uf25d",
-        size: 50,
-        make_node_label : function(node) {
-            var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
-            return at + " userID " + node['properties']['userID'][0]['value']
-        }
-    }, {
-        name : "Entity-NetFlow",
-        is_relevant : function(n) { return n.label === "Entity-NetFlow" },
-        icon_unicode : "\uf262",
-        make_node_label : function(node) {
-            var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
-            var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-            return dest + " : " + port
-        }
-    }, {
-        name : "Subject",
-        is_relevant : function(n) { return n.label === "Subject" },
-        icon_unicode : "\uf375",
-        make_node_label : function(node) {
-            var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-            var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
-            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-            var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
-            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? node['properties']['startedAtTime'][0]['value'] : "no timestamp")
-            switch(t) {
-                case "Process":
-                    return t + " " + pid + " " + timestamp
-                case "Thread":
-                    return t + " of " + pid + " " + timestamp
-                case "Event":
-                    if (e === "Write" || e === "Read") {
-                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ") #" + seq
-                    } else { return t + " " + e + " #" + seq}
-                default:
-                    return t + " seq:" + seq + ", @" + timestamp
-            }
-        }
-    }, {
-        name : "Activity",
-        is_relevant : function(n) { return n.label === "Activity" },
-        icon_unicode : "\uf29a",
-        size: 30,
-        make_node_label : function(node) {
-            return addr = (node['properties'].hasOwnProperty('activity:type') ? node['properties']['activity:type'][0]['value'] : "None")
-        }
-    }, {
-        name : "Phase",
-        is_relevant : function(n) { return n.label === "Phase" },
-        icon_unicode : "\uf228",
-        size: 30,
-        make_node_label : function(node) {
-            return addr = (node['properties'].hasOwnProperty('phase:name') ? node['properties']['phase:name'][0]['value'] : "None")
-        }
-    }, {
-        name : "APT",
-        is_relevant : function(n) { return n.label === "APT" },
-        icon_unicode : "\uf229",
-        size: 30,
-        make_node_label : function(node) {
-            return "APT"
-        }
-    }, {
-        name : "Default",   // This will override anything below here!!!!
-        is_relevant : function(n) { return true },
-        icon_unicode : "\uf3a6",
-        size: 30,
-        make_node_label : function(n) {
-            return n['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
-        }
-     // color : do not set a color for default values, or it will always override query-time color choice.
-    }
-]
-
-var starting_queries = [
-
-    {
-        name : "find file by name & version",
-        base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_})",
-        default_values : ["myfile.txt",1]
-    },
-    {
-        name : "find process by pid",
-        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_})",
-        default_values : [1001]
-    },
-    {
-        name : "find up to n processes of an owner",
-        base_query : "g.V().has(label,'localPrincipal').has('userID',{_}).both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out().has('label','Subject').has('subjectType',0).limit({_})",
-        default_values : [1234,10]
-    },
-    {
-        name : "find NetFlow by dstAddress & port",
-        base_query : "g.V().has(label,'Entity_NetFlow').has('dstAddress','{_}').has('port',{_})",
-        default_values : ["127.0.0.1",80]
-    },
-    {
-        name : "find APTs labeled by DX",
-        base_query : "g.V().has(label,'APT')",
-        default_values : []
-    }
-
 ]

@@ -13,7 +13,7 @@
 
     <script type="text/javascript">
         var node_data_set, edge_data_set, network;
-        // saved_queries and saved_nodes are loaded externally from ui_language.js
+        // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
@@ -28,7 +28,7 @@
                 return true
             }
             UI.loadingUIStart()
-            var query_string;
+            var query_string
             if (typeof query_object === "string") {
                 append_str = query_object.split(";").slice(-1)[0].trim().substring(0,2) == "g." ? ".dedup()" : ""
                 query_string = query_object + append_str
@@ -39,6 +39,9 @@
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
             if (query_string.length == 0) { return UI.failHandler() }
             $.post("/query", {"query": query_string}, function(node_results) {
+                var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
+                if ( ! all_are_nodes) { UI.failHandler(); return false }
+                
                 UI.foundNodes(node_results.length)
                 if ( ! _.isEmpty(node_results)) {
                     var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
@@ -58,6 +61,17 @@
                 } else {
                     UI.loadingUIStop()
                 }
+            }).fail(UI.failHandler)
+        }
+
+
+        function execTextQuery(query_string) {
+            UI.loadingUIStart()
+            $.post("/query", {"query": query_string}, function(results) {
+                UI.queryInputColor("lightgreen")
+                console.log(results)
+                setTimeout(function(){ UI.queryInputColor() }, 750)
+                UI.loadingUIStop()
             }).fail(UI.failHandler)
         }
 
@@ -100,7 +114,7 @@
 
         function makeCluster(){
             function getClusteringData(node_ids, cluster_node_id, name) { 
-                var cluster_spec = _.find(saved_nodes, function(n){return n.name.toLowerCase() === "cluster"})
+                var cluster_spec = _.find(node_appearance, function(n){return n.name.toLowerCase() === "cluster"})
                 return {
                     type : "collapse",
                     node_ids : node_ids,
@@ -330,8 +344,8 @@
                 
                 n['queries'] = getRelevantQueries(n)  
 
-                node_spec = _.find(saved_nodes, function(i){return i.is_relevant(n)})
-                default_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
+                node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
+                default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
                     n['icon'] = {
                         color : getOrElse(node_spec.color, UI.selectedColor()),
@@ -340,7 +354,7 @@
                     }
                 }
 
-                // CONSIDER: should test for 'is_relevant' in 'saved_queries' and 'saved_nodes' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+                // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
 
 
                 translateAllEnums(n)
@@ -381,7 +395,7 @@
                 "is_collapsed" : false,
                 "is_default" : true,  // Will be overridden by any default already defined.
             }
-            var relevant_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node) })
+            var relevant_queries = _.filter(predicates, function(q){ return q.is_relevant(node) })
             var node_queries = _.map(relevant_queries, function(q) {q.is_collapsed = true; return q})
             node_queries.push(adjacent_query)
             var found_one_default = false
@@ -459,21 +473,28 @@
 
         var UI = {
             queryClick : function() {
-                $('#query-string').css("background-color", "white")
+                UI.queryInputColor()
                 var query_string = document.getElementById('query-string').value
-                var formatAndUpdate = _.compose(updateNetwork, formatAllData)
-                execQuery(query_string, formatAndUpdate)
+                if (UI.shift_is_held) {
+                    execTextQuery(query_string)
+                } else {
+                    var formatAndUpdate = _.compose(updateNetwork, formatAllData)
+                    execQuery(query_string, formatAndUpdate)
+                }
             },
+            shift_is_held : false,
             failHandler : function(response) {
-                $('#query-string').css("background-color", "pink")
+                UI.queryInputColor("pink")
                 UI.loadingUIStop()
             },
-            clearInput : function() { 
-                $("#query-string").css("background-color", "white")
+            queryInputColor : function(color) {
+                if (typeof color != "string") { color = "white" }
+                $("#query-string").css("background-color", color)
             },
             ajax_in_progress_count : 0,
             loadingUIStart : function() {
                 $("#found-nodes-icon, #found-edges-icon").hide()
+                UI.queryInputColor()
                 UI.ajax_in_progress_count++
                 $("#loader").show()
             },
@@ -690,7 +711,7 @@
             },
             draw : function(data) {
                 var container = document.getElementById('graph')
-                default_node_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
+                default_node_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 var options = {
                     interaction : { 
                         hover: true,
@@ -859,7 +880,7 @@
                         input.setSelectionRange(pos.pos, pos.pos + pos.len) 
                         highlight_coords.col = highlight_coords.col + 1
                     }
-                    break;
+                    break
                 }
             }
         }
@@ -872,8 +893,12 @@
         $(document).bind("click", function(event) {
             document.getElementById("node-query-menu").className = "hide"
         })
+        $(document).bind("keyup", function(event) { 
+            if (event.keyCode == 16) { UI.shift_is_held = false }
+        })
         $(document).bind("keydown", function(event) { 
-            if ($("#query-string").is(":focus")) { UI.clearInput() }
+            if (event.keyCode == 16) { UI.shift_is_held = true }
+            if ($("#query-string").is(":focus")) { UI.queryInputColor() }
             if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()
             }
@@ -978,12 +1003,11 @@
             font-size: small;
         }
 
-
     </style>
 </head>
 <body>
     <div style="display: block;">
-        <input id="query-string" list="starting-queries" placeholder="Query returning nodes" onfocus="UI.clearInput()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
+        <input id="query-string" list="starting-queries" placeholder="Query returning nodes" onfocus="UI.queryInputColor()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
         <datalist id="starting-queries"></datalist>
         <button id="query-button" title="Add nodes found with the entered query to the existing graph" onclick="UI.queryClick()">Query</button>
         <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2 title="Choose the color for the next added nodes" >
