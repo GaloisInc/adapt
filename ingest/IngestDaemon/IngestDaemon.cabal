@@ -109,4 +109,4 @@ executable Trint
                      , avro
   hs-source-dirs:      programs
   default-language:    Haskell2010
-  ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N2 -Wall -Werror
+  ghc-options:         -O2 -threaded -rtsopts -with-rtsopts=-N3 -Wall -Werror
