@@ -13,7 +13,7 @@
 
     <script type="text/javascript">
         var node_data_set, edge_data_set, network;
-        // saved_queries and saved_nodes are loaded externally from ui_language.js
+        // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
@@ -114,7 +114,7 @@
 
         function makeCluster(){
             function getClusteringData(node_ids, cluster_node_id, name) { 
-                var cluster_spec = _.find(saved_nodes, function(n){return n.name.toLowerCase() === "cluster"})
+                var cluster_spec = _.find(node_appearance, function(n){return n.name.toLowerCase() === "cluster"})
                 return {
                     type : "collapse",
                     node_ids : node_ids,
@@ -344,8 +344,8 @@
                 
                 n['queries'] = getRelevantQueries(n)  
 
-                node_spec = _.find(saved_nodes, function(i){return i.is_relevant(n)})
-                default_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
+                node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
+                default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
                     n['icon'] = {
                         color : getOrElse(node_spec.color, UI.selectedColor()),
@@ -354,7 +354,7 @@
                     }
                 }
 
-                // CONSIDER: should test for 'is_relevant' in 'saved_queries' and 'saved_nodes' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+                // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
 
 
                 translateAllEnums(n)
@@ -395,7 +395,7 @@
                 "is_collapsed" : false,
                 "is_default" : true,  // Will be overridden by any default already defined.
             }
-            var relevant_queries = _.filter(saved_queries, function(q){ return q.is_relevant(node) })
+            var relevant_queries = _.filter(predicates, function(q){ return q.is_relevant(node) })
             var node_queries = _.map(relevant_queries, function(q) {q.is_collapsed = true; return q})
             node_queries.push(adjacent_query)
             var found_one_default = false
@@ -711,7 +711,7 @@
             },
             draw : function(data) {
                 var container = document.getElementById('graph')
-                default_node_spec = _.find(saved_nodes, function(i){return i.name.toLowerCase() === "default"})
+                default_node_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 var options = {
                     interaction : { 
                         hover: true,
