@@ -412,36 +412,31 @@ runDB emit conn inputOps = do
  where
  nrBulk = 100
  deadAt = 4
+
+ go []   = return ()
  go oprs =
-  do let (operVS,operES) = L.partition (isVertex . statement) oprs
-         (vs,es)   = (map statement operVS, map statement operES)
-         nrVS      = length vs
-         nrES      = length es
-         vsCmdEnv  = serializeOperations vs
-         esCmdEnv  = serializeOperations es
-         vsReq     = uncurry mkRequest vsCmdEnv
-         esReq     = uncurry mkRequest esCmdEnv
-         sendReq x o = GC.sendOn conn x (recover o)
-         recover :: [Input] -> Response -> IO ()
-         recover [] _ = error "BUG: failed insertion on an empty batch."
-         recover xs@(x:_) resp
-            | respStatus resp /= 200 =
-                let (live,dead) = L.partition ((<deadAt) . inputAge) (map ageInput xs)
-                    batches
-                      | inputAge x < (deadAt-2)  =
-                          let (a,b) = L.splitAt (length xs `div` 2) live
-                          in [a,b]
-                      | otherwise      = map (\y -> [y]) live
-                    ms500 = 1000 * 500       -- 0.5 seconds
-                    min1  = 1000 * 1000 * 60 -- 1 minute
-                    delayTime = min min1 (ms500 * 4 ^ (inputAge x))
-                    -- ^ exponential back-off
-                in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping statement: " <> T.pack (show dead))
-                      void $ forkIO $ printException "insert-retry" (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
-                   -- ^^^ XXX consider a channel and long-lived thread here
-            | otherwise              = return ()
-     when (nrVS > 0) $ sendReq vsReq operVS
-     when (nrES > 0) $ sendReq esReq operES
+  do let vsCmdEnv    = serializeOperations $ map statement oprs
+         vsReq       = uncurry mkRequest vsCmdEnv
+     GC.sendOn conn vsReq (recover oprs)
+
+ recover :: [Input] -> Response -> IO ()
+ recover [] _ = error "BUG: failed insertion on an empty batch."
+ recover xs@(x:_) resp
+    | respStatus resp /= 200 =
+        let (live,dead) = L.partition ((<deadAt) . inputAge) (map ageInput xs)
+            batches
+              | inputAge x < (deadAt-2)  =
+                  let (a,b) = L.splitAt (length xs `div` 2) live
+                  in [a,b]
+              | otherwise      = map (\y -> [y]) live
+            ms500 = 1000 * 500       -- 0.5 seconds
+            min1  = 1000 * 1000 * 60 -- 1 minute
+            delayTime = min min1 (ms500 * 4 ^ (inputAge x))
+            -- ^ exponential back-off
+        in do when (not (null dead)) (T.hPutStrLn stderr $ "Dropping statement: " <> T.pack (show dead))
+              void $ forkIO $ printException "insert-retry" (threadDelay delayTime >> mapM_ (runDB emit conn) batches)
+           -- ^^^ XXX consider a channel and long-lived thread here
+    | otherwise              = return ()
 
 --------------------------------------------------------------------------------
 --  Utils
