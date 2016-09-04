@@ -313,10 +313,6 @@ kafkaInputToDB cfg =
              Avro.Error _err     -> Nothing
           ms = catMaybes (map decodeMsg bs `using` parListChunk 500 rpar)
       let (ipts,newUIDs) = convertToSchemas uids ms
-      when (not (null bs0)) $ liftIO $ do
-        T.hPutStrLn stderr $ T.pack (show (length bs0)) <> " Kafka msgs received."
-        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ipts)) <> " compiled inputs."
-        T.hPutStrLn stderr $ "\t->" <> T.pack (show (length ms)) <> " decoded CDM stmts."
       mapM_ (sendInputs cfg dbc) (partitionInputsByType ipts)
       if null bs
        then do now <- liftIO $ do reportRate (logKafkaMsg cfg) start cnt
