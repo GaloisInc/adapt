@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import sys, os, csv, json, math, logging, kafka
+import sys, os, csv, json, math, logging, kafka, statistics, numpy
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
@@ -142,11 +142,12 @@ class AnomalyView:
         os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
         log.info("Anomaly scores written to " + self.score_file)
 
-    def attach_scores_to_db(self, percentage = 5.0):
+    def attach_scores_to_db(self, view_stats, percentage = 5.0):
         with open(self.score_file) as f:
             for i, l in enumerate(f):
                 pass
         total_nodes = i
+        view_stats.number_nodes = total_nodes
         cutoff = math.ceil(total_nodes * (percentage / 100.0))
         max_score = 0
         max_id = 0
@@ -157,6 +158,7 @@ class AnomalyView:
         with open(self.score_file, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                view_stats.note_anomaly_score(row['anomaly_score'])
                 QUERY += "x={id};t='{type}';s={score};g.V(x).property(atype,t).next();g.V(x).property(ascore,s).next();".format(id=row['id'], type=self.view_type, score=row['anomaly_score'])
                 feature = "["
                 for k in sorted(row.keys()):
@@ -179,12 +181,112 @@ class AnomalyView:
             log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
             try:
                 self.gremlin.fetch_data(QUERY, binds)
+                view_stats.number_nodes_attached = cnt
             except:
                 log.exception("Exception attaching score")
             log.info('Anomaly score attachment done for view ' + self.view_type)
 
+class ViewStats:
+    def __init__(self, vt, run_time_dir):
+        self.view_type = vt
+        self.feature_file_path = run_time_dir + '/features/' + self.view_type + '.csv'
+        self.number_nodes = 0
+        self.number_nodes_attached = 0
+        self.score_range_min = -1
+        self.score_range_max = -1
+        self.value_list_for_features = {}
+        self.histograms_for_features = {}
+        self.features = []
+        self.feature_means = {}
+        self.feature_stdevs = {}
 
+    def set_value_list_for_features(self):
+        print('setting value list for features...')
+        with open(self.feature_file_path, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                features = row.keys()
+                #print(features)
+                #print(row)
+                for feature in features:
+                    if feature != 'id':
+                        if not(feature in self.value_list_for_features):
+                            self.value_list_for_features[feature] = []
+                        list_for_feature = self.value_list_for_features[feature]
+                        list_for_feature.append(float(row[feature]))
+            self.features = list(self.value_list_for_features.keys())
+            self.features.sort()
+            print('values for features {0}'.format(self.value_list_for_features))
+            
+    def get_stats_info(self):
+        INFO="statistics for view "+self.view_type+'\n'
+        INFO+="# nodes         " + "{0}".format(self.number_nodes) + '\n'
+        INFO+="# nodes attached" + "{0}".format(self.number_nodes_attached) + '\n'
+        INFO+="features: " 
+        #INFO+=', '.join(self.features) + '\n'
+        for f in self.features:
+            INFO+="\n\t" + f + "\tmean " + "{0:.2f}".format(self.feature_means[f]) + "\tstdev " + "{0:.2f}".format(self.feature_stdevs[f])
+        INFO+="\n\nFEATURE HISTOGRAMS"
+        for f in self.features:
+            INFO+="\n\t" + f + "\t:  " + "{0}".format(self.histograms_for_features[f])
+        INFO+="\n\nscore range - min {0} , max {1}\n".format(self.score_range_min, self.score_range_max)
+        INFO+="\n"
+        return INFO
+                  
+    def note_anomaly_score(self, score):
+        score_as_float = float(score)
+        if (self.score_range_min == -1):
+            self.score_range_min = score_as_float
+        else:
+            if (score_as_float < self.score_range_min):
+                self.score_range_min = score_as_float
+        if (self.score_range_max == -1):
+            self.score_range_max = score_as_float
+        else:
+            if (score_as_float > self.score_range_max):
+                self.score_range_max = score_as_float
 
+    def compute_feature_means(self):
+        print('computing means...')
+        if (not(bool(self.value_list_for_features))):
+            self.set_value_list_for_features()
+        
+        for feature in self.features:
+            values = self.value_list_for_features[feature]
+            mean = statistics.mean(values)
+            self.feature_means[feature] = mean
+        
+    def compute_feature_stdevs(self):
+        print('computing standard deviation')
+        if (not(bool(self.value_list_for_features))):
+            self.set_value_list_for_features()
+        
+        for feature in self.features:
+            values = self.value_list_for_features[feature]
+            stdev = statistics.stdev(values)
+            self.feature_stdevs[feature] = stdev
+        
+    def compute_feature_histograms(self):
+        print('computing feature histograms')
+        if (not(bool(self.value_list_for_features))):
+            self.set_value_list_for_features()
+        
+        for feature in self.features:
+            values = self.value_list_for_features[feature]
+            histogram = numpy.histogram(values,'auto', None, False, None, None)
+            self.histograms_for_features[feature] = histogram
+'''
+if __name__ == '__main__':
+    view_stats = ViewStats('statsTest','/home/vagrant/adapt/ad/test')
+    view_stats.compute_feature_means()
+    view_stats.compute_feature_stdevs()
+    view_stats.compute_feature_histograms()
+    view_stats.note_anomaly_score(2.3)
+    view_stats.note_anomaly_score(2.2)
+    view_stats.note_anomaly_score(5.3)
+    view_stats.note_anomaly_score(0.7)
+    print(view_stats.get_stats_info())
+'''
 if __name__ == '__main__':
     in_json = sys.argv[1]
     producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'])
@@ -196,8 +298,14 @@ if __name__ == '__main__':
             producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
             view_data = views[view_type]
             view = AnomalyView(gremlin, view_type, view_data['instance_set'], view_data['feature_set'])
+            ad_output_root = os.getcwd()
+            view_stats = ViewStats(view_type,ad_output_root)
             success = view.compute_view_and_save()
             if success == True:
                 view.compute_anomaly_score()
-                view.attach_scores_to_db()
+                view.attach_scores_to_db(view_stats)
+                view_stats.compute_feature_means()
+                view_stats.compute_feature_stdevs()
+                view_stats.compute_feature_histograms()
+                producer.send("ad-log", bytes(view_stats.get_stats_info()))
             i += 1
