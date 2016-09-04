@@ -7,6 +7,8 @@
 module CompileSchema
   ( -- * Operations
     compile, compileNode, compileEdge, serializeOperation, serializeOperations
+    -- * Cache
+    , GremlinCommandCache, emptyGremlinCommandCache, standardCache
     -- * Types
     , GremlinValue(..)
     , Operation(..)
@@ -22,6 +24,8 @@ import qualified Data.Char as C
 import           Data.Foldable as F
 import           Data.Int (Int64)
 import           Data.List (intersperse)
+import           Data.Hashable
+import qualified Data.HashMap.Strict as HMap
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
@@ -247,18 +251,62 @@ gremlinNum = GremlinNum . fromIntegral
 --------------------------------------------------------------------------------
 --  Gremlin language serialization
 
-serializeOperations :: [Operation Text] -> (Text,Env)
-serializeOperations ops =
-  let (cmds,envs) = unzip $ map (uncurry serializeOperationFrom) (zip [1,1001..] ops)
+serializeOperations :: GremlinCommandCache -> [Operation Text] -> (Text,Env)
+serializeOperations cache ops =
+  let (cmds,envs) = unzip $ map (snd . uncurry (serializeOperationFrom cache)) (zip [1,1001..] ops)
   in (T.intercalate ";" cmds, Map.unions envs)
 
-serializeOperation :: Operation Text -> (Text,Env)
-serializeOperation = serializeOperationFrom 0
+serializeOperation :: GremlinCommandCache -> Operation Text -> (GremlinCommandCache, (Text,Env))
+serializeOperation cache = serializeOperationFrom cache 0
 
 type Env = Map.Map Text A.Value
 
-serializeOperationFrom :: Int -> Operation Text -> (Text,Env)
-serializeOperationFrom start (InsertVertex ty l ps) = (cmd,env)
+-- A command cahce is a mapping of command type and parameter number starting
+-- point to gremlin string.
+newtype GremlinCommandCache = GCC (HMap.HashMap (Int,OperationType) Text)
+  deriving (Eq,Show)
+
+emptyGremlinCommandCache :: GremlinCommandCache
+emptyGremlinCommandCache = GCC HMap.empty
+
+standardCache :: GremlinCommandCache
+standardCache = GCC $ HMap.fromList [ ((start,opTy),constr start opTy)
+                                        | opTy <- AddEdge:AddReifiedEdge: map AddVertex [1..20]
+                                        , start <- [1,1001,100*1000+1]
+                                        ]
+  where
+   constr st opTy =
+     let err = error "BUG: Gremlin command not properly parameterized."
+         op  = case opTy of
+                 AddVertex n    -> InsertVertex err err (replicate n err)
+                 AddEdge        -> InsertEdge err err err False
+                 AddReifiedEdge -> InsertReifiedEdge err err err err err err
+         (_,(cmd,_)) = serializeOperationFrom emptyGremlinCommandCache st op
+     in cmd
+
+data OperationType = AddVertex Int | AddEdge | AddReifiedEdge
+  deriving (Eq,Ord,Show)
+
+opType :: Operation a -> OperationType
+opType (InsertVertex _ _ ps) = AddVertex (length ps)
+opType (InsertEdge {}) = AddEdge
+opType (InsertReifiedEdge {}) = AddReifiedEdge
+
+instance Hashable OperationType where
+  hashWithSalt s (AddVertex x) = hashWithSalt s x `hashWithSalt` (1::Int)
+  hashWithSalt s (AddEdge) = hashWithSalt s (2::Int)
+  hashWithSalt s (AddReifiedEdge) = hashWithSalt s (3::Int)
+
+withCache :: Int -> Operation Text -> GremlinCommandCache -> Text -> (GremlinCommandCache, Text)
+withCache start op (GCC cache) newCmd =
+  case HMap.lookup (start,opType op) cache of
+    Just cmd -> (GCC cache,cmd)
+    Nothing  -> (GCC $ HMap.insert (start,opType op) newCmd cache, newCmd)
+
+serializeOperationFrom :: GremlinCommandCache -> Int -> Operation Text -> (GremlinCommandCache,(Text,Env))
+serializeOperationFrom cache start op@(InsertVertex ty l ps) =
+      let (cache',cmd') = withCache start op cache cmd
+      in (cache',(cmd',env))
     where
        cmd = escapeChars call
        -- graph.addVertex(label, tyParam, 'ident', vertexName, param1, val1, param2, val2 ...)
@@ -272,7 +320,9 @@ serializeOperationFrom start (InsertVertex ty l ps) = (cmd,env)
        identVar   = "l" <> T.pack (show (start+1))
        env = Map.fromList $ (tyParamVar, A.String ty) : (identVar, A.String l) : mkBinding (start+2) ps
 
-serializeOperationFrom start (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) = (cmd,env)
+serializeOperationFrom cache start op@(InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) =
+      let (cache',cmd') = withCache start op cache cmd
+      in (cache',(cmd',env))
     where
     cmd = escapeChars call
     call = T.unwords
@@ -292,11 +342,13 @@ serializeOperationFrom start (InsertReifiedEdge  lNode lE1 lE2 nId srcId dstId) 
                        , (srcVar, A.String srcId), (dstVar, A.String dstId)
                        ]
 
-serializeOperationFrom start (InsertEdge l src dst genVerts)   =
-     if genVerts
-      then (testAndInsertCmd, env)
-      else (nonTestCmd, env)
+serializeOperationFrom cache start op@(InsertEdge l src dst genVerts)   =
+      let (cache',cmd') = withCache start op cache cmd
+      in (cache',(cmd',env))
     where
+      cmd = if genVerts
+             then testAndInsertCmd
+             else nonTestCmd
       -- g.V().has('ident',src).next().addEdge(edgeTy, g.V().has('ident',dst).next(), param1, val1, ...)
       nonTestCmd =
         escapeChars $

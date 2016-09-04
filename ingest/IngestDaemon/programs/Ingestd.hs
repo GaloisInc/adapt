@@ -345,7 +345,7 @@ instance Hashable InputKey where
 -- Divide the inputs into type (edge, vertex, reified edge) and further group
 -- vertex inputs by number of parameters.
 partitionInputsByType :: [Input] -> [[Input]]
-partitionInputsByType is = 
+partitionInputsByType is =
   let mp = L.foldl' foldOp HMap.empty is
       verts = HMap.elems $ HMap.delete ReifiedEdgeIpt (HMap.delete EdgeIpt mp)
       es = catMaybes [HMap.lookup EdgeIpt mp, HMap.lookup ReifiedEdgeIpt mp]
@@ -415,7 +415,7 @@ runDB emit conn inputOps = do
 
  go []   = return ()
  go oprs =
-  do let vsCmdEnv    = serializeOperations $ map statement oprs
+  do let vsCmdEnv    = serializeOperations standardCache $ map statement oprs
          vsReq       = uncurry mkRequest vsCmdEnv
      GC.sendOn conn vsReq (recover oprs)
 
