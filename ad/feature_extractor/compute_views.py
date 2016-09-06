@@ -165,7 +165,6 @@ class AnomalyView:
         with open(self.score_file, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                view_stats.note_anomaly_score(row['anomaly_score'])
                 QUERY += "x={id};t='{type}';s={score};g.V(x).property(atype,t).next();g.V(x).property(ascore,s).next();".format(id=row['id'], type=self.view_type, score=row['anomaly_score'])
                 feature = "["
                 for k in sorted(row.keys()):
@@ -199,6 +198,7 @@ class ViewStats:
     def __init__(self, vt, run_time_dir):
         self.view_type = vt
         self.feature_file_path = run_time_dir + '/features/' + self.view_type + '.csv'
+        self.scores_file_path  = run_time_dir + '/scores/'   + self.view_type + '.csv'
         self.number_nodes = 0
         self.number_nodes_attached = 0
         self.score_range_min = -1
@@ -209,8 +209,24 @@ class ViewStats:
         self.feature_means = {}
         self.feature_stdevs = {}
 
+    def set_score_range(self):
+        #print('setting score range...')
+        with open(self.scores_file_path, 'r') as csvfile:
+            lines = csvfile.readlines()
+            i = 0;
+            for line in lines:
+                if i == 0:
+                    pass
+                    #print('skipping header {0}'.format(line))
+                else:
+                    parts = line.split(',')
+                    score = parts[len(parts) - 1]
+                    self.note_anomaly_score(score)
+                i = i + 1
+            #print('range of scores {0} - {1}'.format(self.score_range_min, self.score_range_max))
+
     def set_value_list_for_features(self):
-        print('setting value list for features...')
+        #print('setting value list for features...')
         with open(self.feature_file_path, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
@@ -225,10 +241,11 @@ class ViewStats:
                         list_for_feature.append(float(row[feature]))
             self.features = list(self.value_list_for_features.keys())
             self.features.sort()
-            print('values for features {0}'.format(self.value_list_for_features))
+            #print('values for features {0}'.format(self.value_list_for_features))
             
     def get_stats_info(self):
-        INFO="statistics for view "+self.view_type+'\n'
+        INFO="###########################################\nstatistics for view "+self.view_type+'\n'
+        INFO+="###########################################\n"
         INFO+="# nodes         " + "{0}".format(self.number_nodes) + '\n'
         INFO+="# nodes attached" + "{0}".format(self.number_nodes_attached) + '\n'
         INFO+="features: " 
@@ -256,7 +273,7 @@ class ViewStats:
                 self.score_range_max = score_as_float
 
     def compute_feature_means(self):
-        print('computing means...')
+        #print('computing means...')
         if (not(bool(self.value_list_for_features))):
             self.set_value_list_for_features()
         
@@ -266,7 +283,7 @@ class ViewStats:
             self.feature_means[feature] = mean
         
     def compute_feature_stdevs(self):
-        print('computing standard deviation')
+        #print('computing standard deviation')
         if (not(bool(self.value_list_for_features))):
             self.set_value_list_for_features()
         
@@ -276,7 +293,7 @@ class ViewStats:
             self.feature_stdevs[feature] = stdev
         
     def compute_feature_histograms(self):
-        print('computing feature histograms')
+        #print('computing feature histograms')
         if (not(bool(self.value_list_for_features))):
             self.set_value_list_for_features()
         
@@ -284,16 +301,14 @@ class ViewStats:
             values = self.value_list_for_features[feature]
             histogram = numpy.histogram(values,'auto', None, False, None, None)
             self.histograms_for_features[feature] = histogram
+
 '''
 if __name__ == '__main__':
     view_stats = ViewStats('statsTest','/home/vagrant/adapt/ad/test')
     view_stats.compute_feature_means()
     view_stats.compute_feature_stdevs()
     view_stats.compute_feature_histograms()
-    view_stats.note_anomaly_score(2.3)
-    view_stats.note_anomaly_score(2.2)
-    view_stats.note_anomaly_score(5.3)
-    view_stats.note_anomaly_score(0.7)
+    view_stats.set_score_range()
     print(view_stats.get_stats_info())
 '''
 
