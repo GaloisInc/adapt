@@ -335,8 +335,8 @@ if __name__ == '__main__':
                     view_stats.compute_feature_histograms()
                     view_stats.set_score_range()
                     producer.send("ad-log", bytes(view_stats.get_stats_info()))
-                    log.info(view_stats.get_stats_info())
+                    log.info(view_stats.get_stats_info(), encoding='utf-8')
                 except:
-                    producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type)) 
+                    producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
                     log.exception("error working with view {0} prevents statistics generation.".format(view_type))
             i += 1
