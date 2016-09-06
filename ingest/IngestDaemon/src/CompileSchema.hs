@@ -272,7 +272,7 @@ emptyGremlinCommandCache = GCC HMap.empty
 standardCache :: GremlinCommandCache
 standardCache = GCC $ HMap.fromList [ ((start,opTy),constr start opTy)
                                         | opTy <- AddEdge:AddReifiedEdge: map AddVertex [1..20]
-                                        , start <- [1,1001,100*1000+1]
+                                        , start <- [1,1001..100*1000+1]
                                         ]
   where
    constr st opTy =
