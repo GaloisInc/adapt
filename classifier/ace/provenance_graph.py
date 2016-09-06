@@ -6,12 +6,13 @@ import logging
 import struct
 import time
 import os
+import sys
 
-from ace.titan_database import TitanDatabase
+sys.path.append(os.path.expanduser('~/adapt/pylib'))
+from titanDB import TitanClient as TitanDatabase
 
 log = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-#handler = logging.StreamHandler()
 handler = logging.FileHandler(os.path.expanduser('~/adapt/classifier/ac.log'))
 handler.setFormatter(formatter)
 log.addHandler(handler)
@@ -25,6 +26,9 @@ class ProvenanceGraph(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def __del__(self):
         self.close()
 
     def close(self):
@@ -61,7 +65,7 @@ class ProvenanceGraph(object):
             yield node
 
     def segmentNodes(self):
-        query = "g.V().has(label, 'Segment')"
+        query = "g.V().has('segment:name','byPID')"
         nodes = self.titanClient.execute(query)
         for node in nodes:
             yield node
@@ -75,10 +79,9 @@ class ProvenanceGraph(object):
             nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).out('segment:includes')"
+            query = "g.V({}).out('segment:includes').id()"
             adjacentNodes = self.titanClient.execute(query.format(nodeId))
-            for adjacentNode in adjacentNodes:
-                adjacentNodeId = adjacentNode['id']
+            for adjacentNodeId in adjacentNodes:
                 G.add_node(adjacentNodeId)
                 G.add_edge(nodeId, adjacentNodeId)
 
@@ -92,10 +95,9 @@ class ProvenanceGraph(object):
         nodeId = node['id']
         G.add_node(nodeId)
 
-        query = "g.V({}).out('segment:includes')"
+        query = "g.V({}).out('segment:includes').id()"
         adjacentNodes = self.titanClient.execute(query.format(nodeId))
-        for adjacentNode in adjacentNodes:
-            adjacentNodeId = adjacentNode['id']
+        for adjacentNodeId in adjacentNodes:
             G.add_node(adjacentNodeId)
             G.add_edge(nodeId, adjacentNodeId)
 
@@ -121,36 +123,38 @@ class ProvenanceGraph(object):
                 node[0]['properties']['activity:suspicionScore'][0]['value'])
 
     def getUnclassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(__.not(outE('segment:activity')))"
+        query = "g.V().has('segment:name','byPID').where(__.not(outE('segment:activity'))).id()"
         nodes = self.titanClient.execute(query)
-        for node in nodes:
+        for nodeId in nodes:
             G = networkx.Graph()
-
-            nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).out('segment:includes')"
-            adjacentNodes = self.titanClient.execute(query.format(nodeId))
-            for adjacentNode in adjacentNodes:
-                adjacentNodeId = adjacentNode['id']
-                G.add_node(adjacentNodeId)
-                G.add_edge(nodeId, adjacentNodeId)
+            log.info("NodeId = " + str(nodeId))
 
-            yield(nodeId, G)
+            try:
+                query = "g.V({}).out('segment:includes').id()"
+                adjacentNodes = self.titanClient.execute(query.format(nodeId))
+
+                for adjacentNodeId in adjacentNodes:
+                    G.add_node(adjacentNodeId)
+                    G.add_edge(nodeId, adjacentNodeId)
+
+                yield(nodeId, G)
+
+            except Exception as e:
+                log.info("Exception: " + str(e))
+                raise
 
     def getClassifiedSegments(self):
-        query = "g.V().hasLabel('Segment').where(outE('segment:activity'))"
+        query = "g.V().has('segment:name','byPID').where(outE('segment:activity')).id()"
         nodes = self.titanClient.execute(query)
-        for node in nodes:
+        for nodeId in nodes:
             G = networkx.Graph()
-
-            nodeId = node['id']
             G.add_node(nodeId)
 
-            query = "g.V({}).out('segment:includes')"
+            query = "g.V({}).out('segment:includes').id()"
             adjacentNodes = self.titanClient.execute(query.format(nodeId))
-            for adjacentNode in adjacentNodes:
-                adjacentNodeId = adjacentNode['id']
+            for adjacentNodeId in adjacentNodes:
                 G.add_node(adjacentNodeId)
                 G.add_edge(nodeId, adjacentNodeId)
 
