@@ -332,5 +332,6 @@ if __name__ == '__main__':
                 view_stats.compute_feature_means()
                 view_stats.compute_feature_stdevs()
                 view_stats.compute_feature_histograms()
+                view_stats.set_score_range()
                 producer.send("ad-log", bytes(view_stats.get_stats_info()))
             i += 1
