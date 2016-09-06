@@ -323,15 +323,20 @@ if __name__ == '__main__':
             producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
             view_data = views[view_type]
             view = AnomalyView(gremlin, view_type, view_data['instance_set'], view_data['feature_set'])
-            ad_output_root = os.getcwd()
-            view_stats = ViewStats(view_type,ad_output_root)
             success = view.compute_view_and_save()
             if success == True:
-                view.compute_anomaly_score()
-                view.attach_scores_to_db(view_stats)
-                view_stats.compute_feature_means()
-                view_stats.compute_feature_stdevs()
-                view_stats.compute_feature_histograms()
-                view_stats.set_score_range()
-                producer.send("ad-log", bytes(view_stats.get_stats_info()))
+                try:
+                    view.compute_anomaly_score()
+                    ad_output_root = os.getcwd()
+                    view_stats = ViewStats(view_type,ad_output_root)
+                    view.attach_scores_to_db(view_stats)
+                    view_stats.compute_feature_means()
+                    view_stats.compute_feature_stdevs()
+                    view_stats.compute_feature_histograms()
+                    view_stats.set_score_range()
+                    producer.send("ad-log", bytes(view_stats.get_stats_info()))
+                    log.info(view_stats.get_stats_info())
+                except:
+                    producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type)) 
+                    log.exception("error working with view {0} prevents statistics generation.".format(view_type))
             i += 1
