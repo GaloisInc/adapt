@@ -133,7 +133,6 @@ install_adapt_dependencies() {
           dnspython \
           flake8 \
           gremlinrestclient \
-          sets \
           networkx \
           pydot \
           numpy \
