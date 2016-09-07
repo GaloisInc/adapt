@@ -246,7 +246,7 @@ var saved_nodes = [
     }, {
         name : "ActivityCluster",
         is_relevant : function(n) { return n.label === "ActivityCluster" },
-        icon_unicode : "\uf482",
+        icon_unicode : "\uf139",
         size: 30,
         make_node_label : function(node) {
             return addr = (node['properties'].hasOwnProperty('cluster:type') ? node['properties']['cluster:type'][0]['value'] : "None")
