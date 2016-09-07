@@ -101,7 +101,7 @@ class TopLevelClassifier(object):
 
         for segmentId, label in classification:
             activity = provenanceGraph.createActivity(segmentId, 'activity' + str(label),
-                                clusterId=segmentId=label2cluster['activity' + str(label)])
+                                clusterId=label2cluster['activity' + str(label)])
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],

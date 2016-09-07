@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
         for segmentId, label in classification:
             activity = provenanceGraph.createActivity(segmentId, 'activity' + str(label),
-                            clusterId=segmentId=label2cluster['activity' + str(label)])
+                            clusterId=label2cluster['activity' + str(label)])
             print("New activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                              activity['properties']['activity:type'][0]['value'],
                                                                              segmentId))
