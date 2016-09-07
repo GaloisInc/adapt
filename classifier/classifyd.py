@@ -97,10 +97,10 @@ class TopLevelClassifier(object):
             lbl = 'activity' + str(label)
             print(lbl)
             if lbl not in label2cluster.keys():
-                cluster = provenanceGraph.createActivityCluster(lbl)
+                cluster = self.provenanceGraph.createActivityCluster(lbl)
                 label2cluster[lbl] = cluster['id']
 
-            activity = provenanceGraph.createActivity(segmentId, lbl, clusterId=label2cluster[lbl])
+            activity = self.provenanceGraph.createActivity(segmentId, lbl, clusterId=label2cluster[lbl])
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
