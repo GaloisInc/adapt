@@ -714,6 +714,15 @@ makeVertexLabel('Activity')
 
 * An activity template identifier (that is, the name of a grammar leaf) that the activity instance matches (*prov-tc:activityID*). Unsigned 16b integer.
 
+ActivityCluster (not in CDM)
+-------
+An activity cluster is a structure comprised of activities.
+
+[schema]: #
+makeVertexLabel('ActivityCluster')
+
+* An activity cluster template identifier (that is, the id of an acitivity cluster) that the activity cluster instance matches (*prov-tc:activityClusterID*). Unsigned 16b integer.
+
 Phase (not in CDM)
 -----
 A phase is a structure comprised of activity instances. Phases strictly correspond to internal nodes in our APT grammar. Required:
@@ -1190,3 +1199,10 @@ This relationship connects an Activity instance to a Segment node. No attributes
 
 [schema]: #
 makeEdgeLabel('segment:activity').multiplicity(SIMPLE)
+
+activity:cluster (not in CDM)
+-----------
+This relationship connects an Activity instance to a ActivityCluster node. No attributes.
+
+[schema]: #
+makeEdgeLabel('activity:cluster').multiplicity(SIMPLE)

@@ -292,6 +292,10 @@ var starting_queries = [
         name : "find APTs labeled by DX",
         base_query : "g.V().has(label,'APT')",
         default_values : []
+    },
+    {
+        name : "find clusters of activities",
+        base_query : "g.V().has(label,'ActivityCluster')",
+        default_values : []
     }
-
 ]
