@@ -91,8 +91,17 @@ class TopLevelClassifier(object):
         classification = self.activityClassifier.classifyNew()
 
         self.producer.send("ac-log", b'** Adding Activities to DB. **')
+
+        #get distinct labels
+        labels = Set([ ('activity' + str(label)) for (_,label) in classification ])
+        label2cluster = {}
+        for label in labels:
+            cluster = provenanceGraph.createActivityCluster(label)
+            label2cluster[label] = cluster['id']
+
         for segmentId, label in classification:
-            activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            activity = provenanceGraph.createActivity(segmentId, 'activity' + str(label),
+                                clusterId=segmentId=label2cluster['activity' + str(label)])
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],

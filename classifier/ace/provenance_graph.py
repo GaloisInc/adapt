@@ -34,13 +34,30 @@ class ProvenanceGraph(object):
     def close(self):
         self.titanClient.close()
 
-    def createActivity(self, segmentId, name, suspicionScore = 0):
-        query  = ("segmentNode = g.V({}).next();"
-                  "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
-                  "edge = segmentNode.addEdge('segment:activity', activityNode);"
-                  "activityNode").format(segmentId, name, suspicionScore)
+    def createActivity(self, segmentId, name, suspicionScore = 0, clusterId = None):
+        if not clusterId:
+            query  = ("segmentNode = g.V({}).next();"
+                      "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
+                      "edge = segmentNode.addEdge('segment:activity', activityNode);"
+                      "activityNode").format(segmentId, name, suspicionScore)
+        else:
+            query  = ("segmentNode = g.V({}).next();"
+                      "activityNode = graph.addVertex(label, 'Activity', 'activity:type', '{}', 'activity:suspicionScore', {});"
+                      "clusterNode = g.V({}).next();"
+                      "clusteredge = activityNode.addEdge('activity:cluster', clusterNode);"
+                      "edge = segmentNode.addEdge('segment:activity', activityNode);"
+                      "activityNode").format(segmentId, name, suspicionScore, clusterId)
 
         log.info('Creating Activity query: %s', query)
+
+        node = self.titanClient.execute(query)
+        return node[0]
+
+    def createActivityCluster(self, clusterName):
+        query  = ("activityClusterNode = graph.addVertex(label, 'ActivityCluster', 'cluster:type', '{}');"
+                  "activityClusterNode").format(clusterName)
+
+        log.info('Creating Activity Cluster query: %s', query)
 
         node = self.titanClient.execute(query)
         return node[0]
