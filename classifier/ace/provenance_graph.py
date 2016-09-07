@@ -21,6 +21,7 @@ log.setLevel(logging.INFO)
 class ProvenanceGraph(object):
     def __init__(self):
         self.titanClient = TitanDatabase()
+        self.is_closed = False
 
     def __enter__(self):
         return self
@@ -29,10 +30,13 @@ class ProvenanceGraph(object):
         self.close()
 
     def __del__(self):
-        self.close()
+        if not self.is_closed:
+            self.close()
 
     def close(self):
-        self.titanClient.close()
+        if not self.is_closed:
+            self.titanClient.close()
+            self.is_closed = True
 
     def createActivity(self, segmentId, name, suspicionScore = 0, clusterId = None):
         if not clusterId:
@@ -71,6 +75,9 @@ class ProvenanceGraph(object):
         node = self.titanClient.execute(query)
 
     def deleteActivities(self):
+        query = "g.V().has(label, 'ActivityCluster').drop().iterate()"
+        result = self.titanClient.execute(query)
+
         query = "g.V().has(label, 'Activity').drop().iterate()"
         # Removing a vertex removes all its incident edges as well.
         result = self.titanClient.execute(query)
