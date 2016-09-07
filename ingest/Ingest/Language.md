@@ -1111,6 +1111,13 @@ This property specifies the string type of an Activity instance, which shall app
 [schema]: #
 makePropertyKey('activity:type').dataType(String.class).cardinality(Cardinality.SINGLE)
 
+cluster:type (not in CDM)
+-----------
+This property specifies the string type of an ActivityCluster instance.
+
+[schema]: #
+makePropertyKey('cluster:type').dataType(String.class).cardinality(Cardinality.SINGLE)
+
 activity:markerType (not in CDM)
 -----------
 This property specifies the integer marker type of a marker begin / end Activity instance.
