@@ -20,9 +20,9 @@ class ViewStats:
         self.scores_file_path  = run_time_dir + '/scores/'   + self.view_type + '.csv'
         self.score_range_min = -1
         self.score_range_max = -1
-        self.score_mean = 'NYI'
-        self.score_stdev = 'NYI'
-        self.score_var = 'NYI'
+        self.score_mean = '?'
+        self.score_stdev = '?'
+        self.score_variance = '?'
         self.scores = []
         self.histogram_for_scores = {}
 
@@ -123,7 +123,7 @@ class ViewStats:
         INFO+="\n"
         INFO+="Anomaly score:\n"
         INFO+="min\tmax\tmean\tstd\tvar\n"
-        INFO+="{0}\t{1}\t{2}\t{3}\t{4}\n\n".format(self.score_range_min, self.score_range_max,self.score_mean, self.score_stdev, self.score_var)
+        INFO+="{0}\t{1}\t{2}\t{3}\t{4}\n\n".format(self.score_range_min, self.score_range_max,self.score_mean, self.score_stdev, self.score_variance)
         INFO+="\n" 
         histogram_ranges              = derive_histogram_ranges(self.histogram_for_scores)
         histogram_range_string_widths = get_range_widths(histogram_ranges)
@@ -172,6 +172,9 @@ class ViewStats:
             if (score_as_float > self.score_range_max):
                 self.score_range_max = score_as_float
 
+    #
+    # score functions
+    #
     def compute_score_mean(self):
         if (not(bool(self.scores))):
             self.load_scores()
@@ -182,7 +185,33 @@ class ViewStats:
             mean = statistics.mean(self.scores)
             self.score_mean = "{0:.2f}".format(mean)
                 
-                
+    def compute_score_variance(self):
+        if (not(bool(self.scores))):
+            self.load_scores()
+        
+        if len(self.scores) == 0:
+            self.score_variance = 'noData'
+        elif len(self.scores) == 1:
+            self.score_variance = '0.00'
+        else:
+            variance = statistics.variance(self.scores)
+            self.score_variance = "{0:.2f}".format(variance)
+            
+    def compute_score_stdev(self):
+        if (not(bool(self.scores))):
+            self.load_scores()
+            
+        if len(self.scores) == 0:
+            self.score_stdev = 'noData'
+        elif len(self.scores) == 1:
+            self.score_stdev = '0.00'
+        else:
+            stdev = statistics.stdev(self.scores)
+            self.score_stdev = "{0:.2f}".format(stdev)
+      
+    #
+    # feature functions
+    #      
     def compute_feature_means(self):
         #print('computing means...')
         if (not(bool(self.value_list_for_features))):

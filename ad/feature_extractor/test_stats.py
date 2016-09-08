@@ -1,4 +1,4 @@
-import unittest, view_stats, os
+import unittest, view_stats, os, statistics
 
 class TestStats(unittest.TestCase):
     def setUp(self):
@@ -54,7 +54,114 @@ class TestStats(unittest.TestCase):
         stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_score_mean()
         self.assertEqual('noData', stats.score_mean)
-     
+    #
+    # score variance
+    #
+    def test_score_variance(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("002,1,0,10,0.7")
+        lines.append("003,1,0,11,0.5")
+        lines.append("")  # ensure handle empty lines
+        lines.append("004,1,0,9,0.3")
+        lines.append("005,1,0,9,0.1")
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_variance()
+        self.assertEqual('0.10', stats.score_variance)
+        
+    def test_score_variance_single_node(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("")  # ensure handle empty lines
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_variance()
+        self.assertEqual('0.00', stats.score_variance)
+        
+        
+    def test_score_variance_same_score_nodes(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("002,0,0,6,0.9")
+        lines.append("")  # ensure handle empty lines
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_variance()
+        self.assertEqual('0.00', stats.score_variance)
+        
+    def test_score_variance_zero_node(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_variance()
+        self.assertEqual('noData', stats.score_variance)
+        
+    def test_score_variance_empty_file(self):
+        lines = []
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_variance()
+        self.assertEqual('noData', stats.score_variance)    
+        
+    #
+    # score stddev
+    #
+    def test_score_stdev(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("002,1,0,10,0.7")
+        lines.append("003,1,0,11,0.5")
+        lines.append("")  # ensure handle empty lines
+        lines.append("004,1,0,9,0.3")
+        lines.append("005,1,0,9,0.1")
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        #import pdb; pdb.set_trace()
+        stats.compute_score_stdev()
+        self.assertEqual('0.32', stats.score_stdev)
+        
+    def test_score_stdev_single_node(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("")  # ensure handle empty lines
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_stdev()
+        self.assertEqual('0.00', stats.score_stdev)
+        
+        
+    def test_score_stdev_same_score_nodes(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("002,0,0,6,0.9")
+        lines.append("")  # ensure handle empty lines
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_stdev()
+        self.assertEqual('0.00', stats.score_stdev)
+        
+    def test_score_stdev_zero_node(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_stdev()
+        self.assertEqual('noData', stats.score_stdev)
+        
+    def test_score_stdev_empty_file(self):
+        lines = []
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_stdev()
+        self.assertEqual('noData', stats.score_stdev)     
     #
     # score range
     #   
