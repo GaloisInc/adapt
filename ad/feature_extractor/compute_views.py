@@ -213,11 +213,7 @@ if __name__ == '__main__':
                     ad_output_root = os.getcwd()
                     vstats = view_stats.ViewStats(view_type,ad_output_root)
                     view.attach_scores_to_db(vstats)
-                    vstats.compute_feature_means()
-                    vstats.compute_feature_variances()
-                    vstats.compute_feature_stdevs()
-                    vstats.compute_feature_histograms()
-                    vstats.set_score_range()
+                    vstats.compute_all_stats()
                     producer.send("ad-log", bytes(vstats.get_stats_info()))
                     log.info(vstats.get_stats_info(), encoding='utf-8')
                 except:

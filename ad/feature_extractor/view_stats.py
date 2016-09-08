@@ -23,6 +23,13 @@ class ViewStats:
         self.value_list_for_scores = {}
         self.histogram_for_scores = {}
 
+    def compute_all_stats():
+        self.compute_feature_means()
+        self.compute_feature_variances()
+        self.compute_feature_stdevs()
+        self.compute_feature_histograms()
+        self.set_score_range()
+        
     def nonblank_lines(self,lines):
         nonblanks = []
         for l in lines:
