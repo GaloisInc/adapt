@@ -3,12 +3,11 @@ import sys, csv, math, statistics, numpy
 class ViewStats:
     def __init__(self, vt, run_time_dir):
         self.view_type = vt
-        self.feature_file_path = run_time_dir + '/features/' + self.view_type + '.csv'
-        self.scores_file_path  = run_time_dir + '/scores/'   + self.view_type + '.csv'
+        #view issues
         self.number_nodes = 0
         self.number_nodes_attached = 0
-        self.score_range_min = -1
-        self.score_range_max = -1
+        #feature issues
+        self.feature_file_path = run_time_dir + '/features/' + self.view_type + '.csv'
         self.value_list_for_features = {}
         self.histograms_for_features = {}
         self.features = []
@@ -17,10 +16,14 @@ class ViewStats:
         self.feature_means = {}
         self.feature_stdevs = {}
         self.feature_variances = {}
+        #score issues
+        self.scores_file_path  = run_time_dir + '/scores/'   + self.view_type + '.csv'
+        self.score_range_min = -1
+        self.score_range_max = -1
         self.score_mean = 'NYI'
         self.score_stdev = 'NYI'
         self.score_var = 'NYI'
-        self.value_list_for_scores = {}
+        self.scores = []
         self.histogram_for_scores = {}
 
     def compute_all_stats():
@@ -29,6 +32,7 @@ class ViewStats:
         self.compute_feature_stdevs()
         self.compute_feature_histograms()
         self.set_score_range()
+        self.compute_score_mean()
         
     def nonblank_lines(self,lines):
         nonblanks = []
@@ -67,8 +71,17 @@ class ViewStats:
                 self.score_range_min = "{0:.2f}".format(self.score_range_min)
                 self.score_range_max = "{0:.2f}".format(self.score_range_max)
                 #print('range of scores {0} - {1}'.format(self.score_range_min, self.score_range_max))
+     
+    def load_scores(self):
+        with open(self.scores_file_path, 'r') as csvfile:
+            self.scores = []
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                score = float(row['anomaly_score'])
+                self.scores.append(score)
+            self.scores.sort()
 
-    def set_value_list_for_features(self):
+    def load_features(self):
         #print('setting value list for features...')
         with open(self.feature_file_path, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
@@ -159,10 +172,21 @@ class ViewStats:
             if (score_as_float > self.score_range_max):
                 self.score_range_max = score_as_float
 
+    def compute_score_mean(self):
+        if (not(bool(self.scores))):
+            self.load_scores()
+        
+        if len(self.scores) == 0:
+            self.score_mean = 'noData'
+        else:
+            mean = statistics.mean(self.scores)
+            self.score_mean = "{0:.2f}".format(mean)
+                
+                
     def compute_feature_means(self):
         #print('computing means...')
         if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
+            self.load_features()
         
         for feature in self.features:
             values = self.value_list_for_features[feature]
@@ -175,7 +199,7 @@ class ViewStats:
             
     def compute_feature_variances(self):
         if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
+            self.load_features()
         
         for feature in self.features:
             values = self.value_list_for_features[feature]
@@ -191,7 +215,7 @@ class ViewStats:
     def compute_feature_stdevs(self):
         #print('computing standard deviation')
         if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
+            self.load_features()
         
         for feature in self.features:
             values = self.value_list_for_features[feature]
@@ -207,7 +231,7 @@ class ViewStats:
     def compute_feature_histograms(self):
         #print('computing feature histograms')
         if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
+            self.load_features()
         
         for feature in self.features:
             values = self.value_list_for_features[feature]
