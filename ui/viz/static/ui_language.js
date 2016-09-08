@@ -151,6 +151,11 @@ var predicates = [
         is_relevant : function(n) {return n.label === "ActivityCluster"},
         floating_query : ".in('activity:cluster')",
     }, {
+        name : "Get Activity Cluster",
+        is_relevant : function(n) {return n.label === "Activity"},
+        floating_query : ".out('activity:cluster')",
+     },
+     {
         name : "Segment Low-level Events",
         is_relevant : function(n) {return n.label === "Segment"},
         floating_query : ".out('segment:includes')",
