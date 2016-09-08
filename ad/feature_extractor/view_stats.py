@@ -43,34 +43,7 @@ class ViewStats:
                 nonblanks.append(l)
         return nonblanks
                 
-    def set_score_range(self):
-        #print('setting score range...')
-        with open(self.scores_file_path, 'r') as csvfile:
-            lines = csvfile.readlines()
-            lines = self.nonblank_lines(lines)
-            if len(lines) == 2:
-                parts = lines[1].split(',') #line[0] is header
-                only_score = parts[len(parts) - 1]
-                self.score_range_min = "{0:.2f}".format(float(only_score))
-                self.score_range_max = self.score_range_min
-            elif len(lines) < 2:
-                # no data present
-                self.score_range_min = "noData"
-                self.score_range_max = "noData"
-            else:
-                i = 0;
-                for line in lines:
-                    if i == 0:
-                        pass
-                        #print('skipping header {0}'.format(line))
-                    else:
-                        parts = line.split(',')
-                        score = parts[len(parts) - 1]
-                        self.note_anomaly_score(score)
-                    i = i + 1
-                self.score_range_min = "{0:.2f}".format(self.score_range_min)
-                self.score_range_max = "{0:.2f}".format(self.score_range_max)
-                #print('range of scores {0} - {1}'.format(self.score_range_min, self.score_range_max))
+
      
     def load_scores(self):
         with open(self.scores_file_path, 'r') as csvfile:
@@ -159,6 +132,11 @@ class ViewStats:
         INFO+="\n"
         return INFO
                   
+
+
+    #
+    # score functions
+    #
     def note_anomaly_score(self, score):
         score_as_float = float(score)
         if (self.score_range_min == -1):
@@ -171,10 +149,24 @@ class ViewStats:
         else:
             if (score_as_float > self.score_range_max):
                 self.score_range_max = score_as_float
-
-    #
-    # score functions
-    #
+                
+    def set_score_range(self):
+        if (not(bool(self.scores))):
+            self.load_scores()
+        
+        if len(self.scores) == 0:
+            # no data present
+            self.score_range_min = "noData"
+            self.score_range_max = "noData"
+        elif len(self.scores) == 1:        
+            self.score_range_min = "{0:.2f}".format(float(self.scores[0]))
+            self.score_range_max = self.score_range_min
+        else:
+            for score in self.scores:
+                self.note_anomaly_score(score) 
+            self.score_range_min = "{0:.2f}".format(self.score_range_min)
+            self.score_range_max = "{0:.2f}".format(self.score_range_max)
+                
     def compute_score_mean(self):
         if (not(bool(self.scores))):
             self.load_scores()
