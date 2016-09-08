@@ -1,4 +1,4 @@
-import unittest, view_stats, os, statistics
+import unittest, view_stats, os, statistics, numpy
 
 class TestStats(unittest.TestCase):
     def setUp(self):
@@ -13,6 +13,32 @@ class TestStats(unittest.TestCase):
         for line in lines:
             f.write("{0}\n".format(line))
         f.close()
+    #
+    #  histogram for scores
+    #
+    def test_score_histogram(self):
+        lines = []
+        lines.append("id,f1,f2,f3,anomaly_score")
+        lines.append("001,1,0,12,0.9")
+        lines.append("002,1,0,10,0.7")
+        lines.append("003,1,0,11,0.5")
+        #lines.append("")  # ensure handle empty lines
+        lines.append("004,1,0,9,0.3")
+        lines.append("005,1,0,9,0.1")
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_score_histogram()
+        #print("\nscore histogram : {0}".format(stats.histogram_for_scores))
+        #print("\ncounts {0}".format(stats.histogram_for_scores[0]))
+        #print("\nranges {0}".format(stats.histogram_for_scores[1]))
+        counts = [2,0,2,1]
+        ranges = [0.1, 0.3, 0.5, 0.7, 0.9]
+        self.assertTrue(len(stats.histogram_for_scores[0]) > 0)
+        self.assertTrue(len(stats.histogram_for_scores[1]) > 0)
+        #d = [1,3,5,7,9]
+        #print("hist for {0} is {1}\n\n".format(d, numpy.histogram(d,'auto', None, False, None, None)))
+        #d = [0.1,0.3,0.5,0.7,0.9]
+        #print("hist for {0} is {1}\n\n".format(d, numpy.histogram(d,'auto', None, False, None, None)))
     #
     # mean score
     #

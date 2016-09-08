@@ -33,6 +33,9 @@ class ViewStats:
         self.compute_feature_histograms()
         self.set_score_range()
         self.compute_score_mean()
+        self.compute_score_variance()
+        self.compute_score_stdev()
+        self.compute_score_histogram()
         
     def nonblank_lines(self,lines):
         nonblanks = []
@@ -200,7 +203,13 @@ class ViewStats:
         else:
             stdev = statistics.stdev(self.scores)
             self.score_stdev = "{0:.2f}".format(stdev)
-      
+    
+    def compute_score_histogram(self):
+        if (not(bool(self.value_list_for_features))):
+            self.load_scores()
+        
+        histogram = numpy.histogram(self.scores,'auto', None, False, None, None)
+        self.histogram_for_scores = histogram  
     #
     # feature functions
     #      
