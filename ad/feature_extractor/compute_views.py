@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import sys, os, csv, json, math, logging, kafka, statistics, numpy
+import sys, os, csv, json, math, logging, kafka, view_stats
 sys.path.append(os.path.expanduser('~/adapt/tools'))
 import gremlin_query
 
@@ -194,123 +194,6 @@ class AnomalyView:
             log.info('Anomaly score attachment done for view ' + self.view_type)
 
 
-class ViewStats:
-    def __init__(self, vt, run_time_dir):
-        self.view_type = vt
-        self.feature_file_path = run_time_dir + '/features/' + self.view_type + '.csv'
-        self.scores_file_path  = run_time_dir + '/scores/'   + self.view_type + '.csv'
-        self.number_nodes = 0
-        self.number_nodes_attached = 0
-        self.score_range_min = -1
-        self.score_range_max = -1
-        self.value_list_for_features = {}
-        self.histograms_for_features = {}
-        self.features = []
-        self.feature_means = {}
-        self.feature_stdevs = {}
-
-    def set_score_range(self):
-        #print('setting score range...')
-        with open(self.scores_file_path, 'r') as csvfile:
-            lines = csvfile.readlines()
-            i = 0;
-            for line in lines:
-                if i == 0:
-                    pass
-                    #print('skipping header {0}'.format(line))
-                else:
-                    parts = line.split(',')
-                    score = parts[len(parts) - 1]
-                    self.note_anomaly_score(score)
-                i = i + 1
-            #print('range of scores {0} - {1}'.format(self.score_range_min, self.score_range_max))
-
-    def set_value_list_for_features(self):
-        #print('setting value list for features...')
-        with open(self.feature_file_path, 'r') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                features = row.keys()
-                #print(features)
-                #print(row)
-                for feature in features:
-                    if feature != 'id':
-                        if not(feature in self.value_list_for_features):
-                            self.value_list_for_features[feature] = []
-                        list_for_feature = self.value_list_for_features[feature]
-                        list_for_feature.append(float(row[feature]))
-            self.features = list(self.value_list_for_features.keys())
-            self.features.sort()
-            #print('values for features {0}'.format(self.value_list_for_features))
-            
-    def get_stats_info(self):
-        INFO="###########################################\nstatistics for view "+self.view_type+'\n'
-        INFO+="###########################################\n"
-        INFO+="# nodes         " + "{0}".format(self.number_nodes) + '\n'
-        INFO+="# nodes attached" + "{0}".format(self.number_nodes_attached) + '\n'
-        INFO+="features: " 
-        #INFO+=', '.join(self.features) + '\n'
-        for f in self.features:
-            INFO+="\n\t" + f + "\tmean " + "{0:.2f}".format(self.feature_means[f]) + "\tstdev " + "{0:.2f}".format(self.feature_stdevs[f])
-        INFO+="\n\nFEATURE HISTOGRAMS"
-        for f in self.features:
-            INFO+="\n\t" + f + "\t:  " + "{0}".format(self.histograms_for_features[f])
-        INFO+="\n\nscore range - min {0} , max {1}\n".format(self.score_range_min, self.score_range_max)
-        INFO+="\n"
-        return INFO
-                  
-    def note_anomaly_score(self, score):
-        score_as_float = float(score)
-        if (self.score_range_min == -1):
-            self.score_range_min = score_as_float
-        else:
-            if (score_as_float < self.score_range_min):
-                self.score_range_min = score_as_float
-        if (self.score_range_max == -1):
-            self.score_range_max = score_as_float
-        else:
-            if (score_as_float > self.score_range_max):
-                self.score_range_max = score_as_float
-
-    def compute_feature_means(self):
-        #print('computing means...')
-        if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
-        
-        for feature in self.features:
-            values = self.value_list_for_features[feature]
-            mean = statistics.mean(values)
-            self.feature_means[feature] = mean
-        
-    def compute_feature_stdevs(self):
-        #print('computing standard deviation')
-        if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
-        
-        for feature in self.features:
-            values = self.value_list_for_features[feature]
-            stdev = statistics.stdev(values)
-            self.feature_stdevs[feature] = stdev
-        
-    def compute_feature_histograms(self):
-        #print('computing feature histograms')
-        if (not(bool(self.value_list_for_features))):
-            self.set_value_list_for_features()
-        
-        for feature in self.features:
-            values = self.value_list_for_features[feature]
-            histogram = numpy.histogram(values,'auto', None, False, None, None)
-            self.histograms_for_features[feature] = histogram
-
-'''
-if __name__ == '__main__':
-    view_stats = ViewStats('statsTest','/home/vagrant/adapt/ad/test')
-    view_stats.compute_feature_means()
-    view_stats.compute_feature_stdevs()
-    view_stats.compute_feature_histograms()
-    view_stats.set_score_range()
-    print(view_stats.get_stats_info())
-'''
 
 if __name__ == '__main__':
     in_json = sys.argv[1]
@@ -328,14 +211,15 @@ if __name__ == '__main__':
                 try:
                     view.compute_anomaly_score()
                     ad_output_root = os.getcwd()
-                    view_stats = ViewStats(view_type,ad_output_root)
-                    view.attach_scores_to_db(view_stats)
-                    view_stats.compute_feature_means()
-                    view_stats.compute_feature_stdevs()
-                    view_stats.compute_feature_histograms()
-                    view_stats.set_score_range()
-                    producer.send("ad-log", bytes(view_stats.get_stats_info()))
-                    log.info(view_stats.get_stats_info(), encoding='utf-8')
+                    vstats = view_stats.ViewStats(view_type,ad_output_root)
+                    view.attach_scores_to_db(vstats)
+                    vstats.compute_feature_means()
+                    vstats.compute_feature_variances()
+                    vstats.compute_feature_stdevs()
+                    vstats.compute_feature_histograms()
+                    vstats.set_score_range()
+                    producer.send("ad-log", bytes(vstats.get_stats_info()))
+                    log.info(vstats.get_stats_info(), encoding='utf-8')
                 except:
                     producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
                     log.exception("error working with view {0} prevents statistics generation.".format(view_type))
