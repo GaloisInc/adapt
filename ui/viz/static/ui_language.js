@@ -4,6 +4,10 @@ var starting_queries = [
         base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_}).dedup()",
         default_values : ["file:///tmp/zqxf1",1]
     }, {
+        name : "find file by partial name",
+        base_query : "g.V().has(label,'Entity-File').has('url',new P(REGEX, "(?i).*{_}.*")).has('file-version',{_}).dedup()",
+        default_values : ["file:///tmp/zqxf1",1]
+    }, {
         name : "find anomalous processes",
         base_query : "g.V().has(label,'Subject').has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
         default_values : [10]
