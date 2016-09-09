@@ -3,6 +3,7 @@ import unittest, view_stats, os, statistics, numpy
 class TestStats(unittest.TestCase):
     def setUp(self):
         self.score_file_path = "/home/vagrant/adapt/ad/test/scores/unittest.csv"
+        self.feature_file_path = "/home/vagrant/adapt/ad/test/features/unittest.csv"
         self.view_name = "unittest"
         self.root = "/home/vagrant/adapt/ad/test"
     
@@ -22,7 +23,7 @@ class TestStats(unittest.TestCase):
         lines.append("001,1,0,12,0.9")
         lines.append("002,1,0,10,0.7")
         lines.append("003,1,0,11,0.5")
-        #lines.append("")  # ensure handle empty lines
+        lines.append("")  # ensure handle empty lines
         lines.append("004,1,0,9,0.3")
         lines.append("005,1,0,9,0.1")
         self.create_file(self.score_file_path, lines)
@@ -208,7 +209,58 @@ class TestStats(unittest.TestCase):
         stats.set_score_range()
         self.assertEqual('noData', stats.score_range_min)
         self.assertEqual('noData', stats.score_range_max)
+    #
+    # feature ranges
+    #
+    def test_compute_feature_ranges(self):
+        flines = []
+        flines.append("id,f1,f2,f3")
+        flines.append("001,6,2,12")
+        flines.append("002,5,2,10")
+        flines.append("003,4,2,11")
+        flines.append("004,3,2,9")
+        flines.append("005,2,2,9")
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_feature_ranges()
+        self.assertEqual('2', stats.feature_mins['f1'])
+        self.assertEqual('2', stats.feature_mins['f2'])
+        self.assertEqual('9', stats.feature_mins['f3'])
+        self.assertEqual('6', stats.feature_maxs['f1'])
+        self.assertEqual('2', stats.feature_maxs['f2'])
+        self.assertEqual('12', stats.feature_maxs['f3'])
         
+
+    def test_compute_feature_ranges_single_node(self):
+        flines = []
+        flines.append("id,f1,f2,f3")
+        flines.append("001,6,2,12")
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_feature_ranges()
+        self.assertEqual('6', stats.feature_mins['f1'])
+        self.assertEqual('2', stats.feature_mins['f2'])
+        self.assertEqual('12', stats.feature_mins['f3'])
+        self.assertEqual('6', stats.feature_maxs['f1'])
+        self.assertEqual('2', stats.feature_maxs['f2'])
+        self.assertEqual('12', stats.feature_maxs['f3'])
+        
+    '''  
+    # Don't support files that only have header because using reader = csv.DictReader(csvfile)
+    # won't have any rows to reference and the lookups will fail
+    def test_compute_feature_ranges_no_data(self):
+        flines = []
+        flines.append("id,f1,f2,f3")
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_feature_ranges()
+        self.assertEqual('noData', stats.feature_mins['f1'])
+        self.assertEqual('noData', stats.feature_mins['f2'])
+        self.assertEqual('noData', stats.feature_mins['f3'])
+        self.assertEqual('noData', stats.feature_maxs['f1'])
+        self.assertEqual('noData', stats.feature_maxs['f2'])
+        self.assertEqual('noData', stats.feature_maxs['f3'])
+    '''
     #
     # mean value for feature
     #
@@ -297,5 +349,173 @@ class TestStats(unittest.TestCase):
         stats.compute_feature_variances()
         self.assertEqual({}, stats.feature_variances)
         
+    # formatting helpers
+    def test_derive_histogram_ranges(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        
+        ranges = []
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("-noData-", range_strings[0])
+        self.assertEqual(1,len(range_strings))
+        
+        ranges = [0.1]
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("0.1 - 0.1", range_strings[0])
+        self.assertEqual(1,len(range_strings))
+        
+        ranges = [0.1, 0.3]
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("0.1 - 0.3", range_strings[0])
+        self.assertEqual(1,len(range_strings))
+        
+        ranges = [0.1, 0.3, 0.5]
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("0.1 - 0.3", range_strings[0])
+        self.assertEqual("0.3 - 0.5", range_strings[1])
+        self.assertEqual(2,len(range_strings))
+        
+        ranges = [0.1, 0.3, 0.5, 0.7]
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("0.1 - 0.3", range_strings[0])
+        self.assertEqual("0.3 - 0.5", range_strings[1])
+        self.assertEqual("0.5 - 0.7", range_strings[2])
+        self.assertEqual(3,len(range_strings))
+        
+        
+        ranges = [0.1, 0.3, 0.5, 0.7, 0.9]
+        range_strings = stats.derive_histogram_ranges(ranges)
+        self.assertEqual("0.1 - 0.3", range_strings[0])
+        self.assertEqual("0.3 - 0.5", range_strings[1])
+        self.assertEqual("0.5 - 0.7", range_strings[2])
+        self.assertEqual("0.7 - 0.9", range_strings[3])
+        self.assertEqual(4,len(range_strings))
+        
+    def test_get_range_widths(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        r = ["0.1-0.2", "0.2-0.33"]
+        w = stats.get_range_widths(r)
+        self.assertEqual(7, w[0])
+        self.assertEqual(8, w[1])
+        
+    def test_get_dash_bar(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        widths= [6]
+        db = stats.get_dash_bar(widths)
+        self.assertEqual("----------", db) # | xxxxxx |  (10 chars wide)
+        widths= [6,4]
+        db = stats.get_dash_bar(widths)
+        self.assertEqual("-----------------", db) # | xxxxxx | xxxx |  (17 chars wide)
+        widths= [6,4,2]
+        db = stats.get_dash_bar(widths)
+        self.assertEqual("----------------------",db) # | xxxxxx | xxxx | xx |  (22 chars wide)
+    
+    def test_get_range_header(self):
+        stats = view_stats.ViewStats('foo','/somepath')   
+        r = ["0.1-0.2"]
+        h = stats.get_range_header(r)
+        self.assertEqual("| 0.1-0.2 |",h)
+        r = ["0.1-0.2", "0.2-0.33"]
+        h = stats.get_range_header(r)
+        self.assertEqual("| 0.1-0.2 | 0.2-0.33 |",h)
+        
+    def test_round_the_bounds(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        self.assertEqual(['0.00'],stats.round_the_bounds([0]))
+        
+    def test_get_histogram_values_string(self):
+        stats = view_stats.ViewStats('foo','/somepath') 
+        range_widths = [7]
+        values = [5]
+        #import pdb; pdb.set_trace()
+        s = stats.get_histogram_values_string(values,range_widths)
+        self.assertEqual("|       5 |",s)
+        
+        range_widths = [7, 7]
+        values = [5,7]
+        s = stats.get_histogram_values_string(values,range_widths)
+        self.assertEqual("|       5 |       7 |",s)
+        
+        range_widths = [7, 7]
+        values = [5555555,7]
+        s = stats.get_histogram_values_string(values,range_widths)
+        self.assertEqual("| 5555555 |       7 |",s)
+        
+        range_widths = [7, 7]
+        values = [55555555,7]
+        s = stats.get_histogram_values_string(values,range_widths)
+        self.assertEqual("| 55555555|       7 |",s)
+        
+        range_widths = [7, 11]
+        values = [55555555,7]
+        s = stats.get_histogram_values_string(values,range_widths)
+        self.assertEqual("| 55555555|           7 |",s)
+    
+    '''    
+    def test_full_format(self):
+        slines = []
+        slines.append("id,f1,f2,f3,anomaly_score")
+        slines.append("001,6,2,12,0.9")
+        slines.append("002,5,2,10,0.7")
+        slines.append("003,4,2,11,0.5")
+        slines.append("004,3,2,9,0.3")
+        slines.append("005,2,2,9,0.1")
+        flines = []
+        flines.append("id,f1,f2,f3")
+        flines.append("001,6,2,12")
+        flines.append("002,5,2,10")
+        flines.append("003,4,2,11")
+        flines.append("004,3,2,9")
+        flines.append("005,2,2,9")
+        self.create_file(self.score_file_path, slines)
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_all_stats()
+        print("{0}\n".format(stats.get_stats_info_formatted()))
+    '''   
+    def test_full_format2(self):
+        slines = []
+        slines.append("id,feature1,feature2,feature3,anomaly_score")
+        slines.append("001,6,2,12,0.1")
+        slines.append("002,5,2,10,0.2")
+        slines.append("003,4,2,11,0.3")
+        slines.append("004,3,2,9,0.4")
+        slines.append("005,2,2,9,0.5")
+        slines.append("006,2,2,9,0.6")
+        slines.append("007,2,2,9,0.7")
+        slines.append("008,2,2,9,0.8")
+        slines.append("009,2,2,9,0.9")
+        slines.append("010,2,2,9,0.1")
+        slines.append("011,2,2,9,0.2")
+        slines.append("012,2,2,9,0.3")
+        flines = []
+        flines.append("id,feature1,feature2,feature3")
+        flines.append("001,6,2,12")
+        flines.append("002,5,2,10")
+        flines.append("003,4,2,11")
+        flines.append("004,3,2,9")
+        flines.append("005,2,2,9")
+        flines.append("006,2,2,9")
+        flines.append("007,2,2,9")
+        flines.append("008,2,2,9")
+        flines.append("009,2,2,9")
+        flines.append("010,2,2,9")
+        flines.append("011,2,2,9")
+        flines.append("012,2,2,9")
+        self.create_file(self.score_file_path, slines)
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_all_stats()
+        print("{0}\n".format(stats.get_stats_info_formatted()))
+        
+    def test_get_proper_length_column(self):
+        stats = view_stats.ViewStats('foo','/somepath') 
+        c = stats.get_proper_length_column('Features', 6)
+        self.assertEqual('Features',c)
+        c = stats.get_proper_length_column('Features', 8)
+        self.assertEqual('Features',c)
+        c = stats.get_proper_length_column('Features', 9)
+        self.assertEqual('Features ',c)
+        c = stats.get_proper_length_column('Features', 10)
+        self.assertEqual('Features  ',c)
 if __name__ == '__main__':
     unittest.main()
