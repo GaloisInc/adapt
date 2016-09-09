@@ -173,7 +173,7 @@ class AnomalyView:
                             feature += ","
                         feature += k + ":" + str(row[k])
                 feature += "]"
-                feature += "Rnk:" + str(cnt+1) + "/" + str(total_nodes) + feature
+                feature = "Rnk:" + str(cnt+1) + "/" + str(total_nodes) + feature
                 QUERY += "f='{feat}';g.V(x).property(afeature,f).next();".format(feat=feature)
                 log.info("Adding anomaly scores to id " + row['id'] + " (" + self.view_type + ", " + row['anomaly_score'] + ")")
                 if float(row['anomaly_score']) > max_score:
@@ -214,8 +214,8 @@ if __name__ == '__main__':
                     vstats = view_stats.ViewStats(view_type,ad_output_root)
                     view.attach_scores_to_db(vstats)
                     vstats.compute_all_stats()
-                    producer.send("ad-log", bytes(vstats.get_stats_info()))
-                    log.info(vstats.get_stats_info(), encoding='utf-8')
+                    producer.send("ad-log", bytes(vstats.get_stats_info(), encoding='utf-8'))
+                    log.info(vstats.get_stats_info())
                 except:
                     producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
                     log.exception("error working with view {0} prevents statistics generation.".format(view_type))
