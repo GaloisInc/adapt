@@ -5,7 +5,7 @@ var starting_queries = [
         default_values : ["file:///tmp/zqxf1",1]
     }, {
         name : "find file by partial name",
-        base_query : "g.V().has(label,'Entity-File').has('url',new P(REGEX, "(?i).*{_}.*")).has('file-version',{_}).dedup()",
+        base_query : "g.V().has(label,'Entity-File').has('url',new P(REGEX,'.*{_}.*')).has('file-version',{_}).dedup()",
         default_values : ["file:///tmp/zqxf1",1]
     }, {
         name : "find anomalous processes",
