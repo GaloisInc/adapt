@@ -206,6 +206,22 @@ class ViewStats:
             histogram_values              = self.histograms_for_features[f][0]
             histogram_bounds              = self.histograms_for_features[f][1]
             histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
+            # choosing bin count per line ...
+            # there are 120 chars per line in the UI widget
+            # if the range has values between 1 and 9, then each bin has 14 chars
+            #    --------------
+            #    | 1.50 - 2.50 
+            #    --------------
+            # if the range has values between 10 and 99, then each bin has 16 chars
+            #    ----------------
+            #    | 11.50 - 12.50 
+            #    ----------------
+            # if the range has values between 100 and 999, then each bin has 18 chars
+            #    ------------------
+            #    | 111.50 - 112.50 
+            #    ------------------
+            # if we assume that 999 is the likely upper bound, then 18*6 == 108, but 18*7 == 126, which is too high
+            # so choosing 6
             bins_per_line                 = 6
             
             # break the bins into sub-sequences so they can fit on the line without wrapping
