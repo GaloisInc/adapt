@@ -241,7 +241,7 @@
                 "second":
                     "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             }
         }
     },
