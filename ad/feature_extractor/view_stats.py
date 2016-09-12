@@ -206,7 +206,7 @@ class ViewStats:
             histogram_values              = self.histograms_for_features[f][0]
             histogram_bounds              = self.histograms_for_features[f][1]
             histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
-            bins_per_line                 = 5
+            bins_per_line                 = 6
             
             # break the bins into sub-sequences so they can fit on the line without wrapping
             portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
