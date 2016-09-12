@@ -97,10 +97,10 @@ class ViewStats:
         if len(range_list) == 0:
             range_strings.append("-noData-")
         elif len(range_list) == 1:
-            range_strings.append("{0} - {0}".format(range_list[0]))
+            range_strings.append("{0:.2f} - {0:.2f}".format(float(range_list[0])))
         else:
             for i in range(len(range_list) - 1):
-                range_strings.append("{0} - {1}".format(range_list[i], range_list[i+1]))
+                range_strings.append("{0:.2f} - {1:.2f}".format(float(range_list[i]), float(range_list[i+1])))
         return range_strings
             
     def get_range_widths(self, histogram_ranges):
@@ -203,21 +203,48 @@ class ViewStats:
         for f in self.features:
             INFO+="\n"
             INFO+="{0}:\n".format(f)
-            histogram_ranges              = self.derive_histogram_ranges(self.histograms_for_features[f][1])
-            histogram_range_string_widths = self.get_range_widths(histogram_ranges)
-            histogram_dash_bar            = self.get_dash_bar(histogram_range_string_widths)
-            histogram_range_header        = self.get_range_header(histogram_ranges)
-            histogram_values_line         = self.get_histogram_values_string(self.histograms_for_features[f][0],histogram_range_string_widths)
-            INFO+="    {0}\n".format(histogram_dash_bar)
-            INFO+="    {0}\n".format(histogram_range_header)
-            INFO+="    {0}\n".format(histogram_dash_bar)
-            INFO+="    {0}\n".format(histogram_values_line)
-            INFO+="    {0}\n".format(histogram_dash_bar)
+            histogram_values              = self.histograms_for_features[f][0]
+            histogram_bounds              = self.histograms_for_features[f][1]
+            histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
+            bins_per_line                 = 5
+            
+            # break the bins into sub-sequences so they can fit on the line without wrapping
+            portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
+            range_portions = portion_info['range_portions']
+            value_portions = portion_info['value_portions']
+            
+            # print out as many bins as bins_per_row, then move to next line
+            for i in range(0,len(range_portions)):
+                histogram_range_portion = range_portions[i]
+                histogram_value_portion = value_portions[i]
+                range_string_widths           = self.get_range_widths(histogram_range_portion)
+                histogram_dash_bar            = self.get_dash_bar(range_string_widths)
+                histogram_range_header        = self.get_range_header(histogram_range_portion)
+                histogram_values_line         = self.get_histogram_values_string(histogram_value_portion,range_string_widths)
+                INFO+="    {0}\n".format(histogram_dash_bar)
+                INFO+="    {0}\n".format(histogram_range_header)
+                INFO+="    {0}\n".format(histogram_dash_bar)
+                INFO+="    {0}\n".format(histogram_values_line)
+                INFO+="    {0}\n".format(histogram_dash_bar)
+            INFO+="\n"
         INFO+="\n"
         return INFO
                   
-
-
+    def partition_histogram(self, histogram_ranges, histogram_values, bins_per_line):
+        h_range_portions = self.get_histogram_portions(histogram_ranges, bins_per_line)
+        h_value_portions = self.get_histogram_portions(histogram_values, bins_per_line)
+        return {'range_portions':h_range_portions, 'value_portions':h_value_portions}
+            
+    def get_histogram_portions(self,bin_item_list, bins_per_line):
+        result = []
+        for portion in self.sublist_generator(bin_item_list, bins_per_line):
+            result.append(portion)
+        return result
+            
+    def sublist_generator(self, l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]   
     #
     # score functions
     #

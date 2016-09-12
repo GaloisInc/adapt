@@ -360,34 +360,34 @@ class TestStats(unittest.TestCase):
         
         ranges = [0.1]
         range_strings = stats.derive_histogram_ranges(ranges)
-        self.assertEqual("0.1 - 0.1", range_strings[0])
+        self.assertEqual("0.10 - 0.10", range_strings[0])
         self.assertEqual(1,len(range_strings))
         
         ranges = [0.1, 0.3]
         range_strings = stats.derive_histogram_ranges(ranges)
-        self.assertEqual("0.1 - 0.3", range_strings[0])
+        self.assertEqual("0.10 - 0.30", range_strings[0])
         self.assertEqual(1,len(range_strings))
         
         ranges = [0.1, 0.3, 0.5]
         range_strings = stats.derive_histogram_ranges(ranges)
-        self.assertEqual("0.1 - 0.3", range_strings[0])
-        self.assertEqual("0.3 - 0.5", range_strings[1])
+        self.assertEqual("0.10 - 0.30", range_strings[0])
+        self.assertEqual("0.30 - 0.50", range_strings[1])
         self.assertEqual(2,len(range_strings))
         
         ranges = [0.1, 0.3, 0.5, 0.7]
         range_strings = stats.derive_histogram_ranges(ranges)
-        self.assertEqual("0.1 - 0.3", range_strings[0])
-        self.assertEqual("0.3 - 0.5", range_strings[1])
-        self.assertEqual("0.5 - 0.7", range_strings[2])
+        self.assertEqual("0.10 - 0.30", range_strings[0])
+        self.assertEqual("0.30 - 0.50", range_strings[1])
+        self.assertEqual("0.50 - 0.70", range_strings[2])
         self.assertEqual(3,len(range_strings))
         
         
         ranges = [0.1, 0.3, 0.5, 0.7, 0.9]
         range_strings = stats.derive_histogram_ranges(ranges)
-        self.assertEqual("0.1 - 0.3", range_strings[0])
-        self.assertEqual("0.3 - 0.5", range_strings[1])
-        self.assertEqual("0.5 - 0.7", range_strings[2])
-        self.assertEqual("0.7 - 0.9", range_strings[3])
+        self.assertEqual("0.10 - 0.30", range_strings[0])
+        self.assertEqual("0.30 - 0.50", range_strings[1])
+        self.assertEqual("0.50 - 0.70", range_strings[2])
+        self.assertEqual("0.70 - 0.90", range_strings[3])
         self.assertEqual(4,len(range_strings))
         
     def test_get_range_widths(self):
@@ -450,6 +450,110 @@ class TestStats(unittest.TestCase):
         s = stats.get_histogram_values_string(values,range_widths)
         self.assertEqual("| 55555555|           7 |",s)
     
+    def test_get_histogram_range_portions(self):
+        stats = view_stats.ViewStats('foo','/somepath') 
+        # case : 1 wide for 2 ranges
+        histogram_bins_per_output_line = 1
+        histogram_ranges = [ "1-2","2-3"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(2,len(range_fragments))
+        self.assertEqual(1,len(range_fragments[0]))
+        self.assertEqual(1,len(range_fragments[1]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[1][0])
+        
+        # case : 2 wide for 3 ranges
+        histogram_bins_per_output_line = 2
+        histogram_ranges = [ "1-2","2-3", "3-4"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(2,len(range_fragments))
+        self.assertEqual(2,len(range_fragments[0]))
+        self.assertEqual(1,len(range_fragments[1]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[1][0])
+        
+        # case : 2 wide for 4 ranges
+        histogram_bins_per_output_line = 2
+        histogram_ranges = [ "1-2","2-3", "3-4","4-5"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(2,len(range_fragments))
+        self.assertEqual(2,len(range_fragments[0]))
+        self.assertEqual(2,len(range_fragments[1]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[1][0])
+        self.assertEqual("4-5", range_fragments[1][1])
+        
+        # case : 2 wide for 5 ranges
+        histogram_bins_per_output_line = 2
+        histogram_ranges = [ "1-2","2-3", "3-4","4-5","5-6"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(3,len(range_fragments))
+        self.assertEqual(2,len(range_fragments[0]))
+        self.assertEqual(2,len(range_fragments[1]))
+        self.assertEqual(1,len(range_fragments[2]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[1][0])
+        self.assertEqual("4-5", range_fragments[1][1])
+        self.assertEqual("5-6", range_fragments[2][0])
+        
+        # case : 3 wide for 7 ranges
+        histogram_bins_per_output_line = 3
+        histogram_ranges = [ "1-2","2-3","3-4","4-5","5-6","6-7","7-8"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(3,len(range_fragments))
+        self.assertEqual(3,len(range_fragments[0]))
+        self.assertEqual(3,len(range_fragments[1]))
+        self.assertEqual(1,len(range_fragments[2]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[0][2])
+        self.assertEqual("4-5", range_fragments[1][0])
+        self.assertEqual("5-6", range_fragments[1][1])
+        self.assertEqual("6-7", range_fragments[1][2])
+        self.assertEqual("7-8", range_fragments[2][0])
+        
+        # case : 5 wide for 10 ranges
+        histogram_bins_per_output_line = 5
+        histogram_ranges = [ "1-2","2-3","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-11"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(2,len(range_fragments))
+        self.assertEqual(5,len(range_fragments[0]))
+        self.assertEqual(5,len(range_fragments[1]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[0][2])
+        self.assertEqual("4-5", range_fragments[0][3])
+        self.assertEqual("5-6", range_fragments[0][4])
+        self.assertEqual("6-7", range_fragments[1][0])
+        self.assertEqual("7-8", range_fragments[1][1])
+        self.assertEqual("8-9", range_fragments[1][2])
+        self.assertEqual("9-10", range_fragments[1][3])
+        self.assertEqual("10-11", range_fragments[1][4])
+        
+        # case : 5 wide for 11 ranges
+        histogram_bins_per_output_line = 5
+        histogram_ranges = [ "1-2","2-3","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-11","11-12"]
+        range_fragments = stats.get_histogram_portions(histogram_ranges, histogram_bins_per_output_line)
+        self.assertEqual(3,len(range_fragments))
+        self.assertEqual(5,len(range_fragments[0]))
+        self.assertEqual(5,len(range_fragments[1]))
+        self.assertEqual(1,len(range_fragments[2]))
+        self.assertEqual("1-2", range_fragments[0][0])
+        self.assertEqual("2-3", range_fragments[0][1])
+        self.assertEqual("3-4", range_fragments[0][2])
+        self.assertEqual("4-5", range_fragments[0][3])
+        self.assertEqual("5-6", range_fragments[0][4])
+        self.assertEqual("6-7", range_fragments[1][0])
+        self.assertEqual("7-8", range_fragments[1][1])
+        self.assertEqual("8-9", range_fragments[1][2])
+        self.assertEqual("9-10", range_fragments[1][3])
+        self.assertEqual("10-11", range_fragments[1][4])
+        self.assertEqual("11-12", range_fragments[2][0])
+        
+       
     '''    
     def test_full_format(self):
         slines = []
@@ -471,7 +575,8 @@ class TestStats(unittest.TestCase):
         stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_all_stats()
         print("{0}\n".format(stats.get_stats_info_formatted()))
-    '''   
+    '''  
+    
     def test_full_format2(self):
         slines = []
         slines.append("id,feature1,feature2,feature3,anomaly_score")
@@ -506,7 +611,7 @@ class TestStats(unittest.TestCase):
         stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_all_stats()
         print("{0}\n".format(stats.get_stats_info_formatted()))
-        
+      
     def test_get_proper_length_column(self):
         stats = view_stats.ViewStats('foo','/somepath') 
         c = stats.get_proper_length_column('Features', 6)
