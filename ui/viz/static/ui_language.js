@@ -1,11 +1,27 @@
 var starting_queries = [
     {
         name : "find file by name & version",
-        base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_})",
+        base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_}).dedup()",
         default_values : ["file:///tmp/zqxf1",1]
     }, {
+        name : "find file by partial name",
+        base_query : "g.V().has(label,'Entity-File').has('url',new P(REGEX,'.*{_}.*')).has('file-version',{_}).dedup()",
+        default_values : ["file:///tmp/zqxf1",1]
+    }, {
+        name : "find anomalous processes",
+        base_query : "g.V().has(label,'Subject').has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        default_values : [10]
+    }, {
+        name : "find anomalous netflows",
+        base_query : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        default_values : [10]
+    }, {
+        name : "find anomalous files",
+        base_query : "g.V().has('eventType',21).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        default_values : [10]
+    }, {
         name : "find process by pid",
-        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_})",
+        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_}).dedup()by('pid')",
         default_values : [1001]
     }, {
         name : "find up to n processes of an owner",
@@ -13,7 +29,7 @@ var starting_queries = [
         default_values : [1234,10]
     }, {
         name : "find NetFlow by dstAddress & port",
-        base_query : "g.V().has(label,'Entity_NetFlow').has('dstAddress','{_}').has('port',{_})",
+        base_query : "g.V().has(label,'Entity_NetFlow').has('dstAddress','{_}').has('port',{_}).dedup()",
         default_values : ["127.0.0.1",80]
     }, {
         name : "find APTs labeled by DX",
@@ -28,9 +44,23 @@ var node_appearance = [
         name : "Cluster",
         is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
         icon_unicode : "\uf413",
-        color : "red",  // setting color here will always override query-specific colors.
+       // color : "gray",  // setting color here will always override query-specific colors.
         size: 54
         // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
+    }, {
+        name : "AnomFile",
+        is_relevant : function(n) { return n.label === "Entity-File" && n['properties'].hasOwnProperty('anomalyScore') },
+        icon_unicode : "\uf41b",
+        size: 40,
+        color: "red",
+        make_node_label : function(node) {
+            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
+            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
+            var anom = anomtype + anomscore
+            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
+            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
+            return url + " ; " + file_version + " " + anom
+        }
     }, {
         name : "File",
         is_relevant : function(n) { return n.label === "Entity-File" },
@@ -47,9 +77,12 @@ var node_appearance = [
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
+            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
+            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
+            var anom = anomtype + anomscore
             var addr = (node['properties'].hasOwnProperty('address') ? node['properties']['address'][0]['value'] : "None")
             var size = (node['properties'].hasOwnProperty('properties') ? node['properties']['properties'][0]['value'] : "None")
-            return size + "@" + addr
+            return size + "@" + addr + " " + anom
         }
     }, {
         name : "Agent",
@@ -61,29 +94,70 @@ var node_appearance = [
             return at + " userID " + node['properties']['userID'][0]['value']
         }
     }, {
+        name : "AnomEntity-NetFlow",
+        is_relevant : function(n) { return n.label === "Entity-NetFlow" &&  n['properties'].hasOwnProperty('anomalyScore') },
+        icon_unicode : "\uf262",
+        color: "red",
+        make_node_label : function(node) {
+            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
+            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
+            var anom = anomtype + anomscore
+            var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
+            var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
+            return dest + " : " + port + " " + anom
+        }
+    }, {
         name : "Entity-NetFlow",
         is_relevant : function(n) { return n.label === "Entity-NetFlow" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
             var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
             var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-            return dest + " : " + port
+            return dest + " : " + port + " "
+        }
+    }, {
+        name : "AnomSubject",
+        is_relevant : function(n) { return n.label === "Subject" &&  n['properties'].hasOwnProperty('anomalyScore') },
+        icon_unicode : "\uf375",
+        color: "red",
+        make_node_label : function(node) {
+            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
+            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
+            var anom = anomtype + anomscore
+            var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+            var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
+            var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
+            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? new Date(node['properties']['startedAtTime'][0]['value']/1000).toGMTString() + " ." + node['properties']['startedAtTime'][0]['value']%1000 : "no timestamp")
+            switch(t) {
+                case "Process":
+                    return t + " " + pid + " \n " + timestamp + " " + anom
+                case "Thread":
+                    return t + " of " + pid + " \n " + timestamp + " " + anom
+                case "Event":
+                    if (e === "Write" || e === "Read") {
+                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
+                        return t + " " + e + " (" + temp + ") #" + seq
+                    } else { return t + " " + e + " #" + seq}
+                default:
+                    return t + " seq:" + seq + ", @" + timestamp + " " + anom
+            }
         }
     }, {
         name : "Subject",
         is_relevant : function(n) { return n.label === "Subject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-            var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+           var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
             var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
             var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
             var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
-            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? node['properties']['startedAtTime'][0]['value'] : "no timestamp")
+            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? new Date(node['properties']['startedAtTime'][0]['value']/1000).toGMTString() + " ." + node['properties']['startedAtTime'][0]['value']%1000 : "no timestamp")
             switch(t) {
                 case "Process":
-                    return t + " " + pid + " " + timestamp
+                    return t + " " + pid + " \n " + timestamp
                 case "Thread":
-                    return t + " of " + pid + " " + timestamp
+                    return t + " of " + pid + " \n " + timestamp
                 case "Event":
                     if (e === "Write" || e === "Read") {
                         var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
@@ -166,9 +240,14 @@ var predicates = [
         floating_query: ".in().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').in()",
         is_default : true
     }, {
+        name : "Agent's Segments",
+        is_relevant : function(n) { return n.label === "Agent"},
+        floating_query: ".in('segment:includes')",
+        is_default : true
+    }, {
         name : "File Lineage",
         is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".union(until(out().hasLabel('EDGE_OBJECT_PREV_VERSION').count().is(eq(0))).repeat(out().hasLabel('EDGE_OBJECT_PREV_VERSION').out().as('a')).select('a').unfold(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',17).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().hasLabel('Subject').has('eventType',20).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup())"
+        floating_query : ".union(until(out().hasLabel('EDGE_OBJECT_PREV_VERSION').count().is(eq(0))).repeat(out().hasLabel('EDGE_OBJECT_PREV_VERSION').out().as('a')).select('a').unfold(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',17).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().hasLabel('Subject').has('eventType',20).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().dedup())"
     }, {
         name : "Previous version",
         is_relevant : function(n) {return n.label === "Entity-File" && n['properties']['file-version'][0]['value'] > 0},
@@ -203,39 +282,43 @@ var predicates = [
         is_relevant : function(n) {return n.label === "Entity-File"},
         floating_query : ".out().hasLabel('EDGE_FILE_AFFECTS_EVENT').out().has('eventType',13).both().hasLabel('EDGE_EVENT_AFFECTS_MEMORY').out().hasLabel('Entity-Memory')"
     }, {
-        name : "Mmapper",
+        name : "My commands (text)",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        floating_query : ".as('parent').union(values('commandLine').as('cmd'), until(__.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).count().is(0)).repeat(__.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).out().has(label,'EDGE_EVENT_AFFECTS_SUBJECT').out().has(label,'Subject').has('subjectType',0)).values('commandLine').as('cmd')).select('parent').dedup().values('pid').as('parent_pid').select('parent_pid','cmd')"
+    }, {
+        name : "My mmaps",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in()"
     }, {
-        name : "Mprotector",
+        name : "My protects",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',15).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in()"
-    },  {
-        name : "Parent process",
+    }, {
+        name : "My parent",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".as('child').in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().has('pid',select('child').values('ppid'))"
     }, {
-        name : "Files Written",
+        name : "Files I wrote",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',21).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"
     }, {
-        name : "Files Read",
+        name : "Files I read",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',17).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"
     }, {
-        name : "Files Created",
+        name : "Files I created",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',7).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File')"
     }, {
-        name : "Files Deleted",
+        name : "Files I deleted",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',12).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File')"
     }, {
-        name : "Children",
+        name : "My children",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',10).outE().inV().hasLabel('Subject')"
     }, {
-        name : "Process Lineage",
+        name : "My ancestors",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".until(both().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').count().is(0)).repeat(has('subjectType',0).in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).as('b')).select('b').unfold()"
     }, {
@@ -243,7 +326,7 @@ var predicates = [
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',2).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
     }, {
-        name : "URL Executed",
+        name : "URLs Executed",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
         floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).in('EDGE_FILE_AFFECTS_EVENT in').in('EDGE_FILE_AFFECTS_EVENT out').dedup()"
     }, {

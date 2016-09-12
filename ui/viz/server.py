@@ -37,8 +37,7 @@ def segmentation():
 def classification():
     data = []
     segmentNodes = provenanceGraph.segmentNodes()
-    for segmentNode in segmentNodes:
-        segmentId = segmentNode['id']
+    for segmentId in segmentNodes:
         activityId, activityType, suspicionScore = provenanceGraph.getActivity(segmentId)
         data.append({ 'segmentId' : segmentId,
                       'activityId' : activityId,
