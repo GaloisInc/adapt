@@ -44,8 +44,15 @@
                 
                 UI.foundNodes(node_results.length)
                 if ( ! _.isEmpty(node_results)) {
-                    var nodes_text_string = _.map(node_results, function(n) { return n['id'] }).join(",")
-                    var edge_query = "x = [" + nodes_text_string + "].toArray(); g.V(x).bothE().dedup()"
+                    var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                    var edge_query
+                    if (node_data_set.getIds().length == 0) {
+                        edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
+                    } else {
+                        // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
+                        var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
+                        edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
+                    }
                     $.post("/query", {"query": edge_query}, function(edge_results) {
                         UI.foundEdges(edge_results.length)
                         var query_color = document.getElementById("query-color").jscolor.value
