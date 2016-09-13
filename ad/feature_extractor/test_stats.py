@@ -28,7 +28,7 @@ class TestStats(unittest.TestCase):
         lines.append("005,1,0,9,0.1")
         self.create_file(self.score_file_path, lines)
         stats = view_stats.ViewStats(self.view_name,self.root)
-        stats.compute_score_histogram()
+        stats.compute_score_histogram(5)
         #print("\nscore histogram : {0}".format(stats.histogram_for_scores))
         #print("\ncounts {0}".format(stats.histogram_for_scores[0]))
         #print("\nranges {0}".format(stats.histogram_for_scores[1]))
@@ -420,7 +420,7 @@ class TestStats(unittest.TestCase):
         
     def test_round_the_bounds(self):
         stats = view_stats.ViewStats('foo','/somepath')
-        self.assertEqual(['0.00'],stats.round_the_bounds([0]))
+        self.assertEqual(['0.0'],stats.round_the_bounds(['0']))
         
     def test_get_histogram_values_string(self):
         stats = view_stats.ViewStats('foo','/somepath') 
@@ -554,7 +554,7 @@ class TestStats(unittest.TestCase):
         self.assertEqual("11-12", range_fragments[2][0])
         
        
-    '''    
+    '''   
     def test_full_format(self):
         slines = []
         slines.append("id,f1,f2,f3,anomaly_score")
@@ -575,8 +575,9 @@ class TestStats(unittest.TestCase):
         stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_all_stats()
         print("{0}\n".format(stats.get_stats_info_formatted()))
-    '''  
-    
+     
+    '''
+    '''
     def test_full_format2(self):
         slines = []
         slines.append("id,feature1,feature2,feature3,anomaly_score")
@@ -611,7 +612,43 @@ class TestStats(unittest.TestCase):
         stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_all_stats()
         print("{0}\n".format(stats.get_stats_info_formatted()))
-      
+    '''
+    ''' 
+    def test_full_format3(self):
+        slines = []
+        slines.append("id,feature1,feature2,feature3,anomaly_score")
+        slines.append("001,600,10,60,0.1")
+        slines.append("002,600,2,50,0.2")
+        slines.append("003,600,2,40,0.3")
+        slines.append("004,600,2,30,0.4")
+        slines.append("005,50,2,20,0.5")
+        slines.append("006,40,2,10,0.6")
+        slines.append("007,2,2,5,0.7")
+        slines.append("008,2,2,4,0.8")
+        slines.append("009,2,2,3,0.9")
+        slines.append("010,2,2,2,0.1")
+        slines.append("011,2,2,1,0.2")
+        slines.append("012,2,2,0,0.3")
+        flines = []
+        flines.append("id,feature1,feature2,feature3")
+        flines.append("001,600,60,12")
+        flines.append("002,600,50,10")
+        flines.append("003,600,40,11")
+        flines.append("004,600,30,9")
+        flines.append("005,50,20,9")
+        flines.append("006,40,10,9")
+        flines.append("007,2,5,9")
+        flines.append("008,2,4,9")
+        flines.append("009,2,3,9")
+        flines.append("010,2,2,9")
+        flines.append("011,2,1,9")
+        flines.append("012,2,0,9")
+        self.create_file(self.score_file_path, slines)
+        self.create_file(self.feature_file_path, flines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
+        stats.compute_all_stats()
+        print("{0}\n".format(stats.get_stats_info_formatted()))
+    '''  
     def test_get_proper_length_column(self):
         stats = view_stats.ViewStats('foo','/somepath') 
         c = stats.get_proper_length_column('Features', 6)
@@ -622,5 +659,234 @@ class TestStats(unittest.TestCase):
         self.assertEqual('Features ',c)
         c = stats.get_proper_length_column('Features', 10)
         self.assertEqual('Features  ',c)
+       
+    def test_get_range_bounds(self):
+        stats = view_stats.ViewStats('foo','/somepath') 
+        values = [ 1.0 ]
+        bin_count = 1
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(2,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(1.0, bounds[1])
+        # needs one bin, ask for one bin
+        values = [ 1.0, 1.0 ]
+        bin_count = 1
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(2,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(1.0, bounds[1])
+        # data needs 1 bin, ask for two bins, get 1
+        values = [ 1.0, 1.0 ]
+        bin_count = 2
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(2,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(1.0, bounds[1])
+        # data needs two bins, ask for five, get 2
+        values = [ 1.0, 2.0 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(3,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(1.5, bounds[1])
+        self.assertEqual(2.0, bounds[2])
+        # data needs two bins, ask for five, get 5 <- stopped being fancy a this point
+        # and just yield 5
+        values = [ 0.0, 0.0, 10.0 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(6,len(bounds))
+        self.assertEqual(0.0, bounds[0])
+        self.assertEqual(2.0, bounds[1])
+        self.assertEqual(4.0, bounds[2])
+        self.assertEqual(6.0, bounds[3])
+        self.assertEqual(8.0, bounds[4])
+        self.assertEqual(10.0, bounds[5])
+        # data needs multiple bins, ask for five, get 5
+        values = [ 0.0, 2.0, 4.0 ,4.0, 10.0 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(6,len(bounds))
+        self.assertEqual(0.0, bounds[0])
+        self.assertEqual(2.0, bounds[1])
+        self.assertEqual(4.0, bounds[2])
+        self.assertEqual(6.0, bounds[3])
+        self.assertEqual(8.0, bounds[4])
+        self.assertEqual(10.0, bounds[5])
+        
+        # data needs one bin, ask for five, get 1
+        values = [ 2,2,2,2,2,2,2,2,2 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(2,len(bounds))
+        self.assertEqual(2.0, bounds[0])
+        self.assertEqual(2.0, bounds[1])
+        
+        # data needs multiple bins, ask for five, get 5
+        values = [ 1,2,3,4,5,6,7,8,9,2,3,4,5,6,7,8,9,10,11 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(6,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(3.0, bounds[1])
+        self.assertEqual(5.0, bounds[2])
+        self.assertEqual(7.0, bounds[3])
+        self.assertEqual(9.0, bounds[4])
+        self.assertEqual(11.0, bounds[5])
+        
+        # data needs multiple bins, ask for 6, get 6
+        values = [ 1,2,3,4,5,6,7,8,9,2,3,4,5,6,7,8,9,10,11,12,13 ]
+        bin_count = 6
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(7,len(bounds))
+        self.assertEqual(1.0, bounds[0])
+        self.assertEqual(3.0, bounds[1])
+        self.assertEqual(5.0, bounds[2])
+        self.assertEqual(7.0, bounds[3])
+        self.assertEqual(9.0, bounds[4])
+        self.assertEqual(11.0, bounds[5])
+        self.assertEqual(13.0, bounds[6])
+        
+        values = [ 6,5,4,3,2,2,2,2,2,2,2,2 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(6,len(bounds))
+        self.assertEqual("2.00", "{0:.2f}".format(bounds[0]))
+        self.assertEqual("2.80", "{0:.2f}".format(bounds[1]))
+        self.assertEqual("3.60", "{0:.2f}".format(bounds[2]))
+        self.assertEqual("4.40", "{0:.2f}".format(bounds[3]))
+        self.assertEqual("5.20", "{0:.2f}".format(bounds[4]))
+        self.assertEqual("6.00", "{0:.2f}".format(bounds[5]))
+        
+        values = [ 2,2,2,2,2,2,2,2,2,2,2,2 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(2,len(bounds))
+        self.assertEqual(2.0, bounds[0])
+        self.assertEqual(2.0, bounds[1])
+        
+        values = [ 12,10,11,9,9,9,9,9,9,9,9,9 ]
+        bin_count = 5
+        bounds = stats.get_range_bounds(values, bin_count)
+        self.assertEqual(6,len(bounds))
+        self.assertEqual("9.00", "{0:.2f}".format(bounds[0]))
+        self.assertEqual("9.60", "{0:.2f}".format(bounds[1]))
+        self.assertEqual("10.20", "{0:.2f}".format(bounds[2]))
+        self.assertEqual("10.80", "{0:.2f}".format(bounds[3]))
+        self.assertEqual("11.40", "{0:.2f}".format(bounds[4]))
+        self.assertEqual("12.00", "{0:.2f}".format(bounds[5]))
+        
+        
+    def test_derive_histogram_ranges_as_floats(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        range_bounds = [ 0.0 ]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(1,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(0.0, ranges[0][1])
+        
+        range_bounds = [ ]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(1,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(0.0, ranges[0][1])
+        
+        range_bounds = [ 0.0, 1.0]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(1,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(1.0, ranges[0][1])
+        
+        range_bounds = [ 0.0, 1.0, 2.0]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(2,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(1.0, ranges[0][1])
+        self.assertEqual(1.0, ranges[1][0])
+        self.assertEqual(2.0, ranges[1][1])
+        
+        range_bounds = [ 0.0, 1.0, 2.0, 3.0]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(3,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(1.0, ranges[0][1])
+        self.assertEqual(1.0, ranges[1][0])
+        self.assertEqual(2.0, ranges[1][1])
+        self.assertEqual(2.0, ranges[2][0])
+        self.assertEqual(3.0, ranges[2][1])
+        
+        range_bounds = [ 0.0, 1.0, 2.0, 3.0, 4.0]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(4,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(1.0, ranges[0][1])
+        self.assertEqual(1.0, ranges[1][0])
+        self.assertEqual(2.0, ranges[1][1])
+        self.assertEqual(2.0, ranges[2][0])
+        self.assertEqual(3.0, ranges[2][1])
+        self.assertEqual(3.0, ranges[3][0])
+        self.assertEqual(4.0, ranges[3][1])
+        
+        range_bounds = [ 0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+        ranges = stats.derive_histogram_ranges_as_floats(range_bounds)
+        self.assertEqual(5,len(ranges))
+        self.assertEqual(0.0, ranges[0][0])
+        self.assertEqual(1.0, ranges[0][1])
+        self.assertEqual(1.0, ranges[1][0])
+        self.assertEqual(2.0, ranges[1][1])
+        self.assertEqual(2.0, ranges[2][0])
+        self.assertEqual(3.0, ranges[2][1])
+        self.assertEqual(3.0, ranges[3][0])
+        self.assertEqual(4.0, ranges[3][1])
+        self.assertEqual(4.0, ranges[4][0])
+        self.assertEqual(5.0, ranges[4][1])
+    
+    def test_bin_the_values(self):
+        stats = view_stats.ViewStats('foo','/somepath')
+        values = [ 1 ]
+        range_pairs = [[1.0, 1.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(1,len(bins))
+        self.assertEqual(1, bins[0])
+        
+        values = [ 1, 1 ]
+        range_pairs = [[1.0, 1.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(1,len(bins))
+        self.assertEqual(2, bins[0])
+        
+        values = [ 1, 1, 1 ]
+        range_pairs = [[1.0, 1.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(1,len(bins))
+        self.assertEqual(3, bins[0])
+        
+        values = [ 1, 2, 1 ]
+        range_pairs = [[1.0, 1.5], [1.5, 2.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(2,len(bins))
+        self.assertEqual(2, bins[0])
+        self.assertEqual(1, bins[1])
+        
+        values = [ 1, 2, 3, 4, 5, 6, 1.1, 4.5, 4.7, 4 ]
+        range_pairs = [[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [5.0, 6.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(5,len(bins))
+        self.assertEqual(2, bins[0])
+        self.assertEqual(1, bins[1])
+        self.assertEqual(1, bins[2])
+        self.assertEqual(4, bins[3])
+        self.assertEqual(2, bins[4])
+        
+        values = [ 1, 1, 1, 6, 1, 6, 1, 1, 1, 1 ]
+        range_pairs = [[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [5.0, 6.0]]
+        bins = stats.bin_the_values(values, range_pairs)
+        self.assertEqual(5,len(bins))
+        self.assertEqual(8, bins[0])
+        self.assertEqual(0, bins[1])
+        self.assertEqual(0, bins[2])
+        self.assertEqual(0, bins[3])
+        self.assertEqual(2, bins[4])
+       
 if __name__ == '__main__':
     unittest.main()
