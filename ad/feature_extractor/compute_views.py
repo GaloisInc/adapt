@@ -156,7 +156,6 @@ class AnomalyView:
         total_nodes = i
         view_stats.number_nodes = total_nodes
         cutoff = min(math.ceil(total_nodes * (percentage / 100.0)), 1000)
-        view_stats.number_nodes_attached = cutoff
         max_score = 0
         max_id = 0
         max_feature = None
@@ -182,10 +181,12 @@ class AnomalyView:
                     max_id = row['id']
                     max_feature = feature
                 cnt = cnt + 1
-                if cnt >= cutoff:
+                if cnt >= cutoff or len(QUERY) > 49000:
                     break
             QUERY += "x={id};t='{type}';s={score};f='{feat}';IDS=g.V(x).in(sin).id().toList().toArray();if(IDS!=[]){{g.V(IDS).property(atype,t).next();g.V(IDS).property(ascore,s).next();g.V(IDS).property(afeature,f).next();}};".format(id=max_id, type=self.view_type, score=max_score, feat=max_feature)
             log.info("size of QUERY = " + str(len(QUERY)))
+            cutoff = cnt
+            view_stats.number_nodes_attached = cutoff
             log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=min(" + str(percentage) + "%,1000))...")
             with gremlin_query.Runner() as gremlin:
                 try:
