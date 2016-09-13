@@ -81,7 +81,7 @@
 
     "process_connected_with_netflow" : {
         "description" : "Analyze process nodes that have network activity",
-        "instance_set" : "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).select('process').dedup().id().toList().toArray()",
+        "instance_set" : "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set" : {
             "num_file_open_during_wr_to_netflow":
                 "g.V(IDS).local(__.as('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('writeNetflow').out(E_A_N_O).select('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,OPEN).as('openFile').in(F_A_E_I).select('writeNetflow','openFile').by(STIME).where('writeNetflow',gte('openFile')).count())",
@@ -102,7 +102,7 @@
 
     "process_connect_many_netflow" : {
         "description": "Analyze process nodes that have many distinct network activity within same network hosts",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).select('process').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set": {
             "max_num_local_net_access":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',0)+1))}.mapValues().max())"
@@ -111,7 +111,7 @@
 
     "process_connect_rare_ip" : {
         "description": "Analyze process nodes that have rare ip access",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).as('process').in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).select('process').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set": {
             "num_distinct_dst_ip_access":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).values(DADDRESS).dedup().count())"
@@ -164,7 +164,7 @@
 
     "process_access_file_attributes" : {
         "description" : "Analyze process that access attributes of files",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).or(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,CHECK_FILE_ATTRIBUTES),__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES)).id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,within(CHECK_FILE_ATTRIBUTES,MODIFY_FILE_ATTRIBUTES))).id().toList().toArray()",
         "feature_set": {
             "num_chk_attrib":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",

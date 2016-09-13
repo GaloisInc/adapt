@@ -230,4 +230,6 @@ if __name__ == '__main__':
             except:
                 producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
                 log.exception("error working with view {0} prevents statistics generation.".format(view_type))
+        else:
+            producer.send("ad-log", bytes("Found 0 " + view_type + " nodes", encoding='utf-8'))
         i += 1
