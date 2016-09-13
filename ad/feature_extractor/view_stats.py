@@ -200,49 +200,49 @@ class ViewStats:
             feature_string = self.get_proper_length_column(f,feature_string_max_length)
             INFO+="{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(feature_string, self.feature_mins[f], self.feature_maxs[f], self.feature_means[f], self.feature_stdevs[f],self.feature_variances[f])
         
-        for f in self.features:
-            INFO+="\n"
-            INFO+="{0}:\n".format(f)
-            histogram_values              = self.histograms_for_features[f][0]
-            histogram_bounds              = self.histograms_for_features[f][1]
-            histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
-            # choosing bin count per line ...
-            # there are 120 chars per line in the UI widget
-            # if the range has values between 1 and 9, then each bin has 14 chars
-            #    --------------
-            #    | 1.50 - 2.50 
-            #    --------------
-            # if the range has values between 10 and 99, then each bin has 16 chars
-            #    ----------------
-            #    | 11.50 - 12.50 
-            #    ----------------
-            # if the range has values between 100 and 999, then each bin has 18 chars
-            #    ------------------
-            #    | 111.50 - 112.50 
-            #    ------------------
-            # if we assume that 999 is the likely upper bound, then 18*6 == 108, but 18*7 == 126, which is too high
-            # so choosing 6
-            bins_per_line                 = 6
-            
-            # break the bins into sub-sequences so they can fit on the line without wrapping
-            portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
-            range_portions = portion_info['range_portions']
-            value_portions = portion_info['value_portions']
-            
-            # print out as many bins as bins_per_row, then move to next line
-            for i in range(0,len(range_portions)):
-                histogram_range_portion = range_portions[i]
-                histogram_value_portion = value_portions[i]
-                range_string_widths           = self.get_range_widths(histogram_range_portion)
-                histogram_dash_bar            = self.get_dash_bar(range_string_widths)
-                histogram_range_header        = self.get_range_header(histogram_range_portion)
-                histogram_values_line         = self.get_histogram_values_string(histogram_value_portion,range_string_widths)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-                INFO+="    {0}\n".format(histogram_range_header)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-                INFO+="    {0}\n".format(histogram_values_line)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-            INFO+="\n"
+        # for f in self.features:
+        #     INFO+="\n"
+        #     INFO+="{0}:\n".format(f)
+        #     histogram_values              = self.histograms_for_features[f][0]
+        #     histogram_bounds              = self.histograms_for_features[f][1]
+        #     histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
+        #     # choosing bin count per line ...
+        #     # there are 120 chars per line in the UI widget
+        #     # if the range has values between 1 and 9, then each bin has 14 chars
+        #     #    --------------
+        #     #    | 1.50 - 2.50
+        #     #    --------------
+        #     # if the range has values between 10 and 99, then each bin has 16 chars
+        #     #    ----------------
+        #     #    | 11.50 - 12.50
+        #     #    ----------------
+        #     # if the range has values between 100 and 999, then each bin has 18 chars
+        #     #    ------------------
+        #     #    | 111.50 - 112.50
+        #     #    ------------------
+        #     # if we assume that 999 is the likely upper bound, then 18*6 == 108, but 18*7 == 126, which is too high
+        #     # so choosing 6
+        #     bins_per_line                 = 6
+        #
+        #     # break the bins into sub-sequences so they can fit on the line without wrapping
+        #     portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
+        #     range_portions = portion_info['range_portions']
+        #     value_portions = portion_info['value_portions']
+        #
+        #     # print out as many bins as bins_per_row, then move to next line
+        #     for i in range(0,len(range_portions)):
+        #         histogram_range_portion = range_portions[i]
+        #         histogram_value_portion = value_portions[i]
+        #         range_string_widths           = self.get_range_widths(histogram_range_portion)
+        #         histogram_dash_bar            = self.get_dash_bar(range_string_widths)
+        #         histogram_range_header        = self.get_range_header(histogram_range_portion)
+        #         histogram_values_line         = self.get_histogram_values_string(histogram_value_portion,range_string_widths)
+        #         INFO+="    {0}\n".format(histogram_dash_bar)
+        #         INFO+="    {0}\n".format(histogram_range_header)
+        #         INFO+="    {0}\n".format(histogram_dash_bar)
+        #         INFO+="    {0}\n".format(histogram_values_line)
+        #         INFO+="    {0}\n".format(histogram_dash_bar)
+        #     INFO+="\n"
         INFO+="\n"
         return INFO
                   
