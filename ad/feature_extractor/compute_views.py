@@ -146,7 +146,7 @@ class AnomalyView:
 
     def compute_anomaly_score(self):
         log.info("Computing anomaly scores...")
-        os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
+        os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 256 -s 256')
         log.info("Anomaly scores written to " + self.score_file)
 
     def attach_scores_to_db(self, view_stats, percentage = 5.0):
