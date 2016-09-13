@@ -23,7 +23,7 @@ class ViewStats:
         self.score_mean = '?'
         self.score_stdev = '?'
         self.score_variance = '?'
-        self.scores = []
+        self.scores = []  # floats
         self.histogram_for_scores = {}
 
     def compute_all_stats(self):
@@ -31,12 +31,12 @@ class ViewStats:
         self.compute_feature_means()
         self.compute_feature_variances()
         self.compute_feature_stdevs()
-        self.compute_feature_histograms()
+        self.compute_feature_histograms(5)
         self.set_score_range()
         self.compute_score_mean()
         self.compute_score_variance()
         self.compute_score_stdev()
-        self.compute_score_histogram()
+        self.compute_score_histogram(5)
         
     def nonblank_lines(self,lines):
         nonblanks = []
@@ -103,6 +103,23 @@ class ViewStats:
                 range_strings.append("{0:.2f} - {1:.2f}".format(float(range_list[i]), float(range_list[i+1])))
         return range_strings
             
+    def derive_histogram_ranges_as_floats(self, range_bound_floats):
+        range_floats = []
+        if len(range_bound_floats) == 0:
+            range_floats.append([ 0.0, 0.0])
+        elif len(range_bound_floats) == 1:
+            r = []
+            r.append(range_bound_floats[0])
+            r.append(range_bound_floats[0])
+            range_floats.append(r)
+        else:
+            for i in range(len(range_bound_floats) - 1):
+                r = []
+                r.append(range_bound_floats[i])
+                r.append(range_bound_floats[i+1])
+                range_floats.append(r)
+        return range_floats
+        
     def get_range_widths(self, histogram_ranges):
         w = []
         for hr in histogram_ranges:
@@ -164,12 +181,7 @@ class ViewStats:
                 result+=' '
             return result
         
-    #   format histogram this way:
-    #     -------------------------
-    #     | 0. - 0.5  | 0.5 - 1.0 |
-    #     -------------------------
-    #     |        6  |         0 |
-    #     -------------------------
+    #  
     #
     #
     def get_stats_info_formatted(self):
@@ -182,17 +194,10 @@ class ViewStats:
         INFO+="min\tmax\tmean\tstd\tvar\n"
         INFO+="{0}\t{1}\t{2}\t{3}\t{4}\n".format(self.score_range_min, self.score_range_max,self.score_mean, self.score_stdev, self.score_variance)
         INFO+="\n" 
-        histogram_ranges              = self.derive_histogram_ranges(self.histogram_for_scores[1])
-        histogram_range_string_widths = self.get_range_widths(histogram_ranges)
-        histogram_dash_bar            = self.get_dash_bar(histogram_range_string_widths)
-        histogram_range_header        = self.get_range_header(histogram_ranges)
-        histogram_values_line         = self.get_histogram_values_string(self.histogram_for_scores[0], histogram_range_string_widths)
-        INFO+="    {0}\n".format(histogram_dash_bar)
-        INFO+="    {0}\n".format(histogram_range_header)
-        INFO+="    {0}\n".format(histogram_dash_bar)
-        INFO+="    {0}\n".format(histogram_values_line)
-        INFO+="    {0}\n".format(histogram_dash_bar)
-        INFO+="\n"
+        histogram_values              = self.histogram_for_scores[0]
+        histogram_bounds              = self.histogram_for_scores[1]
+        INFO+=self.format_histogram(histogram_values, histogram_bounds)
+        
         feature_string_max_length = self.get_feature_string_max_length(self.features)
         feature_header_string = self.get_proper_length_column('Feature',feature_string_max_length)
         INFO+="{0}\tmin\tmax\tmean\tstd\tvar\n".format(feature_header_string)
@@ -205,45 +210,58 @@ class ViewStats:
             INFO+="{0}:\n".format(f)
             histogram_values              = self.histograms_for_features[f][0]
             histogram_bounds              = self.histograms_for_features[f][1]
-            histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
-            # choosing bin count per line ...
-            # there are 120 chars per line in the UI widget
-            # if the range has values between 1 and 9, then each bin has 14 chars
-            #    --------------
-            #    | 1.50 - 2.50 
-            #    --------------
-            # if the range has values between 10 and 99, then each bin has 16 chars
-            #    ----------------
-            #    | 11.50 - 12.50 
-            #    ----------------
-            # if the range has values between 100 and 999, then each bin has 18 chars
-            #    ------------------
-            #    | 111.50 - 112.50 
-            #    ------------------
-            # if we assume that 999 is the likely upper bound, then 18*6 == 108, but 18*7 == 126, which is too high
-            # so choosing 6
-            bins_per_line                 = 6
-            
-            # break the bins into sub-sequences so they can fit on the line without wrapping
-            portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
-            range_portions = portion_info['range_portions']
-            value_portions = portion_info['value_portions']
-            
-            # print out as many bins as bins_per_row, then move to next line
-            for i in range(0,len(range_portions)):
-                histogram_range_portion = range_portions[i]
-                histogram_value_portion = value_portions[i]
-                range_string_widths           = self.get_range_widths(histogram_range_portion)
-                histogram_dash_bar            = self.get_dash_bar(range_string_widths)
-                histogram_range_header        = self.get_range_header(histogram_range_portion)
-                histogram_values_line         = self.get_histogram_values_string(histogram_value_portion,range_string_widths)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-                INFO+="    {0}\n".format(histogram_range_header)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-                INFO+="    {0}\n".format(histogram_values_line)
-                INFO+="    {0}\n".format(histogram_dash_bar)
-            INFO+="\n"
+            INFO+=self.format_histogram(histogram_values, histogram_bounds)
         INFO+="\n"
+        return INFO
+        
+    # format histogram this way, but use five bins:
+    #     -------------------------
+    #     | 0. - 0.5  | 0.5 - 1.0 |
+    #     -------------------------
+    #     |        6  |         0 |
+    #     -------------------------
+    # choosing bin count per line ...
+    # there are 120 chars per line in the UI widget
+    # if the range has values between 1 and 9, then each bin has 14 chars
+    #    --------------
+    #    | 1.50 - 2.50 
+    #    --------------
+    # if the range has values between 10 and 99, then each bin has 16 chars
+    #    ----------------
+    #    | 11.50 - 12.50 
+    #    ----------------
+    # if the range has values between 100 and 999, then each bin has 18 chars
+    #    ------------------
+    #    | 111.50 - 112.50 
+    #    ------------------
+    # if we assume that 999 is the likely upper bound, then 18*6 == 108, but 18*7 == 126, which is too high
+    # so choosing 6
+    # UPDATE - we decided to switch to a five bin histogram so the partitioning will likely not be used
+    # but will leave it in if necessary
+    def format_histogram(self,histogram_values, histogram_bounds):
+        INFO=""
+        histogram_ranges              = self.derive_histogram_ranges(histogram_bounds)
+        bins_per_line                 = 6
+            
+        # break the bins into sub-sequences so they can fit on the line without wrapping
+        portion_info                  = self.partition_histogram(histogram_ranges, histogram_values ,bins_per_line)
+        range_portions = portion_info['range_portions']
+        value_portions = portion_info['value_portions']
+        
+        # print out as many bins as bins_per_row, then move to next line
+        for i in range(0,len(range_portions)):
+            histogram_range_portion = range_portions[i]
+            histogram_value_portion = value_portions[i]
+            range_string_widths           = self.get_range_widths(histogram_range_portion)
+            histogram_dash_bar            = self.get_dash_bar(range_string_widths)
+            histogram_range_header        = self.get_range_header(histogram_range_portion)
+            histogram_values_line         = self.get_histogram_values_string(histogram_value_portion,range_string_widths)
+            INFO+="    {0}\n".format(histogram_dash_bar)
+            INFO+="    {0}\n".format(histogram_range_header)
+            INFO+="    {0}\n".format(histogram_dash_bar)
+            INFO+="    {0}\n".format(histogram_values_line)
+            INFO+="    {0}\n".format(histogram_dash_bar)
+            INFO+="\n" 
         return INFO
                   
     def partition_histogram(self, histogram_ranges, histogram_values, bins_per_line):
@@ -324,7 +342,9 @@ class ViewStats:
             stdev = statistics.stdev(self.scores)
             self.score_stdev = "{0:.2f}".format(stdev)
     
-    def compute_score_histogram(self):
+    # this method not used due to odd behavior, like generating hundreds of bins 
+    # unnecessarily
+    def compute_score_numpy_histogram(self):
         if (not(self.scores_loaded())):
             self.load_scores()
         histogram = numpy.histogram(self.scores,'auto', None, False, None, None)
@@ -332,7 +352,91 @@ class ViewStats:
         histogram_refined.append(histogram[0])
         histogram_refined.append(self.round_the_bounds(histogram[1]))
         self.histogram_for_scores = histogram_refined 
+    
+    def compute_score_histogram(self, bin_count):
+        if (not(self.scores_loaded())):
+            self.load_scores()
+        histogram = self.compute_histogram(self.scores, bin_count)
+        histogram_refined = []
+        histogram_refined.append(histogram[0])
+        histogram_refined.append(self.round_the_bounds(histogram[1]))
+        self.histogram_for_scores = histogram_refined 
          
+    def compute_histogram(self, values, bin_count):
+        range_bounds = self.get_range_bounds(values, bin_count)
+        range_pairs = self.derive_histogram_ranges_as_floats(range_bounds)
+        bin_values = self.bin_the_values(values, range_pairs)
+        #print("bin_count:    {0}".format(bin_count))
+        #print("values   :    {0}".format(values))
+        #print("bounds   :    {0}".format(range_bounds))
+        #print("binvals  :    {0}".format(bin_values))
+        return [ bin_values, range_bounds ]
+    
+    def bin_the_values(self, values, range_pairs):
+        bins = []
+        for i in range(len(range_pairs)):
+            bins.append(0)
+        for v in values:
+            for i in range(len(range_pairs)):
+                range_pair = range_pairs[i]
+                range_min = range_pair[0]
+                range_max = range_pair[1]
+                # rightmost bin includes upper bound
+                if (i == len(range_pairs) - 1):
+                    if v >= range_min and v <= range_max:
+                        bins[i] = bins[i] + 1
+                        break
+                # other bins exclude upper bound
+                else:
+                    if v >= range_min and v < range_max:
+                        bins[i] = bins[i] + 1
+                        break
+        return bins
+        
+    #def round(self, v):
+    #    if v < 1:
+    #        return float("{0:.3f}".format(v))
+    #    return float("{0:.2f}".format(v))
+        
+    def get_range_bounds(self, values, bin_count):
+        # handle a few no brainer small data cases more simple
+        if len(values) == 0:
+            return [0,0]
+        if len(values) == 1:
+            return [ values[0], values[0] ]
+        if len(values) == 2:
+            if values[0] == values[1]:
+                return [ values[0], values[0] ]
+            else:
+                return [ values[0], (values[0] +(values[1]-values[0])/2), values[1] ]
+        if len(set(values)) == 1:
+            return [ values[0], values[0] ]
+        # more than two values, just use bin_count
+        min_value = min(values)
+        #print("\n\nGRB values    : {0}".format(values))
+        #print("GRB bin_count : {0}".format(bin_count))
+        max_value = max(values)
+        #print("GRB min_value : {0}".format(min_value))
+        #print("GRB max_value : {0}".format(max_value))
+        delta = (max_value - min_value) / float(bin_count);
+        
+        #print("GRB delta     : {0}".format(delta))
+        bounds = []
+        cur = min_value
+        for i in range(bin_count):
+            bounds.append(cur)
+            cur += delta
+        bounds.append(max_value)
+        #print("GRB bounds     : {0}".format(bounds))
+        return bounds
+        
+    def get_unique_values(self, values):
+        result = []
+        for value in values:
+            if not(value in result):
+                result.append(value)
+        return result
+        
     def scores_loaded(self):
         return bool(self.scores)
         
@@ -340,8 +444,12 @@ class ViewStats:
         result = []
         for s in list_of_float_strings:
             f = float(s)
-            rounded = "{0:.2f}".format(f)
-            result.append(rounded)
+            if f == 0:
+                result.append('0.0')
+            elif f < 1:
+                result.append("{0:.3f}".format(f))
+            else:
+                result.append("{0:.2f}".format(f))
         return result
         
     #
@@ -409,13 +517,16 @@ class ViewStats:
                 stdev = statistics.stdev(values)
                 self.feature_stdevs[feature] = "{0:.2f}".format(stdev)
         
-    def compute_feature_histograms(self):
+    def compute_feature_histograms(self, bin_count):
         if (not(self.features_loaded())):
             self.load_features()
         for feature in self.features:
             values = self.value_list_for_features[feature]
-            histogram = numpy.histogram(values,'auto', None, False, None, None)
-            self.histograms_for_features[feature] = histogram
+            histogram = self.compute_histogram(values, bin_count)
+            histogram_refined = []
+            histogram_refined.append(histogram[0])
+            histogram_refined.append(self.round_the_bounds(histogram[1]))
+            self.histograms_for_features[feature] = histogram_refined
 
 
 if __name__ == '__main__':
