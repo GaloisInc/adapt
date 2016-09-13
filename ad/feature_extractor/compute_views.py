@@ -192,7 +192,7 @@ class AnomalyView:
                     gremlin.fetch_data(QUERY, binds)
                     log.info('Anomaly score attachment done for view ' + self.view_type)
                 except:
-                    log.exception("Exception attaching score")
+                    log.exception("Exception at query:" + QUERY)
 
 
 
