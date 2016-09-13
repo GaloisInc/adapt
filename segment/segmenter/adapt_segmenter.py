@@ -322,7 +322,7 @@ mgmt.close()\
 		return True
 
 
-	def createVertices_query(self):
+	def createVertices_query_old(self):
 		createVertices_query="""\
 idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
 existingSegNodes_parentIds=g.V().has('%(segmentNodeName)s','%(segmentName)s').values('%(segmentParentId)s').fold().next();\
@@ -336,8 +336,18 @@ graph.addVertex(label,'Segment',\
 }\
 """ % self.params
 		return createVertices_query
+		
+	def createVertices_query(self):
+		createVertices_query="""\
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
+for (i in idsWithProp) {\
+graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(i).values('%(criterion)s').next())}\
+""" % self.params
+		return createVertices_query
 
-	def addEdges_query(self):
+	def addEdges_query_old(self):
 		'''
 		Creates segment nodes and segment:includes edges, checking for pre-existing nodes and edges.
 		'''
@@ -361,12 +371,31 @@ s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
 }
 }""" % self.params
 		return addEdges_query
+		
+		
+	def addEdges_query(self):
+		'''
+		Creates segment nodes and segment:includes edges, checking for pre-existing nodes and edges.
+		'''
+		addEdges_query ="""\
+idWithProp=g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next(); \
+for (i in idWithProp) {sub=g.V(i).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+subtr=sub.traversal(); \
+s=graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(i).values('%(criterion)s').next());\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())
+}
+}""" % self.params
+		return addEdges_query
 
 	def addEdgesInit_query(self):
 		addEdgesInit_query = "g.V().has('%(criterion)s',gte(0)).has(label,neq('Segment')).id().fold().next()" % self.params
 		return addEdgesInit_query
 
-	def addEdgesIter_query(self,i):
+	def addEdgesIter_query_old(self,i):
 		addEdgesIter_query="""
 sub=g.V(%(i)s).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
 subtr=sub.traversal(); \
@@ -374,6 +403,19 @@ s=graph.addVertex(label,'Segment',\
 '%(segmentNodeName)s','%(segmentName)s',\
 '%(criterion)s',g.V(%(i)s).values('%(criterion)s').next(),\
 '%(segmentParentId)s',%(i)s);\
+idNonLinkedNodes=subtr.V().id().fold().next();\
+for (node in idNonLinkedNodes) {\
+s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
+}""" % (extend(self.params,'i',i))
+		return addEdgesIter_query
+		
+	def addEdgesIter_query(self,i):
+		addEdgesIter_query="""
+sub=g.V(%(i)s).repeat(__.%(directionEdges)sE().subgraph('sub').bothV().has(label,neq('Segment'))).times(%(radius)d).cap('sub').next();\
+subtr=sub.traversal(); \
+s=graph.addVertex(label,'Segment',\
+'%(segmentNodeName)s','%(segmentName)s',\
+'%(criterion)s',g.V(%(i)s).values('%(criterion)s').next());\
 idNonLinkedNodes=subtr.V().id().fold().next();\
 for (node in idNonLinkedNodes) {\
 s.addEdge('%(segmentEdgeLabel)s',g.V(node).next())\
