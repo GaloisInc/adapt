@@ -114,7 +114,7 @@ makeNumericSearchIndex('byPID','pid',Integer.class)
 makeNumericSearchIndex('byTime','startedAtTime',Long.class)
 
 mgmt = graph.openManagement()
-mgmt.set('storage.cassandra.frame-size-mb',60)
+mgmt.set('storage.cassandra.frame-size-mb',512)
 mgmt.commit()
 
 // The graph traverser captured by variable 'g' is useful to many of
