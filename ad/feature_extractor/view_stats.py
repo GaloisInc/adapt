@@ -204,7 +204,6 @@ class ViewStats:
         for f in self.features:
             feature_string = self.get_proper_length_column(f,feature_string_max_length)
             INFO+="{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n".format(feature_string, self.feature_mins[f], self.feature_maxs[f], self.feature_means[f], self.feature_stdevs[f],self.feature_variances[f])
-        
         for f in self.features:
             INFO+="\n"
             INFO+="{0}:\n".format(f)

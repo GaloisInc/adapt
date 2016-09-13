@@ -613,7 +613,7 @@ class TestStats(unittest.TestCase):
         stats.compute_all_stats()
         print("{0}\n".format(stats.get_stats_info_formatted()))
     '''
-    '''  
+    ''' 
     def test_full_format3(self):
         slines = []
         slines.append("id,feature1,feature2,feature3,anomaly_score")

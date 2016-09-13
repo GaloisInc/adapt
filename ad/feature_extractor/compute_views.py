@@ -63,8 +63,7 @@ bindings = {
 """
 class AnomalyView:
 
-    def __init__(self, grem, vt, nq, fq):
-        self.gremlin = grem
+    def __init__(self, vt, nq, fq):
         self.view_type = vt
         self.node_ids_query = nq
         self.features_queries = fq
@@ -98,11 +97,12 @@ class AnomalyView:
         QUERY += "]}else [];"
 
         log.info("Extracting features for " + self.view_type + "...")
-        try:
-            result = self.gremlin.fetch_data(QUERY, bindings=bindings)
-        except:
-            log.exception("Exception at query:" + QUERY)
-            return False
+        with gremlin_query.Runner() as gremlin:
+            try:
+                result = gremlin.fetch_data(QUERY, bindings=bindings)
+            except:
+                log.exception("Exception at query:" + QUERY)
+                return False
 
         if result == []:
             log.info("Found 0 " + self.view_type + " nodes")
@@ -146,7 +146,7 @@ class AnomalyView:
 
     def compute_anomaly_score(self):
         log.info("Computing anomaly scores...")
-        os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 100 -s 100')
+        os.system('./../osu_iforest/iforest.exe -i ' + self.feature_file + ' -o ' + self.score_file + ' -m 1 -t 256 -s 256')
         log.info("Anomaly scores written to " + self.score_file)
 
     def attach_scores_to_db(self, view_stats, percentage = 5.0):
@@ -155,43 +155,54 @@ class AnomalyView:
                 pass
         total_nodes = i
         view_stats.number_nodes = total_nodes
-        cutoff = math.ceil(total_nodes * (percentage / 100.0))
+        cutoff = min(math.ceil(total_nodes * (percentage / 100.0)), 500)
+        view_stats.number_nodes_attached = cutoff
         max_score = 0
         max_id = 0
         max_feature = None
         cnt = 0
         QUERY = ""
         binds = {'atype':'anomalyType', 'ascore':'anomalyScore', 'sin':'segment:includes', 'afeature':'anomalyFeature'}
-        with open(self.score_file, 'r') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                QUERY += "x={id};t='{type}';s={score};g.V(x).property(atype,t).next();g.V(x).property(ascore,s).next();".format(id=row['id'], type=self.view_type, score=row['anomaly_score'])
-                feature = "["
-                for k in sorted(row.keys()):
-                    if k != 'id' and k != 'anomaly_score':
-                        if feature != "[":
-                            feature += ","
-                        feature += k + ":" + str(row[k])
-                feature += "]"
-                feature = "Rnk:" + str(cnt+1) + "/" + str(total_nodes) + feature
-                QUERY += "f='{feat}';g.V(x).property(afeature,f).next();".format(feat=feature)
-                log.info("Adding anomaly scores to id " + row['id'] + " (" + self.view_type + ", " + row['anomaly_score'] + ")")
-                if float(row['anomaly_score']) > max_score:
-                    max_score = float(row['anomaly_score'])
-                    max_id = row['id']
-                    max_feature = feature
-                cnt = cnt + 1
-                if cnt >= cutoff:
-                    break
-            QUERY += "x={id};t='{type}';s={score};f='{feat}';IDS=g.V(x).in(sin).id().toList().toArray();if(IDS!=[]){{g.V(IDS).property(atype,t).next();g.V(IDS).property(ascore,s).next();g.V(IDS).property(afeature,f).next();}};".format(id=max_id, type=self.view_type, score=max_score, feat=max_feature)
-            log.info("size of QUERY = " + str(len(QUERY)))
-            log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=" + str(percentage) + "%)...")
-            try:
-                self.gremlin.fetch_data(QUERY, binds)
-                view_stats.number_nodes_attached = cnt
-            except:
-                log.exception("Exception attaching score")
-            log.info('Anomaly score attachment done for view ' + self.view_type)
+        with gremlin_query.Runner() as gremlin:
+            with open(self.score_file, 'r') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    QUERY += "x={id};t='{type}';s={score};g.V(x).property(atype,t).next();g.V(x).property(ascore,s).next();".format(id=row['id'], type=self.view_type, score=row['anomaly_score'])
+                    feature = "["
+                    for k in sorted(row.keys()):
+                        if k != 'id' and k != 'anomaly_score':
+                            if feature != "[":
+                                feature += ","
+                            feature += k + ":" + str(row[k])
+                    feature += "]"
+                    feature = "Rnk:" + str(cnt+1) + "/" + str(total_nodes) + feature
+                    QUERY += "f='{feat}';g.V(x).property(afeature,f).next();".format(feat=feature)
+                    log.info("Adding anomaly scores to id " + row['id'] + " (" + self.view_type + ", " + row['anomaly_score'] + ")")
+                    if float(row['anomaly_score']) > max_score:
+                        max_score = float(row['anomaly_score'])
+                        max_id = row['id']
+                        max_feature = feature
+                    cnt = cnt + 1
+                    if cnt >= cutoff:
+                        break
+                    if len(QUERY) > 20000:
+                        log.info("size of QUERY = " + str(len(QUERY)))
+                        try:
+                            log.info('Attaching anomaly score for ' + str(cnt) + ' nodes')
+                            gremlin.fetch_data(QUERY, binds)
+                            log.info('Anomaly score attachment done for ' + str(cnt) + ' nodes')
+                        except:
+                            log.exception("Exception at query:" + QUERY)
+                        QUERY = ""
+
+                QUERY += "x={id};t='{type}';s={score};f='{feat}';IDS=g.V(x).in(sin).id().toList().toArray();if(IDS!=[]){{g.V(IDS).property(atype,t).next();g.V(IDS).property(ascore,s).next();g.V(IDS).property(afeature,f).next();}};".format(id=max_id, type=self.view_type, score=max_score, feat=max_feature)
+                log.info("size of QUERY = " + str(len(QUERY)))
+    #            log.info("Attaching anomaly scores to top " + str(cutoff) + " anomalous nodes (threshold=min(" + str(percentage) + "%,1000))...")
+                try:
+                    gremlin.fetch_data(QUERY, binds)
+                    log.info('Anomaly score attachment done for view ' + self.view_type)
+                except:
+                    log.exception("Exception at query:" + QUERY)
 
 
 
@@ -200,23 +211,23 @@ if __name__ == '__main__':
     producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'])
     with open(in_json) as f:
         views = json.loads(f.read())
-    with gremlin_query.Runner() as gremlin:
-        i = 1
-        for view_type in sorted(views.keys()):
-            producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
-            view_data = views[view_type]
-            view = AnomalyView(gremlin, view_type, view_data['instance_set'], view_data['feature_set'])
-            success = view.compute_view_and_save()
-            if success == True:
-                try:
-                    view.compute_anomaly_score()
-                    ad_output_root = os.getcwd()
-                    vstats = view_stats.ViewStats(view_type,ad_output_root)
-                    view.attach_scores_to_db(vstats)
-                    vstats.compute_all_stats()
-                    producer.send("ad-log", bytes(vstats.get_stats_info_formatted(), encoding='utf-8'))
-                    log.info(vstats.get_stats_info_formatted())
-                except:
-                    producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
-                    log.exception("error working with view {0} prevents statistics generation.".format(view_type))
-            i += 1
+    i = 1
+    for view_type in sorted(views.keys()):
+        producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
+        log.info('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')')
+        view_data = views[view_type]
+        view = AnomalyView(view_type, view_data['instance_set'], view_data['feature_set'])
+        success = view.compute_view_and_save()
+        if success == True:
+            try:
+                view.compute_anomaly_score()
+                ad_output_root = os.getcwd()
+                vstats = view_stats.ViewStats(view_type,ad_output_root)
+                view.attach_scores_to_db(vstats)
+                vstats.compute_all_stats()
+                producer.send("ad-log", bytes(vstats.get_stats_info_formatted(), encoding='utf-8'))
+                log.info(vstats.get_stats_info_formatted())
+            except:
+                producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
+                log.exception("error working with view {0} prevents statistics generation.".format(view_type))
+        i += 1
