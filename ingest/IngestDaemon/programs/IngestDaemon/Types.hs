@@ -21,9 +21,9 @@ data OperationRecord = OpRecord
                           , code     :: Maybe HttpCode
                           }
 
-data Input = Input { original  :: TCCDMDatum
+data Input = Input { original  :: !TCCDMDatum
                     -- ^ CDM received on the wire
-                   , statement :: Statement
+                   , statement :: !Statement
                     -- ^ Operation we've compiled the CDM into for Titan
                    , inputAge  :: !Int
                     -- ^ Number of times we've tried to run this operation.
