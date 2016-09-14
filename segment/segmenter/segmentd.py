@@ -77,14 +77,14 @@ class TopLevelSegmenter:
                         broker, spec, kafkaUrl, processes)
                 log.info(cmd)
                 os.system(cmd)
-                cmd = './adapt_segmenter.py --broker %s --segment-edges --name byPID --timestamps --spec %s --log-to-kafka --kafka %s --processes %d' % (
-                        broker, spec, kafkaUrl, processes)
-                log.info(cmd)
-                os.system(cmd)
-                cmd = './adapt_segmenter.py --broker %s --time-segment --window 60 --name byTime --spec %s --log-to-kafka --kafka %s --processes %d' % (
-                        broker, spec, kafkaUrl, processes)
-                log.info(cmd)
-                os.system(cmd)
+                #cmd = './adapt_segmenter.py --broker %s --segment-edges --name byPID --timestamps --spec %s --log-to-kafka --kafka %s --processes %d' % (
+                #        broker, spec, kafkaUrl, processes)
+                #log.info(cmd)
+                #os.system(cmd)
+                #cmd = './adapt_segmenter.py --broker %s --time-segment --window 60 --name byTime --spec %s --log-to-kafka --kafka %s --processes %d' % (
+                #        broker, spec, kafkaUrl, processes)
+                #log.info(cmd)
+                #os.system(cmd)
                 self.report_status(STATUS_DONE)
                 self.producer.send("se-log", b'done processing')
                 log.info(start_msg)  # Go back and do it all again.

@@ -14,15 +14,7 @@
             "num_open":
                 "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,OPEN).count())",
             "num_close":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CLOSE).count())",
-            "duration":{
-                "first":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
-                "operator":
-                    "subTime"
-            }
+                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CLOSE).count())"
         }
     },
 
@@ -44,11 +36,11 @@
                 "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CLOSE).count())",
             "duration":{
                 "first":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
+                    "g.V(IDS).local(__.both(E_A_N_I,N_A_E_O).both(E_A_N_O,N_A_E_I).has(STYPE,EVENT).values(STIME).max())",
                 "second":
                     "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             }
         }
     },
@@ -59,11 +51,11 @@
         "feature_set": {
             "connect_last_activity_gap":{
                 "first":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
+                    "g.V(IDS).local(__.both(E_A_N_I,N_A_E_O).both(E_A_N_O,N_A_E_I).has(STYPE,EVENT).values(STIME).max())",
                 "second":
                     "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             }
         }
     },
@@ -78,7 +70,7 @@
                 "second":
                     "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             },
             "num_writes":
                 "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).count())"
@@ -136,7 +128,7 @@
                 "second":
                     "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             },
             "num_writes":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).count())"
@@ -241,7 +233,7 @@
                 "second":
                     "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             }
         }
     },
@@ -256,7 +248,7 @@
                 "second":
                     "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).values(STIME).min())",
                 "operator":
-                    "subTime"
+                    "RELUTime"
             },
             "num_writes":
                 "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).count())"
