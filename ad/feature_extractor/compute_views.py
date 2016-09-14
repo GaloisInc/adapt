@@ -225,7 +225,7 @@ if __name__ == '__main__':
                 vstats = view_stats.ViewStats(view_type,ad_output_root)
                 view.attach_scores_to_db(vstats)
                 vstats.compute_all_stats()
-                producer.send("ad-log", bytes(vstats.get_stats_info_formatted(), encoding='utf-8'))
+                producer.send("ad-log", bytes(vstats.get_stats_info_formatted(), encoding='utf-8')).get()
                 log.info(vstats.get_stats_info_formatted())
             except:
                 producer.send("ad-log", bytes("error working with view {0} prevents statistics generation.".format(view_type), encoding='utf-8'))
