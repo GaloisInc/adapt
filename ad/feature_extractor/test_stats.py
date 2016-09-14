@@ -193,19 +193,34 @@ class TestStats(unittest.TestCase):
     # score range
     #   
     def test_score_range(self):
-        stats = view_stats.ViewStats('statsTest','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3,f4,f5,f6,f7,f8,f9,anomaly_score')
+        lines.append('001,1,0,12,0,0,45,0,0,0,0.9')
+        lines.append('002,1,0,10,0,0,7,0,0,0,0.7')
+        lines.append('003,1,0,11,0,0,5,0,0,0,0.5')
+        lines.append('004,1,0,9,0,0,5,0,0,0,0.3')
+        lines.append('005,1,0,9,0,0,5,0,0,0,0.1')
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.set_score_range()
         self.assertEqual('0.10', stats.score_range_min)
         self.assertEqual('0.90', stats.score_range_max)
         
     def test_score_range_single_node(self):
-        stats = view_stats.ViewStats('statsTestSingleNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3,f4,f5,f6,f7,f8,f9,anomaly_score')
+        lines.append('001,1,0,12,0,0,45,0,0,0,0.9')
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.set_score_range()
         self.assertEqual('0.90', stats.score_range_min)
         self.assertEqual('0.90', stats.score_range_max)
         
     def test_score_range_zero_node(self):
-        stats = view_stats.ViewStats('statsTestZeroNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3,f4,f5,f6,f7,f8,f9,anomaly_score')
+        self.create_file(self.score_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.set_score_range()
         self.assertEqual('noData', stats.score_range_min)
         self.assertEqual('noData', stats.score_range_max)
@@ -265,7 +280,18 @@ class TestStats(unittest.TestCase):
     # mean value for feature
     #
     def test_feature_mean(self):
-        stats = view_stats.ViewStats('statsTest','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,2')
+        lines.append('0002,2,2,4')
+        lines.append('0003,3,2,4')
+        lines.append('0004,4,2,4')
+        lines.append('0005,5,2,5')
+        lines.append('0006,6,2,5')
+        lines.append('0007,7,2,7')
+        lines.append('0008,8,2,9')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_means()
         f1_mean = stats.feature_means['f1']
         f2_mean = stats.feature_means['f2']
@@ -275,7 +301,11 @@ class TestStats(unittest.TestCase):
         self.assertEqual(f3_mean, '5.00')
         
     def test_feature_mean_single_node(self):
-        stats = view_stats.ViewStats('statsTestSingleNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_means()
         f1_mean = stats.feature_means['f1']
         f2_mean = stats.feature_means['f2']
@@ -285,7 +315,10 @@ class TestStats(unittest.TestCase):
         self.assertEqual(f3_mean, '3.00')  
           
     def test_feature_mean_zero_node(self):
-        stats = view_stats.ViewStats('statsTestZeroNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_means()
         self.assertEqual({}, stats.feature_means)
     
@@ -293,7 +326,18 @@ class TestStats(unittest.TestCase):
     # stdev feature values
     #
     def test_feature_stddev(self):
-        stats = view_stats.ViewStats('statsTest','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,2')
+        lines.append('0002,2,2,4')
+        lines.append('0003,3,2,4')
+        lines.append('0004,4,2,4')
+        lines.append('0005,5,2,5')
+        lines.append('0006,6,2,5')
+        lines.append('0007,7,2,7')
+        lines.append('0008,8,2,9')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_stdevs()
         f1_stdev = stats.feature_stdevs['f1']
         f2_stdev = stats.feature_stdevs['f2']
@@ -303,7 +347,11 @@ class TestStats(unittest.TestCase):
         self.assertEqual(f3_stdev, '2.14')
         
     def test_feature_stddev_single_node(self):
-        stats = view_stats.ViewStats('statsTestSingleNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_stdevs()
         f1_stdev = stats.feature_stdevs['f1']
         f2_stdev = stats.feature_stdevs['f2']
@@ -313,7 +361,10 @@ class TestStats(unittest.TestCase):
         self.assertEqual(f3_stdev, '0.00')
  
     def test_feature_stddev_zero_node(self):
-        stats = view_stats.ViewStats('statsTestZeroNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_stdevs()
         self.assertEqual({}, stats.feature_stdevs)
         
@@ -321,7 +372,18 @@ class TestStats(unittest.TestCase):
     # feature value variance
     #
     def test_feature_variance(self):
-        stats = view_stats.ViewStats('statsTest','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,2')
+        lines.append('0002,2,2,4')
+        lines.append('0003,3,2,4')
+        lines.append('0004,4,2,4')
+        lines.append('0005,5,2,5')
+        lines.append('0006,6,2,5')
+        lines.append('0007,7,2,7')
+        lines.append('0008,8,2,9')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_variances()
         f1_variance = stats.feature_variances['f1']
         f2_variance = stats.feature_variances['f2']
@@ -333,7 +395,11 @@ class TestStats(unittest.TestCase):
 
 
     def test_feature_variance_single_node(self):
-        stats = view_stats.ViewStats('statsTestSingleNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        lines.append('0001,1,2,3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_variances()
         f1_variance = stats.feature_variances['f1']
         f2_variance = stats.feature_variances['f2']
@@ -345,7 +411,10 @@ class TestStats(unittest.TestCase):
     
 
     def test_feature_variance_zero_node(self):
-        stats = view_stats.ViewStats('statsTestZeroNode','/home/vagrant/adapt/ad/test')
+        lines = []
+        lines.append('id,f1,f2,f3')
+        self.create_file(self.feature_file_path, lines)
+        stats = view_stats.ViewStats(self.view_name,self.root)
         stats.compute_feature_variances()
         self.assertEqual({}, stats.feature_variances)
         
