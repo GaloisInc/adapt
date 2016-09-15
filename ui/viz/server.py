@@ -101,4 +101,4 @@ log_handler = FileHandler(os.path.expanduser('~/adapt/ui/viz/templates/flask.log
 log_handler.setLevel(logging.INFO)
 app.logger.addHandler(log_handler)
 
-app.run(host='0.0.0.0', port=8180, processes=4)
+app.run(host='0.0.0.0', port=8180, processes=24)
