@@ -147,8 +147,6 @@ install_adapt_dependencies() {
 
     sudo rm -f /etc/rc?.d/S20supervisor || handle_error $LINENO
 
-    stack setup || handle_error $LINENO
-
     ensure_vagrant_user
     install_kafka $KAFKAVER $SCALAVER $KAFKA_HASH || handle_error $LINENO
     install_titan
@@ -170,6 +168,7 @@ function install_ingest_dashboard() {
     mkdir -p $ADAPT_DIR/.stack-adapt                          || handle_error $LINENO
     cp $ADAPT_DIR/install/stack.yaml $ADAPT_DIR/.stack-adapt/ || handle_error $LINENO
     cd $ADAPT_DIR/.stack-adapt                                || handle_error $LINENO
+    stack setup                                               || handle_error $LINENO
     stack install                                             || handle_error $LINENO
     cd $CWD
 }
