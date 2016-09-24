@@ -204,7 +204,7 @@
 
         function persistJournal(event) {
             journal.push(event)
-            localStorage.setItem("previous_journal", JSON.stringify(journal))
+            // localStorage.setItem("previous_journal", JSON.stringify(journal))
         }
 
 
@@ -239,6 +239,19 @@
                     break
                 case "checkpoint":
                     break
+                case "layout":
+                    _.map(event.positions, function(data, node_id) {
+                        network.moveNode(node_id, data.pos.x, data.pos.y)
+                    })
+                    setTimeout(function(){UI.animate(false)}, 0)
+                    _.map(event.positions, function(data, node_id) {
+                        if (data.fixed) {
+                            node_data_set.update( { id: node_id, fixed: true, shadow: { enabled: true } } )
+                        }
+                    })
+                    break
+                default:
+                    break
             }
         }
 
@@ -260,6 +273,10 @@
                     return event
                 case "checkpoint":
                     return event
+                case "layout":
+                    return event
+                default:
+                    return event
             }
         }
 
@@ -269,13 +286,15 @@
             if (journal.length > 0) {
                 journal_event = journal.pop()
                 right_journal.unshift(journal_event)
-                applyJournalEvent(invertJournalEvent(journal_event))
-                UI.animate()
-                localStorage.setItem("previous_journal", JSON.stringify(journal))
+                if (journal_event.type !== "layout") {
+                    applyJournalEvent(invertJournalEvent(journal_event))
+                    UI.animate()
+                }
+                // localStorage.setItem("previous_journal", JSON.stringify(journal))
             }
             UI.updateButtonStates()
             // Skip over checkpoints:
-            if (typeof journal_event !== "undefined" && journal_event.type === "checkpoint") { 
+            if (typeof journal_event !== "undefined" && (journal_event.type === "checkpoint" || journal_event.type === "layout")) { 
                 undoUpdateNetwork()
             }
         }
@@ -291,8 +310,10 @@
             // Skip over checkpoints:
             if (typeof journal_event !== "undefined" && 
                     journal_event.type !== "checkpoint" && 
+                    journal_event.type !== "layout" && 
                     typeof right_journal[0] !== "undefined" &&
-                    right_journal[0].type === "checkpoint") { 
+                    right_journal[0].type === "checkpoint" &&
+                    right_journal[0].type === "layout") { 
                 redoUpdateNetwork() 
             }
         }
@@ -301,8 +322,9 @@
         function undoMany(optional_name) {
             var undid_at_least_one = false
             while (journal.length > 0) {
-                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
-                if (is_checkpoint && undid_at_least_one) { break }
+                var last = journal.slice(-1)[0]
+                var should_skip = last.type === "checkpoint" || last.type === "layout"
+                if (should_skip && undid_at_least_one) { break }
                 if (typeof optional_name === "string" && journal.slice(-1)[0].name === optional_name) { break }
                 undoUpdateNetwork()
                 undid_at_least_one = true
@@ -320,7 +342,8 @@
         function redoMany(optional_name) {
             while (right_journal.length > 0) {
                 redoUpdateNetwork()
-                var is_checkpoint = journal.slice(-1)[0].type === "checkpoint"
+                var last = journal.slice(-1)[0]
+                var is_checkpoint = last.type === "checkpoint" || last.type === "layout"
                 if (is_checkpoint) { break }
             }
             var right_names = _.filter(_.pluck(right_journal, "name"), function(n){return typeof n === "string"})
@@ -338,9 +361,25 @@
                     name : name,
                     type : "checkpoint"
                 }
-                journal.push(journal_event)
+                addLayout()
+                persistJournal(journal_event)
                 UI.checkpointFeedback()
             }
+        }
+
+
+        function addLayout() {
+            var positions = network.getPositions(node_data_set.getIds())
+            var pinned_positions = _.mapObject(positions, function (val, key) { 
+                var result =  { pos: val }
+                if (node_data_set.get(key).fixed) { result['fixed'] = true }
+                return result
+            })
+            var journal_event = {
+                type: "layout",
+                positions: pinned_positions
+            }
+            persistJournal(journal_event)
         }
 
 
@@ -770,11 +809,11 @@
                 if (data.nodes.length > 0 || data.edges.length > 0) {
                     journal = [data]
                 }
-                var previous_journal = localStorage.getItem("previous_journal")
-                if (previous_journal != null) {
-                    right_journal = JSON.parse(previous_journal)
-                    UI.updateButtonStates()
-                }
+                // var previous_journal = localStorage.getItem("previous_journal")
+                // if (previous_journal != null) {
+                //     right_journal = JSON.parse(previous_journal)
+                //     UI.updateButtonStates()
+                // }
 
                 network.on("doubleClick", UI.networkDoubleClickBehavior)
                 network.on("oncontext", UI.networkRightClickBehavior)
@@ -823,6 +862,7 @@
 
 
         function downloadJournal() {
+            addLayout()
             var data_str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
             var anchor = document.getElementById('download-anchor')
             anchor.setAttribute("href", data_str)
