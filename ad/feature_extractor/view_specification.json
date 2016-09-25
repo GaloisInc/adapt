@@ -62,7 +62,7 @@
 
     "netflow_long_write_delay" : {
         "description" : "Identify netflow nodes with long writing delay (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).dedup().where(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).count().is(gt(1))).id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).dedup().where(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).limit(2).count().is(gt(1))).id().toList().toArray()",
         "feature_set": {
             "first_last_write_gap":{
                 "first":
@@ -120,7 +120,7 @@
 
     "process_long_write_to_netflow" : {
         "description" : "Identify process nodes with long writing delay (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).count().is(gt(1))).id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).limit(2).count().is(gt(1))).id().toList().toArray()",
         "feature_set": {
             "first_last_write_gap":{
                 "first":
@@ -137,7 +137,7 @@
 
     "process_write_rate_to_netflow" : {
         "description" : "Identify process with slow write rate (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).count().is(gt(1))).id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).limit(2).count().is(gt(1))).id().toList().toArray()",
         "feature_set": {
             "write_rate":{
                 "first":
@@ -202,24 +202,24 @@
 
     "files_executed" : {
         "description" : "Analyze executed files",
-        "instance_set" : "IDS=g.V().has(ETYPE,EXECUTE).in(F_A_E_I).in(F_A_E_O).dedup().id().toList().toArray()",
+        "instance_set" : "IDS=g.V().has(ETYPE,EXECUTE).both(F_A_E_I,E_A_F_O).both(F_A_E_O,E_A_F_I).dedup().id().toList().toArray()",
         "feature_set" : {
             "num_exec":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,EXECUTE).count())",
             "num_close":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,CLOSE).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,CLOSE).count())",
             "num_chk_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_modify_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
             "num_open":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,OPEN).count())",
             "num_read":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,READ).count())",
             "num_rename":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,RENAME).count())",
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,RENAME).count())",
             "num_write":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).count())"
+                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,WRITE).count())"
         }
     },
 
