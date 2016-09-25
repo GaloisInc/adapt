@@ -28,6 +28,7 @@ bindings = {
     'PROCESS':0,
     'EVENT':4,
 
+    'ACCEPT': 0,
     'CHECK_FILE_ATTRIBUTES':3,
     'CLOSE':5,
     'CONNECT':6,

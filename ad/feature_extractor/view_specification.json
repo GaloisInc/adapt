@@ -1,79 +1,61 @@
 {
-    "netflow" : {
-        "description" : "Analyze netflow nodes i.e. network sockets for possible anomalous behavior",
-        "instance_set" : "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).dedup().id().toList().toArray()",
+    "netflow_connect_process_exec" : {
+        "description" : "Analyze netflow nodes that have connection with file execution (potential remote execution command)",
+        "instance_set" : "IDS=g.V().has(ETYPE,CONNECT).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).as('netflow').both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).out(E_G_B_S_O).out(E_G_B_S_I).in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,EXECUTE).select('netflow').dedup().id().toList().toArray()",
         "feature_set" : {
             "write_bytes":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
             "read_bytes":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,READ).values(SIZE).sum())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,READ).values(SIZE).sum())",
             "num_writes":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).count())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,WRITE).count())",
             "num_reads":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,READ).count())",
-            "num_open":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,OPEN).count())",
-            "num_close":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CLOSE).count())"
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,READ).count())"
         }
     },
 
-    "netflow_connect_process_exec" : {
+    "netflow_accept_process_exec" : {
         "description" : "Analyze netflow nodes that have connection with file execution (potential remote execution command)",
-        "instance_set" : "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).as('netflow').both(E_A_N_I,N_A_E_O).both(E_A_N_O,N_A_E_I).out(E_G_B_S_O).out(E_G_B_S_I).in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,EXECUTE).select('netflow').dedup().id().toList().toArray()",
+        "instance_set" : "IDS=g.V().has(ETYPE,ACCEPT).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).as('netflow').both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).out(E_G_B_S_O).out(E_G_B_S_I).in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,EXECUTE).select('netflow').dedup().id().toList().toArray()",
         "feature_set" : {
             "write_bytes":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,WRITE).values(SIZE).sum())",
             "read_bytes":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,READ).values(SIZE).sum())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,READ).values(SIZE).sum())",
             "num_writes":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).count())",
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,WRITE).count())",
             "num_reads":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,READ).count())",
-            "num_open":
-                "g.V(IDS).local(__.out(N_A_E_O).out(N_A_E_I).has(ETYPE,OPEN).count())",
-            "num_close":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CLOSE).count())",
-            "duration":{
-                "first":
-                    "g.V(IDS).local(__.both(E_A_N_I,N_A_E_O).both(E_A_N_O,N_A_E_I).has(STYPE,EVENT).values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
-                "operator":
-                    "RELUTime"
-            }
+                "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,READ).count())"
         }
     },
 
     "netflow_connect_last_activity_gap" : {
         "description" : "Identify netflow nodes that are open for long time",
-        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).dedup().id().toList().toArray()",
         "feature_set": {
             "connect_last_activity_gap":{
                 "first":
-                    "g.V(IDS).local(__.both(E_A_N_I,N_A_E_O).both(E_A_N_O,N_A_E_I).has(STYPE,EVENT).values(STIME).max())",
+                    "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
+                    "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,CONNECT).values(STIME).min())",
                 "operator":
                     "RELUTime"
             }
         }
     },
 
-    "netflow_long_write_delay" : {
-        "description" : "Identify netflow nodes with long writing delay (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(ETYPE,CONNECT).out(E_A_N_O).out(E_A_N_I).dedup().where(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).limit(2).count().is(gt(1))).id().toList().toArray()",
+    "netflow_accept_last_activity_gap" : {
+        "description" : "Identify netflow nodes that are open for long time",
+        "instance_set": "IDS=g.V().has(ETYPE,ACCEPT).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).dedup().id().toList().toArray()",
         "feature_set": {
-            "first_last_write_gap":{
+            "accept_last_activity_gap":{
                 "first":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).values(STIME).max())",
+                    "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(STYPE,EVENT).values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).values(STIME).min())",
+                    "g.V(IDS).local(__.both(N_A_E_O,E_A_N_I).both(N_A_E_I,E_A_N_O).has(ETYPE,ACCEPT).values(STIME).min())",
                 "operator":
                     "RELUTime"
-            },
-            "num_writes":
-                "g.V(IDS).local(__.in(E_A_N_I).in(E_A_N_O).has(ETYPE,WRITE).count())"
+            }
         }
     },
 
@@ -83,33 +65,31 @@
         "description" : "Analyze process nodes that have network activity",
         "instance_set" : "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set" : {
-            "num_file_open_during_wr_to_netflow":
-                "g.V(IDS).local(__.as('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('writeNetflow').out(E_A_N_O).select('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,OPEN).as('openFile').in(F_A_E_I).select('writeNetflow','openFile').by(STIME).where('writeNetflow',gte('openFile')).count())",
             "num_distinct_dst_port_access":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).values(DPORT).dedup().count())",
             "num_distinct_src_port_access":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).values(SPORT).dedup().count())",
             "total_bytes_sent_to_netflow":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('event').out(E_A_N_O).select('event').has(SIZE).values(SIZE).sum())",
+                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('event').both(E_A_N_O,N_A_E_I).select('event').has(SIZE).values(SIZE).sum())",
             "total_bytes_rcv_from_netflow":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).as('event').in(N_A_E_I).select('event').has(SIZE).values(SIZE).sum())",
+                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).as('event').both(E_A_N_O,N_A_E_I).select('event').has(SIZE).values(SIZE).sum())",
             "num_writes_to_net_flow":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).count())",
+                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).both(E_A_N_O,N_A_E_I).count())",
             "num_reads_to_netflow":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).in(N_A_E_I).count())"
+                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).both(E_A_N_O,N_A_E_I).count())"
         }
     },
 
-    "process_connect_many_netflow" : {
-        "description": "Analyze process nodes that have many distinct network activity within same network hosts",
+    "process_connect_many_ip_same_network" : {
+        "description": "Analyze process nodes that have many ip access within same network",
         "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set": {
             "max_num_local_net_access":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).dedup().groupCount().by{x=it.value(DADDRESS);x.substring(0,x.indexOf('.',x.indexOf('.',0)+1))}.mapValues().max())"
+                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I).both(E_A_N_I,N_A_E_O).dedup().groupCount().by{x=it.value(DADDRESS);if(x.indexOf('.') >=0 ){x.substring(0,x.indexOf('.',x.indexOf('.',0)+1))} else {x.substring(0,x.indexOf(':',x.indexOf(':',0)+1))}}.mapValues().max())"
         }
     },
 
-    "process_connect_rare_ip" : {
+    "process_connect_many_or_rare_ip" : {
         "description": "Analyze process nodes that have rare ip access",
         "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_N_O,N_A_E_I)).id().toList().toArray()",
         "feature_set": {
@@ -118,53 +98,9 @@
         }
     },
 
-    "process_long_write_to_netflow" : {
-        "description" : "Identify process nodes with long writing delay (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).limit(2).count().is(gt(1))).id().toList().toArray()",
-        "feature_set": {
-            "first_last_write_gap":{
-                "first":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).min())",
-                "operator":
-                    "RELUTime"
-            },
-            "num_writes":
-                "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).count())"
-        }
-    },
-
-    "process_write_rate_to_netflow" : {
-        "description" : "Identify process with slow write rate (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).limit(2).count().is(gt(1))).id().toList().toArray()",
-        "feature_set": {
-            "write_rate":{
-                "first":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(SIZE).sum())",
-                "second":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).max())",
-                "third":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).min())",
-                "operator":
-                    "div(SubTime)"
-            },
-            "time_gap_per_writes":{
-                "first":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).min())",
-                "third":
-                    "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').count())",
-                "operator":
-                    "(SubTime)div"
-            }
-        }
-    },
-
     "process_access_file_attributes" : {
         "description" : "Analyze process that access attributes of files",
-        "instance_set": "IDS=g.V().has(STYPE,PROCESS).where(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,within(CHECK_FILE_ATTRIBUTES,MODIFY_FILE_ATTRIBUTES))).id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(STYPE,PROCESS).or(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,CHECK_FILE_ATTRIBUTES),__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES)).id().toList().toArray()",
         "feature_set": {
             "num_chk_attrib":
                 "g.V(IDS).local(__.in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
@@ -180,90 +116,52 @@
         "instance_set" : "IDS=g.V().has(STYPE,EVENT).as('net_events').both(E_A_N_O,N_A_E_I).select('net_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).dedup().id().toList().toArray()",
         "feature_set" : {
             "num_exec":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).count())",
-            "num_close":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,CLOSE).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_chk_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_modify_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
-            "num_open":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).count())",
-            "num_read":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
             "num_rename":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,RENAME).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,RENAME).count())",
+            "num_read":
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,READ).count())",
             "num_write":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,WRITE).count())",
             "num_uploads":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).as('file_read').out(E_G_B_S_O).out(E_G_B_S_I).as('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).out(E_A_N_I).dedup().count())"
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,READ).as('file_read').out(E_G_B_S_O).out(E_G_B_S_I).dedup().as('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').both(E_A_N_O,N_A_E_I).select('file_read').dedup().count())",
+            "num_dnlds":
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,WRITE).as('file_write').out(E_G_B_S_O).out(E_G_B_S_I).dedup().as('process').in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).as('netflow_read').both(E_A_N_O,N_A_E_I).select('file_write').dedup().count())"
         }
     },
 
     "files_executed" : {
         "description" : "Analyze executed files",
-        "instance_set" : "IDS=g.V().has(ETYPE,EXECUTE).both(F_A_E_I,E_A_F_O).both(F_A_E_O,E_A_F_I).dedup().id().toList().toArray()",
+        "instance_set" : "IDS=g.V().has(ETYPE,EXECUTE).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).dedup().id().toList().toArray()",
         "feature_set" : {
             "num_exec":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,EXECUTE).count())",
-            "num_close":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,CLOSE).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).count())",
             "num_chk_attrib":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
             "num_modify_attrib":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
-            "num_open":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,OPEN).count())",
-            "num_read":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,READ).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())",
             "num_rename":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,RENAME).count())",
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,RENAME).count())",
+            "num_read":
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,READ).count())",
             "num_write":
-                "g.V(IDS).local(__.both(E_A_F_I,F_A_E_O).both(E_A_F_O,F_A_E_I).has(ETYPE,WRITE).count())"
-        }
-    },
-
-    "file_open_close_gap" : {
-        "description" : "Identify files that are open for long time",
-        "instance_set": "IDS=g.V().has(ETYPE,CLOSE).in(F_A_E_I).in(F_A_E_O).dedup().as('files').out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).select('files').dedup().id().toList().toArray()",
-        "feature_set": {
-            "open_close_gap":{
-                "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,CLOSE).values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,OPEN).values(STIME).min())",
-                "operator":
-                    "RELUTime"
-            }
-        }
-    },
-
-    "files_connect_netflow_long_write" : {
-        "description" : "Identify files connected with netflow and having writting for long time (potential infiltration)",
-        "instance_set" : "IDS=g.V().has(ETYPE,WRITE).as('write_events').out(E_A_N_O).select('write_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_F_O).out(E_A_F_I).dedup().id().toList().toArray()",
-        "feature_set": {
-            "first_last_write_gap":{
-                "first":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).values(STIME).min())",
-                "operator":
-                    "RELUTime"
-            },
-            "num_writes":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).count())"
+                "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,WRITE).count())"
         }
     },
 
     "file_dnld_exec_gap" : {
         "description" : "Detect files that are executed right after download",
-        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).in(F_A_E_I).in(F_A_E_O).as('files').in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).in(N_A_E_I).select('files').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).as('files').both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,WRITE).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).both(E_A_N_O,N_A_E_I).select('files').dedup().id().toList().toArray()",
         "feature_set": {
             "dnld_exec_gap":{
                 "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).values(STIME).min())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,WRITE).as('dnld').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).in(N_A_E_I).select('dnld').values(STIME).max())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,WRITE).as('dnld').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).both(E_A_N_O,N_A_E_I).select('dnld').values(STIME).max())",
                 "operator":
                     "RELUTime"
             }
@@ -272,13 +170,13 @@
 
     "file_attrib_change_exec_gap" : {
         "description" : "Detect files that are executed right after permission change",
-        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).in(F_A_E_I).in(F_A_E_O).as('files').in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).select('files').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).as('files').both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).select('files').dedup().id().toList().toArray()",
         "feature_set": {
             "attrib_change_exec_gap":{
                 "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).values(STIME).min())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).values(STIME).max())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).values(STIME).min())",
                 "operator":
                     "RELUTime"
             }
@@ -287,13 +185,13 @@
 
     "file_exec_del_gap" : {
         "description" : "Detect files that are deleted right after execution",
-        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).in(F_A_E_I).in(F_A_E_O).as('files').in(E_A_F_I).in(E_A_F_O).has(ETYPE,UNLINK).select('files').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).as('files').both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,UNLINK).select('files').dedup().id().toList().toArray()",
         "feature_set": {
             "exec_del_gap":{
                 "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).values(STIME).max())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,UNLINK).values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,UNLINK).values(STIME).min())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).values(STIME).max())",
                 "operator":
                     "RELUTime"
             }
@@ -302,57 +200,16 @@
 
     "file_upload_del_gap" : {
         "description" : "Detect files that are deleted right after upload",
-        "instance_set": "IDS=g.V().has(ETYPE,UNLINK).out(E_A_F_O).out(E_A_F_I).as('files').out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).out(E_A_N_O).select('files').dedup().id().toList().toArray()",
+        "instance_set": "IDS=g.V().has(ETYPE,UNLINK).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).as('files').both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,READ).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).both(E_A_N_O,N_A_E_I).select('files').dedup().id().toList().toArray()",
         "feature_set": {
             "upload_del_gap":{
                 "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').out(E_A_N_O).select('netflow_write').values(STIME).max())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,READ).as('file_read').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('netflow_write').both(E_A_N_O,N_A_E_I).select('file_read').values(STIME).max())",
                 "second":
-                    "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,UNLINK).values(STIME).min())",
+                    "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,UNLINK).values(STIME).min())",
                 "operator":
                     "RELUTime"
             }
-        }
-    },
-
-    "file_last_write_upload_gap" : {
-        "description" : "Detect files that are uploaded right after write (potential exfiltration)",
-        "instance_set": "IDS=g.V().has(ETYPE,WRITE).as('write_events').out(E_A_N_O).select('write_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,READ).in(F_A_E_I).in(F_A_E_O).dedup().id().toList().toArray()",
-        "feature_set": {
-            "last_write_upload_gap":{
-                "first":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).values(STIME).max())",
-                "second":
-                    "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,READ).out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).has(ETYPE,WRITE).as('net_write').out(E_A_N_O).select('net_write').values(STIME).min())",
-                "operator":
-                    "RELUTime"
-            }
-        }
-    },
-
-    "files_executed_attribute_access" : {
-        "description" : "Analyze file attribute access/change for executed files",
-        "instance_set": "IDS=g.V().has(ETYPE,EXECUTE).in(F_A_E_I).in(F_A_E_O).dedup().id().toList().toArray()",
-        "feature_set": {
-            "num_exec":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).count())",
-            "num_chk_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
-            "num_modify_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())"
-        }
-    },
-
-    "files_in_tmp_dir_connect_netflow" : {
-        "description" : "Analyze the files in temp directory and have connection with netflow",
-        "instance_set": "IDS=g.V().has(STYPE,EVENT).as('net_events').both(E_A_N_O,N_A_E_I).select('net_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).dedup().has('url',textContains('/tmp')).id().toList().toArray()",
-        "feature_set": {
-            "num_exec":
-                "g.V(IDS).local(__.out(F_A_E_O).out(F_A_E_I).has(ETYPE,EXECUTE).count())",
-            "num_chk_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,CHECK_FILE_ATTRIBUTES).count())",
-            "num_modify_attrib":
-                "g.V(IDS).local(__.in(E_A_F_I).in(E_A_F_O).has(ETYPE,MODIFY_FILE_ATTRIBUTES).count())"
         }
     }
 }
