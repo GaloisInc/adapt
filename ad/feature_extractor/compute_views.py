@@ -71,32 +71,40 @@ class AnomalyView:
         self.feature_file = 'features/' + self.view_type + '.csv'
         self.score_file = 'scores/' + self.view_type + '.csv'
 
+    def split_Q_to_many(self, var, Q):
+        QUERY = "{}=[];".format(var)
+        QUERY += "for(int sidx = 0; sidx < IDS.size(); sidx += SIZE){eidx = sidx + SIZE; if(eidx > IDS.size()){eidx = IDS.size()};".replace('SIZE', '50000')
+        QUERY += "{} += ".format(var) + Q.replace('IDS','IDS.subList(sidx,eidx).toArray()') + ".toList()};"
+        return QUERY
+
     def compute_view_and_save(self):
         # extract features
         keys = sorted(self.features_queries.keys())
         QUERY = self.node_ids_query + ";if(IDS!=[]){"
         for i in range(0,len(keys)):
             if type(self.features_queries[keys[i]]) == type(dict()):
-                QUERY += "yf{}=".format(i) + self.features_queries[keys[i]]['first'] + ";"
+                QUERY += self.split_Q_to_many("yf{}".format(i), self.features_queries[keys[i]]['first'])
                 if 'second' in self.features_queries[keys[i]].keys():
-                    QUERY += "ys{}=".format(i) + self.features_queries[keys[i]]['second'] + ";"
+                    QUERY += self.split_Q_to_many("ys{}".format(i), self.features_queries[keys[i]]['second'])
                 if 'third' in self.features_queries[keys[i]].keys():
-                    QUERY += "yt{}=".format(i) + self.features_queries[keys[i]]['third'] + ";"
+                    QUERY += self.split_Q_to_many("yt{}".format(i), self.features_queries[keys[i]]['third'])
             else:
-                QUERY += "x{}=".format(i) + self.features_queries[keys[i]] + ";"
+                QUERY += self.split_Q_to_many("x{}".format(i), self.features_queries[keys[i]])
         QUERY += "[IDS"
         for i in range(0,len(keys)):
             if type(self.features_queries[keys[i]]) == type(dict()):
-                QUERY += ",[yf{}.toList()".format(i)
+                QUERY += ",[yf{}".format(i)
                 if 'second' in self.features_queries[keys[i]].keys():
-                    QUERY += ",ys{}.toList()".format(i)
+                    QUERY += ",ys{}".format(i)
                 if 'third' in self.features_queries[keys[i]].keys():
-                    QUERY += ",yt{}.toList()".format(i)
+                    QUERY += ",yt{}".format(i)
                 QUERY += "]"
             else:
-                QUERY += ",x{}.toList()".format(i)
+                QUERY += ",x{}".format(i)
         QUERY += "]}else [];"
-
+#        print(QUERY)
+#        if len(QUERY) > 0:
+#            return False
         log.info("Extracting features for " + self.view_type + "...")
         with gremlin_query.Runner() as gremlin:
             try:
@@ -209,11 +217,15 @@ class AnomalyView:
 
 if __name__ == '__main__':
     in_json = sys.argv[1]
+    view_to_run = int(sys.argv[2])
     producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'])
     with open(in_json) as f:
         views = json.loads(f.read())
-    i = 1
+    i = 0
     for view_type in sorted(views.keys()):
+        i += 1
+        if i != view_to_run:
+            continue
         producer.send("ad-log", bytes('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')', encoding='utf-8'))
         log.info('Processing Anomaly View ' + view_type + ' (' + str(i) + '/' + str(len(views.keys())) + ')')
         view_data = views[view_type]
@@ -233,4 +245,3 @@ if __name__ == '__main__':
                 log.exception("error working with view {0} prevents statistics generation.".format(view_type))
         else:
             producer.send("ad-log", bytes("Found 0 " + view_type + " nodes", encoding='utf-8'))
-        i += 1
