@@ -73,7 +73,7 @@ class AnomalyView:
 
     def split_Q_to_many(self, var, Q):
         QUERY = "{}=[];".format(var)
-        QUERY += "for(int sidx = 0; sidx < IDS.size(); sidx += SIZE){eidx = sidx + SIZE; if(eidx > IDS.size()){eidx = IDS.size()};".replace('SIZE', '50000')
+        QUERY += "for(int sidx = 0; sidx < IDS.size(); sidx += SIZE){eidx = sidx + SIZE; if(eidx > IDS.size()){eidx = IDS.size()};".replace('SIZE', '10000')
         QUERY += "{} += ".format(var) + Q.replace('IDS','IDS.subList(sidx,eidx).toArray()') + ".toList()};"
         return QUERY
 
