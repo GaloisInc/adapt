@@ -20,10 +20,10 @@ executable dashboard
   main-is:             Dashboard.hs
   other-modules:       Paths_adapt_dashboard
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <4.10,
                        simple-get-opt >=0.1 && <0.2,
                        warp >=3.2 && <3.3,
-                       servant-server >=0.7 && <0.8,
+                       servant-server >=0.7 && <0.9,
                        lucid, http-media, wai, stm,
                        text, string-qq, either,
                        transformers, bytestring,

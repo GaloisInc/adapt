@@ -19,7 +19,7 @@ library
   exposed-modules:     Gremlin.Client
   -- other-modules:       
   other-extensions:    RecordWildCards, OverloadedStrings, ScopedTypeVariables, ParallelListComp
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <4.10,
                        async >=2.0 && <2.2,
                        stm >=2.4 && <2.5,
                        aeson >=0.8 && <0.13,

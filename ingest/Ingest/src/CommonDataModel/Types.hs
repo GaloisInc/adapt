@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module CommonDataModel.Types where
 
 import           Prelude as P
@@ -551,8 +552,8 @@ instance FromAvro RegistryKeyObject where
   fromAvro _ = fail "Invalid value for RegistryKeyObject"
 
 -- XXX seriously...
-fromAvroEnum :: (Bounded a, Enum a) => String -> Ty.Value Avro.Type -> Avro.Result a
+fromAvroEnum :: forall a. (Bounded a, Enum a) => String -> Ty.Value Avro.Type -> Avro.Result a
 fromAvroEnum ty (Ty.Enum _ idx txt)
-  | idx >= minBound && idx <= maxBound = pure $ toEnum idx
+  | idx >= fromEnum (minBound :: a) && idx <= fromEnum (maxBound :: a) = pure $ toEnum idx
   | otherwise = fail $ "Unrecognized enum for '" <> ty <> "': " <> T.unpack txt
 fromAvroEnum ty v = fail $ "Invalid value for '" <> ty <> "': " <> show v
