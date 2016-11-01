@@ -99,10 +99,20 @@ install_adapt_dependencies() {
                      --recv-keys 575159689BEFB442 || handle_error $LINENO
     echo 'deb http://download.fpcomplete.com/ubuntu trusty main' | sudo tee \
                 /etc/apt/sources.list.d/fpco.list || handle_error $LINENO
-    sudo add-apt-repository ppa:webupd8team/java || handle_error $LINENO
+
+    if type -p java; then
+      echo "found java executable in PATH"
+    elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
+      echo "found java executable in JAVA_HOME"
+    else
+      echo "Java not found; Installing Java..."
+      echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
+                  | sudo debconf-set-selections || handle_error $LINENO
+      sudo add-apt-repository ppa:webupd8team/java || handle_error $LINENO
+      sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
+    fi
+
     sudo apt-get update || handle_error $LINENO
-    echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 boolean true" \
-                | sudo debconf-set-selections || handle_error $LINENO
     sudo apt-get install -y \
          exuberant-ctags \
          git \
@@ -117,7 +127,6 @@ install_adapt_dependencies() {
          wget \
          graphviz \
        || handle_error $LINENO
-    sudo apt-get install -y oracle-java8-installer || echo $'tries = 100\ntimeout = 5000' | sudo tee -a /var/cache/oracle-jdk8-installer/wgetrc && sudo apt-get install -y oracle-java8-installer || handle_error $LINENO
     sudo -H easy_install3 pip || handle_error $LINENO
     sudo -H pip2 install \
         avroknife \
