@@ -9,9 +9,16 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 
+import com.bbn.tc.schema.avro.*;
+import java.io.File;
+import java.io.IOException;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.specific.SpecificDatumReader;
+
 public class Ingest {
-    public static void main(String[] args) {
-        TitanGraph graph = TitanFactory.open("/opt/titan/conf/gremlin-server/titan-cassandra-server.properties");
+    public static void main(String[] args) throws IOException {
+        /*TitanGraph graph = TitanFactory.open("/opt/titan/conf/gremlin-server/titan-cassandra-server.properties");
 
         // see org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerFactory.generateClassic()
         final Vertex f1 = graph.addVertex("Entity-File");
@@ -34,6 +41,16 @@ public class Ingest {
         System.out.println("\n\n\nFOUND PATH:");
         System.out.println(list);
         System.out.println("\n\n\n");
+*/
+        File file = new File("test.avro");
+        DatumReader<TCCDMDatum> tcDatumReader = new SpecificDatumReader<TCCDMDatum>(TCCDMDatum.class);
+        DataFileReader<TCCDMDatum> tcFileReader = new DataFileReader<TCCDMDatum>(file, tcDatumReader);
+        TCCDMDatum tcd = null;
+        while(tcFileReader.hasNext()) {
+            tcd = tcFileReader.next();
+            System.out.println(tcd);
+        }
+
         System.exit(0);
     }
 }
