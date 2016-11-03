@@ -823,7 +823,6 @@
                     if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
                 })
                 network.on("hold", function(props) {
-                    console.log(props)
                     if ( props.nodes.length == 1) {
                         var node_id = props.nodes[0]
                         var is_cluster = network.isCluster(node_id)
