@@ -181,7 +181,7 @@
                     }
                     persistJournal(data)
                     // Add position, if needed:
-                    if (typeof starting_node_id === "number" && typeof node_data_set.get(starting_node_id) === "object") {
+                    if (typeof starting_node_id !== "undefined" && typeof node_data_set.get(starting_node_id) === "object") {
                         var bbox = network.getBoundingBox(starting_node_id)
                         var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
                         new_nodes = _.map(new_nodes, function(n) {
@@ -240,13 +240,15 @@
                 case "checkpoint":
                     break
                 case "layout":
-                    _.map(event.positions, function(data, node_id) {
-                        network.moveNode(node_id, data.pos.x, data.pos.y)
+                    _.map(event.positions, function(data, node_id_string) {
+                        network.moveNode(node_id_string, data.pos.x, data.pos.y)
                     })
-                    setTimeout(function(){UI.animate(false)}, 0)
-                    _.map(event.positions, function(data, node_id) {
+                    setTimeout(function(){UI.animate(false)}, 0)    // TODO: do this in a logically rigorous way!!!
+                    _.map(event.positions, function(data, node_id_string) {
                         if (data.fixed) {
-                            node_data_set.update( { id: node_id, fixed: true, shadow: { enabled: true } } )
+                            var possible_numeric_id = Number(node_id_string)
+                            var node_id_as_string_or_number = isNaN(possible_numeric_id) ? node_id_string : possible_numeric_id
+                            node_data_set.update( { id: node_id_as_string_or_number, fixed: true, shadow: { enabled: true } } )
                         }
                     })
                     break
@@ -621,7 +623,7 @@
             networkRightClickBehavior : function(props) {
                 $("#node-query-menu ul").empty()
                 var node_id = network.getNodeAt({x: props.pointer.DOM.x, y: props.pointer.DOM.y})
-                if (typeof node_id == 'number') {
+                if (typeof node_id !== 'undefined') {
                     var query_list = node_data_set.get(node_id).queries
                     if (network.getSelectedNodes().length > 1) {
                         var collapse_query = { 
@@ -821,17 +823,14 @@
                     if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
                 })
                 network.on("hold", function(props) {
+                    console.log(props)
                     if ( props.nodes.length == 1) {
                         var node_id = props.nodes[0]
                         var is_cluster = network.isCluster(node_id)
-                        if ( ! is_cluster) {
+                        
+                        if (props.event.srcEvent.shiftKey && ! is_cluster) {
                             var node = node_data_set.get(node_id)
-                            debug_node = node
-                            console.log(debug_node)
-                        } else { console.log(node_id)}
-
-                        if (props.event.srcEvent.shiftKey) {
-                            var previous_color = is_cluster ? "red" : node.icon.color
+                            var previous_color = node.icon.color
                             var shadow_enabled = node.hasOwnProperty('shadow') && node.shadow.enabled
                             node_data_set.update({ 
                                 id: node_id, 
@@ -842,6 +841,14 @@
                             setTimeout(function(){
                                 node_data_set.update( {id: node_id, icon: {color: previous_color} } )
                             }, 500)
+                        } else {
+                            if (is_cluster) {
+                                console.log(node_id)
+                            } else {
+                                var node = node_data_set.get(node_id)
+                                debug_node = node
+                                console.log(debug_node)
+                            }
                         }
                     }
                 })
@@ -855,8 +862,7 @@
                 })
                 $("#graph").on("mousemove", function(e) {  // Cannot use network 'dragging' event
                     if (UI.drawing) { UI.updateSelectionBox(e) }
-                })
-                        
+                })      
             }
         }
 
