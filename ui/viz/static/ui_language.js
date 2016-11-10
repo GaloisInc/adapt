@@ -137,8 +137,10 @@ var node_appearance = [
                 case "Event":
                     if (e === "Write" || e === "Read") {
                         var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ") #" + seq
-                    } else { return t + " " + e + " #" + seq}
+                        return t + " " + e + " (" + temp + ") #" + seq + "\n" + timestamp
+                    } else { 
+                        return t + " " + e + " #" + seq + "\n" + timestamp
+                    }
                 default:
                     return t + " seq:" + seq + ", @" + timestamp + " " + anom
             }
@@ -161,8 +163,10 @@ var node_appearance = [
                 case "Event":
                     if (e === "Write" || e === "Read") {
                         var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ") #" + seq
-                    } else { return t + " " + e + " #" + seq}
+                        return t + " " + e + " (" + temp + ") #" + seq + "\n" + timestamp
+                    } else { 
+                        return t + " " + e + " #" + seq + "\n" + timestamp
+                    }
                 default:
                     return t + " seq:" + seq + ", @" + timestamp
             }

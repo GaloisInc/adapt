@@ -870,7 +870,7 @@
             addLayout()
             var data_str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
             var anchor = document.getElementById('download-anchor')
-            anchor.setAttribute("href", data_str)
+            anchor.setAttribute("href", data_str)  // TODO: browser download fails when this URI is too long!
             anchor.setAttribute("download", "history.json")
             anchor.click()
             $("#download-button").addClass("ion-checkmark-round").removeClass("ion-ios-cloud-download-outline")
