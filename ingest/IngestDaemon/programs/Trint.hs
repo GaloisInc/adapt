@@ -42,11 +42,13 @@ data Config = Config { lintOnly   :: Bool
                      , verbose    :: Bool
                      , help       :: Bool
                      , pushKafka  :: Bool
+                     , getOffset  :: Bool
                      , files      :: [File]
                      , finished   :: Bool
                      , finishedButBlock :: Bool
                      , ta1_to_ta2_kafkaTopic :: TopicName
                      , ingest_control_topic :: TopicName
+                     , kafkaServer :: KafkaAddress
                      } deriving (Show)
 
 data File = CDMFile { getFP :: FilePath }
@@ -61,12 +63,17 @@ defaultConfig = Config
   , verbose   = False
   , help      = False
   , pushKafka = False
-  , files = []
-  , finished = False
+  , getOffset = True
+  , files     = []
+  , finished  = False
   , finishedButBlock = False
   , ta1_to_ta2_kafkaTopic = "ta2"
   , ingest_control_topic = "in-finished"
+  , kafkaServer = defaultKafkaServer
   }
+
+defaultKafkaServer :: KafkaAddress
+defaultKafkaServer = ("localhost", 9092)
 
 includeFile :: Config -> FilePath -> Either String Config
 includeFile c fp = Right c { files = CDMFile fp : files c }
@@ -101,6 +108,9 @@ opts = OptSpec { progDefaults  = defaultConfig
                   , Option ['f'] ["finished"]
                     "Send the 'finished' signal to ingestd"
                     $ NoArg $ \s -> Right s { finished = True }
+                  , Option ['g'] ["get-offset"]
+                    "Get the last offset for the input topic"
+                    $ NoArg $ \s -> Right s { getOffset = True }
                   , Option ['F'] ["finished-but-block-till-queues-are-empty"]
                     "Send the 0x02 'finished' signal to ingestd"
                     $ NoArg $ \s -> Right s { finished = True }
@@ -108,6 +118,13 @@ opts = OptSpec { progDefaults  = defaultConfig
                     "Set the kafka topic for ingester control messages."
                     $ ReqArg "Topic" $
                         \tp s -> Right s { ingest_control_topic = fromString tp }
+                  , Option ['k'] ["kafka-server"]
+                    "Address of the kafka server (host:port)"
+                    $ ReqArg "Server" $
+                        \str s ->
+                            case parseHostPort str of
+                               Nothing -> Left "Could not parse the host or port of the Kafka address."
+                               Just hp -> Right s { kafkaServer = hp }
                   , Option ['h'] ["help"]
 
                     "Prints this help message."
@@ -115,13 +132,14 @@ opts = OptSpec { progDefaults  = defaultConfig
                   ]
                }
 
-parseHostPort :: String -> Maybe (String,Int)
+parseHostPort :: (IsString s, Num n) => String -> Maybe (s,n)
 parseHostPort str =
   let (h,p) = break (== ':') str
-  in case (h,readMaybe p) of
+  in case (h,readMaybe (drop 1 p)) of
       ("",_)         -> Nothing
       (_,Nothing)    -> Nothing
-      (hst,Just pt) -> Just (hst,pt)
+      (hst,Just pt) -> Just ( fromString (hst :: String)
+                            , fromIntegral (pt::Int))
 
 main :: IO ()
 main =
@@ -129,6 +147,7 @@ main =
      if help c
       then dumpUsage opts
       else do mapM_ (handleFile c) (files c)
+              when (getOffset c) (getTheOffset c)
               when  (finished c)  (sendStatus c Done)
               when  (finishedButBlock c)  (sendStatus c DoneAfterEmptyQueues)
 
@@ -155,6 +174,11 @@ handleFile c fl = do
   onError e = do putStrLn ("Error reading " ++ getFP fl ++ ":")
                  print e
                  exitFailure
+
+getTheOffset :: Config -> IO ()
+getTheOffset c = putStrLn . show =<< runKafka (mkKafkaState "Trint-Client" svr) (getLastOffset LatestTime 0 src)
+ where src = ta1_to_ta2_kafkaTopic c
+       svr = kafkaServer c
 
 processStmts :: Config -> FilePath -> ([Node],[Edge]) -> [BS.ByteString] -> IO ()
 processStmts c fp res stmtBS
