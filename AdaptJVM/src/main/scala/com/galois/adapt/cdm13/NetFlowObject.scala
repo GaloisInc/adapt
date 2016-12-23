@@ -20,7 +20,7 @@ case object NetFlowObject extends CDM13Constructor[NetFlowObject] {
   def from(cdm: RawCDM13Type): Try[NetFlowObject] = Try(
     NetFlowObject(
       cdm.getUuid,
-      AbstractObject.from(new RawCDM13Type(cdm.getBaseObject)).get,
+      cdm.getBaseObject,
       cdm.getSrcAddress,
       cdm.getSrcPort,
       cdm.getDestAddress,

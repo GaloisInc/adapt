@@ -1,5 +1,4 @@
 package com.galois.adapt.cdm13
-import java.util.UUID
 
 import scala.util.Try
 
@@ -25,4 +24,4 @@ case object ProvenanceTagNode extends CDM13Constructor[ProvenanceTagNode] {
 }
 
 
-case class ProvTagValueType(o: Any)
+case class ProvTagValueType(o: Any)   // TODO: This is cheating! Consider shapeless coproduct.

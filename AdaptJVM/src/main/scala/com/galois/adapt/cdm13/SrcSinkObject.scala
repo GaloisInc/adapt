@@ -16,7 +16,7 @@ case object SrcSinkObject extends CDM13Constructor[SrcSinkObject] {
   def from(cdm: RawCDM13Type): Try[SrcSinkObject] = Try(
     SrcSinkObject(
       cdm.getUuid,
-      AbstractObject.from(new RawCDM13Type(cdm.getBaseObject)).get,
+      cdm.getBaseObject,
       cdm.getType
     )
   )

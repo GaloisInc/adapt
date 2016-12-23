@@ -22,7 +22,9 @@ case object Principal extends CDM13Constructor[Principal] {
       cdm.getUuid,
       cdm.getUserId,
       cdm.getGroupIds,
-      cdm.getSource
+      cdm.getSource,
+      cdm.getType,
+      AvroOpt.map(cdm.getProperties)
     )
   }
 }

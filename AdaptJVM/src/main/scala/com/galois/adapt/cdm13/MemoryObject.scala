@@ -17,7 +17,7 @@ case object MemoryObject extends CDM13Constructor[MemoryObject] {
   def from(cdm: RawCDM13Type): Try[MemoryObject] = Try(
     MemoryObject(
       cdm.getUuid,
-      AbstractObject.from(new RawCDM13Type(cdm.getBaseObject)).get,
+      cdm.getBaseObject,
       cdm.getMemoryAddress,
       AvroOpt.long(cdm.getPageNumber)
     )

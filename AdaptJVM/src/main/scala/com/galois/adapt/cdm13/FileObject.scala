@@ -20,7 +20,7 @@ case object FileObject extends CDM13Constructor[FileObject] {
   def from(cdm: RawCDM13Type): Try[FileObject] = Try(
     FileObject(
       cdm.getUuid,
-      AbstractObject.from(new RawCDM13Type(cdm.getBaseObject)).get,
+      cdm.getBaseObject,
       cdm.getUrl,
       cdm.getIsPipe,
       cdm.getVersion,

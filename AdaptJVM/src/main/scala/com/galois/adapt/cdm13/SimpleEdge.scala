@@ -21,7 +21,8 @@ case object SimpleEdge extends CDM13Constructor[SimpleEdge] {
       cdm.getFromUuid,
       cdm.getToUuid,
       cdm.getType,
-      cdm.getTimestamp
+      cdm.getTimestamp,
+      AvroOpt.map(cdm.getProperties)
     )
   )
 }

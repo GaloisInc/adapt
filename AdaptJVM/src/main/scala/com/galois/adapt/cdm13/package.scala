@@ -2,28 +2,47 @@ package com.galois.adapt
 
 import scala.language.implicitConversions
 import java.util.UUID
+
+import com.bbn.tc.schema.avro.TCCDMDatum
+import org.apache.avro.file.DataFileReader
+import org.apache.avro.specific.SpecificDatumReader
+
 import scala.util.Try
 import scala.collection.JavaConverters._
 
 
 package object cdm13 {
 
-  def parse(cdm: RawCDM13Type) = cdm.o match {
-    case _: Subject.RawCDMType => Subject.from(cdm)
-    case _: Principal.RawCDMType => Principal.from(cdm)
-    case _: SimpleEdge.RawCDMType => SimpleEdge.from(cdm)
-    case _: SrcSinkObject.RawCDMType => SrcSinkObject.from(cdm)
-    case _: AbstractObject.RawCDMType => AbstractObject.from(cdm)
-    case _: Event.RawCDMType => Event.from(cdm)
-    case _: FileObject.RawCDMType => FileObject.from(cdm)
-    case _: NetFlowObject.RawCDMType => NetFlowObject.from(cdm)
-    case _: MemoryObject.RawCDMType => MemoryObject.from(cdm)
-    case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
-    case _: RegistryKeyObject.RawCDMType => RegistryKeyObject.from(cdm)
-    case _: TagEntity.RawCDMType => TagEntity.from(cdm)
-    case x => throw new RuntimeException(s"No deserializer for: $x")
-  }
+  object CDM13 {
+    val values = Seq(AbstractObject,Event,FileObject,MemoryObject,NetFlowObject,Principal,ProvenanceTagNode,RegistryKeyObject,SimpleEdge,SrcSinkObject,Subject,TagEntity,Value)
 
+    def readData(filePath: String, limit: Option[Int] = None) = readAvroFile(filePath).map { x =>
+      val cdmDataIter = x.map(CDM13.parse)
+      limit.fold(cdmDataIter)(l => cdmDataIter.take(l))
+    }
+
+    def readAvroFile(filePath: String) = Try {
+      val tcDatumReader = new SpecificDatumReader(classOf[TCCDMDatum])
+      val tcFileReader: DataFileReader[TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
+      tcFileReader.iterator.asScala.map(cdm => new RawCDM13Type(cdm.getDatum))
+    }
+
+    def parse(cdm: RawCDM13Type) = cdm.o match {
+      case _: Subject.RawCDMType => Subject.from(cdm)
+      case _: Principal.RawCDMType => Principal.from(cdm)
+      case _: SimpleEdge.RawCDMType => SimpleEdge.from(cdm)
+      case _: SrcSinkObject.RawCDMType => SrcSinkObject.from(cdm)
+      case _: AbstractObject.RawCDMType => AbstractObject.from(cdm)
+      case _: Event.RawCDMType => Event.from(cdm)
+      case _: FileObject.RawCDMType => FileObject.from(cdm)
+      case _: NetFlowObject.RawCDMType => NetFlowObject.from(cdm)
+      case _: MemoryObject.RawCDMType => MemoryObject.from(cdm)
+      case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
+      case _: RegistryKeyObject.RawCDMType => RegistryKeyObject.from(cdm)
+      case _: TagEntity.RawCDMType => TagEntity.from(cdm)
+      case x => throw new RuntimeException(s"No deserializer for: $x")
+    }
+  }
 
   trait CDM13
 
@@ -67,4 +86,7 @@ package object cdm13 {
   implicit def makeValueType(v: com.bbn.tc.schema.avro.ValueType): ValueType = ValueType.from(v.toString).get
   implicit def makeValDataType(d: com.bbn.tc.schema.avro.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
   implicit def makeTag(t: com.bbn.tc.schema.avro.ProvenanceTagNode): ProvenanceTagNode = ProvenanceTagNode.from(new RawCDM13Type(t)).get
+  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
+  implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM13Type(o)).get
+  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
 }

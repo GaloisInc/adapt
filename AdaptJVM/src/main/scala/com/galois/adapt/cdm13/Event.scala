@@ -32,7 +32,6 @@ case object Event extends CDM13Constructor[Event] {
       cdm.getSequence,
       AvroOpt.long(cdm.getTimestampMicros),
       AvroOpt.str(cdm.getName),
-//      None,
       AvroOpt.listValue(cdm.getParameters),
       AvroOpt.long(cdm.getLocation),
       AvroOpt.long(cdm.getSize),

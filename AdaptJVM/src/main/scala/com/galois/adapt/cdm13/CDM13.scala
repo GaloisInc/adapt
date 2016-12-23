@@ -1,14 +1,12 @@
 package com.galois.adapt.cdm13
 
 
-class FixedShort(val bytes: Array[Byte]) extends AnyVal
-
-
 trait CustomEnum[T] extends CDM13 {
   val values: Seq[T]
-  def from(s: String): Option[T] = values.find(_.toString == s)
+  def from(s: String): Option[T] = values.find(_.toString == s)  // TODO: strings will be slow. Use ordinals.
 }
 
+class FixedShort(val bytes: Array[Byte]) extends AnyVal
 
 sealed trait TagOpCode extends CDM13
 case object TagOpCode extends CustomEnum[TagOpCode] { val values = Seq(TAG_OP_SEQUENCE, TAG_OP_UNION, TAG_OP_ENCODE, TAG_OP_STRONG, TAG_OP_MEDIUM, TAG_OP_WEAK) }
@@ -183,3 +181,16 @@ case object EDGE_EVENT_HAS_TAG extends EdgeType
 case object EDGE_EVENT_AFFECTS_REGISTRYKEY extends EdgeType
 case object EDGE_REGISTRYKEY_AFFECTS_EVENT extends EdgeType
 case object EDGE_REGISTRYKEY_HAS_TAG extends EdgeType
+
+
+//  /* Some Python for generating the CustomEnum[T] code above */
+//def make_enum(name, string_array):
+//    trait = "sealed trait " + name + "\n"
+//    values_list = []
+//    object_list = []
+//    for i in string_array:
+//        values_list.append(i)
+//        object_list.append("case object " + i + " extends " + name + "\n")
+//    object = "case object " + name + " extends CustomEnum[" + name + "] { val values = Seq(" + ", ".join(values_list) + ") }\n"
+//    all = [trait] + [object] + object_list
+//    print "\n" + "".join(all)

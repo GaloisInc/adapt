@@ -18,8 +18,8 @@ case object RegistryKeyObject extends CDM13Constructor[RegistryKeyObject] {
 
   def from(cdm: RawCDM13Type): Try[RegistryKeyObject] = Try(
     RegistryKeyObject(
-      cdm.uuid,
-      AbstractObject.from(new RawCDM13Type(cdm.getBaseObject)).get,
+      cdm.getUuid,
+      cdm.getBaseObject,
       cdm.getKey,
       cdm.getVersion,
       AvroOpt.long(cdm.getSize)

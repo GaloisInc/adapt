@@ -25,21 +25,20 @@ case object Subject extends CDM13Constructor[Subject] {
   type RawCDMType = com.bbn.tc.schema.avro.Subject
 
   def from(cdm: RawCDM13Type): Try[Subject] = Try {
-    val s = cdm.asType[RawCDMType]
     Subject(
       cdm.getUuid,
-      SubjectType.from(s.getType.toString).get,
-      s.getPid,
-      s.getPpid,
-      InstrumentationSource.from(s.getSource.toString).get,
-      AvroOpt.long(s.getStartTimestampMicros),
-      AvroOpt.int(s.getUnitId),
-      AvroOpt.long(s.getEndTimestampMicros),
-      AvroOpt.str(s.getCmdLine),
-      AvroOpt.listStr(s.getImportedLibraries),
-      AvroOpt.listStr(s.getExportedLibraries),
-      AvroOpt.str(s.getPInfo),
-      AvroOpt.map(s.getProperties)
+      cdm.getType,
+      cdm.getPid,
+      cdm.getPpid,
+      cdm.getSource,
+      AvroOpt.long(cdm.getStartTimestampMicros),
+      AvroOpt.int(cdm.getUnitId),
+      AvroOpt.long(cdm.getEndTimestampMicros),
+      AvroOpt.str(cdm.getCmdLine),
+      AvroOpt.listStr(cdm.getImportedLibraries),
+      AvroOpt.listStr(cdm.getExportedLibraries),
+      AvroOpt.str(cdm.getPInfo),
+      AvroOpt.map(cdm.getProperties)
     )
   }
 }
