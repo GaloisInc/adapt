@@ -38,22 +38,23 @@
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
             if (query_string.length == 0) { return UI.failHandler() }
-            $.post("/query", {"query": query_string}, function(node_results) {
+            $.post("/query/nodes", {"query": query_string}, function(node_results) {
                 var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
                 if ( ! all_are_nodes) { UI.failHandler(); return false }
                 
                 UI.foundNodes(node_results.length)
                 if ( ! _.isEmpty(node_results)) {
                     var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                    var edge_query
-                    if (node_data_set.getIds().length == 0) {
+                    var edge_query;
+                    // if (node_data_set.getIds().length == 0) {
                         edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
-                    } else {
-                        // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
-                        var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
-                        edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
-                    }
-                    $.post("/query", {"query": edge_query}, function(edge_results) {
+                        // edge_query = "g.V([" + result_node_ids.join(",") + "].toArray()).bothE().dedup()"
+                    // } else {
+                    //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
+                    //     var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
+                    //     edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
+                    // }
+                    $.post("/query/edges", {"query": edge_query}, function(edge_results) {
                         UI.foundEdges(edge_results.length)
                         var query_color = document.getElementById("query-color").jscolor.value
                         var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})

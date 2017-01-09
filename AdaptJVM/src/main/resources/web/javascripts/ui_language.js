@@ -258,7 +258,7 @@ var predicates = [
         floating_query : ".outE('EDGE_OBJECT_PREV_VERSION out').inV().outE('EDGE_OBJECT_PREV_VERSION in').inV()"
     }, {
         name : "Process Owner",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
+        is_relevant : function(n) {return n.label === "Subject" /*&& n['properties']['subjectType'][0]['value'] == 0 */},
         floating_query : ".both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out()",
         is_default : true
     }, {

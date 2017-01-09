@@ -1,6 +1,10 @@
 package com.galois.adapt.cdm13
 
 import java.util.UUID
+
+import com.galois.adapt.DBWritable
+import org.apache.tinkerpop.gremlin.structure.T.label
+
 import scala.util.Try
 
 
@@ -18,7 +22,24 @@ case class Subject(
   exportedLibraries: Option[Seq[String]] = None,
   pInfo: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM13
+) extends CDM13 with DBWritable {
+  def asDBKeyValues = List(
+    label, "Subject",
+    "uuid", uuid,
+    "subjectType", subjectType.toString,
+    "pid", pid,
+    "ppid", ppid,
+    "source", source.toString
+  ) ++
+    startTimestampMicros.fold[List[Any]](List.empty)(v => List("startTimestampMicros", v)) ++
+    unitId.fold[List[Any]](List.empty)(v => List("unitId", v)) ++
+    endTimestampMicros.fold[List[Any]](List.empty)(v => List("endTimestampMicros", v)) ++
+    cmdLine.fold[List[Any]](List.empty)(v => List("cmdLine", v)) ++
+    importedLibraries.fold[List[Any]](List.empty)(v => List("importedLibraries", v)) ++
+    exportedLibraries.fold[List[Any]](List.empty)(v => List("exportedLibraries", v)) ++
+    pInfo.fold[List[Any]](List.empty)(v => List("pInfo", v)) ++
+    DBOpt.fromKeyValMap(properties)
+}
 
 
 case object Subject extends CDM13Constructor[Subject] {

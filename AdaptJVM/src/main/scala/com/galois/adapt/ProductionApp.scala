@@ -19,7 +19,7 @@ object ProductionApp {
     implicit val executionContext = system.dispatcher
 
     // TODO: Use an actor which distributes to external DB:
-    val dbActor = system.actorOf(Props[DatabaseActor])
+    val dbActor = system.actorOf(Props[DevDBActor])
 
     val bindingFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
 

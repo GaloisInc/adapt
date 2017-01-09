@@ -2,6 +2,9 @@ package com.galois.adapt.cdm13
 
 import java.util.UUID
 
+import com.galois.adapt.DBWritable
+import org.apache.tinkerpop.gremlin.structure.T.label
+
 import scala.util.Try
 
 case class NetFlowObject(
@@ -12,7 +15,19 @@ case class NetFlowObject(
   destAddress: String,
   destPort: Int,
   ipProtocol: Option[Int] = None
-) extends CDM13
+) extends CDM13 with DBWritable {
+  def asDBKeyValues =
+    baseObject.asDBKeyValues ++
+    List(
+      label, "NetFlowObject",
+      "uuid", uuid,
+      "srcAddress", srcAddress,
+      "srcPort", srcPort,
+      "destAddress", destAddress,
+      "destPort", destPort
+    ) ++
+    ipProtocol.fold[List[Any]](List.empty)(v => List("ipProtocol", v))
+}
 
 case object NetFlowObject extends CDM13Constructor[NetFlowObject] {
   type RawCDMType = com.bbn.tc.schema.avro.NetFlowObject

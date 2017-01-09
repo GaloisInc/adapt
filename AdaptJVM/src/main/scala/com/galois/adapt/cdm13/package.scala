@@ -6,12 +6,14 @@ import java.util.UUID
 import com.bbn.tc.schema.avro.TCCDMDatum
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
-
+import org.apache.avro.util.Utf8
 import scala.util.Try
 import scala.collection.JavaConverters._
 
 
 package object cdm13 {
+
+  trait CDM13
 
   object CDM13 {
     val values = Seq(AbstractObject,Event,FileObject,MemoryObject,NetFlowObject,Principal,ProvenanceTagNode,RegistryKeyObject,SimpleEdge,SrcSinkObject,Subject,TagEntity,Value)
@@ -44,9 +46,11 @@ package object cdm13 {
     }
   }
 
-  trait CDM13
 
-  trait CDM13Constructor[T] extends CDM13 {
+  case object EpochMarker extends CDM13
+
+
+  trait CDM13Constructor[T <: CDM13] extends CDM13 {
     type RawCDMType <: org.apache.avro.specific.SpecificRecordBase
     implicit def convertRawTypes(r: RawCDM13Type): RawCDMType = r.asType[RawCDMType]
     def from(cdm: RawCDM13Type): Try[T]
@@ -60,12 +64,12 @@ package object cdm13 {
   type ProvTagNodeValueType = Int with UUID with TagOpCode with IntegrityTag with ConfidentialityTag
 
   object AvroOpt {
-    def listStr(x: => java.util.List[CharSequence]): Option[List[String]] = Try(Option(x.asScala.toList)).toOption.flatten.map(_.asInstanceOf[List[String]])
+    def listStr(x: => java.util.List[CharSequence]): Option[List[String]] = Try(Option(x.asScala.toList)).toOption.flatten.map(_.map(_.toString)) //.asInstanceOf[List[String]])
     def listInt(x: => java.util.List[java.lang.Integer]): Option[Seq[Int]] = Try(Option(x.asScala.toList)).toOption.flatten.map(_.asInstanceOf[Seq[Int]])
     def long(x: => java.lang.Long): Option[Long] = Try(Long2long(x)).toOption
     def int(x: => java.lang.Integer): Option[Int] = Try(Integer2int(x)).toOption
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
-    def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[String,String]].asScala.toMap)
+    def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
     def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
     def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
@@ -89,4 +93,14 @@ package object cdm13 {
   implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
   implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM13Type(o)).get
   implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
+
+  object DBOpt {
+    // Flattens out nested "properties":
+    def fromKeyValMap(mapOpt: Option[Map[String,String]]): List[Any] = mapOpt.fold[List[Any]](List.empty)(aMap =>
+      if (aMap.isEmpty) List.empty
+      else aMap.toList.flatMap { case (k,value) => List(
+        k.toString, Try(value.toLong).getOrElse(value)
+      ) }
+    )
+  }
 }

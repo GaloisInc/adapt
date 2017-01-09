@@ -5,8 +5,8 @@ import java.nio.file.{Files, Paths}
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
-import com.galois.adapt.{AcceptanceApp, DatabaseActor, Node, NodeQuery, Routes, Shutdown}
-import com.galois.adapt.cdm13.CDM13
+import com.galois.adapt.{AcceptanceApp, DevDBActor, Node, NodeQuery, Routes, Shutdown}
+import com.galois.adapt.cdm13.{AbstractObject, CDM13}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 
 import scala.concurrent.Await
@@ -71,7 +71,7 @@ import org.scalatest.FlatSpec
 //}
 
 
-class ParsingTests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) extends FlatSpec {
+class General_TA1_Tests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
 
   "Parsing data in the file..." should
@@ -79,7 +79,6 @@ class ParsingTests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) ext
     var counter = 0
     val parseTry = Try(data.foreach { d =>
       counter += 1
-      print(s"Reading data: $counter \r")
       AcceptanceApp.distribute(d.get)
     })
     println(s"Read events: $counter")
@@ -92,7 +91,7 @@ class ParsingTests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) ext
     }
   }
 
-  CDM13.values.foreach { typeName =>
+  CDM13.values.filter(_ != AbstractObject).foreach { typeName =>
     it should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -102,6 +101,19 @@ class ParsingTests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) ext
     }
   }
 }
+
+
+class CLEARSCOPE_Specific_Tests(totalNodes: Int, incompleteEdgeCount: Int) extends FlatSpec {
+  "Analyzed data" should
+    "contain a representative number of nodes" in {
+      assert(totalNodes > 50000)
+    }
+
+  it should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
+    assert(incompleteEdgeCount == 0)
+  }
+}
+
 
 trait TestEvaluationCases
 case class HowMany(name: String) extends TestEvaluationCases

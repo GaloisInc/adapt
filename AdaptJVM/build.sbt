@@ -15,6 +15,7 @@ lazy val adapt = (project in file(".")).settings(
     "org.apache.avro" % "avro" % "1.8.1",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
+//    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-simple" % "1.7.21",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
@@ -32,7 +33,7 @@ lazy val adapt = (project in file(".")).settings(
 
   // Run the Ingest main class at the command line with `sbt run`
   //mainClass in (Compile, run) := Some("com.galois.adapt.scepter.SimpleTestRunner") //Some("com.galois.adapt.Ingest")
-  mainClass in assembly := Some("com.galois.adapt.scepter.SimpleTestRunner"), //Some("com.galois.adapt.Ingest")
+  mainClass in assembly := Some("com.galois.adapt.Application"),
 
   // Do not buffer test output (which is the default) so that all test results are shown as they happen (helpful for async or timeout results)
   logBuffered in Test := false,
@@ -40,17 +41,20 @@ lazy val adapt = (project in file(".")).settings(
 //  mainClass in Test := Some("com.galois.adapt.scepter.SimpleTestRunner"),
 
   assemblyMergeStrategy in assembly := {
+    case PathList("reference.conf") => MergeStrategy.concat
     case PathList("META-INF", xs@_*) => MergeStrategy.discard
     case x => MergeStrategy.first
-  },
-
-  org.softnetwork.sbt.plugins.GroovyPlugin.groovy.settings
+  }
 
 )
 
 lazy val scepter = (project in file("scepter")).settings(
+  name := "scepter",
+  version := "0.1",
+  organization := "com.galois",
+  scalaVersion := scalaV,
+
 //  libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.3.0",
   mainClass in (Compile, run) := Some("com.galois.adapt.scepter.Wrapper"),
-  mainClass in assembly := Some("com.galois.adapt.scepter.Wrapper"),
-  scalaVersion := scalaV
+  mainClass in assembly := Some("com.galois.adapt.scepter.Wrapper")
 )

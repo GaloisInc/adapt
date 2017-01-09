@@ -12,7 +12,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import org.apache.tinkerpop.gremlin.structure.{Vertex, Element => VertexOrEdge}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Try
 import scala.concurrent.duration._
 
@@ -26,7 +26,7 @@ object Routes {
     if (index != 0) fileName.drop(index + 1) else ""
   }
 
-  val serveStaticsFileRoute =
+  val serveStaticFilesRoute =
     entity(as[HttpRequest]) { requestData =>
       complete {
         val fullPath = requestData.uri.path.toString match {
@@ -46,13 +46,19 @@ object Routes {
 
   implicit val timeout = Timeout(10 seconds)
 
-  def completedQuery[T <: VertexOrEdge](query: String, dbActor: ActorRef)(implicit ec: ExecutionContext) =
-    complete {
-      println(s"Got query: $query")
-      (dbActor ? NodeQuery(query)).mapTo[Try[String]].map { s =>
-        HttpEntity(ContentTypes.`application/json`, s.get)
-      }
+  def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
+    val qType = query match {
+      case _: NodeQuery => "node"
+      case _: EdgeQuery => "edge"
+      case _ => "generic"
     }
+    println(s"Got $qType query: ${query.query}")
+    val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
+      println("returning...")
+      HttpEntity(ContentTypes.`application/json`, s.get)
+    }
+    complete(futureResponse)
+  }
 
 
   def mainRoute(dbActor: ActorRef)(implicit ec: ExecutionContext) =
@@ -60,23 +66,47 @@ object Routes {
       pathPrefix("query") {
         pathPrefix("nodes") {
           path(RemainingPath) { queryString =>
-            completedQuery(queryString.toString, dbActor)
+            completedQuery(NodeQuery(queryString.toString), dbActor)
           }
         } ~
-        path("edges") {
-          complete("NOT IMPLEMENTED")
+        pathPrefix("edges") {
+          path(RemainingPath) { queryString =>
+            completedQuery(EdgeQuery(queryString.toString), dbActor)
+          }
+        } ~
+        pathPrefix("generic") {
+          path(RemainingPath) { queryString =>
+            completedQuery(StringQuery(queryString.toString), dbActor)
+          }
         }
-      } ~ serveStaticsFileRoute
+      } ~
+      serveStaticFilesRoute
     } ~
     post {
       pathPrefix("query") {
         path("nodes") {
           formField('query) { queryString =>
-            completedQuery(queryString, dbActor)
+            completedQuery(NodeQuery(queryString), dbActor)
           }
         } ~
         path("edges") {
-          complete("NOT IMPLEMENTED")
+          formField('query) { queryString =>
+            completedQuery(EdgeQuery(queryString), dbActor)
+          } ~
+          formField('nodes) { nodeListString =>
+            println(s"getting edges for nodes: $nodeListString")
+            val idList = nodeListString.split(",").map(_.toInt)
+            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
+              println("returning...")
+              HttpEntity(ContentTypes.`application/json`, s.get)
+            }
+            complete(futureResponse)
+          }
+        } ~
+        path("generic") {
+          formField('query) { queryString =>
+            completedQuery(StringQuery(queryString), dbActor)
+          }
         }
       }
     }
