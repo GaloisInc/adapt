@@ -16,3 +16,13 @@ supervisord.log
 supervisord.pid
 tools/gremlin_properties/__pycache__/
 tools/gremlin_query/__pycache__/
+
+target
+*.class
+
+*.iml
+*.ipr
+*.iws
+.idea
+out
+

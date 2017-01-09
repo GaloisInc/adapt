@@ -72,6 +72,15 @@ install_titan() {
     cd $CWD || handle_error $LINENO
 }
 
+install_avro() {
+    cd /opt
+    sudo mkdir avro
+    cd avro
+    sudo wget -r --no-parent -nd http://apache.osuosl.org/avro/avro-1.8.1/java/
+    cd ..
+    sudo chown --recusrive vagrant:vagrant avro
+}
+
 ensure_vagrant_user() {
     # post-condition:  a vagrant userid shall appear in /etc/passwd
     egrep '^vagrant:' /etc/group  > /dev/null || sudo addgroup vagrant
@@ -159,6 +168,7 @@ install_adapt_dependencies() {
     ensure_vagrant_user
     install_kafka $KAFKAVER $SCALAVER $KAFKA_HASH || handle_error $LINENO
     install_titan
+    install_avro
     if [ -e $CONFIG_DIR/titan ] ; then
         sudo cp -r $CONFIG_DIR/titan/* $TITAN_SERVER_DIR/ || handle_error $LINENO
     fi
