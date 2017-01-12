@@ -4,15 +4,15 @@ import java.io._
 import java.net.URL
 import java.nio.channels.Channels
 import java.nio.file.{Files, Paths, StandardCopyOption}
-//import java.security.{DigestInputStream, MessageDigest}
+import java.security.{DigestInputStream, MessageDigest}
 import java.util.Scanner
 
 import scala.util._
 import sys.process._
 
-/* Everytime it is run, this app compares its md5 to 'adapt-tester.hash' it downloads. If it is
- * not the same, it downloads a new version of 'adapt-tester.jar' (checks the hash again) and gets
- * the new jar started before exiting.
+/* Everytime it is run, this app compares its MD5 to 'adapt-tester.hash' it downloads. If it is not
+ * the same, it downloads a new version of 'adapt-tester.jar' (checks the hash again) and gets the
+ * new JAR started before exiting.
  *
  * Then, it downloads 'adapt.jar' and its hash, double-checking that these are consistent, and runs
  * it in acceptance test mode.
@@ -38,10 +38,15 @@ object Wrapper extends App {
   }
 
   // Compute a hash of a file
-  // TODO: consider using java.security
+  // The output of this function should match the output of running "md5 -q <file>"
   def computeHash(path: String): String = {
-    val cmd = s"md5 -q $path"
-    return cmd.!!.trim
+    val buffer = new Array[Byte](8192)
+    val md5 = MessageDigest.getInstance("MD5")
+    
+    val dis = new DigestInputStream(new FileInputStream(new File(path)), md5)
+    try { while (dis.read(buffer) != -1) { } } finally { dis.close() }
+    
+    md5.digest.map("%02x".format(_)).mkString
   }
 
   // Download a file synchronously
@@ -52,7 +57,7 @@ object Wrapper extends App {
   }
 
   val dataFilePath = args.headOption.getOrElse(
-    throw new RuntimeException(s"First argument must be a path to the data file you want to test.")
+    throw new RuntimeException("First argument must be a path to the data file you want to test.")
   )
 
   try {
@@ -81,7 +86,7 @@ object Wrapper extends App {
       )
       Files.move(Paths.get(temporaryJarPath), Paths.get(testerJarPath), StandardCopyOption.REPLACE_EXISTING)
       
-      // Re-run the java program (and shutdown the current one)
+      // Re-run the java program (and stream its output to stdout)
       val cmd = s"java -jar $testerJarPath $dataFilePath"
       println("Starting the updated 'adapt-tester.jar'. This may take a while...")
       cmd ! ProcessLogger(println, println)
@@ -109,7 +114,7 @@ object Wrapper extends App {
       if (file.exists) file.deleteOnExit()
 
       // Run the tests
-      val cmd = s"java -Dadapt.app=accept -Dadapt.loadlimit=0 -Dadapt.loadfile=$dataFilePath -jar $adaptJarPath"
+      val cmd = s"java -Xmx4G -Dadapt.app=accept -Dadapt.loadlimit=0 -Dadapt.loadfile=$dataFilePath -jar $adaptJarPath"
       println("Running tests on the data. This could take a moment...")
       cmd ! ProcessLogger(println, println)
 
