@@ -36,6 +36,7 @@ done
 # Re-build 'adapt.jar', upload it, compute its hash, and upload that too
 if [ $UPDATE_ADAPT ]
 then
+  echo "Updating 'adapt.jar'"
   sbt clean
   sbt assembly && \
   scp $ASSEMBLED_ADAPT ${REMOTE}/adapt.jar && \
@@ -49,6 +50,7 @@ fi
 # Re-build 'adapt-tester.jar', upload it, compute its hash, and upload that too
 if [ $UPDATE_SCEPTER ]
 then
+  echo "Updating 'adapt-tester.jar'"
   sbt scepter/clean
   sbt scepter/assembly && \
   scp $ASSEMBLED_SCEPTER ${REMOTE}/adapt-tester.jar && \
@@ -62,6 +64,19 @@ fi
 # Download the latest adapt-tester and try it
 if [ !$TEST_FILE ]
 then
+  echo "Are you SURE you want to skip testing?"
+  echo "Type in 'yes' or enter the path to testing data"
+  echo -n "> "
+  read INPUT
+  case $INPUT in
+    yes) ;;
+    *)   TEST_FILE=$INPUT ;; 
+  esac
+fi
+
+if [ $TEST_FILE ]
+then
+  echo "Running tests"
   # Clean up stuff that may interfere
   rm ./adapt-tester.jar 2> /dev/null
   rm ./adapt.jar 2> /dev/null
