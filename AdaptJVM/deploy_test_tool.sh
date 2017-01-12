@@ -9,9 +9,9 @@ REMOTE="alfred:/srv/www/adapt.galois.com/public_html/acceptance_tests" #"adapt.g
 # Usage
 usage ()
 {
-  echo "Usage: $0 -hfs filename"
+  echo "Usage: $0 [-h] [-s program] [-t path] filename"
   echo "  -s (adapt|scepter) : Skip completely updating either of the JARs."
-  echo "  -t file            : Downloads and tests 'adapter-tester.jar' with the provided file."
+  echo "  -t path            : Downloads and tests 'adapter-tester.jar' with the provided file(s)."
   echo "  -h                 : Display this message."
   exit
 }
@@ -62,7 +62,7 @@ else
 fi
 
 # Download the latest adapt-tester and try it
-if [ !$TEST_FILE ]
+if [ ! $TEST_FILE ]
 then
   echo "Are you SURE you want to skip testing?"
   echo "Type in 'yes' or enter the path to testing data"

@@ -10,6 +10,8 @@ import java.util.Scanner
 import scala.util._
 import sys.process._
 
+import scopt._
+
 /* Everytime it is run, this app compares its MD5 to 'adapt-tester.hash' it downloads. If it is not
  * the same, it downloads a new version of 'adapt-tester.jar' (checks the hash again) and gets the
  * new JAR started before exiting.
@@ -56,11 +58,25 @@ object Wrapper extends App {
     out.transferFrom(in, 0, Long.MaxValue)
   }
 
-  val dataFilePath = args.headOption.getOrElse(
-    throw new RuntimeException("First argument must be a path to the data file you want to test.")
-  )
+  // Option parser
+  val parser = new OptionParser[Config]("adapt-tester") {
+    help("help").text("prints this usage text")
 
-  try {
+    opt[String]('s', "heap-size")
+      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is 4G.")
+      .optional()
+      .action((s,c) => c.copy(heapSize = s))
+
+    arg[String]("targets...")
+      .text("Either data-files or folders containing data-files")
+      .minOccurs(1)
+      .unbounded()
+      .action((t,c) => c.copy(targets = c.targets :+ t))
+
+    note("\nVery roughly, heap-size should be ~3GB of RAM per million CDM statements.")
+  }
+
+  Try {
 
     // Compare the hash of the current 'adapt-tester.jar' to the published one
     val testerStatedHash = fetchHash(testerHashUrl)
@@ -87,11 +103,17 @@ object Wrapper extends App {
       Files.move(Paths.get(temporaryJarPath), Paths.get(testerJarPath), StandardCopyOption.REPLACE_EXISTING)
       
       // Re-run the java program (and stream its output to stdout)
-      val cmd = s"java -jar $testerJarPath $dataFilePath"
+      val cmd = s"java -jar $testerJarPath ${args.mkString(" ")}"
       println("Starting the updated 'adapt-tester.jar'. This may take a while...")
       cmd ! ProcessLogger(println, println)
     
     } else {
+
+      // Process command-line arguments
+      val opts = parser.parse(args, Config()) match {
+        case Some(config) => config
+        case None => sys.exit(1);
+      }
       
       // Download 'adapt.jar'
       print("Getting latest tests... ")
@@ -114,13 +136,21 @@ object Wrapper extends App {
       if (file.exists) file.deleteOnExit()
 
       // Run the tests
-      val cmd = s"java -Xmx4G -Dadapt.app=accept -Dadapt.loadlimit=0 -Dadapt.loadfile=$dataFilePath -jar $adaptJarPath"
+      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.loadfiles.$i=$t" }
+      val cmd = s"""java -Xmx${opts.heapSize}
+                   |     -Dadapt.app=accept
+                   |     -Dadapt.loadlimit=0
+                   |     ${loadFiles.mkString(" ")}
+                   |     -jar $adaptJarPath
+                   |""".stripMargin
       println("Running tests on the data. This could take a moment...")
       cmd ! ProcessLogger(println, println)
 
     } 
-  } catch {
+  } recover {
     // TODO: consider adder finer grain error handling (better error messages)
     case e: Throwable => println(s"Something went wrong:\n ${e.getMessage}")
   }
 }
+
+case class Config(heapSize: String = "4G", targets: Seq[String] = Seq())

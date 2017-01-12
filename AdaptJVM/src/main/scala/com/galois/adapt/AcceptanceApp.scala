@@ -7,7 +7,10 @@ import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Try
+import java.io.File
 
+import scala.language.postfixOps
 
 object AcceptanceApp {
   println(s"Spinning up an acceptance system.")
@@ -22,21 +25,38 @@ object AcceptanceApp {
   var TA1Source: Option[InstrumentationSource] = None
 
   def run(
-    filePath: String,
+    loadPaths: List[String],
     count: Option[Int] = None
   ) {
-    val data = CDM13.readData(filePath, count).get
-    org.scalatest.run(new General_TA1_Tests(data, count))
 
-    val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
-    val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
+    /* Get all of the files on the load paths. Each load path should either
+     *  - be itself a data file
+     *  - be a directory full of data files
+     */
+    val filePaths: List[String] = loadPaths.map(new File(_)).flatMap(path =>
+      if (path.isDirectory)
+        path.listFiles.toList.map(_.getPath)
+      else
+        List(path.getPath)
+    )
 
-    println("")
+    for (filePath <- filePaths) {
+      println(s"Processing $filePath...")
+      Try {
+        val data = CDM13.readData(filePath, count).get
+        org.scalatest.run(new General_TA1_Tests(data, count))
 
-    if (TA1Source contains SOURCE_ANDROID_JAVA_CLEARSCOPE)
-      org.scalatest.run(new CLEARSCOPE_Specific_Tests(finalCount, missingEdgeCount))
+        val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
+        val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
 
-    println(s"Total vertices: $finalCount")
+        println("")
+
+        if (TA1Source contains SOURCE_ANDROID_JAVA_CLEARSCOPE)
+          org.scalatest.run(new CLEARSCOPE_Specific_Tests(finalCount, missingEdgeCount))
+
+        println(s"Total vertices: $finalCount")
+      }
+    }
 
     println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
     system.terminate()
