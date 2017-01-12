@@ -7,6 +7,16 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.1",
   organization := "com.galois",
   scalaVersion := scalaV,
+  scalacOptions := Seq(
+    "-unchecked",
+    "-deprecation",
+    "-feature",
+    "-Yno-adapted-args",
+    "-Ywarn-dead-code",
+    "-Ywarn-numeric-widen",
+    "-Ywarn-value-discard",
+    "-Ywarn-unused"
+  ),
 
   libraryDependencies ++= Seq(
     "com.typesafe" % "config" % "1.3.1",
@@ -20,7 +30,8 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV
-    //  "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
+    // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
+    // "com.github.scopt" %% "scopt" % "3.5.0"
   ),
 
   {
@@ -54,7 +65,10 @@ lazy val scepter = (project in file("scepter")).settings(
   organization := "com.galois",
   scalaVersion := scalaV,
 
-//  libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.3.0",
+  libraryDependencies ++= Seq(
+    // "org.scalaj" %% "scalaj-http" % "2.3.0",
+    "com.github.scopt" %% "scopt" % "3.5.0"
+  ),
   mainClass in (Compile, run) := Some("com.galois.adapt.scepter.Wrapper"),
   mainClass in assembly := Some("com.galois.adapt.scepter.Wrapper")
 )

@@ -1,62 +1,156 @@
 package com.galois.adapt.scepter
 
 import java.io._
-import java.math.BigInteger
 import java.net.URL
 import java.nio.channels.Channels
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, StandardCopyOption}
 import java.security.{DigestInputStream, MessageDigest}
 import java.util.Scanner
 
 import scala.util._
 import sys.process._
 
+import scopt._
 
+/* Everytime it is run, this app compares its MD5 to 'adapt-tester.hash' it downloads. If it is not
+ * the same, it downloads a new version of 'adapt-tester.jar' (checks the hash again) and gets the
+ * new JAR started before exiting.
+ *
+ * Then, it downloads 'adapt.jar' and its hash, double-checking that these are consistent, and runs
+ * it in acceptance test mode.
+ */
 object Wrapper extends App {
 
-  val downloadUrl = "https://adapt.galois.com/acceptance_tests/current.jar"
-  val executableJarPath = "adapt.jar"
+  // remote URLs
+  val adaptDownloadUrl = "https://adapt.galois.com/acceptance_tests/current.jar"
+  val testerDownloadUrl = "https://adapt.galois.com/acceptance_tests/current-tester.jar"
+  val adaptHashUrl = "https://adapt.galois.com/acceptance_tests/current.hash"
+  val testerHashUrl = "https://adapt.galois.com/acceptance_tests/current-tester.hash"
 
-  val dataFilePath = args.headOption.getOrElse(
-    throw new RuntimeException(s"First argument must be a path to the data file you want to test.")
-  )
+  // local JARs
+  val adaptJarPath = "adapt.jar"
+  val testerJarPath = "adapt-tester.jar"
+  val temporaryJarPath = "temporary.jar"
 
-  val r = Try {
-    print("Getting latest tests...")
+  // Fetch a hash remotely
+  def fetchHash(path: String): String = {
+    val hashUrl = new URL(path)
+    val scanner = new Scanner(hashUrl.openStream()).useDelimiter("\\A")
+    return scanner.next().trim
+  }
+
+  // Compute a hash of a file
+  // The output of this function should match the output of running "md5 -q <file>"
+  def computeHash(path: String): String = {
+    val buffer = new Array[Byte](8192)
+    val md5 = MessageDigest.getInstance("MD5")
+    
+    val dis = new DigestInputStream(new FileInputStream(new File(path)), md5)
+    try { while (dis.read(buffer) != -1) { } } finally { dis.close() }
+    
+    md5.digest.map("%02x".format(_)).mkString
+  }
+
+  // Download a file synchronously
+  def downloadFile(downloadUrl: String, filePath: String): Unit = {
     val in = Channels.newChannel(new URL(downloadUrl).openStream)
-    val out = new FileOutputStream(executableJarPath).getChannel
+    val out = new FileOutputStream(filePath).getChannel
     out.transferFrom(in, 0, Long.MaxValue)
-    print(" ...done.\n")
   }
 
-  val fileHash = Try {
-    val md = MessageDigest.getInstance("MD5")
-    val is = Files.newInputStream(Paths.get(executableJarPath))
-    val dis = new DigestInputStream(is, md)
-    val bytes = md.digest()
-    val bi = new BigInteger(1, bytes)
-    val digest = String.format("%0" + (bytes.length << 1) + "X", bi)
-    digest.toLowerCase
+  // Option parser
+  val parser = new OptionParser[Config]("adapt-tester") {
+    help("help").text("prints this usage text")
+
+    opt[String]('s', "heap-size")
+      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is 4G.")
+      .optional()
+      .action((s,c) => c.copy(heapSize = s))
+
+    arg[String]("targets...")
+      .text("Either data-files or folders containing data-files")
+      .minOccurs(1)
+      .unbounded()
+      .action((t,c) => c.copy(targets = c.targets :+ t))
+
+    note("\nVery roughly, heap-size should be ~3GB of RAM per million CDM statements.")
   }
-//  println(s"Hash of downloaded file:\n${fileHash.get}")
 
+  Try {
 
-  val hashUrl = new URL("https://adapt.galois.com/acceptance_tests/current.hash")
-  val statedHash = new Scanner(hashUrl.openStream()).useDelimiter("\\A").next()
-//  println(s"Stated hash:\n$statedHash")
+    // Compare the hash of the current 'adapt-tester.jar' to the published one
+    val testerStatedHash = fetchHash(testerHashUrl)
+    val testerActualHash = computeHash(testerJarPath)
 
-//  require(fileHash.get.equals(statedHash), s"Hash comparison failed. The download file is corrupt or there was an error on the server\nStated hash:   $statedHash\nComputed hash: ${fileHash.get}\n")
+    if (testerStatedHash != testerActualHash) {
+     
+      // Update 'adapt-tester.jar' 
+      print("Your version of 'adapt-tester.jar' is outdated. Downloading the new version... ")
+      downloadFile(testerDownloadUrl, temporaryJarPath)
+      val temporaryJar = new File(temporaryJarPath)
+      if (temporaryJar.exists) temporaryJar.deleteOnExit()
+      println("done.")
 
-  val cmd = s"java -Xmx4G -Dadapt.app=accept -Dadapt.loadlimit=0 -Dadapt.loadfile=$dataFilePath -jar $executableJarPath"
+      // Check that this updated version of 'adapt-tester.jar' matches the newest hash
+      val testerActualHash = computeHash(temporaryJarPath)
+      require(
+        testerStatedHash.equals(testerActualHash),
+        s"""Hash comparison failed. The downloaded 'adapt-tester.jar' file is corrupt or there was an error on the server
+           |  Stated hash:   $testerStatedHash
+           |  Computed hash: $testerActualHash
+           |""".stripMargin
+      )
+      Files.move(Paths.get(temporaryJarPath), Paths.get(testerJarPath), StandardCopyOption.REPLACE_EXISTING)
+      
+      // Re-run the java program (and stream its output to stdout)
+      val cmd = s"java -jar $testerJarPath ${args.mkString(" ")}"
+      println("Starting the updated 'adapt-tester.jar'. This may take a while...")
+      cmd ! ProcessLogger(println, println)
+    
+    } else {
 
-  val file = new File(executableJarPath)
-  if (file.exists) file.deleteOnExit()
+      // Process command-line arguments
+      val opts = parser.parse(args, Config()) match {
+        case Some(config) => config
+        case None => sys.exit(1);
+      }
+      
+      // Download 'adapt.jar'
+      print("Getting latest tests... ")
+      downloadFile(adaptDownloadUrl, adaptJarPath)
+      println("done.")
 
-  r match {
-    case _: Success[_] =>
-      println(s"Running tests on the data. This could take a moment...")
-      println(cmd.!!)
-    case f: Failure[_] =>
-      println(s"Getting new tests failed: ${f.exception.getMessage}")
+      // Expected and actual hashes of 'adapt.jar'
+      val adaptStatedHash = fetchHash(adaptHashUrl)
+      val adaptActualHash = computeHash(adaptJarPath)
+
+      // Check that 'adapt.jar' matches the newest hash
+      require(
+        adaptStatedHash.equals(adaptActualHash), 
+        s"""Hash comparison failed. The downloaded 'adapt.jar' file is corrupt or there was an error on the server
+           |  Stated hash:   $adaptStatedHash
+           |  Computed hash: $adaptActualHash
+           |""".stripMargin
+      )
+      val file = new File(adaptJarPath)
+      if (file.exists) file.deleteOnExit()
+
+      // Run the tests
+      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.loadfiles.$i=$t" }
+      val cmd = s"""java -Xmx${opts.heapSize}
+                   |     -Dadapt.app=accept
+                   |     -Dadapt.loadlimit=0
+                   |     ${loadFiles.mkString(" ")}
+                   |     -jar $adaptJarPath
+                   |""".stripMargin
+      println("Running tests on the data. This could take a moment...")
+      cmd ! ProcessLogger(println, println)
+
+    } 
+  } recover {
+    // TODO: consider adder finer grain error handling (better error messages)
+    case e: Throwable => println(s"Something went wrong:\n ${e.getMessage}")
   }
 }
+
+case class Config(heapSize: String = "4G", targets: Seq[String] = Seq())

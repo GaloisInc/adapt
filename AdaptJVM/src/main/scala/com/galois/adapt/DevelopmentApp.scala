@@ -11,15 +11,19 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.io.StdIn
+import collection.JavaConversions._
+
+import java.io.File
 
 object DevelopmentApp {
   println(s"Spinning up a development system.")
 
   def run(
-    loadFilePath: Option[String] = None,
+    loadPaths: List[String] = List(),
     limitLoad: Option[Int] = None,
     localStorage: Option[String] = None
   ) {
+
     val config = Application.config  //.withFallback(ConfigFactory.load("development"))
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
@@ -29,7 +33,7 @@ object DevelopmentApp {
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
 
-    loadFilePath.fold() { path =>
+    for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get
       var counter = 0
       data.foreach { d =>
