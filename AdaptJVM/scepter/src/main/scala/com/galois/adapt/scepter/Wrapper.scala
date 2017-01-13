@@ -33,15 +33,15 @@ object Wrapper extends App {
   val temporaryJarPath = "temporary.jar"
 
   // Fetch a hash remotely
-  def fetchHash(path: String): String = {
+  def fetchHash(path: String): String = Try {
     val hashUrl = new URL(path)
     val scanner = new Scanner(hashUrl.openStream()).useDelimiter("\\A")
     return scanner.next().trim
-  }
+  }.toOption.getOrElse(throw new Exception(s"Failed to get remote hash at $path."))
 
   // Compute a hash of a file
   // The output of this function should match the output of running "md5 -q <file>"
-  def computeHash(path: String): String = {
+  def computeHash(path: String): String = Try {
     val buffer = new Array[Byte](8192)
     val md5 = MessageDigest.getInstance("MD5")
     
@@ -49,21 +49,21 @@ object Wrapper extends App {
     try { while (dis.read(buffer) != -1) { } } finally { dis.close() }
     
     md5.digest.map("%02x".format(_)).mkString
-  }
+  }.toOption.getOrElse(throw new Exception(s"Failed to compute hash of $path."))
 
   // Download a file synchronously
-  def downloadFile(downloadUrl: String, filePath: String): Unit = {
+  def downloadFile(downloadUrl: String, filePath: String): Unit = Try {
     val in = Channels.newChannel(new URL(downloadUrl).openStream)
     val out = new FileOutputStream(filePath).getChannel
     out.transferFrom(in, 0, Long.MaxValue)
-  }
+  }.toOption.getOrElse(throw new Exception(s"Failed to download file from $downloadUrl."))
 
   // Option parser
   val parser = new OptionParser[Config]("adapt-tester") {
-    help("help").text("prints this usage text")
+    help("help").text("Prints this usage text")
 
     opt[String]('s', "heap-size")
-      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is 4G.")
+      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is '6G'.")
       .optional()
       .action((s,c) => c.copy(heapSize = s))
 
@@ -73,7 +73,12 @@ object Wrapper extends App {
       .unbounded()
       .action((t,c) => c.copy(targets = c.targets :+ t))
 
-    note("\nVery roughly, heap-size should be ~3GB of RAM per million CDM statements.")
+    note(
+      """
+        |Very roughly, heap-size should be ~3G of RAM per million CDM statements.
+        |By Java conventions, valid suffixes for heap sizes are 'K', 'M', and 'G'.
+        |""".stripMargin
+    )
   }
 
   Try {
@@ -145,12 +150,11 @@ object Wrapper extends App {
                    |""".stripMargin
       println("Running tests on the data. This could take a moment...")
       cmd ! ProcessLogger(println, println)
-
     } 
+
   } recover {
-    // TODO: consider adder finer grain error handling (better error messages)
     case e: Throwable => println(s"Something went wrong:\n ${e.getMessage}")
   }
 }
 
-case class Config(heapSize: String = "4G", targets: Seq[String] = Seq())
+case class Config(heapSize: String = "6G", targets: Seq[String] = Seq())
