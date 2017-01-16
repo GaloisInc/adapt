@@ -21,7 +21,8 @@ object AcceptanceApp {
   implicit val askTimeout = Timeout(2 seconds)
 
   val dbActor = system.actorOf(Props(classOf[DevDBActor], None))
-  val counterActor = system.actorOf(Props(new EventCountingTestActor(dbActor)))
+  val counterActor = system.actorOf(Props(new EventCountingTestActor()))
+  val basicOpsActor = system.actorOf(Props(new BasicOpsIdentifyingActor()))
   var TA1Source: Option[InstrumentationSource] = None
 
   def run(
@@ -56,21 +57,24 @@ object AcceptanceApp {
 
         println(s"Total vertices: $finalCount")
       }
+      TA1Source = None
     }
 
     println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
     system.terminate()
   }
 
+  // Identifies all the actors who are interested in a given CDM statement
   def distributionSpec(t: CDM13): Seq[ActorRef] = t match {
     case f: FileObject =>
       if (TA1Source.isEmpty) {
         println(s"Source data from: ${f.baseObject.source}")
         TA1Source = Some(f.baseObject.source)
       }
-      List(counterActor)
-    case _ => List(counterActor)
+      List(counterActor, dbActor, basicOpsActor)
+    case _ => List(counterActor, dbActor, basicOpsActor)
   }
 
+  // Sends a given CDM statement to all interested actors
   def distribute(cdm: CDM13): Unit = distributionSpec(cdm).foreach(receiver => receiver ! cdm)
 }

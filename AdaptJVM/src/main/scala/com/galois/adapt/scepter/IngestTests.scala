@@ -8,6 +8,7 @@ import akka.util.Timeout
 import com.galois.adapt.{AcceptanceApp, DevDBActor, Node, NodeQuery, Routes, Shutdown}
 import com.galois.adapt.cdm13.{AbstractObject, CDM13}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import com.galois.adapt.cdm13._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -24,6 +25,7 @@ import akka.http.scaladsl.model.StatusCodes._
 
 import scala.io.StdIn
 
+import scala.language.postfixOps
 
 //object IngestTest extends App {
 //  val config = ConfigFactory.load("test")
@@ -71,9 +73,14 @@ import org.scalatest.FlatSpec
 //}
 
 
-class General_TA1_Tests(data: => Iterator[Try[CDM13]], count: Option[Int] = None) extends FlatSpec {
+class General_TA1_Tests(
+  data: => Iterator[Try[CDM13]],            // Input CDM statements
+  count: Option[Int] = None                 // Expected number of statements
+) extends FlatSpec {
+
   implicit val timeout = Timeout(1 second)
 
+  // Test that all data gets parsed
   "Parsing data in the file..." should
   "parse successfully" in {
     var counter = 0
@@ -85,19 +92,48 @@ class General_TA1_Tests(data: => Iterator[Try[CDM13]], count: Option[Int] = None
     assert(parseTry.isSuccess)
   }
 
-  if (count.isDefined) {
-    it should s"have a known statement count of ${count.get}" in {
-      assert(Await.result(AcceptanceApp.counterActor ? HowMany("total"), 1 second) == count.get)
+  // Test that we get the right number of statements out
+  count.foreach { count => 
+    it should s"have a known statement count of $count" in {
+      assert(Await.result(AcceptanceApp.counterActor ? HowMany("total"), 1 second) == count)
     }
   }
-
-  CDM13.values.filter(_ != AbstractObject).foreach { typeName =>
+  
+  // Test that we get one of each type of statement
+  val missing = AcceptanceApp.TA1Source match {
+    case Some(SOURCE_ANDROID_JAVA_CLEARSCOPE) =>
+      List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value);
+    case Some(SOURCE_LINUX_AUDIT_TRACE) =>
+      List(AbstractObject, Value);
+    case Some(SOURCE_FREEBSD_DTRACE_CADETS) =>
+      List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, TagEntity, Value); 
+    case Some(SOURCE_WINDOWS_DIFT_FAROS) =>
+      List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value); 
+    case Some(SOURCE_LINUX_THEIA) => 
+      List(AbstractObject, Value); 
+    case Some(SOURCE_WINDOWS_FIVEDIRECTIONS) => 
+      List(AbstractObject, MemoryObject, TagEntity, Value);
+    case _ =>
+      List(AbstractObject);
+  }
+  (CDM13.values diff missing).foreach { typeName =>
     it should s"have at least one $typeName" in {
       assert {
         Await.result(
           AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
+    }
+  }
+  
+  // Tests for 'BasicOps.sh'
+  val missingOps = Await.result(
+    AcceptanceApp.basicOpsActor ? IsBasicOps, 1 second
+  ).asInstanceOf[Option[Map[String,Boolean]]]
+  missingOps.foreach { missing =>
+    behavior of "The 'BasicOps.sh' script"
+    missing.foreach { case (msg,missed) =>
+      it should s"contain $msg" in { assert(missed) }
     }
   }
 }
