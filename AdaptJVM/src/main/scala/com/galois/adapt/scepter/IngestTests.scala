@@ -125,15 +125,18 @@ class General_TA1_Tests(
       }
     }
   }
-  
+ 
   // Tests for 'BasicOps.sh'
-  val missingOps = Await.result(
-    AcceptanceApp.basicOpsActor ? IsBasicOps, 1 second
-  ).asInstanceOf[Option[Map[String,Boolean]]]
-  missingOps.foreach { missing =>
-    behavior of "The 'BasicOps.sh' script"
-    missing.foreach { case (msg,missed) =>
-      it should s"contain $msg" in { assert(missed) }
+  "Looking for BasicOps events.." should "either find almost no events, or all events" in {
+    
+    val basicOps = Await.result(
+      AcceptanceApp.basicOpsActor ? IsBasicOps, 1 second
+    ).asInstanceOf[Option[Map[String,Boolean]]]
+  
+    basicOps.foreach { missing =>
+      missing.foreach { case (msg,found) =>
+        assert(found, msg)
+      }
     }
   }
 }
