@@ -76,19 +76,20 @@ class General_TA1_Tests(
     assert(incompleteEdgeCount == 0)
   }
 
+
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
   it should "not have duplicate PID's in process Subjects" in {
     val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
-    val pids: java.util.List[Int]
+    val pids
       = graph.traversal().V().hasLabel("Subject")
                              .has("subjectType","SUBJECT_PROCESS")
                              .dedup()
                              .values("pid")
-                             .toList()
 
-    for (pid <- pids) {
+    while (pids.hasNext()) {
+      val pid: Int = pids.next()
 
       val processesWithPID: java.util.List[Vertex]
         = graph.traversal().V().has("pid", pid)
@@ -111,12 +112,13 @@ class General_TA1_Tests(
   it should "not have duplicate files" in {
     val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
-    val files: java.util.List[Vertex]
+    val files
       = graph.traversal().V().hasLabel("FileObject")
                              .dedup()
-                             .toList()
 
-    for (file <- files) {
+    while (files.hasNext) {
+      val file: Vertex = files.next()
+
       val urls = file.properties("url").toList
       if (urls.length > 0) {
         val url: String = urls(0).value()
