@@ -229,6 +229,16 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
       }
       sender() ! t
+   
+    case AnyQuery(q) =>
+      sender ! Try {
+        //println(s"query: $q")
+        val results = QueryRunner.eval(graph,
+          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
+        ).asInstanceOf[GraphTraversal[_,_]].toList.asScala.toList
+       // println(s"Found: ${results.length}")
+        results
+      }
 
     case EdgesForNodes(nodeIdList) =>
       val t = Try(
@@ -271,7 +281,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
         finalQuery = items.mkString("g.V(","L,","L)") + remainder
       }
     }
-    println(s"rewritten query: $finalQuery")
+    //println(s"rewritten query: $finalQuery")
     finalQuery
   }
 }
@@ -281,6 +291,7 @@ trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery
 case class EdgeQuery(query: String) extends RestQuery
 case class StringQuery(query: String) extends RestQuery
+case class AnyQuery(query: String) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 
