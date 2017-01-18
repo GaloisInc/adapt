@@ -79,18 +79,24 @@ class General_TA1_Tests(
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
   it should "not have duplicate PID's in process Subjects" in {
-    val pids = Await.result(
-      AcceptanceApp.dbActor ?
-      AnyQuery("g.V().has(label,'Subject').has('subjectType','SUBJECT_PROCESS').values('pid')"),
-      30 seconds
-    ).asInstanceOf[Try[List[_]]].get
+    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
+    val pids: java.util.List[Int]
+      = graph.traversal().V().hasLabel("Subject")
+                             .has("subjectType","SUBJECT_PROCESS")
+                             .dedup()
+                             .values("pid")
+                             .toList()
+
     for (pid <- pids) {
-      val processesWithPID = Await.result(
-        AcceptanceApp.dbActor ?
-        AnyQuery(s"g.V().has('pid',$pid).has(label,'Subject').has('subjectType','SUBJECT_PROCESS').dedup().by('uuid')"),
-        30 seconds
-      ).asInstanceOf[Try[List[Vertex]]].get
+
+      val processesWithPID: java.util.List[Vertex]
+        = graph.traversal().V().has("pid", pid)
+                               .hasLabel("Subject")
+                               .has("subjectType","SUBJECT_PROCESS")
+                               .dedup()
+                               .toList()
+
       val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n")
       
       assert(
@@ -103,22 +109,26 @@ class General_TA1_Tests(
   // Test deduplication of Files
   // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
   it should "not have duplicate files" in {
-    val files = Await.result(
-      AcceptanceApp.dbActor ?
-      AnyQuery("g.V().has(label,'FileObject').dedup()"),
-      30 seconds
-    ).asInstanceOf[Try[List[Vertex]]].get
+    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
+    
+    val files: java.util.List[Vertex]
+      = graph.traversal().V().hasLabel("FileObject")
+                             .dedup()
+                             .toList()
 
     for (file <- files) {
       val urls = file.properties("url").toList
       if (urls.length > 0) {
         val url: String = urls(0).value()
         val version: Int = file.property("version").value()
-        val filesWithUrl = Await.result(
-          AcceptanceApp.dbActor ?
-          AnyQuery(s"g.V().has(label,'FileObject').has('url','${Utility.escapePath(url)}').has('version',$version).dedup().by('uuid')"),
-          30 seconds
-        ).asInstanceOf[Try[List[Vertex]]].get
+        val filesWithUrl: java.util.List[Vertex]
+          = graph.traversal().V().hasLabel("FileObject")
+                                 .has("url",url)
+                                 .has("version",version)
+                                 .dedup()
+                                 .by("uuid")
+                                 .toList()
+        
         val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
         
         assert(
@@ -128,7 +138,6 @@ class General_TA1_Tests(
       }
     }
   }
-
 } 
 
 // Provider specific test classes:

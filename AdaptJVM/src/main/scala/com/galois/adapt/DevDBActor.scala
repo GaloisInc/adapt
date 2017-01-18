@@ -23,6 +23,7 @@ import scala.util.Try
 
 class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
+
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
 //  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
 
@@ -230,16 +231,6 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       }
       sender() ! t
    
-    case AnyQuery(q) =>
-      sender ! Try {
-        //println(s"query: $q")
-        val results = QueryRunner.eval(graph,
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,_]].toList.asScala.toList
-       // println(s"Found: ${results.length}")
-        results
-      }
-
     case EdgesForNodes(nodeIdList) =>
       val t = Try(
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
@@ -294,8 +285,6 @@ case class StringQuery(query: String) extends RestQuery
 case class AnyQuery(query: String) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
-
 case object GiveMeTheGraph
-
-
 case object Shutdown
+
