@@ -91,7 +91,7 @@ class General_TA1_Tests(
         AnyQuery(s"g.V().has('pid',$pid).has(label,'Subject').has('subjectType','SUBJECT_PROCESS').dedup().by('uuid')"),
         30 seconds
       ).asInstanceOf[Try[List[Vertex]]].get
-      val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.property("uuid")).mkString("\n")
+      val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n")
       
       assert(
         processesWithPID.length <= 1,
@@ -116,10 +116,10 @@ class General_TA1_Tests(
         val version: Int = file.property("version").value()
         val filesWithUrl = Await.result(
           AcceptanceApp.dbActor ?
-          AnyQuery(s"g.V().has(label,'FileObject').has('url','$url').has('version',$version).dedup().by('uuid')"),
+          AnyQuery(s"g.V().has(label,'FileObject').has('url','${Utility.escapePath(url)}').has('version',$version).dedup().by('uuid')"),
           30 seconds
         ).asInstanceOf[Try[List[Vertex]]].get
-        val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.property("uuid")).mkString("\n")
+        val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
         
         assert(
           filesWithUrl.length <= 1,
@@ -271,4 +271,15 @@ class CLEARSCOPE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
 
 trait TestEvaluationCases
 case class HowMany(name: String) extends TestEvaluationCases
+
+object Utility {
+  
+  // Escape backslashes (common in Window's paths)
+  def escapePath(path: String): String = path.flatMap {
+    case '\\' => "\\\\"
+    case '\'' => "\\\'"
+    case c => s"$c" 
+  }
+
+}
 
