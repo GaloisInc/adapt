@@ -29,7 +29,11 @@ object Wrapper extends App {
 
   // local JARs
   val adaptJarPath = "adapt.jar"
-  val testerJarPath = "adapt-tester.jar"
+  val testerJarPath = Try {
+    val p = classOf[Config].getProtectionDomain().getCodeSource().getLocation().toURI().getPath()
+    new FileInputStream(new File(p))
+    p
+  }.getOrElse("adapt-tester.jar")
   val temporaryJarPath = "temporary.jar"
 
   // Fetch a hash remotely
