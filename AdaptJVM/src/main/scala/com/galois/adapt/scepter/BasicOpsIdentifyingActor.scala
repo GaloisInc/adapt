@@ -16,18 +16,17 @@ class BasicOpsIdentifyingActor extends Actor {
     "Subject for 'chmod' on 'zqxf1'" -> false,
     "Subject for 'touch' on 'zqxf1'" -> false,
     "Subject for 'sleep' on '1'" -> false,
-    "Subject for 'nmap' on 'git.tc.bbn.com'" -> false,
-    "Event for 'touch' on 'zqxf1'" -> false
+    "Subject for 'nmap' on 'git.tc.bbn.com'" -> false
   )
   var updates = 0
 
   // Current opinion on whether the current data-set is 'BasicOps.sh'
-  def isBasicOps = true //updates > 3
+  def isBasicOps = updates > 2
 
   // Record the presence of the event
   private def logEvent(msg: String): Unit = {
     expectedEvents = expectedEvents.updated(msg, true)
-    //updates = updates + 1
+    updates = updates + 1
   }
 
   def receive = {
@@ -46,8 +45,6 @@ class BasicOpsIdentifyingActor extends Actor {
       => logEvent("Subject for 'sleep' on '1'");
     case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, Some("nmap -A git.tc.bbn.com"), _, _, _, _)
       => logEvent("Subject for 'nmap' on 'git.tc.bbn.com'");
-    case Event(_, _, _, _, _, _, Some("touch"), Some(Seq(_ /* "/tmp/zqfx1" */)), _, _, _, _)
-      => logEvent("Event for 'touch' on 'zqxf1'");
 
     // Receive a query asking about the counts stored
     case IsBasicOps =>

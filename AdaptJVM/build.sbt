@@ -25,13 +25,14 @@ lazy val adapt = (project in file(".")).settings(
     "org.apache.avro" % "avro" % "1.8.1",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
-//    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
+    //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-simple" % "1.7.21",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV
+    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
-    // "com.github.scopt" %% "scopt" % "3.5.0"
+    // "com.github.scopt" %% "scopt" % "3.5.0",
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
   ),
 
   {
