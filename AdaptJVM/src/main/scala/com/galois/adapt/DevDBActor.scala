@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import akka.actor._
 import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
 import com.galois.adapt.scepter.HowMany
+import com.galois.adapt.Traversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -15,7 +16,6 @@ import java.util.UUID
 
 import com.thinkaurelius.titan.core.TitanFactory
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
-import org.apache.tinkerpop.gremlin.groovy.jsr223.GremlinGroovyScriptEngine
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
@@ -179,15 +179,12 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
 
     case NodeQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,Vertex]].toList.asScala.toList
-        println(s"Found: ${results.length}")
-        results
-      }
-      val jsonTry = t.map { vertices =>
+      sender() ! Traversal.run[Vertex](q, graph).map { vertices =>
+
+        // Give a lower bound on the number of vertices
+        println(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
+        
+        // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
         GraphSONWriter.build().create().writeVertices(byteStream, vertices.toIterator.asJava)
 
@@ -198,44 +195,32 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
           } else v
         }.mkString("[", ",", "]")
       }
-      sender() ! jsonTry
 
     case EdgeQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,Edge]].toList.asScala.toList
-        println(s"Found: ${results.length}")
-        results
+      sender() ! Traversal.run[Edge](q, graph).map { edges =>
 
-      }
-      val jsonTry = t.map { edges =>
+        // Give a lower bound on the number of vertices
+        println(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
+        
+        // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
-        edges.foreach { e =>
-          GraphSONWriter.build().create().writeEdge(byteStream, e)
-        }
+        edges.foreach { edge => GraphSONWriter.build().create().writeEdge(byteStream, edge) }
         byteStream.toString.split("\\}\\{").mkString("[", "},{", "]")
-      }
-      sender() ! jsonTry
+     }
 
     case StringQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,_]].toList.toString
-        println(s"Found: ${results.length}")
+      sender() ! Traversal.run(q, graph).map { results => 
+        
+        // Give a lower bound on the number of vertices
+        println(s"Found: ${if (results.lengthCompare(1000) > 0) "> 1000" else results.length}")
+        
         results
-
       }
-      sender() ! t
    
     case EdgesForNodes(nodeIdList) =>
-      val t = Try(
+      sender() ! Try {
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
-      )
-      sender() ! t
+      }
 
     case HowMany(_) =>
       sender() ! graph.vertices().asScala.size
@@ -248,7 +233,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       sender() ! (missingFromUuid.size + missingToUuid.size)
   }
 
-
+/*
   def transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q: String): String = {
     val lineSeparatedQuery = q.split(";")
     var finalQuery = lineSeparatedQuery.last.trim
@@ -275,6 +260,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
     //println(s"rewritten query: $finalQuery")
     finalQuery
   }
+  */
 }
 
 

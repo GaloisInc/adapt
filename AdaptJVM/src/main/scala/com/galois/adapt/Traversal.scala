@@ -9,27 +9,46 @@ import java.util.{Collections, Comparator, Iterator}
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Stream
 import scala.util.parsing.combinator._
-import scala.util.Try
+import scala.util.{Try, Failure, Success}
 import scala.language.existentials
 
 object Traversal {
-
   // Run a 'Traversal' on a 'Graph'
-  def run[S,T](traversal: Traversal[S,T], graph: Graph): Try[Stream[T]] = traversal.apply(graph)
+  def run[S,T](traversal: Traversal[S,T], graph: Graph): Try[Stream[T]] = traversal.run(graph)
+  def run[T](traversal: String, graph: Graph): Try[Stream[T]] =
+    Traversal(traversal).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
   
   // Attempt to parse a traversal from a string
-  def apply(input: String): Option[Traversal[_,_]] = {
-    
+  def apply(input: String): Try[Traversal[_,_]] = {
+
     object Parsers extends JavaTokenParsers {
       // Synonym for untyped traversal
       type Tr = Traversal[_,_]
- 
+     
+      // These are the stores of variables defined. 
+      // Remark: this really should be one dependently-typed map
+      // Remark: if Scala's parser was a monad transformer instead of just a monad, we should thread
+      // this state through it.
+      var ints: Map[String,java.lang.Long] = Map()
+      var strs: Map[String,String] = Map()
+      var intArrs: Map[String,Seq[java.lang.Long]] = Map()
+      var strArrs: Map[String,Seq[String]] = Map()
+
       // These are arguments to the methods called in traversals
-      def int: Parser[java.lang.Long] = wholeNumber ^^ { _.toLong }
-      def str: Parser[String] = stringLiteral
-      def lit: Parser[_] = int | str
+      def int: Parser[java.lang.Long] = variable(ints) | wholeNumber ^^ { _.toLong }
+      def str: Parser[String] = variable(strs) | stringLiteral
+      def intArr: Parser[Seq[java.lang.Long]] = variable(intArrs) | arr(int)
+      def strArr: Parser[Seq[String]] = variable(strArrs) | arr(str)
+      def lit: Parser[_] = int | str | intArr | strArr
+
+      // Parse an identifier iff it is in the store passed in.
+      def variable[T](store: Map[String,T]): Parser[T] = ident.withFilter(store.isDefinedAt(_)).map(store(_))
+      // Parse an array.
+      def arr[T](elem: Parser[T]): Parser[Seq[T]] =
+        "["~repsep(elem,",")~"]"~".toArray()".? ^^ { case _~e~_~_ => e }
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
+      // Otherwise, we get left recursion...
       //
       // Remark: we need the type annotation only when parsing the very first disjunct because Scala type
       // inference is stupidly asymmetric.
@@ -63,34 +82,44 @@ object Traversal {
 
       // Possible sources for traversals
       def source: Parser[Tr] = 
-        ( "g.V(" ~ repsep(int,",") ~ ")"   ^^ { case _~ids~_    => Vertices(ids) }
-        | "g.E(" ~ repsep(int,",") ~ ")"   ^^ { case _~ids~_    => Edges(ids) }
-        | "_"                              ^^ { case _          => Anon(List()) }
-        | "_(" ~ repsep(int,",") ~ ")"     ^^ { case _~ids~_    => Anon(ids) }
+        ( "g.V(" ~ (intArr | repsep(int,",")) ~ ")" ^^ { case _~ids~_ => Vertices(ids) }
+        | "g.E(" ~ (intArr | repsep(int,",")) ~ ")" ^^ { case _~ids~_ => Edges(ids) }
+        | "_"                                       ^^ { case _       => Anon(List()) }
+        | "_(" ~ repsep(int,",") ~ ")"              ^^ { case _~ids~_ => Anon(ids) }
         ).asInstanceOf[Parser[Tr]]
 
+      // Parser for assignment statement. This parser has the side-effect of updating the stores of
+      // variables.
+      def assign: Parser[Unit] =
+        ( ident ~ "=" ~ int    ^^ { case i~_~v => ints += (i -> v); }
+        | ident ~ "=" ~ str    ^^ { case i~_~v => strs += (i -> v); }
+        | ident ~ "=" ~ intArr ^^ { case i~_~v => intArrs += (i -> v); }
+        | ident ~ "=" ~ strArr ^^ { case i~_~v => strArrs += (i -> v); }
+        )
+      
       // Parser for a traversal 
-      def trav: Parser[Tr] = source ~ rep(suffix) ^^ {
-          case src ~ sufs => sufs.foldLeft[Tr](src)((t,suf) => suf(t))
+      def trav: Parser[Tr] = rep(assign ~ ";") ~ source ~ rep(suffix) ^^ {
+          case _ ~ src ~ sufs => sufs.foldLeft[Tr](src)((t,suf) => suf(t))
         }
     }
  
     Parsers.parse(Parsers.trav, input.filterNot(_.isWhitespace)) match {
-      case Parsers.Success(matched, _) => Some(matched)
-      case _ => None
+      case Parsers.Success(matched, _) => Success(matched)
+      case Parsers.Failure(msg, _) => Failure(throw new Exception(msg))
+      case _ => Failure(throw new Exception("Parser failed in an unexpected way"))
     }
   }
 }
 
 // Represents a traversal across a graph where 'S' is the source type and 'T' the destination type
-sealed trait Traversal[S,T] {
+sealed trait Traversal[S,T] { 
   // Convert into a Gremlin traversal by "running" the current traversal on the graph passed in.
   def buildTraversal(graph: Graph): GraphTraversal[S,T] 
 
   // Run our traversal on a graph.
-  def apply(graph: Graph): Try[Stream[T]] = Try { buildTraversal(graph).asScala.toStream }
+  def run(graph: Graph): Try[Stream[T]] = Try { buildTraversal(graph).asScala.toStream }
+  def apply(graph: Graph): Try[Stream[T]] = run(graph)
 }
-
 
 // Sources of traversals
 case class Vertices(ids: Seq[java.lang.Long]) extends Traversal[Vertex,Vertex] {
