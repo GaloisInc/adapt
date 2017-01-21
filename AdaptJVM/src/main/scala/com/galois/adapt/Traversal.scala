@@ -12,6 +12,68 @@ import scala.util.parsing.combinator._
 import scala.util.{Try, Failure, Success}
 import scala.language.existentials
 
+/*
+ * A 'Traversal' represents roughly the shape of path(s) that can be used to explore a graph. This
+ * class exists because:
+ *
+ *   - We need some way of going from strings to queries. Since Groovy reflection wasn't working
+ *     well, we decided to roll our own parsing
+ *   
+ *   - The Java datatypes for this (mostly under 'tinkerpop.gremlin.process.traversal.dsl.graph')
+ *     are unpleasant to handle. For instance, they tie traversals to immediately to a graph.
+ *   
+ *   - This could be a good first-class representation of a mutation to execute on a graph (for
+ *     example to add vertices or edges), but without being opaque.
+ *
+ * Currently, the informal grammar of the supported subset of Java/Gremlin/Groovy is:
+ *
+ *   variable    ::= <same as Java variables>
+ *
+ *   long        ::= variable | <same as Java long>
+ *   string      ::= variable | <same as Java string>
+ *   longArray   ::= variable | '[' long ',' ... ']'
+ *   stringArray ::= variable | '[' string ',' ... ']'
+ *
+ *   literal     ::= long | string | longArray | stringArray
+ *
+ *   traversal   ::= 'g.V(' long ',' ... ')'
+ *                 | 'g.V(' longArray ')'
+ *                 | 'g.E(' long ',' ... ')'
+ *                 | 'g.E(' longArray ')'
+ *                 | '_'
+ *                 | '_(' long ',' ... ')'
+ *                 | traversal '.has(' string ')'
+ *                 | traversal '.has(' string ',' literal ')'
+ *                 | traversal '.hasLabel(' string ')'
+ *                 | traversal '.has(label,' string ')'
+ *                 | traversal '.hasId(' long ')'
+ *                 | traversal '.and(' traversal ',' ... ')'
+ *                 | traversal '.or(' traversal ',' ... ')'
+ *                 | traversal '.dedup()'
+ *                 | traversal '.limit(' long ')'
+ *                 | traversal '.order()'
+ *                 | traversal '.by(' string ')'
+ *                 | traversal '.by(' traversal ( ',incr' | ',decr' )? ')'
+ *                 | traversal '.as(' string ',' ... ')'
+ *                 | traversal '.values()'
+ *                 | traversal '.max()'
+ *                 | traversal '.select(' string ',' ... ')'
+ *                 | traversal '.unfold()'
+ *                 | traversal ( '.both()' | '.bothV()' )
+ *                 | traversal ( '.out()' | '.outV()' )
+ *                 | traversal ( '.in()' | '.inV()' )
+ *                 | traversal '.bothE()'
+ *                 | traversal '.outE()'
+ *                 | traversal '.inE()'
+ *
+ *   assignment  ::= variable '=' literal ';'
+ *
+ *   query       ::= assignment* traversal
+ *
+ * The top-level things you run against graphs are queries.
+ */
+
+
 object Traversal {
   // Run a 'Traversal' on a 'Graph'
   def run[S,T](traversal: Traversal[S,T], graph: Graph): Try[Stream[T]] = traversal.run(graph)

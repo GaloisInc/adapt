@@ -209,12 +209,14 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
      }
 
     case StringQuery(q) =>
-      sender() ! Traversal.run(q, graph).map { results => 
+      sender() ! Traversal.run(q, graph).map { results =>  
         
+        val listResults = results.toList
+
         // Give a lower bound on the number of vertices
-        println(s"Found: ${if (results.lengthCompare(1000) > 0) "> 1000" else results.length}")
+        println(s"Found: ${results.length}")
         
-        results
+        listResults.toString 
       }
    
     case EdgesForNodes(nodeIdList) =>
@@ -232,37 +234,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
       sender() ! (missingFromUuid.size + missingToUuid.size)
   }
-
-/*
-  def transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q: String): String = {
-    val lineSeparatedQuery = q.split(";")
-    var finalQuery = lineSeparatedQuery.last.trim
-    if (lineSeparatedQuery.length > 1) (0 until lineSeparatedQuery.length - 1).foreach { idx =>
-      val x = lineSeparatedQuery(idx).split("=")
-      val symbol = x.head.trim
-      val statement = x.last.trim
-      val individualItemList = statement.stripPrefix("[").stripSuffix(".toArray()").stripSuffix("]").split(",")
-      val newStatement = individualItemList.map(_.trim + "L").mkString("[",",","].toArray()")
-      finalQuery = finalQuery.replaceFirst(symbol, newStatement)   //replaceFirst("g.V("+symbol+")", "g.V("+newStatement+")")
-    } else {
-      if (finalQuery.startsWith("g.V([")) {
-        val splitArray = finalQuery.stripPrefix("g.V([").split("].toArray\\([)]\\)", 2)
-        val items = splitArray(0).split(",")
-        val remainder = splitArray(1)
-        finalQuery = items.mkString("g.V([","L,","L].toArray())") + remainder
-      } else if (finalQuery.startsWith("g.V(") && ! finalQuery.startsWith("g.V()")) {
-        val splitArray = finalQuery.stripPrefix("g.V(").split("[)]", 2)
-        val items = splitArray(0).stripPrefix("[").stripSuffix("]").split(",")
-        val remainder = splitArray(1)
-        finalQuery = items.mkString("g.V(","L,","L)") + remainder
-      }
-    }
-    //println(s"rewritten query: $finalQuery")
-    finalQuery
-  }
-  */
 }
-
 
 trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery
