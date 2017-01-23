@@ -9,19 +9,19 @@ var starting_queries = [
         default_values : ["file:///tmp/zqxf1",1]
     }, {
         name : "find anomalous processes",
-        base_query : "g.V().has(label,'Subject').has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        base_query : "g.V().has(label,'Subject').has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
         default_values : [10]
     }, {
         name : "find anomalous netflows",
-        base_query : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        base_query : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
         default_values : [10]
     }, {
         name : "find anomalous files",
-        base_query : "g.V().has('eventType',21).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().has('anomalyScore').order().by(values('anomalyScore').max(),decr).limit({_})",
+        base_query : "g.V().has('eventType',21).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
         default_values : [10]
     }, {
         name : "find process by pid",
-        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_}).dedup()by('pid')",
+        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_}).dedup().by('pid')",
         default_values : [1001]
     }, {
         name : "find up to n processes of an owner",
@@ -231,7 +231,7 @@ var predicates = [
     }, {
         name : "File Events",
         is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".out().or(hasLabel('EDGE_EVENT_AFFECTS_FILE'),hasLabel('EDGE_FILE_AFFECTS_EVENT')).out()",
+        floating_query : ".out().or(_.hasLabel('EDGE_EVENT_AFFECTS_FILE'),_.hasLabel('EDGE_FILE_AFFECTS_EVENT')).out()",
         is_default : true
     }, {
         name : "Event By...",
@@ -251,7 +251,7 @@ var predicates = [
     }, {
         name : "File Lineage",
         is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".union(until(out().hasLabel('EDGE_OBJECT_PREV_VERSION').count().is(eq(0))).repeat(out().hasLabel('EDGE_OBJECT_PREV_VERSION').out().as('a')).select('a').unfold(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',17).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().hasLabel('Subject').has('eventType',20).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),__.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().dedup())"
+        floating_query : ".union(_.until(_.out().hasLabel('EDGE_OBJECT_PREV_VERSION').count().is(0)).repeat(_.out().hasLabel('EDGE_OBJECT_PREV_VERSION').out().as('a')).select('a').unfold(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',17).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().hasLabel('Subject').has('eventType',20).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().dedup())"
     }, {
         name : "Previous version",
         is_relevant : function(n) {return n.label === "Entity-File" && n['properties']['file-version'][0]['value'] > 0},
@@ -288,7 +288,7 @@ var predicates = [
     }, {
         name : "My commands (text)",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".as('parent').union(values('commandLine').as('cmd'), until(__.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).count().is(0)).repeat(__.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).out().has(label,'EDGE_EVENT_AFFECTS_SUBJECT').out().has(label,'Subject').has('subjectType',0)).values('commandLine').as('cmd')).select('parent').dedup().values('pid').as('parent_pid').select('parent_pid','cmd')"
+        floating_query : ".as('parent').union(_.values('commandLine').as('cmd'), _.until(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).count().is(0)).repeat(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).out().has(label,'EDGE_EVENT_AFFECTS_SUBJECT').out().has(label,'Subject').has('subjectType',0)).values('commandLine').as('cmd')).select('parent').dedup().values('pid').as('parent_pid').select('parent_pid','cmd')"
     }, {
         name : "My mmaps",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
@@ -324,7 +324,7 @@ var predicates = [
     }, {
         name : "My ancestors",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".until(both().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').count().is(0)).repeat(has('subjectType',0).in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).as('b')).select('b').unfold()"
+        floating_query : ".until(_.both().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').count().is(0)).repeat(_.has('subjectType',0).in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).as('b')).select('b').unfold()"
     }, {
         name : "Owner changed by",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
