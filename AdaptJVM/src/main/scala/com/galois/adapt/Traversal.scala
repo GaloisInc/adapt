@@ -1,5 +1,6 @@
 package com.galois.adapt
 
+import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
@@ -34,6 +35,8 @@ import scala.language.existentials
  *   longArray   ::= variable | '[' long ',' ... ']'
  *   stringArray ::= variable | '[' string ',' ... ']'
  *
+ *   regex       ::= 'regex(' string ')'
+ *
  *   literal     ::= long | string | longArray | stringArray
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
@@ -44,6 +47,8 @@ import scala.language.existentials
  *                 | '_(' long ',' ... ')'                                 TODO: What is this?
  *                 | traversal '.has(' string ')'
  *                 | traversal '.has(' string ',' literal ')'
+ *                 | traversal '.has(' string ',' regex ')'
+ *                 | traversal '.has(' string ',' traversal ')'
  *                 | traversal '.hasLabel(' string ')'
  *                 | traversal '.has(label,' string ')'
  *                 | traversal '.hasId(' long ')'
@@ -62,11 +67,14 @@ import scala.language.existentials
  *                 | traversal '.select(' string ',' ... ')'
  *                 | traversal '.unfold()'
  *                 | traversal '.count()'
- *                 | traversal ( '.both()' | '.bothV()' )
- *                 | traversal ( '.out()' | '.outV()' )
- *                 | traversal ( '.in()' | '.inV()' )
+ *                 | traversal '.both(' string ',' ... ')'
+ *                 | traversal '.bothV()'
+ *                 | traversal '.out(' string ',' ... ')'
+ *                 | traversal '.outV()'
+ *                 | traversal '.in(' string ',' ... ')'
+ *                 | traversal '.inV()'
  *                 | traversal '.bothE()'
- *                 | traversal '.outE()'
+ *                 | traversal '.outE(' string ',' ... ')'
  *                 | traversal '.inE()'
  *                 | traversal '.repeat(' traversal ')'
  *                 | traversal '.union(' traversal ',' ... ')'
@@ -94,7 +102,7 @@ object Traversal {
   def run[S,T](traversal: Traversal[S,T], graph: Graph): Try[Stream[T]] = traversal.run(graph)
   def run[T](traversal: String, graph: Graph): Try[Stream[T]] =
     Traversal(traversal).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
-  
+
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Traversal[_,_]] = {
 
@@ -123,6 +131,9 @@ object Traversal {
       // Parse an array.
       def arr[T](elem: Parser[T]): Parser[Seq[T]] =
         "["~repsep(elem,",")~"]"~".toArray()".? ^^ { case _~e~_~_ => e }
+      // Parse a regex
+      def regex[T]: Parser[Regex] =
+         ("regex(" ~ str ~ ")" | "newP(REGEX," ~ str ~ ")") ^^ { case _~r~_ => Regex(r) }
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
@@ -132,6 +143,8 @@ object Traversal {
       def suffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
+        | ".has(" ~ str ~ "," ~regex~ ")"  ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
+        | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasId(" ~ int ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
@@ -152,12 +165,14 @@ object Traversal {
                                                 case _~s~_      => SelectMult(_: Tr, s) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
-        | ".both()"                        ^^ { case _          => Both(_: Traversal[_,Vertex]) }
+        | ".both(" ~ repsep(str,",") ~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], s) }
         | ".bothV()"                       ^^ { case _          => BothV(_: Traversal[_,Edge]) }
-        | (".out()" | ".outV()")           ^^ { case _          => OutV(_: Traversal[_,Edge]) }
-        | (".in()" | ".inV()")             ^^ { case _          => InV(_: Traversal[_,Edge]) }
+        | ".out(" ~ repsep(str,",") ~ ")"  ^^ { case _~s~_      => Out(_: Traversal[_,Vertex], s) }
+        | ".outV()"                        ^^ { case _          => OutV(_: Traversal[_,Edge]) }
+        | ".in(" ~ repsep(str,",") ~ ")"   ^^ { case _~s~_      => In(_: Traversal[_,Vertex], s) }
+        | ".inV()"                         ^^ { case _          => InV(_: Traversal[_,Edge]) }
         | ".bothE()"                       ^^ { case _          => BothE(_: Traversal[_,Vertex]) }
-        | ".outE()"                        ^^ { case _          => OutE(_: Traversal[_,Vertex]) }
+        | ".outE(" ~ repsep(str,",") ~ ")" ^^ { case _~s~_      => OutE(_: Traversal[_,Vertex], s) }
         | ".inE()"                         ^^ { case _          => InE(_: Traversal[_,Vertex]) }
         | ".repeat(" ~ trav ~ ")"          ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
         | ".union(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
@@ -230,6 +245,14 @@ case class Has[S,T](traversal: Traversal[S,T], key: String) extends Traversal[S,
 }
 case class HasValue[S,T,V](traversal: Traversal[S,T], k: String, v: V) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).has(k,v)
+}
+case class HasRegex[S,T](traversal: Traversal[S,T], k: String, regex: Regex) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).has(k, Text.textRegex(regex.raw))
+}
+case class HasTraversal[S,T](traversal: Traversal[S,T], k: String, v: Traversal[_,_]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).has(k, v.buildTraversal(graph))
 }
 case class HasLabel[S,T](traversal: Traversal[S,T], label: String) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).hasLabel(label)
@@ -307,14 +330,20 @@ case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Lon
 
 
 // Extend outwards
-case class Both[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Vertex] {
-  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).both()
+case class Both[S](traversal: Traversal[S,Vertex], edgeLabels: Seq[String]) extends Traversal[S,Vertex] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).both(edgeLabels: _*)
 }
 case class BothV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).bothV()
 }
+case class Out[S](traversal: Traversal[S,Vertex], edgeLabels: Seq[String]) extends Traversal[S,Vertex] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).out(edgeLabels: _*)
+}
 case class OutV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).outV()
+}
+case class In[S](traversal: Traversal[S,Vertex], edgeLabels: Seq[String]) extends Traversal[S,Vertex] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).in(edgeLabels: _*)
 }
 case class InV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).inV()
@@ -322,8 +351,8 @@ case class InV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
 case class BothE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).bothE()
 }
-case class OutE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).outE()
+case class OutE[S](traversal: Traversal[S,Vertex], edgeLabels: Seq[String]) extends Traversal[S,Edge] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).outE(edgeLabels: _*)
 }
 case class InE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).inE()
@@ -340,4 +369,7 @@ case class Local[S,E](traversal: Traversal[S,_], loc: Traversal[_,E]) extends Tr
   override def buildTraversal(graph: Graph)
     = traversal.buildTraversal(graph).local(loc.buildTraversal(graph))
 }
+
+
+case class Regex(raw: String)
 

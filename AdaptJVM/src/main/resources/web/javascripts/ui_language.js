@@ -5,7 +5,7 @@ var starting_queries = [
         default_values : ["file:///tmp/zqxf1",1]
     }, {
         name : "find file by partial name",
-        base_query : "g.V().has(label,'Entity-File').has('url',new P(REGEX,'.*{_}.*')).has('file-version',{_}).dedup()",
+        base_query : "g.V().has(label,'Entity-File').has('url',regex('.*{_}.*')).has('file-version',{_}).dedup()",
         default_values : ["file:///tmp/zqxf1",1]
     }, {
         name : "find anomalous processes",
@@ -300,7 +300,7 @@ var predicates = [
     }, {
         name : "My parent",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".as('child').in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().has('pid',select('child').values('ppid'))"
+        floating_query : ".as('child').in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().has('pid',_.select('child').values('ppid'))"
     }, {
         name : "Files I wrote",
         is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
