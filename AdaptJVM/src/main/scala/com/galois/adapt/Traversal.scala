@@ -52,6 +52,7 @@ import scala.language.existentials
  *                 | traversal '.hasLabel(' string ')'
  *                 | traversal '.has(label,' string ')'
  *                 | traversal '.hasId(' long ')'
+ *                 | traversal '.where(' traversal ')'
  *                 | traversal '.and(' traversal ',' ... ')'
  *                 | traversal '.or(' traversal ',' ... ')'
  *                 | traversal '.dedup()'
@@ -63,7 +64,10 @@ import scala.language.existentials
  *                 | traversal '.as(' string ',' ... ')'
  *                 | traversal '.until(' traveral ')'
  *                 | traversal '.values(' string ',' ... ')'
+ *                 | traversal '.id()'
  *                 | traversal '.max()'
+ *                 | traversal '.min()'
+ *                 | traversal '.sum()'
  *                 | traversal '.select(' string ',' ... ')'
  *                 | traversal '.unfold()'
  *                 | traversal '.count()'
@@ -79,6 +83,7 @@ import scala.language.existentials
  *                 | traversal '.repeat(' traversal ')'
  *                 | traversal '.union(' traversal ',' ... ')'
  *                 | traversal '.local(' trav ')'
+ *                 | traversal '.property(' string ',' literal ',' ... ')'
  *
  *   assignment  ::= variable '=' literal ';'
  *
@@ -148,6 +153,7 @@ object Traversal {
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasId(" ~ int ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
+        | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
         | ".and(" ~ repsep(trav,",") ~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~ repsep(trav,",") ~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
@@ -160,7 +166,10 @@ object Traversal {
         | ".as(" ~ rep1sep(str,",") ~ ")"  ^^ { case _~s~_      => As(_: Tr, s) }
         | ".until(" ~ trav ~ ")"           ^^ { case _~t~_      => Until(_: Tr, t) }
         | ".values("~rep1sep(str,",")~")"  ^^ { case _~s~_      => Values(_: Tr, s) }
+        | ".id()"                          ^^ { case _          => Id(_: Tr) }
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
+        | ".min()"                         ^^ { case _          => Min(_: Traversal[_,java.lang.Long]) }
+        | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
         | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s) 
                                                 case _~s~_      => SelectMult(_: Tr, s) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
@@ -177,13 +186,16 @@ object Traversal {
         | ".repeat(" ~ trav ~ ")"          ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
         | ".union(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
         | ".local(" ~ trav ~ ")"           ^^ { case _~t~_      => Local(_: Tr, t) }
+        | ".property(" ~ rep1sep(str ~ "," ~ lit, ",") ~ ")" ^^ { case _~s~_ =>
+            Property(_: Tr, s.map { case k~_~v => (k,v) })
+          }
         ).asInstanceOf[Parser[Tr => Tr]]
 
       // Possible sources for traversals
       def source: Parser[Tr] = 
         ( "g.V(" ~ (intArr | repsep(int,",")) ~ ")" ^^ { case _~ids~_ => Vertices(ids) }
         | "g.E(" ~ (intArr | repsep(int,",")) ~ ")" ^^ { case _~ids~_ => Edges(ids) }
-        | ("_" | "__")                              ^^ { case _       => Anon(List()) }
+        | ("__" | "_")                              ^^ { case _       => Anon(List()) }
         | "_(" ~ repsep(int,",") ~ ")"              ^^ { case _~ids~_ => Anon(ids) }
         ).asInstanceOf[Parser[Tr]]
 
@@ -260,6 +272,10 @@ case class HasLabel[S,T](traversal: Traversal[S,T], label: String) extends Trave
 case class HasId[S,T](traversal: Traversal[S,T], id: java.lang.Long) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).hasId(id)
 }
+case class Where[S,T](traversal: Traversal[S,T], where: Traversal[_,_]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).where(where.buildTraversal(graph))
+}
 case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph) =
     traversal.buildTraversal(graph).and(anded.map(_.buildTraversal(graph)): _*)
@@ -311,8 +327,17 @@ case class Until[S,E](traversal: Traversal[S,E], cond: Traversal[_,_]) extends T
 case class Values[S,T,V](traversal: Traversal[S,T], keys: Seq[String]) extends Traversal[S,V] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).values(keys: _*)
 }
+case class Id[S,T](traversal: Traversal[S,T]) extends Traversal[S,java.lang.Object] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).id()
+}
 case class Max[S](traversal: Traversal[S,java.lang.Long]) extends Traversal[S,java.lang.Long] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).max()
+}
+case class Min[S](traversal: Traversal[S,java.lang.Long]) extends Traversal[S,java.lang.Long] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).min()
+}
+case class Sum[S](traversal: Traversal[S,java.lang.Double]) extends Traversal[S,java.lang.Double] {
+  override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).sum()
 }
 case class Select[S,T](traversal: Traversal[S,_], key: String) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).select(key)
@@ -358,16 +383,27 @@ case class InE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
   override def buildTraversal(graph: Graph) = traversal.buildTraversal(graph).inE()
 }
 case class Repeat[S](traversal: Traversal[S,Edge], rep: Traversal[_,Edge]) extends Traversal[S,Edge]{
-  override def buildTraversal(graph: Graph)
-    = traversal.buildTraversal(graph).repeat(rep.buildTraversal(graph))
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).repeat(rep.buildTraversal(graph))
 }
 case class Union[S,E](traversal: Traversal[S,_], unioned: Seq[Traversal[_,E]]) extends Traversal[S,E] {
-  override def buildTraversal(graph: Graph)
-    = traversal.buildTraversal(graph).union(unioned.map(_.buildTraversal(graph)): _*)
+  override def buildTraversal(graph: Graph) = 
+    traversal.buildTraversal(graph).union(unioned.map(_.buildTraversal(graph)): _*)
 }
 case class Local[S,E](traversal: Traversal[S,_], loc: Traversal[_,E]) extends Traversal[S,E] {
-  override def buildTraversal(graph: Graph)
-    = traversal.buildTraversal(graph).local(loc.buildTraversal(graph))
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).local(loc.buildTraversal(graph))
+}
+
+
+// Mutating
+case class Property[S,E](traversal: Traversal[S,E], properties: Seq[(String,_)]) extends Traversal[S,E] {
+  override def buildTraversal(graph: Graph) =
+    traversal.buildTraversal(graph).property(
+      properties(0)._1,
+      properties(0)._2,
+      properties.drop(1) flatMap { case (k,v) => Seq(k,v) }
+    )
 }
 
 
