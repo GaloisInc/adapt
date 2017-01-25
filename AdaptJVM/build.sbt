@@ -7,16 +7,16 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.1",
   organization := "com.galois",
   scalaVersion := scalaV,
-  scalacOptions := Seq(
-    "-unchecked",
-    "-deprecation",
-    "-feature",
-    "-Yno-adapted-args",
-    "-Ywarn-dead-code",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard",
-    "-Ywarn-unused"
-  ),
+//  scalacOptions := Seq(
+//    "-unchecked",
+//    "-deprecation",
+//    "-feature",
+//    "-Yno-adapted-args",
+//    "-Ywarn-dead-code",
+//    "-Ywarn-numeric-widen",
+//    "-Ywarn-value-discard",
+//    "-Ywarn-unused"
+//  ),
 
   libraryDependencies ++= Seq(
     "com.typesafe" % "config" % "1.3.1",
@@ -28,6 +28,7 @@ lazy val adapt = (project in file(".")).settings(
     //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-simple" % "1.7.21",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
+    "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
