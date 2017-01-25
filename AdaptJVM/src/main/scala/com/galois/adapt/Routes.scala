@@ -16,6 +16,8 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Try
 import scala.concurrent.duration._
 
+import scala.language.postfixOps
+
 object Routes {
 
   val workingDirectory = System.getProperty("user.dir")
@@ -50,7 +52,7 @@ object Routes {
     val qType = query match {
       case _: NodeQuery => "node"
       case _: EdgeQuery => "edge"
-      case _ => "generic"
+      case _: StringQuery => "generic"
     }
     println(s"Got $qType query: ${query.query}")
     val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>

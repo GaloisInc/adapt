@@ -15,7 +15,6 @@ import java.util.UUID
 
 import com.thinkaurelius.titan.core.TitanFactory
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
-import org.apache.tinkerpop.gremlin.groovy.jsr223.GremlinGroovyScriptEngine
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
@@ -179,15 +178,12 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
 
     case NodeQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,Vertex]].toList.asScala.toList
-        println(s"Found: ${results.length}")
-        results
-      }
-      val jsonTry = t.map { vertices =>
+      sender() ! Query.run[Vertex](q, graph).map { vertices =>
+
+        // Give a lower bound on the number of vertices
+        println(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
+        
+        // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
         GraphSONWriter.build().create().writeVertices(byteStream, vertices.toIterator.asJava)
 
@@ -198,44 +194,33 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
           } else v
         }.mkString("[", ",", "]")
       }
-      sender() ! jsonTry
 
     case EdgeQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,Edge]].toList.asScala.toList
-        println(s"Found: ${results.length}")
-        results
+      sender() ! Query.run[Edge](q, graph).map { edges =>
 
-      }
-      val jsonTry = t.map { edges =>
+        // Give a lower bound on the number of vertices
+        println(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
+        
+        // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
-        edges.foreach { e =>
-          GraphSONWriter.build().create().writeEdge(byteStream, e)
-        }
+        edges.foreach { edge => GraphSONWriter.build().create().writeEdge(byteStream, edge) }
         byteStream.toString.split("\\}\\{").mkString("[", "},{", "]")
-      }
-      sender() ! jsonTry
+     }
 
     case StringQuery(q) =>
-      val t = Try {
-        val results = QueryRunner.eval(graph,
-//          q
-          transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q)
-        ).asInstanceOf[GraphTraversal[_,_]].toList.toString
+      sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
+        
+        // Give a lower bound on the number of vertices
         println(s"Found: ${results.length}")
-        results
-
+       
+        // Generate JSON to send back
+        results.map(_.toString).mkString("[",",","]")
       }
-      sender() ! t
    
     case EdgesForNodes(nodeIdList) =>
-      val t = Try(
+      sender() ! Try {
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
-      )
-      sender() ! t
+      }
 
     case HowMany(_) =>
       sender() ! graph.vertices().asScala.size
@@ -247,42 +232,12 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
       sender() ! (missingFromUuid.size + missingToUuid.size)
   }
-
-
-  def transformQueryIntoSomethingThatStupidGremlinWillEvaluateCorrectlyThisIsABadIdeaShouldDoItAnotherWay(q: String): String = {
-    val lineSeparatedQuery = q.split(";")
-    var finalQuery = lineSeparatedQuery.last.trim
-    if (lineSeparatedQuery.length > 1) (0 until lineSeparatedQuery.length - 1).foreach { idx =>
-      val x = lineSeparatedQuery(idx).split("=")
-      val symbol = x.head.trim
-      val statement = x.last.trim
-      val individualItemList = statement.stripPrefix("[").stripSuffix(".toArray()").stripSuffix("]").split(",")
-      val newStatement = individualItemList.map(_.trim + "L").mkString("[",",","].toArray()")
-      finalQuery = finalQuery.replaceFirst(symbol, newStatement)   //replaceFirst("g.V("+symbol+")", "g.V("+newStatement+")")
-    } else {
-      if (finalQuery.startsWith("g.V([")) {
-        val splitArray = finalQuery.stripPrefix("g.V([").split("].toArray\\([)]\\)", 2)
-        val items = splitArray(0).split(",")
-        val remainder = splitArray(1)
-        finalQuery = items.mkString("g.V([","L,","L].toArray())") + remainder
-      } else if (finalQuery.startsWith("g.V(") && ! finalQuery.startsWith("g.V()")) {
-        val splitArray = finalQuery.stripPrefix("g.V(").split("[)]", 2)
-        val items = splitArray(0).stripPrefix("[").stripSuffix("]").split(",")
-        val remainder = splitArray(1)
-        finalQuery = items.mkString("g.V(","L,","L)") + remainder
-      }
-    }
-    //println(s"rewritten query: $finalQuery")
-    finalQuery
-  }
 }
 
-
-trait RestQuery { val query: String }
+sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery
 case class EdgeQuery(query: String) extends RestQuery
 case class StringQuery(query: String) extends RestQuery
-case class AnyQuery(query: String) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
