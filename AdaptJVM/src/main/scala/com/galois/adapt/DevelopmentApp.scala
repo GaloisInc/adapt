@@ -15,6 +15,8 @@ import collection.JavaConversions._
 
 import java.io.File
 
+import scala.language.postfixOps
+
 object DevelopmentApp {
   println(s"Spinning up a development system.")
 

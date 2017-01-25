@@ -33,12 +33,25 @@ class Runner:
 	def make_request(self, endpoint, query, bindings = {}):
 		"""splice in to the query the given bindings, POST to the given endpoint, and assert the
 		response code is a 200"""
+
+		# Strings need to have quotes added around them, numbers are turned into strings,
+		# lists are converted to `[]` comma delimited strings
+		def printLit(v):
+			if isinstance(v, str):
+				return '"' + v + '"'
+			elif isinstance(v, list):
+				return '[' + ', '.join(map(printLit,v)) + ']'
+			else:
+				return str(v)
+
+
 		# Add the bindings to the front of the query
-		query = ';'.join([ str(k) + " = " + str(v) for k, v in bindings.items() ]) + "; " + query
+		query = '; '.join([ str(k) + " = " + printLit(v) for k, v in bindings.items() ]) + "; " + query
 
 		# Query the 'nodes' REST api, and fail unless you get a 200 response
 		req = requests.post(self.url + endpoint, data={'query': query})
 		if req.status_code != requests.codes.ok:
+			print("Request to " + self.url + endpoint + " failed")
 			raise Exception("Request to " + self.url + endpoint + " failed")
 
 		return req
@@ -50,7 +63,7 @@ class Runner:
 
 
 
-def queries_for_view(view_name = "netflow_connect_process_exec", json_view_defn_file_path = "/Users/ryan/Code/adapt/ad/feature_extractor/view_specification.json"):
+def queries_for_view(view_name = "netflow_connect_process_exec", json_view_defn_file_path = "/Users/atheriault/adapt/ad/feature_extractor/view_specification.json"):
 	with open(json_view_defn_file_path, "r") as fd:
 		view_dict = json.loads(fd.read())
 		this_view = view_dict[view_name]

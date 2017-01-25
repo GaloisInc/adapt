@@ -5,7 +5,6 @@ import java.io.ByteArrayOutputStream
 import akka.actor._
 import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
 import com.galois.adapt.scepter.HowMany
-import com.galois.adapt.Traversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -179,7 +178,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
 
     case NodeQuery(q) =>
-      sender() ! Traversal.run[Vertex](q, graph).map { vertices =>
+      sender() ! Query.run[Vertex](q, graph).map { vertices =>
 
         // Give a lower bound on the number of vertices
         println(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
@@ -197,7 +196,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       }
 
     case EdgeQuery(q) =>
-      sender() ! Traversal.run[Edge](q, graph).map { edges =>
+      sender() ! Query.run[Edge](q, graph).map { edges =>
 
         // Give a lower bound on the number of vertices
         println(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
@@ -209,14 +208,13 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
      }
 
     case StringQuery(q) =>
-      sender() ! Traversal.run(q, graph).map { results =>  
+      sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
         
-        val listResults = results.toList
-
         // Give a lower bound on the number of vertices
         println(s"Found: ${results.length}")
-        
-        listResults.toString 
+       
+        // Generate JSON to send back
+        results.map(_.toString).mkString("[",",","]")
       }
    
     case EdgesForNodes(nodeIdList) =>
@@ -236,11 +234,10 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
   }
 }
 
-trait RestQuery { val query: String }
+sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery
 case class EdgeQuery(query: String) extends RestQuery
 case class StringQuery(query: String) extends RestQuery
-case class AnyQuery(query: String) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
