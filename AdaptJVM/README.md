@@ -9,7 +9,6 @@ You will need to have
 
 Then, you will need to run
 
-    $ sbt compile
     $ sbt -mem 6000 run \
         -Dadapt.loadfiles.0=<PATH TO A DATA FILE> \
         -Dadapt.loadlimit=<MAXIMUM NUMBER OF EVENTS TO INGEST>
