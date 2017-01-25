@@ -13,7 +13,7 @@ import akka.util.Timeout
 import org.apache.tinkerpop.gremlin.structure.{Vertex, Element => VertexOrEdge}
 
 import scala.concurrent.{Await, ExecutionContext}
-import scala.util.Try
+import scala.util.{Try, Success, Failure}
 import scala.concurrent.duration._
 
 import scala.language.postfixOps
@@ -57,7 +57,11 @@ object Routes {
     println(s"Got $qType query: ${query.query}")
     val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
       println("returning...")
-      HttpEntity(ContentTypes.`application/json`, s.get)
+      val toReturn = s match {
+        case Success(json) => json
+        case Failure(e) => println(e.getMessage); ("\"" + e.getMessage + "\"")
+      }
+      HttpEntity(ContentTypes.`application/json`, toReturn)
     }
     complete(futureResponse)
   }

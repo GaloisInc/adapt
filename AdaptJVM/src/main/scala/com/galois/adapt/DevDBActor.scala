@@ -214,7 +214,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
         println(s"Found: ${results.length}")
        
         // Generate JSON to send back
-        results.map(_.toString).mkString("[",",","]")
+        results.map(r => s""""${r.toString.replaceAll("\"", "\\\"")}"""").mkString("[",",","]")
       }
    
     case EdgesForNodes(nodeIdList) =>

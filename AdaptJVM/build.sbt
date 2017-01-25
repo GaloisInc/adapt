@@ -7,16 +7,14 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.1",
   organization := "com.galois",
   scalaVersion := scalaV,
-//  scalacOptions := Seq(
-//    "-unchecked",
-//    "-deprecation",
-//    "-feature",
-//    "-Yno-adapted-args",
-//    "-Ywarn-dead-code",
-//    "-Ywarn-numeric-widen",
-//    "-Ywarn-value-discard",
-//    "-Ywarn-unused"
-//  ),
+  scalacOptions := Seq(
+    "-unchecked",
+    "-deprecation",
+    "-feature",
+    "-Yno-adapted-args",
+    "-Ywarn-numeric-widen",
+    "-Ywarn-unused"
+  ),
 
   libraryDependencies ++= Seq(
     "com.typesafe" % "config" % "1.3.1",

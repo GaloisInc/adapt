@@ -226,16 +226,16 @@ object Query {
 
 
       // Parser for a query
-      def query: Parser[Query[_]] = rep(queryPrefix) ~ trav ^^ {
+      def query: Parser[Qy] = rep(queryPrefix) ~ trav ^^ {
           case pres ~ src => pres.foldRight[Qy](FinalTraversal(src))((pre,t) => pre(t))
         }
     }
  
     Parsers.parseAll(Parsers.query, input.filterNot(_.isWhitespace)) match {
       case Parsers.Success(matched, _) => Success(matched)
-      case Parsers.Error(msg, in) => Failure(throw new Exception(s"At ${in.pos}: $msg"))
-      case Parsers.Failure(msg, in) => Failure(throw new Exception(s"At ${in.pos}: $msg"))
-      case _ => Failure(throw new Exception("Parser failed in an unexpected way"))
+      case Parsers.Error(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
+      case Parsers.Failure(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
+      case _ => Failure(new Exception("Parser failed in an unexpected way"))
     }
   }
 }
