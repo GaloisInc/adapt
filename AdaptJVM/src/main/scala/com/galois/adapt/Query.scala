@@ -64,6 +64,7 @@ import scala.language.existentials
  *                 | traversal '.as(' string ',' ... ')'
  *                 | traversal '.until(' traveral ')'
  *                 | traversal '.values(' string ',' ... ')'
+ *                 | traversal '.label()'
  *                 | traversal '.id()'
  *                 | traversal '.max()'
  *                 | traversal '.min()'
@@ -172,6 +173,7 @@ object Query {
         | ".as(" ~ rep1sep(str,",") ~ ")"  ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
         | ".until(" ~ trav ~ ")"           ^^ { case _~t~_      => Until(_: Tr, t) }
         | ".values("~rep1sep(str,",")~")"  ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
+        | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
         | ".min()"                         ^^ { case _          => Min(_: Traversal[_,java.lang.Long]) }
@@ -404,6 +406,9 @@ case class Until[S,E](traversal: Traversal[S,E], cond: Traversal[_,_]) extends T
 case class Values[S,T,V](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,V] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).values(keys.eval(context): _*)
+}
+case class Label[S,T](traversal: Traversal[S,T]) extends Traversal[S,String] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).label()
 }
 case class Id[S,T](traversal: Traversal[S,T]) extends Traversal[S,java.lang.Object] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).id()
