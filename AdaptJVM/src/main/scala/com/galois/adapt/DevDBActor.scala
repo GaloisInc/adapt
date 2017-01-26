@@ -40,7 +40,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
   var missingFromUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
   var missingToUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
-
+  
   def updateIncompleteEdges(uuid: UUID, node: Vertex) = {
     if (missingFromUuid contains uuid) {
       val edge = missingFromUuid(uuid)
@@ -64,7 +64,43 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       }
     }
   }
+  
+  var pids = collection.mutable.Map.empty[Int,Vertex]
+  var missingToPid = collection.mutable.Map.empty[Int, Seq[Vertex]]
 
+  // Update dangling edges created by nodes who pointed to a PID that didn't exist at the time
+  // TODO: Check that this works - we don't currently have data to try it out
+  def updatePid(pid: Int, node: Vertex, parent: Option[Int]) = {
+    pids += (pid -> node)
+
+    parent.foreach { ppid =>
+        pids get ppid match {
+          case Some(pnode) =>
+            println("Added a pid edge")
+            node.addEdge("child_process_of", pnode)
+          case None => 
+            missingToPid += (ppid -> (node +: missingToPid.get(ppid).getOrElse(Seq())))
+        }
+    }
+
+    (missingToPid get pid).foreach { children =>
+      println("Added a pid edge")
+      missingToPid -= pid
+      children.foreach(child => child.addEdge("child_of", node))
+    }
+  }
+
+  var libraries = collection.mutable.Map.empty[String, Vertex]
+
+  // TODO: Check that this works - we don't currently have data to try it out
+  def getLibrary(name: String): Vertex = libraries.get(name) match {
+      case Some(v) => v
+      case None => 
+        val v = graph.addVertex("Library","name",name)
+        libraries(name) = v
+        println("Made a library")
+        v
+    }
 
   // TODO: TinkerGraph doesn't update the starting IDs when reading data in from a file.
   // Will result in: IllegalArgumentException: Vertex with id already exists: 0
@@ -82,34 +118,22 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       val v = graph.addVertex(l:_*)
       nodeIds += (f.uuid -> v)
 //      println(s"Nodes so far: ${nodeIds.size}")
-//      updateIncompleteEdges(f.uuid, v)
+      updateIncompleteEdges(f.uuid, v)
 
     case e: Event =>
       val l: List[Object] = e.asDBKeyValues.asInstanceOf[List[Object]]
       val v = graph.addVertex(l:_*)
       nodeIds += (e.uuid -> v)
-//      updateIncompleteEdges(e.uuid, v)
+      updateIncompleteEdges(e.uuid, v)
 
     case s: Subject =>
       val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]
       val subjectNode = graph.addVertex(l:_*)
       nodeIds += (s.uuid -> subjectNode)
-      val parentVertexOpt = graph.traversal().V().has("pid",s.ppid).toList.asScala.headOption
-
-      // TODO: do this with internal edges:
-      subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
-        val newUuid = UUID.randomUUID()
-        val v = graph.addVertex(
-          label, "Subject",
-          "uuid", newUuid,
-          "pid", new Integer(s.ppid),
-          "subjectType", SUBJECT_PROCESS.toString
-        )
-        nodeIds += (newUuid -> v)
-        v
-      })
-
-//      updateIncompleteEdges(s.uuid, subjectNode)
+      updatePid(s.pid, subjectNode, Some(s.ppid))
+      updateIncompleteEdges(s.uuid, subjectNode)
+      s.importedLibraries.foreach(_.foreach { name => subjectNode.addEdge("imports",getLibrary(name)) })
+      s.exportedLibraries.foreach(_.foreach { name => subjectNode.addEdge("exports",getLibrary(name)) })
 
     case e: SimpleEdge =>
       val fromOpt = findNode("uuid", e.fromUuid)
@@ -128,13 +152,17 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       println(s"EPOCH BOUNDARY!")
       println(s"FROM nodes missed during epoch: ${missingFromUuid.size}")
       println(s"TO nodes missed during epoch: ${missingToUuid.size}")
+      println(s"TO PIDs missed during epoch: ${missingToPid.size}")
       println("Creating all missing nodes...")
       var nodeCreatedCounter = 0
       var edgeCreatedCounter = 0
       missingFromUuid.foreach { case (u,e) =>
         val v = findNode("uuid",u).getOrElse {
           nodeCreatedCounter += 1
-          val newNode = graph.addVertex("uuid", u)
+          val newNode = graph.addVertex(
+            "uuid", u,
+            "synthetic", "MISSING UUID"
+          )
           nodeIds += (u -> newNode)
           newNode
         }
@@ -160,6 +188,17 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
           fromNode.addEdge(e.edgeType.toString, v)
         }
       }
+      missingToPid.foreach { case (p,vs) => 
+        nodeCreatedCounter += 1
+        val newNode = graph.addVertex(
+          label, "Subject",
+          "subjectType", "SUBJECT_PROCESS",
+          "pid", p.asInstanceOf[java.lang.Object],
+          "synthetic", "MISSING_PID"
+        )
+        updatePid(p, newNode, None)
+      }
+        
       missingToUuid = collection.mutable.Map.empty
       println(s"Nodes created at epoch close: $nodeCreatedCounter")
       println(s"Edges created at epoch close: $edgeCreatedCounter")
@@ -172,10 +211,10 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
       // TODO: so gross!
       val idx = l.indexOf("uuid")
-      if (idx >= 0)  // TODO: don't be lazy
-      nodeIds += (l(idx + 1).asInstanceOf[UUID] -> newVertex)
-//      updateIncompleteEdges(l(idx + 1).asInstanceOf[UUID], newVertex)
-
+      if (idx >= 0) {  // TODO: don't be lazy
+        nodeIds += (l(idx + 1).asInstanceOf[UUID] -> newVertex)
+        updateIncompleteEdges(l(idx + 1).asInstanceOf[UUID], newVertex)
+      }
 
     case NodeQuery(q) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
