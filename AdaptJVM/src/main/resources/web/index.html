@@ -974,6 +974,11 @@
             
             createSavedQueries()
             document.querySelector('input[list="starting-queries"]').addEventListener('input', setSelectedQuery)
+
+            if (window.location.hash.length > 0) {
+                document.getElementById('query-string').value = window.location.hash.replace("#", "")
+                UI.queryClick()
+            }
         })
     </script>
 
