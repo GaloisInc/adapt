@@ -99,6 +99,9 @@ class General_TA1_Tests(
 
       val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n")
       
+      if (!(processesWithPID.length <= 1))
+        AcceptanceApp.toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")})"
+
       assert(
         processesWithPID.length <= 1,
         s"\nMultiple process subjects share the PID $pid:\n$uuidsOfProcessesWithPID\n"
@@ -130,6 +133,9 @@ class General_TA1_Tests(
         
         val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
         
+        if (!(filesWithUrl.length <= 1))
+          AcceptanceApp.toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")})"
+
         assert(
           filesWithUrl.length <= 1,
           s"\nMultiple files share the same url $url and version $version:\n$uuidsOfFilesWithUrlVersion\n"

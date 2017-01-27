@@ -1,6 +1,8 @@
 package com.galois.adapt
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt.cdm13._
@@ -8,7 +10,11 @@ import com.galois.adapt.scepter._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
+import scala.io.StdIn
+
 import java.io.File
+import java.awt.Desktop;
+import java.net.URI;
 
 import scala.language.postfixOps
 
@@ -16,7 +22,8 @@ object AcceptanceApp {
   println(s"Spinning up an acceptance system.")
 
   val config = Application.config  // .withFallback(ConfigFactory.load("acceptance"))
-  val system = ActorSystem("acceptance-actor-system")
+  implicit val system = ActorSystem("acceptance-actor-system")
+  implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
   implicit val askTimeout = Timeout(2 seconds)
 
@@ -24,6 +31,8 @@ object AcceptanceApp {
   val counterActor = system.actorOf(Props(new EventCountingTestActor()))
   val basicOpsActor = system.actorOf(Props(new BasicOpsIdentifyingActor()))
   var ta1Source: Option[InstrumentationSource] = None
+
+  val toDisplay = scala.collection.mutable.ListBuffer.empty[String]
 
   def run(
     loadPaths: List[String],
@@ -73,7 +82,29 @@ object AcceptanceApp {
     }
 
     println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
-    system.terminate()
+    
+    if (config.getBoolean("adapt.webserver")) {
+      val interface = config.getString("akka.http.server.interface")
+      val port = config.getInt("akka.http.server.port")
+      
+      println("Opening up a webserver...")
+      val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port).map { f =>
+        println("Server online at http://localhost:8080/")
+       
+        // Open up the failed tests
+        toDisplay.foreach { query =>
+          Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + query))
+        } 
+        
+        // let it run until user presses return
+        StdIn.readLine()
+        f
+      }
+
+      httpServiceFuture.flatMap(_.unbind()).onComplete { _ => system.terminate() }
+    } else { 
+      system.terminate()
+    }
   }
 
   // Identifies all the actors who are interested in a given CDM statement
