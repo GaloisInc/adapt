@@ -82,39 +82,36 @@ class General_TA1_Tests(
   it should "not have duplicate PID's in process Subjects" in {
     val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
-    val pids
-      = graph.traversal().V().hasLabel("Subject")
-                             .has("subjectType","SUBJECT_PROCESS")
-                             .dedup()
-                             .values("pid")
+    val pids = graph.traversal().V().hasLabel("Subject")
+      .has("subjectType","SUBJECT_PROCESS")
+      .dedup()
+      .values("pid")
 
     while (pids.hasNext()) {
       val pid: Int = pids.next()
 
-      val processesWithPID: java.util.List[Vertex]
-        = graph.traversal().V().has("pid", pid)
-                               .hasLabel("Subject")
-                               .has("subjectType","SUBJECT_PROCESS")
-                               .dedup()
-                               .toList()
+      val processesWithPID: java.util.List[Vertex] = graph.traversal().V()
+        .has("pid", pid)
+        .hasLabel("Subject")
+        .has("subjectType","SUBJECT_PROCESS")
+        .dedup()
+        .toList()
 
       val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n")
       
       assert(
         processesWithPID.length <= 1,
-        s"Multiple process subjects share the PID $pid:\n$uuidsOfProcessesWithPID\n"
+        s"\nMultiple process subjects share the PID $pid:\n$uuidsOfProcessesWithPID\n"
       )
     }
   }
 
   // Test deduplication of Files
   // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
-  it should "not have duplicate files" in {
+  it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
     val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
-    val files
-      = graph.traversal().V().hasLabel("FileObject")
-                             .dedup()
+    val files = graph.traversal().V().hasLabel("FileObject").dedup()
 
     while (files.hasNext) {
       val file: Vertex = files.next()
@@ -123,19 +120,19 @@ class General_TA1_Tests(
       if (urls.length > 0) {
         val url: String = urls(0).value()
         val version: Int = file.property("version").value()
-        val filesWithUrl: java.util.List[Vertex]
-          = graph.traversal().V().hasLabel("FileObject")
-                                 .has("url",url)
-                                 .has("version",version)
-                                 .dedup()
-                                 .by("uuid")
-                                 .toList()
+        val filesWithUrl: java.util.List[Vertex] =
+          graph.traversal().V().hasLabel("FileObject")
+           .has("url",url)
+           .has("version",version)
+           .dedup()
+           .by("uuid")
+           .toList()
         
         val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
         
         assert(
           filesWithUrl.length <= 1,
-          s"Multiple files share the same url $url and version $version:\n$uuidsOfFilesWithUrlVersion\n"
+          s"\nMultiple files share the same url $url and version $version:\n$uuidsOfFilesWithUrlVersion\n"
         )
       }
     }
@@ -146,7 +143,7 @@ class General_TA1_Tests(
 
 class TRACE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, Value)
+  val missing = List(AbstractObject, Value, TagEntity)
   val minimum = 50000
 
   // Test that we get one of each type of statement
