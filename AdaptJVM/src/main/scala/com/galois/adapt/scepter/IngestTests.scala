@@ -97,15 +97,19 @@ class General_TA1_Tests(
         .dedup()
         .toList()
 
-      val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n")
       
-      if (!(processesWithPID.length <= 1))
-        AcceptanceApp.toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")})"
-
-      assert(
-        processesWithPID.length <= 1,
-        s"\nMultiple process subjects share the PID $pid:\n$uuidsOfProcessesWithPID\n"
-      )
+      if (processesWithPID.length <= 1) {
+        assert(processesWithPID.length <= 1)
+      } else {
+        val (code,color) = AcceptanceApp.colors.next()
+        val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+        
+        AcceptanceApp.toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")}):$code"
+        assert(
+          processesWithPID.length <= 1,
+          s"\nMultiple process subjects share the PID$pid:\n$color$uuidsOfProcessesWithPID${Console.RED}\n"
+        )
+      }
     }
   }
 
@@ -131,15 +135,19 @@ class General_TA1_Tests(
            .by("uuid")
            .toList()
         
-        val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
         
-        if (!(filesWithUrl.length <= 1))
-          AcceptanceApp.toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")})"
-
-        assert(
-          filesWithUrl.length <= 1,
-          s"\nMultiple files share the same url $url and version $version:\n$uuidsOfFilesWithUrlVersion\n"
-        )
+        if (filesWithUrl.length <= 1) {
+          assert(filesWithUrl.length <= 1)
+        } else {
+          val (code,color) = AcceptanceApp.colors.next()
+          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
+        
+          AcceptanceApp.toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
+          assert(
+            filesWithUrl.length <= 1,
+            s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
+          )
+        }
       }
     }
   }

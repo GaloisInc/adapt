@@ -33,6 +33,14 @@ object AcceptanceApp {
   var ta1Source: Option[InstrumentationSource] = None
 
   val toDisplay = scala.collection.mutable.ListBuffer.empty[String]
+  val colors: Iterator[(String,String)] = Iterator.continually(Map(
+    "000" -> Console.BLACK,
+    "00F" -> Console.BLUE,
+    "0F0" -> Console.GREEN,
+    "0FF" -> Console.CYAN,
+    "F0F" -> Console.MAGENTA,
+    "FF0" -> Console.YELLOW
+  )).flatten
 
   def run(
     loadPaths: List[String],
@@ -90,11 +98,10 @@ object AcceptanceApp {
       println("Opening up a webserver...")
       val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port).map { f =>
         println("Server online at http://localhost:8080/")
+        println("To navigate the UI, try right-clicking or double-clicking nodes")
        
         // Open up the failed tests
-        toDisplay.foreach { query =>
-          Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + query))
-        } 
+        Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&"))) 
         
         // let it run until user presses return
         StdIn.readLine()

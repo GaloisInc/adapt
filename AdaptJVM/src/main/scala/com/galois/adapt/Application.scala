@@ -20,7 +20,11 @@ object Application extends App {
     case path => Some(path)
   }
 
-
+  val debug: String => Unit = appMode.toLowerCase match {
+    case "dev" => println(_)
+    case _     => (x: String) => { }
+  }
+  
   appMode.toLowerCase match {
     case "accept" => AcceptanceApp.run(loadPaths, loadLimitOpt)
     case "prod"   => ProductionApp.run()
