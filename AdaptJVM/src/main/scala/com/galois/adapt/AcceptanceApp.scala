@@ -3,16 +3,20 @@ package com.galois.adapt
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.util.Timeout
+
 import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter._
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
+import scala.language.postfixOps
+
 import java.io.File
+
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 
-import scala.language.postfixOps
 
 object AcceptanceApp {
   println(s"Spinning up an acceptance system.")
@@ -73,8 +77,7 @@ object AcceptanceApp {
         }
         providerSpecificTests.foreach(org.scalatest.run(_));
 
-        //println(s"Total vertices: $finalCount")
-        
+        println(s"Total vertices: $finalCount")
       }
       ta1Source = None
     }

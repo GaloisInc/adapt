@@ -1,27 +1,22 @@
 package com.galois.adapt
 
-import java.io.ByteArrayOutputStream
-
 import akka.actor._
+
 import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
 import com.galois.adapt.scepter.HowMany
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
-import org.apache.tinkerpop.gremlin.structure.io.IoCore
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+
+import org.apache.tinkerpop.gremlin.structure.io.graphson._
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, T}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.T.label
+
 import java.nio.file.{Files, Paths}
 import java.util.UUID
-
-import com.thinkaurelius.titan.core.TitanFactory
-import com.thinkaurelius.titan.core.schema.TitanGraphIndex
-import com.thinkaurelius.titan.graphdb.tinkerpop.TitanIoRegistry
-import org.apache.tinkerpop.gremlin.structure.io.graphson._
+import java.io.ByteArrayOutputStream
 
 import collection.JavaConverters._
 import scala.util.Try
 
-class DevDBActor(graph: TinkerGraph) extends Actor{
+class DevDBActor(graph: TinkerGraph) extends Actor {
 
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
 
@@ -178,7 +173,7 @@ class DevDBActor(graph: TinkerGraph) extends Actor{
       missingToPid.foreach { case (p,vs) => 
         nodeCreatedCounter += 1
         val newNode = graph.addVertex(
-          label, "Subject",
+          T.label, "Subject",
           "subjectType", "SUBJECT_PROCESS",
           "pid", p.asInstanceOf[java.lang.Object],
           "synthetic", "MISSING_PID"

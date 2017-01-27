@@ -46,10 +46,9 @@ object DevelopmentApp {
 
 
     // TinkerGraph
-    /*val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
+    /*val graph = TinkerGraph.open()     
     graph.createIndex("uuid", classOf[Vertex])
     graph.createIndex("pid", classOf[Vertex])
-//  graph.createIndex("url", classOf[Vertex]) 
     
     val writer = GraphSONWriter.build().create()
     val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))*/
@@ -106,34 +105,4 @@ object DevelopmentApp {
       }
 
   }
-
-/*
-  def dev(loadFilePath: Option[String] = None, limitLoad: Option[Int] = Some(100000)) = {
-    val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("development"))
-    val interface = config.getString("akka.http.server.interface")
-    val port = config.getInt("akka.http.server.port")
-
-    implicit val system = ActorSystem("development-actor-system")
-    implicit val materializer = ActorMaterializer()
-    implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
-    val dbActor = system.actorOf(Props(classOf[DevDBActor], None))
-
-    loadFilePath.fold() { path =>
-      val data = CDM13.readData(path, limitLoad).get
-      var counter = 0
-      data.foreach { d =>
-        dbActor ! d.get
-        counter += 1
-        print(s"Reading data from $path: $counter\r")
-      }
-      dbActor ! EpochMarker
-      print("\n")
-    }
-
-    implicit val timeout = Timeout(10 seconds)
-    val graph = Await.result((dbActor ? GiveMeTheGraph).mapTo[org.apache.tinkerpop.gremlin.structure.Graph], 10 seconds)
-
-    val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
-    (system, dbActor, graph, httpServiceFuture)
-  }*/
 }

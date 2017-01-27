@@ -1,21 +1,19 @@
 package com.galois.adapt
 
-import java.io.ByteArrayOutputStream
-
 import akka.actor._
+
 import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
 import com.galois.adapt.scepter.HowMany
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
-import org.apache.tinkerpop.gremlin.structure.io.IoCore
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.T.label
+
+import org.apache.tinkerpop.gremlin.structure.io.graphson._
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, T}
+
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import java.io.ByteArrayOutputStream
 
 import com.thinkaurelius.titan.core.TitanGraph
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
-import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
 import scala.util.Try
@@ -177,7 +175,7 @@ class TitanDBActor(graph: TitanGraph) extends Actor{
       missingToPid.foreach { case (p,vs) => 
         nodeCreatedCounter += 1
         val newNode = graph.addVertex(
-          label, "Subject",
+          T.label, "Subject",
           "subjectType", "SUBJECT_PROCESS",
           "pid", p.asInstanceOf[java.lang.Object],
           "synthetic", "MISSING_PID"
@@ -209,7 +207,10 @@ class TitanDBActor(graph: TitanGraph) extends Actor{
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case HowMany(_) =>
+    case HowMany("missing") =>
+      sender() ! (missingFromUuid.size + missingToUuid.size)
+
+    case HowMany("total") =>
       sender() ! graph.vertices().asScala.size
   }
 }
