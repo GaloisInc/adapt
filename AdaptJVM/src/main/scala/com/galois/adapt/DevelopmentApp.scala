@@ -19,6 +19,9 @@ import java.nio.file.{Files, Paths}
 import scala.language.postfixOps
 import scala.concurrent.Future
 
+import com.thinkaurelius.titan.core.TitanFactory
+import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONMapper
+import com.thinkaurelius.titan.graphdb.tinkerpop.TitanIoRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
@@ -36,32 +39,37 @@ object DevelopmentApp {
     val config = Application.config  //.withFallback(ConfigFactory.load("development"))
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
+    
+    implicit val system = ActorSystem("development-actor-system")
+    implicit val materializer = ActorMaterializer()
+    implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
 
-    val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
+
+    // TinkerGraph
+    /*val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
     graph.createIndex("uuid", classOf[Vertex])
     graph.createIndex("pid", classOf[Vertex])
 //  graph.createIndex("url", classOf[Vertex]) 
-/*
-  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
-  val management = graph.openManagement()
-  management.buildIndex("uuid", classOf[Vertex]).unique()
-  management.buildIndex("pid", classOf[Vertex])
-  management.commit()*/
-
+    
     val writer = GraphSONWriter.build().create()
-    /*val mapper = GraphSONMapper.build().addRegistry(TitanIoRegistry.INSTANCE).create()
-    val writer = GraphSONWriter.build().mapper(mapper).create()*/
+    val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))*/
+
+    // TitanGraph
+    val graph = TitanFactory.build.set("storage.backend", "inmemory").open
+    val management = graph.openManagement()
+    management.buildIndex("uuid", classOf[Vertex]).unique()
+    management.buildIndex("pid", classOf[Vertex])
+    management.commit()
+
+    val mapper = GraphSONMapper.build().addRegistry(TitanIoRegistry.INSTANCE).create()
+    val writer = GraphSONWriter.build().mapper(mapper).create()
+    val dbActor = system.actorOf(Props(classOf[TitanDBActor], graph))
     
     // Optionally load in existing data:
     localStorage.foreach( path =>
       if (Files.exists(Paths.get(path))) graph.io(IoCore.graphson()).readGraph(path)
     )
 
-
-    implicit val system = ActorSystem("development-actor-system")
-    implicit val materializer = ActorMaterializer()
-    implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
-    val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
     val queryActor = system.actorOf(Props(classOf[QueryDBActor], graph, writer))
 
     for (path <- loadPaths) {
