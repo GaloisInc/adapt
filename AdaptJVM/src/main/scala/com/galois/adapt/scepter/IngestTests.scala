@@ -33,6 +33,7 @@ import org.scalatest.FlatSpec
 class General_TA1_Tests(
   data: => Iterator[Try[CDM13]],            // Input CDM statements
   incompleteEdgeCount: Int,                 // Number of incomplete edges
+  graph: TinkerGraph,                       // A refernce to the graph
   count: Option[Int] = None                 // Expected number of statements
 ) extends FlatSpec {
 
@@ -80,8 +81,6 @@ class General_TA1_Tests(
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
   it should "not have duplicate PID's in process Subjects" in {
-    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
-    
     val pids = graph.traversal().V().hasLabel("Subject")
       .has("subjectType","SUBJECT_PROCESS")
       .dedup()
@@ -109,8 +108,6 @@ class General_TA1_Tests(
   // Test deduplication of Files
   // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
   it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
-    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
-    
     val files = graph.traversal().V().hasLabel("FileObject").dedup()
 
     while (files.hasNext) {
@@ -277,7 +274,7 @@ class CLEARSCOPE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
 }
 
 
-trait TestEvaluationCases
+sealed trait TestEvaluationCases
 case class HowMany(name: String) extends TestEvaluationCases
 
 object Utility {

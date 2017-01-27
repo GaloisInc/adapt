@@ -15,26 +15,13 @@ import java.util.UUID
 
 import com.thinkaurelius.titan.core.TitanFactory
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
+import com.thinkaurelius.titan.graphdb.tinkerpop.TitanIoRegistry
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
 import scala.util.Try
 
-class DevDBActor(localStorage: Option[String] = None) extends Actor{
-
-
-  val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
-//  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
-
-
-  graph.createIndex("uuid", classOf[Vertex])
-  graph.createIndex("pid", classOf[Vertex])
-//  graph.createIndex("url", classOf[Vertex])
-
-  // Optionally load in existing data:
-  localStorage.foreach( path =>
-    if (Files.exists(Paths.get(path))) graph.io(IoCore.graphson()).readGraph(path)
-  )
+class DevDBActor(graph: TinkerGraph) extends Actor{
 
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
 
@@ -198,6 +185,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
         )
         updatePid(p, newNode, None)
       }
+      //graph.tx().commit()
         
       missingToUuid = collection.mutable.Map.empty
       println(s"Nodes created at epoch close: $nodeCreatedCounter")
@@ -216,69 +204,19 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
         updateIncompleteEdges(l(idx + 1).asInstanceOf[UUID], newVertex)
       }
 
-    case NodeQuery(q) =>
-      sender() ! Query.run[Vertex](q, graph).map { vertices =>
-
-        // Give a lower bound on the number of vertices
-        println(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
-        
-        // Generate JSON to send back
-        val byteStream = new ByteArrayOutputStream
-        GraphSONWriter.build().create().writeVertices(byteStream, vertices.toIterator.asJava)
-
-        byteStream.toString.split("\n").map { v =>
-          if (v.length > 0) {
-            val (first, second) = v.splitAt(1)
-            first + """"type":"vertex",""" + second
-          } else v
-        }.mkString("[", ",", "]")
-      }
-
-    case EdgeQuery(q) =>
-      sender() ! Query.run[Edge](q, graph).map { edges =>
-
-        // Give a lower bound on the number of vertices
-        println(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
-        
-        // Generate JSON to send back
-        val byteStream = new ByteArrayOutputStream
-        edges.foreach { edge => GraphSONWriter.build().create().writeEdge(byteStream, edge) }
-        byteStream.toString.split("\\}\\{").mkString("[", "},{", "]")
-     }
-
-    case StringQuery(q) =>
-      sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
-        
-        // Give a lower bound on the number of vertices
-        println(s"Found: ${results.length}")
-       
-        // Generate JSON to send back
-        results.map(r => s""""${r.toString.replaceAll("\"", "\\\"")}"""").mkString("[",",","]")
-      }
-   
     case EdgesForNodes(nodeIdList) =>
       sender() ! Try {
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case HowMany(_) =>
-      sender() ! graph.vertices().asScala.size
-
-    case GiveMeTheGraph => sender() ! graph
-
-    case Shutdown =>
-//      println(s"Incomplete Edge count: ${missingFromUuid.size + missingToUuid.size}")
-      localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
+    case HowMany("missing") =>
       sender() ! (missingFromUuid.size + missingToUuid.size)
+
+    case HowMany("total") =>
+      sender() ! graph.vertices().asScala.size
   }
 }
 
-sealed trait RestQuery { val query: String }
-case class NodeQuery(query: String) extends RestQuery
-case class EdgeQuery(query: String) extends RestQuery
-case class StringQuery(query: String) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
-case object GiveMeTheGraph
-case object Shutdown
 

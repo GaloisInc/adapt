@@ -14,8 +14,15 @@ import scala.io.StdIn
 import collection.JavaConversions._
 
 import java.io.File
+import java.nio.file.{Files, Paths}
 
 import scala.language.postfixOps
+import scala.concurrent.Future
+
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+import org.apache.tinkerpop.gremlin.structure.io.IoCore
+import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONWriter
 
 object DevelopmentApp {
   println(s"Spinning up a development system.")
@@ -30,10 +37,32 @@ object DevelopmentApp {
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
 
+    val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
+    graph.createIndex("uuid", classOf[Vertex])
+    graph.createIndex("pid", classOf[Vertex])
+//  graph.createIndex("url", classOf[Vertex]) 
+/*
+  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
+  val management = graph.openManagement()
+  management.buildIndex("uuid", classOf[Vertex]).unique()
+  management.buildIndex("pid", classOf[Vertex])
+  management.commit()*/
+
+    val writer = GraphSONWriter.build().create()
+    /*val mapper = GraphSONMapper.build().addRegistry(TitanIoRegistry.INSTANCE).create()
+    val writer = GraphSONWriter.build().mapper(mapper).create()*/
+    
+    // Optionally load in existing data:
+    localStorage.foreach( path =>
+      if (Files.exists(Paths.get(path))) graph.io(IoCore.graphson()).readGraph(path)
+    )
+
+
     implicit val system = ActorSystem("development-actor-system")
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
-    val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
+    val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
+    val queryActor = system.actorOf(Props(classOf[QueryDBActor], graph, writer))
 
     for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get
@@ -47,7 +76,7 @@ object DevelopmentApp {
       print("\n")
     }
 
-    val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
+    val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(queryActor), interface, port)
       .map { f =>
       val saveString = localStorage.fold("...")(s => s", and save in-memory database to: $s")
       println(s"\n    Server online at http://localhost:8080/\n\nPress RETURN to stop$saveString\n")
@@ -60,13 +89,17 @@ object DevelopmentApp {
       .onComplete { _ =>
         localStorage.foreach(s => println(s"Writing in-memory database to file: $s"))
         implicit val askDuration = Timeout(10 seconds)
-        Await.result(dbActor ? Shutdown, 10 seconds)
+        Await.result(Future {
+  //      println(s"Incomplete Edge count: ${missingFromUuid.size + missingToUuid.size}")
+          localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
+          //sender() ! (missingFromUuid.size + missingToUuid.size)
+        }, 10 seconds)
         system.terminate()
       }
 
   }
 
-
+/*
   def dev(loadFilePath: Option[String] = None, limitLoad: Option[Int] = Some(100000)) = {
     val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("development"))
     val interface = config.getString("akka.http.server.interface")
@@ -94,5 +127,5 @@ object DevelopmentApp {
 
     val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
     (system, dbActor, graph, httpServiceFuture)
-  }
+  }*/
 }

@@ -9,6 +9,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 import java.io.File
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 
 import scala.language.postfixOps
 
@@ -20,7 +22,11 @@ object AcceptanceApp {
   implicit val ec = system.dispatcher
   implicit val askTimeout = Timeout(2 seconds)
 
-  val dbActor = system.actorOf(Props(classOf[DevDBActor], None))
+  val graph = TinkerGraph.open() 
+  graph.createIndex("uuid", classOf[Vertex])
+  graph.createIndex("pid", classOf[Vertex])
+
+  val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
   val counterActor = system.actorOf(Props(new EventCountingTestActor()))
   val basicOpsActor = system.actorOf(Props(new BasicOpsIdentifyingActor()))
   var ta1Source: Option[InstrumentationSource] = None
@@ -46,11 +52,11 @@ object AcceptanceApp {
       Try {
         val data = CDM13.readData(filePath, count).get
         
-        lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
+        lazy val missingEdgeCount = Await.result(dbActor ? HowMany("missing"), 2 seconds).asInstanceOf[Int]
         lazy val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
         
         // General tests
-        org.scalatest.run(new General_TA1_Tests(data, missingEdgeCount, count))
+        org.scalatest.run(new General_TA1_Tests(data, missingEdgeCount, graph, count))
 
         println("")
 
@@ -67,7 +73,8 @@ object AcceptanceApp {
         }
         providerSpecificTests.foreach(org.scalatest.run(_));
 
-        println(s"Total vertices: $finalCount")
+        //println(s"Total vertices: $finalCount")
+        
       }
       ta1Source = None
     }

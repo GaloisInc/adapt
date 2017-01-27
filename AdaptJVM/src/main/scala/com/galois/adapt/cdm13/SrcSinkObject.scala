@@ -16,7 +16,7 @@ case class SrcSinkObject(
   def asDBKeyValues = List(
     label, "SrcSinkObject",
     "uuid", uuid,
-    "srcSinkType", srcSinkType
+    "srcSinkType", srcSinkType.toString
   ) ++ baseObject.asDBKeyValues
 }
 

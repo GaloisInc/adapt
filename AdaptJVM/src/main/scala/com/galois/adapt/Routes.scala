@@ -48,14 +48,14 @@ object Routes {
 
   implicit val timeout = Timeout(10 seconds)
 
-  def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
+  def completedQuery[T <: VertexOrEdge](query: RestQuery, queryActor: ActorRef)(implicit ec: ExecutionContext) = {
     val qType = query match {
       case _: NodeQuery => "node"
       case _: EdgeQuery => "edge"
       case _: StringQuery => "generic"
     }
     println(s"Got $qType query: ${query.query}")
-    val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
+    val futureResponse = (queryActor ? query).mapTo[Try[String]].map { s =>
       println("returning...")
       val toReturn = s match {
         case Success(json) => json
@@ -67,22 +67,22 @@ object Routes {
   }
 
 
-  def mainRoute(dbActor: ActorRef)(implicit ec: ExecutionContext) =
+  def mainRoute(queryActor: ActorRef)(implicit ec: ExecutionContext) =
     get {
       pathPrefix("query") {
         pathPrefix("nodes") {
           path(RemainingPath) { queryString =>
-            completedQuery(NodeQuery(queryString.toString), dbActor)
+            completedQuery(NodeQuery(queryString.toString), queryActor)
           }
         } ~
         pathPrefix("edges") {
           path(RemainingPath) { queryString =>
-            completedQuery(EdgeQuery(queryString.toString), dbActor)
+            completedQuery(EdgeQuery(queryString.toString), queryActor)
           }
         } ~
         pathPrefix("generic") {
           path(RemainingPath) { queryString =>
-            completedQuery(StringQuery(queryString.toString), dbActor)
+            completedQuery(StringQuery(queryString.toString), queryActor)
           }
         }
       } ~
@@ -92,17 +92,17 @@ object Routes {
       pathPrefix("query") {
         path("nodes") {
           formField('query) { queryString =>
-            completedQuery(NodeQuery(queryString), dbActor)
+            completedQuery(NodeQuery(queryString), queryActor)
           }
         } ~
         path("edges") {
           formField('query) { queryString =>
-            completedQuery(EdgeQuery(queryString), dbActor)
+            completedQuery(EdgeQuery(queryString), queryActor)
           } ~
           formField('nodes) { nodeListString =>
             println(s"getting edges for nodes: $nodeListString")
             val idList = nodeListString.split(",").map(_.toInt)
-            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
+            val futureResponse = (queryActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
               println("returning...")
               HttpEntity(ContentTypes.`application/json`, s.get)
             }
@@ -111,7 +111,7 @@ object Routes {
         } ~
         path("generic") {
           formField('query) { queryString =>
-            completedQuery(StringQuery(queryString), dbActor)
+            completedQuery(StringQuery(queryString), queryActor)
           }
         }
       }
