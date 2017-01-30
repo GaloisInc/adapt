@@ -56,8 +56,11 @@ object DevelopmentApp {
         val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
         (graph, writer, dbActor)
      
-      case "titan-inmemory" =>
-        val graph = TitanFactory.build.set("storage.backend", "inmemory").open
+      case "titan-inmemory" | "titan-cassandra" =>
+        val graph = db match {
+          case "titan-inmemory" => TitanFactory.build.set("storage.backend", "inmemory").open
+          case "titan-cassandra" => TitanFactory.build.set("storage.backend", "cassandra").set("storage.hostname","localhost").open
+        }
         val management = graph.openManagement()
         management.buildIndex("uuid", classOf[Vertex]).unique()
         management.buildIndex("pid", classOf[Vertex])
