@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -23,7 +23,7 @@ import com.thinkaurelius.titan.core.TitanFactory
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONMapper
 import com.thinkaurelius.titan.graphdb.tinkerpop.TitanIoRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONWriter
 
@@ -39,30 +39,37 @@ object DevelopmentApp {
     val config = Application.config  //.withFallback(ConfigFactory.load("development"))
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
+    val db = config.getString("adapt.dev.db")
     
     implicit val system = ActorSystem("development-actor-system")
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
 
-
-    // TinkerGraph
-    /*val graph = TinkerGraph.open()     
-    graph.createIndex("uuid", classOf[Vertex])
-    graph.createIndex("pid", classOf[Vertex])
+    // Setup the right graph and database actor
+    val (graph, writer, dbActor): (Graph, GraphSONWriter, ActorRef)  = db match {
+      case "tinkerpop" =>
+        val graph = TinkerGraph.open()     
+        graph.createIndex("uuid", classOf[Vertex])
+        graph.createIndex("pid", classOf[Vertex])
     
-    val writer = GraphSONWriter.build().create()
-    val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))*/
+        val writer = GraphSONWriter.build().create()
+        val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
+        (graph, writer, dbActor)
+     
+      case "titan-inmemory" =>
+        val graph = TitanFactory.build.set("storage.backend", "inmemory").open
+        val management = graph.openManagement()
+        management.buildIndex("uuid", classOf[Vertex]).unique()
+        management.buildIndex("pid", classOf[Vertex])
+        management.commit()
 
-    // TitanGraph
-    val graph = TitanFactory.build.set("storage.backend", "inmemory").open
-    val management = graph.openManagement()
-    management.buildIndex("uuid", classOf[Vertex]).unique()
-    management.buildIndex("pid", classOf[Vertex])
-    management.commit()
-
-    val mapper = GraphSONMapper.build().addRegistry(TitanIoRegistry.INSTANCE).create()
-    val writer = GraphSONWriter.build().mapper(mapper).create()
-    val dbActor = system.actorOf(Props(classOf[TitanDBActor], graph))
+        val mapper = GraphSONMapper.build().addRegistry(TitanIoRegistry.INSTANCE).create()
+        val writer = GraphSONWriter.build().mapper(mapper).create()
+        val dbActor = system.actorOf(Props(classOf[TitanDBActor], graph))
+        (graph, writer, dbActor)
+      case _ => throw new Exception("Unsupported")
+    }
+    
     
     // Optionally load in existing data:
     localStorage.foreach( path =>

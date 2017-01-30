@@ -58,7 +58,6 @@ class DevDBActor(graph: TinkerGraph) extends Actor {
     parent.foreach { ppid =>
         pids get ppid match {
           case Some(pnode) =>
-            println("Added a pid edge")
             node.addEdge("child_process_of", pnode)
           case None => 
             missingToPid += (ppid -> (node +: missingToPid.get(ppid).getOrElse(Seq())))
@@ -66,7 +65,6 @@ class DevDBActor(graph: TinkerGraph) extends Actor {
     }
 
     (missingToPid get pid).foreach { children =>
-      println("Added a pid edge")
       missingToPid -= pid
       children.foreach(child => child.addEdge("child_of", node))
     }
@@ -80,7 +78,6 @@ class DevDBActor(graph: TinkerGraph) extends Actor {
       case None => 
         val v = graph.addVertex("Library","name",name)
         libraries(name) = v
-        println("Made a library")
         v
     }
 
