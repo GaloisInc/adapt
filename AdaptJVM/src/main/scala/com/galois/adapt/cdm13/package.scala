@@ -18,7 +18,7 @@ package object cdm13 {
   object CDM13 {
     val values = Seq(AbstractObject,Event,FileObject,MemoryObject,NetFlowObject,Principal,ProvenanceTagNode,RegistryKeyObject,SimpleEdge,SrcSinkObject,Subject,TagEntity,Value)
 
-    def readData(filePath: String, limit: Option[Int] = None) = readAvroFile(filePath).map { x =>
+    def readData(filePath: String, limit: Option[Int] = None): Try[Iterator[Try[CDM13]]] = readAvroFile(filePath).map { x =>
       val cdmDataIter = x.map(CDM13.parse)
       limit.fold(cdmDataIter)(l => cdmDataIter.take(l))
     }

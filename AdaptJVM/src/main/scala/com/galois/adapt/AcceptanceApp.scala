@@ -9,7 +9,7 @@ import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter._
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Try, Failure, Success}
 import scala.io.StdIn
 
 import java.io.File
@@ -58,16 +58,22 @@ object AcceptanceApp {
         List(path.getPath)
     )
 
-    for (filePath <- filePaths) {
-      println(s"Processing $filePath...")
-      Try {
-        val data = CDM13.readData(filePath, count).get
+    // Sequence all of the data ahead of time - basically validate that all files are valid Avro,
+    // and put them into one big iterator
+    val data: Try[Iterator[Try[CDM13]]] = Try {
+      filePaths.map { file => println(s"Discovered $file."); CDM13.readData(file, count).get }
+               .foldLeft { Iterator[Try[CDM13]]() } { _ ++ _ }
+    }
+
+    data match {
+      case Failure(e) => println(s"Invalid Avro file ${e.getMessage}")
+      case Success(records) => 
         
         lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
         lazy val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
         
         // General tests
-        org.scalatest.run(new General_TA1_Tests(data, missingEdgeCount, count))
+        org.scalatest.run(new General_TA1_Tests(records, missingEdgeCount, count))
 
         println("")
 
@@ -85,13 +91,11 @@ object AcceptanceApp {
         providerSpecificTests.foreach(org.scalatest.run(_));
 
         println(s"Total vertices: $finalCount")
-      }
-      ta1Source = None
     }
 
     println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
     
-    if (config.getBoolean("adapt.webserver")) {
+    if (config.getBoolean("adapt.webserver") && toDisplay.length != 0) {
       val interface = config.getString("akka.http.server.interface")
       val port = config.getInt("akka.http.server.port")
       
