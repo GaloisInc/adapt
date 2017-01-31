@@ -85,7 +85,7 @@ object AcceptanceApp {
           case Some(SOURCE_WINDOWS_DIFT_FAROS) => Some(new FAROS_Specific_Tests(finalCount))
           case Some(SOURCE_LINUX_THEIA) => Some(new THEIA_Specific_Tests(finalCount))
           case Some(SOURCE_WINDOWS_FIVEDIRECTIONS) => Some(new FIVEDIRECTIONS_Specific_Tests(finalCount))
-          case Some(s) => { println(s"No tests for $s"); None }
+          case Some(s) => { println(s"No tests for: $s"); None }
           case None => { println("Failed to detect provider"); None }
         }
         providerSpecificTests.foreach(org.scalatest.run(_));
@@ -102,12 +102,16 @@ object AcceptanceApp {
       println("Opening up a webserver...")
       val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port).map { f =>
         println("Server online at http://localhost:8080/")
-        println("To navigate the UI, try right-clicking or double-clicking nodes")
+        println("")
        
         // Open up the failed tests
         Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&"))) 
+        println("To navigate the UI, try right-clicking or double-clicking nodes")
+        println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
+        println("")
         
         // let it run until user presses return
+        println("Press ENTER to kill the webserver")
         StdIn.readLine()
         f
       }

@@ -140,7 +140,7 @@ class General_TA1_Tests(
           assert(filesWithUrl.length <= 1)
         } else {
           val (code,color) = AcceptanceApp.colors.next()
-          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n")
+          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
         
           AcceptanceApp.toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
           assert(
