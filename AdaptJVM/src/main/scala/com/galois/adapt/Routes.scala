@@ -54,12 +54,12 @@ object Routes {
       case _: EdgeQuery => "edge"
       case _: StringQuery => "generic"
     }
-    println(s"Got $qType query: ${query.query}")
+    Application.debug(s"Got $qType query: ${query.query}")
     val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
-      println("returning...")
+      Application.debug("returning...")
       val toReturn = s match {
         case Success(json) => json
-        case Failure(e) => println(e.getMessage); ("\"" + e.getMessage + "\"")
+        case Failure(e) => Application.debug(e.getMessage); ("\"" + e.getMessage + "\"")
       }
       HttpEntity(ContentTypes.`application/json`, toReturn)
     }

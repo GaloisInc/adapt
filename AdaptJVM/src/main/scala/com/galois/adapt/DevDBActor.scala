@@ -181,7 +181,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
 
         // Give a lower bound on the number of vertices
-        println(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
+        Application.debug(s"Found: ${if (vertices.lengthCompare(1000) > 0) "> 1000" else vertices.length}")
         
         // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
@@ -199,7 +199,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       sender() ! Query.run[Edge](q, graph).map { edges =>
 
         // Give a lower bound on the number of vertices
-        println(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
+        Application.debug(s"Found: ${if (edges.lengthCompare(1000) > 0) "> 1000" else edges.length}")
         
         // Generate JSON to send back
         val byteStream = new ByteArrayOutputStream
@@ -211,7 +211,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
         
         // Give a lower bound on the number of vertices
-        println(s"Found: ${results.length}")
+        Application.debug(s"Found: ${results.length}")
        
         // Generate JSON to send back
         results.map(r => s""""${r.toString.replaceAll("\"", "\\\"")}"""").mkString("[",",","]")
