@@ -3,6 +3,7 @@ package com.galois.adapt
 import akka.actor._
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberUp}
+import com.typesafe.config.Config
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -20,13 +21,13 @@ object ClusterDevApp {
 
   def run(): Unit = {
     nodeManager = Some(
-      system.actorOf(Props[ClusterNodeManager])
+      system.actorOf(Props(classOf[ClusterNodeManager], config), "mgr")
     )
   }
 }
 
 
-class ClusterNodeManager extends Actor with ActorLogging {
+class ClusterNodeManager(config: Config) extends Actor with ActorLogging {
   val cluster = Cluster(context.system)
 
   override def preStart() = cluster.subscribe(self, classOf[MemberEvent])
@@ -36,9 +37,13 @@ class ClusterNodeManager extends Actor with ActorLogging {
 
   def createChild(roleName: String): Unit = roleName match {
     case "db"     => childActors = childActors + (roleName ->
-      (childActors.getOrElse(roleName, Set.empty[ActorRef]) + context.actorOf(Props(classOf[DevDBActor], None), "db-actor")) )
+      childActors.getOrElse(roleName, Set(context.actorOf(Props(classOf[DevDBActor], None), "db-actor")) ) )
     case "ingest" => childActors = childActors + (roleName ->
-      (childActors.getOrElse(roleName, Set.empty[ActorRef]) + context.actorOf(Props[FileIngestActor], "file-ingest-actor")) )
+      childActors.getOrElse(roleName, Set(context.actorOf(Props[FileIngestActor], "file-ingest-actor")) ) )
+    case "ui" => childActors = childActors + (roleName ->
+      childActors.getOrElse(roleName, Set(context.actorOf(
+        Props(classOf[UIActor], config.getString("akka.http.server.interface"), config.getInt("akka.http.server.port"))
+      ))))
   }
 
   def receive = {
