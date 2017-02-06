@@ -21,15 +21,19 @@ abstract class AdActor[T,U](
   def process(msg: T): Unit
 
   // AdActors usually don't send messages to articular actors - they broadcast to their subscribers
-  def broadCast(msg: U): Unit = for (Subscription(target, pack) <- subscribers; if pack.isDefinedAt(msg))
-    target ! pack(msg)
+  def broadCast(msg: U): Unit = for (Subscription(target, pack) <- subscribers)
+    pack(msg) match {
+      case Some(packed) => target ! packed
+      case _ => ;
+    }
+    
 }
 
 // A subscription aggregates all the information needed on the _sender_ side to pass a message along
 // to a receiver.
 case class Subscription[P,T](
   target: ActorRef,          // Subscribing actor
-  pack: PartialFunction[P,T] // Determines whether the actor is interested in a particular message
+  pack: PartialFunction[P,Option[T]] // Determines whether the actor is interested in a particular message
                              // and packs the message into a format the actor is expecting
 )
 

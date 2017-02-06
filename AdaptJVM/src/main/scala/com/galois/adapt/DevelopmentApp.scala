@@ -4,8 +4,10 @@ import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import akka.actor._
 import akka.pattern.ask
 import com.galois.adapt.cdm13.{CDM13, EpochMarker}
+import com.galois.adapt.ad._
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.Await
@@ -34,16 +36,22 @@ object DevelopmentApp {
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
+    val erActor = system.actorOf(Props(classOf[ErActor]))
+    val ad1 = system.actorOf(AdHighCheckOpenRatio.props(erActor, 2.0))
+    val ad2 = system.actorOf(AdHighUnlink.props(erActor, 2))
+    val out = system.actorOf(Outgestor.props(Set(ad1,ad2)))
 
     for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get
       var counter = 0
       data.foreach { d =>
         dbActor ! d.get
+        erActor ! d.get
         counter += 1
         print(s"Reading data from $path: $counter\r")
       }
       dbActor ! EpochMarker
+      erActor ! EpochMarker
       print("\n")
     }
 

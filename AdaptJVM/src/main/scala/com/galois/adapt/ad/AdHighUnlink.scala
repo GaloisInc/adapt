@@ -22,11 +22,12 @@ import akka.actor._
 class AdHighUnlink(root: ActorRef, threshold: Int) extends AdActor[CDM13,(Subject,Int)](
   immutable.Set(Subscription(
     target = root,
-    pack = PartialFunction[CDM13, CDM13] {
-      case s: Subject if s.subjectType equals SUBJECT_PROCESS => s
-      case e: Event if e.eventType equals EVENT_UNLINK => e
-      case s: SimpleEdge if s.edgeType equals EDGE_EVENT_ISGENERATEDBY_SUBJECT => s
-      case EpochMarker => EpochMarker
+    pack = PartialFunction[CDM13, Option[CDM13]] {
+      case s: Subject if s.subjectType equals SUBJECT_PROCESS => Some(s)
+      case e: Event if e.eventType equals EVENT_UNLINK => Some(e)
+      case s: SimpleEdge if s.edgeType equals EDGE_EVENT_ISGENERATEDBY_SUBJECT => Some(s)
+      case EpochMarker => Some(EpochMarker)
+      case _ => None
     }
   ))
 ) {
@@ -56,8 +57,12 @@ class AdHighUnlink(root: ActorRef, threshold: Int) extends AdActor[CDM13,(Subjec
       } 
 
       unlinks.clear()
+      links.clear()
       processes.clear()
   }
 }
 
+object AdHighUnlink {
+  def props(root: ActorRef, threshold: Int): Props = Props(new AdHighUnlink(root, threshold))
+}
 

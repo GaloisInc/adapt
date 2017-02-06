@@ -8,7 +8,7 @@ import java.util.UUID
 import scala.collection._
 
 import akka.actor._
-
+/*
 // TODO: find a better criterion for dumping information than an EpochMarker
 // TODO: private maps like Map[UUID, Subject] are begging for some better abstraction...
 
@@ -19,15 +19,14 @@ import akka.actor._
  * features:      events with eventType CHECK_FILE_ATTRIBUTES, events with eventType OPEN;
  * scoring basis: sum of CHECK_FILE_ATTRIBUTEs / sum of OPENs
  */
-class AdHighCheckOpenRatio(root: ActorRef, threshold: Double) extends AdActor[CDM13,(Subject,Double)](
+class AdHighPrivilegeEvent(root: ActorRef, threshold: Double) extends AdActor[CDM13,(Subject,Double)](
   immutable.Set(Subscription(
     target = root,
-    pack = PartialFunction[CDM13, Option[CDM13]] {
-      case s: Subject if s.subjectType equals SUBJECT_PROCESS => Some(s)
-      case e: Event if Seq(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_OPEN) contains e.eventType => Some(e)
-      case s: SimpleEdge if s.edgeType equals EDGE_EVENT_ISGENERATEDBY_SUBJECT => Some(s)
-      case EpochMarker => Some(EpochMarker)
-      case _ => None
+    pack = PartialFunction[CDM13, CDM13] {
+      case s: Subject if s.subjectType equals SUBJECT_PROCESS => s
+      case e: Event if Seq(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_OPEN) contains e.eventType => e
+      case s: SimpleEdge if s.edgeType equals EDGE_EVENT_ISGENERATEDBY_SUBJECT => s
+      case EpochMarker => EpochMarker
     }
   ))
 ) {
@@ -68,8 +67,4 @@ class AdHighCheckOpenRatio(root: ActorRef, threshold: Double) extends AdActor[CD
       processes.clear()
   }
 }
-
-object AdHighCheckOpenRatio {
-  def props(root: ActorRef, threshold: Double): Props = Props(new AdHighCheckOpenRatio(root, threshold))
-}
-
+*/
