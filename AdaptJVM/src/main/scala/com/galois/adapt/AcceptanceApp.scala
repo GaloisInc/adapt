@@ -66,7 +66,7 @@ object AcceptanceApp {
     }
 
     data match {
-      case Failure(e) => println(s"Invalid Avro file ${e.getMessage}")
+      case Failure(e) => println(s"Invalid Avro file: ${e.getMessage}")
       case Success(records) => 
         
         lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
