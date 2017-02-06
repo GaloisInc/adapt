@@ -20,7 +20,7 @@
         var default_node_color = "#97c2fc"
 
 
-        function execQuery(query_object, success_function) {
+        function execQuery(query_object, success_function, query_color) {
             right_journal = []
             UI.updateButtonStates()
             if (query_object.name === "Collapse Nodes (selected)") {
@@ -56,9 +56,9 @@
                     // }
                     $.post("/query/edges", {"query": edge_query}, function(edge_results) {
                         UI.foundEdges(edge_results.length)
-                        var query_color = document.getElementById("query-color").jscolor.value
+                        // var query_color = document.getElementById("query-color").jscolor.value
                         var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
-                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})
+                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
                         var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
                         if (query_object.is_collapsed) {
                             data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
@@ -155,9 +155,7 @@
             var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
             if (_.isEmpty(name)) { name = cluster_node_id }
             var cluster_data = getClusteringData(network.getSelectedNodes(), cluster_node_id, name)
-        console.log(cluster_data)
             var formatted_cluster_data = formatAllData(cluster_data)
-            console.log(formatted_cluster_data)
             updateNetwork(formatted_cluster_data)
         }
 
@@ -390,16 +388,15 @@
             var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
 
-                
                 n['queries'] = getRelevantQueries(n)  
 
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
                 default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
                     n['icon'] = {
-                        color : getOrElse(node_spec.color, UI.selectedColor()),
-                        code : getOrElse(node_spec.icon_unicode, default_spec.icon_unicode),
-                        size : getOrElse(node_spec.size, default_spec.size),
+                        color : getOrElse(n.icon.color, getOrElse(node_spec.color, UI.selectedColor())),
+                        code : getOrElse(n.icon.code, getOrElse(node_spec.icon_unicode, default_spec.icon_unicode)),
+                        size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
 
@@ -528,7 +525,7 @@
                     execTextQuery(query_string)
                 } else {
                     var formatAndUpdate = _.compose(updateNetwork, formatAllData)
-                    execQuery(query_string, formatAndUpdate)
+                    execQuery(query_string, formatAndUpdate, document.getElementById("query-color").jscolor.value)
                 }
             },
             shift_is_held : false,
@@ -618,7 +615,7 @@
                     var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
                     var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
                     var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
-                    execQuery(query, formatAndUpdateAtId)
+                    execQuery(query, formatAndUpdateAtId, document.getElementById("query-color").jscolor.value)
                 }
             },
             networkRightClickBehavior : function(props) {
@@ -640,7 +637,7 @@
                         var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
                         var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
                         execQuery_params.push([q, formatAndUpdateAtId])
-                        var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1])"
+                        var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1], document.getElementById('query-color').jscolor.value)"
                         var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
                         $("#node-query-menu ul").append(list_item)
                         idx++
@@ -693,6 +690,7 @@
                 }, 0, props)
             },
             startDrawSelection : function(props) {
+                console.log("drawing selection")
                 UI.drawing = props.pointer.canvas
                 network.setOptions({ 
                     interaction : {
@@ -703,6 +701,7 @@
                 $('#node-selection-box').show()
             },
             endDrawSelection : function(props) {
+                console.log("stopped drawing selection")
                     network.setOptions({interaction: {
                         dragView : true,
                         zoomView : true
@@ -758,6 +757,7 @@
             selectedColor: function() {
                 return document.getElementById("query-color").jscolor.value
             },
+            drawing : false,
             draw : function(data) {
                 var container = document.getElementById('graph')
                 default_node_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
@@ -965,6 +965,7 @@
                 highlight_coords.col = highlight_coords.col + 1
             }
         })
+
         $(function(){
             UI.draw( { "nodes" : [], "edges" : [] } )
             $("#animate-button").click(function(){ UI.animateButton(true) })
@@ -974,6 +975,28 @@
             
             createSavedQueries()
             document.querySelector('input[list="starting-queries"]').addEventListener('input', setSelectedQuery)
+        })
+
+        $(function(){
+            if (window.location.hash.length > 0) {
+                var hash_string = window.location.hash.replace("#", "")
+                queries = hash_string.split("&")
+                var starting_color = document.getElementById("query-color").jscolor.value.replace("#", "")
+                var queries_with_colors = _.map(queries, function(s){ 
+                    var pair = s.split(":")
+                    if (pair.length == 1) { 
+                        return [pair[0], starting_color]
+                    } else {
+                        return pair
+                    }
+                })
+                _.map(queries_with_colors, function(pair){ 
+                    document.getElementById('query-string').value = pair[0]
+                    document.getElementById("query-color").jscolor.value = "#" + pair[1]
+                    UI.queryClick()
+                })
+                document.getElementById("query-color").jscolor.value = "#" + starting_color
+            }
         })
     </script>
 

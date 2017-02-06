@@ -18,7 +18,7 @@ package object cdm13 {
   object CDM13 {
     val values = Seq(AbstractObject,Event,FileObject,MemoryObject,NetFlowObject,Principal,ProvenanceTagNode,RegistryKeyObject,SimpleEdge,SrcSinkObject,Subject,TagEntity,Value)
 
-    def readData(filePath: String, limit: Option[Int] = None) = readAvroFile(filePath).map { x =>
+    def readData(filePath: String, limit: Option[Int] = None): Try[Iterator[Try[CDM13]]] = readAvroFile(filePath).map { x =>
       val cdmDataIter = x.map(CDM13.parse)
       limit.fold(cdmDataIter)(l => cdmDataIter.take(l))
     }
@@ -26,7 +26,15 @@ package object cdm13 {
     def readAvroFile(filePath: String) = Try {
       val tcDatumReader = new SpecificDatumReader(classOf[TCCDMDatum])
       val tcFileReader: DataFileReader[TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
-      tcFileReader.iterator.asScala.map(cdm => new RawCDM13Type(cdm.getDatum))
+      val tcIterator = tcFileReader.iterator.asScala
+
+      val first = {
+        val cdm = tcIterator.next
+        if (cdm.CDMVersion.toString != "13")
+          throw new Exception(s"Expected CDM13, but received CDM${cdm.CDMVersion.toString}")
+        new RawCDM13Type(cdm.getDatum)
+      }
+      Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM13Type(cdm.getDatum))
     }
 
     def parse(cdm: RawCDM13Type) = cdm.o match {
