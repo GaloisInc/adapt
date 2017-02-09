@@ -36,10 +36,10 @@ object DevelopmentApp {
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
-    val erActor = system.actorOf(Props(classOf[ErActor]))
-    val ad1 = system.actorOf(AdHighCheckOpenRatio.props(erActor, 2.0))
-    val ad2 = system.actorOf(AdHighUnlink.props(erActor, 2))
-    val out = system.actorOf(Outgestor.props(Set(ad1,ad2)))
+    val erActor: ActorRef = system.actorOf(Props(classOf[ErActor]))
+    val ad1 = system.actorOf(AdHighCheckOpenRatio.props(erActor))
+    //val ad2 = system.actorOf(AdHighUnlink.props(erActor))
+    val out = system.actorOf(Outgestor.props(Set(ad1/*,ad2*/)))
 
     for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get

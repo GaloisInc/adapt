@@ -19,7 +19,7 @@ import akka.actor._
  * features:      events with eventType UNLINK
  * scoring basis: count all UNLINK events attached to target
  */
-class AdHighUnlink(root: ActorRef, threshold: Int) extends AdActor[CDM13,(Subject,Int)](
+class AdHighUnlink(root: ActorRef, threshold: Int) extends SubscriptionActor[CDM13,(Subject,Int)](
   immutable.Set(Subscription(
     target = root,
     pack = PartialFunction[CDM13, Option[CDM13]] {
