@@ -3,10 +3,13 @@ package com.galois.adapt
 import akka.actor.{ActorSystem, Props, ActorRef}
 
 // Represents something that will subscribe to messages of any type
-class Outgestor(subscriptions: Set[ActorRef]) extends SubscriptionActor[Any,Any](
-  subscriptions.map { sub => Subscription[Any,Any](target = sub, pack = { case x: Any => Some(x) }) } 
-) {
-  
+class Outgestor(outputs: Set[ActorRef]) extends SubscriptionActor[Any,Any] { 
+  val subscriptions: Set[Subscription[_,Any]] = outputs.map { 
+    sub => Subscription[Any,Any](target = sub, pack = { case x: Any => Some(x) })
+  }
+
+  initialize()
+ 
   override def receive = { case t => process(t) }
 
   def process(v: Any): Unit = {

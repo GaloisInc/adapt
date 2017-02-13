@@ -19,8 +19,9 @@ import akka.actor._
  * features:      events with eventType UNLINK
  * scoring basis: count all UNLINK events attached to target
  */
-class AdHighUnlink(root: ActorRef, threshold: Int) extends SubscriptionActor[CDM13,(Subject,Int)](
-  immutable.Set(Subscription(
+class AdHighUnlink(root: ActorRef, threshold: Int) extends SubscriptionActor[CDM13,(Subject,Int)] {
+  
+  val subscriptions: immutable.Set[Subscription[_,CDM13]] = immutable.Set(Subscription(
     target = root,
     pack = PartialFunction[CDM13, Option[CDM13]] {
       case s: Subject if s.subjectType equals SUBJECT_PROCESS => Some(s)
@@ -30,7 +31,9 @@ class AdHighUnlink(root: ActorRef, threshold: Int) extends SubscriptionActor[CDM
       case _ => None
     }
   ))
-) {
+
+  initialize()
+ 
   private val unlinks = mutable.Set.empty[UUID]              // UUIDs of UNLINK Events
   private val links = mutable.ListBuffer.empty[(UUID, UUID)] // Subject UUID -> Event UUID
   private val processes = mutable.Map.empty[UUID, Subject]   // Subject UUID -> Subject

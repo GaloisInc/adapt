@@ -19,8 +19,9 @@ import akka.actor._
  * features:      events with eventType CHECK_FILE_ATTRIBUTES, events with eventType OPEN;
  * scoring basis: sum of CHECK_FILE_ATTRIBUTEs / sum of OPENs
  */
-class AdHighCheckOpenRatio(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]](
-  immutable.Set(Subscription(
+class AdHighCheckOpenRatio(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
+  
+  val subscriptions: immutable.Set[Subscription[_,CDM13]] = immutable.Set(Subscription(
     target = root,
     pack = PartialFunction[CDM13, Option[CDM13]] {
       case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
@@ -32,7 +33,8 @@ class AdHighCheckOpenRatio(root: ActorRef) extends SubscriptionActor[CDM13,Map[S
       case _ => None
     }
   ))
-) {
+
+  initialize()
 
   private val opens = mutable.Set.empty[UUID]                // UUIDs of OPEN Events
   private val writes = mutable.Set.empty[UUID]               // UUIDs of WRITE Events

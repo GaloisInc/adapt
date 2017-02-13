@@ -3,14 +3,17 @@ package com.galois.adapt
 import akka.actor._
 
 // An actor that receives input of type `T` and produces output of type `U`
-abstract class SubscriptionActor[T,U](
-  subscriptions: Set[Subscription[_,T]],          // These are going to be the sources of messages
-  var subscribers: Set[Subscription[U,_]] = Set[Subscription[U,_]]() // This is a list that will grow to be the places to send
-) extends Actor {
-  
-  // On initialization, send subscription request to upstream producers
-  subscriptions.foreach { s => s.target ! s.copy(target = self) }
+trait SubscriptionActor[T,U] extends Actor {
 
+  def subscriptions: Set[Subscription[_,T]]          // These are going to be the sources of messages
+  var subscribers: Set[Subscription[U,_]] = Set[Subscription[U,_]]() // This is a list that will grow to be the places to send
+
+
+  def initialize(): Unit = {
+    // On initialization, send subscription request to upstream producers
+    subscriptions.foreach { s => s.target ! s.copy(target = self) }
+  }
+  
   // Accordingly, an AdActor must be prepared to recieve subscription requests too...
   def receive = {
     case s @ Subscription(_,_) => subscribers += (s.asInstanceOf[Subscription[U,_]])
