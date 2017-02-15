@@ -7,7 +7,7 @@ import akka.util.Timeout
 import akka.actor._
 import akka.pattern.ask
 import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
-import com.galois.adapt.ad._
+import com.galois.adapt.feature._
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.Await
@@ -37,23 +37,23 @@ object DevelopmentApp {
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
+    
     val erActor: ActorRef = system.actorOf(Props(classOf[ErActor]))
-    val ad1 = system.actorOf(AdHighCheckOpenRatio.props(erActor))
-    val ad2 = system.actorOf(NetflowFeature.props(erActor))
+    
+    // The two feature extractors subscribe to the CDM13 produced by the ER actor
+    val featureExtractor1 = system.actorOf(FileEventsFeature.props(erActor))
+    val featureExtractor2 = system.actorOf(NetflowFeature.props(erActor))
 
-    def pack(m: Any): Option[Map[Subject,Seq[Double]]] = Some {
-      m.asInstanceOf[scala.collection.mutable.Map[Subject,(Int,Int,Int)]].toMap.mapValues { case
-      (x,y,z) => Seq(x.toDouble,y.toDouble,z.toDouble) }
-    }
-    def pack1(m: Any): Option[Map[Subject,Seq[Double]]] = Some {
-      m.asInstanceOf[scala.collection.immutable.Map[Subject,Seq[Double]]]
-    }
+    // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
+    val ad = system.actorOf(IForestAnomalyDetector.props(Set(
+      Subscription(featureExtractor1, (m: Any) =>
+        Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
+      Subscription(featureExtractor2, (m: Any) =>
+        Some(m.asInstanceOf[Map[Subject,Seq[Double]]]))
+    )))
 
-    val ad = system.actorOf(IForestAnomalyDetector.props(
-    //  Set(Subscription(ad1, pack(_))),
-      Set(Subscription(ad2, pack1(_)))
-    ))
-    val out = system.actorOf(Outgestor.props(Set(ad2, ad/*,ad2*/)))
+    // As a debugging tool, the Outgestor will print out what the anomaly detector produced
+    val out = system.actorOf(Outgestor.props(Set(ad)))
 
     for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get

@@ -1,4 +1,4 @@
-package com.galois.adapt.ad
+package com.galois.adapt.feature
 
 import com.galois.adapt._
 import com.galois.adapt.cdm13._
@@ -9,17 +9,13 @@ import scala.collection._
 
 import akka.actor._
 
-// TODO: find a better criterion for dumping information than an EpochMarker
-// TODO: private maps like Map[UUID, Subject] are begging for some better abstraction...
-
 /*
- * Subject process has a high (relative) ratio of CHECK_FILE_ATTRIBUTE events to OPEN events
+ * Feature extractor that gets file related information on a per process basis
  *
  * filter:        Subject with subjectType = Process;
- * features:      events with eventType CHECK_FILE_ATTRIBUTES, events with eventType OPEN;
- * scoring basis: sum of CHECK_FILE_ATTRIBUTEs / sum of OPENs
+ * features:      events with eventType CHECK_FILE_ATTRIBUTES, OPEN, and WRITE;
  */
-class AdHighCheckOpenRatio(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
+class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
   
   val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
     target = root,
@@ -63,7 +59,7 @@ class AdHighCheckOpenRatio(root: ActorRef) extends  SubscriptionActor[CDM13,Map[
       }
 
       // Broadcast the subjects with high enough ratios
-      broadCast(counts)
+      broadCast(counts.toMap)
 
       // Clear the stored state
       // TODO: Consider storing several generations of cache
@@ -76,7 +72,7 @@ class AdHighCheckOpenRatio(root: ActorRef) extends  SubscriptionActor[CDM13,Map[
     }
 }
 
-object AdHighCheckOpenRatio {
-  def props(root: ActorRef): Props = Props(new AdHighCheckOpenRatio(root))
+object FileEventsFeature {
+  def props(root: ActorRef): Props = Props(new FileEventsFeature(root))
 }
 

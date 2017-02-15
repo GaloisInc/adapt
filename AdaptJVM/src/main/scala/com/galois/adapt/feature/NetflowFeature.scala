@@ -1,4 +1,4 @@
-package com.galois.adapt.ad
+package com.galois.adapt.feature
 
 import com.galois.adapt._
 import com.galois.adapt.cdm13._
@@ -9,6 +9,17 @@ import scala.collection._
 
 import akka.actor._
 
+/*
+ * Feature extractor that gets network information on a per process basis
+ *
+ * filter:        Subject with subjectType = Process that connects to at least one NetFlow
+ * features:      number of SEND + SENDMSG + WRITE events,
+ *                average size of SEND or SENDMSG or WRITE events,
+ *                number of READ + RECVMSG + RECV events,
+ *                average size of RECV, RECVMSG, or READ events (all per unique IP address) 
+ * 
+ * Thus, every subject has  4 * (# of unique IP addresses in the trace)  features
+ */
 class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject,Seq[Double]]] {
   val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
     target = root,
@@ -32,13 +43,13 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
 
   private val netflows = mutable.Map.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP
   
-  private val sendto = mutable.Map.empty[UUID,Option[Long]]        // Event UUID
-  private val sendmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID
-  private val write = mutable.Map.empty[UUID,Option[Long]]         // Event UUID
+  private val sendto = mutable.Map.empty[UUID,Option[Long]]        // Event UUID -> size
+  private val sendmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID -> size
+  private val write = mutable.Map.empty[UUID,Option[Long]]         // Event UUID -> size
   
-  private val reads = mutable.Map.empty[UUID,Option[Long]]         // Event UUID
-  private val readmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID
-  private val recv = mutable.Map.empty[UUID,Option[Long]]          // Event UUID
+  private val reads = mutable.Map.empty[UUID,Option[Long]]         // Event UUID -> size
+  private val readmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID -> size
+  private val recv = mutable.Map.empty[UUID,Option[Long]]          // Event UUID -> size
 
   private val processes = mutable.Map.empty[UUID, Subject]         // Subject UUID -> Subject
   
@@ -68,7 +79,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
        */
       val counts = mutable.Map.empty[(Subject,String),(Int,Int,Long,Int,Int,Long)]
 
-      // Tally up the counts of opens and checks per Subject
+      // Tally up the counts of different types of network activity per Subject
       for ((event,subj) <- event2process
            if processes isDefinedAt subj
            if event2netflow isDefinedAt event
@@ -78,7 +89,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
 
         if ((sendto isDefinedAt event) || (sendmsg isDefinedAt event) || (write isDefinedAt event)) {
           val ip: String = srcDst._2
-          val size: Option[Long] = sendto.getOrElse(event,sendto.getOrElse(event,write(event)))
+          val size: Option[Long] = sendto.getOrElse(event,sendmsg.getOrElse(event,write(event)))
           val (n,n1,sn,m,m1,sm): (Int,Int,Long,Int,Int,Long) = counts.getOrElse((subject,ip), (0,0,0,0,0,0))
 
           val (delta_n1, delta_sn): (Int,Long) = size match {
@@ -101,7 +112,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
         }
       }
 
-      // Broadcast the subjects with high enough ratios
+      // Broadcast the subjects, after calculating the average message size
       val countsImmutable: immutable.Map[(Subject,String),(Int,Int,Long,Int,Int,Long)] = counts.toMap
       val keySet = countsImmutable.keys
       val subjects: List[Subject] = keySet.map(_._1).toList
@@ -119,7 +130,6 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
       broadCast(toBroadCast.toMap)
 
       // Clear the stored state
-      // TODO: Consider storing several generations of cache
       netflows.clear()
       sendto.clear()
       sendmsg.clear()
@@ -134,7 +144,6 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
       println("EpochMarker: NetflowFeature")
     }
 }
-
 
 object NetflowFeature {
   def props(root: ActorRef): Props = Props(new NetflowFeature(root))
