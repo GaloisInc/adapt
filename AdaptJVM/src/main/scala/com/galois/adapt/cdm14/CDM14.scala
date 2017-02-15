@@ -190,7 +190,7 @@ case object EVENT_LOGIN extends EventType
 case object EVENT_LOGOUT extends EventType
 
 sealed trait FileObjectType extends CDM14
-case object FileObjectType extends CustomEnum[FileObjectType] { val values = Seq(FILE_OBJECT_FILE, FILE_OBJECT_DIR, FILE_OBJECT_NAMED_PIPE, FILE_OBJECT_UNIX_SOCKET, FILE_OBJECT_PEFILE)}a
+case object FileObjectType extends CustomEnum[FileObjectType] { val values = Seq(FILE_OBJECT_FILE, FILE_OBJECT_DIR, FILE_OBJECT_NAMED_PIPE, FILE_OBJECT_UNIX_SOCKET, FILE_OBJECT_PEFILE) }
 case object FILE_OBJECT_FILE extends FileObjectType
 case object FILE_OBJECT_DIR extends FileObjectType
 case object FILE_OBJECT_NAMED_PIPE extends FileObjectType

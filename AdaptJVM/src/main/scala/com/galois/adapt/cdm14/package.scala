@@ -16,7 +16,7 @@ package object cdm14 {
   trait CDM14
 
   object CDM14 {
-    val values = Seq(AbstractObject,Event,FileObject,MemoryObject,NetFlowObject,Principal,ProvenanceTagNode,RegistryKeyObject,SimpleEdge,SrcSinkObject,Subject,TagEntity,Value)
+    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, TimeMarker)
 
     def readData(filePath: String, limit: Option[Int] = None): Try[Iterator[Try[CDM14]]] = readAvroFile(filePath).map { x =>
       val cdmDataIter = x.map(CDM14.parse)
@@ -37,19 +37,23 @@ package object cdm14 {
       Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM14Type(cdm.getDatum))
     }
 
+  //TODO make these classes
     def parse(cdm: RawCDM14Type) = cdm.o match {
-      case _: Subject.RawCDMType => Subject.from(cdm)
       case _: Principal.RawCDMType => Principal.from(cdm)
-      case _: SimpleEdge.RawCDMType => SimpleEdge.from(cdm)
-      case _: SrcSinkObject.RawCDMType => SrcSinkObject.from(cdm)
+      case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
+      case _: TagRunLengthTuple.RawCDMType => TagRunLengthTuple.from(cdm)
+      case _: Value.RawCDMType => Value.from(cdm)
+      case _: CryptographicHash.RawCDMType => CryptographicHash.from(cdm)
+      case _: Subject.RawCDMType => Subject.from(cdm)
       case _: AbstractObject.RawCDMType => AbstractObject.from(cdm)
-      case _: Event.RawCDMType => Event.from(cdm)
       case _: FileObject.RawCDMType => FileObject.from(cdm)
+      case _: UnnamedPipeObject.RawCDMType => UnnamedPipeObject.from(cdm)
+      case _: RegistryKeyObject.RawCDMType => RegistryKeyObject.from(cdm)
       case _: NetFlowObject.RawCDMType => NetFlowObject.from(cdm)
       case _: MemoryObject.RawCDMType => MemoryObject.from(cdm)
-      case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
-      case _: RegistryKeyObject.RawCDMType => RegistryKeyObject.from(cdm)
-      case _: TagEntity.RawCDMType => TagEntity.from(cdm)
+      case _: SrcSinkObject.RawCDMType => SrcSinkObject.from(cdm)
+      case _: Event.RawCDMType => Event.from(cdm)
+      case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }
   }
@@ -87,20 +91,26 @@ package object cdm14 {
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM14Type(x)).get))
   }
 
+  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
+  implicit def makePrivilegeLevel(s: com.bbn.tc.schema.avro.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).get
+  implicit def makeSrcSinkType(s: com.bbn.tc.schema.avro.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
+  implicit def makeSource(s: com.bbn.tc.schema.avro.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
+  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
+  implicit def makeEventType(e: com.bbn.tc.schema.avro.EventType): EventType = EventType.from(e.toString).get
+  implicit def makeFileObjectTime(s: com.bbn.tc.schema.avro.FileObjectType): FileObjectType = FileObjectType.from(s.toString).get
+  implicit def makeValueType(v: com.bbn.tc.schema.avro.ValueType): ValueType = ValueType.from(v.toString).get
+  implicit def makeValDataType(d: com.bbn.tc.schema.avro.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
+  implicit def makeTagOpCode(t: com.bbn.tc.schema.avro.TagOpCode): TagOpCode = TagOpCode.from(t.toString).get
+  implicit def makeIntegrityTag(i: com.bbn.tc.schema.avro.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
+  implicit def makeConfidentialityTag(c: com.bbn.tc.schema.avro.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
+  implicit def makeCryptoHashType(c: com.bbn.tc.schema.avro.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
+
+//TODO do we need these holdovers?
   implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
-  implicit def makeSource(s: com.bbn.tc.schema.avro.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
-  implicit def makeEdgeType(e: com.bbn.tc.schema.avro.EdgeType): EdgeType = EdgeType.from(e.toString).get
   implicit def makeShort(s: com.bbn.tc.schema.avro.SHORT): FixedShort = new FixedShort(s.bytes)
-  implicit def makeSrcSinkType(s: com.bbn.tc.schema.avro.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
-  implicit def makeEventType(e: com.bbn.tc.schema.avro.EventType): EventType = EventType.from(e.toString).get
-  implicit def makeValueType(v: com.bbn.tc.schema.avro.ValueType): ValueType = ValueType.from(v.toString).get
-  implicit def makeValDataType(d: com.bbn.tc.schema.avro.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
-  implicit def makeTag(t: com.bbn.tc.schema.avro.ProvenanceTagNode): ProvenanceTagNode = ProvenanceTagNode.from(new RawCDM14Type(t)).get
-  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
   implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM14Type(o)).get
-  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
 
   object DBOpt {
     // Flattens out nested "properties":
