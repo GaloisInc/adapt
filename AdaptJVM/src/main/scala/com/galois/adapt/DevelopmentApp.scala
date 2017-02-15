@@ -6,7 +6,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import akka.actor._
 import akka.pattern.ask
-import com.galois.adapt.cdm13.{CDM13, EpochMarker}
+import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
 import com.galois.adapt.ad._
 import com.typesafe.config.ConfigFactory
 
@@ -18,6 +18,7 @@ import collection.JavaConversions._
 import java.io.File
 
 import scala.language.postfixOps
+import scala.language.existentials
 
 object DevelopmentApp {
   println(s"Spinning up a development system.")
@@ -38,8 +39,21 @@ object DevelopmentApp {
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
     val erActor: ActorRef = system.actorOf(Props(classOf[ErActor]))
     val ad1 = system.actorOf(AdHighCheckOpenRatio.props(erActor))
-    //val ad2 = system.actorOf(AdHighUnlink.props(erActor))
-    val out = system.actorOf(Outgestor.props(Set(ad1/*,ad2*/)))
+    val ad2 = system.actorOf(NetflowFeature.props(erActor))
+
+    def pack(m: Any): Option[Map[Subject,Seq[Double]]] = Some {
+      m.asInstanceOf[scala.collection.mutable.Map[Subject,(Int,Int,Int)]].toMap.mapValues { case
+      (x,y,z) => Seq(x.toDouble,y.toDouble,z.toDouble) }
+    }
+    def pack1(m: Any): Option[Map[Subject,Seq[Double]]] = Some {
+      m.asInstanceOf[scala.collection.immutable.Map[Subject,Seq[Double]]]
+    }
+
+    val ad = system.actorOf(IForestAnomalyDetector.props(
+    //  Set(Subscription(ad1, pack(_))),
+      Set(Subscription(ad2, pack1(_)))
+    ))
+    val out = system.actorOf(Outgestor.props(Set(ad2, ad/*,ad2*/)))
 
     for (path <- loadPaths) {
       val data = CDM13.readData(path, limitLoad).get

@@ -6,7 +6,7 @@ import akka.actor._
 
 // This actor is special: it performs entity resolution on the input, then feeds that back out. 
 class ErActor() extends SubscriptionActor[Any,CDM13] {
-  val subscriptions: Set[Subscription[_,Any]] = Set()
+  val subscriptions: Set[Subscription[Any]] = Set()
   def process(a: Any) = broadCast(a.asInstanceOf[CDM13])
 }
 

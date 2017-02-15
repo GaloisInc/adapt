@@ -21,9 +21,9 @@ import akka.actor._
  */
 class AdHighCheckOpenRatio(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
   
-  val subscriptions: immutable.Set[Subscription[_,CDM13]] = immutable.Set(Subscription(
+  val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
     target = root,
-    pack = PartialFunction[CDM13, Option[CDM13]] {
+    pack = {
       case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
       case e @ Event(u, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => Some(e)
       case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => Some(e)

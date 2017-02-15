@@ -21,9 +21,9 @@ import akka.actor._
  */
 class AdHighUnlink(root: ActorRef, threshold: Int) extends SubscriptionActor[CDM13,(Subject,Int)] {
   
-  val subscriptions: immutable.Set[Subscription[_,CDM13]] = immutable.Set(Subscription(
+  val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
     target = root,
-    pack = PartialFunction[CDM13, Option[CDM13]] {
+    pack = {
       case s: Subject if s.subjectType equals SUBJECT_PROCESS => Some(s)
       case e: Event if e.eventType equals EVENT_UNLINK => Some(e)
       case s: SimpleEdge if s.edgeType equals EDGE_EVENT_ISGENERATEDBY_SUBJECT => Some(s)

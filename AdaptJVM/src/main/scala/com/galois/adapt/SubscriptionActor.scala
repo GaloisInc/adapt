@@ -5,8 +5,8 @@ import akka.actor._
 // An actor that receives input of type `T` and produces output of type `U`
 trait SubscriptionActor[T,U] extends Actor {
 
-  def subscriptions: Set[Subscription[_,T]]          // These are going to be the sources of messages
-  var subscribers: Set[Subscription[U,_]] = Set[Subscription[U,_]]() // This is a list that will grow to be the places to send
+  def subscriptions: Set[Subscription[T]]          // These are going to be the sources of messages
+  var subscribers: Set[Subscription[_]] = Set[Subscription[_]]() // This is a list that will grow to be the places to send
 
 
   def initialize(): Unit = {
@@ -16,7 +16,7 @@ trait SubscriptionActor[T,U] extends Actor {
   
   // Accordingly, an AdActor must be prepared to recieve subscription requests too...
   def receive = {
-    case s @ Subscription(_,_) => subscribers += (s.asInstanceOf[Subscription[U,_]])
+    case s @ Subscription(_,_) => subscribers += s
     case t: T => process(t.asInstanceOf[T])
   }
 
@@ -31,9 +31,9 @@ trait SubscriptionActor[T,U] extends Actor {
 
 // A subscription aggregates all the information needed on the _sender_ side to pass a message along
 // to a receiver.
-case class Subscription[P,T](
-  target: ActorRef,                  // Subscribing actor
-  pack: PartialFunction[P,Option[T]] // Determines whether the actor is interested in a particular message
-                                     // and packs the message into a format the actor is expecting
+case class Subscription[T](
+  target: ActorRef,        // Subscribing actor
+  pack: Any => Option[T]     // Determines whether the actor is interested in a particular message
+                           // and packs the message into a format the actor is expecting
 )
 
