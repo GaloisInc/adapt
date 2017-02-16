@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm13;
+package com.bbn.tc.schema.avro;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -14,13 +14,13 @@ import org.apache.avro.specific.SpecificData;
      *  but rather instantiate one of its sub types File, NetFlow, of Memory */
 @org.apache.avro.specific.AvroGenerated
 public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 3477050372968112133L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"AbstractObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = 4162285994043188761L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"AbstractObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** The source that emitted the object, see InstrumentationSource */
-  @Deprecated public com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
+  @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
   /** Permission bits defined over the object (Optional) */
-  @Deprecated public com.bbn.tc.schema.avro.cdm13.SHORT permission;
+  @Deprecated public com.bbn.tc.schema.avro.SHORT permission;
   /** * The timestamp when the object was last modified (Optional).
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
   @Deprecated public java.lang.Long lastTimestampMicros;
@@ -42,7 +42,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
    * @param properties Arbitrary key, value pairs describing the entity
    */
-  public AbstractObject(com.bbn.tc.schema.avro.cdm13.InstrumentationSource source, com.bbn.tc.schema.avro.cdm13.SHORT permission, java.lang.Long lastTimestampMicros, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public AbstractObject(com.bbn.tc.schema.avro.InstrumentationSource source, com.bbn.tc.schema.avro.SHORT permission, java.lang.Long lastTimestampMicros, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.source = source;
     this.permission = permission;
     this.lastTimestampMicros = lastTimestampMicros;
@@ -65,8 +65,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: source = (com.bbn.tc.schema.avro.cdm13.InstrumentationSource)value$; break;
-    case 1: permission = (com.bbn.tc.schema.avro.cdm13.SHORT)value$; break;
+    case 0: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
+    case 1: permission = (com.bbn.tc.schema.avro.SHORT)value$; break;
     case 2: lastTimestampMicros = (java.lang.Long)value$; break;
     case 3: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
@@ -77,7 +77,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * Gets the value of the 'source' field.
    * @return The source that emitted the object, see InstrumentationSource
    */
-  public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
+  public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
     return source;
   }
 
@@ -86,7 +86,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * The source that emitted the object, see InstrumentationSource
    * @param value the value to set.
    */
-  public void setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
+  public void setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
     this.source = value;
   }
 
@@ -94,7 +94,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * Gets the value of the 'permission' field.
    * @return Permission bits defined over the object (Optional)
    */
-  public com.bbn.tc.schema.avro.cdm13.SHORT getPermission() {
+  public com.bbn.tc.schema.avro.SHORT getPermission() {
     return permission;
   }
 
@@ -103,7 +103,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * Permission bits defined over the object (Optional)
    * @param value the value to set.
    */
-  public void setPermission(com.bbn.tc.schema.avro.cdm13.SHORT value) {
+  public void setPermission(com.bbn.tc.schema.avro.SHORT value) {
     this.permission = value;
   }
 
@@ -147,8 +147,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * Creates a new AbstractObject RecordBuilder.
    * @return A new AbstractObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder();
+  public static com.bbn.tc.schema.avro.AbstractObject.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.AbstractObject.Builder();
   }
 
   /**
@@ -156,8 +156,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * @param other The existing builder to copy.
    * @return A new AbstractObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder other) {
-    return new com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder(other);
+  public static com.bbn.tc.schema.avro.AbstractObject.Builder newBuilder(com.bbn.tc.schema.avro.AbstractObject.Builder other) {
+    return new com.bbn.tc.schema.avro.AbstractObject.Builder(other);
   }
 
   /**
@@ -165,8 +165,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * @param other The existing instance to copy.
    * @return A new AbstractObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject other) {
-    return new com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder(other);
+  public static com.bbn.tc.schema.avro.AbstractObject.Builder newBuilder(com.bbn.tc.schema.avro.AbstractObject other) {
+    return new com.bbn.tc.schema.avro.AbstractObject.Builder(other);
   }
 
   /**
@@ -176,9 +176,9 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     implements org.apache.avro.data.RecordBuilder<AbstractObject> {
 
     /** The source that emitted the object, see InstrumentationSource */
-    private com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
+    private com.bbn.tc.schema.avro.InstrumentationSource source;
     /** Permission bits defined over the object (Optional) */
-    private com.bbn.tc.schema.avro.cdm13.SHORT permission;
+    private com.bbn.tc.schema.avro.SHORT permission;
     /** * The timestamp when the object was last modified (Optional).
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
     private java.lang.Long lastTimestampMicros;
@@ -194,7 +194,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.AbstractObject.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.source)) {
         this.source = data().deepCopy(fields()[0].schema(), other.source);
@@ -218,7 +218,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
      * Creates a Builder by copying an existing AbstractObject instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.AbstractObject other) {
+    private Builder(com.bbn.tc.schema.avro.AbstractObject other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.source)) {
         this.source = data().deepCopy(fields()[0].schema(), other.source);
@@ -243,7 +243,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * The source that emitted the object, see InstrumentationSource
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
+    public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
       return source;
     }
 
@@ -253,7 +253,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * @param value The value of 'source'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
       validate(fields()[0], value);
       this.source = value;
       fieldSetFlags()[0] = true;
@@ -275,7 +275,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * The source that emitted the object, see InstrumentationSource
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder clearSource() {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder clearSource() {
       source = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -286,7 +286,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * Permission bits defined over the object (Optional)
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.cdm13.SHORT getPermission() {
+    public com.bbn.tc.schema.avro.SHORT getPermission() {
       return permission;
     }
 
@@ -296,7 +296,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * @param value The value of 'permission'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder setPermission(com.bbn.tc.schema.avro.cdm13.SHORT value) {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder setPermission(com.bbn.tc.schema.avro.SHORT value) {
       validate(fields()[1], value);
       this.permission = value;
       fieldSetFlags()[1] = true;
@@ -318,7 +318,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * Permission bits defined over the object (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder clearPermission() {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder clearPermission() {
       permission = null;
       fieldSetFlags()[1] = false;
       return this;
@@ -341,7 +341,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * @param value The value of 'lastTimestampMicros'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder setLastTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder setLastTimestampMicros(java.lang.Long value) {
       validate(fields()[2], value);
       this.lastTimestampMicros = value;
       fieldSetFlags()[2] = true;
@@ -365,7 +365,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder clearLastTimestampMicros() {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder clearLastTimestampMicros() {
       lastTimestampMicros = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -386,7 +386,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * @param value The value of 'properties'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
       validate(fields()[3], value);
       this.properties = value;
       fieldSetFlags()[3] = true;
@@ -408,7 +408,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
       * Arbitrary key, value pairs describing the entity
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder clearProperties() {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder clearProperties() {
       properties = null;
       fieldSetFlags()[3] = false;
       return this;
@@ -418,8 +418,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     public AbstractObject build() {
       try {
         AbstractObject record = new AbstractObject();
-        record.source = fieldSetFlags()[0] ? this.source : (com.bbn.tc.schema.avro.cdm13.InstrumentationSource) defaultValue(fields()[0]);
-        record.permission = fieldSetFlags()[1] ? this.permission : (com.bbn.tc.schema.avro.cdm13.SHORT) defaultValue(fields()[1]);
+        record.source = fieldSetFlags()[0] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[0]);
+        record.permission = fieldSetFlags()[1] ? this.permission : (com.bbn.tc.schema.avro.SHORT) defaultValue(fields()[1]);
         record.lastTimestampMicros = fieldSetFlags()[2] ? this.lastTimestampMicros : (java.lang.Long) defaultValue(fields()[2]);
         record.properties = fieldSetFlags()[3] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[3]);
         return record;

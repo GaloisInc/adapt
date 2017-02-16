@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm13;
+package com.bbn.tc.schema.avro;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -15,8 +15,8 @@ import org.apache.avro.specific.SpecificData;
      * a set of children nodes. */
 @org.apache.avro.specific.AvroGenerated
 public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 5727889058320071132L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     * A provenance tag is represented as a tree. Each node in the tree has a value and\\n     * a set of children nodes.\",\"fields\":[{\"name\":\"value\",\"type\":[\"int\",{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_SEQUENCE       the output is derived from the specified inputs in order, sequentially\\n     *TAG_OP_UNION,         the output is the union of its inputs\\n     * TAG_OP_ENCODE         the output is some encoding of the input\\n     * TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_SEQUENCE\",\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]},{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]},{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"*  the value of the node: can have the following types\\n *   int                 references another node by tagId\\n         *   UUID *   object uuid (source or sink for example)\\n         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode\\n         * *   IntegrityTag        an integrity tag\\n         *   ConfidentialityTag  a *   confidentiality tag\"},{\"name\":\"children\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceTagNode\"}],\"doc\":\"the child nodes\",\"default\":null},{\"name\":\"tagId\",\"type\":[\"null\",\"int\"],\"doc\":\"* the id to be assigned to this tag node\\n         * typically set once when the node is first created, and used in value afterwards\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs associated with a tag node\",\"default\":null}]}");
+  private static final long serialVersionUID = -4330064591468649248L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     * A provenance tag is represented as a tree. Each node in the tree has a value and\\n     * a set of children nodes.\",\"fields\":[{\"name\":\"value\",\"type\":[\"int\",{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_SEQUENCE       the output is derived from the specified inputs in order, sequentially\\n     *TAG_OP_UNION,         the output is the union of its inputs\\n     * TAG_OP_ENCODE         the output is some encoding of the input\\n     * TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_SEQUENCE\",\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]},{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]},{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"*  the value of the node: can have the following types\\n *   int                 references another node by tagId\\n         *   UUID *   object uuid (source or sink for example)\\n         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode\\n         * *   IntegrityTag        an integrity tag\\n         *   ConfidentialityTag  a *   confidentiality tag\"},{\"name\":\"children\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceTagNode\"}],\"doc\":\"the child nodes\",\"default\":null},{\"name\":\"tagId\",\"type\":[\"null\",\"int\"],\"doc\":\"* the id to be assigned to this tag node\\n         * typically set once when the node is first created, and used in value afterwards\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs associated with a tag node\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** *  the value of the node: can have the following types
  *   int                 references another node by tagId
@@ -26,7 +26,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
          *   ConfidentialityTag  a *   confidentiality tag */
   @Deprecated public java.lang.Object value;
   /** the child nodes */
-  @Deprecated public java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> children;
+  @Deprecated public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children;
   /** * the id to be assigned to this tag node
          * typically set once when the node is first created, and used in value afterwards */
   @Deprecated public java.lang.Integer tagId;
@@ -53,7 +53,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
          * typically set once when the node is first created, and used in value afterwards
    * @param properties Arbitrary key, value pairs associated with a tag node
    */
-  public ProvenanceTagNode(java.lang.Object value, java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> children, java.lang.Integer tagId, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public ProvenanceTagNode(java.lang.Object value, java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children, java.lang.Integer tagId, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.value = value;
     this.children = children;
     this.tagId = tagId;
@@ -77,7 +77,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
     case 0: value = (java.lang.Object)value$; break;
-    case 1: children = (java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode>)value$; break;
+    case 1: children = (java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode>)value$; break;
     case 2: tagId = (java.lang.Integer)value$; break;
     case 3: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
@@ -115,7 +115,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
    * Gets the value of the 'children' field.
    * @return the child nodes
    */
-  public java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> getChildren() {
+  public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> getChildren() {
     return children;
   }
 
@@ -124,7 +124,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
    * the child nodes
    * @param value the value to set.
    */
-  public void setChildren(java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> value) {
+  public void setChildren(java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> value) {
     this.children = value;
   }
 
@@ -168,8 +168,8 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
    * Creates a new ProvenanceTagNode RecordBuilder.
    * @return A new ProvenanceTagNode RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder();
+  public static com.bbn.tc.schema.avro.ProvenanceTagNode.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.ProvenanceTagNode.Builder();
   }
 
   /**
@@ -177,8 +177,8 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
    * @param other The existing builder to copy.
    * @return A new ProvenanceTagNode RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder other) {
-    return new com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder(other);
+  public static com.bbn.tc.schema.avro.ProvenanceTagNode.Builder newBuilder(com.bbn.tc.schema.avro.ProvenanceTagNode.Builder other) {
+    return new com.bbn.tc.schema.avro.ProvenanceTagNode.Builder(other);
   }
 
   /**
@@ -186,8 +186,8 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
    * @param other The existing instance to copy.
    * @return A new ProvenanceTagNode RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode other) {
-    return new com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder(other);
+  public static com.bbn.tc.schema.avro.ProvenanceTagNode.Builder newBuilder(com.bbn.tc.schema.avro.ProvenanceTagNode other) {
+    return new com.bbn.tc.schema.avro.ProvenanceTagNode.Builder(other);
   }
 
   /**
@@ -204,7 +204,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
          *   ConfidentialityTag  a *   confidentiality tag */
     private java.lang.Object value;
     /** the child nodes */
-    private java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> children;
+    private java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children;
     /** * the id to be assigned to this tag node
          * typically set once when the node is first created, and used in value afterwards */
     private java.lang.Integer tagId;
@@ -220,7 +220,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.ProvenanceTagNode.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.value)) {
         this.value = data().deepCopy(fields()[0].schema(), other.value);
@@ -244,7 +244,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
      * Creates a Builder by copying an existing ProvenanceTagNode instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode other) {
+    private Builder(com.bbn.tc.schema.avro.ProvenanceTagNode other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.value)) {
         this.value = data().deepCopy(fields()[0].schema(), other.value);
@@ -289,7 +289,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'value'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder setValue(java.lang.Object value) {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setValue(java.lang.Object value) {
       validate(fields()[0], value);
       this.value = value;
       fieldSetFlags()[0] = true;
@@ -321,7 +321,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
          *   ConfidentialityTag  a *   confidentiality tag
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder clearValue() {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearValue() {
       value = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -332,7 +332,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * the child nodes
       * @return The value.
       */
-    public java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> getChildren() {
+    public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> getChildren() {
       return children;
     }
 
@@ -342,7 +342,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'children'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder setChildren(java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode> value) {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setChildren(java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> value) {
       validate(fields()[1], value);
       this.children = value;
       fieldSetFlags()[1] = true;
@@ -364,7 +364,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * the child nodes
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder clearChildren() {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearChildren() {
       children = null;
       fieldSetFlags()[1] = false;
       return this;
@@ -387,7 +387,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'tagId'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder setTagId(java.lang.Integer value) {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setTagId(java.lang.Integer value) {
       validate(fields()[2], value);
       this.tagId = value;
       fieldSetFlags()[2] = true;
@@ -411,7 +411,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
          * typically set once when the node is first created, and used in value afterwards
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder clearTagId() {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearTagId() {
       tagId = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -432,7 +432,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'properties'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
       validate(fields()[3], value);
       this.properties = value;
       fieldSetFlags()[3] = true;
@@ -454,7 +454,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       * Arbitrary key, value pairs associated with a tag node
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder clearProperties() {
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearProperties() {
       properties = null;
       fieldSetFlags()[3] = false;
       return this;
@@ -465,7 +465,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
       try {
         ProvenanceTagNode record = new ProvenanceTagNode();
         record.value = fieldSetFlags()[0] ? this.value : (java.lang.Object) defaultValue(fields()[0]);
-        record.children = fieldSetFlags()[1] ? this.children : (java.util.List<com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode>) defaultValue(fields()[1]);
+        record.children = fieldSetFlags()[1] ? this.children : (java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode>) defaultValue(fields()[1]);
         record.tagId = fieldSetFlags()[2] ? this.tagId : (java.lang.Integer) defaultValue(fields()[2]);
         record.properties = fieldSetFlags()[3] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[3]);
         return record;

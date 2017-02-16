@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm13;
+package com.bbn.tc.schema.avro;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -15,19 +15,19 @@ import org.apache.avro.specific.SpecificData;
      * Events are atomic and immutable. */
 @org.apache.avro.specific.AvroGenerated
 public class Event extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -5434099183305210603L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Event\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* Events represent actions executed on behalf of subjects. Events could include system calls,\\n     * function calls, instruction executions, or even more abstract notions representing a blind execution\\n     * such as black boxes that are not instrumented (more shortly). Events are the core entity in the model\\n     * and they are the main abstraction for representing information flow between data objects, and subjects.\\n     * Events are atomic and immutable.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A universally unique identifier for the event\"},{\"name\":\"sequence\",\"type\":\"long\",\"doc\":\"A logical sequence number for ordering events relative to each other within a subject's execution context\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"EventType\",\"doc\":\"* These event types correspond to the common system calls. Note that we added blind, unit, and update events\\n     *   EVENT_ACCEPT accept a connection on an object\\n     *   EVENT_BIND                       bind to a network endpoint object\\n     *   EVENT_CHANGE_PRINCIPAL           change the principal associated with the process\\n     *   EVENT_CHECK_FILE_ATTRIBUTES check the file attributes such as permissions\\n     *   EVENT_CLONE clone a subject\\n     *   EVENT_CLOSE                      close an object\\n *   EVENT_CONNECT                    connect to an object\\n     * *   EVENT_CREATE_OBJECT              create an object\\n     * *   EVENT_CREATE_THREAD              create a thread subject\\n     * *   EVENT_EXECUTE                    execute an object\\n     *   EVENT_FORK *   fork a process subject\\n     *   EVENT_LINK                       link an *   object to a new name\\n     *   EVENT_UNLINK                     unlink a *   name from an object\\n     *   EVENT_MMAP                       memory map an *   object\\n     *   EVENT_MODIFY_FILE_ATTRIBUTES     modify the attributes of a *   file object\\n     *   EVENT_MPROTECT                   change permissions of *   a memory object\\n     *   EVENT_OPEN                       open an object\\n *   *   EVENT_READ                       read from an object (file or socket)\\n *   *   EVENT_RECVFROM                   receive message from a socket\\n     * *   EVENT_RECVMSG                    receive message from a socket\\n     * *   EVENT_RENAME                     rename an object\\n     *   EVENT_WRITE *   write to an object (file or socket)\\n     *   EVENT_SIGNAL *   signal another subject\\n     *   EVENT_TRUNCATE                   truncate *   an object\\n     *   EVENT_WAIT                       wait on another *   subject\\n     *   EVENT_KERNEL_UNKNOWN             some kernel event\\n     * *   EVENT_OS_UNKNOWN                 some OS layer event\\n     * *   EVENT_APP_UNKNOWN                some application layer event\\n     * *   EVENT_UI_UNKNOWN                 some UI layer event\\n     *   EVENT_UNKNOWN *   some event (we don't know what layer)\\n     *   EVENT_BLIND *   blind event for a black boxes that are not instrumented\\n     *   EVENT_UNIT *   create a BEEP unit\\n     *   EVENT_UPDATE                     update an *   object\\n     *   EVENT_SENDTO                     send through socket\\n *   *   EVENT_SENDMSG                    send message through socket\\n     * *   EVENT_SHM                        share memory between processes\\n     * *   EVENT_EXIT                       process exit\",\"symbols\":[\"EVENT_ACCEPT\",\"EVENT_BIND\",\"EVENT_CHANGE_PRINCIPAL\",\"EVENT_CHECK_FILE_ATTRIBUTES\",\"EVENT_CLONE\",\"EVENT_CLOSE\",\"EVENT_CONNECT\",\"EVENT_CREATE_OBJECT\",\"EVENT_CREATE_THREAD\",\"EVENT_EXECUTE\",\"EVENT_FORK\",\"EVENT_LINK\",\"EVENT_UNLINK\",\"EVENT_MMAP\",\"EVENT_MODIFY_FILE_ATTRIBUTES\",\"EVENT_MPROTECT\",\"EVENT_OPEN\",\"EVENT_READ\",\"EVENT_RECVFROM\",\"EVENT_RECVMSG\",\"EVENT_RENAME\",\"EVENT_WRITE\",\"EVENT_SIGNAL\",\"EVENT_TRUNCATE\",\"EVENT_WAIT\",\"EVENT_OS_UNKNOWN\",\"EVENT_KERNEL_UNKNOWN\",\"EVENT_APP_UNKNOWN\",\"EVENT_UI_UNKNOWN\",\"EVENT_UNKNOWN\",\"EVENT_BLIND\",\"EVENT_UNIT\",\"EVENT_UPDATE\",\"EVENT_SENDTO\",\"EVENT_SENDMSG\",\"EVENT_SHM\",\"EVENT_EXIT\"]},\"doc\":\"The type of the event\"},{\"name\":\"threadId\",\"type\":\"int\",\"doc\":\"The thread id to which this event belongs\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"What source system generated this event, see InstrumentationSource\"},{\"name\":\"timestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The time at which the event occurred. Timestamps allow reasoning about order of events\\n         *  on a host when the same clock is used.\\n         * TODO When different clocks are used on a host or across hosts, we need to also define a clock source\\n         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"Event name (Optional)\",\"default\":null},{\"name\":\"parameters\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Value\",\"doc\":\"* Values represent transient data, mainly parameters to events. Values are created and used once within an\\n     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).\\n     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to\\n     * the value's metadata\\n     *\\n     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or\\n     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.\\n * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as\\n     * components.\\n     *\\n     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", * valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for primitives\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]},\"doc\":\"The type of the value whether input or return\"},{\"name\":\"v","alueDataType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"int\"}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:\\n         * {<numElements:int>, <tagId:int>}*\\n         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of\\n * an int[16] value, this would be represented using the following tag array\\n * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2\\n         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer\\n         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)\\n         * before it can be * assigned to a value\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}}],\"doc\":\"Event parameters represented as values, see Value (Optional)\",\"default\":null},{\"name\":\"location\",\"type\":[\"null\",\"long\"],\"doc\":\"Location refers to the location of the data affecting the event\\n         *  (e.g., the read offset in the file for the read system call event (Optional)\",\"default\":null},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"Size refers to the size of the data affecting the event\\n *  (e.g., the number of bytes read from the file for the read system call event *  (Optional)\",\"default\":null},{\"name\":\"programPoint\",\"type\":[\"null\",\"string\"],\"doc\":\"The program point where the event was triggered (e.g., executable and line number), (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = 2564517858370464348L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Event\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Events represent actions executed on behalf of subjects. Events could include system calls,\\n     * function calls, instruction executions, or even more abstract notions representing a blind execution\\n     * such as black boxes that are not instrumented (more shortly). Events are the core entity in the model\\n     * and they are the main abstraction for representing information flow between data objects, and subjects.\\n     * Events are atomic and immutable.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A universally unique identifier for the event\"},{\"name\":\"sequence\",\"type\":\"long\",\"doc\":\"A logical sequence number for ordering events relative to each other within a subject's execution context\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"EventType\",\"doc\":\"* These event types correspond to the common system calls. Note that we added blind, unit, and update events\\n     *   EVENT_ACCEPT accept a connection on an object\\n     *   EVENT_BIND                       bind to a network endpoint object\\n     *   EVENT_CHANGE_PRINCIPAL           change the principal associated with the process\\n     *   EVENT_CHECK_FILE_ATTRIBUTES check the file attributes such as permissions\\n     *   EVENT_CLONE clone a subject\\n     *   EVENT_CLOSE                      close an object\\n *   EVENT_CONNECT                    connect to an object\\n     * *   EVENT_CREATE_OBJECT              create an object\\n     * *   EVENT_CREATE_THREAD              create a thread subject\\n     * *   EVENT_EXECUTE                    execute an object\\n     *   EVENT_FORK *   fork a process subject\\n     *   EVENT_LINK                       link an *   object to a new name\\n     *   EVENT_UNLINK                     unlink a *   name from an object\\n     *   EVENT_MMAP                       memory map an *   object\\n     *   EVENT_MODIFY_FILE_ATTRIBUTES     modify the attributes of a *   file object\\n     *   EVENT_MPROTECT                   change permissions of *   a memory object\\n     *   EVENT_OPEN                       open an object\\n *   *   EVENT_READ                       read from an object (file or socket)\\n *   *   EVENT_RECVFROM                   receive message from a socket\\n     * *   EVENT_RECVMSG                    receive message from a socket\\n     * *   EVENT_RENAME                     rename an object\\n     *   EVENT_WRITE *   write to an object (file or socket)\\n     *   EVENT_SIGNAL *   signal another subject\\n     *   EVENT_TRUNCATE                   truncate *   an object\\n     *   EVENT_WAIT                       wait on another *   subject\\n     *   EVENT_KERNEL_UNKNOWN             some kernel event\\n     * *   EVENT_OS_UNKNOWN                 some OS layer event\\n     * *   EVENT_APP_UNKNOWN                some application layer event\\n     * *   EVENT_UI_UNKNOWN                 some UI layer event\\n     *   EVENT_UNKNOWN *   some event (we don't know what layer)\\n     *   EVENT_BLIND *   blind event for a black boxes that are not instrumented\\n     *   EVENT_UNIT *   create a BEEP unit\\n     *   EVENT_UPDATE                     update an *   object\\n     *   EVENT_SENDTO                     send through socket\\n *   *   EVENT_SENDMSG                    send message through socket\\n     * *   EVENT_SHM                        share memory between processes\\n     * *   EVENT_EXIT                       process exit\",\"symbols\":[\"EVENT_ACCEPT\",\"EVENT_BIND\",\"EVENT_CHANGE_PRINCIPAL\",\"EVENT_CHECK_FILE_ATTRIBUTES\",\"EVENT_CLONE\",\"EVENT_CLOSE\",\"EVENT_CONNECT\",\"EVENT_CREATE_OBJECT\",\"EVENT_CREATE_THREAD\",\"EVENT_EXECUTE\",\"EVENT_FORK\",\"EVENT_LINK\",\"EVENT_UNLINK\",\"EVENT_MMAP\",\"EVENT_MODIFY_FILE_ATTRIBUTES\",\"EVENT_MPROTECT\",\"EVENT_OPEN\",\"EVENT_READ\",\"EVENT_RECVFROM\",\"EVENT_RECVMSG\",\"EVENT_RENAME\",\"EVENT_WRITE\",\"EVENT_SIGNAL\",\"EVENT_TRUNCATE\",\"EVENT_WAIT\",\"EVENT_OS_UNKNOWN\",\"EVENT_KERNEL_UNKNOWN\",\"EVENT_APP_UNKNOWN\",\"EVENT_UI_UNKNOWN\",\"EVENT_UNKNOWN\",\"EVENT_BLIND\",\"EVENT_UNIT\",\"EVENT_UPDATE\",\"EVENT_SENDTO\",\"EVENT_SENDMSG\",\"EVENT_SHM\",\"EVENT_EXIT\"]},\"doc\":\"The type of the event\"},{\"name\":\"threadId\",\"type\":\"int\",\"doc\":\"The thread id to which this event belongs\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"What source system generated this event, see InstrumentationSource\"},{\"name\":\"timestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The time at which the event occurred. Timestamps allow reasoning about order of events\\n         *  on a host when the same clock is used.\\n         * TODO When different clocks are used on a host or across hosts, we need to also define a clock source\\n         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"Event name (Optional)\",\"default\":null},{\"name\":\"parameters\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Value\",\"doc\":\"* Values represent transient data, mainly parameters to events. Values are created and used once within an\\n     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).\\n     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to\\n     * the value's metadata\\n     *\\n     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or\\n     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.\\n * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as\\n     * components.\\n     *\\n     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", * valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for primitives\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]},\"doc\":\"The type of the value whether input or return\"},{\"name\":\"valueDa","taType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"int\"}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:\\n         * {<numElements:int>, <tagId:int>}*\\n         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of\\n * an int[16] value, this would be represented using the following tag array\\n * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2\\n         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer\\n         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)\\n         * before it can be * assigned to a value\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}}],\"doc\":\"Event parameters represented as values, see Value (Optional)\",\"default\":null},{\"name\":\"location\",\"type\":[\"null\",\"long\"],\"doc\":\"Location refers to the location of the data affecting the event\\n         *  (e.g., the read offset in the file for the read system call event (Optional)\",\"default\":null},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"Size refers to the size of the data affecting the event\\n *  (e.g., the number of bytes read from the file for the read system call event *  (Optional)\",\"default\":null},{\"name\":\"programPoint\",\"type\":[\"null\",\"string\"],\"doc\":\"The program point where the event was triggered (e.g., executable and line number), (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** A universally unique identifier for the event */
-  @Deprecated public com.bbn.tc.schema.avro.cdm13.UUID uuid;
+  @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
   /** A logical sequence number for ordering events relative to each other within a subject's execution context */
   @Deprecated public long sequence;
   /** The type of the event */
-  @Deprecated public com.bbn.tc.schema.avro.cdm13.EventType type;
+  @Deprecated public com.bbn.tc.schema.avro.EventType type;
   /** The thread id to which this event belongs */
   @Deprecated public int threadId;
   /** What source system generated this event, see InstrumentationSource */
-  @Deprecated public com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
+  @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
   /** * The time at which the event occurred. Timestamps allow reasoning about order of events
          *  on a host when the same clock is used.
          * TODO When different clocks are used on a host or across hosts, we need to also define a clock source
@@ -36,7 +36,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
   /** Event name (Optional) */
   @Deprecated public java.lang.CharSequence name;
   /** Event parameters represented as values, see Value (Optional) */
-  @Deprecated public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> parameters;
+  @Deprecated public java.util.List<com.bbn.tc.schema.avro.Value> parameters;
   /** Location refers to the location of the data affecting the event
          *  (e.g., the read offset in the file for the read system call event (Optional) */
   @Deprecated public java.lang.Long location;
@@ -75,7 +75,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * @param programPoint The program point where the event was triggered (e.g., executable and line number), (Optional)
    * @param properties Arbitrary key, value pairs describing the entity
    */
-  public Event(com.bbn.tc.schema.avro.cdm13.UUID uuid, java.lang.Long sequence, com.bbn.tc.schema.avro.cdm13.EventType type, java.lang.Integer threadId, com.bbn.tc.schema.avro.cdm13.InstrumentationSource source, java.lang.Long timestampMicros, java.lang.CharSequence name, java.util.List<com.bbn.tc.schema.avro.cdm13.Value> parameters, java.lang.Long location, java.lang.Long size, java.lang.CharSequence programPoint, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public Event(com.bbn.tc.schema.avro.UUID uuid, java.lang.Long sequence, com.bbn.tc.schema.avro.EventType type, java.lang.Integer threadId, com.bbn.tc.schema.avro.InstrumentationSource source, java.lang.Long timestampMicros, java.lang.CharSequence name, java.util.List<com.bbn.tc.schema.avro.Value> parameters, java.lang.Long location, java.lang.Long size, java.lang.CharSequence programPoint, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.uuid = uuid;
     this.sequence = sequence;
     this.type = type;
@@ -114,14 +114,14 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: uuid = (com.bbn.tc.schema.avro.cdm13.UUID)value$; break;
+    case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
     case 1: sequence = (java.lang.Long)value$; break;
-    case 2: type = (com.bbn.tc.schema.avro.cdm13.EventType)value$; break;
+    case 2: type = (com.bbn.tc.schema.avro.EventType)value$; break;
     case 3: threadId = (java.lang.Integer)value$; break;
-    case 4: source = (com.bbn.tc.schema.avro.cdm13.InstrumentationSource)value$; break;
+    case 4: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
     case 5: timestampMicros = (java.lang.Long)value$; break;
     case 6: name = (java.lang.CharSequence)value$; break;
-    case 7: parameters = (java.util.List<com.bbn.tc.schema.avro.cdm13.Value>)value$; break;
+    case 7: parameters = (java.util.List<com.bbn.tc.schema.avro.Value>)value$; break;
     case 8: location = (java.lang.Long)value$; break;
     case 9: size = (java.lang.Long)value$; break;
     case 10: programPoint = (java.lang.CharSequence)value$; break;
@@ -134,7 +134,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'uuid' field.
    * @return A universally unique identifier for the event
    */
-  public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
+  public com.bbn.tc.schema.avro.UUID getUuid() {
     return uuid;
   }
 
@@ -143,7 +143,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * A universally unique identifier for the event
    * @param value the value to set.
    */
-  public void setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
+  public void setUuid(com.bbn.tc.schema.avro.UUID value) {
     this.uuid = value;
   }
 
@@ -168,7 +168,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'type' field.
    * @return The type of the event
    */
-  public com.bbn.tc.schema.avro.cdm13.EventType getType() {
+  public com.bbn.tc.schema.avro.EventType getType() {
     return type;
   }
 
@@ -177,7 +177,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * The type of the event
    * @param value the value to set.
    */
-  public void setType(com.bbn.tc.schema.avro.cdm13.EventType value) {
+  public void setType(com.bbn.tc.schema.avro.EventType value) {
     this.type = value;
   }
 
@@ -202,7 +202,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'source' field.
    * @return What source system generated this event, see InstrumentationSource
    */
-  public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
+  public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
     return source;
   }
 
@@ -211,7 +211,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * What source system generated this event, see InstrumentationSource
    * @param value the value to set.
    */
-  public void setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
+  public void setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
     this.source = value;
   }
 
@@ -259,7 +259,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'parameters' field.
    * @return Event parameters represented as values, see Value (Optional)
    */
-  public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> getParameters() {
+  public java.util.List<com.bbn.tc.schema.avro.Value> getParameters() {
     return parameters;
   }
 
@@ -268,7 +268,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Event parameters represented as values, see Value (Optional)
    * @param value the value to set.
    */
-  public void setParameters(java.util.List<com.bbn.tc.schema.avro.cdm13.Value> value) {
+  public void setParameters(java.util.List<com.bbn.tc.schema.avro.Value> value) {
     this.parameters = value;
   }
 
@@ -348,8 +348,8 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * Creates a new Event RecordBuilder.
    * @return A new Event RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.Event.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.cdm13.Event.Builder();
+  public static com.bbn.tc.schema.avro.Event.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.Event.Builder();
   }
 
   /**
@@ -357,8 +357,8 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * @param other The existing builder to copy.
    * @return A new Event RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.Event.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Event.Builder other) {
-    return new com.bbn.tc.schema.avro.cdm13.Event.Builder(other);
+  public static com.bbn.tc.schema.avro.Event.Builder newBuilder(com.bbn.tc.schema.avro.Event.Builder other) {
+    return new com.bbn.tc.schema.avro.Event.Builder(other);
   }
 
   /**
@@ -366,8 +366,8 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
    * @param other The existing instance to copy.
    * @return A new Event RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.cdm13.Event.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Event other) {
-    return new com.bbn.tc.schema.avro.cdm13.Event.Builder(other);
+  public static com.bbn.tc.schema.avro.Event.Builder newBuilder(com.bbn.tc.schema.avro.Event other) {
+    return new com.bbn.tc.schema.avro.Event.Builder(other);
   }
 
   /**
@@ -377,15 +377,15 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
     implements org.apache.avro.data.RecordBuilder<Event> {
 
     /** A universally unique identifier for the event */
-    private com.bbn.tc.schema.avro.cdm13.UUID uuid;
+    private com.bbn.tc.schema.avro.UUID uuid;
     /** A logical sequence number for ordering events relative to each other within a subject's execution context */
     private long sequence;
     /** The type of the event */
-    private com.bbn.tc.schema.avro.cdm13.EventType type;
+    private com.bbn.tc.schema.avro.EventType type;
     /** The thread id to which this event belongs */
     private int threadId;
     /** What source system generated this event, see InstrumentationSource */
-    private com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
+    private com.bbn.tc.schema.avro.InstrumentationSource source;
     /** * The time at which the event occurred. Timestamps allow reasoning about order of events
          *  on a host when the same clock is used.
          * TODO When different clocks are used on a host or across hosts, we need to also define a clock source
@@ -394,7 +394,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
     /** Event name (Optional) */
     private java.lang.CharSequence name;
     /** Event parameters represented as values, see Value (Optional) */
-    private java.util.List<com.bbn.tc.schema.avro.cdm13.Value> parameters;
+    private java.util.List<com.bbn.tc.schema.avro.Value> parameters;
     /** Location refers to the location of the data affecting the event
          *  (e.g., the read offset in the file for the read system call event (Optional) */
     private java.lang.Long location;
@@ -415,7 +415,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.Event.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.Event.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -471,7 +471,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
      * Creates a Builder by copying an existing Event instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.cdm13.Event other) {
+    private Builder(com.bbn.tc.schema.avro.Event other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -528,7 +528,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * A universally unique identifier for the event
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
+    public com.bbn.tc.schema.avro.UUID getUuid() {
       return uuid;
     }
 
@@ -538,7 +538,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'uuid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
+    public com.bbn.tc.schema.avro.Event.Builder setUuid(com.bbn.tc.schema.avro.UUID value) {
       validate(fields()[0], value);
       this.uuid = value;
       fieldSetFlags()[0] = true;
@@ -560,7 +560,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * A universally unique identifier for the event
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearUuid() {
+    public com.bbn.tc.schema.avro.Event.Builder clearUuid() {
       uuid = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -581,7 +581,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'sequence'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setSequence(long value) {
+    public com.bbn.tc.schema.avro.Event.Builder setSequence(long value) {
       validate(fields()[1], value);
       this.sequence = value;
       fieldSetFlags()[1] = true;
@@ -603,7 +603,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * A logical sequence number for ordering events relative to each other within a subject's execution context
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearSequence() {
+    public com.bbn.tc.schema.avro.Event.Builder clearSequence() {
       fieldSetFlags()[1] = false;
       return this;
     }
@@ -613,7 +613,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * The type of the event
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.cdm13.EventType getType() {
+    public com.bbn.tc.schema.avro.EventType getType() {
       return type;
     }
 
@@ -623,7 +623,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'type'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setType(com.bbn.tc.schema.avro.cdm13.EventType value) {
+    public com.bbn.tc.schema.avro.Event.Builder setType(com.bbn.tc.schema.avro.EventType value) {
       validate(fields()[2], value);
       this.type = value;
       fieldSetFlags()[2] = true;
@@ -645,7 +645,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * The type of the event
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearType() {
+    public com.bbn.tc.schema.avro.Event.Builder clearType() {
       type = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -666,7 +666,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'threadId'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setThreadId(int value) {
+    public com.bbn.tc.schema.avro.Event.Builder setThreadId(int value) {
       validate(fields()[3], value);
       this.threadId = value;
       fieldSetFlags()[3] = true;
@@ -688,7 +688,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * The thread id to which this event belongs
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearThreadId() {
+    public com.bbn.tc.schema.avro.Event.Builder clearThreadId() {
       fieldSetFlags()[3] = false;
       return this;
     }
@@ -698,7 +698,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * What source system generated this event, see InstrumentationSource
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
+    public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
       return source;
     }
 
@@ -708,7 +708,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'source'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
+    public com.bbn.tc.schema.avro.Event.Builder setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
       validate(fields()[4], value);
       this.source = value;
       fieldSetFlags()[4] = true;
@@ -730,7 +730,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * What source system generated this event, see InstrumentationSource
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearSource() {
+    public com.bbn.tc.schema.avro.Event.Builder clearSource() {
       source = null;
       fieldSetFlags()[4] = false;
       return this;
@@ -757,7 +757,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'timestampMicros'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.Event.Builder setTimestampMicros(java.lang.Long value) {
       validate(fields()[5], value);
       this.timestampMicros = value;
       fieldSetFlags()[5] = true;
@@ -785,7 +785,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
          * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearTimestampMicros() {
+    public com.bbn.tc.schema.avro.Event.Builder clearTimestampMicros() {
       timestampMicros = null;
       fieldSetFlags()[5] = false;
       return this;
@@ -806,7 +806,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'name'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setName(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.Event.Builder setName(java.lang.CharSequence value) {
       validate(fields()[6], value);
       this.name = value;
       fieldSetFlags()[6] = true;
@@ -828,7 +828,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * Event name (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearName() {
+    public com.bbn.tc.schema.avro.Event.Builder clearName() {
       name = null;
       fieldSetFlags()[6] = false;
       return this;
@@ -839,7 +839,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * Event parameters represented as values, see Value (Optional)
       * @return The value.
       */
-    public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> getParameters() {
+    public java.util.List<com.bbn.tc.schema.avro.Value> getParameters() {
       return parameters;
     }
 
@@ -849,7 +849,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'parameters'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setParameters(java.util.List<com.bbn.tc.schema.avro.cdm13.Value> value) {
+    public com.bbn.tc.schema.avro.Event.Builder setParameters(java.util.List<com.bbn.tc.schema.avro.Value> value) {
       validate(fields()[7], value);
       this.parameters = value;
       fieldSetFlags()[7] = true;
@@ -871,7 +871,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * Event parameters represented as values, see Value (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearParameters() {
+    public com.bbn.tc.schema.avro.Event.Builder clearParameters() {
       parameters = null;
       fieldSetFlags()[7] = false;
       return this;
@@ -894,7 +894,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'location'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setLocation(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.Event.Builder setLocation(java.lang.Long value) {
       validate(fields()[8], value);
       this.location = value;
       fieldSetFlags()[8] = true;
@@ -918,7 +918,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
          *  (e.g., the read offset in the file for the read system call event (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearLocation() {
+    public com.bbn.tc.schema.avro.Event.Builder clearLocation() {
       location = null;
       fieldSetFlags()[8] = false;
       return this;
@@ -941,7 +941,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'size'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setSize(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.Event.Builder setSize(java.lang.Long value) {
       validate(fields()[9], value);
       this.size = value;
       fieldSetFlags()[9] = true;
@@ -965,7 +965,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
  *  (e.g., the number of bytes read from the file for the read system call event *  (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearSize() {
+    public com.bbn.tc.schema.avro.Event.Builder clearSize() {
       size = null;
       fieldSetFlags()[9] = false;
       return this;
@@ -986,7 +986,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'programPoint'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setProgramPoint(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.Event.Builder setProgramPoint(java.lang.CharSequence value) {
       validate(fields()[10], value);
       this.programPoint = value;
       fieldSetFlags()[10] = true;
@@ -1008,7 +1008,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * The program point where the event was triggered (e.g., executable and line number), (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearProgramPoint() {
+    public com.bbn.tc.schema.avro.Event.Builder clearProgramPoint() {
       programPoint = null;
       fieldSetFlags()[10] = false;
       return this;
@@ -1029,7 +1029,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'properties'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.Event.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
       validate(fields()[11], value);
       this.properties = value;
       fieldSetFlags()[11] = true;
@@ -1051,7 +1051,7 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
       * Arbitrary key, value pairs describing the entity
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.cdm13.Event.Builder clearProperties() {
+    public com.bbn.tc.schema.avro.Event.Builder clearProperties() {
       properties = null;
       fieldSetFlags()[11] = false;
       return this;
@@ -1061,14 +1061,14 @@ public class Event extends org.apache.avro.specific.SpecificRecordBase implement
     public Event build() {
       try {
         Event record = new Event();
-        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.cdm13.UUID) defaultValue(fields()[0]);
+        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
         record.sequence = fieldSetFlags()[1] ? this.sequence : (java.lang.Long) defaultValue(fields()[1]);
-        record.type = fieldSetFlags()[2] ? this.type : (com.bbn.tc.schema.avro.cdm13.EventType) defaultValue(fields()[2]);
+        record.type = fieldSetFlags()[2] ? this.type : (com.bbn.tc.schema.avro.EventType) defaultValue(fields()[2]);
         record.threadId = fieldSetFlags()[3] ? this.threadId : (java.lang.Integer) defaultValue(fields()[3]);
-        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.cdm13.InstrumentationSource) defaultValue(fields()[4]);
+        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[4]);
         record.timestampMicros = fieldSetFlags()[5] ? this.timestampMicros : (java.lang.Long) defaultValue(fields()[5]);
         record.name = fieldSetFlags()[6] ? this.name : (java.lang.CharSequence) defaultValue(fields()[6]);
-        record.parameters = fieldSetFlags()[7] ? this.parameters : (java.util.List<com.bbn.tc.schema.avro.cdm13.Value>) defaultValue(fields()[7]);
+        record.parameters = fieldSetFlags()[7] ? this.parameters : (java.util.List<com.bbn.tc.schema.avro.Value>) defaultValue(fields()[7]);
         record.location = fieldSetFlags()[8] ? this.location : (java.lang.Long) defaultValue(fields()[8]);
         record.size = fieldSetFlags()[9] ? this.size : (java.lang.Long) defaultValue(fields()[9]);
         record.programPoint = fieldSetFlags()[10] ? this.programPoint : (java.lang.CharSequence) defaultValue(fields()[10]);

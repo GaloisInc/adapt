@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm14.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, Subject}
+import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, Subject}
 import com.galois.adapt.scepter.HowMany
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
@@ -66,10 +66,10 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]
       val subjectNode = graph.addVertex(l:_*)
       nodeIds += (s.uuid -> subjectNode)
+      val parentVertexOpt = graph.traversal().V().has("pid", s.ppid).toList.asScala.headOption
 
       // TODO: do this with internal edges:
-      // TODO Update this
-      /*subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
+       subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
         val newUuid = UUID.randomUUID()
         val v = graph.addVertex(
           label, "Subject",
@@ -79,14 +79,13 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
         )
         nodeIds += (newUuid -> v)
         v
-      })*/
+      })
 
 //      updateIncompleteEdges(s.uuid, subjectNode)
 
     case EpochMarker =>
       println(s"EPOCH BOUNDARY!")
-      // TODO
-      /*println(s"FROM nodes missed during epoch: ${missingFromUuid.size}")
+      println(s"FROM nodes missed during epoch: ${missingFromUuid.size}")
       println(s"TO nodes missed during epoch: ${missingToUuid.size}")
       println("Creating all missing nodes...")
       var nodeCreatedCounter = 0
@@ -123,11 +122,11 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       missingToUuid = collection.mutable.Map.empty
       println(s"Nodes created at epoch close: $nodeCreatedCounter")
       println(s"Edges created at epoch close: $edgeCreatedCounter")
-      println("Done creating all missing nodes.")*/
+      println("Done creating all missing nodes.")
 
-    case cdm14: DBWritable =>
-      val l: List[Object] = cdm14.asDBKeyValues.asInstanceOf[List[Object]]
-      if (l.length % 2 == 1) println(s"OFFENDING: $cdm14\n$l")
+    case cdm13: DBWritable =>
+      val l: List[Object] = cdm13.asDBKeyValues.asInstanceOf[List[Object]]
+      if (l.length % 2 == 1) println(s"OFFENDING: $cdm13\n$l")
       val newVertex = graph.addVertex(l:_*)
 
       // TODO: so gross!
@@ -190,7 +189,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
     case Shutdown =>
 //      println(s"Incomplete Edge count: ${missingFromUuid.size + missingToUuid.size}")
       localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
-      // TODO sender() ! (missingFromUuid.size + missingToUuid.size)
+      sender() ! (missingFromUuid.size + missingToUuid.size)
   }
 }
 

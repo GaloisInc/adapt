@@ -3,13 +3,13 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm13;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 @org.apache.avro.specific.FixedSize(16)
 @org.apache.avro.specific.AvroGenerated
 public class UUID extends org.apache.avro.specific.SpecificFixed {
-  private static final long serialVersionUID = 491161792640267468L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"fixed\",\"name\":\"UUID\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"size\":16}");
+  private static final long serialVersionUID = 638576680176936131L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"fixed\",\"name\":\"UUID\",\"namespace\":\"com.bbn.tc.schema.avro\",\"size\":16}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   public org.apache.avro.Schema getSchema() { return SCHEMA$; }
 

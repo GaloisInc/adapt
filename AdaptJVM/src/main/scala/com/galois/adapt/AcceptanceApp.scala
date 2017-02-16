@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.pattern.ask
 import akka.util.Timeout
-import com.galois.adapt.cdm14._
+import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter._
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -60,9 +60,9 @@ object AcceptanceApp {
 
     // Sequence all of the data ahead of time - basically validate that all files are valid Avro,
     // and put them into one big iterator
-    val data: Try[Iterator[Try[CDM14]]] = Try {
-      filePaths.map { file => println(s"Discovered $file."); CDM14.readData(file, count).get }
-               .foldLeft { Iterator[Try[CDM14]]() } { _ ++ _ }
+    val data: Try[Iterator[Try[CDM13]]] = Try {
+      filePaths.map { file => println(s"Discovered $file."); CDM13.readData(file, count).get }
+               .foldLeft { Iterator[Try[CDM13]]() } { _ ++ _ }
     }
 
     data match {
@@ -123,7 +123,7 @@ object AcceptanceApp {
   }
 
   // Identifies all the actors who are interested in a given CDM statement
-  def distributionSpec(t: CDM14): Seq[ActorRef] = t match {
+  def distributionSpec(t: CDM13): Seq[ActorRef] = t match {
     case f: FileObject =>
       if (ta1Source.isEmpty) {
         println(s"Source data from: ${f.baseObject.source}")
@@ -136,5 +136,5 @@ object AcceptanceApp {
   }
 
   // Sends a given CDM statement to all interested actors
-  def distribute(cdm: CDM14): Unit = distributionSpec(cdm).foreach(receiver => receiver ! cdm)
+  def distribute(cdm: CDM13): Unit = distributionSpec(cdm).foreach(receiver => receiver ! cdm)
 }
