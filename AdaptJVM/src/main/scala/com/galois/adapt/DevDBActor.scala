@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, Subject}
+import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
 import com.galois.adapt.scepter.HowMany
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
@@ -38,6 +38,34 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
 
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
 
+  var missingFromUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
+  var missingToUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
+
+  def updateIncompleteEdges(uuid: UUID, node: Vertex) = {
+    if (missingFromUuid contains uuid) {
+      val edge = missingFromUuid(uuid)
+      missingFromUuid -= uuid
+      findNode("uuid", edge.toUuid).fold[Unit] {
+        missingToUuid += (edge.toUuid -> edge)
+      }{ toNode =>
+        node.addEdge(edge.edgeType.toString, toNode)
+      }
+    } else {
+      if (missingToUuid contains uuid) {
+        val edge = missingToUuid(uuid)
+        missingToUuid -= uuid
+        findNode("uuid", edge.fromUuid).fold[Unit] {
+          missingFromUuid += (edge.fromUuid -> edge)
+        } { fromNode =>
+          fromNode.addEdge(edge.edgeType.toString, node)
+        }
+      } else {
+        // Do nothing.
+      }
+    }
+  }
+
+
   // TODO: TinkerGraph doesn't update the starting IDs when reading data in from a file.
   // Will result in: IllegalArgumentException: Vertex with id already exists: 0
   //  ... on the THIRD run. (after it _writes_ a file containing two of the same index ids)
@@ -66,10 +94,10 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]
       val subjectNode = graph.addVertex(l:_*)
       nodeIds += (s.uuid -> subjectNode)
-      val parentVertexOpt = graph.traversal().V().has("pid", s.ppid).toList.asScala.headOption
+      val parentVertexOpt = graph.traversal().V().has("pid",s.ppid).toList.asScala.headOption
 
       // TODO: do this with internal edges:
-       subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
+      subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
         val newUuid = UUID.randomUUID()
         val v = graph.addVertex(
           label, "Subject",
@@ -82,6 +110,19 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
       })
 
 //      updateIncompleteEdges(s.uuid, subjectNode)
+
+    case e: SimpleEdge =>
+      val fromOpt = findNode("uuid", e.fromUuid)
+      fromOpt.fold[Unit] {
+        missingFromUuid += (e.fromUuid -> e)
+      } { from =>
+        val toOpt = findNode("uuid", e.toUuid)
+        toOpt.fold[Unit] {
+          missingToUuid += (e.toUuid -> e)
+        } { to =>
+          from.addEdge(e.edgeType.toString, to)
+        }
+      }
 
     case EpochMarker =>
       println(s"EPOCH BOUNDARY!")
