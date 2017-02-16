@@ -2,6 +2,7 @@ package com.galois.adapt.cdm14
 
 import java.util.UUID
 
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -47,7 +48,7 @@ case class Subject(
 
 
 case object Subject extends CDM14Constructor[Subject] {
-  type RawCDMType = com.bbn.tc.schema.avro.Subject
+  type RawCDMType = cdm14.Subject
 
   def from(cdm: RawCDM14Type): Try[Subject] = Try {
     Subject(

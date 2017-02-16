@@ -98,7 +98,7 @@
  *     so here we are using longs for timestamps
  */
 
-@namespace("com.bbn.tc.schema.avro")
+@namespace("com.bbn.tc.schema.avro.cdm14")
 protocol TCCDMDataProtocol { // protocol here means a wrapper
 
     // ======================================

@@ -3,10 +3,12 @@ package com.galois.adapt
 import scala.language.implicitConversions
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.TCCDMDatum
+import com.bbn.tc.schema.avro.cdm14.{SHORT, TCCDMDatum}
+import com.bbn.tc.schema.avro.{TCCDMDatum, cdm14}
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.avro.util.Utf8
+
 import scala.util.Try
 import scala.collection.JavaConverters._
 
@@ -37,7 +39,6 @@ package object cdm14 {
       Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM14Type(cdm.getDatum))
     }
 
-  //TODO make these classes
     def parse(cdm: RawCDM14Type) = cdm.o match {
       case _: Principal.RawCDMType => Principal.from(cdm)
       case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
@@ -82,44 +83,45 @@ package object cdm14 {
     def int(x: => java.lang.Integer): Option[Int] = Try(Integer2int(x)).toOption
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
-    def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
-    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
-    def integrityTag(x: => com.bbn.tc.schema.avro.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
-    def confidentialityTag(x: => com.bbn.tc.schema.avro.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
-    def value(x: => com.bbn.tc.schema.avro.Value): Option[Value] = Value.from(new RawCDM14Type(x)).toOption
-    def privilegeLevel(x: => com.bbn.tc.schema.avro.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
-    // TODO def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
+    def uuid(x: => cdm14.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
+    def tagOpCode(x: => cdm14.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
+    def integrityTag(x: => cdm14.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
+    def confidentialityTag(x: => cdm14.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
+    def value(x: => cdm14.Value): Option[Value] = Value.from(new RawCDM14Type(x)).toOption
+    def privilegeLevel(x: => cdm14.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
+    def fixedShort(x: => SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
-    def listValue(x: java.util.List[com.bbn.tc.schema.avro.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
+    def listValue(x: java.util.List[cdm14.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => Value.from(new RawCDM14Type(x)).get))
-    def listProvTagNode(x: java.util.List[com.bbn.tc.schema.avro.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
+    def listProvTagNode(x: java.util.List[cdm14.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM14Type(x)).get))
-    def listCryptographicHash(x: java.util.List[com.bbn.tc.schema.avro.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
+    def listCryptographicHash(x: java.util.List[cdm14.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => CryptographicHash.from(new RawCDM14Type(x)).get))
-    def listUuid(x: java.util.List[com.bbn.tc.schema.avro.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
+    def listUuid(x: java.util.List[cdm14.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x.bytes)))
-    def listTagRunLengthTuple(x: java.util.List[com.bbn.tc.schema.avro.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x)))
+    def listTagRunLengthTuple(x: java.util.List[cdm14.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
+      _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM14Type(x)).get))
   }
 
-  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
-  implicit def makePrivilegeLevel(s: com.bbn.tc.schema.avro.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).get
-  implicit def makeSrcSinkType(s: com.bbn.tc.schema.avro.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
-  implicit def makeSource(s: com.bbn.tc.schema.avro.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
-  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
-  implicit def makeEventType(e: com.bbn.tc.schema.avro.EventType): EventType = EventType.from(e.toString).get
-  implicit def makeFileObjectTime(s: com.bbn.tc.schema.avro.FileObjectType): FileObjectType = FileObjectType.from(s.toString).get
-  implicit def makeValueType(v: com.bbn.tc.schema.avro.ValueType): ValueType = ValueType.from(v.toString).get
-  implicit def makeValDataType(d: com.bbn.tc.schema.avro.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
-  implicit def makeTagOpCode(t: com.bbn.tc.schema.avro.TagOpCode): TagOpCode = TagOpCode.from(t.toString).get
-  implicit def makeIntegrityTag(i: com.bbn.tc.schema.avro.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
-  implicit def makeConfidentialityTag(c: com.bbn.tc.schema.avro.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
-  implicit def makeCryptoHashType(c: com.bbn.tc.schema.avro.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
-  implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
+  implicit def makeSubjectType(s: cdm14.SubjectType): SubjectType = SubjectType.from(s.toString).get
+  implicit def makePrivilegeLevel(s: cdm14.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).get
+  implicit def makeSrcSinkType(s: cdm14.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
+  implicit def makeSource(s: cdm14.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
+  implicit def makePrincipalType(t: cdm14.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
+  implicit def makeEventType(e: cdm14.EventType): EventType = EventType.from(e.toString).get
+  implicit def makeFileObjectTime(s: cdm14.FileObjectType): FileObjectType = FileObjectType.from(s.toString).get
+  implicit def makeValueType(v: cdm14.ValueType): ValueType = ValueType.from(v.toString).get
+  implicit def makeValDataType(d: cdm14.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
+  implicit def makeTagOpCode(t: cdm14.TagOpCode): TagOpCode = TagOpCode.from(t.toString).get
+  implicit def makeIntegrityTag(i: cdm14.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
+  implicit def makeConfidentialityTag(c: cdm14.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
+  implicit def makeCryptoHashType(c: cdm14.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
+  implicit def makeJavaUUID(u: cdm14.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
-  //TODO implicit def makeShort(s: com.bbn.tc.schema.avro.SHORT): FixedShort = new FixedShort(s.bytes)
-  implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM14Type(o)).get
+  implicit def makeShort(s: SHORT): FixedShort = new FixedShort(s.bytes)
+  implicit def makeAbstractObject(o: cdm14.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM14Type(o)).get
+  implicit def makeTagRunLength(x: cdm14.TagRunLengthTuple): TagRunLengthTuple = TagRunLengthTuple.from(new RawCDM14Type(x)).get
 
   object DBOpt {
     // Flattens out nested "properties":

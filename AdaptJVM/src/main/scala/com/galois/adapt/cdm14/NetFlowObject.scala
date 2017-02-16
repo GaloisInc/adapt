@@ -2,6 +2,7 @@ package com.galois.adapt.cdm14
 
 import java.util.UUID
 
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -30,7 +31,7 @@ case class NetFlowObject(
 }
 
 case object NetFlowObject extends CDM14Constructor[NetFlowObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.NetFlowObject
+  type RawCDMType = cdm14.NetFlowObject
 
   def from(cdm: RawCDM14Type): Try[NetFlowObject] = Try(
     NetFlowObject(

@@ -2,6 +2,7 @@ package com.galois.adapt.cdm14
 
 import java.util.UUID
 
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -27,7 +28,7 @@ case class UnnamedPipeObject(
 
 
 case object UnnamedPipeObject extends CDM14Constructor[UnnamedPipeObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.UnnamedPipeObject
+  type RawCDMType = cdm14.UnnamedPipeObject
 
   def from(cdm: RawCDM14Type): Try[UnnamedPipeObject] = Try {
     UnnamedPipeObject(

@@ -1,6 +1,8 @@
 package com.galois.adapt.cdm14
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
+
 import scala.util.Try
 import scala.collection.JavaConverters._
 
@@ -17,7 +19,7 @@ case class CryptographicHash(
 }
 
 case object CryptographicHash extends CDM14Constructor[CryptographicHash] {
-  type RawCDMType = com.bbn.tc.schema.avro.CryptographicHash
+  type RawCDMType = cdm14.CryptographicHash
 
   def from(cdm: RawCDM14Type): Try[CryptographicHash] = Try {
     CryptographicHash(

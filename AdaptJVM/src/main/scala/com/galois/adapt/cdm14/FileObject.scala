@@ -2,6 +2,7 @@ package com.galois.adapt.cdm14
 
 import java.util.UUID
 
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -31,7 +32,7 @@ case class FileObject(
 
 
 case object FileObject extends CDM14Constructor[FileObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.FileObject
+  type RawCDMType = cdm14.FileObject
 
   def from(cdm: RawCDM14Type): Try[FileObject] = Try(
     FileObject(

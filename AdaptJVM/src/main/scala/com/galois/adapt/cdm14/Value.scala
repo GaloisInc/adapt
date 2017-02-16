@@ -1,5 +1,6 @@
 package com.galois.adapt.cdm14
 
+import com.bbn.tc.schema.avro.cdm14
 import com.galois.adapt.DBWritable
 import com.galois.adapt.cdm14.ValueDataType
 import org.apache.tinkerpop.gremlin.structure.T.label
@@ -33,7 +34,7 @@ case class Value(
 }
 
 case object Value extends CDM14Constructor[Value] {
-  type RawCDMType = com.bbn.tc.schema.avro.Value
+  type RawCDMType = cdm14.Value
 
   def from(cdm: RawCDM14Type): Try[Value] = Try(
     Value(
@@ -45,7 +46,7 @@ case object Value extends CDM14Constructor[Value] {
       AvroOpt.str(cdm.getRuntimeDataType),
       AvroOpt.byteArr(cdm.getValueBytes),
       AvroOpt.listTagRunLengthTuple(cdm.getTag),
-      None//AvroOpt.listValue(cdm.getComponents)
+      AvroOpt.listValue(cdm.getComponents)
     )
   )
 }

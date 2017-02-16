@@ -2,8 +2,12 @@ package com.galois.adapt.cdm14
 
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
+
 import scala.util.Try
 import java.util.UUID
+
+import com.bbn.tc.schema.avro.cdm14
+
 import scala.collection.JavaConverters._
 
 
@@ -46,7 +50,7 @@ case class Event(
 }
 
 case object Event extends CDM14Constructor[Event] {
-  type RawCDMType = com.bbn.tc.schema.avro.Event
+  type RawCDMType = cdm14.Event
 
   def from(cdm: RawCDM14Type): Try[Event] = Try(
     Event(
