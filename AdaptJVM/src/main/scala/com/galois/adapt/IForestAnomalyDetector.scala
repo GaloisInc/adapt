@@ -5,7 +5,7 @@ import com.galois.adapt.cdm13._
 
 import java.io.{File, FileWriter, FileReader, BufferedReader, IOException}
 
-import scala.collection._
+import scala.collection.mutable.{Set => MutableSet, Map => MutableMap, ListBuffer}
 import scala.sys.process._
 import scala.concurrent.Future
 
@@ -21,7 +21,7 @@ import akka.util.Timeout
  * the external IForest algorithm, then unpacks the resulting matrix back into a Map (keyed
  * appropriately).
  */
-class IForestAnomalyDetector(override val subscriptions: immutable.Set[Subscription[Map[_,Seq[Double]]]])
+class IForestAnomalyDetector(override val subscriptions: Set[Subscription[Map[_,Seq[Double]]]])
   extends SubscriptionActor[Map[_,Seq[Double]],Map[_,Double]] {
   
   initialize()
@@ -56,7 +56,7 @@ class IForestAnomalyDetector(override val subscriptions: immutable.Set[Subscript
 
       // Read out data
       val outputScores: List[Double] = {
-        val buffer = mutable.ListBuffer.empty[Double]
+        val buffer = ListBuffer.empty[Double]
         if (suceeded) {
           val reader: BufferedReader = new BufferedReader(new FileReader(outputFile))
           var line: String = null
@@ -79,5 +79,5 @@ class IForestAnomalyDetector(override val subscriptions: immutable.Set[Subscript
 }
 
 object IForestAnomalyDetector {
-  def props(inputs: immutable.Set[Subscription[Map[_, Seq[Double]]]]): Props = Props(new IForestAnomalyDetector(inputs))
+  def props(inputs: Set[Subscription[Map[_, Seq[Double]]]]): Props = Props(new IForestAnomalyDetector(inputs))
 }

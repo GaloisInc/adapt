@@ -5,7 +5,7 @@ import com.galois.adapt.cdm13._
 
 import java.util.UUID
 
-import scala.collection._
+import scala.collection.mutable.{Set => MutableSet, Map => MutableMap, ListBuffer}
 
 import akka.actor._
 
@@ -17,7 +17,7 @@ import akka.actor._
  */
 class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
   
-  val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
+  val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
     target = root,
     pack = {
       case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
@@ -32,11 +32,11 @@ class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Sub
 
   initialize()
 
-  private val opens = mutable.Set.empty[UUID]                // UUIDs of OPEN Events
-  private val writes = mutable.Set.empty[UUID]               // UUIDs of WRITE Events
-  private val checks = mutable.Set.empty[UUID]               // UUIDs of CHECK_FILE_ATTRIBUTES Events
-  private val links = mutable.ListBuffer.empty[(UUID, UUID)] // Subject UUID -> Event UUID
-  private val processes = mutable.Map.empty[UUID, Subject]   // Subject UUID -> Subject
+  private val opens = MutableSet.empty[UUID]               // UUIDs of OPEN Events
+  private val writes = MutableSet.empty[UUID]              // UUIDs of WRITE Events
+  private val checks = MutableSet.empty[UUID]              // UUIDs of CHECK_FILE_ATTRIBUTES Events
+  private val links = ListBuffer.empty[(UUID, UUID)]       // Subject UUID -> Event UUID
+  private val processes = MutableMap.empty[UUID, Subject]  // Subject UUID -> Subject
 
   override def process(c: CDM13) = c match {
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (s.uuid -> s)
@@ -46,7 +46,7 @@ class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Sub
     case s @ SimpleEdge(f, t, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => links += (t -> f)
     case EpochMarker =>
       
-      val counts = mutable.Map.empty[Subject, (Int, Int, Int)]
+      val counts = MutableMap.empty[Subject, (Int, Int, Int)]
 
       // Tally up the counts of opens and checks per Subject
       for ((subj,event) <- links if processes isDefinedAt subj) {

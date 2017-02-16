@@ -5,7 +5,7 @@ import com.galois.adapt.cdm13._
 
 import java.util.UUID
 
-import scala.collection._
+import scala.collection.mutable.{Set => MutableSet, Map => MutableMap}
 
 import akka.actor._
 
@@ -21,7 +21,7 @@ import akka.actor._
  * Thus, every subject has  4 * (# of unique IP addresses in the trace)  features
  */
 class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject,Seq[Double]]] {
-  val subscriptions: immutable.Set[Subscription[CDM13]] = immutable.Set(Subscription(
+  val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
     target = root,
     pack = {
       case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
@@ -41,20 +41,20 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
 
   initialize()
 
-  private val netflows = mutable.Map.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP
+  private val netflows = MutableMap.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP
   
-  private val sendto = mutable.Map.empty[UUID,Option[Long]]        // Event UUID -> size
-  private val sendmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID -> size
-  private val write = mutable.Map.empty[UUID,Option[Long]]         // Event UUID -> size
+  private val sendto = MutableMap.empty[UUID,Option[Long]]        // Event UUID -> size
+  private val sendmsg = MutableMap.empty[UUID,Option[Long]]       // Event UUID -> size
+  private val write = MutableMap.empty[UUID,Option[Long]]         // Event UUID -> size
   
-  private val reads = mutable.Map.empty[UUID,Option[Long]]         // Event UUID -> size
-  private val readmsg = mutable.Map.empty[UUID,Option[Long]]       // Event UUID -> size
-  private val recv = mutable.Map.empty[UUID,Option[Long]]          // Event UUID -> size
+  private val reads = MutableMap.empty[UUID,Option[Long]]         // Event UUID -> size
+  private val readmsg = MutableMap.empty[UUID,Option[Long]]       // Event UUID -> size
+  private val recv = MutableMap.empty[UUID,Option[Long]]          // Event UUID -> size
 
-  private val processes = mutable.Map.empty[UUID, Subject]         // Subject UUID -> Subject
+  private val processes = MutableMap.empty[UUID, Subject]         // Subject UUID -> Subject
   
-  private val event2process = mutable.Map.empty[UUID,UUID]         // Relevant edges
-  private val event2netflow = mutable.Map.empty[UUID,UUID]         // Relevant edges
+  private val event2process = MutableMap.empty[UUID,UUID]         // Relevant edges
+  private val event2netflow = MutableMap.empty[UUID,UUID]         // Relevant edges
 
   override def process(c: CDM13) = c match {
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (u -> s)
@@ -77,7 +77,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
        *   #reads/readmsg/recv with a size,
        *   sum of sizes of #reads/readmsg/recv with a size
        */
-      val counts = mutable.Map.empty[(Subject,String),(Int,Int,Long,Int,Int,Long)]
+      val counts = MutableMap.empty[(Subject,String),(Int,Int,Long,Int,Int,Long)]
 
       // Tally up the counts of different types of network activity per Subject
       for ((event,subj) <- event2process
@@ -113,7 +113,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
       }
 
       // Broadcast the subjects, after calculating the average message size
-      val countsImmutable: immutable.Map[(Subject,String),(Int,Int,Long,Int,Int,Long)] = counts.toMap
+      val countsImmutable: Map[(Subject,String),(Int,Int,Long,Int,Int,Long)] = counts.toMap
       val keySet = countsImmutable.keys
       val subjects: List[Subject] = keySet.map(_._1).toList
       val ips: List[String] = keySet.map(_._2).toList
