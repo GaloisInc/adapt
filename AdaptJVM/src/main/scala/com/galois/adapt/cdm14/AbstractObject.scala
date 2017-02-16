@@ -8,7 +8,7 @@ import scala.collection.JavaConverters._
 case class AbstractObject(
                            source: InstrumentationSource,
                            // TODO permission: Option[FixedShort] = None,  // fixed size = 2
-                           epoch: Option[Long] = None,
+                           epoch: Option[Int] = None,
                            properties: Option[Map[String,String]] = None
                          ) extends CDM14 with DBWritable {
   def asDBKeyValues = List(
