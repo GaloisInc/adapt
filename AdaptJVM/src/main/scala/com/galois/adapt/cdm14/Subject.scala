@@ -57,7 +57,7 @@ case object Subject extends CDM14Constructor[Subject] {
       cdm.getParentSubject,
       cdm.getLocalPrincipal,
       cdm.getSource,
-      cdm.getTimestampNanos,
+      cdm.getStartTimestampNanos,
       AvroOpt.int(cdm.getUnitId),
       AvroOpt.int(cdm.getIteration),
       AvroOpt.int(cdm.getCount),

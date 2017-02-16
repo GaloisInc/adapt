@@ -83,7 +83,11 @@ package object cdm14 {
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
     def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
-    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(x.toString).toOption
+    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(x).toOption
+    def integrityTag(x: => com.bbn.tc.schema.avro.IntegrityTag): Option[IntegrityTag] = Try(x).toOption
+    def confidentialityTag(x: => com.bbn.tc.schema.avro.ConfidentialityTag): Option[ConfidentialityTag] = Try(x).toOption
+    def value(x: => com.bbn.tc.schema.avro.Value): Option[Value] = Try(x).toOption
+    def privilegeLevel(x: => com.bbn.tc.schema.avro.PrivilegeLevel): Option[PrivilegeLevel] = Try(x).toOption
     // TODO def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
     def listValue(x: java.util.List[com.bbn.tc.schema.avro.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
@@ -94,8 +98,8 @@ package object cdm14 {
       _.asScala.toList.map(x => CryptographicHash.from(new RawCDM14Type(x)).get))
     def listUuid(x: java.util.List[com.bbn.tc.schema.avro.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x.bytes)))
-    // TODO integrityTag(cdm.getItag)
-    // TODO confidentialityTag(cdm.getCtag)
+    def listTagRunLengthTuple(x: java.util.List[com.bbn.tc.schema.avro.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
+      _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x)))
   }
 
   implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get

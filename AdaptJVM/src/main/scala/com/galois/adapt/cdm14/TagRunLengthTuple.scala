@@ -15,7 +15,7 @@ case class TagRunLengthTuple(
   def asDBKeyValues = List(
     label, "TagRunLengthTuple",
     "numValueElements", numValueElements,
-    "uuid", uuid
+    "uuid", tagId
   )
 }
 
@@ -26,7 +26,7 @@ case object TagRunLengthTuple extends CDM14Constructor[TagRunLengthTuple] {
   def from(cdm: RawCDM14Type): Try[TagRunLengthTuple] = Try {
     TagRunLengthTuple(
       cdm.getNumValueElements,
-      cdm.getUuid
+      cdm.getTagId
     )
   }
 }

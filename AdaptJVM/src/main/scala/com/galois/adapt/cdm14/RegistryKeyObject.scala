@@ -19,7 +19,7 @@ case class RegistryKeyObject(
     "key", key
   ) ++
     baseObject.asDBKeyValues ++
-    value.asDBKeyValues ++
+    // TODO value.asDBKeyValues ++
     size.fold[List[Any]](List.empty)(v => List("size", v))
 }
 

@@ -23,7 +23,7 @@ case object TimeMarker extends CDM14Constructor[TimeMarker] {
 
   def from(cdm: RawCDM14Type): Try[TimeMarker] = Try {
     TimeMarker(
-      cdm.getTimeStampNanos
+      cdm.getTimestampNanos
     )
   }
 }
