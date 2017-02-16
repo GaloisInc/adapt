@@ -45,7 +45,7 @@ case object Value extends CDM14Constructor[Value] {
       AvroOpt.str(cdm.getRuntimeDataType),
       AvroOpt.byteArr(cdm.getValueBytes),
       AvroOpt.listTagRunLengthTuple(cdm.getTag),
-      AvroOpt.listValue(cdm.getComponents)
+      None//AvroOpt.listValue(cdm.getComponents)
     )
   )
 }

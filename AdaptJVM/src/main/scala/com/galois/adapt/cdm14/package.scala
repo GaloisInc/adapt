@@ -83,11 +83,11 @@ package object cdm14 {
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
     def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
-    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(x).toOption
-    def integrityTag(x: => com.bbn.tc.schema.avro.IntegrityTag): Option[IntegrityTag] = Try(x).toOption
-    def confidentialityTag(x: => com.bbn.tc.schema.avro.ConfidentialityTag): Option[ConfidentialityTag] = Try(x).toOption
-    def value(x: => com.bbn.tc.schema.avro.Value): Option[Value] = Try(x).toOption
-    def privilegeLevel(x: => com.bbn.tc.schema.avro.PrivilegeLevel): Option[PrivilegeLevel] = Try(x).toOption
+    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
+    def integrityTag(x: => com.bbn.tc.schema.avro.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
+    def confidentialityTag(x: => com.bbn.tc.schema.avro.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
+    def value(x: => com.bbn.tc.schema.avro.Value): Option[Value] = Value.from(new RawCDM14Type(x)).toOption
+    def privilegeLevel(x: => com.bbn.tc.schema.avro.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
     // TODO def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
     def listValue(x: java.util.List[com.bbn.tc.schema.avro.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
@@ -115,8 +115,6 @@ package object cdm14 {
   implicit def makeIntegrityTag(i: com.bbn.tc.schema.avro.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
   implicit def makeConfidentialityTag(c: com.bbn.tc.schema.avro.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
   implicit def makeCryptoHashType(c: com.bbn.tc.schema.avro.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
-
-//TODO do we need these holdovers?
   implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
