@@ -83,12 +83,19 @@ package object cdm14 {
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
     def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
-    def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
+    def tagOpCode(x: => com.bbn.tc.schema.avro.TagOpCode): Option[TagOpCode] = Try(x.toString).toOption
+    // TODO def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
     def listValue(x: java.util.List[com.bbn.tc.schema.avro.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => Value.from(new RawCDM14Type(x)).get))
     def listProvTagNode(x: java.util.List[com.bbn.tc.schema.avro.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM14Type(x)).get))
+    def listCryptographicHash(x: java.util.List[com.bbn.tc.schema.avro.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
+      _.asScala.toList.map(x => CryptographicHash.from(new RawCDM14Type(x)).get))
+    def listUuid(x: java.util.List[com.bbn.tc.schema.avro.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
+      _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x.bytes)))
+    // TODO integrityTag(cdm.getItag)
+    // TODO confidentialityTag(cdm.getCtag)
   }
 
   implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
@@ -109,7 +116,7 @@ package object cdm14 {
   implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
-  implicit def makeShort(s: com.bbn.tc.schema.avro.SHORT): FixedShort = new FixedShort(s.bytes)
+  //TODO implicit def makeShort(s: com.bbn.tc.schema.avro.SHORT): FixedShort = new FixedShort(s.bytes)
   implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM14Type(o)).get
 
   object DBOpt {

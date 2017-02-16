@@ -40,7 +40,7 @@ case object Principal extends CDM14Constructor[Principal] {
       cdm.getGroupIds,
       cdm.getSource,
       cdm.getType,
-      cdm.getUsername,
+      AvroOpt.str(cdm.getUsername),
       AvroOpt.map(cdm.getProperties)
     )
   }

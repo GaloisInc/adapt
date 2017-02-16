@@ -36,10 +36,10 @@ case object NetFlowObject extends CDM14Constructor[NetFlowObject] {
     NetFlowObject(
       cdm.getUuid,
       cdm.getBaseObject,
-      cdm.getSrcAddress,
-      cdm.getSrcPort,
-      cdm.getDestAddress,
-      cdm.getDestPort,
+      cdm.getInboundAddress,
+      cdm.getInboundPort,
+      cdm.getOutboundAddress,
+      cdm.getOutboundPort,
       AvroOpt.int(cdm.getIpProtocol)
     )
   )

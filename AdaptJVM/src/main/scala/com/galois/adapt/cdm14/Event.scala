@@ -58,7 +58,7 @@ case object Event extends CDM14Constructor[Event] {
       cdm.getSource,
       cdm.getTimestampNanos,
       AvroOpt.str(cdm.getPredicateObjectPath),
-      AvroOpt.str(cdm.getPredicateObject2),
+      AvroOpt.uuid(cdm.getPredicateObject2),
       AvroOpt.str(cdm.getPredicateObject2Path),
       AvroOpt.str(cdm.getName),
       AvroOpt.listValue(cdm.getParameters),

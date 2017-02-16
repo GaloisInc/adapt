@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import akka.pattern.ask
-import com.galois.adapt.cdm13.{CDM13, EpochMarker}
+import com.galois.adapt.cdm14.{CDM14, EpochMarker}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.Await
@@ -36,7 +36,7 @@ object DevelopmentApp {
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
 
     for (path <- loadPaths) {
-      val data = CDM13.readData(path, limitLoad).get
+      val data = CDM14.readData(path, limitLoad).get
       var counter = 0
       data.foreach { d =>
         dbActor ! d.get
@@ -78,7 +78,7 @@ object DevelopmentApp {
     val dbActor = system.actorOf(Props(classOf[DevDBActor], None))
 
     loadFilePath.fold() { path =>
-      val data = CDM13.readData(path, limitLoad).get
+      val data = CDM14.readData(path, limitLoad).get
       var counter = 0
       data.foreach { d =>
         dbActor ! d.get

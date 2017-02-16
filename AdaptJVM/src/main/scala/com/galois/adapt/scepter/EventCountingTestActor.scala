@@ -1,7 +1,7 @@
 package com.galois.adapt.scepter
 
 import akka.actor.{Actor, ActorRef}
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm14._
 
 /* This actor counts all of the CDM statements it receives and sends back these counts every time it
  * receives a 'HowMany' message

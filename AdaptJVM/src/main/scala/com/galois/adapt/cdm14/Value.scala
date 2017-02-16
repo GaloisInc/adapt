@@ -1,7 +1,7 @@
 package com.galois.adapt.cdm14
 
 import com.galois.adapt.DBWritable
-import com.galois.adapt.cdm13.ValueDataType
+import com.galois.adapt.cdm14.ValueDataType
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try

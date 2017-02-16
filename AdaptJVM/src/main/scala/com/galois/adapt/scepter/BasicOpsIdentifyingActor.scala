@@ -1,7 +1,7 @@
 package com.galois.adapt.scepter
 
 import akka.actor.{Actor, ActorRef}
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm14._
 
 /* This actor tries to see if the CDM statements it is receiving come from 'BasicOps.sh' If it
  * receives enough evidence this is the case, it will expect to recieve _all_ evidence.

@@ -7,7 +7,7 @@ import scala.collection.JavaConverters._
 
 case class AbstractObject(
                            source: InstrumentationSource,
-                           permission: Option[FixedShort] = None,  // fixed size = 2
+                           // TODO permission: Option[FixedShort] = None,  // fixed size = 2
                            epoch: Option[Long] = None,
                            properties: Option[Map[String,String]] = None
                          ) extends CDM14 with DBWritable {
@@ -15,7 +15,7 @@ case class AbstractObject(
     //    label, "AbstractObject",
     "source", source.toString
   ) ++
-    permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
+    // TODO permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
     epoch.fold[List[Any]](List.empty)(v => List("epoch", v)) ++
     DBOpt.fromKeyValMap(properties)
 }
@@ -26,8 +26,8 @@ case object AbstractObject extends CDM14Constructor[AbstractObject] {
   def from(cdm: RawCDM14Type): Try[AbstractObject] = Try {
     AbstractObject(
       cdm.getSource,
-      AvroOpt.fixedShort(cdm.getPermission),
-      AvroOpt.long(cdm.getEpoch),
+      // TODO AvroOpt.fixedShort(cdm.getPermission),
+      AvroOpt.int(cdm.getEpoch),
       AvroOpt.map(cdm.getProperties)
     )
   }

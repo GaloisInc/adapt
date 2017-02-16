@@ -1,5 +1,6 @@
 package com.galois.adapt.cdm14
 
+import java.util.UUID
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -34,7 +35,7 @@ case object ProvenanceTagNode extends CDM14Constructor[ProvenanceTagNode] {
 
   def from(cdm: RawCDM14Type): Try[ProvenanceTagNode] = Try(
     ProvenanceTagNode(
-      cdm.getUuid,
+      cdm.getTagId,
       AvroOpt.str(cdm.getProgramPoint),
       AvroOpt.uuid(cdm.getPrevTagId),
       AvroOpt.tagOpCode(cdm.getOpcode),

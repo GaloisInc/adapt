@@ -40,8 +40,8 @@ case object FileObject extends CDM14Constructor[FileObject] {
       AvroOpt.int(cdm.getFileDescriptor),
       AvroOpt.uuid(cdm.getLocalPrincipal),
       AvroOpt.long(cdm.getSize),
-      AvroOpt.str(cdm.getPEInfo),
-      AvroOpt.listCryptographicHash(cdm.getCryptographicHashes)
+      AvroOpt.str(cdm.getPeInfo),
+      AvroOpt.listCryptographicHash(cdm.getHashes)
     )
   )
 }
