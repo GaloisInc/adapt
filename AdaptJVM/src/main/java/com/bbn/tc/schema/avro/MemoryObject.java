@@ -9,20 +9,22 @@ import org.apache.avro.specific.SpecificData;
 
 @SuppressWarnings("all")
 /** * Represents a page in memory. Instantiates an AbstractObject.
- * TODO: is memory really an object (with permissions and so on) or is it a * transient data? */
+     * TODO: is memory really an object (with permissions and so on) or is it a transient data? */
 @org.apache.avro.specific.AvroGenerated
 public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -2192298998453853729L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"MemoryObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a page in memory. Instantiates an AbstractObject.\\n * TODO: is memory really an object (with permissions and so on) or is it a * transient data?\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"memoryAddress\",\"type\":\"long\",\"doc\":\"The location in memory\"},{\"name\":\"pageNumber\",\"type\":[\"null\",\"long\"],\"doc\":\"The memory page number\",\"default\":null}]}");
+  private static final long serialVersionUID = -8912586870117871975L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"MemoryObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a page in memory. Instantiates an AbstractObject.\\n     * TODO: is memory really an object (with permissions and so on) or is it a transient data?\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* InstrumentationSource identifies the source reporting provenance information.\\n     *\\n     * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n     * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * SOURCE_FREEBSD_DTRACE_CADETS,      from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_TESLA_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS,        from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_MACIF_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n     * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation source\\n     * SOURCE_WINDOWS_DIFT_FAROS,         from FAROS' DIFT module\\n     * SOURCE_WINDOWS_PSA_FAROS,          from FAROS' PSA module\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections windows events\",\"symbols\":[\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_WINDOWS_PSA_FAROS\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"pageOffset\",\"type\":\"long\",\"doc\":\"The location in memory\"},{\"name\":\"pageNumber\",\"type\":[\"null\",\"long\"],\"doc\":\"The memory page number\",\"default\":null},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"The entry size in bytes (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** Universally unique identifier for the object */
   @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
   /** The base object attributes */
   @Deprecated public com.bbn.tc.schema.avro.AbstractObject baseObject;
   /** The location in memory */
-  @Deprecated public long memoryAddress;
+  @Deprecated public long pageOffset;
   /** The memory page number */
   @Deprecated public java.lang.Long pageNumber;
+  /** The entry size in bytes (Optional) */
+  @Deprecated public java.lang.Long size;
 
   /**
    * Default constructor.  Note that this does not initialize fields
@@ -35,14 +37,16 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
    * All-args constructor.
    * @param uuid Universally unique identifier for the object
    * @param baseObject The base object attributes
-   * @param memoryAddress The location in memory
+   * @param pageOffset The location in memory
    * @param pageNumber The memory page number
+   * @param size The entry size in bytes (Optional)
    */
-  public MemoryObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.Long memoryAddress, java.lang.Long pageNumber) {
+  public MemoryObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.Long pageOffset, java.lang.Long pageNumber, java.lang.Long size) {
     this.uuid = uuid;
     this.baseObject = baseObject;
-    this.memoryAddress = memoryAddress;
+    this.pageOffset = pageOffset;
     this.pageNumber = pageNumber;
+    this.size = size;
   }
 
   public org.apache.avro.Schema getSchema() { return SCHEMA$; }
@@ -51,8 +55,9 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
     switch (field$) {
     case 0: return uuid;
     case 1: return baseObject;
-    case 2: return memoryAddress;
+    case 2: return pageOffset;
     case 3: return pageNumber;
+    case 4: return size;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -63,8 +68,9 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
     switch (field$) {
     case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
     case 1: baseObject = (com.bbn.tc.schema.avro.AbstractObject)value$; break;
-    case 2: memoryAddress = (java.lang.Long)value$; break;
+    case 2: pageOffset = (java.lang.Long)value$; break;
     case 3: pageNumber = (java.lang.Long)value$; break;
+    case 4: size = (java.lang.Long)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -104,20 +110,20 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
   }
 
   /**
-   * Gets the value of the 'memoryAddress' field.
+   * Gets the value of the 'pageOffset' field.
    * @return The location in memory
    */
-  public java.lang.Long getMemoryAddress() {
-    return memoryAddress;
+  public java.lang.Long getPageOffset() {
+    return pageOffset;
   }
 
   /**
-   * Sets the value of the 'memoryAddress' field.
+   * Sets the value of the 'pageOffset' field.
    * The location in memory
    * @param value the value to set.
    */
-  public void setMemoryAddress(java.lang.Long value) {
-    this.memoryAddress = value;
+  public void setPageOffset(java.lang.Long value) {
+    this.pageOffset = value;
   }
 
   /**
@@ -135,6 +141,23 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
    */
   public void setPageNumber(java.lang.Long value) {
     this.pageNumber = value;
+  }
+
+  /**
+   * Gets the value of the 'size' field.
+   * @return The entry size in bytes (Optional)
+   */
+  public java.lang.Long getSize() {
+    return size;
+  }
+
+  /**
+   * Sets the value of the 'size' field.
+   * The entry size in bytes (Optional)
+   * @param value the value to set.
+   */
+  public void setSize(java.lang.Long value) {
+    this.size = value;
   }
 
   /**
@@ -175,9 +198,11 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
     private com.bbn.tc.schema.avro.AbstractObject baseObject;
     private com.bbn.tc.schema.avro.AbstractObject.Builder baseObjectBuilder;
     /** The location in memory */
-    private long memoryAddress;
+    private long pageOffset;
     /** The memory page number */
     private java.lang.Long pageNumber;
+    /** The entry size in bytes (Optional) */
+    private java.lang.Long size;
 
     /** Creates a new Builder */
     private Builder() {
@@ -201,13 +226,17 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
       if (other.hasBaseObjectBuilder()) {
         this.baseObjectBuilder = com.bbn.tc.schema.avro.AbstractObject.newBuilder(other.getBaseObjectBuilder());
       }
-      if (isValidValue(fields()[2], other.memoryAddress)) {
-        this.memoryAddress = data().deepCopy(fields()[2].schema(), other.memoryAddress);
+      if (isValidValue(fields()[2], other.pageOffset)) {
+        this.pageOffset = data().deepCopy(fields()[2].schema(), other.pageOffset);
         fieldSetFlags()[2] = true;
       }
       if (isValidValue(fields()[3], other.pageNumber)) {
         this.pageNumber = data().deepCopy(fields()[3].schema(), other.pageNumber);
         fieldSetFlags()[3] = true;
+      }
+      if (isValidValue(fields()[4], other.size)) {
+        this.size = data().deepCopy(fields()[4].schema(), other.size);
+        fieldSetFlags()[4] = true;
       }
     }
 
@@ -226,13 +255,17 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
         fieldSetFlags()[1] = true;
       }
       this.baseObjectBuilder = null;
-      if (isValidValue(fields()[2], other.memoryAddress)) {
-        this.memoryAddress = data().deepCopy(fields()[2].schema(), other.memoryAddress);
+      if (isValidValue(fields()[2], other.pageOffset)) {
+        this.pageOffset = data().deepCopy(fields()[2].schema(), other.pageOffset);
         fieldSetFlags()[2] = true;
       }
       if (isValidValue(fields()[3], other.pageNumber)) {
         this.pageNumber = data().deepCopy(fields()[3].schema(), other.pageNumber);
         fieldSetFlags()[3] = true;
+      }
+      if (isValidValue(fields()[4], other.size)) {
+        this.size = data().deepCopy(fields()[4].schema(), other.size);
+        fieldSetFlags()[4] = true;
       }
     }
 
@@ -361,43 +394,43 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
     }
 
     /**
-      * Gets the value of the 'memoryAddress' field.
+      * Gets the value of the 'pageOffset' field.
       * The location in memory
       * @return The value.
       */
-    public java.lang.Long getMemoryAddress() {
-      return memoryAddress;
+    public java.lang.Long getPageOffset() {
+      return pageOffset;
     }
 
     /**
-      * Sets the value of the 'memoryAddress' field.
+      * Sets the value of the 'pageOffset' field.
       * The location in memory
-      * @param value The value of 'memoryAddress'.
+      * @param value The value of 'pageOffset'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.MemoryObject.Builder setMemoryAddress(long value) {
+    public com.bbn.tc.schema.avro.MemoryObject.Builder setPageOffset(long value) {
       validate(fields()[2], value);
-      this.memoryAddress = value;
+      this.pageOffset = value;
       fieldSetFlags()[2] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'memoryAddress' field has been set.
+      * Checks whether the 'pageOffset' field has been set.
       * The location in memory
-      * @return True if the 'memoryAddress' field has been set, false otherwise.
+      * @return True if the 'pageOffset' field has been set, false otherwise.
       */
-    public boolean hasMemoryAddress() {
+    public boolean hasPageOffset() {
       return fieldSetFlags()[2];
     }
 
 
     /**
-      * Clears the value of the 'memoryAddress' field.
+      * Clears the value of the 'pageOffset' field.
       * The location in memory
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.MemoryObject.Builder clearMemoryAddress() {
+    public com.bbn.tc.schema.avro.MemoryObject.Builder clearPageOffset() {
       fieldSetFlags()[2] = false;
       return this;
     }
@@ -445,6 +478,49 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
       return this;
     }
 
+    /**
+      * Gets the value of the 'size' field.
+      * The entry size in bytes (Optional)
+      * @return The value.
+      */
+    public java.lang.Long getSize() {
+      return size;
+    }
+
+    /**
+      * Sets the value of the 'size' field.
+      * The entry size in bytes (Optional)
+      * @param value The value of 'size'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.MemoryObject.Builder setSize(java.lang.Long value) {
+      validate(fields()[4], value);
+      this.size = value;
+      fieldSetFlags()[4] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'size' field has been set.
+      * The entry size in bytes (Optional)
+      * @return True if the 'size' field has been set, false otherwise.
+      */
+    public boolean hasSize() {
+      return fieldSetFlags()[4];
+    }
+
+
+    /**
+      * Clears the value of the 'size' field.
+      * The entry size in bytes (Optional)
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.MemoryObject.Builder clearSize() {
+      size = null;
+      fieldSetFlags()[4] = false;
+      return this;
+    }
+
     @Override
     public MemoryObject build() {
       try {
@@ -455,8 +531,9 @@ public class MemoryObject extends org.apache.avro.specific.SpecificRecordBase im
         } else {
           record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.AbstractObject) defaultValue(fields()[1]);
         }
-        record.memoryAddress = fieldSetFlags()[2] ? this.memoryAddress : (java.lang.Long) defaultValue(fields()[2]);
+        record.pageOffset = fieldSetFlags()[2] ? this.pageOffset : (java.lang.Long) defaultValue(fields()[2]);
         record.pageNumber = fieldSetFlags()[3] ? this.pageNumber : (java.lang.Long) defaultValue(fields()[3]);
+        record.size = fieldSetFlags()[4] ? this.size : (java.lang.Long) defaultValue(fields()[4]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);

@@ -8,29 +8,33 @@ package com.bbn.tc.schema.avro;
 import org.apache.avro.specific.SpecificData;
 
 @SuppressWarnings("all")
-/** * Values represent transient data, mainly parameters to events. Values are created and used once within an
-     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).
-     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to
-     * the value's metadata
+/** * Values represent transient data, mainly parameters to
+     * events. Values are created and used once within an event's
+     * execution and are relevant mainly during fine-grained tracking
+     * (such as with tag/taint propagation).  Values have tags
+     * describing their provenance. Sometimes the actual value's value
+     * is reported in addition to the value's metadata
      *
-     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or
-     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.
- * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as
-     * components.
+     * The size of the value is the number of elements of type
+     * valueDataType. This should be 0 for primitive and complex
+     * types.  For arrays, the size is the array length. i.e., if
+     * size>0, then this value is an array.  A complex value (such as
+     * an object) can contain other values (primitives or other
+     * complex values) within it, as components.
      *
-     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>
-     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>
-     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>
-     *  e.g., a string s="abc" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>
-     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType="MyClass", * valueBytes=<pointer> <br> */
+     * isNull indicates whether a complex value is null. runtimeDataType indicates the runtime datatype. E.g., <br>
+     *  e.g., an integer will have size=0 and valueDataType=INT, and valueBytes.length=4 bytes <br>
+     *  e.g., an int[4] will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) <br>
+     *  e.g., a string s="abc" has size=3 and valueDataType=CHAR, and valueBytes.length=6 bytes (treated as char[]) <br>
+     *  e.g., an MyClass obj has size=0, valueDataType=COMPLEX, runtimeDataType="MyClass", valueBytes=<pointer> <br> */
 @org.apache.avro.specific.AvroGenerated
 public class Value extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 2950727604245715395L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Value\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Values represent transient data, mainly parameters to events. Values are created and used once within an\\n     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).\\n     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to\\n     * the value's metadata\\n     *\\n     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or\\n     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.\\n * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as\\n     * components.\\n     *\\n     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", * valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for primitives\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]},\"doc\":\"The type of the value whether input or return\"},{\"name\":\"valueDataType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"int\"}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:\\n         * {<numElements:int>, <tagId:int>}*\\n         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of\\n * an int[16] value, this would be represented using the following tag array\\n * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2\\n         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer\\n         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)\\n         * before it can be * assigned to a value\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}");
+  private static final long serialVersionUID = -7816924799698238510L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Value\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Values represent transient data, mainly parameters to\\n     * events. Values are created and used once within an event's\\n     * execution and are relevant mainly during fine-grained tracking\\n     * (such as with tag/taint propagation).  Values have tags\\n     * describing their provenance. Sometimes the actual value's value\\n     * is reported in addition to the value's metadata\\n     *\\n     * The size of the value is the number of elements of type\\n     * valueDataType. This should be 0 for primitive and complex\\n     * types.  For arrays, the size is the array length. i.e., if\\n     * size>0, then this value is an array.  A complex value (such as\\n     * an object) can contain other values (primitives or other\\n     * complex values) within it, as components.\\n     *\\n     * isNull indicates whether a complex value is null. runtimeDataType indicates the runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for non-arrays\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either source, sink, or control This is for\\n     * Event parameters to distinguish source/sink values vs control\\n     * parameters (such as a file descriptor).\\n     *\\n     *   VALUE_TYPE_SOURCE   A source value to the event\\n     *   VALUE_TYPE_SINK     A sink value from the event\\n     *   VALUE_TYPE_CONTROL  A control value for the event\",\"symbols\":[\"VALUE_TYPE_SRC\",\"VALUE_TYPE_SINK\",\"VALUE_TYPE_CONTROL\"]},\"doc\":\"The type indicates whether it's a source, sink, or control value\"},{\"name\":\"valueDataType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"TagRunLengthTuple\",\"doc\":\"* This record is a single tuple in a run length encoding of tags\",\"fields\":[{\"name\":\"numValueElements\",\"type\":\"int\",\"default\":0},{\"name\":\"tagId\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16}}]}}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed.\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
-  /** The size of the value: the number of elements of type valueDataType; 0 for primitives */
+  /** The size of the value: the number of elements of type valueDataType; 0 for non-arrays */
   @Deprecated public int size;
-  /** The type of the value whether input or return */
+  /** The type indicates whether it's a source, sink, or control value */
   @Deprecated public com.bbn.tc.schema.avro.ValueType type;
   /** The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)
          *  Strings are treated as char[] so type=CHAR
@@ -47,15 +51,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
   /** The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional) */
   @Deprecated public java.nio.ByteBuffer valueBytes;
   /** * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value */
-  @Deprecated public java.util.List<java.lang.Integer> tag;
+         * Since value could be an array, the tag can use run length encoding if needed. */
+  @Deprecated public java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> tag;
   /** A complex value might comprise other component values if needed (Optional) */
   @Deprecated public java.util.List<com.bbn.tc.schema.avro.Value> components;
 
@@ -68,8 +65,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
   /**
    * All-args constructor.
-   * @param size The size of the value: the number of elements of type valueDataType; 0 for primitives
-   * @param type The type of the value whether input or return
+   * @param size The size of the value: the number of elements of type valueDataType; 0 for non-arrays
+   * @param type The type indicates whether it's a source, sink, or control value
    * @param valueDataType The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)
          *  Strings are treated as char[] so type=CHAR
          *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])
@@ -80,17 +77,10 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  a runtime data type of say "MyClass"
    * @param valueBytes The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)
    * @param tag * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
    * @param components A complex value might comprise other component values if needed (Optional)
    */
-  public Value(java.lang.Integer size, com.bbn.tc.schema.avro.ValueType type, com.bbn.tc.schema.avro.ValueDataType valueDataType, java.lang.Boolean isNull, java.lang.CharSequence name, java.lang.CharSequence runtimeDataType, java.nio.ByteBuffer valueBytes, java.util.List<java.lang.Integer> tag, java.util.List<com.bbn.tc.schema.avro.Value> components) {
+  public Value(java.lang.Integer size, com.bbn.tc.schema.avro.ValueType type, com.bbn.tc.schema.avro.ValueDataType valueDataType, java.lang.Boolean isNull, java.lang.CharSequence name, java.lang.CharSequence runtimeDataType, java.nio.ByteBuffer valueBytes, java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> tag, java.util.List<com.bbn.tc.schema.avro.Value> components) {
     this.size = size;
     this.type = type;
     this.valueDataType = valueDataType;
@@ -130,7 +120,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     case 4: name = (java.lang.CharSequence)value$; break;
     case 5: runtimeDataType = (java.lang.CharSequence)value$; break;
     case 6: valueBytes = (java.nio.ByteBuffer)value$; break;
-    case 7: tag = (java.util.List<java.lang.Integer>)value$; break;
+    case 7: tag = (java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple>)value$; break;
     case 8: components = (java.util.List<com.bbn.tc.schema.avro.Value>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
@@ -138,7 +128,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
   /**
    * Gets the value of the 'size' field.
-   * @return The size of the value: the number of elements of type valueDataType; 0 for primitives
+   * @return The size of the value: the number of elements of type valueDataType; 0 for non-arrays
    */
   public java.lang.Integer getSize() {
     return size;
@@ -146,7 +136,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
   /**
    * Sets the value of the 'size' field.
-   * The size of the value: the number of elements of type valueDataType; 0 for primitives
+   * The size of the value: the number of elements of type valueDataType; 0 for non-arrays
    * @param value the value to set.
    */
   public void setSize(java.lang.Integer value) {
@@ -155,7 +145,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
   /**
    * Gets the value of the 'type' field.
-   * @return The type of the value whether input or return
+   * @return The type indicates whether it's a source, sink, or control value
    */
   public com.bbn.tc.schema.avro.ValueType getType() {
     return type;
@@ -163,7 +153,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
   /**
    * Sets the value of the 'type' field.
-   * The type of the value whether input or return
+   * The type indicates whether it's a source, sink, or control value
    * @param value the value to set.
    */
   public void setType(com.bbn.tc.schema.avro.ValueType value) {
@@ -266,33 +256,19 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
   /**
    * Gets the value of the 'tag' field.
    * @return * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
    */
-  public java.util.List<java.lang.Integer> getTag() {
+  public java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> getTag() {
     return tag;
   }
 
   /**
    * Sets the value of the 'tag' field.
    * * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
    * @param value the value to set.
    */
-  public void setTag(java.util.List<java.lang.Integer> value) {
+  public void setTag(java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> value) {
     this.tag = value;
   }
 
@@ -345,9 +321,9 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
   public static class Builder extends org.apache.avro.specific.SpecificRecordBuilderBase<Value>
     implements org.apache.avro.data.RecordBuilder<Value> {
 
-    /** The size of the value: the number of elements of type valueDataType; 0 for primitives */
+    /** The size of the value: the number of elements of type valueDataType; 0 for non-arrays */
     private int size;
-    /** The type of the value whether input or return */
+    /** The type indicates whether it's a source, sink, or control value */
     private com.bbn.tc.schema.avro.ValueType type;
     /** The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)
          *  Strings are treated as char[] so type=CHAR
@@ -364,15 +340,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     /** The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional) */
     private java.nio.ByteBuffer valueBytes;
     /** * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value */
-    private java.util.List<java.lang.Integer> tag;
+         * Since value could be an array, the tag can use run length encoding if needed. */
+    private java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> tag;
     /** A complex value might comprise other component values if needed (Optional) */
     private java.util.List<com.bbn.tc.schema.avro.Value> components;
 
@@ -471,7 +440,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Gets the value of the 'size' field.
-      * The size of the value: the number of elements of type valueDataType; 0 for primitives
+      * The size of the value: the number of elements of type valueDataType; 0 for non-arrays
       * @return The value.
       */
     public java.lang.Integer getSize() {
@@ -480,7 +449,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Sets the value of the 'size' field.
-      * The size of the value: the number of elements of type valueDataType; 0 for primitives
+      * The size of the value: the number of elements of type valueDataType; 0 for non-arrays
       * @param value The value of 'size'.
       * @return This builder.
       */
@@ -493,7 +462,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Checks whether the 'size' field has been set.
-      * The size of the value: the number of elements of type valueDataType; 0 for primitives
+      * The size of the value: the number of elements of type valueDataType; 0 for non-arrays
       * @return True if the 'size' field has been set, false otherwise.
       */
     public boolean hasSize() {
@@ -503,7 +472,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Clears the value of the 'size' field.
-      * The size of the value: the number of elements of type valueDataType; 0 for primitives
+      * The size of the value: the number of elements of type valueDataType; 0 for non-arrays
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Value.Builder clearSize() {
@@ -513,7 +482,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Gets the value of the 'type' field.
-      * The type of the value whether input or return
+      * The type indicates whether it's a source, sink, or control value
       * @return The value.
       */
     public com.bbn.tc.schema.avro.ValueType getType() {
@@ -522,7 +491,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Sets the value of the 'type' field.
-      * The type of the value whether input or return
+      * The type indicates whether it's a source, sink, or control value
       * @param value The value of 'type'.
       * @return This builder.
       */
@@ -535,7 +504,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Checks whether the 'type' field has been set.
-      * The type of the value whether input or return
+      * The type indicates whether it's a source, sink, or control value
       * @return True if the 'type' field has been set, false otherwise.
       */
     public boolean hasType() {
@@ -545,7 +514,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
 
     /**
       * Clears the value of the 'type' field.
-      * The type of the value whether input or return
+      * The type indicates whether it's a source, sink, or control value
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Value.Builder clearType() {
@@ -787,35 +756,21 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     /**
       * Gets the value of the 'tag' field.
       * * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
       * @return The value.
       */
-    public java.util.List<java.lang.Integer> getTag() {
+    public java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> getTag() {
       return tag;
     }
 
     /**
       * Sets the value of the 'tag' field.
       * * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
       * @param value The value of 'tag'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setTag(java.util.List<java.lang.Integer> value) {
+    public com.bbn.tc.schema.avro.Value.Builder setTag(java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple> value) {
       validate(fields()[7], value);
       this.tag = value;
       fieldSetFlags()[7] = true;
@@ -825,14 +780,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     /**
       * Checks whether the 'tag' field has been set.
       * * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
       * @return True if the 'tag' field has been set, false otherwise.
       */
     public boolean hasTag() {
@@ -843,14 +791,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     /**
       * Clears the value of the 'tag' field.
       * * The value's tag expression describing its provenance (Optional)
-         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:
-         * {<numElements:int>, <tagId:int>}*
-         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of
- * an int[16] value, this would be represented using the following tag array
- * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2
-         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer
-         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)
-         * before it can be * assigned to a value
+         * Since value could be an array, the tag can use run length encoding if needed.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Value.Builder clearTag() {
@@ -913,7 +854,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
         record.name = fieldSetFlags()[4] ? this.name : (java.lang.CharSequence) defaultValue(fields()[4]);
         record.runtimeDataType = fieldSetFlags()[5] ? this.runtimeDataType : (java.lang.CharSequence) defaultValue(fields()[5]);
         record.valueBytes = fieldSetFlags()[6] ? this.valueBytes : (java.nio.ByteBuffer) defaultValue(fields()[6]);
-        record.tag = fieldSetFlags()[7] ? this.tag : (java.util.List<java.lang.Integer>) defaultValue(fields()[7]);
+        record.tag = fieldSetFlags()[7] ? this.tag : (java.util.List<com.bbn.tc.schema.avro.TagRunLengthTuple>) defaultValue(fields()[7]);
         record.components = fieldSetFlags()[8] ? this.components : (java.util.List<com.bbn.tc.schema.avro.Value>) defaultValue(fields()[8]);
         return record;
       } catch (Exception e) {

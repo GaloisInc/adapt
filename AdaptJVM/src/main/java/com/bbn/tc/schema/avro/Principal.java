@@ -9,13 +9,13 @@ import org.apache.avro.specific.SpecificData;
 
 @SuppressWarnings("all")
 /** * A principal is a local user
-    * TODO: extend for second evaluation to include remote principals
-    * TODO: what happens when the user information changes (are we tracking versions?)
-    * TODO: Authentication mechanisms: are TA1s providing that information and how? */
+     * TODO: extend to include remote principals
+     * TODO: what happens when the user information changes (are we tracking versions?)
+     * TODO: Authentication mechanisms: are TA1s providing that information and how? */
 @org.apache.avro.specific.AvroGenerated
 public class Principal extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -5621786451966281809L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Principal\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A principal is a local user\\n    * TODO: extend for second evaluation to include remote principals\\n    * TODO: what happens when the user information changes (are we tracking versions?)\\n    * TODO: Authentication mechanisms: are TA1s providing that information and how?\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A unique id for the principal\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"PrincipalType\",\"doc\":\"* The type of principal may be local to the host, or remote users/systems.\",\"symbols\":[\"PRINCIPAL_LOCAL\",\"PRINCIPAL_REMOTE\"]},\"doc\":\"The type of the principal, local by default\",\"default\":\"PRINCIPAL_LOCAL\"},{\"name\":\"userId\",\"type\":\"string\",\"doc\":\"The operating system identifier associated with the user\"},{\"name\":\"groupIds\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"doc\":\"The ids of the groups which this user is part of\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the Principal record, see InstrumentationSource\"},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = -6347468618680848682L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Principal\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A principal is a local user\\n     * TODO: extend to include remote principals\\n     * TODO: what happens when the user information changes (are we tracking versions?)\\n     * TODO: Authentication mechanisms: are TA1s providing that information and how?\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A unique id for the principal\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"PrincipalType\",\"doc\":\"* PrincipalType identifies the type of user: either local to the\\n     * host, or remote users/systems.\",\"symbols\":[\"PRINCIPAL_LOCAL\",\"PRINCIPAL_REMOTE\"]},\"doc\":\"The type of the principal, local by default\",\"default\":\"PRINCIPAL_LOCAL\"},{\"name\":\"userId\",\"type\":\"string\",\"doc\":\"The operating system identifier associated with the user\"},{\"name\":\"username\",\"type\":[\"null\",\"string\"],\"doc\":\"Human-readable string identifier, such as username (Optional)\",\"default\":null},{\"name\":\"groupIds\",\"type\":{\"type\":\"array\",\"items\":\"string\"},\"doc\":\"The ids of the groups which this user is part of\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* InstrumentationSource identifies the source reporting provenance information.\\n     *\\n     * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n     * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * SOURCE_FREEBSD_DTRACE_CADETS,      from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_TESLA_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS,        from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_MACIF_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n     * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation source\\n     * SOURCE_WINDOWS_DIFT_FAROS,         from FAROS' DIFT module\\n     * SOURCE_WINDOWS_PSA_FAROS,          from FAROS' PSA module\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections windows events\",\"symbols\":[\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_WINDOWS_PSA_FAROS\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the Principal record, see InstrumentationSource\"},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** A unique id for the principal */
   @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
@@ -23,11 +23,15 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
   @Deprecated public com.bbn.tc.schema.avro.PrincipalType type;
   /** The operating system identifier associated with the user */
   @Deprecated public java.lang.CharSequence userId;
+  /** Human-readable string identifier, such as username (Optional) */
+  @Deprecated public java.lang.CharSequence username;
   /** The ids of the groups which this user is part of */
   @Deprecated public java.util.List<java.lang.CharSequence> groupIds;
   /** The source that emitted the Principal record, see InstrumentationSource */
   @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
-  /** Arbitrary key, value pairs describing the entity */
+  /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
   @Deprecated public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
   /**
@@ -42,14 +46,18 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
    * @param uuid A unique id for the principal
    * @param type The type of the principal, local by default
    * @param userId The operating system identifier associated with the user
+   * @param username Human-readable string identifier, such as username (Optional)
    * @param groupIds The ids of the groups which this user is part of
    * @param source The source that emitted the Principal record, see InstrumentationSource
-   * @param properties Arbitrary key, value pairs describing the entity
+   * @param properties * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
-  public Principal(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.PrincipalType type, java.lang.CharSequence userId, java.util.List<java.lang.CharSequence> groupIds, com.bbn.tc.schema.avro.InstrumentationSource source, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public Principal(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.PrincipalType type, java.lang.CharSequence userId, java.lang.CharSequence username, java.util.List<java.lang.CharSequence> groupIds, com.bbn.tc.schema.avro.InstrumentationSource source, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.uuid = uuid;
     this.type = type;
     this.userId = userId;
+    this.username = username;
     this.groupIds = groupIds;
     this.source = source;
     this.properties = properties;
@@ -62,9 +70,10 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
     case 0: return uuid;
     case 1: return type;
     case 2: return userId;
-    case 3: return groupIds;
-    case 4: return source;
-    case 5: return properties;
+    case 3: return username;
+    case 4: return groupIds;
+    case 5: return source;
+    case 6: return properties;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -76,9 +85,10 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
     case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
     case 1: type = (com.bbn.tc.schema.avro.PrincipalType)value$; break;
     case 2: userId = (java.lang.CharSequence)value$; break;
-    case 3: groupIds = (java.util.List<java.lang.CharSequence>)value$; break;
-    case 4: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
-    case 5: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
+    case 3: username = (java.lang.CharSequence)value$; break;
+    case 4: groupIds = (java.util.List<java.lang.CharSequence>)value$; break;
+    case 5: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
+    case 6: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -135,6 +145,23 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
   }
 
   /**
+   * Gets the value of the 'username' field.
+   * @return Human-readable string identifier, such as username (Optional)
+   */
+  public java.lang.CharSequence getUsername() {
+    return username;
+  }
+
+  /**
+   * Sets the value of the 'username' field.
+   * Human-readable string identifier, such as username (Optional)
+   * @param value the value to set.
+   */
+  public void setUsername(java.lang.CharSequence value) {
+    this.username = value;
+  }
+
+  /**
    * Gets the value of the 'groupIds' field.
    * @return The ids of the groups which this user is part of
    */
@@ -170,7 +197,9 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
 
   /**
    * Gets the value of the 'properties' field.
-   * @return Arbitrary key, value pairs describing the entity
+   * @return * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
   public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
     return properties;
@@ -178,7 +207,9 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
 
   /**
    * Sets the value of the 'properties' field.
-   * Arbitrary key, value pairs describing the entity
+   * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    * @param value the value to set.
    */
   public void setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
@@ -223,11 +254,15 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
     private com.bbn.tc.schema.avro.PrincipalType type;
     /** The operating system identifier associated with the user */
     private java.lang.CharSequence userId;
+    /** Human-readable string identifier, such as username (Optional) */
+    private java.lang.CharSequence username;
     /** The ids of the groups which this user is part of */
     private java.util.List<java.lang.CharSequence> groupIds;
     /** The source that emitted the Principal record, see InstrumentationSource */
     private com.bbn.tc.schema.avro.InstrumentationSource source;
-    /** Arbitrary key, value pairs describing the entity */
+    /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
     private java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
     /** Creates a new Builder */
@@ -253,17 +288,21 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
         this.userId = data().deepCopy(fields()[2].schema(), other.userId);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.groupIds)) {
-        this.groupIds = data().deepCopy(fields()[3].schema(), other.groupIds);
+      if (isValidValue(fields()[3], other.username)) {
+        this.username = data().deepCopy(fields()[3].schema(), other.username);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.source)) {
-        this.source = data().deepCopy(fields()[4].schema(), other.source);
+      if (isValidValue(fields()[4], other.groupIds)) {
+        this.groupIds = data().deepCopy(fields()[4].schema(), other.groupIds);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.properties)) {
-        this.properties = data().deepCopy(fields()[5].schema(), other.properties);
+      if (isValidValue(fields()[5], other.source)) {
+        this.source = data().deepCopy(fields()[5].schema(), other.source);
         fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.properties)) {
+        this.properties = data().deepCopy(fields()[6].schema(), other.properties);
+        fieldSetFlags()[6] = true;
       }
     }
 
@@ -285,17 +324,21 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
         this.userId = data().deepCopy(fields()[2].schema(), other.userId);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.groupIds)) {
-        this.groupIds = data().deepCopy(fields()[3].schema(), other.groupIds);
+      if (isValidValue(fields()[3], other.username)) {
+        this.username = data().deepCopy(fields()[3].schema(), other.username);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.source)) {
-        this.source = data().deepCopy(fields()[4].schema(), other.source);
+      if (isValidValue(fields()[4], other.groupIds)) {
+        this.groupIds = data().deepCopy(fields()[4].schema(), other.groupIds);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.properties)) {
-        this.properties = data().deepCopy(fields()[5].schema(), other.properties);
+      if (isValidValue(fields()[5], other.source)) {
+        this.source = data().deepCopy(fields()[5].schema(), other.source);
         fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.properties)) {
+        this.properties = data().deepCopy(fields()[6].schema(), other.properties);
+        fieldSetFlags()[6] = true;
       }
     }
 
@@ -429,6 +472,49 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
     }
 
     /**
+      * Gets the value of the 'username' field.
+      * Human-readable string identifier, such as username (Optional)
+      * @return The value.
+      */
+    public java.lang.CharSequence getUsername() {
+      return username;
+    }
+
+    /**
+      * Sets the value of the 'username' field.
+      * Human-readable string identifier, such as username (Optional)
+      * @param value The value of 'username'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Principal.Builder setUsername(java.lang.CharSequence value) {
+      validate(fields()[3], value);
+      this.username = value;
+      fieldSetFlags()[3] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'username' field has been set.
+      * Human-readable string identifier, such as username (Optional)
+      * @return True if the 'username' field has been set, false otherwise.
+      */
+    public boolean hasUsername() {
+      return fieldSetFlags()[3];
+    }
+
+
+    /**
+      * Clears the value of the 'username' field.
+      * Human-readable string identifier, such as username (Optional)
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Principal.Builder clearUsername() {
+      username = null;
+      fieldSetFlags()[3] = false;
+      return this;
+    }
+
+    /**
       * Gets the value of the 'groupIds' field.
       * The ids of the groups which this user is part of
       * @return The value.
@@ -444,9 +530,9 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Principal.Builder setGroupIds(java.util.List<java.lang.CharSequence> value) {
-      validate(fields()[3], value);
+      validate(fields()[4], value);
       this.groupIds = value;
-      fieldSetFlags()[3] = true;
+      fieldSetFlags()[4] = true;
       return this;
     }
 
@@ -456,7 +542,7 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       * @return True if the 'groupIds' field has been set, false otherwise.
       */
     public boolean hasGroupIds() {
-      return fieldSetFlags()[3];
+      return fieldSetFlags()[4];
     }
 
 
@@ -467,7 +553,7 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       */
     public com.bbn.tc.schema.avro.Principal.Builder clearGroupIds() {
       groupIds = null;
-      fieldSetFlags()[3] = false;
+      fieldSetFlags()[4] = false;
       return this;
     }
 
@@ -487,9 +573,9 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Principal.Builder setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
-      validate(fields()[4], value);
+      validate(fields()[5], value);
       this.source = value;
-      fieldSetFlags()[4] = true;
+      fieldSetFlags()[5] = true;
       return this;
     }
 
@@ -499,7 +585,7 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       * @return True if the 'source' field has been set, false otherwise.
       */
     public boolean hasSource() {
-      return fieldSetFlags()[4];
+      return fieldSetFlags()[5];
     }
 
 
@@ -510,13 +596,15 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
       */
     public com.bbn.tc.schema.avro.Principal.Builder clearSource() {
       source = null;
-      fieldSetFlags()[4] = false;
+      fieldSetFlags()[5] = false;
       return this;
     }
 
     /**
       * Gets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return The value.
       */
     public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
@@ -525,35 +613,41 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
 
     /**
       * Sets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @param value The value of 'properties'.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Principal.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
-      validate(fields()[5], value);
+      validate(fields()[6], value);
       this.properties = value;
-      fieldSetFlags()[5] = true;
+      fieldSetFlags()[6] = true;
       return this;
     }
 
     /**
       * Checks whether the 'properties' field has been set.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return True if the 'properties' field has been set, false otherwise.
       */
     public boolean hasProperties() {
-      return fieldSetFlags()[5];
+      return fieldSetFlags()[6];
     }
 
 
     /**
       * Clears the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Principal.Builder clearProperties() {
       properties = null;
-      fieldSetFlags()[5] = false;
+      fieldSetFlags()[6] = false;
       return this;
     }
 
@@ -564,9 +658,10 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
         record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
         record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.PrincipalType) defaultValue(fields()[1]);
         record.userId = fieldSetFlags()[2] ? this.userId : (java.lang.CharSequence) defaultValue(fields()[2]);
-        record.groupIds = fieldSetFlags()[3] ? this.groupIds : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[3]);
-        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[4]);
-        record.properties = fieldSetFlags()[5] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[5]);
+        record.username = fieldSetFlags()[3] ? this.username : (java.lang.CharSequence) defaultValue(fields()[3]);
+        record.groupIds = fieldSetFlags()[4] ? this.groupIds : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[4]);
+        record.source = fieldSetFlags()[5] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[5]);
+        record.properties = fieldSetFlags()[6] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[6]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);

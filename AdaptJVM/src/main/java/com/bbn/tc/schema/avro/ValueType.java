@@ -5,15 +5,16 @@
  */
 package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
-/** * A value type is either in, out, or in/out
-     * This is for event parameters to distinguish inputs vs return values
+/** * A value type is either source, sink, or control This is for
+     * Event parameters to distinguish source/sink values vs control
+     * parameters (such as a file descriptor).
      *
- *   VALUE_TYPE_IN       An input value to the event
-     *   VALUE_TYPE_OUT *   An output value from the event (return value)
-     *   VALUE_TYPE_INOUT *   Adding this for completeness */
+     *   VALUE_TYPE_SOURCE   A source value to the event
+     *   VALUE_TYPE_SINK     A sink value from the event
+     *   VALUE_TYPE_CONTROL  A control value for the event */
 @org.apache.avro.specific.AvroGenerated
 public enum ValueType {
-  VALUE_TYPE_IN, VALUE_TYPE_OUT, VALUE_TYPE_INOUT  ;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"enum\",\"name\":\"ValueType\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]}");
+  VALUE_TYPE_SRC, VALUE_TYPE_SINK, VALUE_TYPE_CONTROL  ;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"enum\",\"name\":\"ValueType\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A value type is either source, sink, or control This is for\\n     * Event parameters to distinguish source/sink values vs control\\n     * parameters (such as a file descriptor).\\n     *\\n     *   VALUE_TYPE_SOURCE   A source value to the event\\n     *   VALUE_TYPE_SINK     A sink value from the event\\n     *   VALUE_TYPE_CONTROL  A control value for the event\",\"symbols\":[\"VALUE_TYPE_SRC\",\"VALUE_TYPE_SINK\",\"VALUE_TYPE_CONTROL\"]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
 }

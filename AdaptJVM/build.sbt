@@ -38,6 +38,9 @@ lazy val adapt = (project in file(".")).settings(
     lazy val avroCompile = taskKey[Unit]("Compile Avro sources from the schema")
     val avroToolsJarPath = "lib/avro-tools-1.8.1.jar"
     val avroSpecPath = "src/main/avro/TCCDMDatum14.avdl"
+    // TODO Now takes two commands to compile schema, check with Ryan on how to change build file...
+    // java -jar lib/avro-tools-1.8.1.jar idl src/main/avro/CDM14.avdl src/main/avro/CDM14.avpr
+    // java -jar lib/avro-tools-1.8.1.jar compile protocol src/main/avro/CDM14.avpr src/main/java/
     avroCompile := s"java -jar $avroToolsJarPath compile schema $avroSpecPath target/scala-2.11/src_managed/main/".!
   },
 

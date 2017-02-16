@@ -11,21 +11,21 @@ import org.apache.avro.specific.SpecificData;
 /** * Represents a network flow object. Instantiates an AbstractObject. */
 @org.apache.avro.specific.AvroGenerated
 public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -5027217152500373178L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"NetFlowObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a network flow object. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"srcAddress\",\"type\":\"string\",\"doc\":\"The ip address of the source host for this flow\"},{\"name\":\"srcPort\",\"type\":\"int\",\"doc\":\"The network port on the source host for this flow\"},{\"name\":\"destAddress\",\"type\":\"string\",\"doc\":\"The ip address of the destination host for this flow\"},{\"name\":\"destPort\",\"type\":\"int\",\"doc\":\"The network port on the destination host for this flow\"},{\"name\":\"ipProtocol\",\"type\":[\"null\",\"int\"],\"doc\":\"The IP protocol number e.g., TCP=6\",\"default\":null}]}");
+  private static final long serialVersionUID = -1819995780110738472L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"NetFlowObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a network flow object. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* InstrumentationSource identifies the source reporting provenance information.\\n     *\\n     * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n     * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * SOURCE_FREEBSD_DTRACE_CADETS,      from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_TESLA_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS,        from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_MACIF_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n     * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation source\\n     * SOURCE_WINDOWS_DIFT_FAROS,         from FAROS' DIFT module\\n     * SOURCE_WINDOWS_PSA_FAROS,          from FAROS' PSA module\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections windows events\",\"symbols\":[\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_WINDOWS_PSA_FAROS\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"inboundAddress\",\"type\":\"string\",\"doc\":\"The inbound IP address for this flow\"},{\"name\":\"inboundPort\",\"type\":\"int\",\"doc\":\"The inbound network port for this flow\"},{\"name\":\"outboundAddress\",\"type\":\"string\",\"doc\":\"The outbound IP address for this flow\"},{\"name\":\"outboundPort\",\"type\":\"int\",\"doc\":\"The outbound network port for this flow\"},{\"name\":\"ipProtocol\",\"type\":[\"null\",\"int\"],\"doc\":\"The IP protocol number e.g., TCP=6\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** Universally unique identifier for the object */
   @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
   /** The base object attributes */
   @Deprecated public com.bbn.tc.schema.avro.AbstractObject baseObject;
-  /** The ip address of the source host for this flow */
-  @Deprecated public java.lang.CharSequence srcAddress;
-  /** The network port on the source host for this flow */
-  @Deprecated public int srcPort;
-  /** The ip address of the destination host for this flow */
-  @Deprecated public java.lang.CharSequence destAddress;
-  /** The network port on the destination host for this flow */
-  @Deprecated public int destPort;
+  /** The inbound IP address for this flow */
+  @Deprecated public java.lang.CharSequence inboundAddress;
+  /** The inbound network port for this flow */
+  @Deprecated public int inboundPort;
+  /** The outbound IP address for this flow */
+  @Deprecated public java.lang.CharSequence outboundAddress;
+  /** The outbound network port for this flow */
+  @Deprecated public int outboundPort;
   /** The IP protocol number e.g., TCP=6 */
   @Deprecated public java.lang.Integer ipProtocol;
 
@@ -40,19 +40,19 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
    * All-args constructor.
    * @param uuid Universally unique identifier for the object
    * @param baseObject The base object attributes
-   * @param srcAddress The ip address of the source host for this flow
-   * @param srcPort The network port on the source host for this flow
-   * @param destAddress The ip address of the destination host for this flow
-   * @param destPort The network port on the destination host for this flow
+   * @param inboundAddress The inbound IP address for this flow
+   * @param inboundPort The inbound network port for this flow
+   * @param outboundAddress The outbound IP address for this flow
+   * @param outboundPort The outbound network port for this flow
    * @param ipProtocol The IP protocol number e.g., TCP=6
    */
-  public NetFlowObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.CharSequence srcAddress, java.lang.Integer srcPort, java.lang.CharSequence destAddress, java.lang.Integer destPort, java.lang.Integer ipProtocol) {
+  public NetFlowObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.CharSequence inboundAddress, java.lang.Integer inboundPort, java.lang.CharSequence outboundAddress, java.lang.Integer outboundPort, java.lang.Integer ipProtocol) {
     this.uuid = uuid;
     this.baseObject = baseObject;
-    this.srcAddress = srcAddress;
-    this.srcPort = srcPort;
-    this.destAddress = destAddress;
-    this.destPort = destPort;
+    this.inboundAddress = inboundAddress;
+    this.inboundPort = inboundPort;
+    this.outboundAddress = outboundAddress;
+    this.outboundPort = outboundPort;
     this.ipProtocol = ipProtocol;
   }
 
@@ -62,10 +62,10 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
     switch (field$) {
     case 0: return uuid;
     case 1: return baseObject;
-    case 2: return srcAddress;
-    case 3: return srcPort;
-    case 4: return destAddress;
-    case 5: return destPort;
+    case 2: return inboundAddress;
+    case 3: return inboundPort;
+    case 4: return outboundAddress;
+    case 5: return outboundPort;
     case 6: return ipProtocol;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
@@ -77,10 +77,10 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
     switch (field$) {
     case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
     case 1: baseObject = (com.bbn.tc.schema.avro.AbstractObject)value$; break;
-    case 2: srcAddress = (java.lang.CharSequence)value$; break;
-    case 3: srcPort = (java.lang.Integer)value$; break;
-    case 4: destAddress = (java.lang.CharSequence)value$; break;
-    case 5: destPort = (java.lang.Integer)value$; break;
+    case 2: inboundAddress = (java.lang.CharSequence)value$; break;
+    case 3: inboundPort = (java.lang.Integer)value$; break;
+    case 4: outboundAddress = (java.lang.CharSequence)value$; break;
+    case 5: outboundPort = (java.lang.Integer)value$; break;
     case 6: ipProtocol = (java.lang.Integer)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
@@ -121,71 +121,71 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
   }
 
   /**
-   * Gets the value of the 'srcAddress' field.
-   * @return The ip address of the source host for this flow
+   * Gets the value of the 'inboundAddress' field.
+   * @return The inbound IP address for this flow
    */
-  public java.lang.CharSequence getSrcAddress() {
-    return srcAddress;
+  public java.lang.CharSequence getInboundAddress() {
+    return inboundAddress;
   }
 
   /**
-   * Sets the value of the 'srcAddress' field.
-   * The ip address of the source host for this flow
+   * Sets the value of the 'inboundAddress' field.
+   * The inbound IP address for this flow
    * @param value the value to set.
    */
-  public void setSrcAddress(java.lang.CharSequence value) {
-    this.srcAddress = value;
+  public void setInboundAddress(java.lang.CharSequence value) {
+    this.inboundAddress = value;
   }
 
   /**
-   * Gets the value of the 'srcPort' field.
-   * @return The network port on the source host for this flow
+   * Gets the value of the 'inboundPort' field.
+   * @return The inbound network port for this flow
    */
-  public java.lang.Integer getSrcPort() {
-    return srcPort;
+  public java.lang.Integer getInboundPort() {
+    return inboundPort;
   }
 
   /**
-   * Sets the value of the 'srcPort' field.
-   * The network port on the source host for this flow
+   * Sets the value of the 'inboundPort' field.
+   * The inbound network port for this flow
    * @param value the value to set.
    */
-  public void setSrcPort(java.lang.Integer value) {
-    this.srcPort = value;
+  public void setInboundPort(java.lang.Integer value) {
+    this.inboundPort = value;
   }
 
   /**
-   * Gets the value of the 'destAddress' field.
-   * @return The ip address of the destination host for this flow
+   * Gets the value of the 'outboundAddress' field.
+   * @return The outbound IP address for this flow
    */
-  public java.lang.CharSequence getDestAddress() {
-    return destAddress;
+  public java.lang.CharSequence getOutboundAddress() {
+    return outboundAddress;
   }
 
   /**
-   * Sets the value of the 'destAddress' field.
-   * The ip address of the destination host for this flow
+   * Sets the value of the 'outboundAddress' field.
+   * The outbound IP address for this flow
    * @param value the value to set.
    */
-  public void setDestAddress(java.lang.CharSequence value) {
-    this.destAddress = value;
+  public void setOutboundAddress(java.lang.CharSequence value) {
+    this.outboundAddress = value;
   }
 
   /**
-   * Gets the value of the 'destPort' field.
-   * @return The network port on the destination host for this flow
+   * Gets the value of the 'outboundPort' field.
+   * @return The outbound network port for this flow
    */
-  public java.lang.Integer getDestPort() {
-    return destPort;
+  public java.lang.Integer getOutboundPort() {
+    return outboundPort;
   }
 
   /**
-   * Sets the value of the 'destPort' field.
-   * The network port on the destination host for this flow
+   * Sets the value of the 'outboundPort' field.
+   * The outbound network port for this flow
    * @param value the value to set.
    */
-  public void setDestPort(java.lang.Integer value) {
-    this.destPort = value;
+  public void setOutboundPort(java.lang.Integer value) {
+    this.outboundPort = value;
   }
 
   /**
@@ -242,14 +242,14 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
     /** The base object attributes */
     private com.bbn.tc.schema.avro.AbstractObject baseObject;
     private com.bbn.tc.schema.avro.AbstractObject.Builder baseObjectBuilder;
-    /** The ip address of the source host for this flow */
-    private java.lang.CharSequence srcAddress;
-    /** The network port on the source host for this flow */
-    private int srcPort;
-    /** The ip address of the destination host for this flow */
-    private java.lang.CharSequence destAddress;
-    /** The network port on the destination host for this flow */
-    private int destPort;
+    /** The inbound IP address for this flow */
+    private java.lang.CharSequence inboundAddress;
+    /** The inbound network port for this flow */
+    private int inboundPort;
+    /** The outbound IP address for this flow */
+    private java.lang.CharSequence outboundAddress;
+    /** The outbound network port for this flow */
+    private int outboundPort;
     /** The IP protocol number e.g., TCP=6 */
     private java.lang.Integer ipProtocol;
 
@@ -275,20 +275,20 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
       if (other.hasBaseObjectBuilder()) {
         this.baseObjectBuilder = com.bbn.tc.schema.avro.AbstractObject.newBuilder(other.getBaseObjectBuilder());
       }
-      if (isValidValue(fields()[2], other.srcAddress)) {
-        this.srcAddress = data().deepCopy(fields()[2].schema(), other.srcAddress);
+      if (isValidValue(fields()[2], other.inboundAddress)) {
+        this.inboundAddress = data().deepCopy(fields()[2].schema(), other.inboundAddress);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.srcPort)) {
-        this.srcPort = data().deepCopy(fields()[3].schema(), other.srcPort);
+      if (isValidValue(fields()[3], other.inboundPort)) {
+        this.inboundPort = data().deepCopy(fields()[3].schema(), other.inboundPort);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.destAddress)) {
-        this.destAddress = data().deepCopy(fields()[4].schema(), other.destAddress);
+      if (isValidValue(fields()[4], other.outboundAddress)) {
+        this.outboundAddress = data().deepCopy(fields()[4].schema(), other.outboundAddress);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.destPort)) {
-        this.destPort = data().deepCopy(fields()[5].schema(), other.destPort);
+      if (isValidValue(fields()[5], other.outboundPort)) {
+        this.outboundPort = data().deepCopy(fields()[5].schema(), other.outboundPort);
         fieldSetFlags()[5] = true;
       }
       if (isValidValue(fields()[6], other.ipProtocol)) {
@@ -312,20 +312,20 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
         fieldSetFlags()[1] = true;
       }
       this.baseObjectBuilder = null;
-      if (isValidValue(fields()[2], other.srcAddress)) {
-        this.srcAddress = data().deepCopy(fields()[2].schema(), other.srcAddress);
+      if (isValidValue(fields()[2], other.inboundAddress)) {
+        this.inboundAddress = data().deepCopy(fields()[2].schema(), other.inboundAddress);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.srcPort)) {
-        this.srcPort = data().deepCopy(fields()[3].schema(), other.srcPort);
+      if (isValidValue(fields()[3], other.inboundPort)) {
+        this.inboundPort = data().deepCopy(fields()[3].schema(), other.inboundPort);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.destAddress)) {
-        this.destAddress = data().deepCopy(fields()[4].schema(), other.destAddress);
+      if (isValidValue(fields()[4], other.outboundAddress)) {
+        this.outboundAddress = data().deepCopy(fields()[4].schema(), other.outboundAddress);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.destPort)) {
-        this.destPort = data().deepCopy(fields()[5].schema(), other.destPort);
+      if (isValidValue(fields()[5], other.outboundPort)) {
+        this.outboundPort = data().deepCopy(fields()[5].schema(), other.outboundPort);
         fieldSetFlags()[5] = true;
       }
       if (isValidValue(fields()[6], other.ipProtocol)) {
@@ -459,171 +459,171 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
     }
 
     /**
-      * Gets the value of the 'srcAddress' field.
-      * The ip address of the source host for this flow
+      * Gets the value of the 'inboundAddress' field.
+      * The inbound IP address for this flow
       * @return The value.
       */
-    public java.lang.CharSequence getSrcAddress() {
-      return srcAddress;
+    public java.lang.CharSequence getInboundAddress() {
+      return inboundAddress;
     }
 
     /**
-      * Sets the value of the 'srcAddress' field.
-      * The ip address of the source host for this flow
-      * @param value The value of 'srcAddress'.
+      * Sets the value of the 'inboundAddress' field.
+      * The inbound IP address for this flow
+      * @param value The value of 'inboundAddress'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder setSrcAddress(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder setInboundAddress(java.lang.CharSequence value) {
       validate(fields()[2], value);
-      this.srcAddress = value;
+      this.inboundAddress = value;
       fieldSetFlags()[2] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'srcAddress' field has been set.
-      * The ip address of the source host for this flow
-      * @return True if the 'srcAddress' field has been set, false otherwise.
+      * Checks whether the 'inboundAddress' field has been set.
+      * The inbound IP address for this flow
+      * @return True if the 'inboundAddress' field has been set, false otherwise.
       */
-    public boolean hasSrcAddress() {
+    public boolean hasInboundAddress() {
       return fieldSetFlags()[2];
     }
 
 
     /**
-      * Clears the value of the 'srcAddress' field.
-      * The ip address of the source host for this flow
+      * Clears the value of the 'inboundAddress' field.
+      * The inbound IP address for this flow
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearSrcAddress() {
-      srcAddress = null;
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearInboundAddress() {
+      inboundAddress = null;
       fieldSetFlags()[2] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'srcPort' field.
-      * The network port on the source host for this flow
+      * Gets the value of the 'inboundPort' field.
+      * The inbound network port for this flow
       * @return The value.
       */
-    public java.lang.Integer getSrcPort() {
-      return srcPort;
+    public java.lang.Integer getInboundPort() {
+      return inboundPort;
     }
 
     /**
-      * Sets the value of the 'srcPort' field.
-      * The network port on the source host for this flow
-      * @param value The value of 'srcPort'.
+      * Sets the value of the 'inboundPort' field.
+      * The inbound network port for this flow
+      * @param value The value of 'inboundPort'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder setSrcPort(int value) {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder setInboundPort(int value) {
       validate(fields()[3], value);
-      this.srcPort = value;
+      this.inboundPort = value;
       fieldSetFlags()[3] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'srcPort' field has been set.
-      * The network port on the source host for this flow
-      * @return True if the 'srcPort' field has been set, false otherwise.
+      * Checks whether the 'inboundPort' field has been set.
+      * The inbound network port for this flow
+      * @return True if the 'inboundPort' field has been set, false otherwise.
       */
-    public boolean hasSrcPort() {
+    public boolean hasInboundPort() {
       return fieldSetFlags()[3];
     }
 
 
     /**
-      * Clears the value of the 'srcPort' field.
-      * The network port on the source host for this flow
+      * Clears the value of the 'inboundPort' field.
+      * The inbound network port for this flow
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearSrcPort() {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearInboundPort() {
       fieldSetFlags()[3] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'destAddress' field.
-      * The ip address of the destination host for this flow
+      * Gets the value of the 'outboundAddress' field.
+      * The outbound IP address for this flow
       * @return The value.
       */
-    public java.lang.CharSequence getDestAddress() {
-      return destAddress;
+    public java.lang.CharSequence getOutboundAddress() {
+      return outboundAddress;
     }
 
     /**
-      * Sets the value of the 'destAddress' field.
-      * The ip address of the destination host for this flow
-      * @param value The value of 'destAddress'.
+      * Sets the value of the 'outboundAddress' field.
+      * The outbound IP address for this flow
+      * @param value The value of 'outboundAddress'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder setDestAddress(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder setOutboundAddress(java.lang.CharSequence value) {
       validate(fields()[4], value);
-      this.destAddress = value;
+      this.outboundAddress = value;
       fieldSetFlags()[4] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'destAddress' field has been set.
-      * The ip address of the destination host for this flow
-      * @return True if the 'destAddress' field has been set, false otherwise.
+      * Checks whether the 'outboundAddress' field has been set.
+      * The outbound IP address for this flow
+      * @return True if the 'outboundAddress' field has been set, false otherwise.
       */
-    public boolean hasDestAddress() {
+    public boolean hasOutboundAddress() {
       return fieldSetFlags()[4];
     }
 
 
     /**
-      * Clears the value of the 'destAddress' field.
-      * The ip address of the destination host for this flow
+      * Clears the value of the 'outboundAddress' field.
+      * The outbound IP address for this flow
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearDestAddress() {
-      destAddress = null;
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearOutboundAddress() {
+      outboundAddress = null;
       fieldSetFlags()[4] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'destPort' field.
-      * The network port on the destination host for this flow
+      * Gets the value of the 'outboundPort' field.
+      * The outbound network port for this flow
       * @return The value.
       */
-    public java.lang.Integer getDestPort() {
-      return destPort;
+    public java.lang.Integer getOutboundPort() {
+      return outboundPort;
     }
 
     /**
-      * Sets the value of the 'destPort' field.
-      * The network port on the destination host for this flow
-      * @param value The value of 'destPort'.
+      * Sets the value of the 'outboundPort' field.
+      * The outbound network port for this flow
+      * @param value The value of 'outboundPort'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder setDestPort(int value) {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder setOutboundPort(int value) {
       validate(fields()[5], value);
-      this.destPort = value;
+      this.outboundPort = value;
       fieldSetFlags()[5] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'destPort' field has been set.
-      * The network port on the destination host for this flow
-      * @return True if the 'destPort' field has been set, false otherwise.
+      * Checks whether the 'outboundPort' field has been set.
+      * The outbound network port for this flow
+      * @return True if the 'outboundPort' field has been set, false otherwise.
       */
-    public boolean hasDestPort() {
+    public boolean hasOutboundPort() {
       return fieldSetFlags()[5];
     }
 
 
     /**
-      * Clears the value of the 'destPort' field.
-      * The network port on the destination host for this flow
+      * Clears the value of the 'outboundPort' field.
+      * The outbound network port for this flow
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearDestPort() {
+    public com.bbn.tc.schema.avro.NetFlowObject.Builder clearOutboundPort() {
       fieldSetFlags()[5] = false;
       return this;
     }
@@ -681,10 +681,10 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
         } else {
           record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.AbstractObject) defaultValue(fields()[1]);
         }
-        record.srcAddress = fieldSetFlags()[2] ? this.srcAddress : (java.lang.CharSequence) defaultValue(fields()[2]);
-        record.srcPort = fieldSetFlags()[3] ? this.srcPort : (java.lang.Integer) defaultValue(fields()[3]);
-        record.destAddress = fieldSetFlags()[4] ? this.destAddress : (java.lang.CharSequence) defaultValue(fields()[4]);
-        record.destPort = fieldSetFlags()[5] ? this.destPort : (java.lang.Integer) defaultValue(fields()[5]);
+        record.inboundAddress = fieldSetFlags()[2] ? this.inboundAddress : (java.lang.CharSequence) defaultValue(fields()[2]);
+        record.inboundPort = fieldSetFlags()[3] ? this.inboundPort : (java.lang.Integer) defaultValue(fields()[3]);
+        record.outboundAddress = fieldSetFlags()[4] ? this.outboundAddress : (java.lang.CharSequence) defaultValue(fields()[4]);
+        record.outboundPort = fieldSetFlags()[5] ? this.outboundPort : (java.lang.Integer) defaultValue(fields()[5]);
         record.ipProtocol = fieldSetFlags()[6] ? this.ipProtocol : (java.lang.Integer) defaultValue(fields()[6]);
         return record;
       } catch (Exception e) {

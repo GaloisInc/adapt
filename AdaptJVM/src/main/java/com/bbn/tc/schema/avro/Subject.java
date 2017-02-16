@@ -9,39 +9,49 @@ import org.apache.avro.specific.SpecificData;
 
 @SuppressWarnings("all")
 /** * Subjects represent execution contexts and include mainly threads and processes. They can be more granular and
-     * can represent other execution boundaries such as functions and blocks if needed. */
+     * can represent other execution boundaries such as units and blocks if needed. */
 @org.apache.avro.specific.AvroGenerated
 public class Subject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -4590599271314318178L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Subject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Subjects represent execution contexts and include mainly threads and processes. They can be more granular and\\n     * can represent other execution boundaries such as functions and blocks if needed.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"universally unique identifier for the subject\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SubjectType\",\"doc\":\"* SUBJECT_PROCESS,    process\\n     * SUBJECT_THREAD, thread within a process\\n     * SUBJECT_UNIT        so far we only know of TRACE BEEP using this\",\"symbols\":[\"SUBJECT_PROCESS\",\"SUBJECT_THREAD\",\"SUBJECT_UNIT\",\"SUBJECT_BASIC_BLOCK\"]},\"doc\":\"the subject type\"},{\"name\":\"pid\",\"type\":\"int\",\"doc\":\"OS process id for type process and unit id for a unit (Optional)\"},{\"name\":\"ppid\",\"type\":\"int\",\"doc\":\"OS parent process id for type process and pid for type unit (Optional)\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"Where it came from, see InstrumentationSource\"},{\"name\":\"startTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The start time of the subject\\n         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\\n         * (Optional)\",\"default\":null},{\"name\":\"unitId\",\"type\":[\"null\",\"int\"],\"doc\":\"unit id for unit based instrumentation (Optional)\",\"default\":null},{\"name\":\"endTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"The end time of the subject (Optional)\",\"default\":null},{\"name\":\"cmdLine\",\"type\":[\"null\",\"string\"],\"doc\":\"Process command line arguments including process name (Optional)\",\"default\":null},{\"name\":\"importedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"imported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"exportedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"exported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"pInfo\",\"type\":[\"null\",\"string\"],\"doc\":\"additional process information, such portable execution (PE) info in windows (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = 7670602253610774862L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Subject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Subjects represent execution contexts and include mainly threads and processes. They can be more granular and\\n     * can represent other execution boundaries such as units and blocks if needed.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"universally unique identifier for the subject\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SubjectType\",\"doc\":\"* SubjectType enumerates the types of execution contexts supported.\\n     *\\n     * SUBJECT_PROCESS,    process\\n     * SUBJECT_THREAD,     thread within a process\\n     * SUBJECT_UNIT        so far we only know of TRACE BEEP using this\",\"symbols\":[\"SUBJECT_PROCESS\",\"SUBJECT_THREAD\",\"SUBJECT_UNIT\",\"SUBJECT_BASIC_BLOCK\"]},\"doc\":\"the subject type\"},{\"name\":\"cid\",\"type\":\"int\",\"doc\":\"Context ID: OS process id for type process, thread id for threads, or unit id for a unit\"},{\"name\":\"parentSubject\",\"type\":\"UUID\",\"doc\":\"* parent subject's UUID. For a process, this is a parent\\n         * process. For a thread, this is the process that created the\\n         * thread.\"},{\"name\":\"localPrincipal\",\"type\":\"UUID\",\"doc\":\"UUID of local principal that owns this subject\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* InstrumentationSource identifies the source reporting provenance information.\\n     *\\n     * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n     * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * SOURCE_FREEBSD_DTRACE_CADETS,      from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_TESLA_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS,        from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_MACIF_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n     * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation source\\n     * SOURCE_WINDOWS_DIFT_FAROS,         from FAROS' DIFT module\\n     * SOURCE_WINDOWS_PSA_FAROS,          from FAROS' PSA module\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections windows events\",\"symbols\":[\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_WINDOWS_PSA_FAROS\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"Where it came from, see InstrumentationSource\"},{\"name\":\"startTimestampNanos\",\"type\":\"long\",\"doc\":\"* The start time of the subject\\n         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\"},{\"name\":\"unitId\",\"type\":[\"null\",\"int\"],\"doc\":\"unit id for unit based instrumentation (Optional)\",\"default\":null},{\"name\":\"iteration\",\"type\":[\"null\",\"int\"],\"doc\":\"iteration and count are used for distinguishing individual “units” of execution (Optional)\",\"default\":null},{\"name\":\"count\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"cmdLine\",\"type\":[\"null\",\"string\"],\"doc\":\"Process command line arguments including process name (Optional)\",\"default\":null},{\"name\":\"privilegeLevel\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"PrivilegeLevel\",\"doc\":\"* Windows allows Subjects (processes) to have the following\\n     * enumerated privilege levels.\",\"symbols\":[\"LIMITED\",\"ELEVATED\",\"FULL\"]}],\"doc\":\"Windows allows processes to have different privilege levels (Optional)\",\"default\":null},{\"name\":\"importedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"* imported libraries. (Optional). Lists the libraries that\\n         * are expected to be loaded, but may not necessarily\\n         * correspond 1-to-1 with actual load library events because\\n         * some libraries may already be loaded when this event\\n         * occurs.\",\"default\":null},{\"name\":\"exportedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"exported libraries. (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** universally unique identifier for the subject */
   @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
   /** the subject type */
   @Deprecated public com.bbn.tc.schema.avro.SubjectType type;
-  /** OS process id for type process and unit id for a unit (Optional) */
-  @Deprecated public int pid;
-  /** OS parent process id for type process and pid for type unit (Optional) */
-  @Deprecated public int ppid;
+  /** Context ID: OS process id for type process, thread id for threads, or unit id for a unit */
+  @Deprecated public int cid;
+  /** * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread. */
+  @Deprecated public com.bbn.tc.schema.avro.UUID parentSubject;
+  /** UUID of local principal that owns this subject */
+  @Deprecated public com.bbn.tc.schema.avro.UUID localPrincipal;
   /** Where it came from, see InstrumentationSource */
   @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
   /** * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional) */
-  @Deprecated public java.lang.Long startTimestampMicros;
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
+  @Deprecated public long startTimestampNanos;
   /** unit id for unit based instrumentation (Optional) */
   @Deprecated public java.lang.Integer unitId;
-  /** The end time of the subject (Optional) */
-  @Deprecated public java.lang.Long endTimestampMicros;
+  /** iteration and count are used for distinguishing individual “units” of execution (Optional) */
+  @Deprecated public java.lang.Integer iteration;
+  @Deprecated public java.lang.Integer count;
   /** Process command line arguments including process name (Optional) */
   @Deprecated public java.lang.CharSequence cmdLine;
-  /** imported libraries (static or dynamic), (Optional) */
+  /** Windows allows processes to have different privilege levels (Optional) */
+  @Deprecated public com.bbn.tc.schema.avro.PrivilegeLevel privilegeLevel;
+  /** * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs. */
   @Deprecated public java.util.List<java.lang.CharSequence> importedLibraries;
-  /** exported libraries (static or dynamic), (Optional) */
+  /** exported libraries. (Optional) */
   @Deprecated public java.util.List<java.lang.CharSequence> exportedLibraries;
-  /** additional process information, such portable execution (PE) info in windows (Optional) */
-  @Deprecated public java.lang.CharSequence pInfo;
-  /** Arbitrary key, value pairs describing the entity */
+  /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
   @Deprecated public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
   /**
@@ -55,33 +65,44 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * All-args constructor.
    * @param uuid universally unique identifier for the subject
    * @param type the subject type
-   * @param pid OS process id for type process and unit id for a unit (Optional)
-   * @param ppid OS parent process id for type process and pid for type unit (Optional)
+   * @param cid Context ID: OS process id for type process, thread id for threads, or unit id for a unit
+   * @param parentSubject * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
+   * @param localPrincipal UUID of local principal that owns this subject
    * @param source Where it came from, see InstrumentationSource
-   * @param startTimestampMicros * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
+   * @param startTimestampNanos * The start time of the subject
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
    * @param unitId unit id for unit based instrumentation (Optional)
-   * @param endTimestampMicros The end time of the subject (Optional)
+   * @param iteration iteration and count are used for distinguishing individual “units” of execution (Optional)
+   * @param count The new value for count
    * @param cmdLine Process command line arguments including process name (Optional)
-   * @param importedLibraries imported libraries (static or dynamic), (Optional)
-   * @param exportedLibraries exported libraries (static or dynamic), (Optional)
-   * @param pInfo additional process information, such portable execution (PE) info in windows (Optional)
-   * @param properties Arbitrary key, value pairs describing the entity
+   * @param privilegeLevel Windows allows processes to have different privilege levels (Optional)
+   * @param importedLibraries * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
+   * @param exportedLibraries exported libraries. (Optional)
+   * @param properties * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
-  public Subject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.SubjectType type, java.lang.Integer pid, java.lang.Integer ppid, com.bbn.tc.schema.avro.InstrumentationSource source, java.lang.Long startTimestampMicros, java.lang.Integer unitId, java.lang.Long endTimestampMicros, java.lang.CharSequence cmdLine, java.util.List<java.lang.CharSequence> importedLibraries, java.util.List<java.lang.CharSequence> exportedLibraries, java.lang.CharSequence pInfo, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public Subject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.SubjectType type, java.lang.Integer cid, com.bbn.tc.schema.avro.UUID parentSubject, com.bbn.tc.schema.avro.UUID localPrincipal, com.bbn.tc.schema.avro.InstrumentationSource source, java.lang.Long startTimestampNanos, java.lang.Integer unitId, java.lang.Integer iteration, java.lang.Integer count, java.lang.CharSequence cmdLine, com.bbn.tc.schema.avro.PrivilegeLevel privilegeLevel, java.util.List<java.lang.CharSequence> importedLibraries, java.util.List<java.lang.CharSequence> exportedLibraries, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.uuid = uuid;
     this.type = type;
-    this.pid = pid;
-    this.ppid = ppid;
+    this.cid = cid;
+    this.parentSubject = parentSubject;
+    this.localPrincipal = localPrincipal;
     this.source = source;
-    this.startTimestampMicros = startTimestampMicros;
+    this.startTimestampNanos = startTimestampNanos;
     this.unitId = unitId;
-    this.endTimestampMicros = endTimestampMicros;
+    this.iteration = iteration;
+    this.count = count;
     this.cmdLine = cmdLine;
+    this.privilegeLevel = privilegeLevel;
     this.importedLibraries = importedLibraries;
     this.exportedLibraries = exportedLibraries;
-    this.pInfo = pInfo;
     this.properties = properties;
   }
 
@@ -91,17 +112,19 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     switch (field$) {
     case 0: return uuid;
     case 1: return type;
-    case 2: return pid;
-    case 3: return ppid;
-    case 4: return source;
-    case 5: return startTimestampMicros;
-    case 6: return unitId;
-    case 7: return endTimestampMicros;
-    case 8: return cmdLine;
-    case 9: return importedLibraries;
-    case 10: return exportedLibraries;
-    case 11: return pInfo;
-    case 12: return properties;
+    case 2: return cid;
+    case 3: return parentSubject;
+    case 4: return localPrincipal;
+    case 5: return source;
+    case 6: return startTimestampNanos;
+    case 7: return unitId;
+    case 8: return iteration;
+    case 9: return count;
+    case 10: return cmdLine;
+    case 11: return privilegeLevel;
+    case 12: return importedLibraries;
+    case 13: return exportedLibraries;
+    case 14: return properties;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -112,17 +135,19 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     switch (field$) {
     case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
     case 1: type = (com.bbn.tc.schema.avro.SubjectType)value$; break;
-    case 2: pid = (java.lang.Integer)value$; break;
-    case 3: ppid = (java.lang.Integer)value$; break;
-    case 4: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
-    case 5: startTimestampMicros = (java.lang.Long)value$; break;
-    case 6: unitId = (java.lang.Integer)value$; break;
-    case 7: endTimestampMicros = (java.lang.Long)value$; break;
-    case 8: cmdLine = (java.lang.CharSequence)value$; break;
-    case 9: importedLibraries = (java.util.List<java.lang.CharSequence>)value$; break;
-    case 10: exportedLibraries = (java.util.List<java.lang.CharSequence>)value$; break;
-    case 11: pInfo = (java.lang.CharSequence)value$; break;
-    case 12: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
+    case 2: cid = (java.lang.Integer)value$; break;
+    case 3: parentSubject = (com.bbn.tc.schema.avro.UUID)value$; break;
+    case 4: localPrincipal = (com.bbn.tc.schema.avro.UUID)value$; break;
+    case 5: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
+    case 6: startTimestampNanos = (java.lang.Long)value$; break;
+    case 7: unitId = (java.lang.Integer)value$; break;
+    case 8: iteration = (java.lang.Integer)value$; break;
+    case 9: count = (java.lang.Integer)value$; break;
+    case 10: cmdLine = (java.lang.CharSequence)value$; break;
+    case 11: privilegeLevel = (com.bbn.tc.schema.avro.PrivilegeLevel)value$; break;
+    case 12: importedLibraries = (java.util.List<java.lang.CharSequence>)value$; break;
+    case 13: exportedLibraries = (java.util.List<java.lang.CharSequence>)value$; break;
+    case 14: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -162,37 +187,58 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   }
 
   /**
-   * Gets the value of the 'pid' field.
-   * @return OS process id for type process and unit id for a unit (Optional)
+   * Gets the value of the 'cid' field.
+   * @return Context ID: OS process id for type process, thread id for threads, or unit id for a unit
    */
-  public java.lang.Integer getPid() {
-    return pid;
+  public java.lang.Integer getCid() {
+    return cid;
   }
 
   /**
-   * Sets the value of the 'pid' field.
-   * OS process id for type process and unit id for a unit (Optional)
+   * Sets the value of the 'cid' field.
+   * Context ID: OS process id for type process, thread id for threads, or unit id for a unit
    * @param value the value to set.
    */
-  public void setPid(java.lang.Integer value) {
-    this.pid = value;
+  public void setCid(java.lang.Integer value) {
+    this.cid = value;
   }
 
   /**
-   * Gets the value of the 'ppid' field.
-   * @return OS parent process id for type process and pid for type unit (Optional)
+   * Gets the value of the 'parentSubject' field.
+   * @return * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
    */
-  public java.lang.Integer getPpid() {
-    return ppid;
+  public com.bbn.tc.schema.avro.UUID getParentSubject() {
+    return parentSubject;
   }
 
   /**
-   * Sets the value of the 'ppid' field.
-   * OS parent process id for type process and pid for type unit (Optional)
+   * Sets the value of the 'parentSubject' field.
+   * * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
    * @param value the value to set.
    */
-  public void setPpid(java.lang.Integer value) {
-    this.ppid = value;
+  public void setParentSubject(com.bbn.tc.schema.avro.UUID value) {
+    this.parentSubject = value;
+  }
+
+  /**
+   * Gets the value of the 'localPrincipal' field.
+   * @return UUID of local principal that owns this subject
+   */
+  public com.bbn.tc.schema.avro.UUID getLocalPrincipal() {
+    return localPrincipal;
+  }
+
+  /**
+   * Sets the value of the 'localPrincipal' field.
+   * UUID of local principal that owns this subject
+   * @param value the value to set.
+   */
+  public void setLocalPrincipal(com.bbn.tc.schema.avro.UUID value) {
+    this.localPrincipal = value;
   }
 
   /**
@@ -213,24 +259,22 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   }
 
   /**
-   * Gets the value of the 'startTimestampMicros' field.
+   * Gets the value of the 'startTimestampNanos' field.
    * @return * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
    */
-  public java.lang.Long getStartTimestampMicros() {
-    return startTimestampMicros;
+  public java.lang.Long getStartTimestampNanos() {
+    return startTimestampNanos;
   }
 
   /**
-   * Sets the value of the 'startTimestampMicros' field.
+   * Sets the value of the 'startTimestampNanos' field.
    * * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
    * @param value the value to set.
    */
-  public void setStartTimestampMicros(java.lang.Long value) {
-    this.startTimestampMicros = value;
+  public void setStartTimestampNanos(java.lang.Long value) {
+    this.startTimestampNanos = value;
   }
 
   /**
@@ -251,20 +295,36 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   }
 
   /**
-   * Gets the value of the 'endTimestampMicros' field.
-   * @return The end time of the subject (Optional)
+   * Gets the value of the 'iteration' field.
+   * @return iteration and count are used for distinguishing individual “units” of execution (Optional)
    */
-  public java.lang.Long getEndTimestampMicros() {
-    return endTimestampMicros;
+  public java.lang.Integer getIteration() {
+    return iteration;
   }
 
   /**
-   * Sets the value of the 'endTimestampMicros' field.
-   * The end time of the subject (Optional)
+   * Sets the value of the 'iteration' field.
+   * iteration and count are used for distinguishing individual “units” of execution (Optional)
    * @param value the value to set.
    */
-  public void setEndTimestampMicros(java.lang.Long value) {
-    this.endTimestampMicros = value;
+  public void setIteration(java.lang.Integer value) {
+    this.iteration = value;
+  }
+
+  /**
+   * Gets the value of the 'count' field.
+   * @return The value of the 'count' field.
+   */
+  public java.lang.Integer getCount() {
+    return count;
+  }
+
+  /**
+   * Sets the value of the 'count' field.
+   * @param value the value to set.
+   */
+  public void setCount(java.lang.Integer value) {
+    this.count = value;
   }
 
   /**
@@ -285,8 +345,29 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   }
 
   /**
+   * Gets the value of the 'privilegeLevel' field.
+   * @return Windows allows processes to have different privilege levels (Optional)
+   */
+  public com.bbn.tc.schema.avro.PrivilegeLevel getPrivilegeLevel() {
+    return privilegeLevel;
+  }
+
+  /**
+   * Sets the value of the 'privilegeLevel' field.
+   * Windows allows processes to have different privilege levels (Optional)
+   * @param value the value to set.
+   */
+  public void setPrivilegeLevel(com.bbn.tc.schema.avro.PrivilegeLevel value) {
+    this.privilegeLevel = value;
+  }
+
+  /**
    * Gets the value of the 'importedLibraries' field.
-   * @return imported libraries (static or dynamic), (Optional)
+   * @return * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
    */
   public java.util.List<java.lang.CharSequence> getImportedLibraries() {
     return importedLibraries;
@@ -294,7 +375,11 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
   /**
    * Sets the value of the 'importedLibraries' field.
-   * imported libraries (static or dynamic), (Optional)
+   * * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
    * @param value the value to set.
    */
   public void setImportedLibraries(java.util.List<java.lang.CharSequence> value) {
@@ -303,7 +388,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
   /**
    * Gets the value of the 'exportedLibraries' field.
-   * @return exported libraries (static or dynamic), (Optional)
+   * @return exported libraries. (Optional)
    */
   public java.util.List<java.lang.CharSequence> getExportedLibraries() {
     return exportedLibraries;
@@ -311,7 +396,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
   /**
    * Sets the value of the 'exportedLibraries' field.
-   * exported libraries (static or dynamic), (Optional)
+   * exported libraries. (Optional)
    * @param value the value to set.
    */
   public void setExportedLibraries(java.util.List<java.lang.CharSequence> value) {
@@ -319,25 +404,10 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   }
 
   /**
-   * Gets the value of the 'pInfo' field.
-   * @return additional process information, such portable execution (PE) info in windows (Optional)
-   */
-  public java.lang.CharSequence getPInfo() {
-    return pInfo;
-  }
-
-  /**
-   * Sets the value of the 'pInfo' field.
-   * additional process information, such portable execution (PE) info in windows (Optional)
-   * @param value the value to set.
-   */
-  public void setPInfo(java.lang.CharSequence value) {
-    this.pInfo = value;
-  }
-
-  /**
    * Gets the value of the 'properties' field.
-   * @return Arbitrary key, value pairs describing the entity
+   * @return * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
   public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
     return properties;
@@ -345,7 +415,9 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
   /**
    * Sets the value of the 'properties' field.
-   * Arbitrary key, value pairs describing the entity
+   * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    * @param value the value to set.
    */
   public void setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
@@ -388,29 +460,39 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     private com.bbn.tc.schema.avro.UUID uuid;
     /** the subject type */
     private com.bbn.tc.schema.avro.SubjectType type;
-    /** OS process id for type process and unit id for a unit (Optional) */
-    private int pid;
-    /** OS parent process id for type process and pid for type unit (Optional) */
-    private int ppid;
+    /** Context ID: OS process id for type process, thread id for threads, or unit id for a unit */
+    private int cid;
+    /** * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread. */
+    private com.bbn.tc.schema.avro.UUID parentSubject;
+    /** UUID of local principal that owns this subject */
+    private com.bbn.tc.schema.avro.UUID localPrincipal;
     /** Where it came from, see InstrumentationSource */
     private com.bbn.tc.schema.avro.InstrumentationSource source;
     /** * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional) */
-    private java.lang.Long startTimestampMicros;
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
+    private long startTimestampNanos;
     /** unit id for unit based instrumentation (Optional) */
     private java.lang.Integer unitId;
-    /** The end time of the subject (Optional) */
-    private java.lang.Long endTimestampMicros;
+    /** iteration and count are used for distinguishing individual “units” of execution (Optional) */
+    private java.lang.Integer iteration;
+    private java.lang.Integer count;
     /** Process command line arguments including process name (Optional) */
     private java.lang.CharSequence cmdLine;
-    /** imported libraries (static or dynamic), (Optional) */
+    /** Windows allows processes to have different privilege levels (Optional) */
+    private com.bbn.tc.schema.avro.PrivilegeLevel privilegeLevel;
+    /** * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs. */
     private java.util.List<java.lang.CharSequence> importedLibraries;
-    /** exported libraries (static or dynamic), (Optional) */
+    /** exported libraries. (Optional) */
     private java.util.List<java.lang.CharSequence> exportedLibraries;
-    /** additional process information, such portable execution (PE) info in windows (Optional) */
-    private java.lang.CharSequence pInfo;
-    /** Arbitrary key, value pairs describing the entity */
+    /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
     private java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
     /** Creates a new Builder */
@@ -432,49 +514,57 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
         this.type = data().deepCopy(fields()[1].schema(), other.type);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.pid)) {
-        this.pid = data().deepCopy(fields()[2].schema(), other.pid);
+      if (isValidValue(fields()[2], other.cid)) {
+        this.cid = data().deepCopy(fields()[2].schema(), other.cid);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.ppid)) {
-        this.ppid = data().deepCopy(fields()[3].schema(), other.ppid);
+      if (isValidValue(fields()[3], other.parentSubject)) {
+        this.parentSubject = data().deepCopy(fields()[3].schema(), other.parentSubject);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.source)) {
-        this.source = data().deepCopy(fields()[4].schema(), other.source);
+      if (isValidValue(fields()[4], other.localPrincipal)) {
+        this.localPrincipal = data().deepCopy(fields()[4].schema(), other.localPrincipal);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.startTimestampMicros)) {
-        this.startTimestampMicros = data().deepCopy(fields()[5].schema(), other.startTimestampMicros);
+      if (isValidValue(fields()[5], other.source)) {
+        this.source = data().deepCopy(fields()[5].schema(), other.source);
         fieldSetFlags()[5] = true;
       }
-      if (isValidValue(fields()[6], other.unitId)) {
-        this.unitId = data().deepCopy(fields()[6].schema(), other.unitId);
+      if (isValidValue(fields()[6], other.startTimestampNanos)) {
+        this.startTimestampNanos = data().deepCopy(fields()[6].schema(), other.startTimestampNanos);
         fieldSetFlags()[6] = true;
       }
-      if (isValidValue(fields()[7], other.endTimestampMicros)) {
-        this.endTimestampMicros = data().deepCopy(fields()[7].schema(), other.endTimestampMicros);
+      if (isValidValue(fields()[7], other.unitId)) {
+        this.unitId = data().deepCopy(fields()[7].schema(), other.unitId);
         fieldSetFlags()[7] = true;
       }
-      if (isValidValue(fields()[8], other.cmdLine)) {
-        this.cmdLine = data().deepCopy(fields()[8].schema(), other.cmdLine);
+      if (isValidValue(fields()[8], other.iteration)) {
+        this.iteration = data().deepCopy(fields()[8].schema(), other.iteration);
         fieldSetFlags()[8] = true;
       }
-      if (isValidValue(fields()[9], other.importedLibraries)) {
-        this.importedLibraries = data().deepCopy(fields()[9].schema(), other.importedLibraries);
+      if (isValidValue(fields()[9], other.count)) {
+        this.count = data().deepCopy(fields()[9].schema(), other.count);
         fieldSetFlags()[9] = true;
       }
-      if (isValidValue(fields()[10], other.exportedLibraries)) {
-        this.exportedLibraries = data().deepCopy(fields()[10].schema(), other.exportedLibraries);
+      if (isValidValue(fields()[10], other.cmdLine)) {
+        this.cmdLine = data().deepCopy(fields()[10].schema(), other.cmdLine);
         fieldSetFlags()[10] = true;
       }
-      if (isValidValue(fields()[11], other.pInfo)) {
-        this.pInfo = data().deepCopy(fields()[11].schema(), other.pInfo);
+      if (isValidValue(fields()[11], other.privilegeLevel)) {
+        this.privilegeLevel = data().deepCopy(fields()[11].schema(), other.privilegeLevel);
         fieldSetFlags()[11] = true;
       }
-      if (isValidValue(fields()[12], other.properties)) {
-        this.properties = data().deepCopy(fields()[12].schema(), other.properties);
+      if (isValidValue(fields()[12], other.importedLibraries)) {
+        this.importedLibraries = data().deepCopy(fields()[12].schema(), other.importedLibraries);
         fieldSetFlags()[12] = true;
+      }
+      if (isValidValue(fields()[13], other.exportedLibraries)) {
+        this.exportedLibraries = data().deepCopy(fields()[13].schema(), other.exportedLibraries);
+        fieldSetFlags()[13] = true;
+      }
+      if (isValidValue(fields()[14], other.properties)) {
+        this.properties = data().deepCopy(fields()[14].schema(), other.properties);
+        fieldSetFlags()[14] = true;
       }
     }
 
@@ -492,49 +582,57 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
         this.type = data().deepCopy(fields()[1].schema(), other.type);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.pid)) {
-        this.pid = data().deepCopy(fields()[2].schema(), other.pid);
+      if (isValidValue(fields()[2], other.cid)) {
+        this.cid = data().deepCopy(fields()[2].schema(), other.cid);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.ppid)) {
-        this.ppid = data().deepCopy(fields()[3].schema(), other.ppid);
+      if (isValidValue(fields()[3], other.parentSubject)) {
+        this.parentSubject = data().deepCopy(fields()[3].schema(), other.parentSubject);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.source)) {
-        this.source = data().deepCopy(fields()[4].schema(), other.source);
+      if (isValidValue(fields()[4], other.localPrincipal)) {
+        this.localPrincipal = data().deepCopy(fields()[4].schema(), other.localPrincipal);
         fieldSetFlags()[4] = true;
       }
-      if (isValidValue(fields()[5], other.startTimestampMicros)) {
-        this.startTimestampMicros = data().deepCopy(fields()[5].schema(), other.startTimestampMicros);
+      if (isValidValue(fields()[5], other.source)) {
+        this.source = data().deepCopy(fields()[5].schema(), other.source);
         fieldSetFlags()[5] = true;
       }
-      if (isValidValue(fields()[6], other.unitId)) {
-        this.unitId = data().deepCopy(fields()[6].schema(), other.unitId);
+      if (isValidValue(fields()[6], other.startTimestampNanos)) {
+        this.startTimestampNanos = data().deepCopy(fields()[6].schema(), other.startTimestampNanos);
         fieldSetFlags()[6] = true;
       }
-      if (isValidValue(fields()[7], other.endTimestampMicros)) {
-        this.endTimestampMicros = data().deepCopy(fields()[7].schema(), other.endTimestampMicros);
+      if (isValidValue(fields()[7], other.unitId)) {
+        this.unitId = data().deepCopy(fields()[7].schema(), other.unitId);
         fieldSetFlags()[7] = true;
       }
-      if (isValidValue(fields()[8], other.cmdLine)) {
-        this.cmdLine = data().deepCopy(fields()[8].schema(), other.cmdLine);
+      if (isValidValue(fields()[8], other.iteration)) {
+        this.iteration = data().deepCopy(fields()[8].schema(), other.iteration);
         fieldSetFlags()[8] = true;
       }
-      if (isValidValue(fields()[9], other.importedLibraries)) {
-        this.importedLibraries = data().deepCopy(fields()[9].schema(), other.importedLibraries);
+      if (isValidValue(fields()[9], other.count)) {
+        this.count = data().deepCopy(fields()[9].schema(), other.count);
         fieldSetFlags()[9] = true;
       }
-      if (isValidValue(fields()[10], other.exportedLibraries)) {
-        this.exportedLibraries = data().deepCopy(fields()[10].schema(), other.exportedLibraries);
+      if (isValidValue(fields()[10], other.cmdLine)) {
+        this.cmdLine = data().deepCopy(fields()[10].schema(), other.cmdLine);
         fieldSetFlags()[10] = true;
       }
-      if (isValidValue(fields()[11], other.pInfo)) {
-        this.pInfo = data().deepCopy(fields()[11].schema(), other.pInfo);
+      if (isValidValue(fields()[11], other.privilegeLevel)) {
+        this.privilegeLevel = data().deepCopy(fields()[11].schema(), other.privilegeLevel);
         fieldSetFlags()[11] = true;
       }
-      if (isValidValue(fields()[12], other.properties)) {
-        this.properties = data().deepCopy(fields()[12].schema(), other.properties);
+      if (isValidValue(fields()[12], other.importedLibraries)) {
+        this.importedLibraries = data().deepCopy(fields()[12].schema(), other.importedLibraries);
         fieldSetFlags()[12] = true;
+      }
+      if (isValidValue(fields()[13], other.exportedLibraries)) {
+        this.exportedLibraries = data().deepCopy(fields()[13].schema(), other.exportedLibraries);
+        fieldSetFlags()[13] = true;
+      }
+      if (isValidValue(fields()[14], other.properties)) {
+        this.properties = data().deepCopy(fields()[14].schema(), other.properties);
+        fieldSetFlags()[14] = true;
       }
     }
 
@@ -625,86 +723,138 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     }
 
     /**
-      * Gets the value of the 'pid' field.
-      * OS process id for type process and unit id for a unit (Optional)
+      * Gets the value of the 'cid' field.
+      * Context ID: OS process id for type process, thread id for threads, or unit id for a unit
       * @return The value.
       */
-    public java.lang.Integer getPid() {
-      return pid;
+    public java.lang.Integer getCid() {
+      return cid;
     }
 
     /**
-      * Sets the value of the 'pid' field.
-      * OS process id for type process and unit id for a unit (Optional)
-      * @param value The value of 'pid'.
+      * Sets the value of the 'cid' field.
+      * Context ID: OS process id for type process, thread id for threads, or unit id for a unit
+      * @param value The value of 'cid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setPid(int value) {
+    public com.bbn.tc.schema.avro.Subject.Builder setCid(int value) {
       validate(fields()[2], value);
-      this.pid = value;
+      this.cid = value;
       fieldSetFlags()[2] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'pid' field has been set.
-      * OS process id for type process and unit id for a unit (Optional)
-      * @return True if the 'pid' field has been set, false otherwise.
+      * Checks whether the 'cid' field has been set.
+      * Context ID: OS process id for type process, thread id for threads, or unit id for a unit
+      * @return True if the 'cid' field has been set, false otherwise.
       */
-    public boolean hasPid() {
+    public boolean hasCid() {
       return fieldSetFlags()[2];
     }
 
 
     /**
-      * Clears the value of the 'pid' field.
-      * OS process id for type process and unit id for a unit (Optional)
+      * Clears the value of the 'cid' field.
+      * Context ID: OS process id for type process, thread id for threads, or unit id for a unit
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPid() {
+    public com.bbn.tc.schema.avro.Subject.Builder clearCid() {
       fieldSetFlags()[2] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'ppid' field.
-      * OS parent process id for type process and pid for type unit (Optional)
+      * Gets the value of the 'parentSubject' field.
+      * * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
       * @return The value.
       */
-    public java.lang.Integer getPpid() {
-      return ppid;
+    public com.bbn.tc.schema.avro.UUID getParentSubject() {
+      return parentSubject;
     }
 
     /**
-      * Sets the value of the 'ppid' field.
-      * OS parent process id for type process and pid for type unit (Optional)
-      * @param value The value of 'ppid'.
+      * Sets the value of the 'parentSubject' field.
+      * * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
+      * @param value The value of 'parentSubject'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setPpid(int value) {
+    public com.bbn.tc.schema.avro.Subject.Builder setParentSubject(com.bbn.tc.schema.avro.UUID value) {
       validate(fields()[3], value);
-      this.ppid = value;
+      this.parentSubject = value;
       fieldSetFlags()[3] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'ppid' field has been set.
-      * OS parent process id for type process and pid for type unit (Optional)
-      * @return True if the 'ppid' field has been set, false otherwise.
+      * Checks whether the 'parentSubject' field has been set.
+      * * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
+      * @return True if the 'parentSubject' field has been set, false otherwise.
       */
-    public boolean hasPpid() {
+    public boolean hasParentSubject() {
       return fieldSetFlags()[3];
     }
 
 
     /**
-      * Clears the value of the 'ppid' field.
-      * OS parent process id for type process and pid for type unit (Optional)
+      * Clears the value of the 'parentSubject' field.
+      * * parent subject's UUID. For a process, this is a parent
+         * process. For a thread, this is the process that created the
+         * thread.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPpid() {
+    public com.bbn.tc.schema.avro.Subject.Builder clearParentSubject() {
+      parentSubject = null;
       fieldSetFlags()[3] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'localPrincipal' field.
+      * UUID of local principal that owns this subject
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.UUID getLocalPrincipal() {
+      return localPrincipal;
+    }
+
+    /**
+      * Sets the value of the 'localPrincipal' field.
+      * UUID of local principal that owns this subject
+      * @param value The value of 'localPrincipal'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder setLocalPrincipal(com.bbn.tc.schema.avro.UUID value) {
+      validate(fields()[4], value);
+      this.localPrincipal = value;
+      fieldSetFlags()[4] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'localPrincipal' field has been set.
+      * UUID of local principal that owns this subject
+      * @return True if the 'localPrincipal' field has been set, false otherwise.
+      */
+    public boolean hasLocalPrincipal() {
+      return fieldSetFlags()[4];
+    }
+
+
+    /**
+      * Clears the value of the 'localPrincipal' field.
+      * UUID of local principal that owns this subject
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder clearLocalPrincipal() {
+      localPrincipal = null;
+      fieldSetFlags()[4] = false;
       return this;
     }
 
@@ -724,9 +874,9 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
-      validate(fields()[4], value);
+      validate(fields()[5], value);
       this.source = value;
-      fieldSetFlags()[4] = true;
+      fieldSetFlags()[5] = true;
       return this;
     }
 
@@ -736,7 +886,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return True if the 'source' field has been set, false otherwise.
       */
     public boolean hasSource() {
-      return fieldSetFlags()[4];
+      return fieldSetFlags()[5];
     }
 
 
@@ -747,58 +897,53 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearSource() {
       source = null;
-      fieldSetFlags()[4] = false;
+      fieldSetFlags()[5] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'startTimestampMicros' field.
+      * Gets the value of the 'startTimestampNanos' field.
       * * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
       * @return The value.
       */
-    public java.lang.Long getStartTimestampMicros() {
-      return startTimestampMicros;
+    public java.lang.Long getStartTimestampNanos() {
+      return startTimestampNanos;
     }
 
     /**
-      * Sets the value of the 'startTimestampMicros' field.
+      * Sets the value of the 'startTimestampNanos' field.
       * * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
-      * @param value The value of 'startTimestampMicros'.
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+      * @param value The value of 'startTimestampNanos'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setStartTimestampMicros(java.lang.Long value) {
-      validate(fields()[5], value);
-      this.startTimestampMicros = value;
-      fieldSetFlags()[5] = true;
+    public com.bbn.tc.schema.avro.Subject.Builder setStartTimestampNanos(long value) {
+      validate(fields()[6], value);
+      this.startTimestampNanos = value;
+      fieldSetFlags()[6] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'startTimestampMicros' field has been set.
+      * Checks whether the 'startTimestampNanos' field has been set.
       * * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
-      * @return True if the 'startTimestampMicros' field has been set, false otherwise.
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+      * @return True if the 'startTimestampNanos' field has been set, false otherwise.
       */
-    public boolean hasStartTimestampMicros() {
-      return fieldSetFlags()[5];
+    public boolean hasStartTimestampNanos() {
+      return fieldSetFlags()[6];
     }
 
 
     /**
-      * Clears the value of the 'startTimestampMicros' field.
+      * Clears the value of the 'startTimestampNanos' field.
       * * The start time of the subject
-         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-         * (Optional)
+         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearStartTimestampMicros() {
-      startTimestampMicros = null;
-      fieldSetFlags()[5] = false;
+    public com.bbn.tc.schema.avro.Subject.Builder clearStartTimestampNanos() {
+      fieldSetFlags()[6] = false;
       return this;
     }
 
@@ -818,9 +963,9 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setUnitId(java.lang.Integer value) {
-      validate(fields()[6], value);
+      validate(fields()[7], value);
       this.unitId = value;
-      fieldSetFlags()[6] = true;
+      fieldSetFlags()[7] = true;
       return this;
     }
 
@@ -830,7 +975,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return True if the 'unitId' field has been set, false otherwise.
       */
     public boolean hasUnitId() {
-      return fieldSetFlags()[6];
+      return fieldSetFlags()[7];
     }
 
 
@@ -841,50 +986,89 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearUnitId() {
       unitId = null;
-      fieldSetFlags()[6] = false;
+      fieldSetFlags()[7] = false;
       return this;
     }
 
     /**
-      * Gets the value of the 'endTimestampMicros' field.
-      * The end time of the subject (Optional)
+      * Gets the value of the 'iteration' field.
+      * iteration and count are used for distinguishing individual “units” of execution (Optional)
       * @return The value.
       */
-    public java.lang.Long getEndTimestampMicros() {
-      return endTimestampMicros;
+    public java.lang.Integer getIteration() {
+      return iteration;
     }
 
     /**
-      * Sets the value of the 'endTimestampMicros' field.
-      * The end time of the subject (Optional)
-      * @param value The value of 'endTimestampMicros'.
+      * Sets the value of the 'iteration' field.
+      * iteration and count are used for distinguishing individual “units” of execution (Optional)
+      * @param value The value of 'iteration'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setEndTimestampMicros(java.lang.Long value) {
-      validate(fields()[7], value);
-      this.endTimestampMicros = value;
-      fieldSetFlags()[7] = true;
+    public com.bbn.tc.schema.avro.Subject.Builder setIteration(java.lang.Integer value) {
+      validate(fields()[8], value);
+      this.iteration = value;
+      fieldSetFlags()[8] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'endTimestampMicros' field has been set.
-      * The end time of the subject (Optional)
-      * @return True if the 'endTimestampMicros' field has been set, false otherwise.
+      * Checks whether the 'iteration' field has been set.
+      * iteration and count are used for distinguishing individual “units” of execution (Optional)
+      * @return True if the 'iteration' field has been set, false otherwise.
       */
-    public boolean hasEndTimestampMicros() {
-      return fieldSetFlags()[7];
+    public boolean hasIteration() {
+      return fieldSetFlags()[8];
     }
 
 
     /**
-      * Clears the value of the 'endTimestampMicros' field.
-      * The end time of the subject (Optional)
+      * Clears the value of the 'iteration' field.
+      * iteration and count are used for distinguishing individual “units” of execution (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearEndTimestampMicros() {
-      endTimestampMicros = null;
-      fieldSetFlags()[7] = false;
+    public com.bbn.tc.schema.avro.Subject.Builder clearIteration() {
+      iteration = null;
+      fieldSetFlags()[8] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'count' field.
+      * @return The value.
+      */
+    public java.lang.Integer getCount() {
+      return count;
+    }
+
+    /**
+      * Sets the value of the 'count' field.
+      * @param value The value of 'count'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder setCount(java.lang.Integer value) {
+      validate(fields()[9], value);
+      this.count = value;
+      fieldSetFlags()[9] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'count' field has been set.
+      * @return True if the 'count' field has been set, false otherwise.
+      */
+    public boolean hasCount() {
+      return fieldSetFlags()[9];
+    }
+
+
+    /**
+      * Clears the value of the 'count' field.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder clearCount() {
+      count = null;
+      fieldSetFlags()[9] = false;
       return this;
     }
 
@@ -904,9 +1088,9 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setCmdLine(java.lang.CharSequence value) {
-      validate(fields()[8], value);
+      validate(fields()[10], value);
       this.cmdLine = value;
-      fieldSetFlags()[8] = true;
+      fieldSetFlags()[10] = true;
       return this;
     }
 
@@ -916,7 +1100,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @return True if the 'cmdLine' field has been set, false otherwise.
       */
     public boolean hasCmdLine() {
-      return fieldSetFlags()[8];
+      return fieldSetFlags()[10];
     }
 
 
@@ -927,13 +1111,60 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearCmdLine() {
       cmdLine = null;
-      fieldSetFlags()[8] = false;
+      fieldSetFlags()[10] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'privilegeLevel' field.
+      * Windows allows processes to have different privilege levels (Optional)
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.PrivilegeLevel getPrivilegeLevel() {
+      return privilegeLevel;
+    }
+
+    /**
+      * Sets the value of the 'privilegeLevel' field.
+      * Windows allows processes to have different privilege levels (Optional)
+      * @param value The value of 'privilegeLevel'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder setPrivilegeLevel(com.bbn.tc.schema.avro.PrivilegeLevel value) {
+      validate(fields()[11], value);
+      this.privilegeLevel = value;
+      fieldSetFlags()[11] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'privilegeLevel' field has been set.
+      * Windows allows processes to have different privilege levels (Optional)
+      * @return True if the 'privilegeLevel' field has been set, false otherwise.
+      */
+    public boolean hasPrivilegeLevel() {
+      return fieldSetFlags()[11];
+    }
+
+
+    /**
+      * Clears the value of the 'privilegeLevel' field.
+      * Windows allows processes to have different privilege levels (Optional)
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.Subject.Builder clearPrivilegeLevel() {
+      privilegeLevel = null;
+      fieldSetFlags()[11] = false;
       return this;
     }
 
     /**
       * Gets the value of the 'importedLibraries' field.
-      * imported libraries (static or dynamic), (Optional)
+      * * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
       * @return The value.
       */
     public java.util.List<java.lang.CharSequence> getImportedLibraries() {
@@ -942,41 +1173,53 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
     /**
       * Sets the value of the 'importedLibraries' field.
-      * imported libraries (static or dynamic), (Optional)
+      * * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
       * @param value The value of 'importedLibraries'.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setImportedLibraries(java.util.List<java.lang.CharSequence> value) {
-      validate(fields()[9], value);
+      validate(fields()[12], value);
       this.importedLibraries = value;
-      fieldSetFlags()[9] = true;
+      fieldSetFlags()[12] = true;
       return this;
     }
 
     /**
       * Checks whether the 'importedLibraries' field has been set.
-      * imported libraries (static or dynamic), (Optional)
+      * * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
       * @return True if the 'importedLibraries' field has been set, false otherwise.
       */
     public boolean hasImportedLibraries() {
-      return fieldSetFlags()[9];
+      return fieldSetFlags()[12];
     }
 
 
     /**
       * Clears the value of the 'importedLibraries' field.
-      * imported libraries (static or dynamic), (Optional)
+      * * imported libraries. (Optional). Lists the libraries that
+         * are expected to be loaded, but may not necessarily
+         * correspond 1-to-1 with actual load library events because
+         * some libraries may already be loaded when this event
+         * occurs.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearImportedLibraries() {
       importedLibraries = null;
-      fieldSetFlags()[9] = false;
+      fieldSetFlags()[12] = false;
       return this;
     }
 
     /**
       * Gets the value of the 'exportedLibraries' field.
-      * exported libraries (static or dynamic), (Optional)
+      * exported libraries. (Optional)
       * @return The value.
       */
     public java.util.List<java.lang.CharSequence> getExportedLibraries() {
@@ -985,84 +1228,43 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
     /**
       * Sets the value of the 'exportedLibraries' field.
-      * exported libraries (static or dynamic), (Optional)
+      * exported libraries. (Optional)
       * @param value The value of 'exportedLibraries'.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setExportedLibraries(java.util.List<java.lang.CharSequence> value) {
-      validate(fields()[10], value);
+      validate(fields()[13], value);
       this.exportedLibraries = value;
-      fieldSetFlags()[10] = true;
+      fieldSetFlags()[13] = true;
       return this;
     }
 
     /**
       * Checks whether the 'exportedLibraries' field has been set.
-      * exported libraries (static or dynamic), (Optional)
+      * exported libraries. (Optional)
       * @return True if the 'exportedLibraries' field has been set, false otherwise.
       */
     public boolean hasExportedLibraries() {
-      return fieldSetFlags()[10];
+      return fieldSetFlags()[13];
     }
 
 
     /**
       * Clears the value of the 'exportedLibraries' field.
-      * exported libraries (static or dynamic), (Optional)
+      * exported libraries. (Optional)
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearExportedLibraries() {
       exportedLibraries = null;
-      fieldSetFlags()[10] = false;
-      return this;
-    }
-
-    /**
-      * Gets the value of the 'pInfo' field.
-      * additional process information, such portable execution (PE) info in windows (Optional)
-      * @return The value.
-      */
-    public java.lang.CharSequence getPInfo() {
-      return pInfo;
-    }
-
-    /**
-      * Sets the value of the 'pInfo' field.
-      * additional process information, such portable execution (PE) info in windows (Optional)
-      * @param value The value of 'pInfo'.
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.Subject.Builder setPInfo(java.lang.CharSequence value) {
-      validate(fields()[11], value);
-      this.pInfo = value;
-      fieldSetFlags()[11] = true;
-      return this;
-    }
-
-    /**
-      * Checks whether the 'pInfo' field has been set.
-      * additional process information, such portable execution (PE) info in windows (Optional)
-      * @return True if the 'pInfo' field has been set, false otherwise.
-      */
-    public boolean hasPInfo() {
-      return fieldSetFlags()[11];
-    }
-
-
-    /**
-      * Clears the value of the 'pInfo' field.
-      * additional process information, such portable execution (PE) info in windows (Optional)
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPInfo() {
-      pInfo = null;
-      fieldSetFlags()[11] = false;
+      fieldSetFlags()[13] = false;
       return this;
     }
 
     /**
       * Gets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return The value.
       */
     public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
@@ -1071,35 +1273,41 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
 
     /**
       * Sets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @param value The value of 'properties'.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
-      validate(fields()[12], value);
+      validate(fields()[14], value);
       this.properties = value;
-      fieldSetFlags()[12] = true;
+      fieldSetFlags()[14] = true;
       return this;
     }
 
     /**
       * Checks whether the 'properties' field has been set.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return True if the 'properties' field has been set, false otherwise.
       */
     public boolean hasProperties() {
-      return fieldSetFlags()[12];
+      return fieldSetFlags()[14];
     }
 
 
     /**
       * Clears the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.Subject.Builder clearProperties() {
       properties = null;
-      fieldSetFlags()[12] = false;
+      fieldSetFlags()[14] = false;
       return this;
     }
 
@@ -1109,17 +1317,19 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
         Subject record = new Subject();
         record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
         record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.SubjectType) defaultValue(fields()[1]);
-        record.pid = fieldSetFlags()[2] ? this.pid : (java.lang.Integer) defaultValue(fields()[2]);
-        record.ppid = fieldSetFlags()[3] ? this.ppid : (java.lang.Integer) defaultValue(fields()[3]);
-        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[4]);
-        record.startTimestampMicros = fieldSetFlags()[5] ? this.startTimestampMicros : (java.lang.Long) defaultValue(fields()[5]);
-        record.unitId = fieldSetFlags()[6] ? this.unitId : (java.lang.Integer) defaultValue(fields()[6]);
-        record.endTimestampMicros = fieldSetFlags()[7] ? this.endTimestampMicros : (java.lang.Long) defaultValue(fields()[7]);
-        record.cmdLine = fieldSetFlags()[8] ? this.cmdLine : (java.lang.CharSequence) defaultValue(fields()[8]);
-        record.importedLibraries = fieldSetFlags()[9] ? this.importedLibraries : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[9]);
-        record.exportedLibraries = fieldSetFlags()[10] ? this.exportedLibraries : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[10]);
-        record.pInfo = fieldSetFlags()[11] ? this.pInfo : (java.lang.CharSequence) defaultValue(fields()[11]);
-        record.properties = fieldSetFlags()[12] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[12]);
+        record.cid = fieldSetFlags()[2] ? this.cid : (java.lang.Integer) defaultValue(fields()[2]);
+        record.parentSubject = fieldSetFlags()[3] ? this.parentSubject : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[3]);
+        record.localPrincipal = fieldSetFlags()[4] ? this.localPrincipal : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[4]);
+        record.source = fieldSetFlags()[5] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[5]);
+        record.startTimestampNanos = fieldSetFlags()[6] ? this.startTimestampNanos : (java.lang.Long) defaultValue(fields()[6]);
+        record.unitId = fieldSetFlags()[7] ? this.unitId : (java.lang.Integer) defaultValue(fields()[7]);
+        record.iteration = fieldSetFlags()[8] ? this.iteration : (java.lang.Integer) defaultValue(fields()[8]);
+        record.count = fieldSetFlags()[9] ? this.count : (java.lang.Integer) defaultValue(fields()[9]);
+        record.cmdLine = fieldSetFlags()[10] ? this.cmdLine : (java.lang.CharSequence) defaultValue(fields()[10]);
+        record.privilegeLevel = fieldSetFlags()[11] ? this.privilegeLevel : (com.bbn.tc.schema.avro.PrivilegeLevel) defaultValue(fields()[11]);
+        record.importedLibraries = fieldSetFlags()[12] ? this.importedLibraries : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[12]);
+        record.exportedLibraries = fieldSetFlags()[13] ? this.exportedLibraries : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[13]);
+        record.properties = fieldSetFlags()[14] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[14]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);

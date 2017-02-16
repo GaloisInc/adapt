@@ -11,26 +11,36 @@ import org.apache.avro.specific.SpecificData;
 /** * A provenance tag defines source dependence on specific data sources (inputs).
      * A tag identifier is typically bound to a source and used by the tracking system to
      * capture dependence on this source input.
-     * A provenance tag is represented as a tree. Each node in the tree has a value and
-     * a set of children nodes. */
+     *
+     * ProvenanceTagNode defines one step of provenance for a value
+     * (i.e., one read from a source or write to a sink), a reference
+     * to the previous provenance of the value (if any), and the tag
+     * operation that resulted the tagId of this ProvenanceTagNode */
 @org.apache.avro.specific.AvroGenerated
 public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -4330064591468649248L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     * A provenance tag is represented as a tree. Each node in the tree has a value and\\n     * a set of children nodes.\",\"fields\":[{\"name\":\"value\",\"type\":[\"int\",{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_SEQUENCE       the output is derived from the specified inputs in order, sequentially\\n     *TAG_OP_UNION,         the output is the union of its inputs\\n     * TAG_OP_ENCODE         the output is some encoding of the input\\n     * TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_SEQUENCE\",\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]},{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]},{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"*  the value of the node: can have the following types\\n *   int                 references another node by tagId\\n         *   UUID *   object uuid (source or sink for example)\\n         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode\\n         * *   IntegrityTag        an integrity tag\\n         *   ConfidentialityTag  a *   confidentiality tag\"},{\"name\":\"children\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceTagNode\"}],\"doc\":\"the child nodes\",\"default\":null},{\"name\":\"tagId\",\"type\":[\"null\",\"int\"],\"doc\":\"* the id to be assigned to this tag node\\n         * typically set once when the node is first created, and used in value afterwards\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs associated with a tag node\",\"default\":null}]}");
+  private static final long serialVersionUID = 6464402056878438564L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     *\\n     * ProvenanceTagNode defines one step of provenance for a value\\n     * (i.e., one read from a source or write to a sink), a reference\\n     * to the previous provenance of the value (if any), and the tag\\n     * operation that resulted the tagId of this ProvenanceTagNode\",\"fields\":[{\"name\":\"tagId\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Tag ID for this node *\"},{\"name\":\"programPoint\",\"type\":[\"null\",\"string\"],\"doc\":\"The program point where the event was triggered (e.g., executable and line number), (Optional)\",\"default\":null},{\"name\":\"prevTagId\",\"type\":[\"null\",\"UUID\"],\"doc\":\"The previous tag for this value *\",\"default\":null},{\"name\":\"opcode\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_UNION,         the output is the union of its inputs\\n     *   TAG_OP_ENCODE         the output is some encoding of the input\\n     *   TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]}],\"doc\":\"Tag operation that resulted in the tagId of this ProvenanceTagNode *\",\"default\":null},{\"name\":\"tagIds\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"UUID\"}],\"default\":null},{\"name\":\"itag\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]}],\"doc\":\"The integrity tag may be used to specify the intial\\n         *  integrity of an entity, or to endorse it content after\\n         *  performing appropriate checking/sanitization.\",\"default\":null},{\"name\":\"ctag\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"* The confidentiality tag may be used to specify the initial\\n         * confidentiality of an entity, or to declassify its content\\n         * after performing appropriate checking/sanitization.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
-  /** *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag */
-  @Deprecated public java.lang.Object value;
-  /** the child nodes */
-  @Deprecated public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children;
-  /** * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards */
-  @Deprecated public java.lang.Integer tagId;
-  /** Arbitrary key, value pairs associated with a tag node */
+  /** Tag ID for this node * */
+  @Deprecated public com.bbn.tc.schema.avro.UUID tagId;
+  /** The program point where the event was triggered (e.g., executable and line number), (Optional) */
+  @Deprecated public java.lang.CharSequence programPoint;
+  /** The previous tag for this value * */
+  @Deprecated public com.bbn.tc.schema.avro.UUID prevTagId;
+  /** Tag operation that resulted in the tagId of this ProvenanceTagNode * */
+  @Deprecated public com.bbn.tc.schema.avro.TagOpCode opcode;
+  @Deprecated public java.util.List<com.bbn.tc.schema.avro.UUID> tagIds;
+  /** The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization. */
+  @Deprecated public com.bbn.tc.schema.avro.IntegrityTag itag;
+  /** * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization. */
+  @Deprecated public com.bbn.tc.schema.avro.ConfidentialityTag ctag;
+  /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
   @Deprecated public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
   /**
@@ -42,21 +52,29 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
 
   /**
    * All-args constructor.
-   * @param value *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-   * @param children the child nodes
-   * @param tagId * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
-   * @param properties Arbitrary key, value pairs associated with a tag node
+   * @param tagId Tag ID for this node *
+   * @param programPoint The program point where the event was triggered (e.g., executable and line number), (Optional)
+   * @param prevTagId The previous tag for this value *
+   * @param opcode Tag operation that resulted in the tagId of this ProvenanceTagNode *
+   * @param tagIds The new value for tagIds
+   * @param itag The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+   * @param ctag * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+   * @param properties * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
-  public ProvenanceTagNode(java.lang.Object value, java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children, java.lang.Integer tagId, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
-    this.value = value;
-    this.children = children;
+  public ProvenanceTagNode(com.bbn.tc.schema.avro.UUID tagId, java.lang.CharSequence programPoint, com.bbn.tc.schema.avro.UUID prevTagId, com.bbn.tc.schema.avro.TagOpCode opcode, java.util.List<com.bbn.tc.schema.avro.UUID> tagIds, com.bbn.tc.schema.avro.IntegrityTag itag, com.bbn.tc.schema.avro.ConfidentialityTag ctag, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.tagId = tagId;
+    this.programPoint = programPoint;
+    this.prevTagId = prevTagId;
+    this.opcode = opcode;
+    this.tagIds = tagIds;
+    this.itag = itag;
+    this.ctag = ctag;
     this.properties = properties;
   }
 
@@ -64,10 +82,14 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
   // Used by DatumWriter.  Applications should not call.
   public java.lang.Object get(int field$) {
     switch (field$) {
-    case 0: return value;
-    case 1: return children;
-    case 2: return tagId;
-    case 3: return properties;
+    case 0: return tagId;
+    case 1: return programPoint;
+    case 2: return prevTagId;
+    case 3: return opcode;
+    case 4: return tagIds;
+    case 5: return itag;
+    case 6: return ctag;
+    case 7: return properties;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -76,80 +98,149 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: value = (java.lang.Object)value$; break;
-    case 1: children = (java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode>)value$; break;
-    case 2: tagId = (java.lang.Integer)value$; break;
-    case 3: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
+    case 0: tagId = (com.bbn.tc.schema.avro.UUID)value$; break;
+    case 1: programPoint = (java.lang.CharSequence)value$; break;
+    case 2: prevTagId = (com.bbn.tc.schema.avro.UUID)value$; break;
+    case 3: opcode = (com.bbn.tc.schema.avro.TagOpCode)value$; break;
+    case 4: tagIds = (java.util.List<com.bbn.tc.schema.avro.UUID>)value$; break;
+    case 5: itag = (com.bbn.tc.schema.avro.IntegrityTag)value$; break;
+    case 6: ctag = (com.bbn.tc.schema.avro.ConfidentialityTag)value$; break;
+    case 7: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
 
   /**
-   * Gets the value of the 'value' field.
-   * @return *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-   */
-  public java.lang.Object getValue() {
-    return value;
-  }
-
-  /**
-   * Sets the value of the 'value' field.
-   * *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-   * @param value the value to set.
-   */
-  public void setValue(java.lang.Object value) {
-    this.value = value;
-  }
-
-  /**
-   * Gets the value of the 'children' field.
-   * @return the child nodes
-   */
-  public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> getChildren() {
-    return children;
-  }
-
-  /**
-   * Sets the value of the 'children' field.
-   * the child nodes
-   * @param value the value to set.
-   */
-  public void setChildren(java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> value) {
-    this.children = value;
-  }
-
-  /**
    * Gets the value of the 'tagId' field.
-   * @return * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+   * @return Tag ID for this node *
    */
-  public java.lang.Integer getTagId() {
+  public com.bbn.tc.schema.avro.UUID getTagId() {
     return tagId;
   }
 
   /**
    * Sets the value of the 'tagId' field.
-   * * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+   * Tag ID for this node *
    * @param value the value to set.
    */
-  public void setTagId(java.lang.Integer value) {
+  public void setTagId(com.bbn.tc.schema.avro.UUID value) {
     this.tagId = value;
   }
 
   /**
+   * Gets the value of the 'programPoint' field.
+   * @return The program point where the event was triggered (e.g., executable and line number), (Optional)
+   */
+  public java.lang.CharSequence getProgramPoint() {
+    return programPoint;
+  }
+
+  /**
+   * Sets the value of the 'programPoint' field.
+   * The program point where the event was triggered (e.g., executable and line number), (Optional)
+   * @param value the value to set.
+   */
+  public void setProgramPoint(java.lang.CharSequence value) {
+    this.programPoint = value;
+  }
+
+  /**
+   * Gets the value of the 'prevTagId' field.
+   * @return The previous tag for this value *
+   */
+  public com.bbn.tc.schema.avro.UUID getPrevTagId() {
+    return prevTagId;
+  }
+
+  /**
+   * Sets the value of the 'prevTagId' field.
+   * The previous tag for this value *
+   * @param value the value to set.
+   */
+  public void setPrevTagId(com.bbn.tc.schema.avro.UUID value) {
+    this.prevTagId = value;
+  }
+
+  /**
+   * Gets the value of the 'opcode' field.
+   * @return Tag operation that resulted in the tagId of this ProvenanceTagNode *
+   */
+  public com.bbn.tc.schema.avro.TagOpCode getOpcode() {
+    return opcode;
+  }
+
+  /**
+   * Sets the value of the 'opcode' field.
+   * Tag operation that resulted in the tagId of this ProvenanceTagNode *
+   * @param value the value to set.
+   */
+  public void setOpcode(com.bbn.tc.schema.avro.TagOpCode value) {
+    this.opcode = value;
+  }
+
+  /**
+   * Gets the value of the 'tagIds' field.
+   * @return The value of the 'tagIds' field.
+   */
+  public java.util.List<com.bbn.tc.schema.avro.UUID> getTagIds() {
+    return tagIds;
+  }
+
+  /**
+   * Sets the value of the 'tagIds' field.
+   * @param value the value to set.
+   */
+  public void setTagIds(java.util.List<com.bbn.tc.schema.avro.UUID> value) {
+    this.tagIds = value;
+  }
+
+  /**
+   * Gets the value of the 'itag' field.
+   * @return The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+   */
+  public com.bbn.tc.schema.avro.IntegrityTag getItag() {
+    return itag;
+  }
+
+  /**
+   * Sets the value of the 'itag' field.
+   * The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+   * @param value the value to set.
+   */
+  public void setItag(com.bbn.tc.schema.avro.IntegrityTag value) {
+    this.itag = value;
+  }
+
+  /**
+   * Gets the value of the 'ctag' field.
+   * @return * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+   */
+  public com.bbn.tc.schema.avro.ConfidentialityTag getCtag() {
+    return ctag;
+  }
+
+  /**
+   * Sets the value of the 'ctag' field.
+   * * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+   * @param value the value to set.
+   */
+  public void setCtag(com.bbn.tc.schema.avro.ConfidentialityTag value) {
+    this.ctag = value;
+  }
+
+  /**
    * Gets the value of the 'properties' field.
-   * @return Arbitrary key, value pairs associated with a tag node
+   * @return * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
   public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
     return properties;
@@ -157,7 +248,9 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
 
   /**
    * Sets the value of the 'properties' field.
-   * Arbitrary key, value pairs associated with a tag node
+   * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    * @param value the value to set.
    */
   public void setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
@@ -196,19 +289,26 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
   public static class Builder extends org.apache.avro.specific.SpecificRecordBuilderBase<ProvenanceTagNode>
     implements org.apache.avro.data.RecordBuilder<ProvenanceTagNode> {
 
-    /** *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag */
-    private java.lang.Object value;
-    /** the child nodes */
-    private java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> children;
-    /** * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards */
-    private java.lang.Integer tagId;
-    /** Arbitrary key, value pairs associated with a tag node */
+    /** Tag ID for this node * */
+    private com.bbn.tc.schema.avro.UUID tagId;
+    /** The program point where the event was triggered (e.g., executable and line number), (Optional) */
+    private java.lang.CharSequence programPoint;
+    /** The previous tag for this value * */
+    private com.bbn.tc.schema.avro.UUID prevTagId;
+    /** Tag operation that resulted in the tagId of this ProvenanceTagNode * */
+    private com.bbn.tc.schema.avro.TagOpCode opcode;
+    private java.util.List<com.bbn.tc.schema.avro.UUID> tagIds;
+    /** The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization. */
+    private com.bbn.tc.schema.avro.IntegrityTag itag;
+    /** * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization. */
+    private com.bbn.tc.schema.avro.ConfidentialityTag ctag;
+    /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
     private java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
     /** Creates a new Builder */
@@ -222,21 +322,37 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
      */
     private Builder(com.bbn.tc.schema.avro.ProvenanceTagNode.Builder other) {
       super(other);
-      if (isValidValue(fields()[0], other.value)) {
-        this.value = data().deepCopy(fields()[0].schema(), other.value);
+      if (isValidValue(fields()[0], other.tagId)) {
+        this.tagId = data().deepCopy(fields()[0].schema(), other.tagId);
         fieldSetFlags()[0] = true;
       }
-      if (isValidValue(fields()[1], other.children)) {
-        this.children = data().deepCopy(fields()[1].schema(), other.children);
+      if (isValidValue(fields()[1], other.programPoint)) {
+        this.programPoint = data().deepCopy(fields()[1].schema(), other.programPoint);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.tagId)) {
-        this.tagId = data().deepCopy(fields()[2].schema(), other.tagId);
+      if (isValidValue(fields()[2], other.prevTagId)) {
+        this.prevTagId = data().deepCopy(fields()[2].schema(), other.prevTagId);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.properties)) {
-        this.properties = data().deepCopy(fields()[3].schema(), other.properties);
+      if (isValidValue(fields()[3], other.opcode)) {
+        this.opcode = data().deepCopy(fields()[3].schema(), other.opcode);
         fieldSetFlags()[3] = true;
+      }
+      if (isValidValue(fields()[4], other.tagIds)) {
+        this.tagIds = data().deepCopy(fields()[4].schema(), other.tagIds);
+        fieldSetFlags()[4] = true;
+      }
+      if (isValidValue(fields()[5], other.itag)) {
+        this.itag = data().deepCopy(fields()[5].schema(), other.itag);
+        fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.ctag)) {
+        this.ctag = data().deepCopy(fields()[6].schema(), other.ctag);
+        fieldSetFlags()[6] = true;
+      }
+      if (isValidValue(fields()[7], other.properties)) {
+        this.properties = data().deepCopy(fields()[7].schema(), other.properties);
+        fieldSetFlags()[7] = true;
       }
     }
 
@@ -246,180 +362,358 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
      */
     private Builder(com.bbn.tc.schema.avro.ProvenanceTagNode other) {
             super(SCHEMA$);
-      if (isValidValue(fields()[0], other.value)) {
-        this.value = data().deepCopy(fields()[0].schema(), other.value);
+      if (isValidValue(fields()[0], other.tagId)) {
+        this.tagId = data().deepCopy(fields()[0].schema(), other.tagId);
         fieldSetFlags()[0] = true;
       }
-      if (isValidValue(fields()[1], other.children)) {
-        this.children = data().deepCopy(fields()[1].schema(), other.children);
+      if (isValidValue(fields()[1], other.programPoint)) {
+        this.programPoint = data().deepCopy(fields()[1].schema(), other.programPoint);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.tagId)) {
-        this.tagId = data().deepCopy(fields()[2].schema(), other.tagId);
+      if (isValidValue(fields()[2], other.prevTagId)) {
+        this.prevTagId = data().deepCopy(fields()[2].schema(), other.prevTagId);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.properties)) {
-        this.properties = data().deepCopy(fields()[3].schema(), other.properties);
+      if (isValidValue(fields()[3], other.opcode)) {
+        this.opcode = data().deepCopy(fields()[3].schema(), other.opcode);
         fieldSetFlags()[3] = true;
       }
-    }
-
-    /**
-      * Gets the value of the 'value' field.
-      * *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-      * @return The value.
-      */
-    public java.lang.Object getValue() {
-      return value;
-    }
-
-    /**
-      * Sets the value of the 'value' field.
-      * *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-      * @param value The value of 'value'.
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setValue(java.lang.Object value) {
-      validate(fields()[0], value);
-      this.value = value;
-      fieldSetFlags()[0] = true;
-      return this;
-    }
-
-    /**
-      * Checks whether the 'value' field has been set.
-      * *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-      * @return True if the 'value' field has been set, false otherwise.
-      */
-    public boolean hasValue() {
-      return fieldSetFlags()[0];
-    }
-
-
-    /**
-      * Clears the value of the 'value' field.
-      * *  the value of the node: can have the following types
- *   int                 references another node by tagId
-         *   UUID *   object uuid (source or sink for example)
-         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode
-         * *   IntegrityTag        an integrity tag
-         *   ConfidentialityTag  a *   confidentiality tag
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearValue() {
-      value = null;
-      fieldSetFlags()[0] = false;
-      return this;
-    }
-
-    /**
-      * Gets the value of the 'children' field.
-      * the child nodes
-      * @return The value.
-      */
-    public java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> getChildren() {
-      return children;
-    }
-
-    /**
-      * Sets the value of the 'children' field.
-      * the child nodes
-      * @param value The value of 'children'.
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setChildren(java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode> value) {
-      validate(fields()[1], value);
-      this.children = value;
-      fieldSetFlags()[1] = true;
-      return this;
-    }
-
-    /**
-      * Checks whether the 'children' field has been set.
-      * the child nodes
-      * @return True if the 'children' field has been set, false otherwise.
-      */
-    public boolean hasChildren() {
-      return fieldSetFlags()[1];
-    }
-
-
-    /**
-      * Clears the value of the 'children' field.
-      * the child nodes
-      * @return This builder.
-      */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearChildren() {
-      children = null;
-      fieldSetFlags()[1] = false;
-      return this;
+      if (isValidValue(fields()[4], other.tagIds)) {
+        this.tagIds = data().deepCopy(fields()[4].schema(), other.tagIds);
+        fieldSetFlags()[4] = true;
+      }
+      if (isValidValue(fields()[5], other.itag)) {
+        this.itag = data().deepCopy(fields()[5].schema(), other.itag);
+        fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.ctag)) {
+        this.ctag = data().deepCopy(fields()[6].schema(), other.ctag);
+        fieldSetFlags()[6] = true;
+      }
+      if (isValidValue(fields()[7], other.properties)) {
+        this.properties = data().deepCopy(fields()[7].schema(), other.properties);
+        fieldSetFlags()[7] = true;
+      }
     }
 
     /**
       * Gets the value of the 'tagId' field.
-      * * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+      * Tag ID for this node *
       * @return The value.
       */
-    public java.lang.Integer getTagId() {
+    public com.bbn.tc.schema.avro.UUID getTagId() {
       return tagId;
     }
 
     /**
       * Sets the value of the 'tagId' field.
-      * * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+      * Tag ID for this node *
       * @param value The value of 'tagId'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setTagId(java.lang.Integer value) {
-      validate(fields()[2], value);
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setTagId(com.bbn.tc.schema.avro.UUID value) {
+      validate(fields()[0], value);
       this.tagId = value;
-      fieldSetFlags()[2] = true;
+      fieldSetFlags()[0] = true;
       return this;
     }
 
     /**
       * Checks whether the 'tagId' field has been set.
-      * * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+      * Tag ID for this node *
       * @return True if the 'tagId' field has been set, false otherwise.
       */
     public boolean hasTagId() {
-      return fieldSetFlags()[2];
+      return fieldSetFlags()[0];
     }
 
 
     /**
       * Clears the value of the 'tagId' field.
-      * * the id to be assigned to this tag node
-         * typically set once when the node is first created, and used in value afterwards
+      * Tag ID for this node *
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearTagId() {
       tagId = null;
+      fieldSetFlags()[0] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'programPoint' field.
+      * The program point where the event was triggered (e.g., executable and line number), (Optional)
+      * @return The value.
+      */
+    public java.lang.CharSequence getProgramPoint() {
+      return programPoint;
+    }
+
+    /**
+      * Sets the value of the 'programPoint' field.
+      * The program point where the event was triggered (e.g., executable and line number), (Optional)
+      * @param value The value of 'programPoint'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setProgramPoint(java.lang.CharSequence value) {
+      validate(fields()[1], value);
+      this.programPoint = value;
+      fieldSetFlags()[1] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'programPoint' field has been set.
+      * The program point where the event was triggered (e.g., executable and line number), (Optional)
+      * @return True if the 'programPoint' field has been set, false otherwise.
+      */
+    public boolean hasProgramPoint() {
+      return fieldSetFlags()[1];
+    }
+
+
+    /**
+      * Clears the value of the 'programPoint' field.
+      * The program point where the event was triggered (e.g., executable and line number), (Optional)
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearProgramPoint() {
+      programPoint = null;
+      fieldSetFlags()[1] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'prevTagId' field.
+      * The previous tag for this value *
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.UUID getPrevTagId() {
+      return prevTagId;
+    }
+
+    /**
+      * Sets the value of the 'prevTagId' field.
+      * The previous tag for this value *
+      * @param value The value of 'prevTagId'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setPrevTagId(com.bbn.tc.schema.avro.UUID value) {
+      validate(fields()[2], value);
+      this.prevTagId = value;
+      fieldSetFlags()[2] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'prevTagId' field has been set.
+      * The previous tag for this value *
+      * @return True if the 'prevTagId' field has been set, false otherwise.
+      */
+    public boolean hasPrevTagId() {
+      return fieldSetFlags()[2];
+    }
+
+
+    /**
+      * Clears the value of the 'prevTagId' field.
+      * The previous tag for this value *
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearPrevTagId() {
+      prevTagId = null;
       fieldSetFlags()[2] = false;
       return this;
     }
 
     /**
+      * Gets the value of the 'opcode' field.
+      * Tag operation that resulted in the tagId of this ProvenanceTagNode *
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.TagOpCode getOpcode() {
+      return opcode;
+    }
+
+    /**
+      * Sets the value of the 'opcode' field.
+      * Tag operation that resulted in the tagId of this ProvenanceTagNode *
+      * @param value The value of 'opcode'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setOpcode(com.bbn.tc.schema.avro.TagOpCode value) {
+      validate(fields()[3], value);
+      this.opcode = value;
+      fieldSetFlags()[3] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'opcode' field has been set.
+      * Tag operation that resulted in the tagId of this ProvenanceTagNode *
+      * @return True if the 'opcode' field has been set, false otherwise.
+      */
+    public boolean hasOpcode() {
+      return fieldSetFlags()[3];
+    }
+
+
+    /**
+      * Clears the value of the 'opcode' field.
+      * Tag operation that resulted in the tagId of this ProvenanceTagNode *
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearOpcode() {
+      opcode = null;
+      fieldSetFlags()[3] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'tagIds' field.
+      * @return The value.
+      */
+    public java.util.List<com.bbn.tc.schema.avro.UUID> getTagIds() {
+      return tagIds;
+    }
+
+    /**
+      * Sets the value of the 'tagIds' field.
+      * @param value The value of 'tagIds'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setTagIds(java.util.List<com.bbn.tc.schema.avro.UUID> value) {
+      validate(fields()[4], value);
+      this.tagIds = value;
+      fieldSetFlags()[4] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'tagIds' field has been set.
+      * @return True if the 'tagIds' field has been set, false otherwise.
+      */
+    public boolean hasTagIds() {
+      return fieldSetFlags()[4];
+    }
+
+
+    /**
+      * Clears the value of the 'tagIds' field.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearTagIds() {
+      tagIds = null;
+      fieldSetFlags()[4] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'itag' field.
+      * The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.IntegrityTag getItag() {
+      return itag;
+    }
+
+    /**
+      * Sets the value of the 'itag' field.
+      * The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+      * @param value The value of 'itag'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setItag(com.bbn.tc.schema.avro.IntegrityTag value) {
+      validate(fields()[5], value);
+      this.itag = value;
+      fieldSetFlags()[5] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'itag' field has been set.
+      * The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+      * @return True if the 'itag' field has been set, false otherwise.
+      */
+    public boolean hasItag() {
+      return fieldSetFlags()[5];
+    }
+
+
+    /**
+      * Clears the value of the 'itag' field.
+      * The integrity tag may be used to specify the intial
+         *  integrity of an entity, or to endorse it content after
+         *  performing appropriate checking/sanitization.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearItag() {
+      itag = null;
+      fieldSetFlags()[5] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'ctag' field.
+      * * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+      * @return The value.
+      */
+    public com.bbn.tc.schema.avro.ConfidentialityTag getCtag() {
+      return ctag;
+    }
+
+    /**
+      * Sets the value of the 'ctag' field.
+      * * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+      * @param value The value of 'ctag'.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setCtag(com.bbn.tc.schema.avro.ConfidentialityTag value) {
+      validate(fields()[6], value);
+      this.ctag = value;
+      fieldSetFlags()[6] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'ctag' field has been set.
+      * * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+      * @return True if the 'ctag' field has been set, false otherwise.
+      */
+    public boolean hasCtag() {
+      return fieldSetFlags()[6];
+    }
+
+
+    /**
+      * Clears the value of the 'ctag' field.
+      * * The confidentiality tag may be used to specify the initial
+         * confidentiality of an entity, or to declassify its content
+         * after performing appropriate checking/sanitization.
+      * @return This builder.
+      */
+    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearCtag() {
+      ctag = null;
+      fieldSetFlags()[6] = false;
+      return this;
+    }
+
+    /**
       * Gets the value of the 'properties' field.
-      * Arbitrary key, value pairs associated with a tag node
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return The value.
       */
     public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
@@ -428,35 +722,41 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
 
     /**
       * Sets the value of the 'properties' field.
-      * Arbitrary key, value pairs associated with a tag node
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @param value The value of 'properties'.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
-      validate(fields()[3], value);
+      validate(fields()[7], value);
       this.properties = value;
-      fieldSetFlags()[3] = true;
+      fieldSetFlags()[7] = true;
       return this;
     }
 
     /**
       * Checks whether the 'properties' field has been set.
-      * Arbitrary key, value pairs associated with a tag node
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return True if the 'properties' field has been set, false otherwise.
       */
     public boolean hasProperties() {
-      return fieldSetFlags()[3];
+      return fieldSetFlags()[7];
     }
 
 
     /**
       * Clears the value of the 'properties' field.
-      * Arbitrary key, value pairs associated with a tag node
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder clearProperties() {
       properties = null;
-      fieldSetFlags()[3] = false;
+      fieldSetFlags()[7] = false;
       return this;
     }
 
@@ -464,10 +764,14 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
     public ProvenanceTagNode build() {
       try {
         ProvenanceTagNode record = new ProvenanceTagNode();
-        record.value = fieldSetFlags()[0] ? this.value : (java.lang.Object) defaultValue(fields()[0]);
-        record.children = fieldSetFlags()[1] ? this.children : (java.util.List<com.bbn.tc.schema.avro.ProvenanceTagNode>) defaultValue(fields()[1]);
-        record.tagId = fieldSetFlags()[2] ? this.tagId : (java.lang.Integer) defaultValue(fields()[2]);
-        record.properties = fieldSetFlags()[3] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[3]);
+        record.tagId = fieldSetFlags()[0] ? this.tagId : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
+        record.programPoint = fieldSetFlags()[1] ? this.programPoint : (java.lang.CharSequence) defaultValue(fields()[1]);
+        record.prevTagId = fieldSetFlags()[2] ? this.prevTagId : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[2]);
+        record.opcode = fieldSetFlags()[3] ? this.opcode : (com.bbn.tc.schema.avro.TagOpCode) defaultValue(fields()[3]);
+        record.tagIds = fieldSetFlags()[4] ? this.tagIds : (java.util.List<com.bbn.tc.schema.avro.UUID>) defaultValue(fields()[4]);
+        record.itag = fieldSetFlags()[5] ? this.itag : (com.bbn.tc.schema.avro.IntegrityTag) defaultValue(fields()[5]);
+        record.ctag = fieldSetFlags()[6] ? this.ctag : (com.bbn.tc.schema.avro.ConfidentialityTag) defaultValue(fields()[6]);
+        record.properties = fieldSetFlags()[7] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[7]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);

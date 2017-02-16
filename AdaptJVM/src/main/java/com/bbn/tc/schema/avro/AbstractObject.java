@@ -8,23 +8,31 @@ package com.bbn.tc.schema.avro;
 import org.apache.avro.specific.SpecificData;
 
 @SuppressWarnings("all")
-/** *  Objects, in general, represent data sources and sinks which could include sockets, files,
-     *  memory, and any data in general that can be an input and/or output to an event.
-     *  This record is intended to be abstract i.e., one should not instantiate an Object
-     *  but rather instantiate one of its sub types File, NetFlow, of Memory */
+/** *  Objects, in general, represent data sources and sinks which
+     *  could include sockets, files, memory, and any data in general
+     *  that can be an input and/or output to an event.  This record
+     *  is intended to be abstract i.e., one should not instantiate an
+     *  Object but rather instantiate one of its sub types (ie,
+     *  encapsulating records) FileObject, UnnamedPipeObject,
+     *  RegistryKeyObject, NetFlowObject, MemoryObject, or
+     *  SrcSinkObject. */
 @org.apache.avro.specific.AvroGenerated
 public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 4162285994043188761L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"AbstractObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = -6844597933864731689L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"AbstractObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* InstrumentationSource identifies the source reporting provenance information.\\n     *\\n     * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n     * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * SOURCE_FREEBSD_DTRACE_CADETS,      from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_TESLA_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS,        from CADETS freebsd instrumentation\\n     * SOURCE_FREEBSD_MACIF_CADETS,       from CADETS freebsd instrumentation\\n     * SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n     * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation source\\n     * SOURCE_WINDOWS_DIFT_FAROS,         from FAROS' DIFT module\\n     * SOURCE_WINDOWS_PSA_FAROS,          from FAROS' PSA module\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections windows events\",\"symbols\":[\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_WINDOWS_PSA_FAROS\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** The source that emitted the object, see InstrumentationSource */
   @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
   /** Permission bits defined over the object (Optional) */
   @Deprecated public com.bbn.tc.schema.avro.SHORT permission;
-  /** * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
-  @Deprecated public java.lang.Long lastTimestampMicros;
-  /** Arbitrary key, value pairs describing the entity */
+  /** * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path. */
+  @Deprecated public java.lang.Integer epoch;
+  /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
   @Deprecated public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
   /**
@@ -38,14 +46,18 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
    * All-args constructor.
    * @param source The source that emitted the object, see InstrumentationSource
    * @param permission Permission bits defined over the object (Optional)
-   * @param lastTimestampMicros * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-   * @param properties Arbitrary key, value pairs describing the entity
+   * @param epoch * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
+   * @param properties * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
-  public AbstractObject(com.bbn.tc.schema.avro.InstrumentationSource source, com.bbn.tc.schema.avro.SHORT permission, java.lang.Long lastTimestampMicros, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public AbstractObject(com.bbn.tc.schema.avro.InstrumentationSource source, com.bbn.tc.schema.avro.SHORT permission, java.lang.Integer epoch, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.source = source;
     this.permission = permission;
-    this.lastTimestampMicros = lastTimestampMicros;
+    this.epoch = epoch;
     this.properties = properties;
   }
 
@@ -55,7 +67,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     switch (field$) {
     case 0: return source;
     case 1: return permission;
-    case 2: return lastTimestampMicros;
+    case 2: return epoch;
     case 3: return properties;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
@@ -67,7 +79,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     switch (field$) {
     case 0: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
     case 1: permission = (com.bbn.tc.schema.avro.SHORT)value$; break;
-    case 2: lastTimestampMicros = (java.lang.Long)value$; break;
+    case 2: epoch = (java.lang.Integer)value$; break;
     case 3: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
@@ -108,27 +120,33 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
   }
 
   /**
-   * Gets the value of the 'lastTimestampMicros' field.
-   * @return * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+   * Gets the value of the 'epoch' field.
+   * @return * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
    */
-  public java.lang.Long getLastTimestampMicros() {
-    return lastTimestampMicros;
+  public java.lang.Integer getEpoch() {
+    return epoch;
   }
 
   /**
-   * Sets the value of the 'lastTimestampMicros' field.
-   * * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+   * Sets the value of the 'epoch' field.
+   * * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
    * @param value the value to set.
    */
-  public void setLastTimestampMicros(java.lang.Long value) {
-    this.lastTimestampMicros = value;
+  public void setEpoch(java.lang.Integer value) {
+    this.epoch = value;
   }
 
   /**
    * Gets the value of the 'properties' field.
-   * @return Arbitrary key, value pairs describing the entity
+   * @return * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    */
   public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
     return properties;
@@ -136,7 +154,9 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
 
   /**
    * Sets the value of the 'properties' field.
-   * Arbitrary key, value pairs describing the entity
+   * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
    * @param value the value to set.
    */
   public void setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
@@ -179,10 +199,14 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     private com.bbn.tc.schema.avro.InstrumentationSource source;
     /** Permission bits defined over the object (Optional) */
     private com.bbn.tc.schema.avro.SHORT permission;
-    /** * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
-    private java.lang.Long lastTimestampMicros;
-    /** Arbitrary key, value pairs describing the entity */
+    /** * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path. */
+    private java.lang.Integer epoch;
+    /** * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version. */
     private java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties;
 
     /** Creates a new Builder */
@@ -204,8 +228,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         this.permission = data().deepCopy(fields()[1].schema(), other.permission);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.lastTimestampMicros)) {
-        this.lastTimestampMicros = data().deepCopy(fields()[2].schema(), other.lastTimestampMicros);
+      if (isValidValue(fields()[2], other.epoch)) {
+        this.epoch = data().deepCopy(fields()[2].schema(), other.epoch);
         fieldSetFlags()[2] = true;
       }
       if (isValidValue(fields()[3], other.properties)) {
@@ -228,8 +252,8 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         this.permission = data().deepCopy(fields()[1].schema(), other.permission);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.lastTimestampMicros)) {
-        this.lastTimestampMicros = data().deepCopy(fields()[2].schema(), other.lastTimestampMicros);
+      if (isValidValue(fields()[2], other.epoch)) {
+        this.epoch = data().deepCopy(fields()[2].schema(), other.epoch);
         fieldSetFlags()[2] = true;
       }
       if (isValidValue(fields()[3], other.properties)) {
@@ -325,55 +349,65 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     }
 
     /**
-      * Gets the value of the 'lastTimestampMicros' field.
-      * * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+      * Gets the value of the 'epoch' field.
+      * * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
       * @return The value.
       */
-    public java.lang.Long getLastTimestampMicros() {
-      return lastTimestampMicros;
+    public java.lang.Integer getEpoch() {
+      return epoch;
     }
 
     /**
-      * Sets the value of the 'lastTimestampMicros' field.
-      * * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-      * @param value The value of 'lastTimestampMicros'.
+      * Sets the value of the 'epoch' field.
+      * * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
+      * @param value The value of 'epoch'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.AbstractObject.Builder setLastTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.AbstractObject.Builder setEpoch(java.lang.Integer value) {
       validate(fields()[2], value);
-      this.lastTimestampMicros = value;
+      this.epoch = value;
       fieldSetFlags()[2] = true;
       return this;
     }
 
     /**
-      * Checks whether the 'lastTimestampMicros' field has been set.
-      * * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
-      * @return True if the 'lastTimestampMicros' field has been set, false otherwise.
+      * Checks whether the 'epoch' field has been set.
+      * * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
+      * @return True if the 'epoch' field has been set, false otherwise.
       */
-    public boolean hasLastTimestampMicros() {
+    public boolean hasEpoch() {
       return fieldSetFlags()[2];
     }
 
 
     /**
-      * Clears the value of the 'lastTimestampMicros' field.
-      * * The timestamp when the object was last modified (Optional).
-        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
+      * Clears the value of the 'epoch' field.
+      * * Used to track when an object is deleted and a new one is
+         * created with the same identifier. This is useful for when
+         * UUIDs are based on something not likely to be unique, such
+         * as file path.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.AbstractObject.Builder clearLastTimestampMicros() {
-      lastTimestampMicros = null;
+    public com.bbn.tc.schema.avro.AbstractObject.Builder clearEpoch() {
+      epoch = null;
       fieldSetFlags()[2] = false;
       return this;
     }
 
     /**
       * Gets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return The value.
       */
     public java.util.Map<java.lang.CharSequence,java.lang.CharSequence> getProperties() {
@@ -382,7 +416,9 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
 
     /**
       * Sets the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @param value The value of 'properties'.
       * @return This builder.
       */
@@ -395,7 +431,9 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
 
     /**
       * Checks whether the 'properties' field has been set.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return True if the 'properties' field has been set, false otherwise.
       */
     public boolean hasProperties() {
@@ -405,7 +443,9 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
 
     /**
       * Clears the value of the 'properties' field.
-      * Arbitrary key, value pairs describing the entity
+      * * Arbitrary key, value pairs describing the entity.
+         * NOTE: This attribute is meant as a temporary place holder for items that
+         * will become first-class attributes in the next CDM version.
       * @return This builder.
       */
     public com.bbn.tc.schema.avro.AbstractObject.Builder clearProperties() {
@@ -420,7 +460,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         AbstractObject record = new AbstractObject();
         record.source = fieldSetFlags()[0] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[0]);
         record.permission = fieldSetFlags()[1] ? this.permission : (com.bbn.tc.schema.avro.SHORT) defaultValue(fields()[1]);
-        record.lastTimestampMicros = fieldSetFlags()[2] ? this.lastTimestampMicros : (java.lang.Long) defaultValue(fields()[2]);
+        record.epoch = fieldSetFlags()[2] ? this.epoch : (java.lang.Integer) defaultValue(fields()[2]);
         record.properties = fieldSetFlags()[3] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[3]);
         return record;
       } catch (Exception e) {
