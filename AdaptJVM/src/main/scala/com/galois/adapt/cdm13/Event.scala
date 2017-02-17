@@ -23,6 +23,7 @@ case class Event(
 ) extends CDM13 with DBWritable {
   def asDBKeyValues = List(
     label, "Event",
+    "uuid", uuid,
     "eventType", eventType.toString,
     "threadId", threadId,
     "source", source.toString,
