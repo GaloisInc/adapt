@@ -1,8 +1,5 @@
 package com.galois.adapt.cdm14
 
-import com.galois.adapt.cdm14.CDM14
-
-
 trait CustomEnum[T] extends CDM14 {
   val values: Seq[T]
   def from(s: String): Option[T] = values.find(_.toString == s)  // TODO: strings will be slow. Use ordinals.
