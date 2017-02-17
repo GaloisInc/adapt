@@ -1,7 +1,7 @@
 package com.galois.adapt.scepter
 
 import akka.actor.{Actor, ActorRef}
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm14._
 
 /* This actor counts all of the CDM statements it receives and sends back these counts every time it
  * receives a 'HowMany' message
@@ -25,10 +25,8 @@ class EventCountingTestActor extends Actor {
     case _: Principal => incrementTypeCount("Principal")
     case _: ProvenanceTagNode => incrementTypeCount("ProvenanceTagNode")
     case _: RegistryKeyObject => incrementTypeCount("RegistryKeyObject")
-    case _: SimpleEdge => incrementTypeCount("SimpleEdge")
     case _: SrcSinkObject => incrementTypeCount("SrcSinkObject")
     case _: Subject => incrementTypeCount("Subject")
-    case _: TagEntity => incrementTypeCount("TagEntity")
     case _: Value => incrementTypeCount("Value")
 
     // Receive a query asking about the counts stored
