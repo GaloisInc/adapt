@@ -70,7 +70,12 @@ object Wrapper extends App {
       .text("Size of heap to use (passed to Java's '-Xmx' option). Default is '6G'.")
       .optional()
       .action((s,c) => c.copy(heapSize = s))
-
+   
+    opt[Unit]('w', "web-ui")
+      .text("If tests with visualiztions fail, open them in the browser.")
+      .optional()
+      .action((_,c) => c.copy(webUi = true))
+    
     arg[String]("targets...")
       .text("Either data-files or folders containing data-files")
       .minOccurs(1)
@@ -149,6 +154,7 @@ object Wrapper extends App {
       val cmd = s"""java -Xmx${opts.heapSize}
                    |     -Dadapt.app=accept
                    |     -Dadapt.loadlimit=0
+                   |     -Dadapt.webserver=${opts.webUi.toString}
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $adaptJarPath
                    |""".stripMargin
@@ -161,4 +167,4 @@ object Wrapper extends App {
   }
 }
 
-case class Config(heapSize: String = "6G", targets: Seq[String] = Seq())
+case class Config(heapSize: String = "6G", targets: Seq[String] = Seq(), webUi: Boolean = false)

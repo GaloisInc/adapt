@@ -191,6 +191,7 @@ class DevDBActor(graph: TinkerGraph) extends Actor {
 
       // TODO: so gross!
       val idx = l.indexOf("uuid")
+      
       if (idx >= 0) {  // TODO: don't be lazy
         nodeIds += (l(idx + 1).asInstanceOf[UUID] -> newVertex)
         updateIncompleteEdges(l(idx + 1).asInstanceOf[UUID], newVertex)
