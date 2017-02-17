@@ -7,6 +7,7 @@ import java.nio.file.{Files, Paths}
 
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge,Vertex}
+import org.apache.tinkerpop.gremlin.process.traversal.P
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
@@ -76,6 +77,30 @@ class General_TA1_Tests(
     assert(incompleteEdgeCount == 0)
   }
 
+  // Test tht events of type SEND,SENDMSG,READ,etc. have a size field on them
+  it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
+    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
+    
+    val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType",P.within("EVENT_SENDTO", "EVENT_SENDMSG", "EVENT_WRITE", "EVENT_READ", "EVENT_RECVMSG", "EVENT_RECVFROM"))
+        .hasNot("size")
+        .dedup()
+        .toList()
+
+    if (eventsShouldHaveSize.length <= 1) {
+      assert(eventsShouldHaveSize.length <= 1)
+    } else {
+      val (code,color) = AcceptanceApp.colors.next()
+      val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+        
+      AcceptanceApp.toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
+      assert(
+        eventsShouldHaveSize.length <= 1,
+        s"\nSome events of type SENDTO/SEND/SENDMSG/WRITE/READ/RECVMSG/RECVFROM don't have a 'size':\n$color$uuidsOfEventsShouldHaveSize${Console.RED}\n"
+      )
+    }
+  }
 
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
