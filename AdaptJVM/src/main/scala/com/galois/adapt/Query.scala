@@ -52,6 +52,7 @@ import scala.language.existentials
  *                 | traversal '.hasLabel(' string ')'
  *                 | traversal '.has(label,' string ')'
  *                 | traversal '.hasId(' long ')'
+ *                 | traversal '.hasNot(' string ')'
  *                 | traversal '.where(' traversal ')'
  *                 | traversal '.and(' traversal ',' ... ')'
  *                 | traversal '.or(' traversal ',' ... ')'
@@ -160,6 +161,7 @@ object Query {
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasId(" ~ int ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
+        | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
         | ".and(" ~ repsep(trav,",") ~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~ repsep(trav,",") ~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
@@ -345,6 +347,10 @@ case class HasLabel[S,T](traversal: Traversal[S,T], label: Value[String]) extend
 case class HasId[S,T](traversal: Traversal[S,T], id: Value[java.lang.Long]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).hasId(id.eval(context))
+}
+case class HasNot[S,T](traversal: Traversal[S,T], id: Value[String]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).hasNot(id.eval(context))
 }
 case class Where[S,T](traversal: Traversal[S,T], where: Traversal[_,_]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
