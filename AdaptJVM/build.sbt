@@ -1,6 +1,8 @@
 val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on other having that recent a version
-val akkaV = "2.4.14"
+val akkaV = "2.4.16"
 val akkaHttpV = "10.0.0"
+
+resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
@@ -29,9 +31,12 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
+    "com.typesafe.akka" %% "akka-persistence" % akkaV,
+    "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18"
   ),
 
   {
@@ -56,8 +61,8 @@ lazy val adapt = (project in file(".")).settings(
     case PathList("META-INF", xs@_*) => MergeStrategy.discard
     case x => MergeStrategy.first
   }
-
 )
+
 
 lazy val scepter = (project in file("scepter")).settings(
   name := "scepter",

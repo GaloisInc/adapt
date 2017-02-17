@@ -3,31 +3,47 @@ package com.galois.adapt
 import akka.actor._
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberUp}
+import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.typesafe.config.Config
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import ServiceRegistryProtocol._
 
 
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
 
   val config = Application.config
-//  val interface = config.getString("akka.http.server.interface")
-//  val port = config.getInt("akka.http.server.port")
 
   implicit val system = ActorSystem(config.getString("adapt.systemname"))
   var nodeManager: Option[ActorRef] = None
+  var registryProxy: Option[ActorRef] = None
 
   def run(): Unit = {
+    system.actorOf(
+      ClusterSingletonManager.props(
+        singletonProps = Props(classOf[ServiceRegistry]),
+        terminationMessage = Terminated,
+        settings = ClusterSingletonManagerSettings(system)),
+      name = "registry")
+
+    registryProxy = Some(system.actorOf(
+      ClusterSingletonProxy.props(
+        singletonManagerPath = "/user/registry",
+        settings = ClusterSingletonProxySettings(system)),
+      name = "registryProxy"))
+
     nodeManager = Some(
-      system.actorOf(Props(classOf[ClusterNodeManager], config), "mgr")
+      system.actorOf(Props(classOf[ClusterNodeManager], config, registryProxy.get), "mgr")
     )
   }
 }
 
 
-class ClusterNodeManager(config: Config) extends Actor with ActorLogging {
+case class RegistryInfo(registryActor: ActorRef)
+
+
+class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Actor with ActorLogging {
   val cluster = Cluster(context.system)
 
   override def preStart() = cluster.subscribe(self, classOf[MemberEvent])
@@ -36,26 +52,47 @@ class ClusterNodeManager(config: Config) extends Actor with ActorLogging {
   var childActors: Map[String, Set[ActorRef]] = Map.empty
 
   def createChild(roleName: String): Unit = roleName match {
-    case "db"     => childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(context.actorOf(Props(classOf[DevDBActor], None), "db-actor")) ) )
-    case "ingest" => childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(context.actorOf(Props[FileIngestActor], "file-ingest-actor")) ) )
-    case "ui" => childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(context.actorOf(
-        Props(classOf[UIActor], config.getString("akka.http.server.interface"), config.getInt("akka.http.server.port"))
-      ))))
+    case "db" =>
+      childActors = childActors + (roleName ->
+        childActors.getOrElse(roleName, Set(
+          context.actorOf(
+            Props(classOf[DevDBActor], registryProxy, None),
+            "db-actor"
+          )
+        ))
+      )
+
+    case "ingest" =>
+      childActors = childActors + (roleName ->
+        childActors.getOrElse(roleName, Set(
+          context.actorOf(
+            Props(classOf[FileIngestActor], registryProxy),
+            "ingest-actor"
+          )
+        ))
+      )
+
+    case "ui" =>
+      childActors = childActors + (roleName ->
+        childActors.getOrElse(roleName, Set(
+          context.actorOf(
+            Props(
+              classOf[UIActor],
+              registryProxy,
+              config.getString("akka.http.server.interface"),
+              config.getInt("akka.http.server.port")
+            ), "ui-actor")
+        ))
+      )
   }
 
   def receive = {
-    case MemberUp(m) =>
+    case MemberUp(m) if cluster.selfUniqueAddress == m.uniqueAddress =>
       if (cluster.selfUniqueAddress == m.uniqueAddress) {
         log.info("Message: {} will result in creating child nodes for: {}", m, m.roles)
         m.roles foreach createChild
-      } else if (m.hasRole("ingest") /*&& childActors.keySet.contains("db")*/) {
-        val selection = Await.result(context.actorSelection("*/file-ingest-actor").resolveOne( 5 seconds ), 5 seconds)
-        log.info("Message: {} will result subscribing to: {}", m, selection)
-        selection ! Subscription
       }
-    case x => log.warning("received message: {}", x)
+
+    case x => log.warning("received unhandled message: {}", x)
   }
 }

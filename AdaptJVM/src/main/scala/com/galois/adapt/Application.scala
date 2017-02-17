@@ -1,7 +1,6 @@
 package com.galois.adapt
 
 import collection.JavaConversions._
-
 import com.typesafe.config.ConfigFactory
 
 

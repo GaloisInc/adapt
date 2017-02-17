@@ -124,8 +124,8 @@ class General_TA1_Tests(
       val file: Vertex = files.next()
 
       val urls = file.properties("url").toList
-      if (urls.length > 0) {
-        val url: String = urls(0).value()
+      if (urls.nonEmpty) {
+        val url: String = urls.head.value()
         val version: Int = file.property("version").value()
         val filesWithUrl: java.util.List[Vertex] =
           graph.traversal().V().hasLabel("FileObject")
@@ -133,7 +133,7 @@ class General_TA1_Tests(
            .has("version",version)
            .dedup()
            .by("uuid")
-           .toList()
+           .toList
         
         
         if (filesWithUrl.length <= 1) {
