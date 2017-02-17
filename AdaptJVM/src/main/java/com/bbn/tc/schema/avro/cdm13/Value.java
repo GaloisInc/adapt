@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -25,18 +25,18 @@ import org.apache.avro.specific.SpecificData;
      *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType="MyClass", * valueBytes=<pointer> <br> */
 @org.apache.avro.specific.AvroGenerated
 public class Value extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 2950727604245715395L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Value\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Values represent transient data, mainly parameters to events. Values are created and used once within an\\n     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).\\n     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to\\n     * the value's metadata\\n     *\\n     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or\\n     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.\\n * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as\\n     * components.\\n     *\\n     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", * valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for primitives\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]},\"doc\":\"The type of the value whether input or return\"},{\"name\":\"valueDataType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"int\"}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:\\n         * {<numElements:int>, <tagId:int>}*\\n         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of\\n * an int[16] value, this would be represented using the following tag array\\n * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2\\n         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer\\n         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)\\n         * before it can be * assigned to a value\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}");
+  private static final long serialVersionUID = 8504390036143432012L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Value\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* Values represent transient data, mainly parameters to events. Values are created and used once within an\\n     * event's execution and are relevant mainly during fine-grained tracking (such as with tag/taint propagation).\\n     * Values have tags describing their provenance. Sometimes the actual value's value is reported in addition to\\n     * the value's metadata\\n     *\\n     * The size of the value is the number of elements of type valueDataType. This should be 0 for primitive or\\n     * complex types or the size of the array for arrays i.e., if size>0, then this value is an array.\\n * A complex value (such as an object) can contain other values (primitives of * other complex values) within it, as\\n     * components.\\n     *\\n     * isNull * indicates whether a complex value is null. runtimeDataType indicates the * runtime datatype. E.g., <br>\\n     *  e.g., an integer will have size=0 and * valueDataType=INT, and valueBytes.length=4 bytes <br>\\n     *  e.g., an int[4] * will have  size=4 and valueDataType=INT, and valueBytes.length=16 bytes (4*4) * <br>\\n     *  e.g., a string s=\\\"abc\\\" has size=3 and valueDataType=CHAR, and * valueBytes.length=6 bytes (treated as char[]) <br>\\n     *  e.g., an MyClass * obj has size=0, valueDataType=COMPLEX, runtimeDataType=\\\"MyClass\\\", * valueBytes=<pointer> <br>\",\"fields\":[{\"name\":\"size\",\"type\":\"int\",\"doc\":\"The size of the value: the number of elements of type valueDataType; 0 for primitives\",\"default\":0},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"ValueType\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]},\"doc\":\"The type of the value whether input or return\"},{\"name\":\"valueDataType\",\"type\":{\"type\":\"enum\",\"name\":\"ValueDataType\",\"doc\":\"* A value data type is one of the primitive data types. A string is treated as a char array\",\"symbols\":[\"VALUE_DATA_TYPE_BYTE\",\"VALUE_DATA_TYPE_BOOL\",\"VALUE_DATA_TYPE_CHAR\",\"VALUE_DATA_TYPE_SHORT\",\"VALUE_DATA_TYPE_INT\",\"VALUE_DATA_TYPE_FLOAT\",\"VALUE_DATA_TYPE_LONG\",\"VALUE_DATA_TYPE_DOUBLE\",\"VALUE_DATA_TYPE_COMPLEX\"]},\"doc\":\"The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)\\n         *  Strings are treated as char[] so type=CHAR\\n         *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])\\n         *  Complex composite objects comprising of primitive values use the COMPLEX type\"},{\"name\":\"isNull\",\"type\":\"boolean\",\"doc\":\"Whether this value is null, needed to indicate null objects (default: false)\",\"default\":false},{\"name\":\"name\",\"type\":[\"null\",\"string\"],\"doc\":\"the name of the Value, string. (Optional)\",\"default\":null},{\"name\":\"runtimeDataType\",\"type\":[\"null\",\"string\"],\"doc\":\"The runtime data type of the value (Optional); For example, an object of dataType=COMPLEX, can have\\n         *  a runtime data type of say \\\"MyClass\\\"\",\"default\":null},{\"name\":\"valueBytes\",\"type\":[\"null\",\"bytes\"],\"doc\":\"The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)\",\"default\":null},{\"name\":\"tag\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"int\"}],\"doc\":\"* The value's tag expression describing its provenance (Optional)\\n         * Since value could be an array, the tag can use run length encoding if needed. The format of the array is:\\n         * {<numElements:int>, <tagId:int>}*\\n         * For example, to assign a tag 0 (unknown) to elements 0-3, 1 to elements 4-7 and 2 to elements 8-15 of\\n * an int[16] value, this would be represented using the following tag array\\n * *  {4, 0, 4, 1, 8, 2} meaning the first 4 elements have tag 0, next 4 have tag * 1, next 8 have tag 2\\n         * Note that 4 elements of the array correspond * to 16 bytes in the valueBytes buffer\\n         * Note that tagId had to be * defined/emitted earlier (see ProvenanceTagNode)\\n         * before it can be * assigned to a value\",\"default\":null},{\"name\":\"components\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"Value\"}],\"doc\":\"A complex value might comprise other component values if needed (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** The size of the value: the number of elements of type valueDataType; 0 for primitives */
   @Deprecated public int size;
   /** The type of the value whether input or return */
-  @Deprecated public com.bbn.tc.schema.avro.ValueType type;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.ValueType type;
   /** The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)
          *  Strings are treated as char[] so type=CHAR
          *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])
          *  Complex composite objects comprising of primitive values use the COMPLEX type */
-  @Deprecated public com.bbn.tc.schema.avro.ValueDataType valueDataType;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.ValueDataType valueDataType;
   /** Whether this value is null, needed to indicate null objects (default: false) */
   @Deprecated public boolean isNull;
   /** the name of the Value, string. (Optional) */
@@ -57,7 +57,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          * before it can be * assigned to a value */
   @Deprecated public java.util.List<java.lang.Integer> tag;
   /** A complex value might comprise other component values if needed (Optional) */
-  @Deprecated public java.util.List<com.bbn.tc.schema.avro.Value> components;
+  @Deprecated public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> components;
 
   /**
    * Default constructor.  Note that this does not initialize fields
@@ -90,7 +90,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          * before it can be * assigned to a value
    * @param components A complex value might comprise other component values if needed (Optional)
    */
-  public Value(java.lang.Integer size, com.bbn.tc.schema.avro.ValueType type, com.bbn.tc.schema.avro.ValueDataType valueDataType, java.lang.Boolean isNull, java.lang.CharSequence name, java.lang.CharSequence runtimeDataType, java.nio.ByteBuffer valueBytes, java.util.List<java.lang.Integer> tag, java.util.List<com.bbn.tc.schema.avro.Value> components) {
+  public Value(java.lang.Integer size, com.bbn.tc.schema.avro.cdm13.ValueType type, com.bbn.tc.schema.avro.cdm13.ValueDataType valueDataType, java.lang.Boolean isNull, java.lang.CharSequence name, java.lang.CharSequence runtimeDataType, java.nio.ByteBuffer valueBytes, java.util.List<java.lang.Integer> tag, java.util.List<com.bbn.tc.schema.avro.cdm13.Value> components) {
     this.size = size;
     this.type = type;
     this.valueDataType = valueDataType;
@@ -124,14 +124,14 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
     case 0: size = (java.lang.Integer)value$; break;
-    case 1: type = (com.bbn.tc.schema.avro.ValueType)value$; break;
-    case 2: valueDataType = (com.bbn.tc.schema.avro.ValueDataType)value$; break;
+    case 1: type = (com.bbn.tc.schema.avro.cdm13.ValueType)value$; break;
+    case 2: valueDataType = (com.bbn.tc.schema.avro.cdm13.ValueDataType)value$; break;
     case 3: isNull = (java.lang.Boolean)value$; break;
     case 4: name = (java.lang.CharSequence)value$; break;
     case 5: runtimeDataType = (java.lang.CharSequence)value$; break;
     case 6: valueBytes = (java.nio.ByteBuffer)value$; break;
     case 7: tag = (java.util.List<java.lang.Integer>)value$; break;
-    case 8: components = (java.util.List<com.bbn.tc.schema.avro.Value>)value$; break;
+    case 8: components = (java.util.List<com.bbn.tc.schema.avro.cdm13.Value>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -157,7 +157,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'type' field.
    * @return The type of the value whether input or return
    */
-  public com.bbn.tc.schema.avro.ValueType getType() {
+  public com.bbn.tc.schema.avro.cdm13.ValueType getType() {
     return type;
   }
 
@@ -166,7 +166,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * The type of the value whether input or return
    * @param value the value to set.
    */
-  public void setType(com.bbn.tc.schema.avro.ValueType value) {
+  public void setType(com.bbn.tc.schema.avro.cdm13.ValueType value) {
     this.type = value;
   }
 
@@ -177,7 +177,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])
          *  Complex composite objects comprising of primitive values use the COMPLEX type
    */
-  public com.bbn.tc.schema.avro.ValueDataType getValueDataType() {
+  public com.bbn.tc.schema.avro.cdm13.ValueDataType getValueDataType() {
     return valueDataType;
   }
 
@@ -189,7 +189,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  Complex composite objects comprising of primitive values use the COMPLEX type
    * @param value the value to set.
    */
-  public void setValueDataType(com.bbn.tc.schema.avro.ValueDataType value) {
+  public void setValueDataType(com.bbn.tc.schema.avro.cdm13.ValueDataType value) {
     this.valueDataType = value;
   }
 
@@ -300,7 +300,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * Gets the value of the 'components' field.
    * @return A complex value might comprise other component values if needed (Optional)
    */
-  public java.util.List<com.bbn.tc.schema.avro.Value> getComponents() {
+  public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> getComponents() {
     return components;
   }
 
@@ -309,7 +309,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * A complex value might comprise other component values if needed (Optional)
    * @param value the value to set.
    */
-  public void setComponents(java.util.List<com.bbn.tc.schema.avro.Value> value) {
+  public void setComponents(java.util.List<com.bbn.tc.schema.avro.cdm13.Value> value) {
     this.components = value;
   }
 
@@ -317,8 +317,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * Creates a new Value RecordBuilder.
    * @return A new Value RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Value.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.Value.Builder();
+  public static com.bbn.tc.schema.avro.cdm13.Value.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.cdm13.Value.Builder();
   }
 
   /**
@@ -326,8 +326,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * @param other The existing builder to copy.
    * @return A new Value RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Value.Builder newBuilder(com.bbn.tc.schema.avro.Value.Builder other) {
-    return new com.bbn.tc.schema.avro.Value.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.Value.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Value.Builder other) {
+    return new com.bbn.tc.schema.avro.cdm13.Value.Builder(other);
   }
 
   /**
@@ -335,8 +335,8 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
    * @param other The existing instance to copy.
    * @return A new Value RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Value.Builder newBuilder(com.bbn.tc.schema.avro.Value other) {
-    return new com.bbn.tc.schema.avro.Value.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.Value.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Value other) {
+    return new com.bbn.tc.schema.avro.cdm13.Value.Builder(other);
   }
 
   /**
@@ -348,12 +348,12 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
     /** The size of the value: the number of elements of type valueDataType; 0 for primitives */
     private int size;
     /** The type of the value whether input or return */
-    private com.bbn.tc.schema.avro.ValueType type;
+    private com.bbn.tc.schema.avro.cdm13.ValueType type;
     /** The actual datatype of the value elements, e.g., int, double, byte, etc. (Optional)
          *  Strings are treated as char[] so type=CHAR
          *  String[] is a COMPLEX value whose components are the string values (each modeled as a char[])
          *  Complex composite objects comprising of primitive values use the COMPLEX type */
-    private com.bbn.tc.schema.avro.ValueDataType valueDataType;
+    private com.bbn.tc.schema.avro.cdm13.ValueDataType valueDataType;
     /** Whether this value is null, needed to indicate null objects (default: false) */
     private boolean isNull;
     /** the name of the Value, string. (Optional) */
@@ -374,7 +374,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          * before it can be * assigned to a value */
     private java.util.List<java.lang.Integer> tag;
     /** A complex value might comprise other component values if needed (Optional) */
-    private java.util.List<com.bbn.tc.schema.avro.Value> components;
+    private java.util.List<com.bbn.tc.schema.avro.cdm13.Value> components;
 
     /** Creates a new Builder */
     private Builder() {
@@ -385,7 +385,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.Value.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.Value.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.size)) {
         this.size = data().deepCopy(fields()[0].schema(), other.size);
@@ -429,7 +429,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
      * Creates a Builder by copying an existing Value instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.Value other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.Value other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.size)) {
         this.size = data().deepCopy(fields()[0].schema(), other.size);
@@ -484,7 +484,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'size'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setSize(int value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setSize(int value) {
       validate(fields()[0], value);
       this.size = value;
       fieldSetFlags()[0] = true;
@@ -506,7 +506,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * The size of the value: the number of elements of type valueDataType; 0 for primitives
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearSize() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearSize() {
       fieldSetFlags()[0] = false;
       return this;
     }
@@ -516,7 +516,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * The type of the value whether input or return
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.ValueType getType() {
+    public com.bbn.tc.schema.avro.cdm13.ValueType getType() {
       return type;
     }
 
@@ -526,7 +526,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'type'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setType(com.bbn.tc.schema.avro.ValueType value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setType(com.bbn.tc.schema.avro.cdm13.ValueType value) {
       validate(fields()[1], value);
       this.type = value;
       fieldSetFlags()[1] = true;
@@ -548,7 +548,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * The type of the value whether input or return
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearType() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearType() {
       type = null;
       fieldSetFlags()[1] = false;
       return this;
@@ -562,7 +562,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  Complex composite objects comprising of primitive values use the COMPLEX type
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.ValueDataType getValueDataType() {
+    public com.bbn.tc.schema.avro.cdm13.ValueDataType getValueDataType() {
       return valueDataType;
     }
 
@@ -575,7 +575,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'valueDataType'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setValueDataType(com.bbn.tc.schema.avro.ValueDataType value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setValueDataType(com.bbn.tc.schema.avro.cdm13.ValueDataType value) {
       validate(fields()[2], value);
       this.valueDataType = value;
       fieldSetFlags()[2] = true;
@@ -603,7 +603,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  Complex composite objects comprising of primitive values use the COMPLEX type
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearValueDataType() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearValueDataType() {
       valueDataType = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -624,7 +624,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'isNull'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setIsNull(boolean value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setIsNull(boolean value) {
       validate(fields()[3], value);
       this.isNull = value;
       fieldSetFlags()[3] = true;
@@ -646,7 +646,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * Whether this value is null, needed to indicate null objects (default: false)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearIsNull() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearIsNull() {
       fieldSetFlags()[3] = false;
       return this;
     }
@@ -666,7 +666,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'name'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setName(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setName(java.lang.CharSequence value) {
       validate(fields()[4], value);
       this.name = value;
       fieldSetFlags()[4] = true;
@@ -688,7 +688,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * the name of the Value, string. (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearName() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearName() {
       name = null;
       fieldSetFlags()[4] = false;
       return this;
@@ -711,7 +711,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'runtimeDataType'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setRuntimeDataType(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setRuntimeDataType(java.lang.CharSequence value) {
       validate(fields()[5], value);
       this.runtimeDataType = value;
       fieldSetFlags()[5] = true;
@@ -735,7 +735,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          *  a runtime data type of say "MyClass"
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearRuntimeDataType() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearRuntimeDataType() {
       runtimeDataType = null;
       fieldSetFlags()[5] = false;
       return this;
@@ -756,7 +756,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'valueBytes'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setValueBytes(java.nio.ByteBuffer value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setValueBytes(java.nio.ByteBuffer value) {
       validate(fields()[6], value);
       this.valueBytes = value;
       fieldSetFlags()[6] = true;
@@ -778,7 +778,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * The actual bytes of the value in Big Endian format, e.g., an int is converted to a 4 byte buffer (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearValueBytes() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearValueBytes() {
       valueBytes = null;
       fieldSetFlags()[6] = false;
       return this;
@@ -815,7 +815,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'tag'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setTag(java.util.List<java.lang.Integer> value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setTag(java.util.List<java.lang.Integer> value) {
       validate(fields()[7], value);
       this.tag = value;
       fieldSetFlags()[7] = true;
@@ -853,7 +853,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
          * before it can be * assigned to a value
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearTag() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearTag() {
       tag = null;
       fieldSetFlags()[7] = false;
       return this;
@@ -864,7 +864,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * A complex value might comprise other component values if needed (Optional)
       * @return The value.
       */
-    public java.util.List<com.bbn.tc.schema.avro.Value> getComponents() {
+    public java.util.List<com.bbn.tc.schema.avro.cdm13.Value> getComponents() {
       return components;
     }
 
@@ -874,7 +874,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * @param value The value of 'components'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder setComponents(java.util.List<com.bbn.tc.schema.avro.Value> value) {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder setComponents(java.util.List<com.bbn.tc.schema.avro.cdm13.Value> value) {
       validate(fields()[8], value);
       this.components = value;
       fieldSetFlags()[8] = true;
@@ -896,7 +896,7 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       * A complex value might comprise other component values if needed (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Value.Builder clearComponents() {
+    public com.bbn.tc.schema.avro.cdm13.Value.Builder clearComponents() {
       components = null;
       fieldSetFlags()[8] = false;
       return this;
@@ -907,14 +907,14 @@ public class Value extends org.apache.avro.specific.SpecificRecordBase implement
       try {
         Value record = new Value();
         record.size = fieldSetFlags()[0] ? this.size : (java.lang.Integer) defaultValue(fields()[0]);
-        record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.ValueType) defaultValue(fields()[1]);
-        record.valueDataType = fieldSetFlags()[2] ? this.valueDataType : (com.bbn.tc.schema.avro.ValueDataType) defaultValue(fields()[2]);
+        record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.cdm13.ValueType) defaultValue(fields()[1]);
+        record.valueDataType = fieldSetFlags()[2] ? this.valueDataType : (com.bbn.tc.schema.avro.cdm13.ValueDataType) defaultValue(fields()[2]);
         record.isNull = fieldSetFlags()[3] ? this.isNull : (java.lang.Boolean) defaultValue(fields()[3]);
         record.name = fieldSetFlags()[4] ? this.name : (java.lang.CharSequence) defaultValue(fields()[4]);
         record.runtimeDataType = fieldSetFlags()[5] ? this.runtimeDataType : (java.lang.CharSequence) defaultValue(fields()[5]);
         record.valueBytes = fieldSetFlags()[6] ? this.valueBytes : (java.nio.ByteBuffer) defaultValue(fields()[6]);
         record.tag = fieldSetFlags()[7] ? this.tag : (java.util.List<java.lang.Integer>) defaultValue(fields()[7]);
-        record.components = fieldSetFlags()[8] ? this.components : (java.util.List<com.bbn.tc.schema.avro.Value>) defaultValue(fields()[8]);
+        record.components = fieldSetFlags()[8] ? this.components : (java.util.List<com.bbn.tc.schema.avro.cdm13.Value>) defaultValue(fields()[8]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);

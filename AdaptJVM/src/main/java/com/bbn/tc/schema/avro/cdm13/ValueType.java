@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 @SuppressWarnings("all")
 /** * A value type is either in, out, or in/out
      * This is for event parameters to distinguish inputs vs return values
@@ -14,6 +14,6 @@ package com.bbn.tc.schema.avro;
 @org.apache.avro.specific.AvroGenerated
 public enum ValueType {
   VALUE_TYPE_IN, VALUE_TYPE_OUT, VALUE_TYPE_INOUT  ;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"enum\",\"name\":\"ValueType\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]}");
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"enum\",\"name\":\"ValueType\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* A value type is either in, out, or in/out\\n     * This is for event parameters to distinguish inputs vs return values\\n     *\\n *   VALUE_TYPE_IN       An input value to the event\\n     *   VALUE_TYPE_OUT *   An output value from the event (return value)\\n     *   VALUE_TYPE_INOUT *   Adding this for completeness\",\"symbols\":[\"VALUE_TYPE_IN\",\"VALUE_TYPE_OUT\",\"VALUE_TYPE_INOUT\"]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
 }

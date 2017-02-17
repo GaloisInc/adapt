@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -14,13 +14,13 @@ import org.apache.avro.specific.SpecificData;
  * to the tag to allow adding an edge from the object/subject/event to the * TagEntity. */
 @org.apache.avro.specific.AvroGenerated
 public class TagEntity extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -5031633176719423672L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"TagEntity\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* The purpose of a TagEntity is to be able to assign one or more tags to the objects/subjects/events\\n     * at a later point in time after the objects/subjects/events have been emitted.\\n     * As the name indicates, TagEntity wraps a tag (ProvenanceTagNode) with an entity i.e. assign a uuid\\n * to the tag to allow adding an edge from the object/subject/event to the * TagEntity.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A unique ID for the entity\"},{\"name\":\"tag\",\"type\":{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     * A provenance tag is represented as a tree. Each node in the tree has a value and\\n     * a set of children nodes.\",\"fields\":[{\"name\":\"value\",\"type\":[\"int\",\"UUID\",{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_SEQUENCE       the output is derived from the specified inputs in order, sequentially\\n     *TAG_OP_UNION,         the output is the union of its inputs\\n     * TAG_OP_ENCODE         the output is some encoding of the input\\n     * TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_SEQUENCE\",\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]},{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]},{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"*  the value of the node: can have the following types\\n *   int                 references another node by tagId\\n         *   UUID *   object uuid (source or sink for example)\\n         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode\\n         * *   IntegrityTag        an integrity tag\\n         *   ConfidentialityTag  a *   confidentiality tag\"},{\"name\":\"children\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceTagNode\"}],\"doc\":\"the child nodes\",\"default\":null},{\"name\":\"tagId\",\"type\":[\"null\",\"int\"],\"doc\":\"* the id to be assigned to this tag node\\n         * typically set once when the node is first created, and used in value afterwards\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs associated with a tag node\",\"default\":null}]},\"doc\":\"The provenance tag\"},{\"name\":\"timestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the tag was created (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = 5756211295344290395L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"TagEntity\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* The purpose of a TagEntity is to be able to assign one or more tags to the objects/subjects/events\\n     * at a later point in time after the objects/subjects/events have been emitted.\\n     * As the name indicates, TagEntity wraps a tag (ProvenanceTagNode) with an entity i.e. assign a uuid\\n * to the tag to allow adding an edge from the object/subject/event to the * TagEntity.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"A unique ID for the entity\"},{\"name\":\"tag\",\"type\":{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     * A provenance tag is represented as a tree. Each node in the tree has a value and\\n     * a set of children nodes.\",\"fields\":[{\"name\":\"value\",\"type\":[\"int\",\"UUID\",{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\\n     *\\n     *   TAG_OP_SEQUENCE       the output is derived from the specified inputs in order, sequentially\\n     *TAG_OP_UNION,         the output is the union of its inputs\\n     * TAG_OP_ENCODE         the output is some encoding of the input\\n     * TAG_OP_STRONG         this is more qualitative (coarse) saying there is strong dependence\\n     *   TAG_OP_MEDIUM         this is more qualitative (coarse) saying there is medium dependence\\n     *   TAG_OP_WEAK           this is more qualitative (coarse) saying there is weak   dependence\",\"symbols\":[\"TAG_OP_SEQUENCE\",\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]},{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]},{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"*  the value of the node: can have the following types\\n *   int                 references another node by tagId\\n         *   UUID *   object uuid (source or sink for example)\\n         *   TaOpCode *   the opcode applied to the children nodes, see TaOpCode\\n         * *   IntegrityTag        an integrity tag\\n         *   ConfidentialityTag  a *   confidentiality tag\"},{\"name\":\"children\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceTagNode\"}],\"doc\":\"the child nodes\",\"default\":null},{\"name\":\"tagId\",\"type\":[\"null\",\"int\"],\"doc\":\"* the id to be assigned to this tag node\\n         * typically set once when the node is first created, and used in value afterwards\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs associated with a tag node\",\"default\":null}]},\"doc\":\"The provenance tag\"},{\"name\":\"timestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the tag was created (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** A unique ID for the entity */
-  @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.UUID uuid;
   /** The provenance tag */
-  @Deprecated public com.bbn.tc.schema.avro.ProvenanceTagNode tag;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode tag;
   /** * The timestamp when the tag was created (Optional).
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
   @Deprecated public java.lang.Long timestampMicros;
@@ -42,7 +42,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
    * @param properties Arbitrary key, value pairs describing the entity
    */
-  public TagEntity(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.ProvenanceTagNode tag, java.lang.Long timestampMicros, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public TagEntity(com.bbn.tc.schema.avro.cdm13.UUID uuid, com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode tag, java.lang.Long timestampMicros, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.uuid = uuid;
     this.tag = tag;
     this.timestampMicros = timestampMicros;
@@ -65,8 +65,8 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
-    case 1: tag = (com.bbn.tc.schema.avro.ProvenanceTagNode)value$; break;
+    case 0: uuid = (com.bbn.tc.schema.avro.cdm13.UUID)value$; break;
+    case 1: tag = (com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode)value$; break;
     case 2: timestampMicros = (java.lang.Long)value$; break;
     case 3: properties = (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
@@ -77,7 +77,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * Gets the value of the 'uuid' field.
    * @return A unique ID for the entity
    */
-  public com.bbn.tc.schema.avro.UUID getUuid() {
+  public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
     return uuid;
   }
 
@@ -86,7 +86,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * A unique ID for the entity
    * @param value the value to set.
    */
-  public void setUuid(com.bbn.tc.schema.avro.UUID value) {
+  public void setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
     this.uuid = value;
   }
 
@@ -94,7 +94,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * Gets the value of the 'tag' field.
    * @return The provenance tag
    */
-  public com.bbn.tc.schema.avro.ProvenanceTagNode getTag() {
+  public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode getTag() {
     return tag;
   }
 
@@ -103,7 +103,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * The provenance tag
    * @param value the value to set.
    */
-  public void setTag(com.bbn.tc.schema.avro.ProvenanceTagNode value) {
+  public void setTag(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode value) {
     this.tag = value;
   }
 
@@ -147,8 +147,8 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * Creates a new TagEntity RecordBuilder.
    * @return A new TagEntity RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.TagEntity.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.TagEntity.Builder();
+  public static com.bbn.tc.schema.avro.cdm13.TagEntity.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.cdm13.TagEntity.Builder();
   }
 
   /**
@@ -156,8 +156,8 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * @param other The existing builder to copy.
    * @return A new TagEntity RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.TagEntity.Builder newBuilder(com.bbn.tc.schema.avro.TagEntity.Builder other) {
-    return new com.bbn.tc.schema.avro.TagEntity.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.TagEntity.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.TagEntity.Builder other) {
+    return new com.bbn.tc.schema.avro.cdm13.TagEntity.Builder(other);
   }
 
   /**
@@ -165,8 +165,8 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
    * @param other The existing instance to copy.
    * @return A new TagEntity RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.TagEntity.Builder newBuilder(com.bbn.tc.schema.avro.TagEntity other) {
-    return new com.bbn.tc.schema.avro.TagEntity.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.TagEntity.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.TagEntity other) {
+    return new com.bbn.tc.schema.avro.cdm13.TagEntity.Builder(other);
   }
 
   /**
@@ -176,10 +176,10 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
     implements org.apache.avro.data.RecordBuilder<TagEntity> {
 
     /** A unique ID for the entity */
-    private com.bbn.tc.schema.avro.UUID uuid;
+    private com.bbn.tc.schema.avro.cdm13.UUID uuid;
     /** The provenance tag */
-    private com.bbn.tc.schema.avro.ProvenanceTagNode tag;
-    private com.bbn.tc.schema.avro.ProvenanceTagNode.Builder tagBuilder;
+    private com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode tag;
+    private com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder tagBuilder;
     /** * The timestamp when the tag was created (Optional).
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC. */
     private java.lang.Long timestampMicros;
@@ -195,7 +195,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.TagEntity.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.TagEntity.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -206,7 +206,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
         fieldSetFlags()[1] = true;
       }
       if (other.hasTagBuilder()) {
-        this.tagBuilder = com.bbn.tc.schema.avro.ProvenanceTagNode.newBuilder(other.getTagBuilder());
+        this.tagBuilder = com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.newBuilder(other.getTagBuilder());
       }
       if (isValidValue(fields()[2], other.timestampMicros)) {
         this.timestampMicros = data().deepCopy(fields()[2].schema(), other.timestampMicros);
@@ -222,7 +222,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
      * Creates a Builder by copying an existing TagEntity instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.TagEntity other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.TagEntity other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -248,7 +248,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * A unique ID for the entity
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.UUID getUuid() {
+    public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
       return uuid;
     }
 
@@ -258,7 +258,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * @param value The value of 'uuid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder setUuid(com.bbn.tc.schema.avro.UUID value) {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
       validate(fields()[0], value);
       this.uuid = value;
       fieldSetFlags()[0] = true;
@@ -280,7 +280,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * A unique ID for the entity
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder clearUuid() {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder clearUuid() {
       uuid = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -291,7 +291,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * The provenance tag
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode getTag() {
+    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode getTag() {
       return tag;
     }
 
@@ -301,7 +301,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * @param value The value of 'tag'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder setTag(com.bbn.tc.schema.avro.ProvenanceTagNode value) {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder setTag(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode value) {
       validate(fields()[1], value);
       this.tagBuilder = null;
       this.tag = value;
@@ -323,12 +323,12 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
      * The provenance tag
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.ProvenanceTagNode.Builder getTagBuilder() {
+    public com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder getTagBuilder() {
       if (tagBuilder == null) {
         if (hasTag()) {
-          setTagBuilder(com.bbn.tc.schema.avro.ProvenanceTagNode.newBuilder(tag));
+          setTagBuilder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.newBuilder(tag));
         } else {
-          setTagBuilder(com.bbn.tc.schema.avro.ProvenanceTagNode.newBuilder());
+          setTagBuilder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.newBuilder());
         }
       }
       return tagBuilder;
@@ -340,7 +340,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
      * @param value The builder instance that must be set.
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.TagEntity.Builder setTagBuilder(com.bbn.tc.schema.avro.ProvenanceTagNode.Builder value) {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder setTagBuilder(com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode.Builder value) {
       clearTag();
       tagBuilder = value;
       return this;
@@ -360,7 +360,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * The provenance tag
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder clearTag() {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder clearTag() {
       tag = null;
       tagBuilder = null;
       fieldSetFlags()[1] = false;
@@ -384,7 +384,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * @param value The value of 'timestampMicros'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder setTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder setTimestampMicros(java.lang.Long value) {
       validate(fields()[2], value);
       this.timestampMicros = value;
       fieldSetFlags()[2] = true;
@@ -408,7 +408,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder clearTimestampMicros() {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder clearTimestampMicros() {
       timestampMicros = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -429,7 +429,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * @param value The value of 'properties'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
       validate(fields()[3], value);
       this.properties = value;
       fieldSetFlags()[3] = true;
@@ -451,7 +451,7 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
       * Arbitrary key, value pairs describing the entity
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.TagEntity.Builder clearProperties() {
+    public com.bbn.tc.schema.avro.cdm13.TagEntity.Builder clearProperties() {
       properties = null;
       fieldSetFlags()[3] = false;
       return this;
@@ -461,11 +461,11 @@ public class TagEntity extends org.apache.avro.specific.SpecificRecordBase imple
     public TagEntity build() {
       try {
         TagEntity record = new TagEntity();
-        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
+        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.cdm13.UUID) defaultValue(fields()[0]);
         if (tagBuilder != null) {
           record.tag = this.tagBuilder.build();
         } else {
-          record.tag = fieldSetFlags()[1] ? this.tag : (com.bbn.tc.schema.avro.ProvenanceTagNode) defaultValue(fields()[1]);
+          record.tag = fieldSetFlags()[1] ? this.tag : (com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode) defaultValue(fields()[1]);
         }
         record.timestampMicros = fieldSetFlags()[2] ? this.timestampMicros : (java.lang.Long) defaultValue(fields()[2]);
         record.properties = fieldSetFlags()[3] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[3]);

@@ -3,13 +3,13 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 @SuppressWarnings("all")
 @org.apache.avro.specific.FixedSize(2)
 @org.apache.avro.specific.AvroGenerated
 public class SHORT extends org.apache.avro.specific.SpecificFixed {
-  private static final long serialVersionUID = 4625678493828918348L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"fixed\",\"name\":\"SHORT\",\"namespace\":\"com.bbn.tc.schema.avro\",\"size\":2}");
+  private static final long serialVersionUID = 5637922902114073667L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"fixed\",\"name\":\"SHORT\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"size\":2}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   public org.apache.avro.Schema getSchema() { return SCHEMA$; }
 

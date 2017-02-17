@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -12,19 +12,19 @@ import org.apache.avro.specific.SpecificData;
      * can represent other execution boundaries such as functions and blocks if needed. */
 @org.apache.avro.specific.AvroGenerated
 public class Subject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -4590599271314318178L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Subject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Subjects represent execution contexts and include mainly threads and processes. They can be more granular and\\n     * can represent other execution boundaries such as functions and blocks if needed.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"universally unique identifier for the subject\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SubjectType\",\"doc\":\"* SUBJECT_PROCESS,    process\\n     * SUBJECT_THREAD, thread within a process\\n     * SUBJECT_UNIT        so far we only know of TRACE BEEP using this\",\"symbols\":[\"SUBJECT_PROCESS\",\"SUBJECT_THREAD\",\"SUBJECT_UNIT\",\"SUBJECT_BASIC_BLOCK\"]},\"doc\":\"the subject type\"},{\"name\":\"pid\",\"type\":\"int\",\"doc\":\"OS process id for type process and unit id for a unit (Optional)\"},{\"name\":\"ppid\",\"type\":\"int\",\"doc\":\"OS parent process id for type process and pid for type unit (Optional)\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"Where it came from, see InstrumentationSource\"},{\"name\":\"startTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The start time of the subject\\n         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\\n         * (Optional)\",\"default\":null},{\"name\":\"unitId\",\"type\":[\"null\",\"int\"],\"doc\":\"unit id for unit based instrumentation (Optional)\",\"default\":null},{\"name\":\"endTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"The end time of the subject (Optional)\",\"default\":null},{\"name\":\"cmdLine\",\"type\":[\"null\",\"string\"],\"doc\":\"Process command line arguments including process name (Optional)\",\"default\":null},{\"name\":\"importedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"imported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"exportedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"exported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"pInfo\",\"type\":[\"null\",\"string\"],\"doc\":\"additional process information, such portable execution (PE) info in windows (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
+  private static final long serialVersionUID = 4793642519784228488L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Subject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* Subjects represent execution contexts and include mainly threads and processes. They can be more granular and\\n     * can represent other execution boundaries such as functions and blocks if needed.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"universally unique identifier for the subject\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SubjectType\",\"doc\":\"* SUBJECT_PROCESS,    process\\n     * SUBJECT_THREAD, thread within a process\\n     * SUBJECT_UNIT        so far we only know of TRACE BEEP using this\",\"symbols\":[\"SUBJECT_PROCESS\",\"SUBJECT_THREAD\",\"SUBJECT_UNIT\",\"SUBJECT_BASIC_BLOCK\"]},\"doc\":\"the subject type\"},{\"name\":\"pid\",\"type\":\"int\",\"doc\":\"OS process id for type process and unit id for a unit (Optional)\"},{\"name\":\"ppid\",\"type\":\"int\",\"doc\":\"OS parent process id for type process and pid for type unit (Optional)\"},{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"Where it came from, see InstrumentationSource\"},{\"name\":\"startTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The start time of the subject\\n         * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\\n         * (Optional)\",\"default\":null},{\"name\":\"unitId\",\"type\":[\"null\",\"int\"],\"doc\":\"unit id for unit based instrumentation (Optional)\",\"default\":null},{\"name\":\"endTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"The end time of the subject (Optional)\",\"default\":null},{\"name\":\"cmdLine\",\"type\":[\"null\",\"string\"],\"doc\":\"Process command line arguments including process name (Optional)\",\"default\":null},{\"name\":\"importedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"imported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"exportedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"exported libraries (static or dynamic), (Optional)\",\"default\":null},{\"name\":\"pInfo\",\"type\":[\"null\",\"string\"],\"doc\":\"additional process information, such portable execution (PE) info in windows (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** universally unique identifier for the subject */
-  @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.UUID uuid;
   /** the subject type */
-  @Deprecated public com.bbn.tc.schema.avro.SubjectType type;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.SubjectType type;
   /** OS process id for type process and unit id for a unit (Optional) */
   @Deprecated public int pid;
   /** OS parent process id for type process and pid for type unit (Optional) */
   @Deprecated public int ppid;
   /** Where it came from, see InstrumentationSource */
-  @Deprecated public com.bbn.tc.schema.avro.InstrumentationSource source;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
   /** * The start time of the subject
          * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
          * (Optional) */
@@ -69,7 +69,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * @param pInfo additional process information, such portable execution (PE) info in windows (Optional)
    * @param properties Arbitrary key, value pairs describing the entity
    */
-  public Subject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.SubjectType type, java.lang.Integer pid, java.lang.Integer ppid, com.bbn.tc.schema.avro.InstrumentationSource source, java.lang.Long startTimestampMicros, java.lang.Integer unitId, java.lang.Long endTimestampMicros, java.lang.CharSequence cmdLine, java.util.List<java.lang.CharSequence> importedLibraries, java.util.List<java.lang.CharSequence> exportedLibraries, java.lang.CharSequence pInfo, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
+  public Subject(com.bbn.tc.schema.avro.cdm13.UUID uuid, com.bbn.tc.schema.avro.cdm13.SubjectType type, java.lang.Integer pid, java.lang.Integer ppid, com.bbn.tc.schema.avro.cdm13.InstrumentationSource source, java.lang.Long startTimestampMicros, java.lang.Integer unitId, java.lang.Long endTimestampMicros, java.lang.CharSequence cmdLine, java.util.List<java.lang.CharSequence> importedLibraries, java.util.List<java.lang.CharSequence> exportedLibraries, java.lang.CharSequence pInfo, java.util.Map<java.lang.CharSequence,java.lang.CharSequence> properties) {
     this.uuid = uuid;
     this.type = type;
     this.pid = pid;
@@ -110,11 +110,11 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
-    case 1: type = (com.bbn.tc.schema.avro.SubjectType)value$; break;
+    case 0: uuid = (com.bbn.tc.schema.avro.cdm13.UUID)value$; break;
+    case 1: type = (com.bbn.tc.schema.avro.cdm13.SubjectType)value$; break;
     case 2: pid = (java.lang.Integer)value$; break;
     case 3: ppid = (java.lang.Integer)value$; break;
-    case 4: source = (com.bbn.tc.schema.avro.InstrumentationSource)value$; break;
+    case 4: source = (com.bbn.tc.schema.avro.cdm13.InstrumentationSource)value$; break;
     case 5: startTimestampMicros = (java.lang.Long)value$; break;
     case 6: unitId = (java.lang.Integer)value$; break;
     case 7: endTimestampMicros = (java.lang.Long)value$; break;
@@ -131,7 +131,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * Gets the value of the 'uuid' field.
    * @return universally unique identifier for the subject
    */
-  public com.bbn.tc.schema.avro.UUID getUuid() {
+  public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
     return uuid;
   }
 
@@ -140,7 +140,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * universally unique identifier for the subject
    * @param value the value to set.
    */
-  public void setUuid(com.bbn.tc.schema.avro.UUID value) {
+  public void setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
     this.uuid = value;
   }
 
@@ -148,7 +148,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * Gets the value of the 'type' field.
    * @return the subject type
    */
-  public com.bbn.tc.schema.avro.SubjectType getType() {
+  public com.bbn.tc.schema.avro.cdm13.SubjectType getType() {
     return type;
   }
 
@@ -157,7 +157,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * the subject type
    * @param value the value to set.
    */
-  public void setType(com.bbn.tc.schema.avro.SubjectType value) {
+  public void setType(com.bbn.tc.schema.avro.cdm13.SubjectType value) {
     this.type = value;
   }
 
@@ -199,7 +199,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * Gets the value of the 'source' field.
    * @return Where it came from, see InstrumentationSource
    */
-  public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
+  public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
     return source;
   }
 
@@ -208,7 +208,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * Where it came from, see InstrumentationSource
    * @param value the value to set.
    */
-  public void setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
+  public void setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
     this.source = value;
   }
 
@@ -356,8 +356,8 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * Creates a new Subject RecordBuilder.
    * @return A new Subject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Subject.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.Subject.Builder();
+  public static com.bbn.tc.schema.avro.cdm13.Subject.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.cdm13.Subject.Builder();
   }
 
   /**
@@ -365,8 +365,8 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * @param other The existing builder to copy.
    * @return A new Subject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Subject.Builder newBuilder(com.bbn.tc.schema.avro.Subject.Builder other) {
-    return new com.bbn.tc.schema.avro.Subject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.Subject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Subject.Builder other) {
+    return new com.bbn.tc.schema.avro.cdm13.Subject.Builder(other);
   }
 
   /**
@@ -374,8 +374,8 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
    * @param other The existing instance to copy.
    * @return A new Subject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.Subject.Builder newBuilder(com.bbn.tc.schema.avro.Subject other) {
-    return new com.bbn.tc.schema.avro.Subject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.Subject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.Subject other) {
+    return new com.bbn.tc.schema.avro.cdm13.Subject.Builder(other);
   }
 
   /**
@@ -385,15 +385,15 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     implements org.apache.avro.data.RecordBuilder<Subject> {
 
     /** universally unique identifier for the subject */
-    private com.bbn.tc.schema.avro.UUID uuid;
+    private com.bbn.tc.schema.avro.cdm13.UUID uuid;
     /** the subject type */
-    private com.bbn.tc.schema.avro.SubjectType type;
+    private com.bbn.tc.schema.avro.cdm13.SubjectType type;
     /** OS process id for type process and unit id for a unit (Optional) */
     private int pid;
     /** OS parent process id for type process and pid for type unit (Optional) */
     private int ppid;
     /** Where it came from, see InstrumentationSource */
-    private com.bbn.tc.schema.avro.InstrumentationSource source;
+    private com.bbn.tc.schema.avro.cdm13.InstrumentationSource source;
     /** * The start time of the subject
          * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.
          * (Optional) */
@@ -422,7 +422,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.Subject.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.Subject.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -482,7 +482,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
      * Creates a Builder by copying an existing Subject instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.Subject other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.Subject other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -543,7 +543,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * universally unique identifier for the subject
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.UUID getUuid() {
+    public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
       return uuid;
     }
 
@@ -553,7 +553,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'uuid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setUuid(com.bbn.tc.schema.avro.UUID value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
       validate(fields()[0], value);
       this.uuid = value;
       fieldSetFlags()[0] = true;
@@ -575,7 +575,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * universally unique identifier for the subject
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearUuid() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearUuid() {
       uuid = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -586,7 +586,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * the subject type
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.SubjectType getType() {
+    public com.bbn.tc.schema.avro.cdm13.SubjectType getType() {
       return type;
     }
 
@@ -596,7 +596,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'type'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setType(com.bbn.tc.schema.avro.SubjectType value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setType(com.bbn.tc.schema.avro.cdm13.SubjectType value) {
       validate(fields()[1], value);
       this.type = value;
       fieldSetFlags()[1] = true;
@@ -618,7 +618,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * the subject type
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearType() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearType() {
       type = null;
       fieldSetFlags()[1] = false;
       return this;
@@ -639,7 +639,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'pid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setPid(int value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setPid(int value) {
       validate(fields()[2], value);
       this.pid = value;
       fieldSetFlags()[2] = true;
@@ -661,7 +661,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * OS process id for type process and unit id for a unit (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPid() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearPid() {
       fieldSetFlags()[2] = false;
       return this;
     }
@@ -681,7 +681,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'ppid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setPpid(int value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setPpid(int value) {
       validate(fields()[3], value);
       this.ppid = value;
       fieldSetFlags()[3] = true;
@@ -703,7 +703,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * OS parent process id for type process and pid for type unit (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPpid() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearPpid() {
       fieldSetFlags()[3] = false;
       return this;
     }
@@ -713,7 +713,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * Where it came from, see InstrumentationSource
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.InstrumentationSource getSource() {
+    public com.bbn.tc.schema.avro.cdm13.InstrumentationSource getSource() {
       return source;
     }
 
@@ -723,7 +723,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'source'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setSource(com.bbn.tc.schema.avro.InstrumentationSource value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setSource(com.bbn.tc.schema.avro.cdm13.InstrumentationSource value) {
       validate(fields()[4], value);
       this.source = value;
       fieldSetFlags()[4] = true;
@@ -745,7 +745,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * Where it came from, see InstrumentationSource
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearSource() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearSource() {
       source = null;
       fieldSetFlags()[4] = false;
       return this;
@@ -770,7 +770,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'startTimestampMicros'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setStartTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setStartTimestampMicros(java.lang.Long value) {
       validate(fields()[5], value);
       this.startTimestampMicros = value;
       fieldSetFlags()[5] = true;
@@ -796,7 +796,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
          * (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearStartTimestampMicros() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearStartTimestampMicros() {
       startTimestampMicros = null;
       fieldSetFlags()[5] = false;
       return this;
@@ -817,7 +817,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'unitId'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setUnitId(java.lang.Integer value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setUnitId(java.lang.Integer value) {
       validate(fields()[6], value);
       this.unitId = value;
       fieldSetFlags()[6] = true;
@@ -839,7 +839,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * unit id for unit based instrumentation (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearUnitId() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearUnitId() {
       unitId = null;
       fieldSetFlags()[6] = false;
       return this;
@@ -860,7 +860,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'endTimestampMicros'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setEndTimestampMicros(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setEndTimestampMicros(java.lang.Long value) {
       validate(fields()[7], value);
       this.endTimestampMicros = value;
       fieldSetFlags()[7] = true;
@@ -882,7 +882,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * The end time of the subject (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearEndTimestampMicros() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearEndTimestampMicros() {
       endTimestampMicros = null;
       fieldSetFlags()[7] = false;
       return this;
@@ -903,7 +903,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'cmdLine'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setCmdLine(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setCmdLine(java.lang.CharSequence value) {
       validate(fields()[8], value);
       this.cmdLine = value;
       fieldSetFlags()[8] = true;
@@ -925,7 +925,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * Process command line arguments including process name (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearCmdLine() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearCmdLine() {
       cmdLine = null;
       fieldSetFlags()[8] = false;
       return this;
@@ -946,7 +946,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'importedLibraries'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setImportedLibraries(java.util.List<java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setImportedLibraries(java.util.List<java.lang.CharSequence> value) {
       validate(fields()[9], value);
       this.importedLibraries = value;
       fieldSetFlags()[9] = true;
@@ -968,7 +968,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * imported libraries (static or dynamic), (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearImportedLibraries() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearImportedLibraries() {
       importedLibraries = null;
       fieldSetFlags()[9] = false;
       return this;
@@ -989,7 +989,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'exportedLibraries'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setExportedLibraries(java.util.List<java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setExportedLibraries(java.util.List<java.lang.CharSequence> value) {
       validate(fields()[10], value);
       this.exportedLibraries = value;
       fieldSetFlags()[10] = true;
@@ -1011,7 +1011,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * exported libraries (static or dynamic), (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearExportedLibraries() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearExportedLibraries() {
       exportedLibraries = null;
       fieldSetFlags()[10] = false;
       return this;
@@ -1032,7 +1032,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'pInfo'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setPInfo(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setPInfo(java.lang.CharSequence value) {
       validate(fields()[11], value);
       this.pInfo = value;
       fieldSetFlags()[11] = true;
@@ -1054,7 +1054,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * additional process information, such portable execution (PE) info in windows (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearPInfo() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearPInfo() {
       pInfo = null;
       fieldSetFlags()[11] = false;
       return this;
@@ -1075,7 +1075,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * @param value The value of 'properties'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder setProperties(java.util.Map<java.lang.CharSequence,java.lang.CharSequence> value) {
       validate(fields()[12], value);
       this.properties = value;
       fieldSetFlags()[12] = true;
@@ -1097,7 +1097,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
       * Arbitrary key, value pairs describing the entity
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.Subject.Builder clearProperties() {
+    public com.bbn.tc.schema.avro.cdm13.Subject.Builder clearProperties() {
       properties = null;
       fieldSetFlags()[12] = false;
       return this;
@@ -1107,11 +1107,11 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     public Subject build() {
       try {
         Subject record = new Subject();
-        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
-        record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.SubjectType) defaultValue(fields()[1]);
+        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.cdm13.UUID) defaultValue(fields()[0]);
+        record.type = fieldSetFlags()[1] ? this.type : (com.bbn.tc.schema.avro.cdm13.SubjectType) defaultValue(fields()[1]);
         record.pid = fieldSetFlags()[2] ? this.pid : (java.lang.Integer) defaultValue(fields()[2]);
         record.ppid = fieldSetFlags()[3] ? this.ppid : (java.lang.Integer) defaultValue(fields()[3]);
-        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.InstrumentationSource) defaultValue(fields()[4]);
+        record.source = fieldSetFlags()[4] ? this.source : (com.bbn.tc.schema.avro.cdm13.InstrumentationSource) defaultValue(fields()[4]);
         record.startTimestampMicros = fieldSetFlags()[5] ? this.startTimestampMicros : (java.lang.Long) defaultValue(fields()[5]);
         record.unitId = fieldSetFlags()[6] ? this.unitId : (java.lang.Integer) defaultValue(fields()[6]);
         record.endTimestampMicros = fieldSetFlags()[7] ? this.endTimestampMicros : (java.lang.Long) defaultValue(fields()[7]);

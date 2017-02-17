@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -11,13 +11,13 @@ import org.apache.avro.specific.SpecificData;
 /** * Represents a registry key. Instantiates an AbstractObject. */
 @org.apache.avro.specific.AvroGenerated
 public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -7019943173095006524L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"RegistryKeyObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a registry key. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"key\",\"type\":\"string\",\"doc\":\"The registry key/path\"},{\"name\":\"version\",\"type\":\"int\",\"doc\":\"The version incremented every time the entry changes\",\"default\":1},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"The entry size in bytes (Optional)\",\"default\":null}]}");
+  private static final long serialVersionUID = 4317148582620505157L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"RegistryKeyObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* Represents a registry key. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"key\",\"type\":\"string\",\"doc\":\"The registry key/path\"},{\"name\":\"version\",\"type\":\"int\",\"doc\":\"The version incremented every time the entry changes\",\"default\":1},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"The entry size in bytes (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** Universally unique identifier for the object */
-  @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.UUID uuid;
   /** The base object attributes */
-  @Deprecated public com.bbn.tc.schema.avro.AbstractObject baseObject;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject;
   /** The registry key/path */
   @Deprecated public java.lang.CharSequence key;
   /** The version incremented every time the entry changes */
@@ -40,7 +40,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * @param version The version incremented every time the entry changes
    * @param size The entry size in bytes (Optional)
    */
-  public RegistryKeyObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.CharSequence key, java.lang.Integer version, java.lang.Long size) {
+  public RegistryKeyObject(com.bbn.tc.schema.avro.cdm13.UUID uuid, com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject, java.lang.CharSequence key, java.lang.Integer version, java.lang.Long size) {
     this.uuid = uuid;
     this.baseObject = baseObject;
     this.key = key;
@@ -65,8 +65,8 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
-    case 1: baseObject = (com.bbn.tc.schema.avro.AbstractObject)value$; break;
+    case 0: uuid = (com.bbn.tc.schema.avro.cdm13.UUID)value$; break;
+    case 1: baseObject = (com.bbn.tc.schema.avro.cdm13.AbstractObject)value$; break;
     case 2: key = (java.lang.CharSequence)value$; break;
     case 3: version = (java.lang.Integer)value$; break;
     case 4: size = (java.lang.Long)value$; break;
@@ -78,7 +78,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * Gets the value of the 'uuid' field.
    * @return Universally unique identifier for the object
    */
-  public com.bbn.tc.schema.avro.UUID getUuid() {
+  public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
     return uuid;
   }
 
@@ -87,7 +87,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * Universally unique identifier for the object
    * @param value the value to set.
    */
-  public void setUuid(com.bbn.tc.schema.avro.UUID value) {
+  public void setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
     this.uuid = value;
   }
 
@@ -95,7 +95,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * Gets the value of the 'baseObject' field.
    * @return The base object attributes
    */
-  public com.bbn.tc.schema.avro.AbstractObject getBaseObject() {
+  public com.bbn.tc.schema.avro.cdm13.AbstractObject getBaseObject() {
     return baseObject;
   }
 
@@ -104,7 +104,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * The base object attributes
    * @param value the value to set.
    */
-  public void setBaseObject(com.bbn.tc.schema.avro.AbstractObject value) {
+  public void setBaseObject(com.bbn.tc.schema.avro.cdm13.AbstractObject value) {
     this.baseObject = value;
   }
 
@@ -163,8 +163,8 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * Creates a new RegistryKeyObject RecordBuilder.
    * @return A new RegistryKeyObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.RegistryKeyObject.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.RegistryKeyObject.Builder();
+  public static com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder();
   }
 
   /**
@@ -172,8 +172,8 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * @param other The existing builder to copy.
    * @return A new RegistryKeyObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.RegistryKeyObject.Builder newBuilder(com.bbn.tc.schema.avro.RegistryKeyObject.Builder other) {
-    return new com.bbn.tc.schema.avro.RegistryKeyObject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder other) {
+    return new com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder(other);
   }
 
   /**
@@ -181,8 +181,8 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
    * @param other The existing instance to copy.
    * @return A new RegistryKeyObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.RegistryKeyObject.Builder newBuilder(com.bbn.tc.schema.avro.RegistryKeyObject other) {
-    return new com.bbn.tc.schema.avro.RegistryKeyObject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.RegistryKeyObject other) {
+    return new com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder(other);
   }
 
   /**
@@ -192,10 +192,10 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
     implements org.apache.avro.data.RecordBuilder<RegistryKeyObject> {
 
     /** Universally unique identifier for the object */
-    private com.bbn.tc.schema.avro.UUID uuid;
+    private com.bbn.tc.schema.avro.cdm13.UUID uuid;
     /** The base object attributes */
-    private com.bbn.tc.schema.avro.AbstractObject baseObject;
-    private com.bbn.tc.schema.avro.AbstractObject.Builder baseObjectBuilder;
+    private com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject;
+    private com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder baseObjectBuilder;
     /** The registry key/path */
     private java.lang.CharSequence key;
     /** The version incremented every time the entry changes */
@@ -212,7 +212,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.RegistryKeyObject.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -223,7 +223,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
         fieldSetFlags()[1] = true;
       }
       if (other.hasBaseObjectBuilder()) {
-        this.baseObjectBuilder = com.bbn.tc.schema.avro.AbstractObject.newBuilder(other.getBaseObjectBuilder());
+        this.baseObjectBuilder = com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder(other.getBaseObjectBuilder());
       }
       if (isValidValue(fields()[2], other.key)) {
         this.key = data().deepCopy(fields()[2].schema(), other.key);
@@ -243,7 +243,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
      * Creates a Builder by copying an existing RegistryKeyObject instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.RegistryKeyObject other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.RegistryKeyObject other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -273,7 +273,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * Universally unique identifier for the object
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.UUID getUuid() {
+    public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
       return uuid;
     }
 
@@ -283,7 +283,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'uuid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setUuid(com.bbn.tc.schema.avro.UUID value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
       validate(fields()[0], value);
       this.uuid = value;
       fieldSetFlags()[0] = true;
@@ -305,7 +305,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * Universally unique identifier for the object
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder clearUuid() {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder clearUuid() {
       uuid = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -316,7 +316,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * The base object attributes
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.AbstractObject getBaseObject() {
+    public com.bbn.tc.schema.avro.cdm13.AbstractObject getBaseObject() {
       return baseObject;
     }
 
@@ -326,7 +326,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'baseObject'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setBaseObject(com.bbn.tc.schema.avro.AbstractObject value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setBaseObject(com.bbn.tc.schema.avro.cdm13.AbstractObject value) {
       validate(fields()[1], value);
       this.baseObjectBuilder = null;
       this.baseObject = value;
@@ -348,12 +348,12 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
      * The base object attributes
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.AbstractObject.Builder getBaseObjectBuilder() {
+    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder getBaseObjectBuilder() {
       if (baseObjectBuilder == null) {
         if (hasBaseObject()) {
-          setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.newBuilder(baseObject));
+          setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder(baseObject));
         } else {
-          setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.newBuilder());
+          setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder());
         }
       }
       return baseObjectBuilder;
@@ -365,7 +365,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
      * @param value The builder instance that must be set.
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.Builder value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder value) {
       clearBaseObject();
       baseObjectBuilder = value;
       return this;
@@ -385,7 +385,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * The base object attributes
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder clearBaseObject() {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder clearBaseObject() {
       baseObject = null;
       baseObjectBuilder = null;
       fieldSetFlags()[1] = false;
@@ -407,7 +407,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'key'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setKey(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setKey(java.lang.CharSequence value) {
       validate(fields()[2], value);
       this.key = value;
       fieldSetFlags()[2] = true;
@@ -429,7 +429,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * The registry key/path
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder clearKey() {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder clearKey() {
       key = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -450,7 +450,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'version'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setVersion(int value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setVersion(int value) {
       validate(fields()[3], value);
       this.version = value;
       fieldSetFlags()[3] = true;
@@ -472,7 +472,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * The version incremented every time the entry changes
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder clearVersion() {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder clearVersion() {
       fieldSetFlags()[3] = false;
       return this;
     }
@@ -492,7 +492,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * @param value The value of 'size'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder setSize(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder setSize(java.lang.Long value) {
       validate(fields()[4], value);
       this.size = value;
       fieldSetFlags()[4] = true;
@@ -514,7 +514,7 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
       * The entry size in bytes (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.RegistryKeyObject.Builder clearSize() {
+    public com.bbn.tc.schema.avro.cdm13.RegistryKeyObject.Builder clearSize() {
       size = null;
       fieldSetFlags()[4] = false;
       return this;
@@ -524,11 +524,11 @@ public class RegistryKeyObject extends org.apache.avro.specific.SpecificRecordBa
     public RegistryKeyObject build() {
       try {
         RegistryKeyObject record = new RegistryKeyObject();
-        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
+        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.cdm13.UUID) defaultValue(fields()[0]);
         if (baseObjectBuilder != null) {
           record.baseObject = this.baseObjectBuilder.build();
         } else {
-          record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.AbstractObject) defaultValue(fields()[1]);
+          record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.cdm13.AbstractObject) defaultValue(fields()[1]);
         }
         record.key = fieldSetFlags()[2] ? this.key : (java.lang.CharSequence) defaultValue(fields()[2]);
         record.version = fieldSetFlags()[3] ? this.version : (java.lang.Integer) defaultValue(fields()[3]);

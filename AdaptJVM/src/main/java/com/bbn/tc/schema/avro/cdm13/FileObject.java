@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro;
+package com.bbn.tc.schema.avro.cdm13;
 
 import org.apache.avro.specific.SpecificData;
 
@@ -11,13 +11,13 @@ import org.apache.avro.specific.SpecificData;
 /** * Represents a file on the file system. Instantiates an AbstractObject. */
 @org.apache.avro.specific.AvroGenerated
 public class FileObject extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = 1393692462428291582L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"FileObject\",\"namespace\":\"com.bbn.tc.schema.avro\",\"doc\":\"* Represents a file on the file system. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"url\",\"type\":\"string\",\"doc\":\"The location of the file absolute path or remote url\"},{\"name\":\"isPipe\",\"type\":\"boolean\",\"doc\":\"Whether the file is a Unix pipe\",\"default\":false},{\"name\":\"version\",\"type\":\"int\",\"doc\":\"The file version incremented every time the file changes\",\"default\":1},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"The file size in bytes (Optional)\",\"default\":null}]}");
+  private static final long serialVersionUID = -6184431373163383419L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"FileObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm13\",\"doc\":\"* Represents a file on the file system. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which could include sockets, files,\\n     *  memory, and any data in general that can be an input and/or output to an event.\\n     *  This record is intended to be abstract i.e., one should not instantiate an Object\\n     *  but rather instantiate one of its sub types File, NetFlow, of Memory\",\"fields\":[{\"name\":\"source\",\"type\":{\"type\":\"enum\",\"name\":\"InstrumentationSource\",\"doc\":\"* SOURCE_LINUX_AUDIT_TRACE,          from Linux /dev/audit\\n * SOURCE_LINUX_PROC_TRACE,           from Linux's /proc\\n     * * SOURCE_LINUX_BEEP_TRACE,           from BEEP instrumentation\\n     * * SOURCE_FREEBSD_OPENBSM_TRACE,      from FreeBSD openBSM\\n     * * SOURCE_ANDROID_JAVA_CLEARSCOPE,    from android java instrumentation\\n     * * SOURCE_ANDROID_NATIVE_CLEARSCOPE,  from android's native instrumentation\\n * * SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS  for CADETS * freebsd instrumentation\\n     * SOURCE_FREEBSD_LOOM_CADETS, * SOURCE_FREEBSD_MACIF_CADETS    for CADETS freebsd instrumentation\\n     * * SOURCE_LINUX_THEIA                 from the GATech THEIA instrumentation * source\\n     * SOURCE_WINDOWS_FIVEDIRECTIONS      for the fivedirections * windows events\",\"symbols\":[\"SOURCE_LINUX_AUDIT_TRACE\",\"SOURCE_LINUX_PROC_TRACE\",\"SOURCE_LINUX_BEEP_TRACE\",\"SOURCE_FREEBSD_OPENBSM_TRACE\",\"SOURCE_ANDROID_JAVA_CLEARSCOPE\",\"SOURCE_ANDROID_NATIVE_CLEARSCOPE\",\"SOURCE_FREEBSD_DTRACE_CADETS\",\"SOURCE_FREEBSD_TESLA_CADETS\",\"SOURCE_FREEBSD_LOOM_CADETS\",\"SOURCE_FREEBSD_MACIF_CADETS\",\"SOURCE_WINDOWS_DIFT_FAROS\",\"SOURCE_LINUX_THEIA\",\"SOURCE_WINDOWS_FIVEDIRECTIONS\"]},\"doc\":\"The source that emitted the object, see InstrumentationSource\"},{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"lastTimestampMicros\",\"type\":[\"null\",\"long\"],\"doc\":\"* The timestamp when the object was last modified (Optional).\\n        * A timestamp stores the number of microseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"Arbitrary key, value pairs describing the entity\",\"default\":null}]},\"doc\":\"The base object attributes\"},{\"name\":\"url\",\"type\":\"string\",\"doc\":\"The location of the file absolute path or remote url\"},{\"name\":\"isPipe\",\"type\":\"boolean\",\"doc\":\"Whether the file is a Unix pipe\",\"default\":false},{\"name\":\"version\",\"type\":\"int\",\"doc\":\"The file version incremented every time the file changes\",\"default\":1},{\"name\":\"size\",\"type\":[\"null\",\"long\"],\"doc\":\"The file size in bytes (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   /** Universally unique identifier for the object */
-  @Deprecated public com.bbn.tc.schema.avro.UUID uuid;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.UUID uuid;
   /** The base object attributes */
-  @Deprecated public com.bbn.tc.schema.avro.AbstractObject baseObject;
+  @Deprecated public com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject;
   /** The location of the file absolute path or remote url */
   @Deprecated public java.lang.CharSequence url;
   /** Whether the file is a Unix pipe */
@@ -43,7 +43,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * @param version The file version incremented every time the file changes
    * @param size The file size in bytes (Optional)
    */
-  public FileObject(com.bbn.tc.schema.avro.UUID uuid, com.bbn.tc.schema.avro.AbstractObject baseObject, java.lang.CharSequence url, java.lang.Boolean isPipe, java.lang.Integer version, java.lang.Long size) {
+  public FileObject(com.bbn.tc.schema.avro.cdm13.UUID uuid, com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject, java.lang.CharSequence url, java.lang.Boolean isPipe, java.lang.Integer version, java.lang.Long size) {
     this.uuid = uuid;
     this.baseObject = baseObject;
     this.url = url;
@@ -70,8 +70,8 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
   @SuppressWarnings(value="unchecked")
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
-    case 0: uuid = (com.bbn.tc.schema.avro.UUID)value$; break;
-    case 1: baseObject = (com.bbn.tc.schema.avro.AbstractObject)value$; break;
+    case 0: uuid = (com.bbn.tc.schema.avro.cdm13.UUID)value$; break;
+    case 1: baseObject = (com.bbn.tc.schema.avro.cdm13.AbstractObject)value$; break;
     case 2: url = (java.lang.CharSequence)value$; break;
     case 3: isPipe = (java.lang.Boolean)value$; break;
     case 4: version = (java.lang.Integer)value$; break;
@@ -84,7 +84,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * Gets the value of the 'uuid' field.
    * @return Universally unique identifier for the object
    */
-  public com.bbn.tc.schema.avro.UUID getUuid() {
+  public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
     return uuid;
   }
 
@@ -93,7 +93,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * Universally unique identifier for the object
    * @param value the value to set.
    */
-  public void setUuid(com.bbn.tc.schema.avro.UUID value) {
+  public void setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
     this.uuid = value;
   }
 
@@ -101,7 +101,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * Gets the value of the 'baseObject' field.
    * @return The base object attributes
    */
-  public com.bbn.tc.schema.avro.AbstractObject getBaseObject() {
+  public com.bbn.tc.schema.avro.cdm13.AbstractObject getBaseObject() {
     return baseObject;
   }
 
@@ -110,7 +110,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * The base object attributes
    * @param value the value to set.
    */
-  public void setBaseObject(com.bbn.tc.schema.avro.AbstractObject value) {
+  public void setBaseObject(com.bbn.tc.schema.avro.cdm13.AbstractObject value) {
     this.baseObject = value;
   }
 
@@ -186,8 +186,8 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * Creates a new FileObject RecordBuilder.
    * @return A new FileObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.FileObject.Builder newBuilder() {
-    return new com.bbn.tc.schema.avro.FileObject.Builder();
+  public static com.bbn.tc.schema.avro.cdm13.FileObject.Builder newBuilder() {
+    return new com.bbn.tc.schema.avro.cdm13.FileObject.Builder();
   }
 
   /**
@@ -195,8 +195,8 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * @param other The existing builder to copy.
    * @return A new FileObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.FileObject.Builder newBuilder(com.bbn.tc.schema.avro.FileObject.Builder other) {
-    return new com.bbn.tc.schema.avro.FileObject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.FileObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.FileObject.Builder other) {
+    return new com.bbn.tc.schema.avro.cdm13.FileObject.Builder(other);
   }
 
   /**
@@ -204,8 +204,8 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
    * @param other The existing instance to copy.
    * @return A new FileObject RecordBuilder
    */
-  public static com.bbn.tc.schema.avro.FileObject.Builder newBuilder(com.bbn.tc.schema.avro.FileObject other) {
-    return new com.bbn.tc.schema.avro.FileObject.Builder(other);
+  public static com.bbn.tc.schema.avro.cdm13.FileObject.Builder newBuilder(com.bbn.tc.schema.avro.cdm13.FileObject other) {
+    return new com.bbn.tc.schema.avro.cdm13.FileObject.Builder(other);
   }
 
   /**
@@ -215,10 +215,10 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
     implements org.apache.avro.data.RecordBuilder<FileObject> {
 
     /** Universally unique identifier for the object */
-    private com.bbn.tc.schema.avro.UUID uuid;
+    private com.bbn.tc.schema.avro.cdm13.UUID uuid;
     /** The base object attributes */
-    private com.bbn.tc.schema.avro.AbstractObject baseObject;
-    private com.bbn.tc.schema.avro.AbstractObject.Builder baseObjectBuilder;
+    private com.bbn.tc.schema.avro.cdm13.AbstractObject baseObject;
+    private com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder baseObjectBuilder;
     /** The location of the file absolute path or remote url */
     private java.lang.CharSequence url;
     /** Whether the file is a Unix pipe */
@@ -237,7 +237,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
      * Creates a Builder by copying an existing Builder.
      * @param other The existing Builder to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.FileObject.Builder other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.FileObject.Builder other) {
       super(other);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -248,7 +248,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
         fieldSetFlags()[1] = true;
       }
       if (other.hasBaseObjectBuilder()) {
-        this.baseObjectBuilder = com.bbn.tc.schema.avro.AbstractObject.newBuilder(other.getBaseObjectBuilder());
+        this.baseObjectBuilder = com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder(other.getBaseObjectBuilder());
       }
       if (isValidValue(fields()[2], other.url)) {
         this.url = data().deepCopy(fields()[2].schema(), other.url);
@@ -272,7 +272,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
      * Creates a Builder by copying an existing FileObject instance
      * @param other The existing instance to copy.
      */
-    private Builder(com.bbn.tc.schema.avro.FileObject other) {
+    private Builder(com.bbn.tc.schema.avro.cdm13.FileObject other) {
             super(SCHEMA$);
       if (isValidValue(fields()[0], other.uuid)) {
         this.uuid = data().deepCopy(fields()[0].schema(), other.uuid);
@@ -306,7 +306,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * Universally unique identifier for the object
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.UUID getUuid() {
+    public com.bbn.tc.schema.avro.cdm13.UUID getUuid() {
       return uuid;
     }
 
@@ -316,7 +316,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'uuid'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setUuid(com.bbn.tc.schema.avro.UUID value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setUuid(com.bbn.tc.schema.avro.cdm13.UUID value) {
       validate(fields()[0], value);
       this.uuid = value;
       fieldSetFlags()[0] = true;
@@ -338,7 +338,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * Universally unique identifier for the object
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearUuid() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearUuid() {
       uuid = null;
       fieldSetFlags()[0] = false;
       return this;
@@ -349,7 +349,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * The base object attributes
       * @return The value.
       */
-    public com.bbn.tc.schema.avro.AbstractObject getBaseObject() {
+    public com.bbn.tc.schema.avro.cdm13.AbstractObject getBaseObject() {
       return baseObject;
     }
 
@@ -359,7 +359,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'baseObject'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setBaseObject(com.bbn.tc.schema.avro.AbstractObject value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setBaseObject(com.bbn.tc.schema.avro.cdm13.AbstractObject value) {
       validate(fields()[1], value);
       this.baseObjectBuilder = null;
       this.baseObject = value;
@@ -381,12 +381,12 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
      * The base object attributes
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.AbstractObject.Builder getBaseObjectBuilder() {
+    public com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder getBaseObjectBuilder() {
       if (baseObjectBuilder == null) {
         if (hasBaseObject()) {
-          setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.newBuilder(baseObject));
+          setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder(baseObject));
         } else {
-          setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.newBuilder());
+          setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.newBuilder());
         }
       }
       return baseObjectBuilder;
@@ -398,7 +398,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
      * @param value The builder instance that must be set.
      * @return This builder.
      */
-    public com.bbn.tc.schema.avro.FileObject.Builder setBaseObjectBuilder(com.bbn.tc.schema.avro.AbstractObject.Builder value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setBaseObjectBuilder(com.bbn.tc.schema.avro.cdm13.AbstractObject.Builder value) {
       clearBaseObject();
       baseObjectBuilder = value;
       return this;
@@ -418,7 +418,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * The base object attributes
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearBaseObject() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearBaseObject() {
       baseObject = null;
       baseObjectBuilder = null;
       fieldSetFlags()[1] = false;
@@ -440,7 +440,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'url'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setUrl(java.lang.CharSequence value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setUrl(java.lang.CharSequence value) {
       validate(fields()[2], value);
       this.url = value;
       fieldSetFlags()[2] = true;
@@ -462,7 +462,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * The location of the file absolute path or remote url
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearUrl() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearUrl() {
       url = null;
       fieldSetFlags()[2] = false;
       return this;
@@ -483,7 +483,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'isPipe'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setIsPipe(boolean value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setIsPipe(boolean value) {
       validate(fields()[3], value);
       this.isPipe = value;
       fieldSetFlags()[3] = true;
@@ -505,7 +505,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * Whether the file is a Unix pipe
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearIsPipe() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearIsPipe() {
       fieldSetFlags()[3] = false;
       return this;
     }
@@ -525,7 +525,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'version'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setVersion(int value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setVersion(int value) {
       validate(fields()[4], value);
       this.version = value;
       fieldSetFlags()[4] = true;
@@ -547,7 +547,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * The file version incremented every time the file changes
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearVersion() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearVersion() {
       fieldSetFlags()[4] = false;
       return this;
     }
@@ -567,7 +567,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * @param value The value of 'size'.
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder setSize(java.lang.Long value) {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder setSize(java.lang.Long value) {
       validate(fields()[5], value);
       this.size = value;
       fieldSetFlags()[5] = true;
@@ -589,7 +589,7 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
       * The file size in bytes (Optional)
       * @return This builder.
       */
-    public com.bbn.tc.schema.avro.FileObject.Builder clearSize() {
+    public com.bbn.tc.schema.avro.cdm13.FileObject.Builder clearSize() {
       size = null;
       fieldSetFlags()[5] = false;
       return this;
@@ -599,11 +599,11 @@ public class FileObject extends org.apache.avro.specific.SpecificRecordBase impl
     public FileObject build() {
       try {
         FileObject record = new FileObject();
-        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.UUID) defaultValue(fields()[0]);
+        record.uuid = fieldSetFlags()[0] ? this.uuid : (com.bbn.tc.schema.avro.cdm13.UUID) defaultValue(fields()[0]);
         if (baseObjectBuilder != null) {
           record.baseObject = this.baseObjectBuilder.build();
         } else {
-          record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.AbstractObject) defaultValue(fields()[1]);
+          record.baseObject = fieldSetFlags()[1] ? this.baseObject : (com.bbn.tc.schema.avro.cdm13.AbstractObject) defaultValue(fields()[1]);
         }
         record.url = fieldSetFlags()[2] ? this.url : (java.lang.CharSequence) defaultValue(fields()[2]);
         record.isPipe = fieldSetFlags()[3] ? this.isPipe : (java.lang.Boolean) defaultValue(fields()[3]);
