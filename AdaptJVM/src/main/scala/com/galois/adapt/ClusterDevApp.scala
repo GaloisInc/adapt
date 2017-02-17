@@ -2,9 +2,10 @@ package com.galois.adapt
 
 import akka.actor._
 import akka.cluster.Cluster
-import akka.cluster.ClusterEvent.{MemberEvent, MemberUp}
+import akka.cluster.ClusterEvent.{MemberEvent, MemberJoined, MemberUp}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.typesafe.config.Config
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import ServiceRegistryProtocol._
@@ -92,6 +93,10 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         log.info("Message: {} will result in creating child nodes for: {}", m, m.roles)
         m.roles foreach createChild
       }
+
+    case _: MemberUp => ()
+
+    case _: MemberJoined => ()
 
     case x => log.warning("received unhandled message: {}", x)
   }

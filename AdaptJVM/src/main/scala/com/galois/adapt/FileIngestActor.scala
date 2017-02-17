@@ -18,8 +18,9 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
     var counter = 0
     data.foreach { d =>
       subscribers.foreach(_ ! d.get)
+      counter = counter + 1
     }
-    log.info(s"Ingested total events: $counter")
+    log.info(s"Ingested total events: $counter  from: ${j.path}")
   }
 
   def beginService() = { //()  // TODO
@@ -27,7 +28,7 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
     subscribers = subscribers :+ dependencyMap("DevDBActor").get
     context.self ! IngestFile(
       "/Users/ryan/Code/adapt/AdaptJVM/Engagement1DataCDM13/pandex/ta1-cadets-cdm13_pandex.bin.1",
-      Some(10000)
+      Some(100)
     )
 
   }
@@ -41,7 +42,7 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
       subscribers = subscribers :+ sender()
 
     case msg @ IngestFile(path, limitOpt) if subscribers.nonEmpty =>
-      log.info("got ingest request from: {} to ingest file: {}", sender())
+      log.info("got ingest request from: {} to ingest: {} events from file: {}", sender(), limitOpt.getOrElse("ALL"), path)
       jobQueue.enqueue(msg)
       processJobQueue()
   }

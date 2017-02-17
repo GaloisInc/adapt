@@ -103,6 +103,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
         .foreach(p => p._1 ! ServiceAvailable(ps.serviceName, ps.serviceEndpoint))
       context.watch(ps.serviceEndpoint)
       considerRememberParticipant(ps.serviceEndpoint)
+      log.info(s"ServiceRegistry State:\n$subscribers\n$subscribersPublishers\n$publishers")
 
     case ups: UnPublishService =>
       log.info(s"Received -> UnPublishService: $ups  from: ${sender()}")

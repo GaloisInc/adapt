@@ -12,7 +12,7 @@ trait BaseActorBehavior { self: Actor with ActorLogging =>
 }
 
 
-trait ServiceClient extends BaseActorBehavior { self: Actor with ActorLogging =>
+trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
   lazy val thisName = this.getClass.getSimpleName
   val registry: ActorRef
   def localReceive: PartialFunction[Any,Unit]
@@ -30,7 +30,7 @@ trait ServiceClient extends BaseActorBehavior { self: Actor with ActorLogging =>
     val depsSatisfied = dependencyMap forall (_._2.isDefined)
     if (depsSatisfied) {
       beginService()
-      registry ! PublishService(thisName, context.self)
+      registry.!(PublishService(thisName, context.self))(context.self)
     } else {
       log.info(s"$thisName is waiting to satisfy more dependencies before publing service availability: $dependencyMap")
     }
@@ -55,7 +55,7 @@ trait ServiceClient extends BaseActorBehavior { self: Actor with ActorLogging =>
       if (dependencyMap.keySet contains serviceName) {
         dependencyMap += (serviceName -> None)
 //        registry ! UnSubscribeToService()
-        registry ! UnPublishService(thisName)
+        registry.!(UnPublishService(thisName))(context.self)
         endService()
       } else {
         log.warning(s"Unplanned `Dependency Unavailable` notice: $serviceName")
@@ -63,11 +63,11 @@ trait ServiceClient extends BaseActorBehavior { self: Actor with ActorLogging =>
 
     case DoSubscriptions =>
       log.info(s"Announcing dependencies to Service Manager: ${dependencies.mkString(",")}")
-      dependencies.foreach(d => registry ! SubscribeToService(d))
+      dependencies.foreach(d => registry.!(SubscribeToService(d))(context.self))
       startIfReady()
   }
 
-  context.self ! DoSubscriptions
+  case object DoSubscriptions
+  context.self.!(DoSubscriptions)(context.self)
 }
 
-case object DoSubscriptions
