@@ -5,7 +5,7 @@ import com.galois.adapt.ServiceRegistryProtocol._
 import scala.collection.mutable.{Map => MutableMap}
 
 
-trait BaseActorBehavior { self: Actor with ActorLogging =>
+trait BaseActorBehavior { s: Actor with ActorLogging =>
   def receive: PartialFunction[Any,Unit] = {
     case m => log.error("Received unhandled message: {}\nFrom sender: {}", m, sender)
   }
@@ -14,19 +14,18 @@ trait BaseActorBehavior { self: Actor with ActorLogging =>
 
 trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
   lazy val thisName = this.getClass.getSimpleName
+
   val registry: ActorRef
   def localReceive: PartialFunction[Any,Unit]
-
   val dependencies: List[String]
-
   def beginService(): Unit
   def endService(): Unit
 
-  override def receive = handleServiceManagerMessages orElse localReceive orElse super.receive
+  override def receive = localReceive orElse handleServiceManagerMessages orElse super.receive
 
   lazy val dependencyMap: MutableMap[String, Option[ActorRef]] = MutableMap(dependencies.map(_ -> None):_*)
 
-  def startIfReady() = {
+  private def startIfReady() = {
     val depsSatisfied = dependencyMap forall (_._2.isDefined)
     if (depsSatisfied) {
       beginService()
@@ -36,7 +35,7 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
     }
   }
 
-  def handleServiceManagerMessages: PartialFunction[Any,Unit] = {
+  private def handleServiceManagerMessages: PartialFunction[Any,Unit] = {
 
     case ServiceAvailable(serviceName, actorRef) =>
       log.info(s"$serviceName has announced its availability to $thisName")
@@ -67,7 +66,7 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
       startIfReady()
   }
 
-  case object DoSubscriptions
+  private case object DoSubscriptions
   context.self.!(DoSubscriptions)(context.self)
 }
 

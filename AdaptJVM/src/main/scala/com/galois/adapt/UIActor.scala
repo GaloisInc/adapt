@@ -14,7 +14,10 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
   val dependencies = "DevDBActor" :: Nil
 
-  def beginService() = localReceive(StartUI(dependencyMap("DevDBActor").get))
+  def beginService() = {
+    log.info(s"Starting UI at: $interface  on port: $port")
+    localReceive(StartUI(dependencyMap("DevDBActor").get))
+  }
 
   def endService() = localReceive(StopUI)
 

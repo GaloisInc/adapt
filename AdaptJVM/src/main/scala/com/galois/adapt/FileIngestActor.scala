@@ -12,8 +12,9 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
 
   var jobQueue = Queue.empty[IngestFile]
 
-  def processJobQueue() = while (jobQueue.nonEmpty) {
+  def processJobQueue() = while (subscribers.nonEmpty && jobQueue.nonEmpty) {
     val j = jobQueue.dequeue()
+    log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " + i.toString + " CDM statements"))
     val data = CDM13.readData(j.path, j.loadLimit).get
     var counter = 0
     data.foreach { d =>
@@ -24,12 +25,13 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
   }
 
   def beginService() = { //()  // TODO
-    log.info("Ingest Actor is starting ingest process")
+    log.info("Ingest Actor is starting up")
     subscribers = subscribers :+ dependencyMap("DevDBActor").get
-    context.self ! IngestFile(
-      "/Users/ryan/Code/adapt/AdaptJVM/Engagement1DataCDM13/pandex/ta1-cadets-cdm13_pandex.bin.1",
-      Some(100)
-    )
+    processJobQueue()
+//    context.self ! IngestFile(
+//      "Engagement1DataCDM13/pandex/ta1-cadets-cdm13_pandex.bin.1",
+//      Some(100)
+//    )
 
   }
 
@@ -37,12 +39,12 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
 
   def localReceive: PartialFunction[Any,Unit] = {
     case Subscription =>
-      log.info("got subscription from: {}", sender())
+      log.info("Received subscription from: {}", sender())
       context watch sender()
       subscribers = subscribers :+ sender()
 
-    case msg @ IngestFile(path, limitOpt) if subscribers.nonEmpty =>
-      log.info("got ingest request from: {} to ingest: {} events from file: {}", sender(), limitOpt.getOrElse("ALL"), path)
+    case msg @ IngestFile(path, limitOpt) =>
+      log.info("Received ingest request from: {} to ingest: {} events from file: {}", sender(), limitOpt.getOrElse("ALL"), path)
       jobQueue.enqueue(msg)
       processJobQueue()
   }

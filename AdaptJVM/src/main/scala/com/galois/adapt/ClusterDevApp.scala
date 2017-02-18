@@ -5,9 +5,7 @@ import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberJoined, MemberUp}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.typesafe.config.Config
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
 
 
@@ -41,8 +39,6 @@ object ClusterDevApp {
 }
 
 
-case class RegistryInfo(registryActor: ActorRef)
-
 
 class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Actor with ActorLogging {
   val cluster = Cluster(context.system)
@@ -71,6 +67,12 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
             "ingest-actor"
           )
         ))
+      )
+      val limitOpt = if (config.getInt("adapt.loadlimit") > 0) Some(config.getInt("adapt.loadlimit")) else None
+      config.getStringList("adapt.loadfiles").asScala foreach (f =>
+        childActors(roleName) foreach ( ingestActor =>
+          ingestActor ! IngestFile(f, limitOpt)
+        )
       )
 
     case "ui" =>
