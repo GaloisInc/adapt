@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * The confidentiality tag may be used to specify the initial confidentiality of an entity,
      * or to declassify its content after performing appropriate checking/sanitization. */

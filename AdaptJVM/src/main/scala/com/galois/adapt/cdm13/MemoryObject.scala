@@ -22,7 +22,7 @@ case class MemoryObject(
 }
 
 case object MemoryObject extends CDM13Constructor[MemoryObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.MemoryObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.MemoryObject
 
   def from(cdm: RawCDM13Type): Try[MemoryObject] = Try(
     MemoryObject(

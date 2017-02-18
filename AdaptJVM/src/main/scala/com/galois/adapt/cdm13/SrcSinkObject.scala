@@ -21,7 +21,7 @@ case class SrcSinkObject(
 }
 
 case object SrcSinkObject extends CDM13Constructor[SrcSinkObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.SrcSinkObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.SrcSinkObject
 
   def from(cdm: RawCDM13Type): Try[SrcSinkObject] = Try(
     SrcSinkObject(

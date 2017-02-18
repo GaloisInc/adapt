@@ -43,7 +43,7 @@ case class Subject(
 
 
 case object Subject extends CDM13Constructor[Subject] {
-  type RawCDMType = com.bbn.tc.schema.avro.Subject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.Subject
 
   def from(cdm: RawCDM13Type): Try[Subject] = Try {
     Subject(

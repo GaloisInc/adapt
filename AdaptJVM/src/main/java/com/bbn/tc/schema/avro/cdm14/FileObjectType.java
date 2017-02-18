@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * These types enumerate the types of FileObjects */
 @org.apache.avro.specific.AvroGenerated

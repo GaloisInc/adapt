@@ -23,7 +23,7 @@ case class TagEntity(
 }
 
 case object TagEntity extends CDM13Constructor[TagEntity] {
-  type RawCDMType = com.bbn.tc.schema.avro.TagEntity
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.TagEntity
 
   def from(cdm: RawCDM13Type): Try[TagEntity] = Try(
     TagEntity(

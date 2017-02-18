@@ -29,7 +29,7 @@ case class Principal(
 }
 
 case object Principal extends CDM13Constructor[Principal] {
-  type RawCDMType = com.bbn.tc.schema.avro.Principal
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.Principal
 
   def from(cdm: RawCDM13Type): Try[Principal] = Try {
     Principal(

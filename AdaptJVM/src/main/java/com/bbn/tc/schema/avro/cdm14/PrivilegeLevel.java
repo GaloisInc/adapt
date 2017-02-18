@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * Windows allows Subjects (processes) to have the following
      * enumerated privilege levels. */

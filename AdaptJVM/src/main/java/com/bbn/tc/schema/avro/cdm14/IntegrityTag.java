@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * The integrity tag may be used to specify the initial integrity of an entity,
      * or to endorse its content after performing appropriate checking/sanitization. */

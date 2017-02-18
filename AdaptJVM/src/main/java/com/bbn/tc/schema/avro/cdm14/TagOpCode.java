@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * The tag opcode describes the provenance relation i.e., how multiple sources are combined to
      * produce the output. We identify the following provenance relations

@@ -30,7 +30,7 @@ case class NetFlowObject(
 }
 
 case object NetFlowObject extends CDM13Constructor[NetFlowObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.NetFlowObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.NetFlowObject
 
   def from(cdm: RawCDM13Type): Try[NetFlowObject] = Try(
     NetFlowObject(

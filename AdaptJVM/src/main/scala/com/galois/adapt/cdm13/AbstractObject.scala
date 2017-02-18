@@ -22,7 +22,7 @@ case class AbstractObject(
 }
 
 case object AbstractObject extends CDM13Constructor[AbstractObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.AbstractObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.AbstractObject
 
   def from(cdm: RawCDM13Type): Try[AbstractObject] = Try {
     AbstractObject(

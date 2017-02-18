@@ -31,7 +31,7 @@ case class Value(
 }
 
 case object Value extends CDM13Constructor[Value] {
-  type RawCDMType = com.bbn.tc.schema.avro.Value
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.Value
 
   def from(cdm: RawCDM13Type): Try[Value] = Try(
     Value(

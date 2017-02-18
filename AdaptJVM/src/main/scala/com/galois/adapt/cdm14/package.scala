@@ -33,7 +33,7 @@ package object cdm14 {
 
       val first = {
         val cdm = tcIterator.next
-        if (cdm.CDMVersion.toString != "13")
+        if (cdm.CDMVersion.toString != "14")
           throw new Exception(s"Expected CDM14, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM14Type(cdm.getDatum)
       }

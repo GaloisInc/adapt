@@ -3,7 +3,7 @@
  *
  * DO NOT EDIT DIRECTLY
  */
-package com.bbn.tc.schema.avro.cdm14;
+package com.bbn.tc.schema.avro;
 @SuppressWarnings("all")
 /** * A value data type is one of the primitive data types. A string is treated as a char array */
 @org.apache.avro.specific.AvroGenerated

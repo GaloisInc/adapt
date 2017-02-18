@@ -24,7 +24,7 @@ case class RegistryKeyObject(
 }
 
 case object RegistryKeyObject extends CDM13Constructor[RegistryKeyObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.RegistryKeyObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.RegistryKeyObject
 
   def from(cdm: RawCDM13Type): Try[RegistryKeyObject] = Try(
     RegistryKeyObject(
