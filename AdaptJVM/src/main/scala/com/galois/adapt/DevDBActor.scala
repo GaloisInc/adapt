@@ -13,6 +13,7 @@ import org.apache.tinkerpop.gremlin.structure.T.label
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 
+import com.galois.adapt.ServiceRegistryProtocol.SubscribeToService
 import com.thinkaurelius.titan.core.TitanFactory
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
@@ -20,7 +21,12 @@ import org.apache.tinkerpop.gremlin.structure.io.graphson._
 import collection.JavaConverters._
 import scala.util.Try
 
-class DevDBActor(localStorage: Option[String] = None) extends Actor{
+class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None) extends Actor with ActorLogging with ServiceClient {
+
+  val dependencies = List.empty
+
+  def beginService() = ()  // TODO
+  def endService() = ()  // TODO
 
 
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
@@ -75,20 +81,7 @@ class DevDBActor(localStorage: Option[String] = None) extends Actor{
     else graph.traversal().V().has(key,value).toList.asScala.headOption
   }
 
-  def receive = {
-
-    case f: FileObject =>
-      val l: List[Object] = f.asDBKeyValues.asInstanceOf[List[Object]]
-      val v = graph.addVertex(l:_*)
-      nodeIds += (f.uuid -> v)
-//      println(s"Nodes so far: ${nodeIds.size}")
-//      updateIncompleteEdges(f.uuid, v)
-
-    case e: Event =>
-      val l: List[Object] = e.asDBKeyValues.asInstanceOf[List[Object]]
-      val v = graph.addVertex(l:_*)
-      nodeIds += (e.uuid -> v)
-//      updateIncompleteEdges(e.uuid, v)
+  def localReceive: PartialFunction[Any,Unit] = {
 
     case s: Subject =>
       val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]

@@ -1,7 +1,6 @@
 package com.galois.adapt
 
 import collection.JavaConversions._
-
 import com.typesafe.config.ConfigFactory
 
 
@@ -28,9 +27,10 @@ object Application extends App {
   }
   
   appMode.toLowerCase match {
-    case "accept" => AcceptanceApp.run(loadPaths, loadLimitOpt)
-    case "prod"   => ProductionApp.run()
-    case  _       => DevelopmentApp.run(loadPaths, loadLimitOpt, devLocalStorageOpt)
+    case "accept"  => AcceptanceApp.run(loadPaths, loadLimitOpt)
+    case "prod"    => ProductionApp.run()
+    case "cluster" => ClusterDevApp.run()
+    case  _        => DevelopmentApp.run(loadPaths, loadLimitOpt, devLocalStorageOpt)
   }
 
 }

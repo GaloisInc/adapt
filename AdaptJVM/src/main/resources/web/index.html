@@ -979,7 +979,7 @@
 
         $(function(){
             if (window.location.hash.length > 0) {
-                var hash_string = window.location.hash.replace("#", "")
+                var hash_string = decodeURIComponent(window.location.hash).replace("#", "")
                 queries = hash_string.split("&")
                 var starting_color = document.getElementById("query-color").jscolor.value.replace("#", "")
                 var queries_with_colors = _.map(queries, function(s){ 

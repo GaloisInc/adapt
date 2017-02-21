@@ -33,7 +33,7 @@ object DevelopmentApp {
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
 
-    implicit val system = ActorSystem("development-actor-system")
+    implicit val system = ActorSystem(config.getString("adapt.systemname"))
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher  // needed for the future flatMap/onComplete in the end
     val dbActor = system.actorOf(Props(classOf[DevDBActor], localStorage))
@@ -72,7 +72,7 @@ object DevelopmentApp {
     val httpServiceFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
       .map { f =>
       val saveString = localStorage.fold("...")(s => s", and save in-memory database to: $s")
-      println(s"\n    Server online at http://localhost:8080/\n\nPress RETURN to stop$saveString\n")
+      println(s"\n    Server online at http://$interface:$port/\n\nPress RETURN to stop$saveString\n")
       StdIn.readLine() // let it run until user presses return
       f
     }
