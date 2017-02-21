@@ -74,7 +74,7 @@ void Forest::writeScoreDatabase(doubleframe *dtTestNorm, doubleframe *dtTestAnom
 }
 
 std::vector<double> Forest::getScore(doubleframe *df, int type){
-	std::vector<double> pscores[df->nrow];
+	std::vector<double> *pscores = new std::vector<double>[df->nrow];
 	for(int i = 0; i < df->nrow; ++i){
 		for(int t = 0; t < this->ntree; ++t){
 			std::vector<double> psi = this->trees[t]->getPatternScores(df->data[i]);
@@ -101,6 +101,7 @@ std::vector<double> Forest::getScore(doubleframe *df, int type){
 		}else// maximum
 			res.push_back(max);
 	}
+	delete [] pscores;
 	return res;
 }
 
