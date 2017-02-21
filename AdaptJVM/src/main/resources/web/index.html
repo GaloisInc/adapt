@@ -6,7 +6,7 @@
     <script type="text/javascript" src="javascripts/underscore.js"></script>
     <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
     <script type="text/javascript" src="javascripts/ui_language.js"></script>
-    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>    
+    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script> 
 
     <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
     <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
@@ -869,11 +869,12 @@
 
         function downloadJournal() {
             addLayout()
-            var data_str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(journal))
-            var anchor = document.getElementById('download-anchor')
-            anchor.setAttribute("href", data_str)  // TODO: browser download fails when this URI is too long!
-            anchor.setAttribute("download", "history.json")
-            anchor.click()
+            var blob = new Blob([JSON.stringify(journal)], {type: "application/json"})
+            var a = document.createElement('a')
+            a.download = "history.json"
+            a.href = URL.createObjectURL(blob)
+            a.target = "_blank"
+            a.click()
             $("#download-button").addClass("ion-checkmark-round").removeClass("ion-ios-cloud-download-outline")
             setTimeout(function(){
                 $("#download-button").addClass("ion-ios-cloud-download-outline").removeClass("ion-checkmark-round")
