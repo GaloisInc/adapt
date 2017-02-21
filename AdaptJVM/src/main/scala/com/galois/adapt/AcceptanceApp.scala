@@ -5,10 +5,13 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.pattern.ask
 import akka.util.Timeout
+
 import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter._
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
+
 import scala.util.{Try, Failure, Success}
 import scala.io.StdIn
 
@@ -16,7 +19,9 @@ import java.io.File
 import java.awt.Desktop;
 import java.net.URI;
 
-import scala.language.postfixOps
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+
 
 object AcceptanceApp {
   println(s"Spinning up an acceptance system.")
@@ -27,7 +32,11 @@ object AcceptanceApp {
   implicit val ec = system.dispatcher
   implicit val askTimeout = Timeout(2 seconds)
 
-  val dbActor = system.actorOf(Props(classOf[DevDBActor], None))
+  val graph = TinkerGraph.open() 
+  graph.createIndex("uuid", classOf[Vertex])
+  graph.createIndex("pid", classOf[Vertex])
+
+  val dbActor = system.actorOf(Props(classOf[DevDBActor], graph))
   val counterActor = system.actorOf(Props(new EventCountingTestActor()))
   val basicOpsActor = system.actorOf(Props(new BasicOpsIdentifyingActor()))
   var ta1Source: Option[InstrumentationSource] = None
@@ -69,11 +78,11 @@ object AcceptanceApp {
       case Failure(e) => println(s"Invalid Avro file: ${e.getMessage}")
       case Success(records) => 
         
-        lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
+        lazy val missingEdgeCount = Await.result(dbActor ? HowMany("missing"), 2 seconds).asInstanceOf[Int]
         lazy val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
         
         // General tests
-        org.scalatest.run(new General_TA1_Tests(records, missingEdgeCount, count))
+        org.scalatest.run(new General_TA1_Tests(records, missingEdgeCount, graph, count))
 
         println("")
 

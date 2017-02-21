@@ -14,7 +14,7 @@ case class ProvenanceTagNode(
 ) extends CDM13 with DBWritable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
-    "value", value.o
+    "value", value.o.toString
   ) ++
   children.fold[List[Any]](List.empty)(v => List("children", v)) ++
   tagId.fold[List[Any]](List.empty)(v => List("tagId", v)) ++
