@@ -38,7 +38,7 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
   def endService() = ()  // TODO
 
   def localReceive: PartialFunction[Any,Unit] = {
-    case Subscription =>
+    case SubscriptionObj =>
       log.info("Received subscription from: {}", sender())
       context watch sender()
       subscribers = subscribers :+ sender()
@@ -52,4 +52,4 @@ class FileIngestActor(val registry: ActorRef) extends Actor with ActorLogging wi
 
 case class IngestFile(path: String, loadLimit: Option[Int] = None)
 
-case object Subscription
+case object SubscriptionObj

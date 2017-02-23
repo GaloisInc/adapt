@@ -30,7 +30,7 @@ object Application extends App {
     case "accept"  => AcceptanceApp.run(loadPaths, loadLimitOpt)
     case "prod"    => ProductionApp.run()
     case "cluster" => ClusterDevApp.run()
-    case  _        => DevelopmentApp.run(loadPaths, loadLimitOpt, devLocalStorageOpt)
+    //case  _        => DevelopmentApp.run(loadPaths, loadLimitOpt, devLocalStorageOpt)
   }
 
 }

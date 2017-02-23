@@ -8,6 +8,9 @@ import com.typesafe.config.Config
 import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
 
+import com.galois.adapt.feature._
+import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
+
 
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
@@ -86,6 +89,36 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
               config.getInt("akka.http.server.port")
             ), "ui-actor")
         ))
+      )
+
+   case "outgestor" =>
+      childActors = childActors + (roleName ->
+        childActors.getOrElse(roleName, Set(
+          context.actorOf(
+            Props(classOf[Outgestor], Set()),
+            "outgestor-actor"
+          )
+        ))
+      )
+
+  case "features" =>
+      
+      val erActor = context.actorOf(Props(classOf[ErActor]), "er-actor")
+
+      // The two feature extractors subscribe to the CDM13 produced by the ER actor
+      val featureExtractor1 = context.actorOf(FileEventsFeature.props(erActor), "file-events-actor")
+      val featureExtractor2 = context.actorOf(NetflowFeature.props(erActor), "netflow-actor")
+      
+      // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
+      val ad = context.actorOf(IForestAnomalyDetector.props(Set(
+        Subscription(featureExtractor1, (m: Any) =>
+          Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
+        Subscription(featureExtractor2, (m: Any) =>
+          Some(m.asInstanceOf[Map[Subject,Seq[Double]]]))
+      )), "anomaly-detector")
+      
+      childActors = childActors + (roleName ->
+        childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
       )
   }
 
