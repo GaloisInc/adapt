@@ -22,7 +22,7 @@ case class ProvenanceTagNode(
 }
 
 case object ProvenanceTagNode extends CDM13Constructor[ProvenanceTagNode] {
-  type RawCDMType = com.bbn.tc.schema.avro.ProvenanceTagNode
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode
 
   def from(cdm: RawCDM13Type): Try[ProvenanceTagNode] = Try(
     ProvenanceTagNode(

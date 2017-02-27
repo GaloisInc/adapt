@@ -29,6 +29,7 @@ class BasicOpsIdentifyingActor extends Actor {
     updates = updates + 1
   }
 
+  // Note: These tests for the most part don't make sense for CDM14 yet as file paths are no longer a part of the class
   def receive = {
     // CDM statements that should be in BasicOps.sh
     case FileObject(_, _, "file:///tmp/zqxf1", false, _, _)

@@ -31,7 +31,7 @@ case class FileObject(
 
 
 case object FileObject extends CDM13Constructor[FileObject] {
-  type RawCDMType = com.bbn.tc.schema.avro.FileObject
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.FileObject
 
   def from(cdm: RawCDM13Type): Try[FileObject] = Try(
     FileObject(

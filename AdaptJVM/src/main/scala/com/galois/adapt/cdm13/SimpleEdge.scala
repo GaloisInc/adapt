@@ -14,7 +14,7 @@ case class SimpleEdge(
 ) extends CDM13
 
 case object SimpleEdge extends CDM13Constructor[SimpleEdge] {
-  type RawCDMType = com.bbn.tc.schema.avro.SimpleEdge
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.SimpleEdge
 
   def from(cdm: RawCDM13Type): Try[SimpleEdge] = Try(
     SimpleEdge(

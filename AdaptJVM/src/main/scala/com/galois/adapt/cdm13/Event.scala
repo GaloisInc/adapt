@@ -39,7 +39,7 @@ case class Event(
 }
 
 case object Event extends CDM13Constructor[Event] {
-  type RawCDMType = com.bbn.tc.schema.avro.Event
+  type RawCDMType = com.bbn.tc.schema.avro.cdm13.Event
 
   def from(cdm: RawCDM13Type): Try[Event] = Try(
     Event(

@@ -78,29 +78,29 @@ package object cdm13 {
     def int(x: => java.lang.Integer): Option[Int] = Try(Integer2int(x)).toOption
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
-    def uuid(x: => com.bbn.tc.schema.avro.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
-    def fixedShort(x: => com.bbn.tc.schema.avro.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
+    def uuid(x: => com.bbn.tc.schema.avro.cdm13.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
+    def fixedShort(x: => com.bbn.tc.schema.avro.cdm13.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
-    def listValue(x: java.util.List[com.bbn.tc.schema.avro.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
+    def listValue(x: java.util.List[com.bbn.tc.schema.avro.cdm13.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => Value.from(new RawCDM13Type(x)).get))
-    def listProvTagNode(x: java.util.List[com.bbn.tc.schema.avro.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
+    def listProvTagNode(x: java.util.List[com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM13Type(x)).get))
   }
 
-  implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
+  implicit def makeJavaUUID(u: com.bbn.tc.schema.avro.cdm13.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
-  implicit def makeSource(s: com.bbn.tc.schema.avro.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
-  implicit def makeEdgeType(e: com.bbn.tc.schema.avro.EdgeType): EdgeType = EdgeType.from(e.toString).get
-  implicit def makeShort(s: com.bbn.tc.schema.avro.SHORT): FixedShort = new FixedShort(s.bytes)
-  implicit def makeSrcSinkType(s: com.bbn.tc.schema.avro.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
-  implicit def makeEventType(e: com.bbn.tc.schema.avro.EventType): EventType = EventType.from(e.toString).get
-  implicit def makeValueType(v: com.bbn.tc.schema.avro.ValueType): ValueType = ValueType.from(v.toString).get
-  implicit def makeValDataType(d: com.bbn.tc.schema.avro.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
-  implicit def makeTag(t: com.bbn.tc.schema.avro.ProvenanceTagNode): ProvenanceTagNode = ProvenanceTagNode.from(new RawCDM13Type(t)).get
-  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
-  implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM13Type(o)).get
-  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.SubjectType): SubjectType = SubjectType.from(s.toString).get
+  implicit def makeSource(s: com.bbn.tc.schema.avro.cdm13.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
+  implicit def makeEdgeType(e: com.bbn.tc.schema.avro.cdm13.EdgeType): EdgeType = EdgeType.from(e.toString).get
+  implicit def makeShort(s: com.bbn.tc.schema.avro.cdm13.SHORT): FixedShort = new FixedShort(s.bytes)
+  implicit def makeSrcSinkType(s: com.bbn.tc.schema.avro.cdm13.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
+  implicit def makeEventType(e: com.bbn.tc.schema.avro.cdm13.EventType): EventType = EventType.from(e.toString).get
+  implicit def makeValueType(v: com.bbn.tc.schema.avro.cdm13.ValueType): ValueType = ValueType.from(v.toString).get
+  implicit def makeValDataType(d: com.bbn.tc.schema.avro.cdm13.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
+  implicit def makeTag(t: com.bbn.tc.schema.avro.cdm13.ProvenanceTagNode): ProvenanceTagNode = ProvenanceTagNode.from(new RawCDM13Type(t)).get
+  implicit def makePrincipalType(t: com.bbn.tc.schema.avro.cdm13.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
+  implicit def makeAbstractObject(o: com.bbn.tc.schema.avro.cdm13.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM13Type(o)).get
+  implicit def makeSubjectType(s: com.bbn.tc.schema.avro.cdm13.SubjectType): SubjectType = SubjectType.from(s.toString).get
 
   object DBOpt {
     // Flattens out nested "properties":
