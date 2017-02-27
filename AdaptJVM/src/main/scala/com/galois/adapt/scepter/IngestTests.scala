@@ -1,7 +1,7 @@
 package com.galois.adapt.scepter
 
 import com.galois.adapt._
-import com.galois.adapt.cdm14._
+import com.galois.adapt.cdm15._
 
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge,Vertex}
@@ -19,7 +19,7 @@ import scala.language.postfixOps
 import org.scalatest.FlatSpec
 
 class General_TA1_Tests(
-  data: => Iterator[Try[CDM14]],            // Input CDM statements
+  data: => Iterator[Try[CDM15]],            // Input CDM statements
   incompleteEdgeCount: Int,                 // Number of incomplete edges
   count: Option[Int] = None                 // Expected number of statements
 ) extends FlatSpec {
@@ -173,7 +173,7 @@ class TRACE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -196,7 +196,7 @@ class CADETS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000  
 
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -219,7 +219,7 @@ class FAROS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -241,7 +241,7 @@ class THEIA_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -263,7 +263,7 @@ class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000
    
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -285,7 +285,7 @@ class CLEARSCOPE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM14.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
