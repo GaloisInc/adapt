@@ -21,16 +21,14 @@ import akka.util.Timeout
  * the external IForest algorithm, then unpacks the resulting matrix back into a Map (keyed
  * appropriately).
  */
-class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions: Set[Subscription[Map[_,Seq[Double]]]])
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[_,Seq[Double]],Map[_,Double]] {
+class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions: Set[Subscription])
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[_,Double]] {
   
-  initialize()
-
   val dependencies = List.empty
-  def beginService() = ()  // TODO
-  def endService() = ()  // TODO
+  def beginService() = initialize()
+  def endService() = ()
 
-  override def receive = ({ case c: Map[_,Seq[Double]] =>
+  override def process = { case c: Map[_,_] =>
 
     // Execution context and timeout
     val system = akka.actor.ActorSystem("system")
@@ -38,7 +36,7 @@ class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions:
 
     // Perform this asynchronously
     Future {
-      val rows: List[(_,Seq[Double])] = c.toList
+      val rows: List[(_,_)] = c.toList
 
       // Make a temporary file
       val inputFile: File = File.createTempFile("input",".csv")
@@ -48,8 +46,12 @@ class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions:
     
       // Write in data
       val writer: FileWriter = new FileWriter(inputFile)
-      for ((_,row) <- rows)
-        writer.write(row.mkString("",",","\n"))
+      for ((_,row) <- rows) {
+        row match {
+          case seq: Seq[_] => seq.mkString("",",","\n");
+          case prod: Product => prod.productIterator.toSeq.mkString("",",","\n")
+        }
+      }
       writer.close()
 
       // Call IForest
@@ -79,10 +81,11 @@ class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions:
       val output: Map[_, Double] = (rows zip outputScores).map { case ((key, _), value) => (key, value) }.toMap
       broadCast(output)
     }
-  }: PartialFunction[Any,Unit]) orElse super.receive
+  }
 }
 
 object IForestAnomalyDetector {
-  def props(registry: ActorRef, inputs: Set[Subscription[Map[_, Seq[Double]]]]): Props =
+  def props(registry: ActorRef, inputs: Set[Subscription]): Props =
     Props(new IForestAnomalyDetector(registry, inputs))
 }
+

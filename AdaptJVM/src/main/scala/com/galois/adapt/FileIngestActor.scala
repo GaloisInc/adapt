@@ -5,10 +5,10 @@ import com.galois.adapt.cdm13.CDM13
 import collection.mutable.Queue
 
 class FileIngestActor(val registry: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing,CDM13] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13] {
 
   val dependencies = List.empty
-  val subscriptions = Set[Subscription[Nothing]]()
+  val subscriptions = Set[Subscription]()
 
   var jobQueue = Queue.empty[IngestFile]
 
@@ -29,7 +29,6 @@ class FileIngestActor(val registry: ActorRef)
     log.info("Ingest Actor is starting up")
     initialize()
     processJobQueue()
-
   }
   def endService() = ()  // TODO
 
@@ -38,7 +37,7 @@ class FileIngestActor(val registry: ActorRef)
       log.info("Received ingest request from: {} to ingest: {} events from file: {}", sender(), limitOpt.getOrElse("ALL"), path)
       jobQueue.enqueue(msg)
       processJobQueue()
-    case s: Subscription[_] =>
+    case s: Subscription =>
       subscribers += s
       processJobQueue()
   }: PartialFunction[Any,Unit]) orElse super.receive

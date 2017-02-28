@@ -16,26 +16,24 @@ import akka.actor._
  * features:      events with eventType CHECK_FILE_ATTRIBUTES, OPEN, and WRITE;
  */
 class FileEventsFeature(val registry: ActorRef, root: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,(Int,Int,Int)]] { 
   
-  val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
+  val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
-    pack = {
-      case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
-      case e @ Event(u, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_CHECK_FILE_ATTRIBUTES, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case s @ SimpleEdge(f, t, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => Some(s)
-      case EpochMarker => Some(EpochMarker)
-      case _ => None
+    interested = {
+      case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_CHECK_FILE_ATTRIBUTES, _, _, _, _, _, _, _, _, _, _) => true
+      case SimpleEdge(_, _, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => true
+      case EpochMarker => true
+      case _ => false
     }
   ))
 
-  initialize()
-  
   val dependencies = List.empty
-  def beginService() = ()  // TODO
-  def endService() = ()  // TODO
+  def beginService() = initialize()
+  def endService() = ()
 
   private val opens = MutableSet.empty[UUID]               // UUIDs of OPEN Events
   private val writes = MutableSet.empty[UUID]              // UUIDs of WRITE Events
@@ -43,7 +41,7 @@ class FileEventsFeature(val registry: ActorRef, root: ActorRef)
   private val links = ListBuffer.empty[(UUID, UUID)]       // Subject UUID -> Event UUID
   private val processes = MutableMap.empty[UUID, Subject]  // Subject UUID -> Subject
 
-  override def receive = ({
+  override def process = {
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (s.uuid -> s)
     case e @ Event(u, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => opens += e.uuid
     case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => writes += e.uuid
@@ -74,7 +72,7 @@ class FileEventsFeature(val registry: ActorRef, root: ActorRef)
       processes.clear()
 
       println("EpochMarker: AdHighCheckOpenRatio")
-    }: PartialFunction[Any,Unit]) orElse super.receive
+    }
 }
 
 object FileEventsFeature {

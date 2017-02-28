@@ -3,21 +3,21 @@ package com.galois.adapt
 import akka.actor._
 
 // Represents something that will subscribe to messages of any type
-class Outgestor(val registry: ActorRef, val outputs: Set[ActorRef])
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Any,Any] { 
-
-  val subscriptions: Set[Subscription[Any]] = outputs.map { 
-    sub => Subscription[Any](target = sub, pack = { case x: Any => Some(x) })
+class Outgestor(val registry: ActorRef)
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] { 
+  
+  val dependencies = "IForestAnomalyDetector" :: Nil
+  lazy val subscriptions = {
+    log.info("Forced subcription list")
+    val ingest: ActorRef = dependencyMap("IForestAnomalyDetector").get
+    Set[Subscription](Subscription(ingest, { _ => true }))
   }
 
-  val dependencies = List.empty
-  def beginService() = ()  // TODO
+  def beginService() = initialize()
   def endService() = ()  // TODO
 
-  initialize()
-  
   def process(v: Any): Unit = {
-    println("Outgestor: " + v)
+    log.info("Outgestor: " + v)
   }
 }
 

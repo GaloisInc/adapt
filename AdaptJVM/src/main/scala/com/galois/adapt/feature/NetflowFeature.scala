@@ -21,31 +21,29 @@ import akka.actor._
  * Thus, every subject has  4 * (# of unique IP addresses in the trace)  features
  */
 class NetflowFeature(val registry: ActorRef, root: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Map[Subject,Seq[Double]]] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,Seq[Double]]] {
   
-  val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
+  val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
-    pack = {
-      case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => Some(s)
-      case e @ Event(u, EVENT_SENDTO, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_SENDMSG, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_READ, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_RECVMSG, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case e @ Event(u, EVENT_RECVFROM, _, _, _, _, _, _, _, _, _, _) => Some(e)
-      case n @ NetFlowObject(_, _, _, _, _, _, _) => Some(n) 
-      case s @ SimpleEdge(f, t, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => Some(s)
-      case s @ SimpleEdge(f, t, EDGE_EVENT_AFFECTS_NETFLOW, _, _) => Some(s)
-      case EpochMarker => Some(EpochMarker)
-      case _ => None
+    interested = {
+      case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => true
+      case Event(_, EVENT_SENDTO, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_SENDMSG, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_READ, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_RECVMSG, _, _, _, _, _, _, _, _, _, _) => true
+      case Event(_, EVENT_RECVFROM, _, _, _, _, _, _, _, _, _, _) => true
+      case NetFlowObject(_, _, _, _, _, _, _) => true
+      case SimpleEdge(_, _, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => true
+      case SimpleEdge(_, _, EDGE_EVENT_AFFECTS_NETFLOW, _, _) => true
+      case EpochMarker => true
+      case _ => false
     }
   ))
 
-  initialize()
-
   val dependencies = List.empty
-  def beginService() = ()  // TODO
-  def endService() = ()  // TODO
+  def beginService() = initialize()
+  def endService() = ()
 
 
   private val netflows = MutableMap.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP
@@ -63,7 +61,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
   private val event2process = MutableMap.empty[UUID,UUID]         // Relevant edges
   private val event2netflow = MutableMap.empty[UUID,UUID]         // Relevant edges
 
-  override def receive = ({
+  override def process = {
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (u -> s)
     case e @ Event(u, EVENT_SENDTO, _, _, _, _, _, _, _, s, _, _) => sendto += (u -> s)
     case e @ Event(u, EVENT_SENDMSG, _, _, _, _, _, _, _, s, _, _) => sendmsg += (u -> s)
@@ -149,7 +147,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
       event2netflow.clear()
 
       println("EpochMarker: NetflowFeature")
-    }: PartialFunction[Any,Unit]) orElse super.receive
+    }
 }
 
 object NetflowFeature {

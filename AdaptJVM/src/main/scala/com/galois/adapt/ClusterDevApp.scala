@@ -94,7 +94,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(
           context.actorOf(
-            Props(classOf[Outgestor], registryProxy, Set()),
+            Props(classOf[Outgestor], registryProxy),
             "Outgestor"
           )
         ))
@@ -102,7 +102,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 
   case "features" =>
       
-      val erActor = context.actorOf(Props(classOf[ErActor]), "er-actor")
+      val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
 
       // The two feature extractors subscribe to the CDM13 produced by the ER actor
       val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
@@ -110,11 +110,11 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       
       // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
       val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
-        Subscription(featureExtractor1, (m: Any) =>
-          Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
-        Subscription(featureExtractor2, (m: Any) =>
-          Some(m.asInstanceOf[Map[Subject,Seq[Double]]]))
-      )), "anomaly-detector")
+        Subscription(featureExtractor1, { _ => true }),
+       //   Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
+        Subscription(featureExtractor2, { _ => true })
+        //  Some(m.asInstanceOf[Map[Subject,Seq[Double]]]))
+      )), "IForestAnomalyDetector")
       
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))

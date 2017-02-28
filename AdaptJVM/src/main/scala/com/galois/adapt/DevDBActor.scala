@@ -22,13 +22,13 @@ import collection.JavaConverters._
 import scala.util.Try
 
 class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Nothing] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
 
   val dependencies = "FileIngestActor" :: Nil
   lazy val subscriptions = {
     log.info("Forced subcription list")
     val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription[CDM13]](Subscription(ingest, (c: Any) => Some(c.asInstanceOf[CDM13])))
+    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM13]))
   }
 
   def beginService() = {
