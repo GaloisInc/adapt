@@ -126,7 +126,8 @@ object AcceptanceApp {
   def distributionSpec(t: CDM15): Seq[ActorRef] = t match {
     case f: FileObject =>
       if (ta1Source.isEmpty) {
-        // TODO: This is no longer a part of base object
+        println(s"Source data from: ${f.baseObject.source}")
+        ta1Source = Some(f.baseObject.source)
       }
       List(counterActor, dbActor, basicOpsActor)
     case _: Subject => List(counterActor, dbActor, basicOpsActor)
