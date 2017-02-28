@@ -31,12 +31,11 @@ package object cdm15 {
       val tcFileReader: DataFileReader[com.bbn.tc.schema.avro.cdm15.TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
       val tcIterator = tcFileReader.iterator.asScala
 
+      val cdm = tcIterator.next()
       val first = {
-        val cdm = tcIterator.next()
         new TCCDMDatum(cdm.getSource)
       }
       val second = {
-        val cdm = tcIterator.next
         if (cdm.CDMVersion.toString != "15")
           throw new Exception(s"Expected CDM15, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM15Type(cdm.getDatum)
@@ -61,6 +60,7 @@ package object cdm15 {
       case _: Event.RawCDMType => Event.from(cdm)
       case _: UnitDependency.RawCDMType => UnitDependency.from(cdm)
       case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
+      case _: TCCDMDatum.RawCDMType => TCCDMDatum.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }
   }
