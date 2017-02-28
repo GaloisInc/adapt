@@ -11,16 +11,18 @@ import scala.util.Try
 case class MemoryObject(
                          uuid: UUID,
                          baseObject: AbstractObject,
-                         pageOffset: Long,
+                         memoryAddress: Long,
                          pageNumber: Option[Long] = None,
+                         pageOffset: Option[Long] = None,
                          size: Option[Long] = None
                        ) extends CDM15 with DBWritable {
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     label, "MemoryObject",
     "uuid", uuid,
-    "pageOffset", pageOffset
+    "memoryAddress", memoryAddress
   )  ++
     pageNumber.fold[List[Any]](List.empty)(v => List("pageNumber", v)) ++
+    pageOffset.fold[List[Any]](List.empty)(v => List("pageOffset", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v))
 }
 
@@ -31,8 +33,9 @@ case object MemoryObject extends CDM15Constructor[MemoryObject] {
     MemoryObject(
       cdm.getUuid,
       cdm.getBaseObject,
-      cdm.getPageOffset,
+      cdm.getMemoryAddress,
       AvroOpt.long(cdm.getPageNumber),
+      AvroOpt.long(cdm.getPageOffset),
       AvroOpt.long(cdm.getSize)
     )
   )

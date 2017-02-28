@@ -13,7 +13,6 @@ case class Principal(
                       uuid: UUID,
                       userId: String,
                       groupIds: Seq[String],
-                      source: InstrumentationSource,
                       principalType: PrincipalType = PRINCIPAL_LOCAL,
                       username: Option[String] = None,
                       properties: Option[Map[String,String]] = None
@@ -23,7 +22,6 @@ case class Principal(
     "uuid", uuid,
     "userId", userId,
     //    "groupIds", groupIds.mkString(", "),
-    "source", source.toString,
     "principalType", principalType.toString
   ) ++
     (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else List.empty) ++
@@ -39,7 +37,6 @@ case object Principal extends CDM15Constructor[Principal] {
       cdm.getUuid,
       cdm.getUserId,
       cdm.getGroupIds,
-      cdm.getSource,
       cdm.getType,
       AvroOpt.str(cdm.getUsername),
       AvroOpt.map(cdm.getProperties)

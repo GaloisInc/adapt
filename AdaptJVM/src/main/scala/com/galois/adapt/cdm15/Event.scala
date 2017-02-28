@@ -13,12 +13,12 @@ import scala.collection.JavaConverters._
 
 case class Event(
                   uuid: UUID,
+                  sequence: Long = 0,
                   eventType: EventType,
                   threadId: Int,
                   subject: UUID,
-                  predicateObject: UUID,
-                  source: InstrumentationSource,
                   timestampNanos: Long,
+                  predicateObject: Option[UUID] = None,
                   predicateObjectPath: Option[String] = None,
                   predicateObject2: Option[UUID] = None,
                   predicateObject2Path: Option[String] = None,
@@ -31,13 +31,14 @@ case class Event(
                 ) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "Event",
+    "uuid", uuid,
+    "sequence", sequence,
     "eventType", eventType.toString,
     "threadId", threadId,
     "subject", subject,
-    "predicateObject", predicateObject,
-    "source", source.toString,
     "timestampNanos", timestampNanos
   ) ++
+    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObject", v)) ++
     predicateObjectPath.fold[List[Any]](List.empty)(v => List("predicateObjectPath", v)) ++
     predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2", v.toString)) ++
     predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
@@ -55,12 +56,12 @@ case object Event extends CDM15Constructor[Event] {
   def from(cdm: RawCDM15Type): Try[Event] = Try(
     Event(
       cdm.getUuid,
+      cdm.getSequence,
       cdm.getType,
       cdm.getThreadId,
       cdm.getSubject,
-      cdm.getPredicateObject,
-      cdm.getSource,
       cdm.getTimestampNanos,
+      AvroOpt.uuid(cdm.getPredicateObject),
       AvroOpt.str(cdm.getPredicateObjectPath),
       AvroOpt.uuid(cdm.getPredicateObject2),
       AvroOpt.str(cdm.getPredicateObject2Path),

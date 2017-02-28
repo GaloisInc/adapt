@@ -12,6 +12,7 @@ import scala.util.Try
 case class FileObject(
                        uuid: UUID,
                        baseObject: AbstractObject,
+                       fileObjectType: FileObjectType,
                        fileDescriptor: Option[Int] = None,
                        localPrincipal: Option[UUID] = None,
                        size: Option[Long] = None,
@@ -21,7 +22,8 @@ case class FileObject(
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
       label, "FileObject",
-      "uuid", uuid
+      "uuid", uuid,
+      "fileObjectType", fileObjectType
     ) ++
     fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v)) ++
     localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipal", v)) ++
@@ -38,6 +40,7 @@ case object FileObject extends CDM15Constructor[FileObject] {
     FileObject(
       cdm.getUuid,
       cdm.getBaseObject,
+      cdm.getType,
       AvroOpt.int(cdm.getFileDescriptor),
       AvroOpt.uuid(cdm.getLocalPrincipal),
       AvroOpt.long(cdm.getSize),

@@ -30,6 +30,7 @@ package object cdm15 {
   type TagOpCode             = toplevel.TagOpCode
   type TagRunLengthTuple     = toplevel.TagRunLengthTuple
   type TimeMarker            = toplevel.TimeMarker
+  type UnitDependency        = toplevel.UnitDependency
   type UUID                  = toplevel.UUID
   type UnnamedPipeObject     = toplevel.UnnamedPipeObject
   type Value                 = toplevel.Value

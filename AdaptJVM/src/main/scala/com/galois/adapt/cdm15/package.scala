@@ -19,7 +19,7 @@ package object cdm15 {
   trait CDM15
 
   object CDM15 {
-    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, TimeMarker)
+    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
 
     def readData(filePath: String, limit: Option[Int] = None): Try[Iterator[Try[CDM15]]] = readAvroFile(filePath).map { x =>
       val cdmDataIter = x.map(CDM15.parse)
@@ -55,6 +55,7 @@ package object cdm15 {
       case _: MemoryObject.RawCDMType => MemoryObject.from(cdm)
       case _: SrcSinkObject.RawCDMType => SrcSinkObject.from(cdm)
       case _: Event.RawCDMType => Event.from(cdm)
+      case _: UnitDependency.RawCDMType => UnitDependency.from(cdm)
       case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }

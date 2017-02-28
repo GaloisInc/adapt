@@ -11,6 +11,9 @@ import scala.util.Try
 
 case class ProvenanceTagNode(
                               tagId: UUID,
+                              subject: UUID,
+                              flowObject: Option[UUID] = None,
+                              systemCall: Option[String] = None,
                               programPoint: Option[String] = None,
                               prevTagId: Option[UUID] = None,
                               opcode: Option[TagOpCode] = None,
@@ -21,8 +24,11 @@ case class ProvenanceTagNode(
                             ) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
-    "tagId", tagId
+    "tagId", tagId,
+    "subject", subject
   ) ++
+    flowObject.fold[List[Any]](List.empty)(v => List("flowObject", v)) ++
+    systemCall.fold[List[Any]](List.empty)(v => List("systemCall", v)) ++
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
     prevTagId.fold[List[Any]](List.empty)(v => List("prevTagId", v.toString)) ++
     opcode.fold[List[Any]](List.empty)(v => List("opcode", v.toString)) ++
@@ -38,6 +44,9 @@ case object ProvenanceTagNode extends CDM15Constructor[ProvenanceTagNode] {
   def from(cdm: RawCDM15Type): Try[ProvenanceTagNode] = Try(
     ProvenanceTagNode(
       cdm.getTagId,
+      cdm.getSubject,
+      AvroOpt.uuid(cdm.getFlowObject),
+      AvroOpt.str(cdm.getSystemCall),
       AvroOpt.str(cdm.getProgramPoint),
       AvroOpt.uuid(cdm.getPrevTagId),
       AvroOpt.tagOpCode(cdm.getOpcode),

@@ -8,7 +8,7 @@ import scala.util.Try
 
 
 case class Value(
-                  size: Int = 0,
+                  size: Int = -1,
                   valueType: ValueType,
                   valueDataType: ValueDataType,
                   isNull: Boolean = false,     // TODO: What are the semantics of this?!?

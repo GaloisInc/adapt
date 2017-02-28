@@ -12,13 +12,15 @@ import scala.util.Try
 case class SrcSinkObject(
                           uuid: UUID,
                           baseObject: AbstractObject,
-                          srcSinkType: SrcSinkType
+                          srcSinkType: SrcSinkType,
+                          fileDescriptor: Option[Int]
                         ) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "SrcSinkObject",
     "uuid", uuid,
     "srcSinkType", srcSinkType
-  ) ++ baseObject.asDBKeyValues
+  ) ++ baseObject.asDBKeyValues ++
+    fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
 }
 
 case object SrcSinkObject extends CDM15Constructor[SrcSinkObject] {
@@ -28,7 +30,8 @@ case object SrcSinkObject extends CDM15Constructor[SrcSinkObject] {
     SrcSinkObject(
       cdm.getUuid,
       cdm.getBaseObject,
-      cdm.getType
+      cdm.getType,
+      AvroOpt.int(cdm.getFileDescriptor)
     )
   )
 }

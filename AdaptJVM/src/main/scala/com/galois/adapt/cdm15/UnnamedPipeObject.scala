@@ -13,15 +13,13 @@ case class UnnamedPipeObject(
                     uuid: UUID,
                     baseObject: AbstractObject,
                     sourceFileDescriptor: Int,
-                    sinkFileDescriptor: Int,
-                    localPrincipal: UUID
+                    sinkFileDescriptor: Int
                   ) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "UnnamedPipeObject",
     "uuid", uuid,
     "sourceFileDescriptor", sourceFileDescriptor,
-    "sinkFileDescriptor", sinkFileDescriptor,
-    "localPrinicpal", localPrincipal
+    "sinkFileDescriptor", sinkFileDescriptor
   ) ++
     baseObject.asDBKeyValues
 }
@@ -35,8 +33,7 @@ case object UnnamedPipeObject extends CDM15Constructor[UnnamedPipeObject] {
       cdm.getUuid,
       cdm.getBaseObject,
       cdm.getSourceFileDescriptor,
-      cdm.getSinkFileDescriptor,
-      cdm.getLocalPrincipal
+      cdm.getSinkFileDescriptor
     )
   }
 }

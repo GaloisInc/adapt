@@ -24,7 +24,7 @@ case object TimeMarker extends CDM15Constructor[TimeMarker] {
 
   def from(cdm: RawCDM15Type): Try[TimeMarker] = Try {
     TimeMarker(
-      cdm.getTimestampNanos
+      cdm.getTsNanos
     )
   }
 }

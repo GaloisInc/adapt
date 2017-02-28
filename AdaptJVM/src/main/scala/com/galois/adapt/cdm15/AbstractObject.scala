@@ -8,14 +8,12 @@ import scala.collection.JavaConverters._
 
 
 case class AbstractObject(
-                           source: InstrumentationSource,
                            permission: Option[FixedShort] = None,  // fixed size = 2
                            epoch: Option[Int] = None,
                            properties: Option[Map[String,String]] = None
                          ) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     //    label, "AbstractObject",
-    "source", source.toString
   ) ++
     permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
     epoch.fold[List[Any]](List.empty)(v => List("epoch", v)) ++
@@ -27,7 +25,6 @@ case object AbstractObject extends CDM15Constructor[AbstractObject] {
 
   def from(cdm: RawCDM15Type): Try[AbstractObject] = Try {
     AbstractObject(
-      cdm.getSource,
       AvroOpt.fixedShort(cdm.getPermission),
       AvroOpt.int(cdm.getEpoch),
       AvroOpt.map(cdm.getProperties)

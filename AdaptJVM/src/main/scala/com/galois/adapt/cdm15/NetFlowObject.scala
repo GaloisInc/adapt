@@ -2,6 +2,7 @@ package com.galois.adapt.cdm15
 
 import java.util.UUID
 
+import akka.protobuf.Descriptors.FileDescriptor
 import com.bbn.tc.schema.avro.cdm15
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
@@ -11,23 +12,25 @@ import scala.util.Try
 case class NetFlowObject(
                           uuid: UUID,
                           baseObject: AbstractObject,
-                          inboundAddress: String,
-                          inboundPort: Int,
-                          outboundAddress: String,
-                          outboundPort: Int,
-                          ipProtocol: Option[Int] = None
+                          localAddress: String,
+                          localPort: Int,
+                          remoteAddress: String,
+                          remotePort: Int,
+                          ipProtocol: Option[Int] = None,
+                          fileDescriptor: Option[Int] = None
                         ) extends CDM15 with DBWritable {
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
       List(
         label, "NetFlowObject",
         "uuid", uuid,
-        "inboundAddress", inboundAddress,
-        "inboundPort", inboundPort,
-        "outboundAddress", outboundAddress,
-        "outboundPort", outboundPort
+        "localAddress", localAddress,
+        "localPort", localPort,
+        "remoteAddress", remoteAddress,
+        "remotePort", remotePort
       ) ++
-      ipProtocol.fold[List[Any]](List.empty)(v => List("ipProtocol", v))
+      ipProtocol.fold[List[Any]](List.empty)(v => List("ipProtocol", v)) ++
+      fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
 }
 
 case object NetFlowObject extends CDM15Constructor[NetFlowObject] {
@@ -37,11 +40,12 @@ case object NetFlowObject extends CDM15Constructor[NetFlowObject] {
     NetFlowObject(
       cdm.getUuid,
       cdm.getBaseObject,
-      cdm.getInboundAddress,
-      cdm.getInboundPort,
-      cdm.getOutboundAddress,
-      cdm.getOutboundPort,
-      AvroOpt.int(cdm.getIpProtocol)
+      cdm.getLocalAddress,
+      cdm.getLocalPort,
+      cdm.getRemoteAddress,
+      cdm.getRemotePort,
+      AvroOpt.int(cdm.getIpProtocol),
+      AvroOpt.int(cdm.getFileDescriptor)
     )
   )
 }

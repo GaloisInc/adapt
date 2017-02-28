@@ -13,10 +13,9 @@ case class Subject(
                     uuid: UUID,
                     subjectType: SubjectType,
                     cid: Int,
-                    parentSubject: UUID,
                     localPrincipal: UUID,
-                    source: InstrumentationSource,
                     startTimestampNanos: Long,
+                    parentSubject: Option[UUID] = None,
                     unitId: Option[Int] = None,
                     iteration: Option[Int] = None,
                     count: Option[Int] = None,
@@ -31,11 +30,10 @@ case class Subject(
     "uuid", uuid,
     "subjectType", subjectType.toString,
     "cid", cid,
-    "parentSubject", parentSubject,
     "localPrincipal", localPrincipal,
-    "source", source.toString,
     "startTimestampNanos", startTimestampNanos
   ) ++
+    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubject", v)) ++
     unitId.fold[List[Any]](List.empty)(v => List("unitId", v)) ++
     iteration.fold[List[Any]](List.empty)(v => List("iteration", v)) ++
     count.fold[List[Any]](List.empty)(v => List("count", v)) ++
@@ -55,10 +53,9 @@ case object Subject extends CDM15Constructor[Subject] {
       cdm.getUuid,
       cdm.getType,
       cdm.getCid,
-      cdm.getParentSubject,
       cdm.getLocalPrincipal,
-      cdm.getSource,
       cdm.getStartTimestampNanos,
+      AvroOpt.uuid(cdm.getParentSubject),
       AvroOpt.int(cdm.getUnitId),
       AvroOpt.int(cdm.getIteration),
       AvroOpt.int(cdm.getCount),
