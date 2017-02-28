@@ -19,7 +19,7 @@ package object cdm15 {
   trait CDM15
 
   object CDM15 {
-    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
+    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker, TCCDMDatum)
 
     def readData(filePath: String, limit: Option[Int] = None): Try[Iterator[Try[CDM15]]] = readAvroFile(filePath).map { x =>
       val cdmDataIter = x.map(CDM15.parse)
@@ -27,17 +27,21 @@ package object cdm15 {
     }
 
     def readAvroFile(filePath: String) = Try {
-      val tcDatumReader = new SpecificDatumReader(classOf[TCCDMDatum])
-      val tcFileReader: DataFileReader[TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
+      val tcDatumReader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm15.TCCDMDatum])
+      val tcFileReader: DataFileReader[com.bbn.tc.schema.avro.cdm15.TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
       val tcIterator = tcFileReader.iterator.asScala
 
       val first = {
+        val cdm = tcIterator.next()
+        new TCCDMDatum(cdm.getSource)
+      }
+      val second = {
         val cdm = tcIterator.next
         if (cdm.CDMVersion.toString != "15")
           throw new Exception(s"Expected CDM15, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM15Type(cdm.getDatum)
       }
-      Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM15Type(cdm.getDatum))
+      Iterator(first) ++ Iterator(second) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM15Type(cdm.getDatum))
     }
 
     def parse(cdm: RawCDM15Type) = cdm.o match {
