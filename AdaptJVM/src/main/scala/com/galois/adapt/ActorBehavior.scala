@@ -5,10 +5,14 @@ import com.galois.adapt.ServiceRegistryProtocol._
 import scala.collection.mutable.{Map => MutableMap}
 
 
+/*
+ * This class provides a default implementation of `receive` which is the identity element of the
+ * monoid over PartialFunction[Any,Unit] with operation `orElse`. Concretely, this lets us create a
+ * bunch of traits all extending `BaseActorBehaviour` and use `super.receive` in their definition of
+ * `super.receive`.
+ */
 trait BaseActorBehavior { s: Actor with ActorLogging =>
-  def receive: PartialFunction[Any,Unit] = {
-    case m => log.error("Received unhandled message: {}\nFrom sender: {}", m, sender)
-  }
+  def receive: PartialFunction[Any,Unit] = PartialFunction.empty
 }
 
 
@@ -16,7 +20,7 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
   lazy val thisName = this.getClass.getSimpleName
 
   val registry: ActorRef
-  def localReceive: PartialFunction[Any,Unit]
+  def localReceive: PartialFunction[Any,Unit] = PartialFunction.empty
   val dependencies: List[String]
   def beginService(): Unit
   def endService(): Unit

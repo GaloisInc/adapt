@@ -15,7 +15,8 @@ import akka.actor._
  * filter:        Subject with subjectType = Process;
  * features:      events with eventType CHECK_FILE_ATTRIBUTES, OPEN, and WRITE;
  */
-class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
+class FileEventsFeature(val registry: ActorRef, root: ActorRef)
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Map[Subject,(Int,Int,Int)]] { 
   
   val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
     target = root,
@@ -31,6 +32,10 @@ class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Sub
   ))
 
   initialize()
+  
+  val dependencies = List.empty
+  def beginService() = ()  // TODO
+  def endService() = ()  // TODO
 
   private val opens = MutableSet.empty[UUID]               // UUIDs of OPEN Events
   private val writes = MutableSet.empty[UUID]              // UUIDs of WRITE Events
@@ -38,7 +43,7 @@ class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Sub
   private val links = ListBuffer.empty[(UUID, UUID)]       // Subject UUID -> Event UUID
   private val processes = MutableMap.empty[UUID, Subject]  // Subject UUID -> Subject
 
-  override def process(c: CDM13) = c match {
+  override def receive = ({
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (s.uuid -> s)
     case e @ Event(u, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => opens += e.uuid
     case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => writes += e.uuid
@@ -69,10 +74,10 @@ class FileEventsFeature(root: ActorRef) extends  SubscriptionActor[CDM13,Map[Sub
       processes.clear()
 
       println("EpochMarker: AdHighCheckOpenRatio")
-    }
+    }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
 object FileEventsFeature {
-  def props(root: ActorRef): Props = Props(new FileEventsFeature(root))
+  def props(registry: ActorRef, root: ActorRef): Props = Props(new FileEventsFeature(registry, root))
 }
 

@@ -21,12 +21,16 @@ import akka.util.Timeout
  * the external IForest algorithm, then unpacks the resulting matrix back into a Map (keyed
  * appropriately).
  */
-class IForestAnomalyDetector(override val subscriptions: Set[Subscription[Map[_,Seq[Double]]]])
-  extends SubscriptionActor[Map[_,Seq[Double]],Map[_,Double]] {
+class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions: Set[Subscription[Map[_,Seq[Double]]]])
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[_,Seq[Double]],Map[_,Double]] {
   
   initialize()
 
-  override def process(c: Map[_,Seq[Double]]): Unit = {
+  val dependencies = List.empty
+  def beginService() = ()  // TODO
+  def endService() = ()  // TODO
+
+  override def receive = ({ case c: Map[_,Seq[Double]] =>
 
     // Execution context and timeout
     val system = akka.actor.ActorSystem("system")
@@ -75,9 +79,10 @@ class IForestAnomalyDetector(override val subscriptions: Set[Subscription[Map[_,
       val output: Map[_, Double] = (rows zip outputScores).map { case ((key, _), value) => (key, value) }.toMap
       broadCast(output)
     }
-  }
+  }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
 object IForestAnomalyDetector {
-  def props(inputs: Set[Subscription[Map[_, Seq[Double]]]]): Props = Props(new IForestAnomalyDetector(inputs))
+  def props(registry: ActorRef, inputs: Set[Subscription[Map[_, Seq[Double]]]]): Props =
+    Props(new IForestAnomalyDetector(registry, inputs))
 }

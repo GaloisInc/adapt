@@ -3,7 +3,7 @@ package com.galois.adapt
 import akka.actor._
 
 // An actor that receives input of type `T` and produces output of type `U`
-trait SubscriptionActor[T,U] extends Actor {
+trait SubscriptionActor[T,U] extends Actor with BaseActorBehavior { s: Actor with ActorLogging => 
 
   // These are going to be the sources of messages
   def subscriptions: Set[Subscription[T]]         
@@ -13,17 +13,15 @@ trait SubscriptionActor[T,U] extends Actor {
 
 
   // On initialization, send subscription request to upstream producers
-  def initialize(): Unit =  subscriptions.foreach { s => s.target ! s.copy(target = self) }
+  def initialize(): Unit = subscriptions.foreach { s => s.target ! s.copy(target = self) }
   
   // Accordingly, an AdActor must be prepared to recieve subscription requests too...
-  def receive = {
-    case s @ Subscription(_,_) => subscribers += s
-    case t: T => process(t.asInstanceOf[T])
-  }
-
+  override def receive: PartialFunction[Any,Unit]
+    = ({ case s: Subscription[T] => subscribers += s;
+         log.info(s"Received a subscription from ${sender()} = ${s.target}") }: PartialFunction[Any,Unit]) orElse super.receive orElse process
 
   // What to do with a message. This is where calls to `broadCast` will be made
-  def process(msg: T): Unit
+  def process: PartialFunction[Any, Unit] = PartialFunction.empty
 
   // AdActors usually don't send messages to articular actors - they broadcast to their subscribers
   def broadCast(msg: U): Unit = for (Subscription(target, pack) <- subscribers)

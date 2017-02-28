@@ -15,13 +15,12 @@ import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
 
-  val config = Application.config
-
-  implicit val system = ActorSystem(config.getString("adapt.systemname"))
   var nodeManager: Option[ActorRef] = None
   var registryProxy: Option[ActorRef] = None
 
-  def run(): Unit = {
+  def run(config: Config): Unit = {
+    implicit val system = ActorSystem(config.getString("adapt.systemname"))
+   
     system.actorOf(
       ClusterSingletonManager.props(
         singletonProps = Props(classOf[ServiceRegistry]),
@@ -57,7 +56,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         childActors.getOrElse(roleName, Set(
           context.actorOf(
             Props(classOf[DevDBActor], registryProxy, None),
-            "db-actor"
+            "DevDBActor"
           )
         ))
       )
@@ -67,7 +66,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         childActors.getOrElse(roleName, Set(
           context.actorOf(
             Props(classOf[FileIngestActor], registryProxy),
-            "ingest-actor"
+            "FileIngestActor"
           )
         ))
       )
@@ -87,7 +86,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
               registryProxy,
               config.getString("akka.http.server.interface"),
               config.getInt("akka.http.server.port")
-            ), "ui-actor")
+            ), "UIActor")
         ))
       )
 
@@ -95,8 +94,8 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(
           context.actorOf(
-            Props(classOf[Outgestor], Set()),
-            "outgestor-actor"
+            Props(classOf[Outgestor], registryProxy, Set()),
+            "Outgestor"
           )
         ))
       )
@@ -106,11 +105,11 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       val erActor = context.actorOf(Props(classOf[ErActor]), "er-actor")
 
       // The two feature extractors subscribe to the CDM13 produced by the ER actor
-      val featureExtractor1 = context.actorOf(FileEventsFeature.props(erActor), "file-events-actor")
-      val featureExtractor2 = context.actorOf(NetflowFeature.props(erActor), "netflow-actor")
+      val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
+      val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
       
       // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
-      val ad = context.actorOf(IForestAnomalyDetector.props(Set(
+      val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
         Subscription(featureExtractor1, (m: Any) =>
           Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
         Subscription(featureExtractor2, (m: Any) =>

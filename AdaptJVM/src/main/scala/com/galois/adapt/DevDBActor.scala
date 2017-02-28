@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm13.{EpochMarker, Event, FileObject, SUBJECT_PROCESS, SimpleEdge, Subject}
+import com.galois.adapt.cdm13._
 import com.galois.adapt.scepter.HowMany
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
@@ -21,11 +21,20 @@ import org.apache.tinkerpop.gremlin.structure.io.graphson._
 import collection.JavaConverters._
 import scala.util.Try
 
-class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None) extends Actor with ActorLogging with ServiceClient {
+class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Nothing] {
 
-  val dependencies = List.empty
+  val dependencies = "FileIngestActor" :: Nil
+  lazy val subscriptions = {
+    log.info("Forced subcription list")
+    val ingest: ActorRef = dependencyMap("FileIngestActor").get
+    Set[Subscription[CDM13]](Subscription(ingest, (c: Any) => Some(c.asInstanceOf[CDM13])))
+  }
 
-  def beginService() = ()  // TODO
+  def beginService() = {
+    log.info("Begin service")
+    initialize()    
+  }
   def endService() = ()  // TODO
 
 
@@ -81,7 +90,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None) ex
     else graph.traversal().V().has(key,value).toList.asScala.headOption
   }
 
-  def localReceive: PartialFunction[Any,Unit] = {
+  override def process: PartialFunction[Any,Unit] = {
 
     case s: Subject =>
       val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]

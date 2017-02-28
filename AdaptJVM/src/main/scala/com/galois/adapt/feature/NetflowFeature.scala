@@ -20,7 +20,9 @@ import akka.actor._
  * 
  * Thus, every subject has  4 * (# of unique IP addresses in the trace)  features
  */
-class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject,Seq[Double]]] {
+class NetflowFeature(val registry: ActorRef, root: ActorRef)
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13,Map[Subject,Seq[Double]]] {
+  
   val subscriptions: Set[Subscription[CDM13]] = Set(Subscription(
     target = root,
     pack = {
@@ -41,6 +43,11 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
 
   initialize()
 
+  val dependencies = List.empty
+  def beginService() = ()  // TODO
+  def endService() = ()  // TODO
+
+
   private val netflows = MutableMap.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP
   
   private val sendto = MutableMap.empty[UUID,Option[Long]]        // Event UUID -> size
@@ -56,7 +63,7 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
   private val event2process = MutableMap.empty[UUID,UUID]         // Relevant edges
   private val event2netflow = MutableMap.empty[UUID,UUID]         // Relevant edges
 
-  override def process(c: CDM13) = c match {
+  override def receive = ({
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (u -> s)
     case e @ Event(u, EVENT_SENDTO, _, _, _, _, _, _, _, s, _, _) => sendto += (u -> s)
     case e @ Event(u, EVENT_SENDMSG, _, _, _, _, _, _, _, s, _, _) => sendmsg += (u -> s)
@@ -142,10 +149,10 @@ class NetflowFeature(root: ActorRef) extends SubscriptionActor[CDM13,Map[Subject
       event2netflow.clear()
 
       println("EpochMarker: NetflowFeature")
-    }
+    }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
 object NetflowFeature {
-  def props(root: ActorRef): Props = Props(new NetflowFeature(root))
+  def props(registry: ActorRef, root: ActorRef): Props = Props(new NetflowFeature(registry, root))
 }
 

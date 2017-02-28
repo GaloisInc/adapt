@@ -21,7 +21,7 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
   def endService() = localReceive(StopUI)
 
-  def localReceive: PartialFunction[Any,Unit] = {
+  override def localReceive: PartialFunction[Any,Unit] = {
     case msg @ StartUI(dbActor) =>
       if (httpService.isEmpty) {
         implicit val ec = context.dispatcher
