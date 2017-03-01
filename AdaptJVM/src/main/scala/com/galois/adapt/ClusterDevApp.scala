@@ -19,7 +19,7 @@ object ClusterDevApp {
   var registryProxy: Option[ActorRef] = None
 
   def run(config: Config): Unit = {
-    implicit val system = ActorSystem(config.getString("adapt.systemname"))
+    implicit val system = ActorSystem(config.getString("adapt.systemname"), config)
 
     system.actorOf(
       ClusterSingletonManager.props(
@@ -102,6 +102,9 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
           )
         ))
       )
+
+  case "acceptance" =>
+      
 
   case "features" =>
       
