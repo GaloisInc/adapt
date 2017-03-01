@@ -2,7 +2,7 @@ package com.galois.adapt
 
 import akka.actor._
 import akka.cluster.Cluster
-import akka.cluster.ClusterEvent.{MemberEvent, MemberJoined, MemberUp}
+import akka.cluster.ClusterEvent.{MemberEvent, MemberJoined, MemberUp, InitialStateAsEvents}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.typesafe.config.Config
 import scala.collection.JavaConverters._
@@ -20,7 +20,7 @@ object ClusterDevApp {
 
   def run(config: Config): Unit = {
     implicit val system = ActorSystem(config.getString("adapt.systemname"))
-   
+
     system.actorOf(
       ClusterSingletonManager.props(
         singletonProps = Props(classOf[ServiceRegistry]),
@@ -45,7 +45,10 @@ object ClusterDevApp {
 class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Actor with ActorLogging {
   val cluster = Cluster(context.system)
 
-  override def preStart() = cluster.subscribe(self, classOf[MemberEvent])
+  log.info("ClusterNodeManager started")
+  log.info(s"Cluster has roles ${cluster.selfRoles}")
+
+  override def preStart() = cluster.subscribe(self, InitialStateAsEvents, classOf[MemberEvent])
   override def postStop() = cluster.unsubscribe(self)
 
   var childActors: Map[String, Set[ActorRef]] = Map.empty
@@ -111,9 +114,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
       val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
         Subscription(featureExtractor1, { _ => true }),
-       //   Some(m.asInstanceOf[Map[Subject,(Int,Int,Int)]].mapValues(t => Seq(t._1.toDouble, t._2.toDouble, t._3.toDouble)))),
         Subscription(featureExtractor2, { _ => true })
-        //  Some(m.asInstanceOf[Map[Subject,Seq[Double]]]))
       )), "IForestAnomalyDetector")
       
       childActors = childActors + (roleName ->
@@ -123,14 +124,8 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 
   def receive = {
     case MemberUp(m) if cluster.selfUniqueAddress == m.uniqueAddress =>
-      if (cluster.selfUniqueAddress == m.uniqueAddress) {
-        log.info("Message: {} will result in creating child nodes for: {}", m, m.roles)
-        m.roles foreach createChild
-      }
-
-    case _: MemberUp => ()
-
-    case _: MemberJoined => ()
+      log.info("Message: {} will result in creating child nodes for: {}", m, m.roles)
+      m.roles foreach createChild
 
     case x => log.warning("received unhandled message: {}", x)
   }
