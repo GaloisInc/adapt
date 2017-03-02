@@ -16,14 +16,17 @@ class FileIngestActor(val registry: ActorRef)
   val jobQueue = Queue.empty[IngestFile]
   var errors = Nil
 
-  def processJobQueue() = while (subscribers.nonEmpty && jobQueue.nonEmpty) {
+  def processJobQueue() = while (subscribers.size >= 2 && jobQueue.nonEmpty) {
     val j = jobQueue.dequeue()
     log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
     i.toString + s" CDM statements"))
 
     // Starting to process file
     broadCastUnsafe(BeginFile(j.path))
-    
+
+    log.info("Ingesting")
+    log.info("subscribers: " + subscribers.toString)
+
     CDM13.readData(j.path, j.loadLimit) match {
       case Failure(t) =>
         broadCastUnsafe(ErrorReadingFile(j.path,t));
@@ -66,5 +69,4 @@ case class BeginFile(path: String/*, TODO source: InstrumentationSource */)
 case class DoneFile(path: String/*, TODO source: InstrumentationSource */)
 case class ErrorReadingStatement(exception: Throwable)
 case class ErrorReadingFile(path: String, exception: Throwable)
-case object Done
 

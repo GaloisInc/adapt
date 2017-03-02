@@ -1,12 +1,20 @@
 package com.galois.adapt.scepter
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ActorRef, ActorSystem, Props, Actor, ActorLogging}
+import com.galois.adapt.{ServiceClient, SubscriptionActor, Subscription}
 import com.galois.adapt.cdm13._
 
 /* This actor counts all of the CDM statements it receives and sends back these counts every time it
  * receives a 'HowMany' message
  */
-class EventCountingTestActor extends Actor {
+class EventCountingTestActor(val registry: ActorRef) extends
+  Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
+
+  val dependencies = "AcceptanceTestsActor" :: Nil
+  lazy val subscriptions =  Set[Subscription](Subscription(dependencyMap("AcceptanceTestsActor").get, _ => true))
+  
+  def beginService() = initialize()
+  def endService() = ()
   
   // Map of statement-name to its current count
   var typeCounter = Map.empty[String,Int]
@@ -15,7 +23,7 @@ class EventCountingTestActor extends Actor {
     typeCounter = typeCounter.updated(name, typeCounter.getOrElse(name, 0) + 1)
   }
 
-  def receive = {
+  override def process = {
     // Receive CDM statements to count
     case _: AbstractObject => incrementTypeCount("AbstractObject")
     case _: Event => incrementTypeCount("Event")

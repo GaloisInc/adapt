@@ -32,29 +32,30 @@ import scala.language.postfixOps
 import org.scalatest.FlatSpec
 
 class General_TA1_Tests(
-  data: => Iterator[Try[CDM13]],            // Input CDM statements
+  failedStatements: Int,                    // Number of failed events
+  failedStatementsMsgs: List[String],       // First 5 failed messages TODO: use this?
+  successStatements: Int,                   // Number of successfully parsed events
   incompleteEdgeCount: Int,                 // Number of incomplete edges
+  dbActor: ActorRef,
+  counterActor: ActorRef,
+  basicOpsActor: ActorRef,
+  acceptActor: ActorRef,
+  ta1Source: Option[InstrumentationSource],
   count: Option[Int] = None                 // Expected number of statements
 ) extends FlatSpec {
 
   implicit val timeout = Timeout(30 second)
 
   // Test that all data gets parsed
-  "Parsing data in the file..." should
-  "parse successfully" in {
-    var counter = 0
-    val parseTry = Try(data.foreach { d =>
-      counter += 1
-      AcceptanceApp.distribute(d.get)
-    })
-    println(s"Read events: $counter")
-    assert(parseTry.isSuccess)
+  "Parsing data in the file..." should "parse successfully" in {
+    println(s"Read events: ${failedStatements + successStatements}")
+    assert(failedStatements == 0)
   }
 
   // Test that we get the right number of statements out
   count.foreach { count => 
     it should s"have a known statement count of $count" in {
-      assert(Await.result(AcceptanceApp.counterActor ? HowMany("total"), 1 second) == count)
+      assert(Await.result(counterActor ? HowMany("total"), 10 second) == count)
     }
   }
   
@@ -62,7 +63,7 @@ class General_TA1_Tests(
   "Looking for BasicOps events.." should "either find almost no events, or all events" in {
     
     val basicOps = Await.result(
-      AcceptanceApp.basicOpsActor ? IsBasicOps, 1 second
+      basicOpsActor ? IsBasicOps, 1 second
     ).asInstanceOf[Option[Map[String,Boolean]]]
   
     basicOps.foreach { missing =>
@@ -79,22 +80,23 @@ class General_TA1_Tests(
 
   // Test tht events of type SEND,SENDMSG,READ,etc. have a size field on them
   it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
-    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
-    
+    val graph = Await.result(dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
         .hasLabel("Event")
         .has("eventType",P.within("EVENT_SENDTO", "EVENT_SENDMSG", "EVENT_WRITE", "EVENT_READ", "EVENT_RECVMSG", "EVENT_RECVFROM"))
         .hasNot("size")
         .dedup()
         .toList()
-
+    
     if (eventsShouldHaveSize.length <= 1) {
       assert(eventsShouldHaveSize.length <= 1)
     } else {
-      val (code,color) = AcceptanceApp.colors.next()
+      val color = Await.result(
+        acceptActor ? DisplayThese(s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")})"),
+        5 second
+      ).asInstanceOf[String]
       val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-        
-      AcceptanceApp.toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
+      
       assert(
         eventsShouldHaveSize.length <= 1,
         s"\nSome events of type SENDTO/SEND/SENDMSG/WRITE/READ/RECVMSG/RECVFROM don't have a 'size':\n$color$uuidsOfEventsShouldHaveSize${Console.RED}\n"
@@ -105,7 +107,7 @@ class General_TA1_Tests(
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
   it should "not have duplicate PID's in process Subjects" in {
-    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
+    val graph = Await.result(dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
     val pids = graph.traversal().V().hasLabel("Subject")
       .has("subjectType","SUBJECT_PROCESS")
@@ -126,10 +128,12 @@ class General_TA1_Tests(
       if (processesWithPID.length <= 1) {
         assert(processesWithPID.length <= 1)
       } else {
-        val (code,color) = AcceptanceApp.colors.next()
+        val color = Await.result(
+        acceptActor ? DisplayThese(s"g.V(${processesWithPID.map(_.id().toString).mkString(",")})"),
+          1 second
+        ).asInstanceOf[String]
         val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-        
-        AcceptanceApp.toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")}):$code"
+      
         assert(
           processesWithPID.length <= 1,
           s"\nMultiple process subjects share the PID$pid:\n$color$uuidsOfProcessesWithPID${Console.RED}\n"
@@ -141,7 +145,7 @@ class General_TA1_Tests(
   // Test deduplication of Files
   // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
   it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
-    val graph = Await.result(AcceptanceApp.dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
+    val graph = Await.result(dbActor ? GiveMeTheGraph, 2 seconds).asInstanceOf[TinkerGraph]
     
     val files = graph.traversal().V().hasLabel("FileObject").dedup()
 
@@ -164,10 +168,12 @@ class General_TA1_Tests(
         if (filesWithUrl.length <= 1) {
           assert(filesWithUrl.length <= 1)
         } else {
-          val (code,color) = AcceptanceApp.colors.next()
+          val color = Await.result(
+          acceptActor ? DisplayThese(s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")})"),
+            1 second
+          ).asInstanceOf[String]
           val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
         
-          AcceptanceApp.toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
           assert(
             filesWithUrl.length <= 1,
             s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
@@ -175,12 +181,12 @@ class General_TA1_Tests(
         }
       }
     }
-  }
+  } 
 } 
 
 // Provider specific test classes:
 
-class TRACE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class TRACE_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, Value, TagEntity)
   val minimum = 50000
@@ -190,7 +196,7 @@ class TRACE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }
@@ -203,7 +209,7 @@ class TRACE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
 
 }
 
-class CADETS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class CADETS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject,
   TagEntity, Value)
@@ -214,7 +220,7 @@ class CADETS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }
@@ -227,7 +233,7 @@ class CADETS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
 
 }
 
-class FAROS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class FAROS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value) 
   val minimum = 50000
@@ -237,7 +243,7 @@ class FAROS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }
@@ -249,7 +255,7 @@ class FAROS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   }
 }
 
-class THEIA_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class THEIA_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, Value)
   val minimum = 50000
@@ -259,7 +265,7 @@ class THEIA_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }
@@ -271,7 +277,7 @@ class THEIA_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   }
 }  
 
-class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(MemoryObject, TagEntity, Value)
   val minimum = 50000
@@ -281,7 +287,7 @@ class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }
@@ -293,7 +299,7 @@ class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int) extends FlatSpec {
   }
 }
 
-class CLEARSCOPE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
+class CLEARSCOPE_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value)
   val minimum = 50000
@@ -303,7 +309,7 @@ class CLEARSCOPE_Specific_Tests(val totalNodes: Int) extends FlatSpec {
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
-          AcceptanceApp.counterActor ? HowMany(typeName.toString), 1 second
+          counterActor ? HowMany(typeName.toString), 1 second
         ).asInstanceOf[Int] > 0
       }
     }

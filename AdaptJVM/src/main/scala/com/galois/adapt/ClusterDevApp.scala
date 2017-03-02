@@ -9,6 +9,7 @@ import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
 
 import com.galois.adapt.feature._
+import com.galois.adapt.scepter._
 import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
 
 import java.io.File
@@ -121,8 +122,14 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         ))
       )
 
-  case "acceptance" =>
-      
+  case "accept" =>
+    val counterActor = context.actorOf(Props(classOf[EventCountingTestActor], registryProxy))
+    val basicOpsActor = context.actorOf(Props(classOf[BasicOpsIdentifyingActor], registryProxy))
+    val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy, counterActor, basicOpsActor), "AcceptanceTestsActor")
+
+    childActors = childActors + (roleName ->
+      childActors.getOrElse(roleName, Set(counterActor, basicOpsActor, accept))
+    )
 
   case "features" =>
       
