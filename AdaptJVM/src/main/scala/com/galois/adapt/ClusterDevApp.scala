@@ -11,6 +11,8 @@ import ServiceRegistryProtocol._
 import com.galois.adapt.feature._
 import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
 
+import java.io.File
+import scala.collection.JavaConversions._
 
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
@@ -73,12 +75,28 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
           )
         ))
       )
-      val limitOpt = if (config.getInt("adapt.loadlimit") > 0) Some(config.getInt("adapt.loadlimit")) else None
-      config.getStringList("adapt.loadfiles").asScala foreach (f =>
-        childActors(roleName) foreach ( ingestActor =>
-          ingestActor ! IngestFile(f, limitOpt)
-        )
+    
+      /* Get all of the files on the load paths. Each load path should either
+       *  - be itself a data file
+       *  - be a directory full of data files
+       */
+      val loadPaths: List[String] = config.getStringList("adapt.loadfiles").asScala.toList
+      val filePaths: List[String] = loadPaths.map(new File(_)).flatMap(path =>
+        if (path.isDirectory)
+          path.listFiles.toList.map(_.getPath)
+        else
+          List(path.getPath)
       )
+
+      // Non-positive limit indicates no limit
+      val limitOpt: Option[Int] = if (config.getInt("adapt.loadlimit") > 0)
+          Some(config.getInt("adapt.loadlimit"))
+        else
+          None
+      
+      filePaths foreach { file =>
+        childActors(roleName) foreach { _ ! IngestFile(file, limitOpt) }
+      }
 
     case "ui" =>
       childActors = childActors + (roleName ->

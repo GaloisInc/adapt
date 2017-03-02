@@ -27,6 +27,9 @@ trait SubscriptionActor[U] extends Actor with BaseActorBehavior { s: Actor with 
   def broadCast(msg: U): Unit
     = for (Subscription(target, interested) <- subscribers; if interested(msg))
         target ! msg
+  def broadCastUnsafe(msg: Any): Unit
+    = for (Subscription(target, _) <- subscribers)
+        target ! msg
 }
 
 // A subscription aggregates all the information needed on the _sender_ side to pass a message along
