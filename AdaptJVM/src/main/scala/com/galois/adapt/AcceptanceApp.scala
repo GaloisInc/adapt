@@ -61,8 +61,12 @@ object AcceptanceApp {
     // Sequence all of the data ahead of time - basically validate that all files are valid Avro,
     // and put them into one big iterator
     val data: Try[Iterator[Try[CDM15]]] = Try {
-      filePaths.map { file => println(s"Discovered $file."); CDM15.readData(file, count).get }
-               .foldLeft { Iterator[Try[CDM15]]() } { _ ++ _ }
+      filePaths.map { file =>
+        println(s"Discovered $file.")
+        val (source, data) = CDM15.readData(file, count).get
+        ta1Source.fold(ta1Source = Some(source))(firstSource => if(firstSource != source) { throw new RuntimeException("Not all files are from the same TA1 source") } else { firstSource })
+        data
+      }.foldLeft { Iterator[Try[CDM15]]() } { _ ++ _ }
     }
 
     data match {
@@ -124,12 +128,7 @@ object AcceptanceApp {
 
   // Identifies all the actors who are interested in a given CDM statement
   def distributionSpec(t: CDM15): Seq[ActorRef] = t match {
-    case f: FileObject =>
-      if (ta1Source.isEmpty) {
-        println(s"Source data from: ${f.baseObject.source}")
-        ta1Source = Some(f.baseObject.source)
-      }
-      List(counterActor, dbActor, basicOpsActor)
+    case f: FileObject => List(counterActor, dbActor, basicOpsActor)
     case _: Subject => List(counterActor, dbActor, basicOpsActor)
     case _: Event => List(counterActor, dbActor, basicOpsActor)
     case _ => List(counterActor, basicOpsActor)
