@@ -71,7 +71,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(
           context.actorOf(
-            Props(classOf[FileIngestActor], registryProxy),
+            Props(classOf[FileIngestActor], registryProxy, config.getInt("adapt.ingest.minsubscribers")),
             "FileIngestActor"
           )
         ))

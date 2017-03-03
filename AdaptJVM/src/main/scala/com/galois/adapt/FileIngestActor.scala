@@ -5,7 +5,7 @@ import com.galois.adapt.cdm15.{InstrumentationSource, CDM15}
 import collection.mutable.Queue
 import scala.util.{Try,Success,Failure}
 
-class FileIngestActor(val registry: ActorRef)
+class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
   extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM15] {
 
   log.info("FileIngestActor created")
@@ -16,7 +16,7 @@ class FileIngestActor(val registry: ActorRef)
   val jobQueue = Queue.empty[IngestFile]
   var errors = Nil
 
-  def processJobQueue() = while (subscribers.size >= 2 && jobQueue.nonEmpty) {
+  def processJobQueue() = while (subscribers.size >= minSubscribers && jobQueue.nonEmpty) {
     val j = jobQueue.dequeue()
     log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
     i.toString + s" CDM statements"))
