@@ -1,13 +1,15 @@
 package com.galois.adapt.feature
 
 import com.galois.adapt._
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm15._
 
 import java.util.UUID
 
 import scala.collection.mutable.{Set => MutableSet, Map => MutableMap, ListBuffer}
 
 import akka.actor._
+
+// TODO CDM15
 
 /*
  * Feature extractor that gets file related information on a per process basis
@@ -21,12 +23,14 @@ class FileEventsFeature(val registry: ActorRef, root: ActorRef)
   val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
     interested = {
+      /*
       case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _) => true
       case Event(_, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => true
       case Event(_, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => true
       case Event(_, EVENT_CHECK_FILE_ATTRIBUTES, _, _, _, _, _, _, _, _, _, _) => true
       case SimpleEdge(_, _, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => true
       case EpochMarker => true
+      */
       case _ => false
     }
   ))
@@ -42,11 +46,13 @@ class FileEventsFeature(val registry: ActorRef, root: ActorRef)
   private val processes = MutableMap.empty[UUID, Subject]  // Subject UUID -> Subject
 
   override def process = {
+    /*
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (s.uuid -> s)
     case e @ Event(u, EVENT_OPEN, _, _, _, _, _, _, _, _, _, _) => opens += e.uuid
     case e @ Event(u, EVENT_WRITE, _, _, _, _, _, _, _, _, _, _) => writes += e.uuid
     case e @ Event(u, EVENT_CHECK_FILE_ATTRIBUTES, _, _, _, _, _, _, _, _, _, _) => checks += e.uuid
     case s @ SimpleEdge(f, t, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => links += (t -> f)
+    */
     case EpochMarker =>
       
       val counts = MutableMap.empty[Subject, (Int, Int, Int)]

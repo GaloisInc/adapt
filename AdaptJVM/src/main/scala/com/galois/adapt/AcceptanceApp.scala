@@ -11,7 +11,7 @@ import java.io.File
  * That config is in 'src/main/resources/accept.conf'
  */
 object AcceptanceApp {
-  println(s"Spinning up a development system.")
+  println(s"Spinning up an acceptance system.")
 
   def run(): Unit = {
     val acceptConfigFile = new File("src/main/resources/accept.conf")

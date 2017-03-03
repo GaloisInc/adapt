@@ -10,7 +10,7 @@ import ServiceRegistryProtocol._
 
 import com.galois.adapt.feature._
 import com.galois.adapt.scepter._
-import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
+import com.galois.adapt.cdm15.{CDM15, EpochMarker, Subject}
 
 import java.io.File
 import scala.collection.JavaConversions._
@@ -33,7 +33,7 @@ object ClusterDevApp {
 
     registryProxy = Some(system.actorOf(
       ClusterSingletonProxy.props(
-        singletonManagerPath = "/user/registry",
+          singletonManagerPath = "/user/registry",
         settings = ClusterSingletonProxySettings(system)),
       name = "registryProxy"))
 
@@ -94,6 +94,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
           Some(config.getInt("adapt.loadlimit"))
         else
           None
+      println("limit: " + limitOpt.toString)
       
       filePaths foreach { file =>
         childActors(roleName) foreach { _ ! IngestFile(file, limitOpt) }
@@ -135,7 +136,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       
       val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
 
-      // The two feature extractors subscribe to the CDM13 produced by the ER actor
+      // The two feature extractors subscribe to the CDM15 produced by the ER actor
       val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
       val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
       

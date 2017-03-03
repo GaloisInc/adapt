@@ -1,13 +1,16 @@
 package com.galois.adapt.feature
 
 import com.galois.adapt._
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm15._
 
 import java.util.UUID
 
 import scala.collection.mutable.{Set => MutableSet, Map => MutableMap}
 
 import akka.actor._
+
+
+// TODO: CDM15
 
 /*
  * Feature extractor that gets network information on a per process basis
@@ -26,6 +29,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
   val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
     interested = {
+      /*
       case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => true
       case Event(_, EVENT_SENDTO, _, _, _, _, _, _, _, _, _, _) => true
       case Event(_, EVENT_SENDMSG, _, _, _, _, _, _, _, _, _, _) => true
@@ -37,6 +41,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
       case SimpleEdge(_, _, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => true
       case SimpleEdge(_, _, EDGE_EVENT_AFFECTS_NETFLOW, _, _) => true
       case EpochMarker => true
+      */
       case _ => false
     }
   ))
@@ -62,6 +67,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
   private val event2netflow = MutableMap.empty[UUID,UUID]         // Relevant edges
 
   override def process = {
+    /*
     case s @ Subject(u, SUBJECT_PROCESS, _, _, _, _, _, _, _, _, _, _, _)  => processes += (u -> s)
     case e @ Event(u, EVENT_SENDTO, _, _, _, _, _, _, _, s, _, _) => sendto += (u -> s)
     case e @ Event(u, EVENT_SENDMSG, _, _, _, _, _, _, _, s, _, _) => sendmsg += (u -> s)
@@ -72,6 +78,7 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
     case n @ NetFlowObject(u, _, src, _, dst, _, _) => netflows += (u -> { (src,dst) } )
     case s @ SimpleEdge(f, t, EDGE_EVENT_ISGENERATEDBY_SUBJECT, _, _) => event2process += (f -> t)
     case s @ SimpleEdge(f, t, EDGE_EVENT_AFFECTS_NETFLOW, _, _) => event2netflow += (f -> t)
+    */
     case EpochMarker =>
      
       /* The values in the map are:

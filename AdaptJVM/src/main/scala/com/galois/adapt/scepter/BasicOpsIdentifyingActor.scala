@@ -2,7 +2,9 @@ package com.galois.adapt.scepter
 
 import akka.actor.{ActorRef, ActorSystem, Props, Actor, ActorLogging}
 import com.galois.adapt.{ServiceClient, SubscriptionActor, Subscription}
-import com.galois.adapt.cdm13._
+//import com.galois.adapt.cdm13._
+
+// TODO: Nuke this maybe? It doesn't make sense in CDM14
 
 /* This actor tries to see if the CDM statements it is receiving come from 'BasicOps.sh' If it
  * receives enough evidence this is the case, it will expect to recieve _all_ evidence.
@@ -37,8 +39,10 @@ class BasicOpsIdentifyingActor(val registry: ActorRef) extends
     updates = updates + 1
   }
 
+  // Note: These tests for the most part don't make sense for CDM14+ yet as file paths are no longer a part of the class
   override def process = {
     // CDM statements that should be in BasicOps.sh
+    /*
     case FileObject(_, _, "file:///tmp/zqxf1", false, _, _)
       => logEvent("FileObject for 'zqxf1'")
     case FileObject(_, _, "file:///tmp/zqxf4", false, _, _)
@@ -53,7 +57,7 @@ class BasicOpsIdentifyingActor(val registry: ActorRef) extends
       => logEvent("Subject for 'sleep' on '1'");
     case Subject(_, SUBJECT_PROCESS, _, _, _, _, _, _, Some("nmap -A git.tc.bbn.com"), _, _, _, _)
       => logEvent("Subject for 'nmap' on 'git.tc.bbn.com'");
-  
+    */
     // Receive a query asking about the counts stored
     case IsBasicOps =>
        sender() ! (if (isBasicOps) Some(expectedEvents) else None)

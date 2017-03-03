@@ -1,29 +1,17 @@
 package com.galois.adapt.scepter
 
 import com.galois.adapt._
-import com.galois.adapt.cdm13._
-
-import java.nio.file.{Files, Paths}
+import com.galois.adapt.cdm15._
 
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge,Vertex}
 import org.apache.tinkerpop.gremlin.process.traversal.P
 
-import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
+import akka.actor.{ActorRef, ActorSystem, Props, Actor, ActorLogging}
 import akka.util.Timeout
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpHeader.ParsingResult.Ok
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes._
 
 import scala.collection.JavaConversions._
-import scala.io.StdIn
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
@@ -188,11 +176,11 @@ class General_TA1_Tests(
 
 class TRACE_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, Value, TagEntity)
+  val missing = List(AbstractObject, Value)
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -211,12 +199,11 @@ class TRACE_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends 
 
 class CADETS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject,
-  TagEntity, Value)
+  val missing = List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value)
   val minimum = 50000  
 
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -235,11 +222,11 @@ class CADETS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends
 
 class FAROS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value) 
+  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -261,7 +248,7 @@ class THEIA_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends 
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -279,11 +266,11 @@ class THEIA_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends 
 
 class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(MemoryObject, TagEntity, Value)
+  val missing = List(MemoryObject, Value)
   val minimum = 50000
    
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(
@@ -301,11 +288,11 @@ class FIVEDIRECTIONS_Specific_Tests(val totalNodes: Int, counterActor: ActorRef)
 
 class CLEARSCOPE_Specific_Tests(val totalNodes: Int, counterActor: ActorRef) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, TagEntity, Value)
+  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
   val minimum = 50000
   
   // Test that we get one of each type of statement
-  (CDM13.values diff missing).foreach { typeName =>
+  (CDM15.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert {
         Await.result(

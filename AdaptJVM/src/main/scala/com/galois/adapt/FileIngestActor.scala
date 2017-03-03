@@ -1,12 +1,12 @@
 package com.galois.adapt
 
 import akka.actor._
-import com.galois.adapt.cdm13.CDM13
+import com.galois.adapt.cdm15.{InstrumentationSource, CDM15}
 import collection.mutable.Queue
 import scala.util.{Try,Success,Failure}
 
 class FileIngestActor(val registry: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM15] {
 
   log.info("FileIngestActor created")
 
@@ -21,17 +21,18 @@ class FileIngestActor(val registry: ActorRef)
     log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
     i.toString + s" CDM statements"))
 
-    // Starting to process file
-    broadCastUnsafe(BeginFile(j.path))
-
     log.info("Ingesting")
     log.info("subscribers: " + subscribers.toString)
 
-    CDM13.readData(j.path, j.loadLimit) match {
+    CDM15.readData(j.path, j.loadLimit) match {
       case Failure(t) =>
+        // Can't ingest file
         broadCastUnsafe(ErrorReadingFile(j.path,t));
-        log.info(s"Ingestion from ${j.path} failed")
-      case Success(data) =>
+      
+      case Success((source,data)) =>
+        // Starting to process file
+        broadCastUnsafe(BeginFile(j.path, source))
+
         var counter = 0
         data.foreach {
           case Failure(t) => broadCastUnsafe(ErrorReadingStatement(t))
@@ -65,8 +66,8 @@ class FileIngestActor(val registry: ActorRef)
 }
 
 case class IngestFile(path: String, loadLimit: Option[Int] = None)
-case class BeginFile(path: String/*, TODO source: InstrumentationSource */)
-case class DoneFile(path: String/*, TODO source: InstrumentationSource */)
+case class BeginFile(path: String, source: InstrumentationSource)
+case class DoneFile(path: String)
 case class ErrorReadingStatement(exception: Throwable)
 case class ErrorReadingFile(path: String, exception: Throwable)
 

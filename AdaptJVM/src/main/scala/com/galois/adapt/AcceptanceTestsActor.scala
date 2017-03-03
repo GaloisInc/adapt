@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.pattern.ask
 import akka.util.Timeout
-import com.galois.adapt.cdm13._
+import com.galois.adapt.cdm15._
 import com.galois.adapt.scepter._
 import scala.concurrent.{ExecutionContext, Future, Await}
 import scala.concurrent.duration._
@@ -20,12 +20,12 @@ import scala.language.postfixOps
 
 
 class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, val basicOpsActor: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM15] {
   
   import context.dispatcher
  
   val dependencies = "DevDBActor" :: "FileIngestActor" :: "UIActor" :: Nil
-  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("FileIngestActor").get, _.isInstanceOf[CDM13]))
+  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("FileIngestActor").get, _.isInstanceOf[CDM15]))
 
   println(s"Spinning up an acceptance system.")
 
@@ -67,8 +67,8 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
       if (failedStatementsMsgs.length < 10)
         failedStatementsMsgs = t.getMessage :: failedStatementsMsgs
     
-    case c: CDM13 =>
-      log.info("Read CDM13")
+    case c: CDM15 =>
+      log.info("Read CDM15")
       successStatements += 1
       broadCast(c)
 
