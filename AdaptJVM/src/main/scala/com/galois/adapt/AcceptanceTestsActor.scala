@@ -30,7 +30,7 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
   println(s"Spinning up an acceptance system.")
 
   //implicit val ec = system.dispatcher
-  implicit val askTimeout = Timeout(2 seconds)
+  implicit val askTimeout = Timeout(100 seconds)
 
   lazy val dbActor = dependencyMap("DevDBActor").get
   var ta1Source: Option[InstrumentationSource] = None
@@ -87,8 +87,8 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
 
       Future { 
         log.info("Done file")
-        lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 2 seconds).asInstanceOf[Int]
-        lazy val finalCount = Await.result(dbActor ? HowMany("total"), 2 seconds).asInstanceOf[Int]
+        lazy val missingEdgeCount = Await.result(dbActor ? Shutdown, 30 seconds).asInstanceOf[Int]
+        lazy val finalCount = Await.result(dbActor ? HowMany("total"), 30 seconds).asInstanceOf[Int]
         
         // General tests
         org.scalatest.run(new General_TA1_Tests(
