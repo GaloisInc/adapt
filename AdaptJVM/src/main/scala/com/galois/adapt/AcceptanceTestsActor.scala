@@ -33,11 +33,6 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
   implicit val askTimeout = Timeout(2 seconds)
 
   lazy val dbActor = dependencyMap("DevDBActor").get
-  // TODO move the creation of these to an "accept" role
-  //    * pass their refs to AcceptanceTestsActor
-  //    * subscribe them to AcceptanceTestsActor
-  //val counterActor = system.actorOf(Props(new EventCountingTestActor()))
-  //val basicOpsActor = system.actorOf(Props(new BasicOpsIdentifyingActor()))
   var ta1Source: Option[InstrumentationSource] = None
 
   val colors: Iterator[(String,String)] = Iterator.continually(Map(
@@ -139,6 +134,10 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
           // let it run until user presses return
           println("Press CTRL^C to kill the webserver")
         }
+      } onFailure { case f: Throwable => 
+        println("The tests crashed in some unexpected manner! This should never happen: it is a bug.")
+        println("")
+        println(f.getMessage)
       }
   }
 }

@@ -14,7 +14,8 @@ object DevelopmentApp {
   println(s"Spinning up a development system.")
 
   def run(): Unit = {
-    val devConfigFile = new File("src/main/resources/dev.conf")
+    val devConfigPath = getClass().getClassLoader().getResource("dev.conf").getPath
+    val devConfigFile = new File(devConfigPath)
     val devConfig = ConfigFactory.parseFile(devConfigFile).resolve()
     
     ClusterDevApp.run(devConfig withFallback Application.config)
