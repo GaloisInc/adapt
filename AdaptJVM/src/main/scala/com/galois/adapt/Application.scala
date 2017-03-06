@@ -31,7 +31,6 @@ object Application extends App {
     case "prod"    => ProductionApp.run()
     case "dev"     => DevelopmentApp.run()
     case "cluster" => ClusterDevApp.run(config)
-    //case  _        => DevelopmentApp.run(loadPaths, loadLimitOpt, devLocalStorageOpt)
   }
 
 }

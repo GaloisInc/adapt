@@ -56,6 +56,11 @@ class AcceptanceTestsActor(val registry: ActorRef, val counterActor: ActorRef, v
 
   override def process = {
 
+    case ErrorReadingFile(path, t) =>
+      println(s"Error reading file $path")
+      failedStatements += 1
+      log.info(s"Error reading file $path")
+
     case ErrorReadingStatement(t) =>
       log.info("Error reading statement")
       failedStatements += 1
