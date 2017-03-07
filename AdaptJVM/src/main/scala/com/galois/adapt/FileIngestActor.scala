@@ -27,6 +27,7 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
     CDM15.readData(j.path, j.loadLimit) match {
       case Failure(t) =>
         // Can't ingest file
+        println("COULD NOTE PARSE!!!!")
         broadCastUnsafe(ErrorReadingFile(j.path,t));
       
       case Success((source,data)) =>

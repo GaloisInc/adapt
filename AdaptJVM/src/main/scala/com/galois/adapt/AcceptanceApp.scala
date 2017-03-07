@@ -14,10 +14,11 @@ object AcceptanceApp {
   println(s"Spinning up an acceptance system.")
 
   def run(): Unit = {
+    /*
     val acceptConfigPath = getClass().getClassLoader().getResource("accept.conf").getPath
     val acceptConfigFile = new File(acceptConfigPath)
-    val acceptConfig = ConfigFactory.parseFile(acceptConfigFile).resolve()
+    val acceptConfig = ConfigFactory.parseFile(acceptConfigFile).resolve()*/
     
-    ClusterDevApp.run(acceptConfig withFallback Application.config)
+    ClusterDevApp.run(Application.config.getConfig("accept") withFallback Application.config)
   }
 }
