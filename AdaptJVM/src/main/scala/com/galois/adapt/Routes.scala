@@ -20,29 +20,12 @@ import scala.language.postfixOps
 
 object Routes {
 
-  val workingDirectory = System.getProperty("user.dir")
-  val resourcesDir = workingDirectory + "/src/main/resources/web"
-
-  def getExtensions(fileName: String): String = {
-    val index = fileName.lastIndexOf('.')
-    if (index != 0) fileName.drop(index + 1) else ""
-  }
-
   val serveStaticFilesRoute =
-    entity(as[HttpRequest]) { requestData =>
-      complete {
-        val fullPath = requestData.uri.path.toString match {
-          case "/" | ""=> Paths.get(resourcesDir + "/index.html")
-          case _ => Paths.get(resourcesDir +  requestData.uri.path.toString)
-        }
-
-        val ext = getExtensions(fullPath.getFileName.toString)
-        val mediaType = MediaTypes.forExtensionOption(ext).getOrElse(MediaTypes.`text/plain`)
-        val c : ContentType = ContentType(mediaType, () => HttpCharsets.`UTF-8`)
-        val byteArray = Files.readAllBytes(fullPath)
-
-        HttpResponse(OK, entity = HttpEntity(c, byteArray))
-      }
+    path("") {
+      getFromResource("web/index.html")
+    } ~
+    pathPrefix("") {
+      getFromResourceDirectory("web")
     }
 
 
