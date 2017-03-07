@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream
 
 import akka.actor._
 import com.galois.adapt.cdm15._
-import com.galois.adapt.scepter.HowMany
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -67,6 +66,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   }
 
   override def process: PartialFunction[Any,Unit] = {
+
+    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.size))
+
+    case c: IngestControl => broadCastUnsafe(c)
 
     case EpochMarker =>
       println("EPOCH BOUNDARY!")
@@ -171,9 +174,6 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case HowMany(_) =>
-      sender() ! graph.vertices().asScala.size
-
     case GiveMeTheGraph => sender() ! graph
 
     case Shutdown =>
@@ -182,6 +182,8 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       sender() !  missingToUuid.size
   }
 }
+
+case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
 
 sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery

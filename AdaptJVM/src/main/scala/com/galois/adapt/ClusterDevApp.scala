@@ -94,7 +94,6 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
           Some(config.getInt("adapt.loadlimit"))
         else
           None
-      println("limit: " + limitOpt.toString)
       
       filePaths foreach { file =>
         childActors(roleName) foreach { _ ! IngestFile(file, limitOpt) }
@@ -124,13 +123,8 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       )
 
   case "accept" =>
-    val counterActor = context.actorOf(Props(classOf[EventCountingTestActor], registryProxy))
-    val basicOpsActor = context.actorOf(Props(classOf[BasicOpsIdentifyingActor], registryProxy))
-    val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy, counterActor, basicOpsActor), "AcceptanceTestsActor")
-
-    childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(counterActor, basicOpsActor, accept))
-    )
+    val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))
 
   case "features" =>
       
