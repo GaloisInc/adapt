@@ -2,6 +2,7 @@ package com.galois.adapt
 
 import scala.language.implicitConversions
 import java.util.UUID
+import java.nio.ByteBuffer
 
 import com.bbn.tc.schema.avro.cdm15.TCCDMDatum
 
@@ -123,7 +124,10 @@ package object cdm15 {
   implicit def makeIntegrityTag(i: bbnCDM15.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
   implicit def makeConfidentialityTag(c: bbnCDM15.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
   implicit def makeCryptoHashType(c: bbnCDM15.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
-  implicit def makeJavaUUID(u: bbnCDM15.UUID): UUID = UUID.nameUUIDFromBytes(u.bytes)
+  implicit def makeJavaUUID(u: bbnCDM15.UUID): UUID = {
+    val bb = ByteBuffer.wrap(u.bytes)
+    new UUID(bb.getLong, bb.getLong)
+  }
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
   implicit def makeShort(s: bbnCDM15.SHORT): FixedShort = new FixedShort(s.bytes)
