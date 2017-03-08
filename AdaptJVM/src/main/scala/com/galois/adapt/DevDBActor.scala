@@ -3,8 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm13._
-import com.galois.adapt.scepter.HowMany
+import com.galois.adapt.cdm15._
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -28,7 +27,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   lazy val subscriptions = {
     log.info("Forced subcription list")
     val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM13]))
+    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM15]))
   }
 
   def beginService() = {
@@ -51,34 +50,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
     if (Files.exists(Paths.get(path))) graph.io(IoCore.graphson()).readGraph(path)
   )
 
+  // The second map represents:
+  //   (UUID that was destination of edge not in `nodeIds` at the time) -> (source Vertex, edge label)
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
-
-  var missingFromUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
-  var missingToUuid = collection.mutable.Map.empty[UUID, SimpleEdge]
-
-  def updateIncompleteEdges(uuid: UUID, node: Vertex) = {
-    if (missingFromUuid contains uuid) {
-      val edge = missingFromUuid(uuid)
-      missingFromUuid -= uuid
-      findNode("uuid", edge.toUuid).fold[Unit] {
-        missingToUuid += (edge.toUuid -> edge)
-      }{ toNode =>
-        node.addEdge(edge.edgeType.toString, toNode)
-      }
-    } else {
-      if (missingToUuid contains uuid) {
-        val edge = missingToUuid(uuid)
-        missingToUuid -= uuid
-        findNode("uuid", edge.fromUuid).fold[Unit] {
-          missingFromUuid += (edge.fromUuid -> edge)
-        } { fromNode =>
-          fromNode.addEdge(edge.edgeType.toString, node)
-        }
-      } else {
-        // Do nothing.
-      }
-    }
-  }
+  var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex,String)]]
 
 
   // TODO: TinkerGraph doesn't update the starting IDs when reading data in from a file.
@@ -92,92 +67,67 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
   override def process: PartialFunction[Any,Unit] = {
 
-    case s: Subject =>
-      val l: List[Object] = s.asDBKeyValues.asInstanceOf[List[Object]]
-      val subjectNode = graph.addVertex(l:_*)
-      nodeIds += (s.uuid -> subjectNode)
-      val parentVertexOpt = graph.traversal().V().has("pid",s.ppid).toList.asScala.headOption
+    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.size))
 
-      // TODO: do this with internal edges:
-      subjectNode.addEdge("child_of", parentVertexOpt.getOrElse{
-        val newUuid = UUID.randomUUID()
-        val v = graph.addVertex(
-          label, "Subject",
-          "uuid", newUuid,
-          "pid", new Integer(s.ppid),
-          "subjectType", SUBJECT_PROCESS.toString
-        )
-        nodeIds += (newUuid -> v)
-        v
-      })
-
-//      updateIncompleteEdges(s.uuid, subjectNode)
-
-    case e: SimpleEdge =>
-      val fromOpt = findNode("uuid", e.fromUuid)
-      fromOpt.fold[Unit] {
-        missingFromUuid += (e.fromUuid -> e)
-      } { from =>
-        val toOpt = findNode("uuid", e.toUuid)
-        toOpt.fold[Unit] {
-          missingToUuid += (e.toUuid -> e)
-        } { to =>
-          from.addEdge(e.edgeType.toString, to)
-        }
-      }
+    case c: IngestControl => broadCastUnsafe(c)
 
     case EpochMarker =>
-      println(s"EPOCH BOUNDARY!")
-      println(s"FROM nodes missed during epoch: ${missingFromUuid.size}")
+      println("EPOCH BOUNDARY!")
       println(s"TO nodes missed during epoch: ${missingToUuid.size}")
       println("Creating all missing nodes...")
+      
       var nodeCreatedCounter = 0
       var edgeCreatedCounter = 0
-      missingFromUuid.foreach { case (u,e) =>
-        val v = findNode("uuid",u).getOrElse {
+      
+      // If at the end of an epoch there are still elements in `missingToUuid`, empty those out and
+      // create placeholder vertices/edges for them.
+      for ((uuid,edges) <- missingToUuid; (fromVertex,label) <- edges) {
+       
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        val toVertex = findNode("uuid",uuid) getOrElse {
           nodeCreatedCounter += 1
-          val newNode = graph.addVertex("uuid", u)
-          nodeIds += (u -> newNode)
+          val newNode = graph.addVertex("uuid", uuid)
+          nodeIds += (uuid -> newNode)
           newNode
         }
-        findNode("uuid", e.toUuid).fold[Unit] {
-          missingToUuid += (e.toUuid -> e)
-        } { toNode =>
-          edgeCreatedCounter += 1
-          v.addEdge(e.edgeType.toString, toNode)
-        }
+
+        // Create the missing edge
+        edgeCreatedCounter += 1
+        fromVertex.addEdge(label, toVertex)
       }
-      missingFromUuid = collection.mutable.Map.empty
-      missingToUuid foreach { case (u,e) =>
-        val v = findNode("uuid",u).getOrElse {
-          nodeCreatedCounter += 1
-          val newNode = graph.addVertex("uuid", u)
-          nodeIds += (u -> newNode)
-          newNode
-        }
-        findNode("uuid", e.fromUuid).fold[Unit]{
-          throw new RuntimeException(s"But everything should have been created by now!")
-        } { fromNode =>
-          edgeCreatedCounter += 1
-          fromNode.addEdge(e.edgeType.toString, v)
-        }
-      }
+
+      // Empty out the map
+      // TODO: when should we empty out the nodeId's map?
       missingToUuid = collection.mutable.Map.empty
+
       println(s"Nodes created at epoch close: $nodeCreatedCounter")
       println(s"Edges created at epoch close: $edgeCreatedCounter")
       println("Done creating all missing nodes.")
 
-    case cdm13: DBWritable =>
-      val l: List[Object] = cdm13.asDBKeyValues.asInstanceOf[List[Object]]
-      if (l.length % 2 == 1) println(s"OFFENDING: $cdm13\n$l")
-      val newVertex = graph.addVertex(l:_*)
+    case cdm15: DBWritable =>
+      // Get the uuid of the node
+      val uuid = cdm15.getUuid
 
-      // TODO: so gross!
-      val idx = l.indexOf("uuid")
-      if (idx >= 0)  // TODO: don't be lazy
-      nodeIds += (l(idx + 1).asInstanceOf[UUID] -> newVertex)
-//      updateIncompleteEdges(l(idx + 1).asInstanceOf[UUID], newVertex)
+      // Create a new vertex with the properties on the node
+      val props: List[Object] = cdm15.asDBKeyValues.asInstanceOf[List[Object]]
+      assert(props.length % 2 == 0, s"Node ($cdm15) has odd length properties list: $props.")
+      val newVertex: Vertex = graph.addVertex(props: _*)
 
+      // Add this vertex to the map of vertices we know about and see if it is the destination of
+      // any previous nodes (see next comment for more on this).
+      nodeIds += (uuid -> newVertex)
+      for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
+        fromVertex.addEdge(label, newVertex)
+      missingToUuid -= uuid
+
+      // Recall all edges are treated as outgoing. In general, we expect that the 'toUuid' has
+      // already been found. However, if it hasn't, we add it to a map of edges keyed by the UUID
+      // they point to (for which no corresponding vertex exists, as of yet). 
+      for ((label,toUuid) <- cdm15.asDBEdges)
+        nodeIds.get(toUuid) match {
+          case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil) 
+          case Some(toVertex) => newVertex.addEdge(label, toVertex)
+        }
 
     case NodeQuery(q) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
@@ -224,17 +174,16 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case HowMany(_) =>
-      sender() ! graph.vertices().asScala.size
-
     case GiveMeTheGraph => sender() ! graph
 
     case Shutdown =>
-//      println(s"Incomplete Edge count: ${missingFromUuid.size + missingToUuid.size}")
-      localStorage.fold()(path => graph.io(IoCore.graphson()).writeGraph(path))
-      sender() ! (missingFromUuid.size + missingToUuid.size)
+      log.info(s"Incomplete Edge count: ${missingToUuid.size}")
+      localStorage.foreach(path => graph.io(IoCore.graphson()).writeGraph(path))
+      sender() !  missingToUuid.size
   }
 }
+
+case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
 
 sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery

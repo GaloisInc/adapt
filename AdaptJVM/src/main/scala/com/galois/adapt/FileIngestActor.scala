@@ -1,28 +1,72 @@
 package com.galois.adapt
 
 import akka.actor._
-import com.galois.adapt.cdm13.CDM13
+import com.galois.adapt.cdm15.{InstrumentationSource, CDM15}
 import collection.mutable.Queue
+import scala.util.{Try,Success,Failure}
 
-class FileIngestActor(val registry: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM13] {
+class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM15] {
+
+  log.info("FileIngestActor created")
 
   val dependencies = List.empty
   val subscriptions = Set[Subscription]()
 
-  var jobQueue = Queue.empty[IngestFile]
+  val jobQueue = Queue.empty[IngestFile]
+  var errors = Nil
 
-  def processJobQueue() = while (subscribers.nonEmpty && jobQueue.nonEmpty) {
-    val j = jobQueue.dequeue()
-    log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
-    i.toString + s" CDM statements"))
-    val data = CDM13.readData(j.path, j.loadLimit).get
-    var counter = 0
-    data.foreach { d =>
-      broadCast(d.get)
-      counter = counter + 1
+  /*
+   * This function checks to see if it has the right number of subscribers and something to ingest.
+   * Once those conditions are met, it ingests everything it can, broadcasting CDM statements. It
+   * also broadcasts:
+   *
+   *  - _ErrorReadingFile_ when starting to process a new file which could not be read by Avro
+   *  - _BeginFile_ when starting to process a new file which _could_ be read by Avro
+   *  - _ErrorReadingStatement_ when encountering a CDM statement that could not be read (usu. wrong
+   *  schema)
+   *  - _DoneFile_ when done with a file. These pair up with _ErrorReadingFile_/_BeginFile_
+   *  - _DoneIngest_ when the queue is empty after having not been empty
+   *
+   */
+  def processJobQueue() = if (subscribers.size >= minSubscribers && jobQueue.nonEmpty) {
+    while (subscribers.size >= minSubscribers && jobQueue.nonEmpty) {
+      val j = jobQueue.dequeue()
+      log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
+      i.toString + s" CDM statements"))
+
+      log.info("Ingesting")
+      log.info("subscribers: " + subscribers.toString)
+
+      Thread.sleep(2000)
+
+      CDM15.readData(j.path, j.loadLimit) match {
+        case Failure(t) =>
+          // Can't ingest file
+          println("COULD NOT PARSE!!!!")
+          broadCastUnsafe(ErrorReadingFile(j.path,t));
+        
+        case Success((source,data)) =>
+          // Starting to process file
+          broadCastUnsafe(BeginFile(j.path, source))
+  
+          var counter = 0
+          data.foreach {
+            case Failure(t) => broadCastUnsafe(ErrorReadingStatement(t))
+            case Success(cdm) =>
+              broadCast(cdm)
+              counter += 1
+          }
+          log.info(s"Ingested total events: $counter  from: ${j.path}")
+      }
+   
+      // Finished processing file
+      broadCastUnsafe(DoneFile(j.path))
     }
-    log.info(s"Ingested total events: $counter  from: ${j.path}")
+    
+    println("Done ingest")
+    // Emptied job queue
+    broadCastUnsafe(DoneIngest)
   }
 
   def beginService() = {
@@ -43,5 +87,11 @@ class FileIngestActor(val registry: ActorRef)
   }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
-case class IngestFile(path: String, loadLimit: Option[Int] = None)
+sealed trait IngestControl
+case class IngestFile(path: String, loadLimit: Option[Int] = None) extends IngestControl
+case class BeginFile(path: String, source: InstrumentationSource) extends IngestControl
+case class DoneFile(path: String) extends IngestControl
+case object DoneIngest extends IngestControl
+case class ErrorReadingStatement(exception: Throwable) extends IngestControl
+case class ErrorReadingFile(path: String, exception: Throwable) extends IngestControl
 

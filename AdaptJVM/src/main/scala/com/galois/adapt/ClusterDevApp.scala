@@ -9,8 +9,11 @@ import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
 
 import com.galois.adapt.feature._
-import com.galois.adapt.cdm13.{CDM13, EpochMarker, Subject}
+import com.galois.adapt.scepter._
+import com.galois.adapt.cdm15.{CDM15, EpochMarker, Subject}
 
+import java.io.File
+import scala.collection.JavaConversions._
 
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
@@ -30,7 +33,7 @@ object ClusterDevApp {
 
     registryProxy = Some(system.actorOf(
       ClusterSingletonProxy.props(
-        singletonManagerPath = "/user/registry",
+          singletonManagerPath = "/user/registry",
         settings = ClusterSingletonProxySettings(system)),
       name = "registryProxy"))
 
@@ -68,17 +71,33 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(
           context.actorOf(
-            Props(classOf[FileIngestActor], registryProxy),
+            Props(classOf[FileIngestActor], registryProxy, config.getInt("adapt.ingest.minsubscribers")),
             "FileIngestActor"
           )
         ))
       )
-      val limitOpt = if (config.getInt("adapt.loadlimit") > 0) Some(config.getInt("adapt.loadlimit")) else None
-      config.getStringList("adapt.loadfiles").asScala foreach (f =>
-        childActors(roleName) foreach ( ingestActor =>
-          ingestActor ! IngestFile(f, limitOpt)
-        )
+    
+      /* Get all of the files on the load paths. Each load path should either
+       *  - be itself a data file
+       *  - be a directory full of data files
+       */
+      val loadPaths: List[String] = config.getStringList("adapt.loadfiles").asScala.toList
+      val filePaths: List[String] = loadPaths.map(new File(_)).flatMap(path =>
+        if (path.isDirectory)
+          path.listFiles.toList.map(_.getPath)
+        else
+          List(path.getPath)
       )
+
+      // Non-positive limit indicates no limit
+      val limitOpt: Option[Int] = if (config.getInt("adapt.loadlimit") > 0)
+          Some(config.getInt("adapt.loadlimit"))
+        else
+          None
+      
+      filePaths foreach { file =>
+        childActors(roleName) foreach { _ ! IngestFile(file, limitOpt) }
+      }
 
     case "ui" =>
       childActors = childActors + (roleName ->
@@ -103,14 +122,15 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         ))
       )
 
-  case "acceptance" =>
-      
+  case "accept" =>
+    val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))
 
   case "features" =>
       
       val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
 
-      // The two feature extractors subscribe to the CDM13 produced by the ER actor
+      // The two feature extractors subscribe to the CDM15 produced by the ER actor
       val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
       val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
       
