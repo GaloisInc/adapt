@@ -125,6 +125,7 @@ object Query {
       // this state through it.
       var ints: Set[String] = Set()
       var strs: Set[String] = Set()
+      var uids: Set[String] = Set()
       var arrs: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
@@ -134,9 +135,14 @@ object Query {
         | stringLiteral            ^^ { case s => Raw(s) }
         | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         )
+      def uid: Parser[Value[java.util.UUID]] = variable(uids) | 
+        """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
+          s => Raw(java.util.UUID.fromString(s))
+        }
       def intArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(int)
       def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
-      def lit: Parser[Value[_]] = int | str | intArr | strArr
+      def uidArr: Parser[Value[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
+      def lit: Parser[Value[_]] = uid | int | str | intArr | strArr | uidArr
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
