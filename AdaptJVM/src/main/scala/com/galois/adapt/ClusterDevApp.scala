@@ -125,6 +125,11 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
   case "accept" =>
     val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
     childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))
+  
+  case "devfeatures" =>
+    val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
+    val processWrites = context.actorOf(Props(classOf[ProcessWrites], registryProxy), "ProcessWrites")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites)))
 
   case "features" =>
       

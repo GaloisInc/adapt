@@ -6,21 +6,18 @@ import akka.actor._
 class Outgestor(val registry: ActorRef)
   extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] { 
   
-  val dependencies = "IForestAnomalyDetector" :: Nil
+  val dependencies = "FileWrites" :: "ProcessWrites" :: Nil
   lazy val subscriptions = {
-    log.info("Forced subcription list")
-    val ingest: ActorRef = dependencyMap("IForestAnomalyDetector").get
-    Set[Subscription](Subscription(ingest, { _ => true }))
+    val fileWrites: ActorRef = dependencyMap("FileWrites").get
+    val processWrites: ActorRef = dependencyMap("ProcessWrites").get
+    Set(Subscription(processWrites, { _ => true }), Subscription(fileWrites, { _ => true }))
   }
 
   def beginService() = initialize()
   def endService() = ()  // TODO
 
-  def process(v: Any): Unit = {
-    log.info("Outgestor: " + v)
+  override def process = {
+    case v => log.info("Outgestor: " + v)
   }
 }
 
-//object Outgestor {
-//  def props(subscriptions: Set[ActorRef]): Props = Props(new Outgestor(subscriptions))
-//}
