@@ -32,12 +32,14 @@ import scala.language.existentials
  *
  *   long        ::= variable | <same as Java long>
  *   string      ::= variable | <same as Java string>
+ *   uuid        ::= variable | <same as toString of Java UUID>
  *   longArray   ::= variable | '[' long ',' ... ']'
  *   stringArray ::= variable | '[' string ',' ... ']'
+ *   uuidArray   ::= variable | '[' uuid ',' ... ']'
  *
  *   regex       ::= 'regex(' string ')'
  *
- *   literal     ::= long | string | longArray | stringArray
+ *   literal     ::= long | string | uuid | longArray | stringArray | uuidArray
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -132,7 +134,7 @@ object Query {
       def int: Parser[Value[java.lang.Long]] = variable(ints) | wholeNumber ^^ { x => Raw(x.toLong) }
       def str: Parser[Value[String]] =
         ( variable(strs)
-        | stringLiteral            ^^ { case s => Raw(s) }
+        | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         )
       def uid: Parser[Value[java.util.UUID]] = variable(uids) | 
