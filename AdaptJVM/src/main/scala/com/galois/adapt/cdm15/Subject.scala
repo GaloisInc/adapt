@@ -39,8 +39,8 @@ case class Subject(
     count.fold[List[Any]](List.empty)(v => List("count", v)) ++
     cmdLine.fold[List[Any]](List.empty)(v => List("cmdLine", v)) ++
     privilegeLevel.fold[List[Any]](List.empty)(v => List("privilegeLevel", v.toString)) ++
-    importedLibraries.fold[List[Any]](List.empty)(v => List("importedLibraries", v)) ++
-    exportedLibraries.fold[List[Any]](List.empty)(v => List("exportedLibraries", v)) ++
+    importedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("importedLibraries", v.mkString(", "))) ++
+    exportedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("exportedLibraries", v.mkString(", "))) ++
     DBOpt.fromKeyValMap(properties)
 
   def asDBEdges = List(("localPrincipal",localPrincipal)) ++

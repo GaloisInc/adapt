@@ -43,7 +43,7 @@ case class Event(
     predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2", v.toString)) ++
     predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
-    parameters.fold[List[Any]](List.empty)(v => List("parameters", v.map(_.asDBKeyValues))) ++
+    parameters.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("parameters", v.map(_.asDBKeyValues).mkString(", "))) ++
     location.fold[List[Any]](List.empty)(v => List("location", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v)) ++
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++

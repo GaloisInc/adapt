@@ -29,7 +29,7 @@ case class FileObject(
     localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipal", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v)) ++
     peInfo.fold[List[Any]](List.empty)(v => List("peInfo", v)) ++
-    hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}")))  // TODO: Revisit how we should represent this in the DB
+    hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", ")))  // TODO: Revisit how we should represent this in the DB
 
   def asDBEdges = List.concat(
     localPrincipal.map(p => ("localPrincipal",p))

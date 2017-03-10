@@ -32,7 +32,7 @@ case class ProvenanceTagNode(
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
     prevTagId.fold[List[Any]](List.empty)(v => List("prevTagId", v.toString)) ++
     opcode.fold[List[Any]](List.empty)(v => List("opcode", v.toString)) ++
-    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v)) ++
+    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v.mkString(", "))) ++
     itag.fold[List[Any]](List.empty)(v => List("itag", v.toString)) ++
     ctag.fold[List[Any]](List.empty)(v => List("ctag", v.toString)) ++
     DBOpt.fromKeyValMap(properties)

@@ -24,7 +24,7 @@ case class Principal(
     //    "groupIds", groupIds.mkString(", "),
     "principalType", principalType.toString
   ) ++
-    (if (groupIds.nonEmpty) List("groupIds", groupIds) else List.empty) ++
+    (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else List.empty) ++
     username.fold[List[Any]](List.empty)(v => List("username", v)) ++
     DBOpt.fromKeyValMap(properties)
 
