@@ -1,6 +1,6 @@
 package com.galois.adapt.cdm15
 
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -28,7 +28,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM15 with DBWritable {
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,

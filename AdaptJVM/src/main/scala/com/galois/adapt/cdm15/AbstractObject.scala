@@ -18,10 +18,6 @@ case class AbstractObject(
     permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
     epoch.fold[List[Any]](List.empty)(v => List("epoch", v)) ++
     DBOpt.fromKeyValMap(properties)
-
-  def asDBEdges = throw new RuntimeException("AbstractObject has no edges... ever.")
-
-  def getUuid = throw new RuntimeException("AbstractObject has no UUID")
 }
 
 case object AbstractObject extends CDM15Constructor[AbstractObject] {

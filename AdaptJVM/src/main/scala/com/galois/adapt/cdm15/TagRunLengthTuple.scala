@@ -18,10 +18,6 @@ case class TagRunLengthTuple(
     "numValueElements", numValueElements,
     "uuid", tagId
   )
-
-  def asDBEdges = Nil
-
-  def getUuid = tagId
 }
 
 

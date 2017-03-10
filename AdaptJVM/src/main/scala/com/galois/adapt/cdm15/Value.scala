@@ -29,10 +29,6 @@ case class Value(
     valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v.toString)) ++
     tag.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tag", v.map(_.asDBKeyValues).mkString(", "))) ++
     components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
-
-  def asDBEdges = throw new RuntimeException("Value has no EDGES... ever.")  // There are assumptions elsewhere in the code that there will _never_ be an edges here!
-  
-  def getUuid = throw new RuntimeException("Value has no UUID")
 }
 
 case object Value extends CDM15Constructor[Value] {

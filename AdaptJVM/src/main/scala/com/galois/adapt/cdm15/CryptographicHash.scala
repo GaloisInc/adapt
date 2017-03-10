@@ -16,10 +16,6 @@ case class CryptographicHash(
     "type", cryptoType.toString,
     "hash", hash
   )
-
-  def asDBEdges = throw new RuntimeException("CryptographicHash has no edges... ever.")
-
-  def getUuid = throw new RuntimeException("CryptographicHash has no UUID")
 }
 
 case object CryptographicHash extends CDM15Constructor[CryptographicHash] {

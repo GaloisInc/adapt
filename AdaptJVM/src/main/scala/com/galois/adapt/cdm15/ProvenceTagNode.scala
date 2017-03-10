@@ -3,7 +3,7 @@ package com.galois.adapt.cdm15
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm15
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -21,7 +21,7 @@ case class ProvenanceTagNode(
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM15 with DBWritable {
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
     "tagId", tagId,

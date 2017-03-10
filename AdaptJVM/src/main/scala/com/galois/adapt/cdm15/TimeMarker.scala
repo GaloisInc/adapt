@@ -16,10 +16,6 @@ case class TimeMarker(
 //    label, "TimeMarker",
     "timestampNanos", timestampNanos
   )
-
-  def asDBEdges = throw new RuntimeException("TimeMarker has no Edges")
-
-  def getUuid = throw new RuntimeException("TimeMarker has no UUID")
 }
 
 

@@ -3,7 +3,7 @@ package com.galois.adapt.cdm15
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm15
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -14,7 +14,7 @@ case class UnnamedPipeObject(
   baseObject: AbstractObject,
   sourceFileDescriptor: Int,
   sinkFileDescriptor: Int
-) extends CDM15 with DBWritable {
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "UnnamedPipeObject",
     "uuid", uuid,
