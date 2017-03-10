@@ -10,21 +10,21 @@ import scala.util.Try
 
 
 case class Subject(
-                    uuid: UUID,
-                    subjectType: SubjectType,
-                    cid: Int,
-                    localPrincipal: UUID,
-                    startTimestampNanos: Long,
-                    parentSubject: Option[UUID] = None,
-                    unitId: Option[Int] = None,
-                    iteration: Option[Int] = None,
-                    count: Option[Int] = None,
-                    cmdLine: Option[String] = None,
-                    privilegeLevel: Option[PrivilegeLevel] = None,
-                    importedLibraries: Option[Seq[String]] = None,
-                    exportedLibraries: Option[Seq[String]] = None,
-                    properties: Option[Map[String,String]] = None
-                  ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  subjectType: SubjectType,
+  cid: Int,
+  localPrincipal: UUID,
+  startTimestampNanos: Long,
+  parentSubject: Option[UUID] = None,
+  unitId: Option[Int] = None,
+  iteration: Option[Int] = None,
+  count: Option[Int] = None,
+  cmdLine: Option[String] = None,
+  privilegeLevel: Option[PrivilegeLevel] = None,
+  importedLibraries: Option[Seq[String]] = None,
+  exportedLibraries: Option[Seq[String]] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "Subject",
     "uuid", uuid,

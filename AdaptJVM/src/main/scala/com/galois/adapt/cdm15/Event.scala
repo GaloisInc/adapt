@@ -12,23 +12,23 @@ import scala.collection.JavaConverters._
 
 
 case class Event(
-                  uuid: UUID,
-                  sequence: Long = 0,
-                  eventType: EventType,
-                  threadId: Int,
-                  subject: UUID,
-                  timestampNanos: Long,
-                  predicateObject: Option[UUID] = None,
-                  predicateObjectPath: Option[String] = None,
-                  predicateObject2: Option[UUID] = None,
-                  predicateObject2Path: Option[String] = None,
-                  name: Option[String] = None,
-                  parameters: Option[Seq[Value]] = None,
-                  location: Option[Long] = None,
-                  size: Option[Long] = None,
-                  programPoint: Option[String] = None,
-                  properties: Option[Map[String,String]] = None
-                ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  sequence: Long = 0,
+  eventType: EventType,
+  threadId: Int,
+  subject: UUID,
+  timestampNanos: Long,
+  predicateObject: Option[UUID] = None,
+  predicateObjectPath: Option[String] = None,
+  predicateObject2: Option[UUID] = None,
+  predicateObject2Path: Option[String] = None,
+  name: Option[String] = None,
+  parameters: Option[Seq[Value]] = None,
+  location: Option[Long] = None,
+  size: Option[Long] = None,
+  programPoint: Option[String] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,
@@ -43,7 +43,7 @@ case class Event(
     predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2", v.toString)) ++
     predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
-    parameters.fold[List[Any]](List.empty)(v => List("parameters", v.mkString(", "))) ++
+    parameters.fold[List[Any]](List.empty)(v => List("parameters", v.map(_.asDBKeyValues))) ++
     location.fold[List[Any]](List.empty)(v => List("location", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v)) ++
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++

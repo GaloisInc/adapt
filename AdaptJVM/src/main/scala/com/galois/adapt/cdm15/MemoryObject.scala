@@ -9,13 +9,13 @@ import org.apache.tinkerpop.gremlin.structure.T.label
 import scala.util.Try
 
 case class MemoryObject(
-                         uuid: UUID,
-                         baseObject: AbstractObject,
-                         memoryAddress: Long,
-                         pageNumber: Option[Long] = None,
-                         pageOffset: Option[Long] = None,
-                         size: Option[Long] = None
-                       ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  memoryAddress: Long,
+  pageNumber: Option[Long] = None,
+  pageOffset: Option[Long] = None,
+  size: Option[Long] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     label, "MemoryObject",
     "uuid", uuid,

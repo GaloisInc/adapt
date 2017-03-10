@@ -10,13 +10,13 @@ import scala.util.Try
 
 
 case class Principal(
-                      uuid: UUID,
-                      userId: String,
-                      groupIds: Seq[String],
-                      principalType: PrincipalType = PRINCIPAL_LOCAL,
-                      username: Option[String] = None,
-                      properties: Option[Map[String,String]] = None
-                    ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  userId: String,
+  groupIds: Seq[String],
+  principalType: PrincipalType = PRINCIPAL_LOCAL,
+  username: Option[String] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "Principal",
     "uuid", uuid,
@@ -24,7 +24,7 @@ case class Principal(
     //    "groupIds", groupIds.mkString(", "),
     "principalType", principalType.toString
   ) ++
-    (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else List.empty) ++
+    (if (groupIds.nonEmpty) List("groupIds", groupIds) else List.empty) ++
     username.fold[List[Any]](List.empty)(v => List("username", v)) ++
     DBOpt.fromKeyValMap(properties)
 

@@ -10,11 +10,11 @@ import scala.util.Try
 
 
 case class UnnamedPipeObject(
-                    uuid: UUID,
-                    baseObject: AbstractObject,
-                    sourceFileDescriptor: Int,
-                    sinkFileDescriptor: Int
-                  ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  sourceFileDescriptor: Int,
+  sinkFileDescriptor: Int
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "UnnamedPipeObject",
     "uuid", uuid,

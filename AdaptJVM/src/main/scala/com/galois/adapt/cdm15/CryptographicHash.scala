@@ -8,16 +8,16 @@ import scala.collection.JavaConverters._
 
 
 case class CryptographicHash(
-                           cryptoType: CryptoHashType,
-                           hash: String
-                         ) extends CDM15 with DBWritable {
+  cryptoType: CryptoHashType,
+  hash: String
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     //    label, "CryptographicHash",
     "type", cryptoType.toString,
     "hash", hash
   )
 
-  def asDBEdges = Nil
+  def asDBEdges = throw new RuntimeException("CryptographicHash has no edges... ever.")
 
   def getUuid = throw new RuntimeException("CryptographicHash has no UUID")
 }

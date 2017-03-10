@@ -10,9 +10,9 @@ import scala.util.Try
 
 
 case class UnitDependency(
-                       unit: UUID,
-                       dependentUnit: UUID
-                     ) extends CDM15 with DBWritable {
+  unit: UUID,
+  dependentUnit: UUID
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "UnitDependency",
     "unit", unit,

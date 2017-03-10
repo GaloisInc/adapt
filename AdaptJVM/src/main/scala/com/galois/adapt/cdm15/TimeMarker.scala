@@ -10,14 +10,14 @@ import scala.util.Try
 
 
 case class TimeMarker(
-                    timestampNanos: Long
-                  ) extends CDM15 with DBWritable {
+  timestampNanos: Long
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
-    label, "TimeMarker",
+//    label, "TimeMarker",
     "timestampNanos", timestampNanos
   )
 
-  def asDBEdges = Nil
+  def asDBEdges = throw new RuntimeException("TimeMarker has no Edges")
 
   def getUuid = throw new RuntimeException("TimeMarker has no UUID")
 }

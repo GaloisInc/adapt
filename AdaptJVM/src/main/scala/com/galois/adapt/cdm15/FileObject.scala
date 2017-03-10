@@ -10,26 +10,26 @@ import scala.util.Try
 
 
 case class FileObject(
-                       uuid: UUID,
-                       baseObject: AbstractObject,
-                       fileObjectType: FileObjectType,
-                       fileDescriptor: Option[Int] = None,
-                       localPrincipal: Option[UUID] = None,
-                       size: Option[Long] = None,
-                       peInfo: Option[String] = None,
-                       hashes: Option[Seq[CryptographicHash]] = None
-                     ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  fileObjectType: FileObjectType,
+  fileDescriptor: Option[Int] = None,
+  localPrincipal: Option[UUID] = None,
+  size: Option[Long] = None,
+  peInfo: Option[String] = None,
+  hashes: Option[Seq[CryptographicHash]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
       label, "FileObject",
       "uuid", uuid,
-      "fileObjectType", fileObjectType
+      "fileObjectType", fileObjectType.toString
     ) ++
     fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v)) ++
     localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipal", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v)) ++
     peInfo.fold[List[Any]](List.empty)(v => List("peInfo", v)) ++
-    hashes.fold[List[Any]](List.empty)(v => List("hashes", v.mkString(", ")))
+    hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}")))  // TODO: Revisit how we should represent this in the DB
 
   def asDBEdges = List.concat(
     localPrincipal.map(p => ("localPrincipal",p))

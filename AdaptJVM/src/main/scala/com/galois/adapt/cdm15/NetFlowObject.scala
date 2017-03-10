@@ -10,15 +10,15 @@ import org.apache.tinkerpop.gremlin.structure.T.label
 import scala.util.Try
 
 case class NetFlowObject(
-                          uuid: UUID,
-                          baseObject: AbstractObject,
-                          localAddress: String,
-                          localPort: Int,
-                          remoteAddress: String,
-                          remotePort: Int,
-                          ipProtocol: Option[Int] = None,
-                          fileDescriptor: Option[Int] = None
-                        ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  localAddress: String,
+  localPort: Int,
+  remoteAddress: String,
+  remotePort: Int,
+  ipProtocol: Option[Int] = None,
+  fileDescriptor: Option[Int] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
       List(

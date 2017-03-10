@@ -10,16 +10,17 @@ import scala.util.Try
 
 
 case class SrcSinkObject(
-                          uuid: UUID,
-                          baseObject: AbstractObject,
-                          srcSinkType: SrcSinkType,
-                          fileDescriptor: Option[Int]
-                        ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  srcSinkType: SrcSinkType,
+  fileDescriptor: Option[Int]
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     label, "SrcSinkObject",
     "uuid", uuid,
-    "srcSinkType", srcSinkType
-  ) ++ baseObject.asDBKeyValues ++
+    "srcSinkType", srcSinkType.toString
+  ) ++
+    baseObject.asDBKeyValues ++
     fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
 
   def asDBEdges = Nil
