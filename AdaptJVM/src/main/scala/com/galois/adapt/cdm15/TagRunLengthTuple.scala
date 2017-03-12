@@ -10,18 +10,14 @@ import scala.util.Try
 
 
 case class TagRunLengthTuple(
-                    numValueElements: Int,
-                    tagId: UUID
-                  ) extends CDM15 with DBWritable {
+  numValueElements: Int,
+  tagId: UUID
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
-    label, "TagRunLengthTuple",
+//    label, this.getClass.getSimpleName,// "TagRunLengthTuple",
     "numValueElements", numValueElements,
     "uuid", tagId
   )
-
-  def asDBEdges = Nil
-
-  def getUuid = tagId
 }
 
 

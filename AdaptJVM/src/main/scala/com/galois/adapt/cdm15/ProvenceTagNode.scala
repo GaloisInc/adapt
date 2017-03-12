@@ -3,25 +3,25 @@ package com.galois.adapt.cdm15
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm15
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
 
 
 case class ProvenanceTagNode(
-                              tagId: UUID,
-                              subject: UUID,
-                              flowObject: Option[UUID] = None,
-                              systemCall: Option[String] = None,
-                              programPoint: Option[String] = None,
-                              prevTagId: Option[UUID] = None,
-                              opcode: Option[TagOpCode] = None,
-                              tagIds: Option[Seq[UUID]] = None,
-                              itag: Option[IntegrityTag] = None,
-                              ctag: Option[ConfidentialityTag] = None,
-                              properties: Option[Map[String,String]] = None
-                            ) extends CDM15 with DBWritable {
+  tagId: UUID,
+  subject: UUID,
+  flowObject: Option[UUID] = None,
+  systemCall: Option[String] = None,
+  programPoint: Option[String] = None,
+  prevTagId: Option[UUID] = None,
+  opcode: Option[TagOpCode] = None,
+  tagIds: Option[Seq[UUID]] = None,
+  itag: Option[IntegrityTag] = None,
+  ctag: Option[ConfidentialityTag] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
     "tagId", tagId,
@@ -32,7 +32,7 @@ case class ProvenanceTagNode(
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
     prevTagId.fold[List[Any]](List.empty)(v => List("prevTagId", v.toString)) ++
     opcode.fold[List[Any]](List.empty)(v => List("opcode", v.toString)) ++
-    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v.toString())) ++
+    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v.mkString(", "))) ++
     itag.fold[List[Any]](List.empty)(v => List("itag", v.toString)) ++
     ctag.fold[List[Any]](List.empty)(v => List("ctag", v.toString)) ++
     DBOpt.fromKeyValMap(properties)

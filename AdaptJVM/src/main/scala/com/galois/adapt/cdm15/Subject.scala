@@ -3,28 +3,28 @@ package com.galois.adapt.cdm15
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm15
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
 
 
 case class Subject(
-                    uuid: UUID,
-                    subjectType: SubjectType,
-                    cid: Int,
-                    localPrincipal: UUID,
-                    startTimestampNanos: Long,
-                    parentSubject: Option[UUID] = None,
-                    unitId: Option[Int] = None,
-                    iteration: Option[Int] = None,
-                    count: Option[Int] = None,
-                    cmdLine: Option[String] = None,
-                    privilegeLevel: Option[PrivilegeLevel] = None,
-                    importedLibraries: Option[Seq[String]] = None,
-                    exportedLibraries: Option[Seq[String]] = None,
-                    properties: Option[Map[String,String]] = None
-                  ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  subjectType: SubjectType,
+  cid: Int,
+  localPrincipal: UUID,
+  startTimestampNanos: Long,
+  parentSubject: Option[UUID] = None,
+  unitId: Option[Int] = None,
+  iteration: Option[Int] = None,
+  count: Option[Int] = None,
+  cmdLine: Option[String] = None,
+  privilegeLevel: Option[PrivilegeLevel] = None,
+  importedLibraries: Option[Seq[String]] = None,
+  exportedLibraries: Option[Seq[String]] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Subject",
     "uuid", uuid,
@@ -39,8 +39,8 @@ case class Subject(
     count.fold[List[Any]](List.empty)(v => List("count", v)) ++
     cmdLine.fold[List[Any]](List.empty)(v => List("cmdLine", v)) ++
     privilegeLevel.fold[List[Any]](List.empty)(v => List("privilegeLevel", v.toString)) ++
-    importedLibraries.fold[List[Any]](List.empty)(v => List("importedLibraries", v)) ++
-    exportedLibraries.fold[List[Any]](List.empty)(v => List("exportedLibraries", v)) ++
+    importedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("importedLibraries", v.mkString(", "))) ++
+    exportedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("exportedLibraries", v.mkString(", "))) ++
     DBOpt.fromKeyValMap(properties)
 
   def asDBEdges = List(("localPrincipal",localPrincipal)) ++

@@ -8,32 +8,27 @@ import scala.util.Try
 
 
 case class Value(
-                  size: Int = -1,
-                  valueType: ValueType,
-                  valueDataType: ValueDataType,
-                  isNull: Boolean = false,     // TODO: What are the semantics of this?!?
-                  name: Option[String] = None,
-                  runtimeDataType: Option[String] = None,
-                  valueBytes: Option[Array[Byte]] = None,
-                  tag: Option[Seq[TagRunLengthTuple]] = None,
-                  components: Option[Seq[Value]] = None
-                ) extends CDM15 with DBWritable {
+  size: Int = -1,
+  valueType: ValueType,
+  valueDataType: ValueDataType,
+  isNull: Boolean = false,     // TODO: What are the semantics of this?!?
+  name: Option[String] = None,
+  runtimeDataType: Option[String] = None,
+  valueBytes: Option[Array[Byte]] = None,
+  tag: Option[Seq[TagRunLengthTuple]] = None,
+  components: Option[Seq[Value]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
-    label, "Value",
     "size", size,
-    "valueType", valueType,
-    "valueDataType", valueDataType,
+    "valueType", valueType.toString,
+    "valueDataType", valueDataType.toString,
     "isNull", isNull
   ) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     runtimeDataType.fold[List[Any]](List.empty)(v => List("runtimeDataType", v)) ++
-    valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v)) ++
-    tag.fold[List[Any]](List.empty)(v => List("tag", v)) ++
-    components.fold[List[Any]](List.empty)(v => List("components", v))
-
-  def asDBEdges = Nil
-  
-  def getUuid = throw new RuntimeException("Value has no UUID")
+    valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v.toString)) ++
+    tag.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tag", v.map(_.asDBKeyValues).mkString(", "))) ++
+    components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 }
 
 case object Value extends CDM15Constructor[Value] {

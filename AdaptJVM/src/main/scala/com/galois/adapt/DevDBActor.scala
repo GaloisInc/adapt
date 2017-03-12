@@ -104,7 +104,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       println(s"Edges created at epoch close: $edgeCreatedCounter")
       println("Done creating all missing nodes.")
 
-    case cdm15: DBWritable =>
+    case cdm15: DBNodeable =>
       // Get the uuid of the node
       val uuid = cdm15.getUuid
 

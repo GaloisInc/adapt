@@ -8,20 +8,16 @@ import scala.collection.JavaConverters._
 
 
 case class AbstractObject(
-                           permission: Option[FixedShort] = None,  // fixed size = 2
-                           epoch: Option[Int] = None,
-                           properties: Option[Map[String,String]] = None
-                         ) extends CDM15 with DBWritable {
+  permission: Option[FixedShort] = None,  // fixed size = 2
+  epoch: Option[Int] = None,
+  properties: Option[Map[String,String]] = None
+) extends CDM15 with DBWritable {
   def asDBKeyValues = List(
     //    label, "AbstractObject",
   ) ++
     permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
     epoch.fold[List[Any]](List.empty)(v => List("epoch", v)) ++
     DBOpt.fromKeyValMap(properties)
-
-  def asDBEdges = Nil
-
-  def getUuid = throw new RuntimeException("AbstractObject has no UUID")
 }
 
 case object AbstractObject extends CDM15Constructor[AbstractObject] {

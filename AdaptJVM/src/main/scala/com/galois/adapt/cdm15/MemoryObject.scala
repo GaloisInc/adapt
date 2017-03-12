@@ -3,19 +3,19 @@ package com.galois.adapt.cdm15
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm15
-import com.galois.adapt.DBWritable
+import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
 
 case class MemoryObject(
-                         uuid: UUID,
-                         baseObject: AbstractObject,
-                         memoryAddress: Long,
-                         pageNumber: Option[Long] = None,
-                         pageOffset: Option[Long] = None,
-                         size: Option[Long] = None
-                       ) extends CDM15 with DBWritable {
+  uuid: UUID,
+  baseObject: AbstractObject,
+  memoryAddress: Long,
+  pageNumber: Option[Long] = None,
+  pageOffset: Option[Long] = None,
+  size: Option[Long] = None
+) extends CDM15 with DBWritable with DBNodeable {
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     label, "MemoryObject",
     "uuid", uuid,
