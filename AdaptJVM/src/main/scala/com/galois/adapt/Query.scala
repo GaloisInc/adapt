@@ -1,7 +1,7 @@
 package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, Graph}
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -30,16 +30,19 @@ import scala.language.existentials
  *
  *   variable    ::= <same as Java variables>
  *
- *   long        ::= variable | <same as Java long>
+ *   int         ::= variable | <same as java int, but with "I" suffix>
+ *   long        ::= variable | <same as java long, but with "L" suffix> | <same as Java long>
  *   string      ::= variable | <same as Java string>
  *   uuid        ::= variable | <same as toString of Java UUID>
+ *
+ *   intArray    ::= variable | '[' int ',' ... ']'
  *   longArray   ::= variable | '[' long ',' ... ']'
  *   stringArray ::= variable | '[' string ',' ... ']'
  *   uuidArray   ::= variable | '[' uuid ',' ... ']'
  *
  *   regex       ::= 'regex(' string ')'
  *
- *   literal     ::= long | string | uuid | longArray | stringArray | uuidArray
+ *   literal     ::= int | long | string | uuid | intArray | longArray | stringArray | uuidArray
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -63,6 +66,10 @@ import scala.language.existentials
  *                 | traversal '.is(' literal ')'
  *                 | traversal '.order()'
  *                 | traversal '.by(' string ')'
+ *                 | traversal '.by(id)'
+ *                 | traversal '.by(key)'
+ *                 | traversal '.by(label)'
+ *                 | traversal '.by(value)'
  *                 | traversal '.by(' traversal ( ',incr' | ',decr' )? ')'
  *                 | traversal '.as(' string ',' ... ')'
  *                 | traversal '.until(' traveral ')'
@@ -113,8 +120,11 @@ import scala.language.existentials
 object Query {
   // Run a 'Traversal' on a 'Graph'
   def run[T](query: Query[T], graph: Graph): Try[Stream[T]] = query.run(graph)
-  def run[T](query: String, graph: Graph): Try[Stream[T]] =
+  def run[T](query: String, graph: Graph): Try[Stream[T]] = {
+    val s = Query(query)
+    println(s)
     Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
+  }
 
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {
@@ -129,12 +139,21 @@ object Query {
       // Remark: if Scala's parser was a monad transformer instead of just a monad, we should thread
       // this state through it.
       var ints: Set[String] = Set()
+      var lngs: Set[String] = Set()
       var strs: Set[String] = Set()
       var uids: Set[String] = Set()
       var arrs: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
-      def int: Parser[Value[java.lang.Long]] = variable(ints) | wholeNumber ^^ { x => Raw(x.toLong) }
+      def lng: Parser[Value[java.lang.Long]] = 
+        ( variable(lngs)
+        | wholeNumber ~ "L" ^^ { case x~_ => Raw(x.toLong) }
+        | wholeNumber       ^^ { x => Raw(x.toLong) }
+        ).asInstanceOf[Parser[Value[java.lang.Long]]]
+      def int: Parser[Value[Int]] = 
+        ( variable[Int](ints)
+        | wholeNumber ~ "I" ^^ { case x~_ => Raw(x.toInt) }
+        )
       def str: Parser[Value[String]] =
         ( variable(strs)
         | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
@@ -144,10 +163,11 @@ object Query {
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(java.util.UUID.fromString(s))
         }
-      def intArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(int)
-      def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
       def uidArr: Parser[Value[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
-      def lit: Parser[Value[_]] = uid | int | str | intArr | strArr | uidArr
+      def lngArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
+      def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
+      def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
+      def lit: Parser[Value[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
@@ -171,15 +191,19 @@ object Query {
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
-        | ".hasId(" ~ int ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
+        | ".hasId(" ~ lng ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
         | ".and(" ~ repsep(trav,",") ~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~ repsep(trav,",") ~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
-        | ".limit(" ~ int ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
+        | ".limit(" ~ lng ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
         | ".order()"                       ^^ { case _          => Order(_: Tr) }
+        | ".by(id)"                        ^^ { case _          => ByToken(_: Tr, Token.id) }
+        | ".by(key)"                       ^^ { case _          => ByToken(_: Tr, Token.key) }
+        | ".by(label)"                     ^^ { case _          => ByToken(_: Tr, Token.label) }
+        | ".by(value)"                     ^^ { case _          => ByToken(_: Tr, Token.value) }
         | ".by(" ~ str ~ ")"               ^^ { case _~k~_      => By(_: Tr, k) }
         | ".by(" ~ trav ~ (",incr)" | ")") ^^ { case _~t~_      => ByTraversal(_: Tr, t, true) }
         | ".by(" ~ trav ~ ",decr)"         ^^ { case _~t~_      => ByTraversal(_: Tr, t, false) }
@@ -218,12 +242,12 @@ object Query {
 
       // Possible sources for traversals
       def travSource: Parser[Tr] = 
-        ( "g.V(" ~ intArr ~ ")"                     ^^ { case _~ids~_ => Vertices(ids) }
-        | "g.V(" ~ repsep(int,",") ~ ")"            ^^ { case _~ids~_ => Vertices(RawArr(ids)) }
-        | "g.E(" ~ intArr ~ ")"                     ^^ { case _~ids~_ => Edges(ids) }
-        | "g.E(" ~ repsep(int,",") ~ ")"            ^^ { case _~ids~_ => Edges(RawArr(ids)) }
+        ( "g.V(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Vertices(ids) }
+        | "g.V(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Vertices(RawArr(ids)) }
+        | "g.E(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Edges(ids) }
+        | "g.E(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Edges(RawArr(ids)) }
         | ("__" | "_")                              ^^ { case _       => Anon(Raw(Seq())) }
-        | "_(" ~ repsep(int,",") ~ ")"              ^^ { case _~ids~_ => Anon(RawArr(ids)) }
+        | "_(" ~ repsep(lng,",") ~ ")"              ^^ { case _~ids~_ => Anon(RawArr(ids)) }
         ).asInstanceOf[Parser[Tr]]
 
       // Parser for a traversal 
@@ -236,6 +260,7 @@ object Query {
       // get to the queries that use them.
       def queryPrefix: Parser[Qy => Qy] = 
         ( ident ~ "=" ~ int ~ ";"               ^^ { case i~_~v~_ => ints += i; AssignLiteral(i,v,_: Qy).asInstanceOf[Qy] }
+        | ident ~ "=" ~ lng ~ ";"               ^^ { case i~_~v~_ => lngs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ str ~ ";"               ^^ { case i~_~v~_ => strs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ (intArr | strArr) ~ ";" ^^ { case i~_~v~_ => arrs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ trav ~ ";"              ^^ { case i~_~t~_ => arrs += i; AssignTraversal(i,t,_: Qy) }
@@ -398,6 +423,10 @@ case class Order[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
 case class By[S,T](traversal: Traversal[S,T], key: Value[String]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).by(key.eval(context))
+}
+case class ByToken[S,T](traversal: Traversal[S,T], token: Token) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).by(token)
 }
 case class ByTraversal[S,T](traversal: Traversal[S,T], comp: Traversal[_,_], incr: Boolean) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
