@@ -1,7 +1,7 @@
 package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Graph}
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -75,6 +75,8 @@ import scala.language.existentials
  *                 | traversal '.select(' string ',' ... ')'
  *                 | traversal '.unfold()'
  *                 | traversal '.count()'
+ *                 | traversal '.groupCount()'
+ *                 | traversal '.match(' traversal ',' ... ')'
  *                 | traversal '.both(' string ',' ... ')'
  *                 | traversal '.bothV()'
  *                 | traversal '.out(' string ',' ... ')'
@@ -88,6 +90,7 @@ import scala.language.existentials
  *                 | traversal '.union(' traversal ',' ... ')'
  *                 | traversal '.local(' traversal ')'
  *                 | traversal '.property(' string ',' literal ',' ... ')'
+ *                 | traversal '.properties()'
  *
  *   query     ::= ( ident '=' literal ';'
  *                 | ident '=' traversal ';'
@@ -183,6 +186,7 @@ object Query {
         | ".as(" ~ rep1sep(str,",") ~ ")"  ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
         | ".until(" ~ trav ~ ")"           ^^ { case _~t~_      => Until(_: Tr, t) }
         | ".values("~rep1sep(str,",")~")"  ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
+        | ".properties("~repsep(str,",")~")"^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
         | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
@@ -192,6 +196,7 @@ object Query {
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
+        | ".groupCount()"                  ^^ { case _          => GroupCount(_: Tr) }
         | ".both(" ~ repsep(str,",") ~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], RawArr(s)) }
         | ".bothV()"                       ^^ { case _          => BothV(_: Traversal[_,Edge]) }
         | ".out(" ~ repsep(str,",") ~ ")"  ^^ { case _~s~_      => Out(_: Traversal[_,Vertex], RawArr(s)) }
@@ -204,6 +209,7 @@ object Query {
         | ".repeat(" ~ trav ~ ")"          ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
         | ".union(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
         | ".local(" ~ trav ~ ")"           ^^ { case _~t~_      => Local(_: Tr, t) }
+        | ".match(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Match(_: Tr, t) }
         | ".property(" ~ rep1sep(str ~ "," ~ lit, ",") ~ ")" ^^ { case _~s~_ =>
             Property(_: Tr, RawArr(s.map { case k~_~v => k }), RawArr(s.map { case k~_~v => v}))
           }
@@ -452,7 +458,9 @@ case class Unfold[S,T](traversal: Traversal[S,_]) extends Traversal[S,T] {
 case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Long] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).count()
 }
-
+case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] { 
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).groupCount()
+}
 
 // Extend outwards
 case class Both[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Vertex] {
@@ -498,7 +506,15 @@ case class Local[S,E](traversal: Traversal[S,_], loc: Traversal[_,E]) extends Tr
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).local(loc.buildTraversal(graph, context))
 }
-
+case class Match[S,E](traversal: Traversal[S,_], matches: Seq[Traversal[_,_]]) extends Traversal[S,java.util.Map[String,E]] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).`match`(matches.map(_.buildTraversal(graph, context)): _*)
+}
+case class Properties[S](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,GremlinProperty[_]] { 
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = 
+    traversal.buildTraversal(graph,context).properties(keys.eval(context)
+    :_*).asInstanceOf[GraphTraversal[S,GremlinProperty[_]]]
+}
 
 // Mutating
 case class Property[S,E](traversal: Traversal[S,E], keys: Value[Seq[String]], values: Value[Seq[_]]) extends Traversal[S,E] {

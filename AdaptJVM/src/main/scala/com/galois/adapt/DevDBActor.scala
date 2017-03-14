@@ -164,9 +164,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         
         // Give a lower bound on the number of vertices
         Application.debug(s"Found: ${results.length}")
-       
+
         // Generate JSON to send back
-        results.map(r => s""""${r.toString.replaceAll("\"", "\\\"")}"""").mkString("[",",","]")
+        results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""")
+               .mkString("[",",","]")
       }
    
     case EdgesForNodes(nodeIdList) =>
