@@ -262,7 +262,7 @@ object Query {
         ( ident ~ "=" ~ int ~ ";"               ^^ { case i~_~v~_ => ints += i; AssignLiteral(i,v,_: Qy).asInstanceOf[Qy] }
         | ident ~ "=" ~ lng ~ ";"               ^^ { case i~_~v~_ => lngs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ str ~ ";"               ^^ { case i~_~v~_ => strs += i; AssignLiteral(i,v,_: Qy) }
-        | ident ~ "=" ~ (intArr | strArr) ~ ";" ^^ { case i~_~v~_ => arrs += i; AssignLiteral(i,v,_: Qy) }
+        | ident ~ "=" ~ (intArr|strArr|lngArr) ~ ";" ^^ { case i~_~v~_ => arrs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ trav ~ ";"              ^^ { case i~_~t~_ => arrs += i; AssignTraversal(i,t,_: Qy) }
         | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) } 
         ).asInstanceOf[Parser[Qy => Qy]]
