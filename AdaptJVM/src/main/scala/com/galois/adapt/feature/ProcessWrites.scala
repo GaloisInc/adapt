@@ -13,7 +13,7 @@ import akka.actor._
  * Finds all process subjects / file write event pairs
  */
 class ProcessWrites(val registry: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[(Float,Subject,Event)] { 
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[(Set[UUID],String,Seq[Double])] { 
   
   val dependencies = "FileIngestActor" :: Nil
   lazy val subscriptions =
@@ -34,7 +34,7 @@ class ProcessWrites(val registry: ActorRef)
   override def process = {
     case s: Subject if s.subjectType == SUBJECT_PROCESS => processes(s.uuid) = s
     case e: Event if e.eventType == EVENT_WRITE && processes.isDefinedAt(e.subject) =>
-      broadCast((scala.util.Random.nextFloat,processes(e.subject),e))
+      broadCast((Set(e.uuid,processes(e.subject).uuid),"FileWrite",Seq(scala.util.Random.nextFloat)))
   }
 }
 
