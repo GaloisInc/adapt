@@ -13,8 +13,8 @@ import scala.util.{Try, Failure, Success}
 import scala.io.StdIn
 
 import java.io.File
-import java.awt.Desktop;
-import java.net.URI;
+import java.awt.Desktop
+import java.net.URI
 
 import scala.language.postfixOps
 

@@ -120,11 +120,8 @@ import scala.language.existentials
 object Query {
   // Run a 'Traversal' on a 'Graph'
   def run[T](query: Query[T], graph: Graph): Try[Stream[T]] = query.run(graph)
-  def run[T](query: String, graph: Graph): Try[Stream[T]] = {
-    val s = Query(query)
-    println(s)
+  def run[T](query: String, graph: Graph): Try[Stream[T]] =
     Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
-  }
 
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {

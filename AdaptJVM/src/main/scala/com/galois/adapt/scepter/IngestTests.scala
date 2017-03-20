@@ -75,6 +75,23 @@ class General_TA1_Tests(
     }
   }
 
+  // Test uniqueness of... UUIDs
+  // Some providers have suggested that they may reuse UUIDs. That would be bad.
+  it should "not have any duplicate UUIDs" in {
+    val grouped: java.util.List[java.util.Map[java.util.UUID,java.lang.Long]] = graph.traversal().V()
+      .values("uuid")
+      .groupCount[java.util.UUID]()
+      .toList()
+
+    val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 <= 1).take(20)
+    for ((uuid,count) <- offending) {
+      assert(
+        count <= 1,
+        s"Multiple nodes ($count nodes int this case) should not share the same UUID $uuid"
+      )
+    }
+  }
+
   // Test deduplication of PIDs
   // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
   it should "not have duplicate PID's in process Subjects" in {
