@@ -174,7 +174,9 @@ object Query {
         "["~repsep(elem,",")~"]"~".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
       // Parse a regex
       def regex[T]: Parser[Regex] =
-         ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ { case _~r~_ => Regex(r) }
+         ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
+           case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
+         }
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
