@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.pattern.ask
 import akka.util.Timeout
-import com.galois.adapt.cdm15._
+import com.galois.adapt.cdm16._
 import com.galois.adapt.scepter._
 import scala.concurrent.{ExecutionContext, Future, Await}
 import scala.concurrent.duration._

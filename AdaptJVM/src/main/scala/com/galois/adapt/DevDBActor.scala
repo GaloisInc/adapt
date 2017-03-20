@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm15._
+import com.galois.adapt.cdm16._
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -27,7 +27,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   lazy val subscriptions = {
     log.info("Forced subcription list")
     val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM15]))
+    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM16]))
   }
 
   def beginService() = {
