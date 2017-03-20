@@ -34,7 +34,8 @@ class ProcessWrites(val registry: ActorRef)
   override def process = {
     case s: Subject if s.subjectType == SUBJECT_PROCESS => processes(s.uuid) = s
     case e: Event if e.eventType == EVENT_WRITE && processes.isDefinedAt(e.subject) =>
-      broadCast((Set(e.uuid,processes(e.subject).uuid),"FileWrite",Seq(scala.util.Random.nextFloat)))
+      val size: Long = e.size.getOrElse(0)
+      broadCast((Set(e.uuid,processes(e.subject).uuid),"FileWrite",Seq(size.toDouble)))
   }
 }
 
