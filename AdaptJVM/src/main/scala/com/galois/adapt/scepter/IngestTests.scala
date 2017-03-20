@@ -1,7 +1,7 @@
 package com.galois.adapt.scepter
 
 import com.galois.adapt._
-import com.galois.adapt.cdm15._
+import com.galois.adapt.cdm16._
 
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge,Vertex}
@@ -171,7 +171,7 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
@@ -189,7 +189,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000  
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
@@ -207,7 +207,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
@@ -225,7 +225,7 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
@@ -243,7 +243,7 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
@@ -261,7 +261,7 @@ class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we get one of each type of statement
-  (CDM15.values diff missing).foreach { typeName =>
+  (CDM16.values diff missing).foreach { typeName =>
     "This provider" should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }

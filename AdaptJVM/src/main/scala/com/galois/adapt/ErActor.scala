@@ -1,17 +1,17 @@
 package com.galois.adapt
 
-import com.galois.adapt.cdm15._
+import com.galois.adapt.cdm16._
 
 import akka.actor._
 
 // This actor is special: it performs entity resolution on the input, then feeds that back out. 
-class ErActor(val registry: ActorRef) extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM15] {
+class ErActor(val registry: ActorRef) extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM16] {
   
   val dependencies = "FileIngestActor" :: Nil
   lazy val subscriptions = {
     log.info("Forced subcription list")
     val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM15]))
+    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM16]))
   }
 
   def beginService() = {
@@ -20,6 +20,6 @@ class ErActor(val registry: ActorRef) extends Actor with ActorLogging with Servi
   }
   def endService() = ()  // TODO
 
-  override def process = { case c: CDM15 => broadCast(c) }
+  override def process = { case c: CDM16 => broadCast(c) }
 }
 
