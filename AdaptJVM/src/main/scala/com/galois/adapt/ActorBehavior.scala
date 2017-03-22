@@ -28,12 +28,14 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
   override def receive = localReceive orElse handleServiceManagerMessages orElse super.receive
 
   lazy val dependencyMap: MutableMap[String, Option[ActorRef]] = MutableMap(dependencies.map(_ -> None):_*)
+  
+  val clusterName = Application.config.getString("adapt.name")
 
   private def startIfReady() = {
     val depsSatisfied = dependencyMap forall (_._2.isDefined)
     if (depsSatisfied) {
       beginService()
-      registry.!(PublishService(thisName, context.self))(context.self)
+      registry.!(PublishService(thisName, context.self, clusterName))(context.self)
     } else {
       log.info(s"$thisName is waiting to satisfy more dependencies before publing service availability: $dependencyMap")
     }
@@ -66,8 +68,13 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
 
     case DoSubscriptions =>
       log.info(s"Announcing dependencies to Service Manager: ${dependencies.mkString(",")}")
-      dependencies.foreach(d => registry.!(SubscribeToService(d))(context.self))
+      dependencies.foreach(d => registry.!(SubscribeToService(d, clusterName))(context.self))
       startIfReady()
+  
+    case WrongCluster(triedToJoin) =>
+      log.error(s"Tried to join the wrong cluster: $triedToJoin")
+      throw new Exception("Tried to join the wrong cluster") 
+
   }
 
   private case object DoSubscriptions
