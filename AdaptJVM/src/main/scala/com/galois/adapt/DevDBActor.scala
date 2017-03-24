@@ -183,7 +183,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       sender() !  missingToUuid.size
   }
 }
-
+/*
 case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
 
 sealed trait RestQuery { val query: String }
@@ -194,4 +194,4 @@ case class StringQuery(query: String) extends RestQuery
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
 case object Shutdown
-
+*/
