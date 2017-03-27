@@ -16,7 +16,7 @@ case class Event(
   sequence: Long = 0,
   eventType: EventType,
   threadId: Int,
-  subject: UUID,
+  subject: UUID,                                   // Causes the event
   timestampNanos: Long,
   predicateObject: Option[UUID] = None,
   predicateObjectPath: Option[String] = None,
@@ -35,7 +35,7 @@ case class Event(
     "sequence", sequence,
     "eventType", eventType.toString,
     "threadId", threadId,
-    "subject", subject,
+    "subject1", subject,
     "timestampNanos", timestampNanos
   ) ++
     predicateObject.fold[List[Any]](List.empty)(v => List("predicateObject", v)) ++

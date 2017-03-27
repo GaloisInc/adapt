@@ -24,7 +24,10 @@ lazy val adapt = (project in file(".")).settings(
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "org.apache.avro" % "avro" % "1.8.1",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+    // Titan related
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
+    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0",
+    "org.apache.cassandra" % "cassandra-all" % "2.1", 
     //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-simple" % "1.7.21",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
