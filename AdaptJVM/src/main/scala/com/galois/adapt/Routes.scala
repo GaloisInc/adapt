@@ -1,21 +1,17 @@
 package com.galois.adapt
 
-import java.nio.file.{Files, Paths}
+import java.util.UUID
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives._
-import com.galois.adapt.ApiJsonProtocol._
 import akka.pattern.ask
 import akka.util.Timeout
-import org.apache.tinkerpop.gremlin.structure.{Vertex, Element => VertexOrEdge}
-
-import scala.concurrent.{Await, ExecutionContext}
-import scala.util.{Try, Success, Failure}
+import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+import ApiJsonProtocol._
+import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
-
 import scala.language.postfixOps
 
 object Routes {
@@ -23,6 +19,9 @@ object Routes {
   val serveStaticFilesRoute =
     path("") {
       getFromResource("web/index.html")
+    } ~
+    path("graph") {
+      getFromResource("web/graph.html")
     } ~
     pathPrefix("") {
       getFromResourceDirectory("web")
@@ -42,7 +41,9 @@ object Routes {
       Application.debug("returning...")
       val toReturn = s match {
         case Success(json) => json
-        case Failure(e) => Application.debug(e.getMessage); ("\"" + e.getMessage + "\"")
+        case Failure(e) =>
+          Application.debug(e.getMessage)
+          "\"" + e.getMessage + "\""
       }
       HttpEntity(ContentTypes.`application/json`, toReturn)
     }
@@ -50,9 +51,20 @@ object Routes {
   }
 
 
-  def mainRoute(dbActor: ActorRef)(implicit ec: ExecutionContext) =
+  def mainRoute(dbActor: ActorRef, rankedList: => List[(String,Set[UUID],Float)], statusList: => List[StatusReport])(implicit ec: ExecutionContext) =
     get {
       pathPrefix("query") {
+        pathPrefix("ranked") {
+          complete(rankedList.toString)
+        } ~
+        pathPrefix("status") {
+          complete(
+            Map(
+            "nodes" -> statusList.map(s => UINode(s.from.toString, s.from.path.elements.last, s.measurements.mapValues(_.toString).toList.map(t => s"${t._1}: ${t._2}").mkString("<br />"))).map(ApiJsonProtocol.c.write),
+            "edges" -> statusList.flatMap(s => s.subscribers.map(x => UIEdge(s.from.toString, x.toString, ""))).map(ApiJsonProtocol.d.write)
+          )
+          )
+        } ~
         pathPrefix("nodes") {
           path(RemainingPath) { queryString =>
             completedQuery(NodeQuery(queryString.toString), dbActor)
@@ -101,3 +113,7 @@ object Routes {
     }
 
 }
+
+
+case class UIEdge(from: String, to: String, label: String)
+case class UINode(id: String, label: String, title: String)

@@ -24,7 +24,7 @@ import akka.actor._
  * Thus, every subject has  4 * (# of unique IP addresses in the trace)  features
  */
 class NetflowFeature(val registry: ActorRef, root: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,Seq[Double]]] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,Seq[Double]]] with ReportsStatus {
   
   val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
@@ -49,6 +49,19 @@ class NetflowFeature(val registry: ActorRef, root: ActorRef)
   val dependencies = List.empty
   def beginService() = initialize()
   def endService() = ()
+
+  def statusReport = Map(
+    "netflows_size" -> netflows.size,
+    "sendto_size" -> sendto.size,
+    "sendmsg_size" -> sendmsg.size,
+    "write_size" -> write.size,
+    "reads_size" -> reads.size,
+    "readmsg_size" -> readmsg.size,
+    "recv_size" -> recv.size,
+    "processes_size" -> processes.size,
+    "event2process_size" -> event2process.size,
+    "event2netflow_size" -> event2netflow.size
+  )
 
 
   private val netflows = MutableMap.empty[UUID,(String,String)]   // UUIDs of NetFlowObject to their src/dst IP

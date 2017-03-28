@@ -18,7 +18,7 @@ import akka.actor._
  * features:      events with eventType CHECK_FILE_ATTRIBUTES, OPEN, and WRITE;
  */
 class FileEventsFeature(val registry: ActorRef, root: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,(Int,Int,Int)]] { 
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[Subject,(Int,Int,Int)]] with ReportsStatus {
   
   val subscriptions: Set[Subscription] = Set(Subscription(
     target = root,
@@ -38,6 +38,14 @@ class FileEventsFeature(val registry: ActorRef, root: ActorRef)
   val dependencies = List.empty
   def beginService() = initialize()
   def endService() = ()
+
+  def statusReport = Map(
+    "opens_size" -> opens.size,
+    "writes_size" -> writes.size,
+    "checks_size" -> checks.size,
+    "links_size" -> links.size,
+    "processes_size" -> processes.size
+  )
 
   private val opens = MutableSet.empty[UUID]               // UUIDs of OPEN Events
   private val writes = MutableSet.empty[UUID]              // UUIDs of WRITE Events

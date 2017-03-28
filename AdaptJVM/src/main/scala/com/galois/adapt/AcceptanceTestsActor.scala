@@ -33,6 +33,9 @@ class AcceptanceTestsActor(val registry: ActorRef)
   def beginService(): Unit = initialize()
   def endService(): Unit = ()
 
+
+  def statusReport = Map()
+
   // Some stats to keep
   var failedStatements: Int = 0
   var failedStatementsMsgs: List[String] = Nil // First 5 failed messages
@@ -96,16 +99,16 @@ class AcceptanceTestsActor(val registry: ActorRef)
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
       
-      if (toDisplay.length > 0) {
+      if (toDisplay.nonEmpty) {
         println("Opening up a webserver...")
        
         // Open up the failed tests
-        Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&"))) 
+        Desktop.getDesktop().browse(new URI("http://0.0.0.0:8080/graph#" + toDisplay.mkString("&")))
         println("To navigate the UI, try right-clicking or double-clicking nodes")
         println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
         println("")
       
-        // let it run until user presses return
+        // let it run until user kills the process
         println("Press CTRL^C to kill the webserver")
       }
     }

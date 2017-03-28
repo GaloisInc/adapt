@@ -7,7 +7,7 @@ import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerS
 import com.typesafe.config.Config
 import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
-
+import scala.concurrent.duration._
 import com.galois.adapt.feature._
 import com.galois.adapt.scepter._
 import com.galois.adapt.cdm16.{CDM16, EpochMarker, Subject}
@@ -36,6 +36,8 @@ object ClusterDevApp {
           singletonManagerPath = "/user/registry",
         settings = ClusterSingletonProxySettings(system)),
       name = "registryProxy"))
+
+    Thread.sleep(5000)
 
     nodeManager = Some(
       system.actorOf(Props(classOf[ClusterNodeManager], config, registryProxy.get), "mgr")
@@ -116,7 +118,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors = childActors + (roleName ->
         childActors.getOrElse(roleName, Set(
           context.actorOf(
-            Props(classOf[Outgestor], registryProxy),
+            Props(classOf[Outgester], registryProxy),
             "Outgestor"
           )
         ))
@@ -124,30 +126,46 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 
   case "accept" =>
     val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
-    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))   // TODO: These sets are not used correctly
   
   case "devfeatures" =>
     val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
     val processWrites = context.actorOf(Props(classOf[ProcessWrites], registryProxy), "ProcessWrites")
-    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites)))
+    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
+
+  case "rankedui" =>
+    val rankedDataActor = context.actorOf(Props(classOf[RankedDataActor], registryProxy), "RankedDataActor")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(rankedDataActor)))   // TODO: These sets are not used correctly
 
   case "features" =>
-      
-      val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
+    val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
 
-      // The two feature extractors subscribe to the CDM15 produced by the ER actor
-      val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
-      val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
-      
-      // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
-      val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
-        Subscription(featureExtractor1, { _ => true }),
-        Subscription(featureExtractor2, { _ => true })
-      )), "IForestAnomalyDetector")
-      
-      childActors = childActors + (roleName ->
-        childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
-      )
+    // The two feature extractors subscribe to the CDM produced by the ER actor
+    val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
+    val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
+
+    // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
+    val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
+      Subscription(featureExtractor1, { _ => true }),
+      Subscription(featureExtractor2, { _ => true })
+    )), "IForestAnomalyDetector")
+
+    childActors = childActors + (roleName ->
+      childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
+    )
+  }
+
+
+  implicit val ec = context.dispatcher
+  var statusCounter = 0
+  var statusResults: Map[Int, (Int, List[StatusReport])] = Map.empty
+  val cancellableStatusHeartbeat = context.system.scheduler.schedule(5 seconds, 5 seconds){
+    val totalSent = childActors.map(_._2.size).sum
+    childActors.foreach(_._2.foreach { ref =>
+      ref ! StatusRequest(statusCounter, totalSent)
+    })
+    statusCounter = statusCounter + 1
   }
 
   def receive = {
@@ -155,6 +173,17 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       log.info("Message: {} will result in creating child nodes for: {}", m, m.roles)
       m.roles foreach createChild
 
+    case msg @ StatusReport(id, total, fromActor, dependencies, subscribers, measurements) =>
+      val results = statusResults.getOrElse(id, total -> List.empty[StatusReport])
+      val newList = msg :: results._2
+      statusResults = statusResults + (id -> (results._1 -> newList))
+      if (newList.length == results._1) {
+        childActors.get("ui").foreach(_.foreach(_ ! UIStatusReport(newList)))
+        statusResults = statusResults - id
+      }
+
     case x => log.warning("received unhandled message: {}", x)
   }
 }
+
+case class UIStatusReport(reports: List[StatusReport])

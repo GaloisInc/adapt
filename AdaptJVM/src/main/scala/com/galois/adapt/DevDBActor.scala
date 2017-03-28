@@ -21,7 +21,7 @@ import collection.JavaConverters._
 import scala.util.Try
 
 class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] with ReportsStatus {
 
   val dependencies = "FileIngestActor" :: Nil
   lazy val subscriptions = {
@@ -36,6 +36,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   }
   def endService() = ()  // TODO
 
+
+  def statusReport = {
+    Map("graph" -> "FIX THIS LATER")
+  }
 
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
 //  val graph = TitanFactory.build.set("storage.backend", "inmemory").open

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
+    <script type="text/javascript" src="javascripts/underscore.js"></script>
+
+    <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
+    <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+
+    <style type="text/css">
+        html, body, #graph {
+            padding: 0px;
+            margin: 0px;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+    </style>
+</head>
+<body>
+<div id="graph"></div>
+
+<script type="text/javascript">
+        $.getJSON("/query/status", function(results) {
+            var nodes = new vis.DataSet(results.nodes)
+            var edges = new vis.DataSet(results.edges)
+            var data  = { nodes: nodes, edges: edges }
+
+            var options = {
+                interaction : {
+                    hover: true,
+                    tooltipDelay: 700
+                },
+                layout: {
+                    improvedLayout : true,
+                    randomSeed : 10203040,
+                    hierarchical: {
+                        direction: "LR"
+                    }
+                },
+                physics: {
+                    forceAtlas2Based: {
+                        gravitationalConstant: -26,
+                        centralGravity: 0.005,
+                        springLength: 230,
+                        springConstant: 0.18,
+                        avoidOverlap: 1.5
+
+                    },
+                    maxVelocity: 25,
+                    solver: 'forceAtlas2Based',
+                    timestep: 0.25,
+                    stabilization: {
+                        enabled: true,
+                        iterations: 150,
+                        updateInterval: 25
+                    }
+                },
+                nodes : {
+                    shape: 'dot',
+                    size: 15
+                },
+                edges: {
+                    arrows: "to"
+                }
+            }
+
+            var container = document.getElementById('graph')
+            var network = new vis.Network(container, data, options)
+        })
+    </script>
+
+</body>
+</html>

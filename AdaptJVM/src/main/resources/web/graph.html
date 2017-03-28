@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore.js"></script>
+    <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
+    <script type="text/javascript" src="javascripts/ui_language.js"></script>
+    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script> 
+
+    <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
+    <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+
+    <script type="text/javascript">
+        var node_data_set, edge_data_set, network;
+        // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
+        var execQuery_params = []
+        var journal = []
+        var right_journal =[]
+        var default_node_color = "#97c2fc"
+
+
+        function execQuery(query_object, success_function, query_color) {
+            right_journal = []
+            UI.updateButtonStates()
+            if (query_object.name === "Collapse Nodes (selected)") {
+                makeCluster()
+                return true
+            }
+            UI.loadingUIStart()
+            var query_string
+            if (typeof query_object === "string") {
+                append_str = query_object.split(";").slice(-1)[0].trim().substring(0,2) == "g." ? ".dedup()" : ""
+                query_string = query_object + append_str
+                query_object = { "is_collapsed" : false }
+            } else {
+                query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
+            }
+            document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
+            if (query_string.length == 0) { return UI.failHandler() }
+            $.post("/query/nodes", {"query": query_string}, function(node_results) {
+                var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
+                if ( ! all_are_nodes) { UI.failHandler(); return false }
+                
+                UI.foundNodes(node_results.length)
+                if ( ! _.isEmpty(node_results)) {
+                    var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                    var edge_query;
+                    // if (node_data_set.getIds().length == 0) {
+                        edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
+                        // edge_query = "g.V([" + result_node_ids.join(",") + "].toArray()).bothE().dedup()"
+                    // } else {
+                    //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
+                    //     var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
+                    //     edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
+                    // }
+                    $.post("/query/edges", {"query": edge_query}, function(edge_results) {
+                        UI.foundEdges(edge_results.length)
+                        // var query_color = document.getElementById("query-color").jscolor.value
+                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
+                        var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
+                        if (query_object.is_collapsed) {
+                            data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
+                        }
+                        success_function(data)
+                        UI.loadingUIStop()
+                    }).fail(UI.failHandler)
+                } else {
+                    UI.loadingUIStop()
+                }
+            }).fail(UI.failHandler)
+        }
+
+
+        function execTextQuery(query_string) {
+            UI.loadingUIStart()
+            $.post("/query", {"query": query_string}, function(results) {
+                UI.queryInputColor("lightgreen")
+                console.log(results)
+                setTimeout(function(){ UI.queryInputColor() }, 750)
+                UI.loadingUIStop()
+            }).fail(UI.failHandler)
+        }
+
+
+        function getQueryObjectFromNode(node_id, query_name) {
+            var queries_from_node = node_data_set.get(node_id).queries
+            var query_object = _.filter(queries_from_node, function(q){ 
+                if (typeof query_name === "string") {
+                    return q.name === query_name
+                } else {
+                    return q.is_default
+                }})[0]
+            query_object['starting_node_id'] = node_id
+            return query_object
+        }
+
+
+        function addCollapsedEdges(data, starting_node_id, floating_query, edge_name) {
+            var special_edges = _.map(data['nodes'], function(n) {
+                return {
+                    id: "COLLAPSED-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23),
+                    inV: n.id,
+                    type: "edge",
+                    outV: starting_node_id,
+                    inVLabel: n.label,
+                    outVLabel: node_data_set.get(starting_node_id).label,
+                    label: typeof edge_name !== 'string' ? floating_query : edge_name,
+                    title: floating_query
+                }
+            })
+            var all_edges = data['edges'].concat(special_edges)
+            var new_data = {
+                "type" : "add",
+                "nodes" : uniqueBy(data['nodes']),
+                "edges" : uniqueBy(all_edges, function(e){ return String(e.outV)+e.title+String(e.inV) } ) 
+            }
+            return new_data
+        }
+
+
+        function makeCluster(){
+            function getClusteringData(node_ids, cluster_node_id, name) { 
+                var cluster_spec = _.find(node_appearance, function(n){return n.name.toLowerCase() === "cluster"})
+                return {
+                    type : "collapse",
+                    node_ids : node_ids,
+                    id : cluster_node_id,
+                    name : name,
+                    joinCondition : function(node_props) {
+                        return _.contains(this.node_ids, node_props.id)
+                    },
+                    processProperties: function (cluster_node, child_nodes, child_edges) {
+                        cluster_node['child_nodes'] = child_nodes
+                        cluster_node['child_edges'] = child_edges
+                        cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
+                        cluster_node.id = this.id
+                        cluster_node.label = this.name
+                        return cluster_node
+                    },
+                    clusterNodeProperties : {
+                        icon: { 
+                            code: cluster_spec.icon_unicode,
+                            color: cluster_spec.color,
+                            size: cluster_spec.size
+                        }
+                    },
+                    clusterEdgeProperties : {
+                        color : "red"
+                    }
+                }
+            }
+            var name = prompt("Name your cluster:")
+            var cluster_node_id = "CLUSTER-" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 23)
+            if (_.isEmpty(name)) { name = cluster_node_id }
+            var cluster_data = getClusteringData(network.getSelectedNodes(), cluster_node_id, name)
+            var formatted_cluster_data = formatAllData(cluster_data)
+            updateNetwork(formatted_cluster_data)
+        }
+
+
+        function formatAllData(node_and_edge_data) {
+            var data = copy(node_and_edge_data)
+            data.nodes = formatNodes(data.nodes)
+            data.edges = formatEdges(data.edges)
+            return data
+        }
+
+
+        function updateNetwork(additional_data, starting_node_id) {
+            switch (additional_data.type) {
+                case "add":
+                    var new_nodes = _.filter(additional_data['nodes'], function(n){ return ! node_data_set.get(n.id) })
+                    var new_edges = _.filter(additional_data['edges'], function(e){ return ! edge_data_set.get(e.id) })
+                    var data = { 
+                        "type" : "add", 
+                        "nodes": new_nodes,
+                        "edges": new_edges,
+                    }
+                    persistJournal(data)
+                    // Add position, if needed:
+                    if (typeof starting_node_id !== "undefined" && typeof node_data_set.get(starting_node_id) === "object") {
+                        var bbox = network.getBoundingBox(starting_node_id)
+                        var starting_position = { x: (bbox.left + bbox.right) / 2, y: (bbox.top + bbox.bottom) / 2 }
+                        new_nodes = _.map(new_nodes, function(n) {
+                            n.x = starting_position.x
+                            n.y = starting_position.y
+                            return n
+                        })
+                    }
+                    applyJournalEvent(data)
+                    break
+                default:
+                    persistJournal(additional_data)
+                    applyJournalEvent(additional_data)
+                    break
+            }
+            UI.animate()
+            UI.updateButtonStates()
+        }
+
+
+        function persistJournal(event) {
+            journal.push(event)
+            // localStorage.setItem("previous_journal", JSON.stringify(journal))
+        }
+
+
+        function applyJournalEvent(event) {
+            switch (event.type) {
+                case "add":
+                    node_data_set.add(event.nodes)
+                    edge_data_set.add(event.edges)
+                    break
+                case "subtract":
+                    var node_ids_to_remove = _.pluck(event.nodes, "id")
+                    var edge_ids_to_remove = _.pluck(event.edges, "id")
+                    node_data_set.remove(node_ids_to_remove)
+                    edge_data_set.remove(edge_ids_to_remove)
+                    break
+                case "collapse":
+                    event.joinCondition = function(node_props) {
+                        return _.contains(this.node_ids, node_props.id)
+                    },
+                    event.processProperties = function (cluster_node, child_nodes, child_edges) {
+                        cluster_node['child_nodes'] = child_nodes
+                        cluster_node['child_edges'] = child_edges
+                        cluster_node.title = _.map(child_nodes, function(n){ return n.label }).join("<br />")
+                        cluster_node.id = this.id
+                        cluster_node.label = this.name
+                        return cluster_node
+                    }
+                    network.clustering.cluster(event)
+                    break
+                case "expand":
+                    network.openCluster(event.id)
+                    break
+                case "checkpoint":
+                    break
+                case "layout":
+                    _.map(event.positions, function(data, node_id_string) {
+                        network.moveNode(node_id_string, data.pos.x, data.pos.y)
+                    })
+                    setTimeout(function(){UI.animate(false)}, 0)    // TODO: do this in a logically rigorous way!!!
+                    _.map(event.positions, function(data, node_id_string) {
+                        if (data.fixed) {
+                            var possible_numeric_id = Number(node_id_string)
+                            var node_id_as_string_or_number = isNaN(possible_numeric_id) ? node_id_string : possible_numeric_id
+                            node_data_set.update( { id: node_id_as_string_or_number, fixed: true, shadow: { enabled: true } } )
+                        }
+                    })
+                    break
+                default:
+                    break
+            }
+        }
+
+
+        function invertJournalEvent(initial_event) {
+            var event = copy(initial_event)
+            switch (event.type) {
+                case "add":
+                    event.type = "subtract"
+                    return event
+                case "subtract":
+                    event.type = "add"
+                    return event
+                case "collapse":
+                    event.type = "expand"
+                    return event
+                case "expand":
+                    event.type = "collapse"
+                    return event
+                case "checkpoint":
+                    return event
+                case "layout":
+                    return event
+                default:
+                    return event
+            }
+        }
+
+
+        function undoUpdateNetwork() {
+            var journal_event
+            if (journal.length > 0) {
+                journal_event = journal.pop()
+                right_journal.unshift(journal_event)
+                if (journal_event.type !== "layout") {
+                    applyJournalEvent(invertJournalEvent(journal_event))
+                    UI.animate()
+                }
+                // localStorage.setItem("previous_journal", JSON.stringify(journal))
+            }
+            UI.updateButtonStates()
+            // Skip over checkpoints:
+            if (typeof journal_event !== "undefined" && (journal_event.type === "checkpoint" || journal_event.type === "layout")) { 
+                undoUpdateNetwork()
+            }
+        }
+
+
+        function redoUpdateNetwork() {
+            var journal_event
+            if (right_journal.length > 0) {
+                journal_event = right_journal.shift()
+                updateNetwork(journal_event)
+            }
+            UI.updateButtonStates()
+            // Skip over checkpoints:
+            if (typeof journal_event !== "undefined" && 
+                    journal_event.type !== "checkpoint" && 
+                    journal_event.type !== "layout" && 
+                    typeof right_journal[0] !== "undefined" &&
+                    right_journal[0].type === "checkpoint" &&
+                    right_journal[0].type === "layout") { 
+                redoUpdateNetwork() 
+            }
+        }
+
+
+        function undoMany(optional_name) {
+            var undid_at_least_one = false
+            while (journal.length > 0) {
+                var last = journal.slice(-1)[0]
+                var should_skip = last.type === "checkpoint" || last.type === "layout"
+                if (should_skip && undid_at_least_one) { break }
+                if (typeof optional_name === "string" && journal.slice(-1)[0].name === optional_name) { break }
+                undoUpdateNetwork()
+                undid_at_least_one = true
+            }
+            var last_event = journal.slice(-1)[0]
+            if (typeof optional_name === "string" && 
+                    typeof last_event !== "undefined" &&
+                    last_event.name !== optional_name &&
+                    _.contains(_.pluck(journal, "name"), optional_name)) {
+                undoMany(optional_name)
+            }
+        }
+
+
+        function redoMany(optional_name) {
+            while (right_journal.length > 0) {
+                redoUpdateNetwork()
+                var last = journal.slice(-1)[0]
+                var is_checkpoint = last.type === "checkpoint" || last.type === "layout"
+                if (is_checkpoint) { break }
+            }
+            var right_names = _.filter(_.pluck(right_journal, "name"), function(n){return typeof n === "string"})
+            if (typeof optional_name === "string" && 
+                _.contains(right_names, optional_name)) { 
+                    redoMany(optional_name) 
+            }
+        }
+
+
+        function addCheckpoint() {
+            var name = prompt("Name your checkpoint:")
+            if (! _.isEmpty(name)) {
+                var journal_event = {
+                    name : name,
+                    type : "checkpoint"
+                }
+                addLayout()
+                persistJournal(journal_event)
+                UI.checkpointFeedback()
+            }
+        }
+
+
+        function addLayout() {
+            var positions = network.getPositions(node_data_set.getIds())
+            var pinned_positions = _.mapObject(positions, function (val, key) { 
+                var result =  { pos: val }
+                if (node_data_set.get(key).fixed) { result['fixed'] = true }
+                return result
+            })
+            var journal_event = {
+                type: "layout",
+                positions: pinned_positions
+            }
+            persistJournal(journal_event)
+        }
+
+
+        function formatNodes(raw_results) {
+            var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
+            return _.map(nodes, function(n) {
+
+                n['queries'] = getRelevantQueries(n)  
+
+                node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
+                default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
+                if (typeof node_spec === "object") {
+                    n['icon'] = {
+                        color : getOrElse(n.icon.color, getOrElse(node_spec.color, UI.selectedColor())),
+                        code : getOrElse(n.icon.code, getOrElse(node_spec.icon_unicode, default_spec.icon_unicode)),
+                        size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
+                    }
+                }
+
+                // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+
+
+                translateAllEnums(n)
+                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
+                n["title"] = makeNodeTitle(n)
+                n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
+                return n
+            })
+        }
+
+
+        function formatEdges(raw_edge_results) {
+            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
+            return _.map(edges, function(e, i, list) {
+                var new_edge = { 
+                    "id" : e['id'],
+                    "from" : e['outV'],
+                    "to" : e['inV'],
+                    // "label" : e['label'],
+                    "arrows" : "to",
+                    "title" : e['label'] 
+                }
+                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+                    new_edge['label'] = e['label']
+                    new_edge['title'] = e['title']
+                    new_edge['color'] = "green"
+                    new_edge['dashes'] = true
+                }
+                return new_edge
+            })
+        }
+
+
+        function getRelevantQueries(node) {
+            var adjacent_query = {
+                "name" : "Adjacent Nodes",
+                "floating_query" : ".bothE().bothV()",
+                "is_collapsed" : false,
+                "is_default" : true,  // Will be overridden by any default already defined.
+            }
+            var relevant_queries = _.filter(predicates, function(q){ return q.is_relevant(node) })
+            var node_queries = _.map(relevant_queries, function(q) {q.is_collapsed = true; return q})
+            node_queries.push(adjacent_query)
+            var found_one_default = false
+            return _.map(node_queries, function(q){
+                var new_q = {
+                    "name" : q.name,
+                    "floating_query" : q.floating_query,
+                    "is_collapsed" : q.is_collapsed
+                }
+                if (q['is_default'] && ! found_one_default) {
+                    found_one_default = true
+                    new_q['is_default'] = true
+                } else {
+                    new_q['is_default'] = false
+                }
+                return new_q
+            })
+        }
+
+
+        function uniqueBy(array, function_object_to_unique_value) {
+            var f = typeof function_object_to_unique_value === "function" ? function_object_to_unique_value : function(x){ return x.id }
+            var id_list = _.map(array, f)
+            var unique_ids = Array.from(new Set(id_list))
+            var unique_data_by_id = _.map(unique_ids, function(id) {
+                var idx = _.indexOf(id_list, id)
+                return array[idx]
+            })
+            return unique_data_by_id
+        }
+
+
+        function getOrElse(value, alternate) {
+            if (typeof value != "undefined" && value != null) {
+                return value
+            } else {
+                return alternate
+            }
+        }
+
+
+        function copy(object) { return $.extend(true, {}, object) }
+
+
+        function translateAllEnums(node) {  // Mutates 'node' in place.
+            var translateEnum = function(prop_key, ordered_list) {
+                var keys = Object.keys(node['properties'])
+                var node_has_prop = $.inArray(prop_key, keys) >= 0
+                if (node_has_prop) {
+                    var idx = node['properties'][prop_key][0]['value']
+                    if (ordered_list.length > idx) { 
+                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
+                    }
+                }
+            }
+            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+            translateEnum("srcSinkType", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+            translateEnum("source", ["LINUX_AUDIT_TRACE","LINUX_PROC_TRACE","LINUX_BEEP_TRACE","FREEBSD_OPENBSM_TRACE","ANDROID_JAVA_CLEARSCOPE","ANDROID_NATIVE_CLEARSCOPE","LINUX_AUDIT_CADETS","WINDOWS_DIFT_FAROS"])
+            translateEnum("agentType", ["Local","Remote"])
+        }
+        
+
+        function makeNodeTitle(node) {
+            var keys = Object.keys(node['properties'])
+            var prop_lines = _.map(keys, function(key) {
+                x = node['properties'][key]
+                var value_list = _.map(x, function(s){ 
+                    return String(s.value) } )
+                return key + " : " + value_list.join(", ")
+            })
+            return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+        }
+
+
+        var UI = {
+            queryClick : function() {
+                UI.queryInputColor()
+                var query_string = document.getElementById('query-string').value
+                if (UI.shift_is_held) {
+                    execTextQuery(query_string)
+                } else {
+                    var formatAndUpdate = _.compose(updateNetwork, formatAllData)
+                    execQuery(query_string, formatAndUpdate, document.getElementById("query-color").jscolor.value)
+                }
+            },
+            shift_is_held : false,
+            failHandler : function(response) {
+                UI.queryInputColor("pink")
+                UI.loadingUIStop()
+            },
+            queryInputColor : function(color) {
+                if (typeof color != "string") { color = "white" }
+                $("#query-string").css("background-color", color)
+            },
+            ajax_in_progress_count : 0,
+            loadingUIStart : function() {
+                $("#found-nodes-icon, #found-edges-icon").hide()
+                UI.queryInputColor()
+                UI.ajax_in_progress_count++
+                $("#loader").show()
+            },
+            loadingUIStop : function() {
+                UI.ajax_in_progress_count--
+                if (UI.ajax_in_progress_count <= 0) {
+                    UI.ajax_in_progress_count = 0
+                    $('#loader').hide()
+                }
+            },
+            foundNodes : function(count) {
+                $("#found-nodes-icon").html("<span>"+count+"</span>").show()
+            },
+            foundEdges : function(count) {
+                $("#found-edges-icon").html("<span>"+count+"</span>").show()
+            },
+            animate : function(millisOrBool) {
+                if (typeof millisOrBool === "boolean") {
+                    network.setOptions({ physics: millisOrBool })
+                } else {
+                    var millis = typeof millisOrBool === "number" ? millisOrBool : 1000
+                    network.setOptions({ physics: true })
+                    $("#animate-button").removeClass("ion-ios-play").addClass("ion-ios-pause")
+                    $("#animate-button").click(function(){ UI.animateButton(false) })
+                    setTimeout(function() {
+                        network.setOptions({ physics: false })
+                        $("#animate-button").removeClass("ion-ios-pause").addClass("ion-ios-play")
+                        $("#animate-button").click(function(){ UI.animateButton(true) })
+                    }, millis)
+                }
+            },
+            animateButton : function(should) {
+                if (should) {
+                    UI.animate(true)
+                    $("#animate-button").removeClass("ion-ios-play").addClass("ion-ios-pause")
+                    $("#animate-button").click(function(){ UI.animateButton(false) })
+                } else {
+                    UI.animate(false)
+                    $("#animate-button").removeClass("ion-ios-pause").addClass("ion-ios-play")
+                    $("#animate-button").click(function(){ UI.animateButton(true) })
+                }
+            },
+            updateButtonStates : function() {
+                if (journal.length == 0) { $("#undo-button").addClass("disabled") } 
+                else { $("#undo-button").removeClass("disabled") }
+                
+                if (journal.length < 2) { $("#undo-all-button").addClass("disabled") } 
+                else { $("#undo-all-button").removeClass("disabled") }
+
+                if (right_journal.length == 0) { $("#redo-button").addClass("disabled") }
+                else { $("#redo-button").removeClass("disabled") }
+                
+                if (right_journal.length < 2) { $("#redo-all-button").addClass("disabled") }
+                else { $("#redo-all-button").removeClass("disabled") }
+            },
+            checkpointFeedback : function() {
+                $("#checkpoint-button").addClass("ion-ios-location").removeClass("ion-ios-location-outline")
+                setTimeout(function(){
+                    $("#checkpoint-button").addClass("ion-ios-location-outline").removeClass("ion-ios-location")
+                }, 2000)
+            },
+            networkDoubleClickBehavior : function(props) {
+                if (props.nodes.length === 1 && network.isCluster(props.nodes[0])) {
+                    var data = { type: "expand", id: props.nodes[0]}
+                    var cluster_event = _.find(journal, function(j) { return j.id == props.nodes[0] })
+                    if (cluster_event) { 
+                        updateNetwork(invertJournalEvent(cluster_event))
+                        UI.animate()
+                    }
+                } else if (props.nodes.length === 1 && ! props.event.changedPointers[0].shiftKey) {
+                    var starting_node_id = props.nodes[0]
+                    var query = getQueryObjectFromNode(starting_node_id)  // no 2nd paramter == default
+                    var updateNetworkAtId = _.partial(updateNetwork, _, starting_node_id)
+                    var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
+                    execQuery(query, formatAndUpdateAtId, document.getElementById("query-color").jscolor.value)
+                }
+            },
+            networkRightClickBehavior : function(props) {
+                $("#node-query-menu ul").empty()
+                var node_id = network.getNodeAt({x: props.pointer.DOM.x, y: props.pointer.DOM.y})
+                if (typeof node_id !== 'undefined') {
+                    var query_list = node_data_set.get(node_id).queries
+                    if (network.getSelectedNodes().length > 1) {
+                        var collapse_query = { 
+                            name : "Collapse Nodes (selected)"
+                        }
+                        query_list = [collapse_query].concat(query_list)
+                    }
+                    execQuery_params =  []
+                    var idx = 0
+                    _.map(query_list, function(q) {
+                        q['starting_node_id'] = node_id
+                        var default_string = q.is_default ? "  (default)" : ""
+                        var updateNetworkAtId = _.partial(updateNetwork, _, node_id)
+                        var formatAndUpdateAtId = _.compose(updateNetworkAtId, formatAllData)
+                        execQuery_params.push([q, formatAndUpdateAtId])
+                        var onclick_function_call = "execQuery(execQuery_params["+idx+"][0], execQuery_params["+idx+"][1], document.getElementById('query-color').jscolor.value)"
+                        var list_item = '<li title="'+ q.floating_query +'" onclick="'+ onclick_function_call +'">' + q.name + default_string + '</li>'
+                        $("#node-query-menu ul").append(list_item)
+                        idx++
+                    })
+                    var query_menu = document.getElementById("node-query-menu")
+                    query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
+                    query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
+                    query_menu.style.removeProperty("right")
+                    query_menu.className = "show"  
+                }
+            },
+            checkpointRightClickBehavior : function(e) {
+                e.preventDefault()
+                $("#node-query-menu ul").empty()
+
+                var left_checkpoints = _.filter(journal, function(e){return e.type === "checkpoint"})
+                _.map(left_checkpoints, function(c) {
+                    $("#node-query-menu ul").append(
+                        '<li onclick="undoMany(\''+c.name+'\')">' + c.name + '</li>'
+                    )
+                })
+                $("#node-query-menu ul").append( '<li><b> —> u r here <— </b></li>')
+                var right_checkpoints = _.filter(right_journal, function(e){return e.type === "checkpoint"})
+                _.map(right_checkpoints, function(c) {
+                    $("#node-query-menu ul").append(
+                        '<li onclick="redoMany(\''+c.name+'\')">' + c.name + '</li>'
+                    )
+                })
+                var query_menu = document.getElementById("node-query-menu")
+                query_menu.style.top =  e.clientY + 'px'
+                query_menu.style.removeProperty("left")
+                query_menu.style.right = window.innerWidth - e.screenX + "px"
+                query_menu.className = "show"  
+            },
+            toggleNode : function(props) {
+                // Calling `.getNodeAt()` inside this event handler always returns undefined. 
+                // Workaround/hack: setTimeout at 0 to move this to the end of the call chain.
+                // Downsides: broken call chain order consistency, flash in the UI.
+                setTimeout(function(props) {
+                    var new_selection = props.nodes.concat(props.previousSelection.nodes)
+                    var node_id = network.getNodeAt(props.pointer.DOM)
+                    if (typeof node_id === 'number') {
+                        if (_.contains(props.previousSelection.nodes, node_id)) {
+                            new_selection = _.without(new_selection, node_id)
+                        } else {
+                            new_selection = new_selection.concat([node_id])
+                        }
+                    }
+                    network.selectNodes(new_selection)
+                }, 0, props)
+            },
+            startDrawSelection : function(props) {
+                console.log("drawing selection")
+                UI.drawing = props.pointer.canvas
+                network.setOptions({ 
+                    interaction : {
+                        dragView : false,
+                        zoomView : false
+                    }
+                })
+                $('#node-selection-box').show()
+            },
+            endDrawSelection : function(props) {
+                console.log("stopped drawing selection")
+                    network.setOptions({interaction: {
+                        dragView : true,
+                        zoomView : true
+                    }})
+                    var nps = network.getPositions()
+                    var end_canvas_point = props.pointer.canvas
+                    var xs = _.sortBy([UI.drawing.x, end_canvas_point.x])
+                    var ys = _.sortBy([UI.drawing.y, end_canvas_point.y])
+                    var selected_nodes = network.getSelectedNodes()
+                    for (var n in nps) {
+                        if (nps[n].x >= xs[0] && nps[n].x <= xs[1] && nps[n].y >= ys[0] && nps[n].y <= ys[1]) {
+                            selected_nodes.push(n)
+                        }
+                    }
+                    network.selectNodes(selected_nodes)
+                    UI.drawing = false
+                $('#node-selection-box').hide().css({"width": 0, "height": 0})
+            },
+            updateSelectionBox : function(e) {
+                var coords = network.canvasToDOM(UI.drawing)
+                var element_bounds = document.getElementById("graph").getBoundingClientRect()
+                coords.x = coords.x + element_bounds.left  // element offset
+                coords.y = coords.y + element_bounds.top   // element offset
+                var width  = Math.abs(e.pageX - coords.x)
+                var height = Math.abs(e.pageY - coords.y)
+                var new_x  = (e.pageX < coords.x) ? (coords.x - width) : coords.x
+                var new_y  = (e.pageY < coords.y) ? (coords.y - height) : coords.y
+                $('#node-selection-box').css({
+                    width: width,
+                    height: height,
+                    top: new_y,
+                    left: new_x
+                })
+            },
+            deleteSelectedNodes : function() {
+                var node_ids = network.getSelectedNodes()
+                if ( ! _.isEmpty(node_ids)) {
+                    var nodes = node_data_set.get(node_ids)
+                    var journal_event = { type: "subtract", nodes: nodes, edges: [] }
+                    updateNetwork(journal_event)
+                }
+            },
+            colorNodes : function(node_ids, color_string) {
+                node_data_set.update(
+                    _.map(node_ids, function(n) {
+                        return { id: n, icon: {"color": color_string} }
+                    })
+                )
+            },
+            setQueryColor: function(element) {
+                document.getElementById("query-color").jscolor.value = element.toHEXString()
+            },
+            selectedColor: function() {
+                return document.getElementById("query-color").jscolor.value
+            },
+            drawing : false,
+            draw : function(data) {
+                var container = document.getElementById('graph')
+                default_node_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
+                var options = {
+                    interaction : { 
+                        hover: true,
+                        tooltipDelay: 700
+                    },
+                    layout: { 
+                        improvedLayout : true,
+                        randomSeed : 10203040
+                    },
+                    physics: {
+                        forceAtlas2Based: {
+                            gravitationalConstant: -26,
+                            centralGravity: 0.005,
+                            springLength: 230,
+                            springConstant: 0.18,
+                            avoidOverlap: 1.5
+
+                        },
+                        maxVelocity: 25,
+                        solver: 'forceAtlas2Based',
+                        timestep: 0.25,
+                        stabilization: {
+                            enabled: true,
+                            iterations: 150,
+                            updateInterval: 25
+                        }
+                    },
+                    nodes : {
+                        // shape: 'dot',
+                        // size: 15,
+                        shape: 'icon',
+                        icon: {
+                            face: 'Ionicons',
+                            code: default_node_spec.icon_unicode,
+                            size: default_node_spec.size,
+                            color: default_node_color
+                        }
+                    },
+                    edges: {
+                        smooth: false,
+                        color: default_node_color
+                    }
+                }
+
+                node_data_set = new vis.DataSet(data.nodes)
+                edge_data_set = new vis.DataSet(data.edges)
+                var network_data = { "type" : "add", "nodes" : node_data_set, "edges" : edge_data_set}
+                network = new vis.Network(container, network_data, options)
+                if (data.nodes.length > 0 || data.edges.length > 0) {
+                    journal = [data]
+                }
+                // var previous_journal = localStorage.getItem("previous_journal")
+                // if (previous_journal != null) {
+                //     right_journal = JSON.parse(previous_journal)
+                //     UI.updateButtonStates()
+                // }
+
+                network.on("doubleClick", UI.networkDoubleClickBehavior)
+                network.on("oncontext", UI.networkRightClickBehavior)
+                network.on("deselectNode", function(props) {
+                    if (props.event.changedPointers[0].shiftKey) { UI.toggleNode(props) }
+                })
+                network.on("hold", function(props) {
+                    if ( props.nodes.length == 1) {
+                        var node_id = props.nodes[0]
+                        var is_cluster = network.isCluster(node_id)
+                        
+                        if (props.event.srcEvent.shiftKey && ! is_cluster) {
+                            var node = node_data_set.get(node_id)
+                            var previous_color = node.icon.color
+                            var shadow_enabled = node.hasOwnProperty('shadow') && node.shadow.enabled
+                            node_data_set.update({ 
+                                id: node_id, 
+                                fixed: ! node.fixed, 
+                                shadow: { enabled: ! shadow_enabled }, 
+                                icon: { color: "black" }
+                            })
+                            setTimeout(function(){
+                                node_data_set.update( {id: node_id, icon: {color: previous_color} } )
+                            }, 500)
+                        } else {
+                            if (is_cluster) {
+                                console.log(node_id)
+                            } else {
+                                var node = node_data_set.get(node_id)
+                                debug_node = node
+                                console.log(debug_node)
+                            }
+                        }
+                    }
+                })
+                network.on("dragEnd", function(props){
+                    if (UI.drawing) { UI.endDrawSelection(props) }
+                })
+                network.on("dragStart", function(props){
+                    if (props.event.changedPointers[0].shiftKey && props.nodes.length === 0) {
+                        UI.startDrawSelection(props)
+                    }
+                })
+                $("#graph").on("mousemove", function(e) {  // Cannot use network 'dragging' event
+                    if (UI.drawing) { UI.updateSelectionBox(e) }
+                })      
+            }
+        }
+
+
+        function downloadJournal() {
+            addLayout()
+            var blob = new Blob([JSON.stringify(journal)], {type: "application/json"})
+            var a = document.createElement('a')
+            a.download = "history.json"
+            a.href = URL.createObjectURL(blob)
+            a.target = "_blank"
+            a.click()
+            $("#download-button").addClass("ion-checkmark-round").removeClass("ion-ios-cloud-download-outline")
+            setTimeout(function(){
+                $("#download-button").addClass("ion-ios-cloud-download-outline").removeClass("ion-checkmark-round")
+            }, 2000)
+        }
+
+
+        function uploadFile(event) {
+            var files = event.target.files
+            _.map(files, function(f){
+                if (f.type === "application/json") {
+                    right_journal = []
+                    var reader = new FileReader()
+                    reader.onload = function(e) {
+                        var data = JSON.parse(e.target.result)
+                        right_journal = right_journal.concat(data)
+                        UI.updateButtonStates()
+                    }
+                    reader.readAsText(f)
+                } else {
+                    UI.failHandler()
+                }
+            })
+        }
+
+
+        function createSavedQueries() {
+            var arg_idx = 0
+            _.map(starting_queries, function(q){
+                var replacement_indices = []
+                var replaced_query_string = q.base_query
+                _.map(q.default_values, function(v){
+                    var val = String(v)
+                    idx = replaced_query_string.indexOf("{_}")
+                    if (idx >= 0) {
+                        replacement_indices.push({pos: idx, len: val.length})
+                        replaced_query_string = replaced_query_string.slice(0,idx) + val + replaced_query_string.slice(idx+3)
+                    }
+                })
+                highlight_points.push(replacement_indices)
+                var query_item = '<option value="'+replaced_query_string+'">'+ q.name + '</option>'
+                arg_idx++
+                $("#starting-queries").append(query_item)
+            })
+        }
+
+        function setSelectedQuery(e) {
+            var input = e.target
+            var list = input.getAttribute('list')
+            var options = document.getElementById(list).childNodes
+            for(var i = 0; i < options.length; i++) {
+                if(options[i].value === input.value) {
+                    original_query_string_length = input.value.length
+                    highlight_coords = { row: i, col: 0 }
+                    var pos = highlight_points[highlight_coords.row][highlight_coords.col]
+                    if (typeof pos !== "undefined") {
+                        input.setSelectionRange(pos.pos, pos.pos + pos.len) 
+                        highlight_coords.col = highlight_coords.col + 1
+                    }
+                    break
+                }
+            }
+        }
+
+        var highlight_points = []
+        var highlight_coords = {row: 0, col: 0}
+        var original_query_string_length = 0
+
+
+        $(document).bind("click", function(event) {
+            document.getElementById("node-query-menu").className = "hide"
+        })
+        $(document).bind("keyup", function(event) { 
+            if (event.keyCode == 16) { UI.shift_is_held = false }
+        })
+        $(document).bind("keydown", function(event) { 
+            if (event.keyCode == 16) { UI.shift_is_held = true }
+            if ($("#query-string").is(":focus")) { UI.queryInputColor() }
+            if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
+                UI.deleteSelectedNodes()
+            }
+            // TAB key for highlighting positions in queries.
+            if (event.keyCode == 9 && $("#query-string").is(':focus') && highlight_coords.col < highlight_points[highlight_coords.row].length) {
+                event.preventDefault()
+                var pos = highlight_points[highlight_coords.row][highlight_coords.col]
+                var input = document.getElementById("query-string")
+                var position_change = input.value.length - original_query_string_length
+                input.setSelectionRange(pos.pos + position_change, pos.pos + pos.len + position_change)
+                highlight_coords.col = highlight_coords.col + 1
+            }
+        })
+
+        $(function(){
+            UI.draw( { "nodes" : [], "edges" : [] } )
+            $("#animate-button").click(function(){ UI.animateButton(true) })
+            document.getElementById("query-color").jscolor.value = default_node_color
+            document.getElementById('choose-upload').addEventListener('change', uploadFile, false)
+            document.getElementById("checkpoint-button").addEventListener('contextmenu', UI.checkpointRightClickBehavior)
+            
+            createSavedQueries()
+            document.querySelector('input[list="starting-queries"]').addEventListener('input', setSelectedQuery)
+        })
+
+        $(function(){
+            if (window.location.hash.length > 0) {
+                var hash_string = decodeURIComponent(window.location.hash).replace("#", "")
+                queries = hash_string.split("&")
+                var starting_color = document.getElementById("query-color").jscolor.value.replace("#", "")
+                var queries_with_colors = _.map(queries, function(s){ 
+                    var pair = s.split(":")
+                    if (pair.length == 1) { 
+                        return [pair[0], starting_color]
+                    } else {
+                        return pair
+                    }
+                })
+                _.map(queries_with_colors, function(pair){ 
+                    document.getElementById('query-string').value = pair[0]
+                    document.getElementById("query-color").jscolor.value = "#" + pair[1]
+                    UI.queryClick()
+                })
+                document.getElementById("query-color").jscolor.value = "#" + starting_color
+            }
+        })
+    </script>
+
+    <style type="text/css">
+        html, body, #graph {
+            padding: 0px;
+            margin: 0px;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        .show {
+            z-index: 1;
+            position: absolute;
+            background-color: rgba(234, 236, 53, 0.9);
+            border: 1px solid #424242;
+            padding: 20px;
+            display: block;
+            margin: 0;
+            list-style-type: none;
+            list-style: none;
+            border-radius: 15px;
+        }
+        .hide { display: none; }
+        .show ul { margin: 0px; padding: 0px; }
+        .show li { list-style: none; padding-bottom: 1em; }
+        .show ul li:last-child { padding-bottom: 0em; }
+
+        .loader {
+            border: .2em solid #f3f3f3;
+            border-top: .2em solid #c5c5c5;
+            border-radius: 50%;
+            width: 3em;
+            height: 3em;
+            animation: spin 0.5s linear infinite;
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #node-selection-box {
+            position: absolute;
+            pointer-events: none;
+            background-color: rgba(53, 211, 236, 0.13);
+        }
+
+        i {
+            font-size: 1.5em;
+            color: gray;
+            margin-left: 1.2em;
+            display: block;
+            float: left;
+        }
+        input, button {
+            font-size: 1em;
+            line-height: normal;
+            display: block;
+            float: left;
+        }
+        .disabled {
+            color: lightgray;
+        }
+        .ion-checkmark-round {
+            width: 21px;
+            color: green;
+        }
+        .ion-ios-location { color: green; }
+        i.right-icon {
+            float: right;
+            margin-right: .5em;
+            margin-left: 0em;
+        }
+        i.right-icon span {
+            font-size: small;
+        }
+
+    </style>
+</head>
+<body>
+    <div style="display: block;">
+        <input id="query-string" list="starting-queries" placeholder="Query returning nodes" onfocus="UI.queryInputColor()" autofocus onkeyup="if (event.keyCode == 13) document.getElementById('query-button').click()" size=70 />
+        <datalist id="starting-queries"></datalist>
+        <button id="query-button" title="Add nodes found with the entered query to the existing graph" onclick="UI.queryClick()">Query</button>
+        <input id="query-color" class="jscolor {valueElement:null,value:'97c2fc',onFineChange:'UI.setQueryColor(this)'}" size=2 title="Choose the color for the next added nodes" >
+        <i class="ion-ios-rewind disabled" id="undo-all-button" title="Undo until previous checkpoint" onclick="undoMany()"></i>
+        <i class="ion-ios-skipbackward disabled" id="undo-button" title="Undo previous change" onclick="undoUpdateNetwork()"></i>
+        <i class="ion-ios-play" id="animate-button" title="Animate graph until you press again to pause" ></i>
+        <i class="ion-ios-skipforward disabled" id="redo-button" title="Redo or apply next change" onclick="redoUpdateNetwork()"></i>
+        <i class="ion-ios-fastforward disabled" id="redo-all-button" title="Redo until next checkpoint" onclick="redoMany()"></i>
+        <i class="ion-ios-location-outline" id="checkpoint-button" title="Create a checkpoint" onclick="addCheckpoint()"></i>
+        <i class="ion-ios-cloud-download-outline" id="download-button" title="Download the history log up to this point" onclick="downloadJournal()"></i>
+        <i class="ion-ios-cloud-upload-outline" id="upload-button" title="Upload a history log to be replayed through Redo" onclick="document.getElementById('choose-upload').click()"></i>
+        <i class="ion-android-radio-button-on right-icon hide" id="found-nodes-icon"><span>0</span></i>
+        <i class="ion-arrow-resize right-icon hide" id="found-edges-icon"><span>0</span></i>
+    </div>
+    <div id="loader" class="loader"></div>
+    <div id="graph" onclick="$('#query-string, #query-color').blur()" oncontextmenu="event.preventDefault()"></div>
+    <div class="hide" id="node-query-menu"><ul></ul></div>
+    <div id="node-selection-box" style="display: none;"></div>
+    <a id="download-anchor" style="display:none"></a>
+    <input type="file" id="choose-upload" name="files[]" style="display: none;" multiple />
+</body>
+</html>

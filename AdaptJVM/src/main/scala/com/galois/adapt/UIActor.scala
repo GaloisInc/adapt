@@ -1,5 +1,7 @@
 package com.galois.adapt
 
+import java.util.UUID
+
 import akka.actor._
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
@@ -9,24 +11,41 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 
-class UIActor(val registry: ActorRef, interface: String, port: Int) extends Actor with ActorLogging with ServiceClient {
+class UIActor(val registry: ActorRef, interface: String, port: Int) extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] with ReportsStatus {
   var httpService: Option[Http.ServerBinding] = None
 
-  val dependencies = "DevDBActor" :: Nil
+  val dependencies = "DevDBActor" ::
+    "RankedDataActor" ::
+    Nil
 
   def beginService() = {
+    initialize()
     log.info(s"Starting UI at: $interface  on port: $port")
     localReceive(StartUI(dependencyMap("DevDBActor").get))
   }
 
   def endService() = localReceive(StopUI)
 
+
+  def statusReport = Map("UI_available_at" -> httpService.map(_ => s"$interface:$port").getOrElse("NONE"))
+
+  def subscriptions = Set(Subscription(dependencyMap("RankedDataActor").get, _ => true))
+
+  var rankedList: List[(String,Set[UUID],Float)] = List.empty
+
+  var allStatusReports: List[StatusReport] = List.empty
+
+  def process = {
+    case 5 => ???
+//    case l: List[(String,Set[UUID],Float)] => rankedList = l
+  }
+
   override def localReceive: PartialFunction[Any,Unit] = {
     case msg @ StartUI(dbActor) =>
       if (httpService.isEmpty) {
         implicit val ec = context.dispatcher
         implicit val materializer = ActorMaterializer()
-        val httpServiceF = Http()(context.system).bindAndHandle(Routes.mainRoute(dbActor), interface, port)
+        val httpServiceF = Http()(context.system).bindAndHandle(Routes.mainRoute(dbActor, rankedList, allStatusReports), interface, port)
         httpService = Some(Await.result(httpServiceF, 10 seconds))
         registry ! PublishService(this.getClass.getSimpleName, context.self)
       } else {
@@ -43,6 +62,11 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
       } else {
         log.warning(s"Got a message to stop the UI when it was already stopped: $msg\n from: $sender")
       }
+
+    case UIStatusReport(l) =>
+      allStatusReports = l
+//      println(s"List of StatusReports: \n${l.mkString("\n")}")
+
   }
 }
 
