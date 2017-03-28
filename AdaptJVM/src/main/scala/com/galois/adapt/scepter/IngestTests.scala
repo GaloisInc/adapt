@@ -10,14 +10,13 @@ import org.apache.tinkerpop.gremlin.process.traversal.P
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem, Props, Actor, ActorLogging}
 import akka.util.Timeout
-
 import scala.collection.JavaConversions._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.language.postfixOps
-
 import org.scalatest.FlatSpec
+
 
 class General_TA1_Tests(
   failedStatements: Int,                    // Number of failed events
@@ -48,30 +47,32 @@ class General_TA1_Tests(
   }
 
   // Test to assert that there are no dangling edges
-  "Data" should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
+  "Data in this data set" should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
     assert(incompleteEdgeCount == 0)
   }
 
-  // Test tht events of type SEND,SENDMSG,READ,etc. have a size field on them
-  it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
-    val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
+  // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them
+  if ( ! ta1Source.contains(SOURCE_WINDOWS_FIVEDIRECTIONS)) {
+    it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
+      val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
         .hasLabel("Event")
-        .has("eventType",P.within("EVENT_SENDTO", "EVENT_SENDMSG", "EVENT_WRITE", "EVENT_READ", "EVENT_RECVMSG", "EVENT_RECVFROM"))
+        .has("eventType", P.within("EVENT_SENDTO", "EVENT_SENDMSG", "EVENT_WRITE", "EVENT_READ", "EVENT_RECVMSG", "EVENT_RECVFROM"))
         .hasNot("size")
         .dedup()
-        .toList()
-    
-    if (eventsShouldHaveSize.length <= 1) {
-      assert(eventsShouldHaveSize.length <= 1)
-    } else {
-      val (code,color) = colors.next()
-      toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
-      val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-      
-      assert(
-        eventsShouldHaveSize.length <= 1,
-        s"\nSome events of type SENDTO/SEND/SENDMSG/WRITE/READ/RECVMSG/RECVFROM don't have a 'size':\n$color$uuidsOfEventsShouldHaveSize${Console.RED}\n"
-      )
+        .toList
+
+      if (eventsShouldHaveSize.length <= 1) {
+        assert(eventsShouldHaveSize.length <= 1)
+      } else {
+        val (code, color) = colors.next()
+        toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
+        val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+        assert(
+          eventsShouldHaveSize.length <= 1,
+          s"\nSome events of type SENDTO/SEND/SENDMSG/WRITE/READ/RECVMSG/RECVFROM don't have a 'size':\n$color$uuidsOfEventsShouldHaveSize${Console.RED}\n"
+        )
+      }
     }
   }
 
@@ -81,7 +82,7 @@ class General_TA1_Tests(
     val grouped: java.util.List[java.util.Map[java.util.UUID,java.lang.Long]] = graph.traversal().V()
       .values("uuid")
       .groupCount[java.util.UUID]()
-      .toList()
+      .toList
 
     val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 <= 1).take(20)
     for ((uuid,count) <- offending) {
@@ -100,7 +101,7 @@ class General_TA1_Tests(
       .dedup()
       .values("pid")
 
-    while (pids.hasNext()) {
+    while (pids.hasNext) {
       val pid: Int = pids.next()
 
       val processesWithPID: java.util.List[Vertex] = graph.traversal().V()
@@ -108,7 +109,7 @@ class General_TA1_Tests(
         .hasLabel("Subject")
         .has("subjectType","SUBJECT_PROCESS")
         .dedup()
-        .toList()
+        .toList
       
       if (processesWithPID.length <= 1) {
         assert(processesWithPID.length <= 1)
@@ -170,34 +171,34 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val missing = List(AbstractObject, Value)
   val minimum = 50000
 
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
+
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
-  }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
   }
 }
 
 class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value)
-  val minimum = 50000  
+  val minimum = 50000
+
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
 
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
-  }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
   }
 }
 
@@ -205,18 +206,18 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
   val minimum = 50000
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
 
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
   }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
-  }
+
 }
 
 class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
@@ -224,34 +225,34 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val missing = List(AbstractObject, Value)
   val minimum = 50000
 
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
+
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
-  }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
   }
 }  
 
 class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(MemoryObject, Value)
+  val missing = List(MemoryObject, Value, TagRunLengthTuple, UnnamedPipeObject, SrcSinkObject, UnitDependency, AbstractObject, CryptographicHash)  // This list is largely from an email Ryan got from Allen Chung: https://mail.google.com/mail/u/0/#inbox/15aa5d58c25c2a53
   val minimum = 50000
+
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
 
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
-  }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
   }
 }
 
@@ -260,16 +261,16 @@ class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
   val minimum = 50000
 
+  // Test that we have a minimum number of nodes
+  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+    assert(graph.traversal().V().count().next() > minimum)
+  }
+
   // Test that we get one of each type of statement
   (CDM16.values diff missing).foreach { typeName =>
-    "This provider" should s"have at least one $typeName" in {
+    it should s"have at least one $typeName" in {
       assert(graph.traversal().V().hasLabel(typeName.toString).count().next() > 0)
     }
-  }
-  
-  // Test that we have a minimum number of nodes
-  "This provider" should "contain a representative number of nodes" in {
-    assert(graph.traversal().V().count().next() > minimum)
   }
 }
 
