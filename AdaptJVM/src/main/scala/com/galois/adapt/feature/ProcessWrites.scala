@@ -28,17 +28,43 @@ class ProcessWrites(val registry: ActorRef)
   def endService() = ()
 
 
-  def statusReport = Map("processes_size" -> processes.size)
+  def statusReport = Map(
+    "processes" -> processes.size,
+    "unmatched writes" -> unmatchedWrites.values.map(_.size).sum,
+    "total_received" -> totalReceived,
+    "total_sent" -> totalSent
+  )
 
-  private val processes = MutableMap.empty[UUID, Subject]  // File UUID -> Subject
+  type ProcessUUID = UUID
+  val processes = MutableMap.empty[ProcessUUID, Subject]
+  val unmatchedWrites = MutableMap.empty[ProcessUUID, Set[Event]]
+  var totalReceived = 0
+  var totalSent = 0
 
   override def process = {
     case s: Subject if s.subjectType == SUBJECT_PROCESS =>
 //      log.info(s"ProcessWrites got: $s")
+      totalReceived = totalReceived + 1
       processes(s.uuid) = s
-    case e: Event if e.eventType == EVENT_WRITE && processes.isDefinedAt(e.subject) =>      // TODO: this will silently throw away events that arrive before files.
+      unmatchedWrites.get(s.uuid).foreach { writes =>
+        unmatchedWrites -= s.uuid
+        writes.foreach { w =>
+          totalSent = totalSent + 1
+          broadCast(s -> w)
+        }
+      }
+
+    case e: Event if e.eventType == EVENT_WRITE =>
 //      log.info(s"ProcessWrites got: $e")
-      broadCast(processes(e.subject) -> e)
+      totalReceived = totalReceived + 1
+      processes.get(e.subject).fold(
+        unmatchedWrites(e.subject) = unmatchedWrites.getOrElse(e.subject, Set.empty) + e
+      ){ subject =>
+        broadCast(subject -> e)
+        totalSent = totalSent + 1
+      }
+
+
 //    case t: TimeMarker => broadCast(t)
   }
 }

@@ -38,8 +38,11 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
 
   def statusReport = {
-    Map("graph" -> "FIX THIS LATER")
+    Map("nodes received" -> nodesReceived)
   }
+
+  var nodesReceived = 0
+
 
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
 //  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
@@ -109,6 +112,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       println("Done creating all missing nodes.")
 
     case cdm15: DBNodeable =>
+      nodesReceived += 1
       // Get the uuid of the node
       val uuid = cdm15.getUuid
 

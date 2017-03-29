@@ -24,24 +24,36 @@ class ProcessWritesFile(val registry: ActorRef) extends Actor with ActorLogging 
 
 
   def statusReport = Map(
+    "total_received" -> totalReceived,
     "missingFiles_size" -> missingFiles.size,
-    "missingProcesses_size" -> missingProcesses.size
+    "missingProcesses_size" -> missingProcesses.size,
+    "total_sent" -> totalSent
   )
 
   val missingFiles = MutableMap.empty[Event, Subject]
   val missingProcesses = MutableMap.empty[Event, FileObject]
+  var totalReceived = 0
+  var totalSent = 0
 
   def process = {
     case msg @ (f: FileObject, e: Event) =>
-      log.info(s"ProcessWritesFile got: $msg")
+//      log.info(s"ProcessWritesFile got: $msg")
+      totalReceived = totalReceived + 1
       missingFiles.get(e).fold(
         missingProcesses(e) = f
-      )(process => broadCast((process, e, f)))
+      ){ process =>
+        totalSent = totalSent + 1
+        broadCast((process, e, f))
+      }
 
     case msg @ (s: Subject, e: Event) =>
-      log.info(s"ProcessWritesFile got: $msg")
+//      log.info(s"ProcessWritesFile got: $msg")
+      totalReceived = totalReceived + 1
       missingProcesses.get(e).fold(
         missingFiles(e) = s
-      )(file => broadCast((s, e, file)))
+      ){ file =>
+        totalSent = totalSent + 1
+        broadCast((s, e, file))
+      }
   }
 }

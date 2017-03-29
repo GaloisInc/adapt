@@ -17,7 +17,7 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
   val subscriptions = Set[Subscription]()
 
   val jobQueue = Queue.empty[IngestFile]
-  var errors = Nil
+  var errors: List[Throwable] = Nil
 
   /*
    * This function checks to see if it has the right number of subscribers and something to ingest.
@@ -50,7 +50,9 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
   
           var counter = 0
           data.foreach {
-            case Failure(t) => broadCastUnsafe(ErrorReadingStatement(t))
+            case Failure(t) =>
+              errors = t :: errors
+              broadCastUnsafe(ErrorReadingStatement(t))
             case Success(cdm) =>
               broadCast(cdm)
               counter += 1
@@ -74,7 +76,10 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
   }
   def endService() = ()  // TODO
 
-  def statusReport = Map("job_queue_size" -> jobQueue.size, "errors" -> errors)
+  def statusReport = Map(
+    "job_queue_size" -> jobQueue.size,
+    "errors" -> errors.groupBy(_.toString).mapValues(_.size)
+  )
 
   override def receive: PartialFunction[Any,Unit] = ({
     case msg @ IngestFile(path, limitOpt) =>

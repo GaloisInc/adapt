@@ -26,21 +26,48 @@ class FileWrites(val registry: ActorRef)
   def beginService() = initialize()
   def endService() = ()
 
-  def statusReport = Map("files_length" -> files.size)
+  def statusReport = Map(
+    "total_received" -> (filesReceived + writesReceived),
+    "writes_received" -> writesReceived,
+    "files_received" -> filesReceived,
+    "files_collected" -> files.size,
+    "unmatched_writes" -> unmatchedWrites.values.map(_.size).sum,
+    "total_sent" -> totalSent
+  )
 
-  private val files = MutableMap.empty[UUID, FileObject]  // File UUID -> FileObject
+  type FileUUID = UUID
+
+  val files = MutableMap.empty[FileUUID, FileObject]
+  val unmatchedWrites = MutableMap.empty[FileUUID, Set[Event]]
+  var filesReceived = 0
+  var writesReceived = 0
+  var totalSent = 0
 
   def process = {
     case f: FileObject =>
 //      log.info(s"FileWrites is saving: $f")
+      filesReceived += 1
       files(f.uuid) = f
+      unmatchedWrites.get(f.uuid).foreach { writes =>
+        unmatchedWrites -= f.uuid
+        writes.foreach { w =>
+          broadCast(f -> w)
+          totalSent += 1
+        }
+      }
+
     case e: Event if e.eventType == EVENT_WRITE =>
 //      log.info(s"FileWrites got: $e")
-      for (
-        uuid <- e.predicateObject if files.isDefinedAt(uuid)   // TODO: this will silently throw away events that arrive before files.
-      ) {
-        log.info(s"FileWrites is sending: ${(files(uuid),e)}")
-        broadCast((files(uuid),e))
+      writesReceived += 1
+      val fileUuids = List(e.predicateObject, e.predicateObject2).flatten
+      fileUuids foreach { fu =>
+        println(s"GOT A FILE UUID: $fu")
+        files.get(fu).fold {
+          unmatchedWrites(fu) = unmatchedWrites.getOrElse(fu, Set.empty[Event]) + e
+        } { file =>
+          broadCast(file -> e)
+          totalSent += 1
+        }
       }
   }
 }

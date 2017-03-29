@@ -49,7 +49,7 @@ var node_appearance = [
         // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
     }, {
         name : "AnomFile",
-        is_relevant : function(n) { return n.label === "Entity-File" && n['properties'].hasOwnProperty('anomalyScore') },
+        is_relevant : function(n) { return n.label === "FileObject" && n['properties'].hasOwnProperty('anomalyScore') },
         icon_unicode : "\uf41b",
         size: 40,
         color: "red",
@@ -63,17 +63,17 @@ var node_appearance = [
         }
     }, {
         name : "File",
-        is_relevant : function(n) { return n.label === "Entity-File" },
+        is_relevant : function(n) { return n.label === "FileObject" },
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
-            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-            return url + " ; " + file_version
+            var file_type = (node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'][0]['value'] : "Unknown")
+            var url = (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "None")
+            return file_type+"\n"+url
         }
     }, {
         name : "Memory",
-        is_relevant : function(n) { return n.label === "Entity-Memory" },
+        is_relevant : function(n) { return n.label === "MemoryObject" },
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
@@ -94,6 +94,24 @@ var node_appearance = [
             return at + " userID " + node['properties']['userID'][0]['value']
         }
     }, {
+        name : "Principal",
+        is_relevant : function(n) { return n.label === "Principal" },
+        icon_unicode : "\uf3bb",
+        size: 35,
+        make_node_label : function(node) {
+            var id = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'][0]['value'] : "None")
+            return "UserID: " + id
+        }
+    }, {
+        name : "Events",
+        is_relevant : function(n) { return n.label === "Event" },
+        icon_unicode : "\uf470",
+        size: 35,
+        make_node_label : function(node) {
+            var id = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "Some Event")
+            return id
+        }
+    }, {
         name : "AnomEntity-NetFlow",
         is_relevant : function(n) { return n.label === "Entity-NetFlow" &&  n['properties'].hasOwnProperty('anomalyScore') },
         icon_unicode : "\uf262",
@@ -108,7 +126,7 @@ var node_appearance = [
         }
     }, {
         name : "Entity-NetFlow",
-        is_relevant : function(n) { return n.label === "Entity-NetFlow" },
+        is_relevant : function(n) { return n.label === "NetFlowObject" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
             var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")

@@ -15,7 +15,7 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
   var httpService: Option[Http.ServerBinding] = None
 
   val dependencies = "DevDBActor" ::
-    "RankedDataActor" ::
+//    "RankedDataActor" ::
     Nil
 
   def beginService() = {
@@ -29,14 +29,14 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
   def statusReport = Map("UI_available_at" -> httpService.map(_ => s"$interface:$port").getOrElse("NONE"))
 
-  def subscriptions = Set(Subscription(dependencyMap("RankedDataActor").get, _ => true))
+  def subscriptions = Set.empty //Set(Subscription(dependencyMap("RankedDataActor").get, _ => true))
 
   var rankedList: List[(String,Set[UUID],Float)] = List.empty
 
   var allStatusReports: List[StatusReport] = List.empty
 
   def process = {
-    case 5 => ???
+    case 5 => ???  // TODO
 //    case l: List[(String,Set[UUID],Float)] => rankedList = l
   }
 
@@ -65,7 +65,6 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
     case UIStatusReport(l) =>
       allStatusReports = l
-//      println(s"List of StatusReports: \n${l.mkString("\n")}")
 
   }
 }
