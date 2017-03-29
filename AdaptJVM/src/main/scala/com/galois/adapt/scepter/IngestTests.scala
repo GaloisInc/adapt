@@ -83,7 +83,7 @@ class General_TA1_Tests(
       .groupCount[java.util.UUID]()
       .toList()
 
-    val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 <= 1).take(20)
+    val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
     for ((uuid,count) <- offending) {
       assert(
         count <= 1,
