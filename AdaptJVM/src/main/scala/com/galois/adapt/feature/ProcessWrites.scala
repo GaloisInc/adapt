@@ -14,6 +14,7 @@ class ProcessWrites(val registry: ActorRef)
   extends Actor with ActorLogging with ServiceClient with SubscriptionActor[(Subject,Event)] with ReportsStatus {
   
   val dependencies = "FileIngestActor" :: Nil
+
   lazy val subscriptions =
     Set[Subscription](Subscription(
       target = dependencyMap("FileIngestActor").get,

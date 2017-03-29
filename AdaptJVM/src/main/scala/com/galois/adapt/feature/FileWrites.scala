@@ -61,7 +61,6 @@ class FileWrites(val registry: ActorRef)
       writesReceived += 1
       val fileUuids = List(e.predicateObject, e.predicateObject2).flatten
       fileUuids foreach { fu =>
-        println(s"GOT A FILE UUID: $fu")
         files.get(fu).fold {
           unmatchedWrites(fu) = unmatchedWrites.getOrElse(fu, Set.empty[Event]) + e
         } { file =>
