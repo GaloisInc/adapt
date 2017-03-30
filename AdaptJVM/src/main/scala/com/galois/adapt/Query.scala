@@ -2,6 +2,7 @@ package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
+import org.apache.tinkerpop.gremlin.process.traversal.Path
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -64,6 +65,8 @@ import scala.language.existentials
  *                 | traversal '.dedup()'
  *                 | traversal '.limit(' long ')'
  *                 | traversal '.is(' literal ')'
+ *                 | traversal '.simplePath()'
+ *                 | traversal '.times(' int ')'
  *                 | traversal '.order()'
  *                 | traversal '.by(' string ')'
  *                 | traversal '.by(id)'
@@ -74,6 +77,7 @@ import scala.language.existentials
  *                 | traversal '.as(' string ',' ... ')'
  *                 | traversal '.until(' traveral ')'
  *                 | traversal '.values(' string ',' ... ')'
+ *                 | traversal '.valueMap(' string ',' ... ')'
  *                 | traversal '.label()'
  *                 | traversal '.id()'
  *                 | traversal '.max()'
@@ -98,6 +102,7 @@ import scala.language.existentials
  *                 | traversal '.local(' traversal ')'
  *                 | traversal '.property(' string ',' literal ',' ... ')'
  *                 | traversal '.properties()'
+ *                 | traversal '.path()'
  *
  *   query     ::= ( ident '=' literal ';'
  *                 | ident '=' traversal ';'
@@ -198,6 +203,8 @@ object Query {
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
         | ".limit(" ~ lng ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
+        | ".simplePath()"                  ^^ { case _          => SimplePath(_: Tr) }
+        | ".times(" ~ int ~ ")"            ^^ { case _~l~_      => Times(_: Tr, l) }
         | ".order()"                       ^^ { case _          => Order(_: Tr) }
         | ".by(id)"                        ^^ { case _          => ByToken(_: Tr, Token.id) }
         | ".by(key)"                       ^^ { case _          => ByToken(_: Tr, Token.key) }
@@ -209,6 +216,7 @@ object Query {
         | ".as(" ~ rep1sep(str,",") ~ ")"  ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
         | ".until(" ~ trav ~ ")"           ^^ { case _~t~_      => Until(_: Tr, t) }
         | ".values("~rep1sep(str,",")~")"  ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
+        | ".valueMap("~repsep(str,",")~")" ^^ { case _~s~_      => ValueMap(_: Tr, RawArr(s)) }
         | ".properties("~repsep(str,",")~")"^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
         | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
@@ -236,6 +244,7 @@ object Query {
         | ".property(" ~ rep1sep(str ~ "," ~ lit, ",") ~ ")" ^^ { case _~s~_ =>
             Property(_: Tr, RawArr(s.map { case k~_~v => k }), RawArr(s.map { case k~_~v => v}))
           }
+        | ".path()"                        ^^ { case _          => PathTraversal(_: Tr) }
         | ".toList()"                      ^^ { case _          => identity(_: Tr) }
         ).asInstanceOf[Parser[Tr => Tr]]
 
@@ -413,6 +422,13 @@ case class Is[S,T](traversal: Traversal[S,T], value: Value[Any]) extends Travers
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).is(value.eval(context))
 }
+case class Times[S,T](traversal: Traversal[S,T], limit: Value[Int]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).times(limit.eval(context))
+}
+case class SimplePath[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).simplePath()
+}
 
 
 // Indirect
@@ -455,6 +471,10 @@ case class Values[S,T,V](traversal: Traversal[S,T], keys: Value[Seq[String]]) ex
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).values(keys.eval(context): _*)
 }
+case class ValueMap[S,T,E](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,java.util.Map[String,E]] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).valueMap(keys.eval(context): _*)
+}
 case class Label[S,T](traversal: Traversal[S,T]) extends Traversal[S,String] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).label()
 }
@@ -489,6 +509,10 @@ case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Lon
 case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] { 
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).groupCount()
 }
+case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] { 
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).path()
+}
+
 
 // Extend outwards
 case class Both[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Vertex] {
