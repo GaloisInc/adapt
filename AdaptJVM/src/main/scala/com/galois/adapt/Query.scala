@@ -2,7 +2,7 @@ package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
-import org.apache.tinkerpop.gremlin.process.traversal.Path
+import org.apache.tinkerpop.gremlin.process.traversal.{P, Path}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -45,6 +45,13 @@ import scala.language.existentials
  *
  *   literal     ::= int | long | string | uuid | intArray | longArray | stringArray | uuidArray
  *
+ *   predicate   ::= 'eq(' literal ')'
+ *                 | 'neq(' literal ')'
+ *                 | 'within(' literal ',' literal ')'
+ *                 | 'lte(' literal ')'
+ *                 | 'gte(' literal ')'
+ *                 | 'between(' literal ',' literal ')'   
+ *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
  *                 | 'g.E(' long ',' ... ')'
@@ -60,11 +67,13 @@ import scala.language.existentials
  *                 | traversal '.hasId(' long ')'
  *                 | traversal '.hasNot(' string ')'
  *                 | traversal '.where(' traversal ')'
+ *                 | traversal '.where(' predicate ')'
  *                 | traversal '.and(' traversal ',' ... ')'
  *                 | traversal '.or(' traversal ',' ... ')'
  *                 | traversal '.dedup()'
  *                 | traversal '.limit(' long ')'
  *                 | traversal '.is(' literal ')'
+ *                 | traversal '.is(' predicate ')'
  *                 | traversal '.simplePath()'
  *                 | traversal '.times(' int ')'
  *                 | traversal '.order()'
@@ -170,6 +179,7 @@ object Query {
       def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
       def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
       def lit: Parser[Value[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
+      def pred: Parser[Value[P[_]]] = predicate(uid) | predicate(int) | predicate(lng) | predicate(str)
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
@@ -182,6 +192,14 @@ object Query {
          ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
            case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
          }
+      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] = 
+        ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
+        | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
+        | "within(" ~ elem ~ "," ~ elem ~ ")"    ^^ { case _~l~_~h~_ => RawWithinPred(l,h) }
+        | "lte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawLtePred(l) }
+        | "gte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawGtePred(l) }
+        | "between(" ~ elem ~ ',' ~ elem ~ ")"   ^^ { case _~l~_~h~_ => RawBetweenPred(l,h) }
+        )
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
@@ -198,11 +216,13 @@ object Query {
         | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".hasId(" ~ lng ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
+        | ".where(" ~ predicate(str) ~ ")" ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
         | ".and(" ~ repsep(trav,",") ~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~ repsep(trav,",") ~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
         | ".limit(" ~ lng ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
+        | ".is(" ~ pred ~ ")"              ^^ { case _~p~_      => IsPredicate(_: Tr, p.asInstanceOf[Value[P[Any]]]) }
         | ".simplePath()"                  ^^ { case _          => SimplePath(_: Tr) }
         | ".times(" ~ int ~ ")"            ^^ { case _~l~_      => Times(_: Tr, l) }
         | ".order()"                       ^^ { case _          => Order(_: Tr) }
@@ -346,6 +366,24 @@ case class Raw[T](value: T) extends Value[T] {
 case class RawArr[T](values: Seq[Value[T]]) extends Value[Seq[T]] {
   override def eval(context: Map[String,Value[_]]): Seq[T] = values.map(_.eval(context))
 }
+case class RawEqPred[T](comp: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.eq(comp.eval(context))
+}
+case class RawNeqPred[T](comp: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.neq(comp.eval(context))
+}
+case class RawLtePred[T](comp: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.lte(comp.eval(context))
+}
+case class RawGtePred[T](comp: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.gte(comp.eval(context))
+}
+case class RawWithinPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.within(lo.eval(context),hi.eval(context))
+}
+case class RawBetweenPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
+  override def eval(context: Map[String,Value[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
+}
 case class Variable[T](name: String) extends Value[T] {
   override def eval(context: Map[String,Value[_]]): T = context(name).eval(context).asInstanceOf[T]
 }
@@ -403,6 +441,10 @@ case class Where[S,T](traversal: Traversal[S,T], where: Traversal[_,_]) extends 
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).where(where.buildTraversal(graph, context))
 }
+case class WherePredicate[S,T](traversal: Traversal[S,T], where: Value[P[String]]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).where(where.eval(context))
+}
 case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).and(anded.map(_.buildTraversal(graph, context)): _*)
@@ -421,6 +463,11 @@ case class Limit[S,T](traversal: Traversal[S,T], lim: Value[java.lang.Long]) ext
 case class Is[S,T](traversal: Traversal[S,T], value: Value[Any]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).is(value.eval(context))
+}
+// TODO: figure out how to get this to compile with pred: Value[P[T]] 
+case class IsPredicate[S,T](traversal: Traversal[S,T], pred: Value[P[Any]]) extends Traversal[S,T] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).is(pred.eval(context))
 }
 case class Times[S,T](traversal: Traversal[S,T], limit: Value[Int]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
