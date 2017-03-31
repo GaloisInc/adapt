@@ -19,9 +19,11 @@ case class UnitDependency(
     "dependentUnit", dependentUnit
   )
 
-  def asDBEdges = List(("dependentUnit",dependentUnit))
+  def asDBEdges = List(("dependentUnit",dependentUnit),("unit",unit))
 
-  def getUuid = unit
+  val thisUUID = UUID.randomUUID()
+
+  def getUuid = thisUUID
 }
 
 
