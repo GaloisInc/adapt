@@ -27,6 +27,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
   log.info(s"ServiceRegistry created")
 
   override val persistenceId: String = ServiceRegistry.identity
+  val clusterName = Application.config.getString("adapt.name")
 
   def recordSubscriberPublisher(subpub: AddSubscriberPublisher): Unit = {
     subscribersPublishers += subpub.subscriberPublisher
@@ -80,13 +81,17 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
   override def receiveCommand: Receive = {
 
     case ps: PublishService =>
-      log.info(s"Received -> PublishService: $ps  from: ${sender()}")
-      publishers += (ps.serviceName -> ps.serviceEndpoint)
-      subscribers.filter(p => p._2.contains(ps.serviceName))
-        .foreach(p => p._1 ! ServiceAvailable(ps.serviceName, ps.serviceEndpoint))
-      context.watch(ps.serviceEndpoint)
-      considerRememberParticipant(ps.serviceEndpoint)
-//      log.info(s"ServiceRegistry State:\n$subscribers\n$subscribersPublishers\n$publishers")
+      if (ps.clusterName equals clusterName) {
+        log.info(s"Received -> PublishService: $ps  from: ${sender()}")
+        publishers += (ps.serviceName -> ps.serviceEndpoint)
+        subscribers.filter(p => p._2.contains(ps.serviceName))
+          .foreach(p => p._1 ! ServiceAvailable(ps.serviceName, ps.serviceEndpoint))
+        context.watch(ps.serviceEndpoint)
+        considerRememberParticipant(ps.serviceEndpoint)
+        log.info(s"ServiceRegistry State:\n$subscribers\n$subscribersPublishers\n$publishers")
+      } else {
+        sender() ! WrongCluster(clusterName)
+      }
 
     case ups: UnPublishService =>
 //      log.info(s"Received -> UnPublishService: $ups  from: ${sender()}")
@@ -97,15 +102,19 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       serviceEndpoint.foreach(ep => considerForgetParticipant(ep))
 
     case ss: SubscribeToService =>
-//      log.info(s"Received -> SubscribeToService: $ss  from: ${sender()}")
-      subscribers += (sender() -> subscribers.get(sender())
-        .orElse(Some(new mutable.HashSet[String])).map(s => {
-        s + ss.serviceName
-      })
-        .getOrElse(new mutable.HashSet[String]))
-      publishers.filter(p => p._1 == ss.serviceName)
-        .foreach(p => sender() ! ServiceAvailable(ss.serviceName, p._2))
-      considerRememberParticipant(sender())
+      if (ss.clusterName equals clusterName) {
+        log.info(s"Received -> SubscribeToService: $ss  from: ${sender()}")
+        subscribers += (sender() -> subscribers.get(sender())
+          .orElse(Some(new mutable.HashSet[String])).map(s => {
+          s + ss.serviceName
+        })
+          .getOrElse(new mutable.HashSet[String]))
+        publishers.filter(p => p._1 == ss.serviceName)
+          .foreach(p => sender() ! ServiceAvailable(ss.serviceName, p._2))
+        considerRememberParticipant(sender())
+      } else {
+        sender() ! WrongCluster(clusterName)
+      }
 
     case us: UnSubscribeToService =>
 //      log.info(s"Received -> UnSubscribeToService: $us  from: ${sender()}")
@@ -183,7 +192,7 @@ object ServiceRegistryProtocol {
   /**
     * Service implementor sends to ServiceRegistry when transitions to online.
     */
-  case class PublishService(serviceName: String, serviceEndpoint: ActorRef)
+  case class PublishService(serviceName: String, serviceEndpoint: ActorRef, clusterName: String)
 
   /**
     * Service implementor sends to ServiceRegistry when transitions to offline.
@@ -193,7 +202,7 @@ object ServiceRegistryProtocol {
   /**
     * Service client sends to ServiceRegistry when requiring dependent service.
     */
-  case class SubscribeToService(serviceName: String)
+  case class SubscribeToService(serviceName: String, clusterName: String)
 
   /**
     * Service client sends to ServiceRegistry when no longer requiring dependent service.
@@ -223,5 +232,13 @@ object ServiceRegistryProtocol {
     * Realtime response that a service is not online.
     */
   case class RespondServiceUnAvailable(serviceName: String)
+
+
+
+
+  /**
+    * ServiceRegistry sends to a service client who is part of the wrong cluster.
+    */
+  case class WrongCluster(clusterName: String)
 
 }

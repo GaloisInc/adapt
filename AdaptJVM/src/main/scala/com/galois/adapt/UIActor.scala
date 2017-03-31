@@ -26,7 +26,6 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
   def endService() = localReceive(StopUI)
 
-
   def statusReport = Map("UI_available_at" -> httpService.map(_ => s"$interface:$port").getOrElse("NONE"))
 
   def subscriptions = Set.empty //Set(Subscription(dependencyMap("RankedDataActor").get, _ => true))
@@ -40,6 +39,7 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 //    case l: List[(String,Set[UUID],Float)] => rankedList = l
   }
 
+
   override def localReceive: PartialFunction[Any,Unit] = {
     case msg @ StartUI(dbActor) =>
       if (httpService.isEmpty) {
@@ -47,7 +47,7 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
         implicit val materializer = ActorMaterializer()
         val httpServiceF = Http()(context.system).bindAndHandle(Routes.mainRoute(dbActor, rankedList, allStatusReports), interface, port)
         httpService = Some(Await.result(httpServiceF, 10 seconds))
-        registry ! PublishService(this.getClass.getSimpleName, context.self)
+        registry ! PublishService(this.getClass.getSimpleName, context.self, clusterName)
       } else {
         log.warning(s"Got a message to start the UI when it was already running: $msg\n from: $sender")
       }
