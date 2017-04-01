@@ -1,15 +1,16 @@
 package com.galois.adapt.scepter
 
+import java.util.UUID
+
 import com.galois.adapt._
 import com.galois.adapt.cdm16._
-
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.{Edge,Vertex}
+import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.process.traversal.P
-
 import akka.pattern.ask
-import akka.actor.{ActorRef, ActorSystem, Props, Actor, ActorLogging}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.util.Timeout
+
 import scala.collection.JavaConversions._
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -21,7 +22,7 @@ import org.scalatest.FlatSpec
 class General_TA1_Tests(
   failedStatements: Int,                    // Number of failed events
   failedStatementsMsgs: List[String],       // First 5 failed messages TODO: use this?
-  incompleteEdgeCount: Int,                 // Number of incomplete edges
+  incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
   ta1Source: Option[InstrumentationSource],
   toDisplay: scala.collection.mutable.ListBuffer[String]
@@ -48,7 +49,14 @@ class General_TA1_Tests(
 
   // Test to assert that there are no dangling edges
   "Data in this data set" should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
-    assert(incompleteEdgeCount == 0)
+    val incompleteCount = incompleteEdges.size
+    if (incompleteCount == 0) assert(incompleteCount == 0)
+    else {
+      val (code, color) = colors.next()
+      val uuidsToPrint = incompleteEdges.keys.mkString("\n" + color)
+      val message = s"\nThe following UUIDs are all referenced as the end of an edge, but nodes with these UUIDs do not exist in this dataset:\n$color$uuidsToPrint${Console.RED}\n"
+      assert(incompleteCount == 0, message)
+    }
   }
 
   // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them

@@ -67,7 +67,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
   override def process: PartialFunction[Any,Unit] = {
 
-    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.size))
+    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.toMap))
 
     case c: IngestControl => broadCastUnsafe(c)
 
@@ -184,7 +184,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   }
 }
 
-case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
+case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
 
 sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery

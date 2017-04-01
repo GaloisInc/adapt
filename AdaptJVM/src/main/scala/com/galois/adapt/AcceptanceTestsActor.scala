@@ -59,7 +59,7 @@ class AcceptanceTestsActor(val registry: ActorRef)
         case Some(source2) => assert(source == source2)
       }
       
-    case DoneDevDB(graphOpt, incompleteEdgeCount) =>
+    case DoneDevDB(graphOpt, incompleteEdges) =>
 
       println("Beginning to run tests.")
 
@@ -72,7 +72,7 @@ class AcceptanceTestsActor(val registry: ActorRef)
       org.scalatest.run(new General_TA1_Tests(
         failedStatements,
         failedStatementsMsgs,
-        incompleteEdgeCount,
+        incompleteEdges,
         graph,
         instrumentationSource,
         toDisplay
