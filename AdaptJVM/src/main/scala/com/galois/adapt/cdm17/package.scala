@@ -91,7 +91,7 @@ package object cdm17 {
     def int(x: => java.lang.Integer): Option[Int] = Try(Integer2int(x)).toOption
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
-    def uuid(x: => bbnCDM15.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
+    def uuid(x: => bbnCDM15.UUID): Option[UUID] = Try(makeJavaUUID(x)).toOption
     def tagOpCode(x: => bbnCDM15.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
     def integrityTag(x: => bbnCDM15.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
     def confidentialityTag(x: => bbnCDM15.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
@@ -106,7 +106,7 @@ package object cdm17 {
     def listCryptographicHash(x: java.util.List[bbnCDM15.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => CryptographicHash.from(new RawCDM15Type(x)).get))
     def listUuid(x: java.util.List[bbnCDM15.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x.bytes)))
+      _.asScala.toList.map(makeJavaUUID(_)))
     def listTagRunLengthTuple(x: java.util.List[bbnCDM15.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM15Type(x)).get))
   }
