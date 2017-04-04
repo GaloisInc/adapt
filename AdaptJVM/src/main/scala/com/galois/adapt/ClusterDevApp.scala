@@ -10,7 +10,7 @@ import ServiceRegistryProtocol._
 
 import com.galois.adapt.feature._
 import com.galois.adapt.scepter._
-import com.galois.adapt.cdm16.{CDM16, EpochMarker, Subject}
+import com.galois.adapt.cdm17.{CDM17, EpochMarker, Subject}
 
 import java.io.File
 import scala.collection.JavaConversions._
