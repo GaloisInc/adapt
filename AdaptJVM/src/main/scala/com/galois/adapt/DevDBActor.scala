@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm16._
+import com.galois.adapt.cdm17._
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Graph, Edge, Vertex}
@@ -32,7 +32,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
  
   // The DB only needs to wait on / subscribe to the 'FileIngestActor'
   val dependencies = "FileIngestActor" :: Nil
-  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("FileIngestActor").get, _.isInstanceOf[CDM16]))
+  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("FileIngestActor").get, _.isInstanceOf[CDM17]))
 
   def beginService() = initialize()
   def endService() = ()
@@ -386,17 +386,5 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
 // Messages this actor (or the actor system via a Scheduler) sends itself
 case object Heartbeat
-
-case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
-
-sealed trait RestQuery { val query: String }
-case class NodeQuery(query: String) extends RestQuery
-case class EdgeQuery(query: String) extends RestQuery
-case class StringQuery(query: String) extends RestQuery
-
-case class EdgesForNodes(nodeIdList: Seq[Int])
-case object GiveMeTheGraph
-case object Shutdown
-
 
 

@@ -1,5 +1,5 @@
-package com.galois.adapt.cdm16
-import com.bbn.tc.schema.avro.cdm16
+package com.galois.adapt.cdm17
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -11,7 +11,7 @@ case class AbstractObject(
   permission: Option[FixedShort] = None,  // fixed size = 2
   epoch: Option[Int] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM16 with DBWritable {
+) extends CDM17 with DBWritable {
   def asDBKeyValues = List(
     //    label, "AbstractObject",
   ) ++
@@ -20,8 +20,8 @@ case class AbstractObject(
     DBOpt.fromKeyValMap(properties)
 }
 
-case object AbstractObject extends CDM16Constructor[AbstractObject] {
-  type RawCDMType = cdm16.AbstractObject
+case object AbstractObject extends CDM17Constructor[AbstractObject] {
+  type RawCDMType = cdm17.AbstractObject
 
   def from(cdm: RawCDM15Type): Try[AbstractObject] = Try {
     AbstractObject(

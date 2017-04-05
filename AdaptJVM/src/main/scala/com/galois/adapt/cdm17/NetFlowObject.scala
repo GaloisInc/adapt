@@ -1,9 +1,9 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
 import akka.protobuf.Descriptors.FileDescriptor
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -18,7 +18,7 @@ case class NetFlowObject(
   remotePort: Int,
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
       List(
@@ -37,8 +37,8 @@ case class NetFlowObject(
   def getUuid = uuid
 }
 
-case object NetFlowObject extends CDM16Constructor[NetFlowObject] {
-  type RawCDMType = cdm16.NetFlowObject
+case object NetFlowObject extends CDM17Constructor[NetFlowObject] {
+  type RawCDMType = cdm17.NetFlowObject
 
   def from(cdm: RawCDM15Type): Try[NetFlowObject] = Try(
     NetFlowObject(

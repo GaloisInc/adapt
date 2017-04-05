@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -16,7 +16,7 @@ case class Principal(
   principalType: PrincipalType = PRINCIPAL_LOCAL,
   username: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Principal",
     "uuid", uuid,
@@ -33,8 +33,8 @@ case class Principal(
   def getUuid = uuid
 }
 
-case object Principal extends CDM16Constructor[Principal] {
-  type RawCDMType = cdm16.Principal
+case object Principal extends CDM17Constructor[Principal] {
+  type RawCDMType = cdm17.Principal
 
   def from(cdm: RawCDM15Type): Try[Principal] = Try {
     Principal(

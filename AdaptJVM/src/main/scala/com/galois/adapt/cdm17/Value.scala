@@ -1,6 +1,6 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -17,7 +17,7 @@ case class Value(
   valueBytes: Option[Array[Byte]] = None,
   tag: Option[Seq[TagRunLengthTuple]] = None,
   components: Option[Seq[Value]] = None
-) extends CDM16 with DBWritable {
+) extends CDM17 with DBWritable {
   def asDBKeyValues = List(
     "size", size,
     "valueType", valueType.toString,
@@ -31,8 +31,8 @@ case class Value(
     components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 }
 
-case object Value extends CDM16Constructor[Value] {
-  type RawCDMType = cdm16.Value
+case object Value extends CDM17Constructor[Value] {
+  type RawCDMType = cdm17.Value
 
   def from(cdm: RawCDM15Type): Try[Value] = Try(
     Value(

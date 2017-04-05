@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -15,7 +15,7 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "RegistryKeyObject",
     "uuid", uuid,
@@ -30,8 +30,8 @@ case class RegistryKeyObject(
   def getUuid = uuid
 }
 
-case object RegistryKeyObject extends CDM16Constructor[RegistryKeyObject] {
-  type RawCDMType = cdm16.RegistryKeyObject
+case object RegistryKeyObject extends CDM17Constructor[RegistryKeyObject] {
+  type RawCDMType = cdm17.RegistryKeyObject
 
   def from(cdm: RawCDM15Type): Try[RegistryKeyObject] = Try(
     RegistryKeyObject(

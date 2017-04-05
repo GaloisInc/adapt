@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
-import com.galois.adapt.cdm16._
+import com.galois.adapt.cdm17._
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -27,7 +27,7 @@ class DebugDevDBActor(val registry: ActorRef, localStorage: Option[String] = Non
   lazy val subscriptions = {
     log.info("Forced subcription list")
     val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM16]))
+    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM17]))
   }
 
   def beginService() = {
@@ -67,7 +67,7 @@ class DebugDevDBActor(val registry: ActorRef, localStorage: Option[String] = Non
 
   override def process: PartialFunction[Any,Unit] = {
 
-    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.size))
+    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.toMap))
 
     case c: IngestControl => broadCastUnsafe(c)
 
@@ -183,8 +183,9 @@ class DebugDevDBActor(val registry: ActorRef, localStorage: Option[String] = Non
       sender() !  missingToUuid.size
   }
 }
-/*
-case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Int)
+
+
+case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
 
 sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String) extends RestQuery
@@ -194,4 +195,3 @@ case class StringQuery(query: String) extends RestQuery
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
 case object Shutdown
-*/

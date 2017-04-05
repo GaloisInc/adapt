@@ -1,12 +1,12 @@
 package com.galois.adapt
 
 import akka.actor._
-import com.galois.adapt.cdm16.{InstrumentationSource, CDM16}
+import com.galois.adapt.cdm17.{InstrumentationSource, CDM17}
 import collection.mutable.Queue
 import scala.util.{Try,Success,Failure}
 
 class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM16] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM17] {
 
   log.info("FileIngestActor created")
 
@@ -40,7 +40,7 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
 
       Thread.sleep(2000)
 
-      CDM16.readData(j.path, j.loadLimit) match {
+      CDM17.readData(j.path, j.loadLimit) match {
         case Failure(t) =>
           // Can't ingest file
           println("COULD NOT PARSE!!!!")

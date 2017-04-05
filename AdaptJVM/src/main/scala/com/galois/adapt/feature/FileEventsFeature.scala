@@ -1,7 +1,7 @@
 package com.galois.adapt.feature
 
 import com.galois.adapt._
-import com.galois.adapt.cdm16._
+import com.galois.adapt.cdm17._
 
 import java.util.UUID
 

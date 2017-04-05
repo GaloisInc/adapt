@@ -1,4 +1,4 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
@@ -6,7 +6,7 @@ import org.apache.tinkerpop.gremlin.structure.T.label
 import scala.util.Try
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 
 import scala.collection.JavaConverters._
 
@@ -28,7 +28,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,
@@ -58,8 +58,8 @@ case class Event(
   def getUuid = uuid
 }
 
-case object Event extends CDM16Constructor[Event] {
-  type RawCDMType = cdm16.Event
+case object Event extends CDM17Constructor[Event] {
+  type RawCDMType = cdm17.Event
 
   def from(cdm: RawCDM15Type): Try[Event] = Try(
     Event(

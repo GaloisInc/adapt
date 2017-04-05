@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.DBWritable
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -12,7 +12,7 @@ import scala.util.Try
 case class TagRunLengthTuple(
   numValueElements: Int,
   tagId: UUID
-) extends CDM16 with DBWritable {
+) extends CDM17 with DBWritable {
   def asDBKeyValues = List(
 //    label, this.getClass.getSimpleName,// "TagRunLengthTuple",
     "numValueElements", numValueElements,
@@ -21,8 +21,8 @@ case class TagRunLengthTuple(
 }
 
 
-case object TagRunLengthTuple extends CDM16Constructor[TagRunLengthTuple] {
-  type RawCDMType = cdm16.TagRunLengthTuple
+case object TagRunLengthTuple extends CDM17Constructor[TagRunLengthTuple] {
+  type RawCDMType = cdm17.TagRunLengthTuple
 
   def from(cdm: RawCDM15Type): Try[TagRunLengthTuple] = Try {
     TagRunLengthTuple(

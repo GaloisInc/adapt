@@ -4,9 +4,9 @@ import scala.language.implicitConversions
 import java.util.UUID
 import java.nio.ByteBuffer
 
-import com.bbn.tc.schema.avro.cdm16.TCCDMDatum
+import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
 
-import com.bbn.tc.schema.avro.{cdm16 => bbnCDM15}
+import com.bbn.tc.schema.avro.{cdm17 => bbnCDM15}
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.avro.util.Utf8
@@ -15,32 +15,32 @@ import scala.util.Try
 import scala.collection.JavaConverters._
 
 
-package object cdm16 {
+package object cdm17 {
 
-  trait CDM16
+  trait CDM17
 
-  object CDM16 {
+  object CDM17 {
     val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
 
-    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM16]])] = {
+    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM17]])] = {
       val fileContents = readAvroFile(filePath)
 
       fileContents map {
         case (source, data) =>
           val croppedData = limit.fold(data)(data take _)
-          (source, croppedData.map(CDM16.parse))
+          (source, croppedData.map(CDM17.parse))
       }
     }
 
     def readAvroFile(filePath: String): Try[(InstrumentationSource, Iterator[RawCDM15Type])] = Try {
-      val tcDatumReader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm16.TCCDMDatum])
-      val tcFileReader: DataFileReader[com.bbn.tc.schema.avro.cdm16.TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
+      val tcDatumReader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+      val tcFileReader: DataFileReader[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
       val tcIterator = tcFileReader.iterator.asScala
 
       val cdm = tcIterator.next()
       val first: RawCDM15Type = {
-        if (cdm.CDMVersion.toString != "16")
-          throw new Exception(s"Expected CDM16, but received CDM${cdm.CDMVersion.toString}")
+        if (cdm.CDMVersion.toString != "17")
+          throw new Exception(s"Expected CDM17, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM15Type(cdm.getDatum)
       }
       (cdm.getSource, Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM15Type(cdm.getDatum)))
@@ -68,10 +68,10 @@ package object cdm16 {
   }
 
 
-  case object EpochMarker extends CDM16
+  case object EpochMarker extends CDM17
 
 
-  trait CDM16Constructor[T <: CDM16] extends CDM16 {
+  trait CDM17Constructor[T <: CDM17] extends CDM17 {
     type RawCDMType <: org.apache.avro.specific.SpecificRecordBase
     implicit def convertRawTypes(r: RawCDM15Type): RawCDMType = r.asType[RawCDMType]
     def from(cdm: RawCDM15Type): Try[T]
@@ -91,7 +91,7 @@ package object cdm16 {
     def int(x: => java.lang.Integer): Option[Int] = Try(Integer2int(x)).toOption
     def str(x: => java.lang.CharSequence): Option[String] = Try(x.toString).toOption
     def map(x: => java.util.Map[CharSequence,CharSequence]): Option[Map[String,String]] = Try(Option(x)).toOption.flatten.map(_.asInstanceOf[java.util.HashMap[Utf8,Utf8]].asScala.map{ case (k,v) => k.toString -> v.toString}.toMap)
-    def uuid(x: => bbnCDM15.UUID): Option[UUID] = Try(UUID.nameUUIDFromBytes(x.bytes)).toOption
+    def uuid(x: => bbnCDM15.UUID): Option[UUID] = Try(makeJavaUUID(x)).toOption
     def tagOpCode(x: => bbnCDM15.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
     def integrityTag(x: => bbnCDM15.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
     def confidentialityTag(x: => bbnCDM15.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
@@ -106,7 +106,7 @@ package object cdm16 {
     def listCryptographicHash(x: java.util.List[bbnCDM15.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => CryptographicHash.from(new RawCDM15Type(x)).get))
     def listUuid(x: java.util.List[bbnCDM15.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => UUID.nameUUIDFromBytes(x.bytes)))
+      _.asScala.toList.map(makeJavaUUID(_)))
     def listTagRunLengthTuple(x: java.util.List[bbnCDM15.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM15Type(x)).get))
   }

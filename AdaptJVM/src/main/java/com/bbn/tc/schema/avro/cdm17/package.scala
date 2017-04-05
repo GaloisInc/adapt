@@ -2,7 +2,7 @@ package com.bbn.tc.schema.avro
 
 import com.bbn.tc.schema.{avro => toplevel}
 
-package object cdm16 {
+package object cdm17 {
   type AbstractObject        = toplevel.AbstractObject        
   type ConfidentialityTag    = toplevel.ConfidentialityTag
   type CryptoHashType        = toplevel.CryptoHashType

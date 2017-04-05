@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -15,7 +15,7 @@ case class MemoryObject(
   pageNumber: Option[Long] = None,
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     label, "MemoryObject",
     "uuid", uuid,
@@ -30,8 +30,8 @@ case class MemoryObject(
   def getUuid = uuid
 }
 
-case object MemoryObject extends CDM16Constructor[MemoryObject] {
-  type RawCDMType = cdm16.MemoryObject
+case object MemoryObject extends CDM17Constructor[MemoryObject] {
+  type RawCDMType = cdm17.MemoryObject
 
   def from(cdm: RawCDM15Type): Try[MemoryObject] = Try(
     MemoryObject(

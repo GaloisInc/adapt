@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -24,7 +24,7 @@ case class Subject(
   importedLibraries: Option[Seq[String]] = None,
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Subject",
     "uuid", uuid,
@@ -50,8 +50,8 @@ case class Subject(
 }
 
 
-case object Subject extends CDM16Constructor[Subject] {
-  type RawCDMType = cdm16.Subject
+case object Subject extends CDM17Constructor[Subject] {
+  type RawCDMType = cdm17.Subject
 
   def from(cdm: RawCDM15Type): Try[Subject] = Try {
     Subject(

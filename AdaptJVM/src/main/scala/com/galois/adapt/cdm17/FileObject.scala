@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -18,7 +18,7 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
       label, "FileObject",
@@ -39,8 +39,8 @@ case class FileObject(
 }
 
 
-case object FileObject extends CDM16Constructor[FileObject] {
-  type RawCDMType = cdm16.FileObject
+case object FileObject extends CDM17Constructor[FileObject] {
+  type RawCDMType = cdm17.FileObject
 
   def from(cdm: RawCDM15Type): Try[FileObject] = Try(
     FileObject(

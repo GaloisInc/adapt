@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -21,7 +21,7 @@ case class ProvenanceTagNode(
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
     "tagId", tagId,
@@ -45,8 +45,8 @@ case class ProvenanceTagNode(
   def getUuid = tagId
 }
 
-case object ProvenanceTagNode extends CDM16Constructor[ProvenanceTagNode] {
-  type RawCDMType = cdm16.ProvenanceTagNode
+case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
+  type RawCDMType = cdm17.ProvenanceTagNode
 
   def from(cdm: RawCDM15Type): Try[ProvenanceTagNode] = Try(
     ProvenanceTagNode(

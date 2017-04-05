@@ -1,8 +1,8 @@
-package com.galois.adapt.cdm16
+package com.galois.adapt.cdm17
 
 import java.util.UUID
 
-import com.bbn.tc.schema.avro.cdm16
+import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
@@ -14,7 +14,7 @@ case class SrcSinkObject(
   baseObject: AbstractObject,
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
-) extends CDM16 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "SrcSinkObject",
     "uuid", uuid,
@@ -28,8 +28,8 @@ case class SrcSinkObject(
   def getUuid = uuid
 }
 
-case object SrcSinkObject extends CDM16Constructor[SrcSinkObject] {
-  type RawCDMType = cdm16.SrcSinkObject
+case object SrcSinkObject extends CDM17Constructor[SrcSinkObject] {
+  type RawCDMType = cdm17.SrcSinkObject
 
   def from(cdm: RawCDM15Type): Try[SrcSinkObject] = Try(
     SrcSinkObject(
