@@ -251,7 +251,7 @@ case object CONFIDENTIALITY_PRIVATE extends ConfidentialityTag
 case object CONFIDENTIALITY_PUBLIC extends ConfidentialityTag
 
 sealed trait CryptoHashType extends CDM17
-case object CryptoHashType extends CustomEnum[CryptoHashType] { val values = Seq(MD5, SHA1, SHA256, SHA512, AUTENTIHASH, SSDEEP, IMPHASH)}
+case object CryptoHashType extends CustomEnum[CryptoHashType] { val values = Seq(MD5, SHA1, SHA256, SHA512, AUTHENTIHASH, SSDEEP, IMPHASH)}
 case object MD5 extends CryptoHashType
 case object SHA1 extends CryptoHashType
 case object SHA256 extends CryptoHashType
