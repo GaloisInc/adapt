@@ -256,7 +256,7 @@ case object MD5 extends CryptoHashType
 case object SHA1 extends CryptoHashType
 case object SHA256 extends CryptoHashType
 case object SHA512 extends CryptoHashType
-case object AUTENTIHASH extends CryptoHashType
+case object AUTHENTIHASH extends CryptoHashType
 case object SSDEEP extends CryptoHashType
 case object IMPHASH extends CryptoHashType
 
