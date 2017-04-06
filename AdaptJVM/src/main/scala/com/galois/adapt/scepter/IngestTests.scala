@@ -54,6 +54,7 @@ class General_TA1_Tests(
     else {
       val (code, color) = colors.next()
       val edgesToPrint = incompleteEdges.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
+      toDisplay += s"g.V(${incompleteEdges.flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
       val message = s"\nThe following edges (ExistingUUID --> MissingUUID) are all referenced in this data set, but nodes with these MissingUUIDs do not exist in this dataset:\n$color$edgesToPrint${Console.RED}\n"
       assert(incompleteCount == 0, message)
     }
