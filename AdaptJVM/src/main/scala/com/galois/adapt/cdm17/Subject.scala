@@ -30,10 +30,10 @@ case class Subject(
     "uuid", uuid,
     "subjectType", subjectType.toString,
     "cid", cid,
-    "subjectLocalPrincipal", localPrincipal,
+    "subjectLocalPrincipalUuid", localPrincipal,
     "startTimestampNanos", startTimestampNanos
   ) ++
-    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubject", v)) ++
+    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubjectUuid", v)) ++
     unitId.fold[List[Any]](List.empty)(v => List("unitId", v)) ++
     iteration.fold[List[Any]](List.empty)(v => List("iteration", v)) ++
     count.fold[List[Any]](List.empty)(v => List("count", v)) ++
@@ -43,7 +43,7 @@ case class Subject(
     exportedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("exportedLibraries", v.mkString(", "))) ++
     DBOpt.fromKeyValMap(properties)
 
-  def asDBEdges = List(("subjectLocalPrincipal1",localPrincipal)) ++
+  def asDBEdges = List(("subjectLocalPrincipal",localPrincipal)) ++
     parentSubject.fold[List[(String,UUID)]](Nil)(v => List(("parentSubject", v)))
 
   def getUuid = uuid

@@ -45,6 +45,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   // The following is supposed to set up a 'uuid' index (since we do a lot of lookups by UUID).
   // unfortunately, based on the log messages, it isn't doing that. In fact, it doesn't seem to be
   // doing anything at all.  -.-
+  /*
   var management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
   if (null == management.getGraphIndex("byUuidUnique")) {
     
@@ -71,6 +72,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
     ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
 
   } else { management.commit() }
+  */
 
 
   // Optionally load in existing data:
@@ -99,6 +101,9 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
         assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
 
+       // val uuidIndex: Int = props.indexOf("uuid")
+       // val uuidVal: UUID =  props(uuidIndex + 1).asInstanceOf[UUID]
+      //  val uuidVal: UUID = UUID.randomUUID()
         val newTitanVertex: TitanVertex = transaction.addVertex(props: _*)
       
         // Add this vertex to the map of vertices we know about and see if it is the destination of
@@ -258,8 +263,9 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       // Lookup the key in our maps. If we don't find it in the current nodeIds (those from this
       // transaction), look in the past nodeIds (from previous transactions) but remember to refresh
       // anything we get back from there.
-      nodeIdsCurrent.get(uuid) orElse graph.traversal().V().has("uuid",uuid).tryNext()
-      
+    //  nodeIdsCurrent.get(uuid) orElse graph.traversal().V().has("uuid",uuid).tryNext()
+     graph.traversal().V().has("uuid",uuid).tryNext()
+
      // nodeIdsPast.get(uuid).map(v => transaction.getVertex(v.longId()))
       //nodeIdsCurrent.get(uuid) orElse nodeIdsPast.get(uuid)
     } else {
