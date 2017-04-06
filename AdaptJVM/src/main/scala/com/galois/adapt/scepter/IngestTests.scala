@@ -53,8 +53,8 @@ class General_TA1_Tests(
     if (incompleteCount == 0) assert(incompleteCount == 0)
     else {
       val (code, color) = colors.next()
-      val uuidsToPrint = incompleteEdges.keys.mkString("\n" + color)
-      val message = s"\nThe following UUIDs are all referenced as the end of an edge, but nodes with these UUIDs do not exist in this dataset:\n$color$uuidsToPrint${Console.RED}\n"
+      val edgesToPrint = incompleteEdges.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
+      val message = s"\nThe following edges (ExistingUUID --> MissingUUID) are all referenced in this data set, but nodes with these MissingUUIDs do not exist in this dataset:\n$color$edgesToPrint${Console.RED}\n"
       assert(incompleteCount == 0, message)
     }
   }
