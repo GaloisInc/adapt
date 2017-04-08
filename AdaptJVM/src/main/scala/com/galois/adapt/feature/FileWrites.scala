@@ -5,7 +5,7 @@ import com.galois.adapt.cdm17._
 
 import java.util.UUID
 
-import scala.collection.mutable.{Set => MutableSet, Map => MutableMap, ListBuffer}
+import scala.collection.mutable.{Map => MutableMap}
 
 import akka.actor._
 
