@@ -22,11 +22,13 @@ import akka.util.Timeout
  * appropriately).
  */
 class IForestAnomalyDetector(val registry: ActorRef, override val subscriptions: Set[Subscription])
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[_,Double]] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Map[_,Double]] with ReportsStatus {
   
   val dependencies = List.empty
   def beginService() = initialize()
   def endService() = ()
+
+  def statusReport = Map("IForestAnomalyDetector" -> "status...?")
 
   override def process = { case c: Map[_,_] =>
 

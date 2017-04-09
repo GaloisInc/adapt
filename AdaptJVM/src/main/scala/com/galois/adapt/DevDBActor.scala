@@ -21,7 +21,7 @@ import collection.JavaConverters._
 import scala.util.Try
 
 class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] with ReportsStatus {
 
   val dependencies = "FileIngestActor" :: Nil
   lazy val subscriptions = {
@@ -35,6 +35,13 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
     initialize()    
   }
   def endService() = ()  // TODO
+
+
+  def statusReport = {
+    Map("nodes received" -> nodesReceived)
+  }
+
+  var nodesReceived = 0
 
 
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
@@ -105,6 +112,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       println("Done creating all missing nodes.")
 
     case cdm15: DBNodeable =>
+      nodesReceived += 1
       // Get the uuid of the node
       val uuid = cdm15.getUuid
 

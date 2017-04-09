@@ -1,6 +1,6 @@
-val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on other having that recent a version
-val akkaV = "2.4.16"
-val akkaHttpV = "10.0.0"
+val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on others having that recent a version
+val akkaV = "2.4.17"
+val akkaHttpV = "10.0.5"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 

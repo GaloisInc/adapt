@@ -1,22 +1,5 @@
 package com.galois.adapt
 
-/**
-  * Copyright  2015  Comcast Cable Communications Management, LLC
-  *
-  * Licensed under the Apache License, Version 2.0 (the "License");
-  * you may not use this file except in compliance with the License.
-  * You may obtain a copy of the License at
-  *
-  * http://www.apache.org/licenses/LICENSE-2.0
-  *
-  * Unless required by applicable law or agreed to in writing, software
-  * distributed under the License is distributed on an "AS IS" BASIS,
-  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  * See the License for the specific language governing permissions and
-  * limitations under the License.
-  */
-
-//package com.comcast.csv.akka.serviceregistry
 
 import akka.actor._
 import akka.persistence.{PersistentActor, RecoveryCompleted, SaveSnapshotSuccess, SnapshotOffer}
@@ -76,19 +59,19 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
 
   override def receiveRecover: Receive = {
     case add: AddSubscriberPublisher =>
-      log.info(s"Received -> AddSubscriberPublisher: $add  from: ${sender()}")
+//      log.info(s"Received -> AddSubscriberPublisher: $add  from: ${sender()}")
       recordSubscriberPublisher(add)
 
     case remove: RemoveSubscriberPublisher =>
-      log.info(s"Received -> RemoveSubscriberPublisher: $remove  from: ${sender()}")
+//      log.info(s"Received -> RemoveSubscriberPublisher: $remove  from: ${sender()}")
       unrecordSubscriberPublisher(remove)
 
     case SnapshotOffer(_, snapshot: SnapshotAfterRecover) =>
-      log.info(s"Received -> SnapshotOffer  from: ${sender()}")
+//      log.info(s"Received -> SnapshotOffer  from: ${sender()}")
     // do nothing
 
     case RecoveryCompleted =>
-      log.info(s"Received -> RecoveryCompleted  from: ${sender()}")
+//      log.info(s"Received -> RecoveryCompleted  from: ${sender()}")
       val registryHasRestarted = RegistryHasRestarted(self)
       subscribersPublishers.foreach(sp => sp ! registryHasRestarted)
       subscribersPublishers.clear()
@@ -111,7 +94,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       }
 
     case ups: UnPublishService =>
-      log.info(s"Received -> UnPublishService: $ups  from: ${sender()}")
+//      log.info(s"Received -> UnPublishService: $ups  from: ${sender()}")
       val serviceEndpoint = publishers.get(ups.serviceName)
       publishers.remove(ups.serviceName)
       subscribers.filter(p => p._2.contains(ups.serviceName))
@@ -134,7 +117,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       }
 
     case us: UnSubscribeToService =>
-      log.info(s"Received -> UnSubscribeToService: $us  from: ${sender()}")
+//      log.info(s"Received -> UnSubscribeToService: $us  from: ${sender()}")
       subscribers += (sender() -> subscribers.get(sender())
         .orElse(Some(new mutable.HashSet[String])).map(s => {
         s - us.serviceName
@@ -143,7 +126,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       considerForgetParticipant(sender())
 
     case rs: RequestService =>
-      log.info(s"Received -> RequestService: $rs  from: ${sender()}")
+//      log.info(s"Received -> RequestService: $rs  from: ${sender()}")
       publishers.find(p => p._1 == rs.serviceName) match {
         case Some(svc) =>
           sender() ! RespondService(rs.serviceName, svc._2)
@@ -152,7 +135,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       }
 
     case terminated: Terminated =>
-      log.info(s"Received -> Terminated: $terminated  from: ${sender()}")
+//      log.info(s"Received -> Terminated: $terminated  from: ${sender()}")
       var toRemoveServiceName: Option[String] = None
       publishers.find(p => p._2 == terminated.getActor).foreach(p2 => {
         toRemoveServiceName = Some(p2._1)
@@ -162,7 +145,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
       toRemoveServiceName.foreach(serviceName => publishers.remove(serviceName))
 
     case sss: SaveSnapshotSuccess =>
-      log.info(s"Received -> SaveSnapshotSuccess: $sss  from: ${sender()}")
+//      log.info(s"Received -> SaveSnapshotSuccess: $sss  from: ${sender()}")
 
     case End =>
       log.info(s"Received -> End  from: ${sender()}")

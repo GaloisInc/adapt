@@ -156,12 +156,12 @@ object Query {
       var arrs: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
-      def lng: Parser[Value[java.lang.Long]] = 
+      def lng: Parser[Value[java.lang.Long]] =
         ( variable(lngs)
         | wholeNumber ~ "L" ^^ { case x~_ => Raw(x.toLong) }
         | wholeNumber       ^^ { x => Raw(x.toLong) }
         ).asInstanceOf[Parser[Value[java.lang.Long]]]
-      def int: Parser[Value[Int]] = 
+      def int: Parser[Value[Int]] =
         ( variable[Int](ints)
         | wholeNumber ~ "I" ^^ { case x~_ => Raw(x.toInt) }
         )
@@ -170,10 +170,11 @@ object Query {
         | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         )
-      def uid: Parser[Value[java.util.UUID]] = variable(uids) | 
+      def uid: Parser[Value[java.util.UUID]] = variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(java.util.UUID.fromString(s))
         }
+
       def uidArr: Parser[Value[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
       def lngArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
       def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
@@ -192,7 +193,7 @@ object Query {
          ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
            case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
          }
-      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] = 
+      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
         | "within(" ~ elem ~ "," ~ elem ~ ")"    ^^ { case _~l~_~h~_ => RawWithinPred(l,h) }
@@ -243,7 +244,7 @@ object Query {
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
         | ".min()"                         ^^ { case _          => Min(_: Traversal[_,java.lang.Long]) }
         | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
-        | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s) 
+        | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s)
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
@@ -269,7 +270,7 @@ object Query {
         ).asInstanceOf[Parser[Tr => Tr]]
 
       // Possible sources for traversals
-      def travSource: Parser[Tr] = 
+      def travSource: Parser[Tr] =
         ( "g.V(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Vertices(ids) }
         | "g.V(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Vertices(RawArr(ids)) }
         | "g.E(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Edges(ids) }
@@ -278,7 +279,7 @@ object Query {
         | "_(" ~ repsep(lng,",") ~ ")"              ^^ { case _~ids~_ => Anon(RawArr(ids)) }
         ).asInstanceOf[Parser[Tr]]
 
-      // Parser for a traversal 
+      // Parser for a traversal
       def trav: Parser[Tr] = travSource ~ rep(travSuffix) ^^ {
           case src ~ sufs => sufs.foldLeft[Tr](src)((t,suf) => suf(t))
         }
@@ -286,13 +287,13 @@ object Query {
       // Queries are _not_ left recursive (unlike the traversals), but we still need to abstract
       // prefixes (and then repeat them) so that variables of different types get noted before we
       // get to the queries that use them.
-      def queryPrefix: Parser[Qy => Qy] = 
+      def queryPrefix: Parser[Qy => Qy] =
         ( ident ~ "=" ~ int ~ ";"               ^^ { case i~_~v~_ => ints += i; AssignLiteral(i,v,_: Qy).asInstanceOf[Qy] }
         | ident ~ "=" ~ lng ~ ";"               ^^ { case i~_~v~_ => lngs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ str ~ ";"               ^^ { case i~_~v~_ => strs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ (intArr|strArr|lngArr) ~ ";" ^^ { case i~_~v~_ => arrs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ trav ~ ";"              ^^ { case i~_~t~_ => arrs += i; AssignTraversal(i,t,_: Qy) }
-        | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) } 
+        | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) }
         ).asInstanceOf[Parser[Qy => Qy]]
 
 
@@ -301,7 +302,7 @@ object Query {
           case pres ~ src => pres.foldRight[Qy](FinalTraversal(src))((pre,t) => pre(t))
         }
     }
- 
+
     Parsers.parseAll(Parsers.query, input.filterNot(_.isWhitespace)) match {
       case Parsers.Success(matched, _) => Success(matched)
       case Parsers.Error(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
@@ -345,9 +346,9 @@ case class FinalTraversal[E](traversal: Traversal[_,E]) extends Query[E] {
 
 
 // Represents a traversal across a graph where 'S' is the source type and 'T' the destination type
-sealed trait Traversal[S,T] { 
+sealed trait Traversal[S,T] {
   // Convert into a Gremlin traversal by "running" the current traversal on the graph passed in.
-  def buildTraversal(graph: Graph, context: Map[String,Value[_]]): GraphTraversal[S,T] 
+  def buildTraversal(graph: Graph, context: Map[String,Value[_]]): GraphTraversal[S,T]
 
   // Run our traversal on a graph.
   def run(graph: Graph): Try[Stream[T]] = Try { buildTraversal(graph, Map()).asScala.toStream }
@@ -411,7 +412,7 @@ case class Anon[A](starts: Value[Seq[A]]) extends Traversal[A,A] {
 // Filters of traversals
 case class Has[S,T](traversal: Traversal[S,T], key: Value[String]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
-    traversal.buildTraversal(graph,context).has(key.eval(context)) 
+    traversal.buildTraversal(graph,context).has(key.eval(context))
 }
 case class HasValue[S,T,V](traversal: Traversal[S,T], k: Value[String], v: Value[V]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
@@ -464,7 +465,7 @@ case class Is[S,T](traversal: Traversal[S,T], value: Value[Any]) extends Travers
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).is(value.eval(context))
 }
-// TODO: figure out how to get this to compile with pred: Value[P[T]] 
+// TODO: figure out how to get this to compile with pred: Value[P[T]]
 case class IsPredicate[S,T](traversal: Traversal[S,T], pred: Value[P[Any]]) extends Traversal[S,T] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).is(pred.eval(context))
@@ -553,10 +554,10 @@ case class Unfold[S,T](traversal: Traversal[S,_]) extends Traversal[S,T] {
 case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Long] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).count()
 }
-case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] { 
+case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).groupCount()
 }
-case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] { 
+case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).path()
 }
 
@@ -598,7 +599,7 @@ case class Repeat[S](traversal: Traversal[S,Edge], rep: Traversal[_,Edge]) exten
     traversal.buildTraversal(graph,context).repeat(rep.buildTraversal(graph, context))
 }
 case class Union[S,E](traversal: Traversal[S,_], unioned: Seq[Traversal[_,E]]) extends Traversal[S,E] {
-  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = 
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).union(unioned.map(_.buildTraversal(graph, context)): _*)
 }
 case class Local[S,E](traversal: Traversal[S,_], loc: Traversal[_,E]) extends Traversal[S,E] {
@@ -609,8 +610,8 @@ case class Match[S,E](traversal: Traversal[S,_], matches: Seq[Traversal[_,_]]) e
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).`match`(matches.map(_.buildTraversal(graph, context)): _*)
 }
-case class Properties[S](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,GremlinProperty[_]] { 
-  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = 
+case class Properties[S](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,GremlinProperty[_]] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
     traversal.buildTraversal(graph,context).properties(keys.eval(context)
     :_*).asInstanceOf[GraphTraversal[S,GremlinProperty[_]]]
 }
