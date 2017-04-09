@@ -17,19 +17,19 @@ import GraphDSL.Implicits._
 import FanInShape._
 
 
-object GeneralFlow extends App {
+object TestFlow extends App {
 
   implicit val system = ActorSystem("test")
   implicit val ec = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
-  val (ta1, cdmData) = CDM17.readData("/Users/ryan/Desktop/ta1-cadets-cdm17-2.bin", None).get
+  val (ta1, cdmData) = CDM17.readData("/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin", None).get
   val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
 
   val printSink = Sink.foreach(println)
   val actorPrintSink = Sink.actorRef(system.actorOf(Props(classOf[TestSinkActor])), DoneMessage)
 
-  val g = RunnableGraph.fromGraph(GraphDSL.create(){ implicit buildBlock =>
+  val pwfRG = RunnableGraph.fromGraph(GraphDSL.create(){ implicit buildBlock =>
     val bcast = buildBlock.add(Broadcast[CDM17](3))
     val eventBroadcast = buildBlock.add(Broadcast[Event](2))
 
@@ -41,29 +41,17 @@ object GeneralFlow extends App {
     def eventFilter(eType: EventType) = Flow[CDM17].filter(e => e.isInstanceOf[Event] && e.asInstanceOf[Event].eventType == eType).map(_.asInstanceOf[Event])
     val fileFilter = Flow[CDM17].filter(f => f.isInstanceOf[FileObject] && f.asInstanceOf[FileObject].fileObjectType == FILE_OBJECT_FILE).map(_.asInstanceOf[FileObject])
 
-    cdmSource.map(_.get) ~> bcast.in
-    bcast.out(0) ~> processFilter ~> processWrites.in0
-    bcast.out(1) ~> fileFilter ~> fileWrites.in0
-    bcast.out(2) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in
-    eventBroadcast.out(0) ~> processWrites.in1
-    eventBroadcast.out(1) ~> fileWrites.in1
-    processWrites.out ~> processWritesFile.in0
-    fileWrites.out ~> processWritesFile.in1
-    processWritesFile.out ~> actorPrintSink
-
+    cdmSource.map(_.get) ~> bcast.in;                                   eventBroadcast.out(0) ~> processWrites.in1
+                            bcast.out(0) ~> processFilter ~>                                     processWrites.in0
+                            bcast.out(2) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in;       processWrites.out ~> processWritesFile.in0
+                            bcast.out(1) ~> fileFilter ~>                                        fileWrites.in0
+                                                                        eventBroadcast.out(1) ~> fileWrites.in1
+                                                                                                 fileWrites.out ~>    processWritesFile.in1
+                                                                                                                      processWritesFile.out ~> actorPrintSink
     ClosedShape
   })
 
-
-//  cdmSource.map(_.get).runWith(actorPrintSink)
-
-//  val e = cdmSource.runForeach(println)
-//  val f = cdmSource.runFold(0){(a,b) => println(s"$a  $b"); a + 1}
-//  f.map(i => println(s"count: $i"))
-
-  g.run()
-
-  println("should have run")
+  pwfRG.run()
 }
 
 case object DoneMessage
@@ -90,15 +78,17 @@ case class ProcessWrites() extends GraphStage[FanInShape2[Subject, Event, (Subje
       def onPush() = {
         val p = grab(shape.in0)
         processes(p.uuid) = p
-        unmatchedWrites.get(p.uuid).fold(
-          pull(shape.in0)
-        ) { writes =>
-          unmatchedWrites -= p.uuid
-          val wList = writes.toList
-          wList.headOption foreach { w =>
-            push(shape.out, p -> w)
+        unmatchedWrites.get(p.uuid) match {
+          case None =>
+            pull(shape.in0)
+          case Some(writes) => {
+            unmatchedWrites -= p.uuid
+            val wList = writes.toList
+            wList.headOption foreach { w =>
+              push(shape.out, p -> w)
+            }
+            if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(p -> _)
           }
-          if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(p -> _)
         }
       }
     })
@@ -107,11 +97,12 @@ case class ProcessWrites() extends GraphStage[FanInShape2[Subject, Event, (Subje
       def onPush() = {
         val e = grab(shape.in1)
         val processUuid = e.subject
-        processes.get(processUuid).fold {
-          unmatchedWrites(processUuid) = unmatchedWrites.getOrElse(processUuid, Set.empty[Event]) + e
-          pull(shape.in1)
-        } { p =>
-          push(shape.out, p -> e)
+        processes.get(processUuid) match {
+          case None =>
+            unmatchedWrites(processUuid) = unmatchedWrites.getOrElse(processUuid, Set.empty[Event]) + e
+            pull(shape.in1)
+          case Some(p) =>
+            push(shape.out, p -> e)
         }
       }
     })
@@ -145,15 +136,17 @@ case class FileWrites() extends GraphStage[FanInShape2[FileObject, Event, (FileO
       def onPush() = {
         val f = grab(shape.in0)
         files(f.uuid) = f
-        unmatchedWrites.get(f.uuid).fold(
-          pull(shape.in0)
-        ) { writes =>
-          unmatchedWrites -= f.uuid
-          val wList = writes.toList
-          wList.headOption foreach { w =>
-            push(shape.out, f -> w)
+        unmatchedWrites.get(f.uuid)match {
+          case None =>
+            pull(shape.in0)
+          case Some(writes) => {
+            unmatchedWrites -= f.uuid
+            val wList = writes.toList
+            wList.headOption foreach { w =>
+              push(shape.out, f -> w)
+            }
+            if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(f -> _)
           }
-          if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(f -> _)
         }
       }
     })
@@ -163,11 +156,12 @@ case class FileWrites() extends GraphStage[FanInShape2[FileObject, Event, (FileO
         val e = grab(shape.in1)
         val fileUuids = List(e.predicateObject, e.predicateObject2).flatten
         fileUuids foreach { fu =>
-          files.get(fu).fold {
-            unmatchedWrites(fu) = unmatchedWrites.getOrElse(fu, Set.empty[Event]) + e
-            pull(shape.in1)
-          } { file =>
-            push(shape.out, file -> e)
+          files.get(fu) match {
+            case None =>
+              unmatchedWrites(fu) = unmatchedWrites.getOrElse(fu, Set.empty[Event]) + e
+              pull(shape.in1)
+            case Some(file) =>
+              push(shape.out, file -> e)
           }
         }
       }
@@ -196,7 +190,7 @@ case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), 
 
     //    val unmatchedProcesses = MutableMap.empty[Subject,Set[Event]]
     //    val unmatchedFiles = MutableMap.empty[FileObject, Set[Event]]
-    val unmatchesProcesses = MutableMap.empty[Event, Subject]
+    val unmatchesProcesses = MutableMap.empty[Event, Subject]  // todo: probably inefficient copies of Subject when Event differs, but Subject doesn't.
     val unmatchedFiles = MutableMap.empty[Event, FileObject]
     //    var sendingBuffer = List.empty[(Subject, Event, FileObject)]
 
@@ -209,7 +203,8 @@ case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), 
             pull(shape.in0)
           case Some(file) =>
             push(shape.out, (p, e, file))
-          //            unmatchedFiles -= e  // Should this hold files forever? Yes, probably so.
+            // unmatchedFiles -= e  // Should this hold files forever? Yes, probably so.
+            // if Unlinked, then it may queue it up for deletion once the next TimeMarker comes in.
         }
       }
     })
@@ -261,35 +256,6 @@ case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), 
 //      def onPush() = {
 //
 //      }
-//    })
-//  }
-//}
-
-
-
-
-//case class Pairer() extends GraphStage[FlowShape[CDM17, (CDM17, CDM17)]] {
-//  val in = Inlet[CDM17]("Pairer.in")
-//  val out = Outlet[(CDM17, CDM17)]("Pairer.out")
-//  def shape = FlowShape.of(in, out)
-//
-//  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-//    var internalState: Option[CDM17] = None
-//
-//    setHandler(in, new InHandler {
-//      def onPush() = {
-//        if (internalState.isEmpty) {
-//          internalState = Some(grab(in))
-//          pull(in)
-//        } else {
-//          push(out, (internalState.get, grab(in)))
-//          internalState = None
-//        }
-//      }
-//    })
-//
-//    setHandler(out, new OutHandler {
-//      def onPull() = pull(in)
 //    })
 //  }
 //}
