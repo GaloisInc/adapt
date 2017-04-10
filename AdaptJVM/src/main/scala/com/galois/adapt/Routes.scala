@@ -28,7 +28,7 @@ object Routes {
     }
 
 
-  implicit val timeout = Timeout(10 seconds)
+  implicit val timeout = Timeout(20 seconds)
 
   def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
     val qType = query match {

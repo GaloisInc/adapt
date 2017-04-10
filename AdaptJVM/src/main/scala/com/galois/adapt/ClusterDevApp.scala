@@ -2,18 +2,25 @@ package com.galois.adapt
 
 import akka.actor._
 import akka.cluster.Cluster
-import akka.cluster.ClusterEvent.{MemberEvent, MemberJoined, MemberUp, InitialStateAsEvents}
+import akka.cluster.ClusterEvent.{InitialStateAsEvents, MemberEvent, MemberJoined, MemberUp}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import com.typesafe.config.Config
+
 import scala.collection.JavaConverters._
 import ServiceRegistryProtocol._
+
 import scala.concurrent.duration._
 import com.galois.adapt.feature._
 import com.galois.adapt.scepter._
-import com.galois.adapt.cdm17.{CDM17, EpochMarker, Subject}
-
+import com.galois.adapt.cdm17.{CDM17, EVENT_READ, EVENT_WRITE, EpochMarker, Event, EventType, FILE_OBJECT_FILE, FileObject, SUBJECT_PROCESS, Subject, TimeMarker}
 import java.io.File
+
+import akka.NotUsed
+import akka.stream.{ActorMaterializer, ClosedShape}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, RunnableGraph, Sink, Source}
+
 import scala.collection.JavaConversions._
+import scala.util.Try
 
 object ClusterDevApp {
   println(s"Spinning up a development cluster.")
@@ -36,8 +43,6 @@ object ClusterDevApp {
           singletonManagerPath = "/user/registry",
         settings = ClusterSingletonProxySettings(system)),
       name = "registryProxy"))
-
-    Thread.sleep(5000)
 
     nodeManager = Some(
       system.actorOf(Props(classOf[ClusterNodeManager], config, registryProxy.get), "mgr")
@@ -130,7 +135,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
   
   case "devfeatures" =>
     val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
-    val processWrites = context.actorOf(Props(classOf[ProcessWrites], registryProxy), "ProcessWrites")
+    val processWrites = context.actorOf(Props(classOf[ProcessEvents], registryProxy), "ProcessWrites")
     val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
     childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
 
@@ -154,8 +159,25 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     childActors = childActors + (roleName ->
       childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
     )
-  }
 
+  case "stream1" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val rankedData = context.actorOf(Props(classOf[RankedDataActor]))
+    val rankedDataSink = Sink.actorRef(rankedData, TimeMarker(0L))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processWritesFile(cdmSource.map(_.get), rankedDataSink)))
+    childActors = childActors + (roleName -> Set(streamActor))
+
+  case "stream2" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val checkOpenRatioActor = context.actorOf(Props(classOf[ProcessCheckOpenActor]))
+    val sink = Sink.actorRef(checkOpenRatioActor, TimeMarker(System.nanoTime))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processCheckOpenGraph(cdmSource.map(_.get), sink)))
+    childActors = childActors + (roleName -> Set(streamActor))
+  }
 
   implicit val ec = context.dispatcher
   var statusCounter = 0
@@ -184,6 +206,58 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 
     case x => log.warning("received unhandled message: {}", x)
   }
+
+
+
+
+
+
+//  import GraphDSL.Implicits._
+//  val pwfRG = RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+//    val bcast = graph.add(Broadcast[CDM17](3))
+//    val eventBroadcast = graph.add(Broadcast[Event](2))
+//
+//    val (ta1, cdmData) = CDM17.readData("/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin", None).get
+//    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+//
+//    val rankedDataSink = Sink.actorRef(context.actorOf(Props(classOf[RankedDataActor])), TimeMarker(System.nanoTime))
+//
+//    val processFilter = Flow[CDM17].filter(s => s.isInstanceOf[Subject] && s.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS).map(_.asInstanceOf[Subject])
+//    def eventFilter(eType: EventType) = Flow[CDM17].filter(e => e.isInstanceOf[Event] && e.asInstanceOf[Event].eventType == eType).map(_.asInstanceOf[Event])
+//
+//    val fileFilter = Flow[CDM17].filter(f => f.isInstanceOf[FileObject] && f.asInstanceOf[FileObject].fileObjectType == FILE_OBJECT_FILE).map(_.asInstanceOf[FileObject])
+//
+//
+//    val processEvents = graph.add(ProcessEvents())
+//    val fileEvents = graph.add(FileWrites())
+//    val processEventsFile = graph.add(ProcessWritesFile())
+//
+//    cdmSource.map(_.get) ~> bcast.in
+//    eventBroadcast.out(0) ~> processEvents.in1
+//    bcast.out(0) ~> processFilter ~> processEvents.in0
+//    bcast.out(2) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in
+//    processEvents.out ~> processEventsFile.in0
+//    bcast.out(1) ~> fileFilter ~> fileEvents.in0
+//    eventBroadcast.out(1) ~> fileEvents.in1
+//    fileEvents.out ~>    processEventsFile.in1
+//    processEventsFile.out ~> rankedDataSink
+//    ClosedShape
+//  })
+
+
 }
 
 case class UIStatusReport(reports: List[StatusReport])
+
+
+class GraphRunner(graph: RunnableGraph[_]) extends Actor {
+  implicit val ec = context.dispatcher
+  implicit val materializer = ActorMaterializer()(context)
+
+  graph.run()
+
+  def receive = {
+    case _ => ()
+  }
+
+}

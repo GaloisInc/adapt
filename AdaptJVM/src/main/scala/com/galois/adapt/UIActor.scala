@@ -46,7 +46,7 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
         implicit val ec = context.dispatcher
         implicit val materializer = ActorMaterializer()
         val httpServiceF = Http()(context.system).bindAndHandle(Routes.mainRoute(dbActor, rankedList, allStatusReports), interface, port)
-        httpService = Some(Await.result(httpServiceF, 10 seconds))
+        httpService = Some(Await.result(httpServiceF, 20 seconds))
         registry ! PublishService(this.getClass.getSimpleName, context.self, clusterName)
       } else {
         log.warning(s"Got a message to start the UI when it was already running: $msg\n from: $sender")

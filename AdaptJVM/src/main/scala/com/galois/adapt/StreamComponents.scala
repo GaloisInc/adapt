@@ -1,73 +1,80 @@
 package com.galois.adapt
 
 import java.util.UUID
-
-import akka.NotUsed
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.Actor
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
-
 import scala.collection.mutable.{Map => MutableMap}
-import scala.collection.immutable
-import scala.concurrent.duration._
-import scala.util.Try
 import GraphDSL.Implicits._
-import FanInShape._
 
 
-object TestFlow extends App {
+object Streams {
 
-  implicit val system = ActorSystem("test")
-  implicit val ec = system.dispatcher
-  implicit val materializer = ActorMaterializer()
+  def processWritesFile(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val bcast = graph.add(Broadcast[CDM17](3))
+      val eventBroadcast = graph.add(Broadcast[Event](2))
 
-  val (ta1, cdmData) = CDM17.readData("/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin", None).get
-  val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+      val processFilter = Flow[CDM17].filter(s => s.isInstanceOf[Subject] && s.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS).map(_.asInstanceOf[Subject])
+      def eventFilter(eType: EventType) = Flow[CDM17].filter(e => e.isInstanceOf[Event] && e.asInstanceOf[Event].eventType == eType).map(_.asInstanceOf[Event])
+      val fileFilter = Flow[CDM17].filter(f => f.isInstanceOf[FileObject] && f.asInstanceOf[FileObject].fileObjectType == FILE_OBJECT_FILE).map(_.asInstanceOf[FileObject])
 
-  val printSink = Sink.foreach(println)
-  val actorPrintSink = Sink.actorRef(system.actorOf(Props(classOf[TestSinkActor])), DoneMessage)
+      val processEvents = graph.add(ProcessEvents())
+      val fileEvents = graph.add(FileWrites())
+      val processEventsFile = graph.add(ProcessWritesFile())
 
-  val pwfRG = RunnableGraph.fromGraph(GraphDSL.create(){ implicit buildBlock =>
-    val bcast = buildBlock.add(Broadcast[CDM17](3))
-    val eventBroadcast = buildBlock.add(Broadcast[Event](2))
+      source ~> bcast.in;                                   eventBroadcast.out(0) ~> processEvents.in1
+                bcast.out(0) ~> processFilter ~>                                     processEvents.in0
+                bcast.out(1) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in;       processEvents.out ~> processEventsFile.in0
+                bcast.out(2) ~> fileFilter ~>                                        fileEvents.in0
+                                                            eventBroadcast.out(1) ~> fileEvents.in1
+                                                                                     fileEvents.out  ~>   processEventsFile.in1
+                                                                                                          processEventsFile.out ~> sink
+      ClosedShape
+    }
+  )
 
-    val processWrites = buildBlock.add(ProcessWrites())
-    val fileWrites = buildBlock.add(FileWrites())
-    val processWritesFile = buildBlock.add(ProcessWritesFile())
 
-    val processFilter = Flow[CDM17].filter(s => s.isInstanceOf[Subject] && s.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS).map(_.asInstanceOf[Subject])
-    def eventFilter(eType: EventType) = Flow[CDM17].filter(e => e.isInstanceOf[Event] && e.asInstanceOf[Event].eventType == eType).map(_.asInstanceOf[Event])
-    val fileFilter = Flow[CDM17].filter(f => f.isInstanceOf[FileObject] && f.asInstanceOf[FileObject].fileObjectType == FILE_OBJECT_FILE).map(_.asInstanceOf[FileObject])
-
-    cdmSource.map(_.get) ~> bcast.in;                                   eventBroadcast.out(0) ~> processWrites.in1
-                            bcast.out(0) ~> processFilter ~>                                     processWrites.in0
-                            bcast.out(2) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in;       processWrites.out ~> processWritesFile.in0
-                            bcast.out(1) ~> fileFilter ~>                                        fileWrites.in0
-                                                                        eventBroadcast.out(1) ~> fileWrites.in1
-                                                                                                 fileWrites.out ~>    processWritesFile.in1
-                                                                                                                      processWritesFile.out ~> actorPrintSink
-    ClosedShape
-  })
-
-  pwfRG.run()
+  def processCheckOpenGraph(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      source.filter(cdm =>
+        (cdm.isInstanceOf[Subject] && cdm.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS) ||
+        (cdm.isInstanceOf[Event] && cdm.asInstanceOf[Event].eventType == EVENT_OPEN) ||
+        (cdm.isInstanceOf[Event] && cdm.asInstanceOf[Event].eventType == EVENT_CHECK_FILE_ATTRIBUTES)
+      ) ~> sink
+      ClosedShape
+    }
+  )
 }
 
-case object DoneMessage
 
-class TestSinkActor extends Actor {
+
+class ProcessCheckOpenActor() extends Actor {
+  type ProcessUUID = UUID
+  val processes = MutableMap.empty[ProcessUUID, Subject]
+  val opens = MutableMap.empty[ProcessUUID, List[Event]]
+  val checks = MutableMap.empty[ProcessUUID, List[Event]]
   def receive = {
-    case DoneMessage => println("DONE!!!")
-    case x => println(x)
+    case e: Event if e.eventType == EVENT_OPEN =>
+      opens(e.subject) = opens.getOrElse(e.subject, List.empty[Event]) :+ e
+    case e: Event if e.eventType == EVENT_CHECK_FILE_ATTRIBUTES =>
+      checks(e.subject) = checks.getOrElse(e.subject, List.empty[Event]) :+ e
+      println("check")
+    case p: Subject =>
+      processes(p.uuid) = p
+    case t: TimeMarker =>
+      println(s"Opens: ${opens.size}\nChecks: ${checks.size}")
+      val ratio = opens.map{ case (k,v) => k -> (checks.getOrElse(k, List.empty).length / v.length) }.filterNot(_._2 == 0)
+      val sorted = ratio.toList.sortBy(_._2).reverse
+      sorted foreach println
   }
 }
 
 
-
-
-case class ProcessWrites() extends GraphStage[FanInShape2[Subject, Event, (Subject,Event)]] {
-  val shape = new FanInShape2[Subject, Event, (Subject,Event)]("ProcessWrites")
+case class ProcessEvents() extends GraphStage[FanInShape2[Subject, Event, (Subject,Event)]] {
+  val shape = new FanInShape2[Subject, Event, (Subject,Event)]("ProcessEvents")
   def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
     type ProcessUUID = UUID
     val processes = MutableMap.empty[ProcessUUID, Subject]
@@ -120,7 +127,6 @@ case class ProcessWrites() extends GraphStage[FanInShape2[Subject, Event, (Subje
     })
   }
 }
-
 
 
 case class FileWrites() extends GraphStage[FanInShape2[FileObject, Event, (FileObject,Event)]] {
@@ -182,17 +188,14 @@ case class FileWrites() extends GraphStage[FanInShape2[FileObject, Event, (FileO
 }
 
 
-
-
 case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), (FileObject, Event), (Subject, Event, FileObject)]] {
   val shape = new FanInShape2[(Subject, Event), (FileObject, Event), (Subject, Event, FileObject)]("ProcessWritesFile")
   def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
 
-    //    val unmatchedProcesses = MutableMap.empty[Subject,Set[Event]]
-    //    val unmatchedFiles = MutableMap.empty[FileObject, Set[Event]]
+    //    val unmatchedProcesses = MutableMap.empty[Subject,Set[Event]]   // ???
+    //    val unmatchedFiles = MutableMap.empty[FileObject, Set[Event]]   // ???
     val unmatchesProcesses = MutableMap.empty[Event, Subject]  // todo: probably inefficient copies of Subject when Event differs, but Subject doesn't.
     val unmatchedFiles = MutableMap.empty[Event, FileObject]
-    //    var sendingBuffer = List.empty[(Subject, Event, FileObject)]
 
     setHandler(shape.in0, new InHandler {
       def onPush() = {
@@ -203,8 +206,7 @@ case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), 
             pull(shape.in0)
           case Some(file) =>
             push(shape.out, (p, e, file))
-            // unmatchedFiles -= e  // Should this hold files forever? Yes, probably so.
-            // if Unlinked, then it may queue it up for deletion once the next TimeMarker comes in.
+             unmatchedFiles -= e
         }
       }
     })
@@ -230,34 +232,3 @@ case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), 
     })
   }
 }
-
-
-
-
-//case class JoinerShape[L, R](leftIn: Inlet[L], rightIn: Inlet[R], joinedOut: Outlet[(L,R)]) extends Shape {
-//  def inlets = leftIn :: rightIn :: Nil
-//  def outlets = joinedOut :: Nil
-//  def deepCopy() = JoinerShape(leftIn.carbonCopy(), rightIn.carbonCopy(), joinedOut.carbonCopy())
-//  def copyFromPorts(inlets: immutable.Seq[Inlet[_]], outlets: immutable.Seq[Outlet[_]]) = {
-//    assert(inlets.size == this.inlets.size)
-//    assert(outlets.size == this.outlets.size)
-//    JoinerShape(inlets(0).as[L], inlets(1).as[R], outlets(0).as[(L,R)])
-//  }
-//}
-//
-//case class Joiner[L, R](joinFunc: (L, R) => Boolean, cleanFunc: () => Unit) extends GraphStage[JoinerShape[L,R]] {
-//  val leftIn = Inlet[L]("leftIn")
-//  val rightIn = Inlet[R]("rightIn")
-//  val joinedOut = Outlet[(L,R)]("joinedOut")
-//  def shape = JoinerShape(leftIn, rightIn, joinedOut)
-//  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-//
-//    setHandler(leftIn, new InHandler {
-//      def onPush() = {
-//
-//      }
-//    })
-//  }
-//}
-
-
