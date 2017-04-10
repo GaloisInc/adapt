@@ -177,6 +177,15 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     val sink = Sink.actorRef(checkOpenRatioActor, TimeMarker(System.nanoTime))
     val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processCheckOpenGraph(cdmSource.map(_.get), sink)))
     childActors = childActors + (roleName -> Set(streamActor))
+
+  case "stream3" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val printActor = context.actorOf(Props(classOf[PrintActor]))
+    val sink = Sink.actorRef(printActor, TimeMarker(System.nanoTime))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processUsedNetFlow(cdmSource.map(_.get), sink)))
+    childActors = childActors + (roleName -> Set(streamActor))
   }
 
   implicit val ec = context.dispatcher

@@ -6,7 +6,7 @@ import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
-import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 
 
@@ -47,7 +47,97 @@ object Streams {
       ClosedShape
     }
   )
+
+//  def ProcessEventCounter(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
+//    GraphDSL.create(){ implicit graph =>
+//
+//      source
+//        .filter(cdm => cdm.isInstanceOf[Event])
+//        .groupBy(44, _.asInstanceOf[Event].eventType)
+//
+//      ClosedShape
+//    }
+//  )
+
+
+  def processUsedNetFlow(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val bcast = graph.add(Broadcast[CDM17](2))
+      val processUsedNetFlow = graph.add(ProcessUsedNetFlow())
+
+      val eventTypesWeCareAbout = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
+
+      source ~> bcast.in
+      bcast.out(0).collect{ case n: NetFlowObject => n} ~> processUsedNetFlow.in0
+      bcast.out(1).collect{ case e: Event if eventTypesWeCareAbout.contains(e.eventType) => e} ~> processUsedNetFlow.in1
+      processUsedNetFlow.out ~> sink
+
+      ClosedShape
+    }
+  )
 }
+
+
+class PrintActor extends Actor {
+  def receive = {
+    case t: TimeMarker => println("DONE!!!")
+    case x => println(x)
+  }
+}
+
+
+
+case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Event, UUID]] {
+  val shape = new FanInShape2[NetFlowObject, Event, UUID]("ProcessUsedNetFlow")
+  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+    type ProcessUUID = UUID
+    type EventUUID = UUID
+    type NetFlowUUID = UUID
+
+    val netflows = MutableSet.empty[NetFlowUUID]
+    val events = MutableSet.empty[Event]
+    val alreadySent = MutableSet.empty[ProcessUUID]
+
+    setHandler(shape.in0, new InHandler {
+      def onPush() = {
+        val n = grab(shape.in0)
+        netflows += n.uuid
+        pull(shape.in0)
+      }
+    })
+
+    setHandler(shape.in1, new InHandler {
+      def onPush() = {
+        val e = grab(shape.in1)
+        e.predicateObject match {
+          case None =>
+            pull(shape.in1)
+          case Some(netflowUuid) =>
+            if (netflows.contains(netflowUuid)) {
+              if (alreadySent contains e.subject) {
+                pull(shape.in1)
+              } else {
+                push(shape.out, e.subject)
+              }
+              alreadySent += e.subject
+            } else {
+              events += e
+              pull(shape.in1)
+            }
+        }
+      }
+    })
+
+    setHandler(shape.out, new OutHandler {
+      def onPull() = {
+        if ( ! hasBeenPulled(shape.in0)) pull(shape.in0)
+        if ( ! hasBeenPulled(shape.in1)) pull(shape.in1)
+      }
+    })
+  }
+
+}
+
 
 
 
