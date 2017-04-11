@@ -160,6 +160,11 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
     )
 
+  case "kafkaWriter" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val kafkaWriter = context.actorOf(Props(classOf[KafkaWriter], files))
+    childActors = childActors + (roleName -> Set(kafkaWriter))
+
   case "stream1" =>
     val files = config.getStringList("adapt.loadfiles")
     val (ta1, cdmData) = CDM17.readData(files.head, None).get
