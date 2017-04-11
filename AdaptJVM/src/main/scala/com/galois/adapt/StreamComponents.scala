@@ -48,16 +48,20 @@ object Streams {
     }
   )
 
-//  def ProcessEventCounter(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
-//    GraphDSL.create(){ implicit graph =>
-//
-//      source
-//        .filter(cdm => cdm.isInstanceOf[Event])
-//        .groupBy(44, _.asInstanceOf[Event].eventType)
-//
-//      ClosedShape
-//    }
-//  )
+  def processEventCounter(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+
+      source
+        .collect{ case cdm: Event => cdm }
+        .groupBy(1000000, _.subject)   // TODO: pull this number out to somewhere else
+        .fold(MutableMap.empty[EventType,Int]) { (a, b) =>
+        a += (b.eventType -> (a.getOrElse(b.eventType, 0) + 1)); a
+      }
+      .mergeSubstreams ~> sink
+
+      ClosedShape
+    }
+  )
 
 
   def processUsedNetFlow(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
