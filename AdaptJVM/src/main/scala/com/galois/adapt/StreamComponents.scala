@@ -102,7 +102,16 @@ case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Ev
       def onPush() = {
         val n = grab(shape.in0)
         netflows += n.uuid
-        pull(shape.in0)
+        events.collect {
+          case e if e.predicateObject.isDefined && e.predicateObject.get == n.uuid => e
+        }.headOption.fold(
+          pull(shape.in0)
+        ) { e =>
+          events -= e
+//          if ( ! alreadySent.contains(e.subject))
+          push(shape.out, e.subject)
+          alreadySent += e.subject
+        }
       }
     })
 
@@ -118,8 +127,8 @@ case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Ev
                 pull(shape.in1)
               } else {
                 push(shape.out, e.subject)
+                alreadySent += e.subject
               }
-              alreadySent += e.subject
             } else {
               events += e
               pull(shape.in1)
