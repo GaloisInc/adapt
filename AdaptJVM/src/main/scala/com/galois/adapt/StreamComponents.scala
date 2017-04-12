@@ -54,10 +54,10 @@ object Streams {
       source
         .collect{ case cdm: Event => cdm }
         .groupBy(1000000, _.subject)   // TODO: pull this number out to somewhere else
-        .fold(MutableMap.empty[EventType,Int]) { (a, b) =>
-        a += (b.eventType -> (a.getOrElse(b.eventType, 0) + 1)); a
-      }
-      .mergeSubstreams ~> sink
+        .fold[(Option[UUID], Map[EventType,Int])]((None, Map.empty)) { (a, b) =>
+          Some(b.subject) -> (a._2 + (b.eventType -> (a._2.getOrElse(b.eventType, 0) + 1)))
+        }
+        .mergeSubstreams ~> sink
 
       ClosedShape
     }
@@ -112,9 +112,11 @@ case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Ev
           pull(shape.in0)
         ) { e =>
           events -= e
-//          if ( ! alreadySent.contains(e.subject))
-          push(shape.out, e.subject)
-          alreadySent += e.subject
+          if ( ! alreadySent.contains(e.subject)) {
+            push(shape.out, e.subject)
+            alreadySent += e.subject
+          }
+          else pull(shape.in0)
         }
       }
     })
