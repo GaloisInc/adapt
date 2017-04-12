@@ -93,6 +93,8 @@ import scala.language.existentials
  *                 | traversal '.min()'
  *                 | traversal '.sum()'
  *                 | traversal '.select(' string ',' ... ')'
+ *                 | traversal '.choose(' traversal ')'
+ *                 | traversal '.option(' literal ',' traversal ')'
  *                 | traversal '.unfold()'
  *                 | traversal '.count()'
  *                 | traversal '.groupCount()'
@@ -266,6 +268,8 @@ object Query {
           }
         | ".path()"                        ^^ { case _          => PathTraversal(_: Tr) }
         | ".toList()"                      ^^ { case _          => identity(_: Tr) }
+        | ".choose(" ~ trav ~ ")"          ^^ { case _~t~_      => Choose(_:Tr, t) }
+        | ".option(" ~lit~ "," ~trav~ ")"  ^^ { case _~x~_~t~_  => OptionTrav(_:Tr, x, t) }
         ).asInstanceOf[Parser[Tr => Tr]]
 
       // Possible sources for traversals
@@ -614,6 +618,16 @@ case class Properties[S](traversal: Traversal[S,_], keys: Value[Seq[String]]) ex
     traversal.buildTraversal(graph,context).properties(keys.eval(context)
     :_*).asInstanceOf[GraphTraversal[S,GremlinProperty[_]]]
 }
+case class Choose[S,E](traversal: Traversal[S,E], choice: Traversal[_,_]) extends Traversal[S,E] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).choose(choice.buildTraversal(graph, context))
+}
+case class OptionTrav[S,E](traversal: Traversal[S,E], value: Value[_], option: Traversal[_,_]) extends Traversal[S,E] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).option(value.eval(context), option.asInstanceOf[Traversal[E,_]].buildTraversal(graph, context))
+}
+
+
 
 // Mutating
 case class Property[S,E](traversal: Traversal[S,E], keys: Value[Seq[String]], values: Value[Seq[_]]) extends Traversal[S,E] {
