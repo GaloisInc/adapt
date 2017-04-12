@@ -184,7 +184,7 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
     val printActor = context.actorOf(Props(classOf[PrintActor]))
     val sink = Sink.actorRef(printActor, TimeMarker(System.nanoTime))
-    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processEventCounter(cdmSource.map(_.get), sink)))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processEventCount(cdmSource.map(_.get), sink)))
     childActors = childActors + (roleName -> Set(streamActor))
   }
 

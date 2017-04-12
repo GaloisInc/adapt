@@ -9,6 +9,17 @@ import com.galois.adapt.cdm17._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 
+import scala.concurrent.duration._
+
+case class SubjectEventCount(
+  subjectUuid: UUID,
+  filesExecuted: Int,
+  netflowsConnected: Int,
+  eventCounts: Map[EventType, Int]
+)
+
+// TODO: put this somewhere else
+case class AdaptProcessingInstruction(id: Long) extends CDM17
 
 object Streams {
 
@@ -79,6 +90,72 @@ object Streams {
       ClosedShape
     }
   )
+
+
+  // Aggregate some statistics for each process. See 'SubjectEventCount' for specifically what is
+  // aggregated. Emit downstream a stream of these records every time a 'AdaptProcessingInstruction'
+  // is recieved.
+  def processEventCount(source: Source[CDM17,_], sink: Sink[SubjectEventCount,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val netflowEventTypes = List(
+        EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, 
+        EVENT_SENDMSG, EVENT_WRITE
+      )
+
+      // TODO remove this
+      val timestamps = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
+      
+      source
+        .collect[CDM17]{
+            case e: Event => e
+            case t: AdaptProcessingInstruction => t
+        }
+        .merge(timestamps)   // TODO remove this
+        .statefulMapConcat[SubjectEventCount]{ () =>
+
+          // Note these map is closed over by the following function
+          val filesExecuted     = MutableMap[/* Subject */UUID, Set[/* FileObject */UUID]]()
+          val netflowsConnected = MutableMap[/* Subject */UUID, Set[/* Netflow    */UUID]]()
+          val typesOfEvents     = MutableMap[/* Subject */UUID, Map[EventType, Int]]()
+          val subjectUuids      = MutableSet[/* Subject */UUID]()
+
+          // This is the 'flatMap'ing function that gets called for every CDM passed
+          {
+            case e: Event  =>
+
+              if (EVENT_EXECUTE == e.eventType)
+                filesExecuted(e.subject) = filesExecuted.getOrElse(e.subject, Set()) + e.predicateObject.get
+
+              if (netflowEventTypes contains e.eventType)
+                netflowsConnected(e.subject) = netflowsConnected.getOrElse(e.subject, Set()) + e.predicateObject.get
+
+              typesOfEvents(e.subject) = {
+                val v = typesOfEvents.getOrElse(e.subject,Map())
+                v.updated(e.eventType, 1 + v.getOrElse(e.eventType, 0))
+              }
+
+              subjectUuids += e.subject
+
+              Nil
+
+            case t: AdaptProcessingInstruction =>
+              subjectUuids.toList.map { uuid =>
+                SubjectEventCount(
+                  uuid,
+                  filesExecuted.get(uuid).map(_.size).getOrElse(0),
+                  netflowsConnected.get(uuid).map(_.size).getOrElse(0),
+                  typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
+                )
+              }
+          }
+
+        } ~> sink
+      
+      ClosedShape
+    }
+  )
+
+
 }
 
 
@@ -150,8 +227,6 @@ case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Ev
   }
 
 }
-
-
 
 
 class ProcessCheckOpenActor() extends Actor {
