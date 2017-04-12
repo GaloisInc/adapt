@@ -9,6 +9,17 @@ import com.galois.adapt.cdm17._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 
+import scala.concurrent.duration._
+
+case class SubjectEventCount(
+  subjectUuid: UUID,
+  filesExecuted: Int,
+  netflowsConnected: Int,
+  eventCounts: Map[EventType, Int]
+)
+
+// TODO: put this somewhere else
+case class AdaptProcessingInstruction(id: Long) extends CDM17
 
 object Streams {
 
@@ -79,7 +90,145 @@ object Streams {
       ClosedShape
     }
   )
+
+
+  // Aggregate some statistics for each process. See 'SubjectEventCount' for specifically what is
+  // aggregated. Emit downstream a stream of these records every time a 'AdaptProcessingInstruction'
+  // is recieved.
+  def processEventCount(source: Source[CDM17,_], sink: Sink[SubjectEventCount,_]) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val netflowEventTypes = List(
+        EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, 
+        EVENT_SENDMSG, EVENT_WRITE
+      )
+
+      // TODO remove this
+      val timestamps = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
+      
+      source
+        .collect[CDM17]{
+            case e: Event => e
+            case t: AdaptProcessingInstruction => t
+        }
+        .merge(timestamps)   // TODO remove this
+        .statefulMapConcat[SubjectEventCount]{ () =>
+
+          // Note these map is closed over by the following function
+          val filesExecuted     = MutableMap[/* Subject */UUID, Set[/* FileObject */UUID]]()
+          val netflowsConnected = MutableMap[/* Subject */UUID, Set[/* Netflow    */UUID]]()
+          val typesOfEvents     = MutableMap[/* Subject */UUID, Map[EventType, Int]]()
+          val subjectUuids      = MutableSet[/* Subject */UUID]()
+
+          // This is the 'flatMap'ing function that gets called for every CDM passed
+          {
+            case e: Event  =>
+
+              if (EVENT_EXECUTE == e.eventType)
+                filesExecuted(e.subject) = filesExecuted.getOrElse(e.subject, Set()) + e.predicateObject.get
+
+              if (netflowEventTypes contains e.eventType)
+                netflowsConnected(e.subject) = netflowsConnected.getOrElse(e.subject, Set()) + e.predicateObject.get
+
+              typesOfEvents(e.subject) = {
+                val v = typesOfEvents.getOrElse(e.subject,Map())
+                v.updated(e.eventType, 1 + v.getOrElse(e.eventType, 0))
+              }
+
+              subjectUuids += e.subject
+
+              Nil
+
+            case t: AdaptProcessingInstruction =>
+              subjectUuids.toList.map { uuid =>
+                SubjectEventCount(
+                  uuid,
+                  filesExecuted.get(uuid).map(_.size).getOrElse(0),
+                  netflowsConnected.get(uuid).map(_.size).getOrElse(0),
+                  typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
+                )
+              }
+          }
+
+        } ~> sink
+      
+      ClosedShape
+    }
+  )
+
+
 }
+
+sealed trait Multiplicity
+case object One extends Multiplicity
+case object Many extends Multiplicity
+
+case class Join[A,B,K](
+  in0Key: A => K,
+  in1Key: B => K,
+  in0Multiplicity: Multiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
+  in1Multiplicity: Multiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
+) extends GraphStage[FanInShape2[A, B, (K,A,B)]] {
+  val shape = new FanInShape2[A, B, (K,A,B)]("Join")
+  
+  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+
+    val in0Stored = MutableMap.empty[K,Set[A]]
+    val in1Stored = MutableMap.empty[K,Set[B]]
+
+    setHandler(shape.in0, new InHandler {
+      def onPush() = {
+        val a: A = grab(shape.in0)
+        val k: K = in0Key(a)
+
+        in1Stored.getOrElse(k,Set()) match {
+          case s if s.isEmpty =>
+            in0Stored(k) = in0Stored.getOrElse(k,Set[A]()) + a
+
+          case bs =>
+            for (b <- bs)
+              push(shape.out, (k,a,b))
+
+            if (in0Multiplicity == One)
+              in0Stored -= k
+
+            if (in1Multiplicity == One)
+              in1Stored -= k
+        }
+      }
+    })
+
+    setHandler(shape.in1, new InHandler {
+      def onPush() = {
+        val b: B = grab(shape.in1)
+        val k: K = in1Key(b)
+
+        in0Stored.getOrElse(k,Set()) match {
+          case s if s.isEmpty =>
+            in1Stored(k) = in1Stored.getOrElse(k,Set[B]()) + b
+
+          case as =>
+            for (a <- as)
+              push(shape.out, (k,a,b))
+
+            if (in0Multiplicity == One)
+              in0Stored -= k
+
+            if (in1Multiplicity == One)
+              in1Stored -= k
+        }
+      }
+    })
+
+    setHandler(shape.out, new OutHandler {
+      def onPull() = {
+        if (!hasBeenPulled(shape.in0)) pull(shape.in0)
+        if (!hasBeenPulled(shape.in1)) pull(shape.in1)
+      }
+    })
+  }
+}
+
+
 
 
 class PrintActor extends Actor {
@@ -152,8 +301,6 @@ case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Ev
   }
 
 }
-
-
 
 
 class ProcessCheckOpenActor() extends Actor {
