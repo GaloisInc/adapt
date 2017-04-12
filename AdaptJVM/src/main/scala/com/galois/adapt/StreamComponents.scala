@@ -158,6 +158,78 @@ object Streams {
 
 }
 
+sealed trait Multiplicity
+case object One extends Multiplicity
+case object Many extends Multiplicity
+
+case class Join[A,B,K](
+  in0Key: A => K,
+  in1Key: B => K,
+  in0Multiplicity: Multiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
+  in1Multiplicity: Multiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
+) extends GraphStage[FanInShape2[A, B, (K,A,B)]] {
+  val shape = new FanInShape2[A, B, (K,A,B)]("Join")
+  
+  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+
+    val in0Stored = MutableMap.empty[K,Set[A]]
+    val in1Stored = MutableMap.empty[K,Set[B]]
+
+    setHandler(shape.in0, new InHandler {
+      def onPush() = {
+        val a: A = grab(shape.in0)
+        val k: K = in0Key(a)
+
+        in1Stored.getOrElse(k,Set()) match {
+          case s if s.isEmpty =>
+            in0Stored(k) = in0Stored.getOrElse(k,Set[A]()) + a
+
+          case bs =>
+            for (b <- bs)
+              push(shape.out, (k,a,b))
+
+            if (in0Multiplicity == One)
+              in0Stored -= k
+
+            if (in1Multiplicity == One)
+              in1Stored -= k
+        }
+      }
+    })
+
+    setHandler(shape.in1, new InHandler {
+      def onPush() = {
+        val b: B = grab(shape.in1)
+        val k: K = in1Key(b)
+
+        in0Stored.getOrElse(k,Set()) match {
+          case s if s.isEmpty =>
+            in1Stored(k) = in1Stored.getOrElse(k,Set[B]()) + b
+
+          case as =>
+            for (a <- as)
+              push(shape.out, (k,a,b))
+
+            if (in0Multiplicity == One)
+              in0Stored -= k
+
+            if (in1Multiplicity == One)
+              in1Stored -= k
+        }
+      }
+    })
+
+    setHandler(shape.out, new OutHandler {
+      def onPull() = {
+        if (!hasBeenPulled(shape.in0)) pull(shape.in0)
+        if (!hasBeenPulled(shape.in1)) pull(shape.in1)
+      }
+    })
+  }
+}
+
+
+
 
 class PrintActor extends Actor {
   def receive = {
