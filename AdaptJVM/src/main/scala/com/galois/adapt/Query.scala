@@ -89,6 +89,8 @@ import scala.language.existentials
  *                 | traversal '.valueMap(' string ',' ... ')'
  *                 | traversal '.label()'
  *                 | traversal '.id()'
+ *                 | traversal '.emit()'
+ *                 | traversal '.emit(' traversal ')'
  *                 | traversal '.max()'
  *                 | traversal '.min()'
  *                 | traversal '.sum()'
@@ -244,6 +246,8 @@ object Query {
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
         | ".min()"                         ^^ { case _          => Min(_: Traversal[_,java.lang.Long]) }
+        | ".emit()"                        ^^ { case _          => Emit(_: Tr) }
+        | ".emit(" ~ trav ~ ")"            ^^ { case _~t~_      => EmitTrav(_: Tr, t) }
         | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
         | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s) 
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
@@ -531,6 +535,13 @@ case class Label[S,T](traversal: Traversal[S,T]) extends Traversal[S,String] {
 }
 case class Id[S,T](traversal: Traversal[S,T]) extends Traversal[S,java.lang.Object] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).id()
+}
+case class Emit[S,E](traversal: Traversal[S,E]) extends Traversal[S,E] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).emit()
+}
+case class EmitTrav[S,E](traversal: Traversal[S,E], emit: Traversal[_,_]) extends Traversal[S,E] {
+  override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    traversal.buildTraversal(graph,context).emit(emit.buildTraversal(graph,context))
 }
 case class Max[S](traversal: Traversal[S,java.lang.Long]) extends Traversal[S,java.lang.Long] {
   override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).max()
