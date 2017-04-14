@@ -1,16 +1,40 @@
 package com.galois.adapt
 
+import java.io.ByteArrayOutputStream
 import java.util.UUID
+
 import akka.actor.Actor
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
-
+import akka.kafka.ProducerSettings
+import akka.kafka.scaladsl.Producer
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.avro.io.EncoderFactory
+import org.apache.avro.specific.SpecificDatumWriter
 
 object Streams {
+
+  def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val datums = CDM17.readAvroAsTCCDMDatum(file)
+      Source.fromIterator(() => datums).map(elem => {
+        val baos = new ByteArrayOutputStream
+        val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+        val encoder = EncoderFactory.get.binaryEncoder(baos, null)
+        writer.write(elem, encoder)
+        encoder.flush
+        baos.toByteArray
+      }).map(elem => new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)) ~> Producer.plainSink(producerSettings)
+
+      ClosedShape
+    }
+  )
 
   def processWritesFile(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>

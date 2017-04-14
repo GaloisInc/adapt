@@ -16,8 +16,12 @@ import com.galois.adapt.cdm17.{CDM17, EVENT_READ, EVENT_WRITE, EpochMarker, Even
 import java.io.File
 
 import akka.NotUsed
+import akka.kafka.ProducerSettings
+import akka.kafka.scaladsl.Producer
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, RunnableGraph, Sink, Source}
+import org.apache.kafka.common.serialization.ByteArraySerializer
+import akka.kafka._
 
 import scala.collection.JavaConversions._
 import scala.util.Try
@@ -160,10 +164,13 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
     )
 
-  case "kafkaWriter" =>
-    val files = config.getStringList("adapt.loadfiles")
-    val kafkaWriter = context.actorOf(Props(classOf[KafkaWriter], files))
-    childActors = childActors + (roleName -> Set(kafkaWriter))
+   case "kafkaProducer" =>
+      val file = config.getStringList("adapt.loadfiles").head
+      val producerSettings = ProducerSettings(config, new ByteArraySerializer, new ByteArraySerializer)
+      val streamActor = {
+        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaProducer(file, producerSettings, "kafkaTest")))
+      }
+      childActors = childActors + (roleName -> Set(streamActor))
 
   case "stream1" =>
     val files = config.getStringList("adapt.loadfiles")

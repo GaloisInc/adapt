@@ -37,7 +37,8 @@ lazy val adapt = (project in file(".")).settings(
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18"
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.14"
   ),
 
   {
