@@ -1,14 +1,21 @@
 package com.galois.adapt
 
+import java.io.File
 import java.util.UUID
-import akka.actor.Actor
+
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
+import org.mapdb.DB.TreeSetMaker
+import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
+import collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.duration._
 
 case class SubjectEventCount(
@@ -19,7 +26,10 @@ case class SubjectEventCount(
 )
 
 // TODO: put this somewhere else
-case class AdaptProcessingInstruction(id: Long) extends CDM17
+trait ProcessingCommand extends CDM17
+case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
+case object Emit extends ProcessingCommand
+case object CleanUp extends ProcessingCommand
 
 object Streams {
 
@@ -103,14 +113,14 @@ object Streams {
       )
 
       // TODO remove this
-      val timestamps = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
+      val executions = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
       
       source
         .collect[CDM17]{
             case e: Event => e
             case t: AdaptProcessingInstruction => t
         }
-        .merge(timestamps)   // TODO remove this
+        .merge(executions)   // TODO remove this
         .statefulMapConcat[SubjectEventCount]{ () =>
 
           // Note these map is closed over by the following function
@@ -148,15 +158,182 @@ object Streams {
                 )
               }
           }
-
         } ~> sink
-      
       ClosedShape
     }
   )
-
-
 }
+
+
+object FlowComponents {
+
+  val processTrees = Flow[CDM17]
+    .filter(c => (c.isInstanceOf[Subject] && c.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS) || c.isInstanceOf[AdaptProcessingInstruction])
+    .statefulMapConcat{() =>
+      val p = MutableSet.empty[UUID]
+
+      { case s: Subject => p += s.localPrincipal; List.empty
+        case AdaptProcessingInstruction(i) => p.toList }
+  }
+
+  def eventsPerPredObj(cmdSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID,mutable.SortedSet[Event]]) = Flow[CDM17]
+      .collect{ case c: Event if c.predicateObject.isDefined => c }
+      .mapConcat(e =>
+        if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
+        else List((e.predicateObject.get, e)))
+      .filter(_._1 != UUID.fromString("00000000-0000-0000-0000-000000000000"))
+      .groupBy(Int.MaxValue, _._1)   // TODO: Limited to ~4 billion unique UUIDs!!!
+      .merge(cmdSource)
+      .statefulMapConcat { () =>
+        var uuid: Option[UUID] = None
+        val events = mutable.SortedSet.empty[Event](Ordering.by[Event,Long](_.sequence))
+
+        {
+          case Emit =>
+            val existingSet = dbMap.get(uuid.get)
+            val newSet = existingSet ++= events
+            dbMap.put(uuid.get, newSet)
+            events.clear()
+            List(uuid.get -> newSet)
+
+          case CleanUp =>
+            if (events.nonEmpty) {
+              val existingSet = dbMap.get(uuid.get)
+              val newSet = existingSet ++= events
+              dbMap.put(uuid.get, newSet)
+              events.clear()
+            }
+            List.empty
+
+          case Tuple2(u: UUID, e: Event) =>
+            if (uuid.isEmpty) {
+              uuid = Some(u)
+              val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event,Long](_.sequence))
+              dbMap.put(u, emptySet)
+            }
+            events += e
+            List.empty
+        }
+      }//.mergeSubstreams
+
+
+  val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
+
+  val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
+
+  val fileFeatures = Flow[(UUID, mutable.SortedSet[Event])]
+    .map{ case (u, es) =>
+      val m = MutableMap.empty[String,Any]
+      m("execAfterWriteByNetFlowReadingProcess") = false   // TODO
+      m("execAfterPermissionChangeToExecutable") = false   // TODO
+      m("deletedImmediatelyAfterExec") = es.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
+      m("deletedRightAfterProcessWithOpenNetFlowsWrites") = false   // TODO
+      m("isReadByAProcessWritingWritingToNetFlows") = false   // TODO
+      m("isInsideTempDirectory") = false   // TODO
+      m("execDeleteGapMillis") = es.timeBetween(EVENT_EXECUTE, EVENT_UNLINK)
+      m("attribChangeEventGapMillis") = es.timeBetween(EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_EXECUTE)
+      m("downloadExecutionGapMillis") = 0   // TODO
+      m("uploadDeletionGapMillis") = 0   // TODO
+      m("countDistinctProcessesHaveEventToFile") = es.map(_.subject).size
+      m("countDistinctNetFlowConnectionsByProcess") = 0   // TODO
+      m("totalBytesRead") = es.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
+      m("totalBytesWritten") = es.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
+
+      fileEventTypes.foreach( t =>
+        m("count_"+ t.toString) = es.count(_.eventType == t)
+      )
+      u -> m
+    }
+
+
+  def printCounter[T](name: String, every: Int = 10000) = Flow[CDM17].statefulMapConcat { () =>
+    var counter = 0
+
+    { case item: T =>  // Type is a hack to compile!! No runtime effect because Generic.
+        counter = counter + 1
+        if (counter % every == 0)
+          println(s"$name ingested: $counter")
+        List(item)
+    }
+  }
+
+  implicit class EventCollection(es: Iterable[Event]) {
+    def timeBetween(first: EventType, second: EventType): Long = {
+      val foundFirst = es.dropWhile(_.eventType != first)
+      val foundSecond = foundFirst.drop(1).find(_.eventType == second)
+      foundFirst.headOption.flatMap(f => foundSecond.map(s => (s.timestampNanos / 1e6 - (f.timestampNanos / 1e6)).toLong)).getOrElse(0L)
+    }
+  }
+}
+
+
+
+object TestGraph extends App {
+  implicit val system = ActorSystem("test")
+  implicit val ec = system.dispatcher
+  implicit val mat = ActorMaterializer()
+
+  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
+  val source = Source.fromIterator(() => CDM17.readData(path, None).get._2.map(_.get))
+    .via(FlowComponents.printCounter("CDM Source", 1000000))
+
+
+  val sink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
+
+  def commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+    .merge(Source.tick[ProcessingCommand](10 seconds, 10 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+//    .via(FlowComponents.printCounter("Command Source", 1))
+
+  val dbFilePath = "/Users/ryan/Desktop/map.db"
+  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+  val dbMap = db.hashMap("eventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+  new File(dbFilePath).deleteOnExit()
+
+
+  Flow[CDM17]
+    .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
+    .via(FlowComponents.eventsPerPredObj(commandSource, dbMap).mergeSubstreams)
+    .via(FlowComponents.fileFeatures)
+    .runWith(source, sink)
+
+//    .map {
+//      case (u, es) => u -> es.toList.sliding(2).forall(l => if (l.length > 1) l(0).sequence < l(1).sequence else true)   //es.toList.reverse.dropWhile(_.eventType != EVENT_EXECUTE).find(_.eventType == EVENT_UNLINK).fold(false)(_ => true)
+//    }
+//    .mergeSubstreams
+//    .recover{ case e: Throwable => e.printStackTrace() }
+//    .filter(_.isInstanceOf[Tuple2[UUID,_]])
+//    .filterNot(_._2)
+//    .runWith(source, sink)
+
+//  commandSource.runWith(sink)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 sealed trait Multiplicity
 case object One extends Multiplicity
@@ -233,7 +410,9 @@ case class Join[A,B,K](
 
 class PrintActor extends Actor {
   def receive = {
-    case t: TimeMarker => println("DONE!!!")
+    case t: TimeMarker => println("TimeMarker!!!")
+    case p: AdaptProcessingInstruction => println("Make it so!")
+    case x: ProcessingCommand => println(s"Processing Command: $x")
     case x => println(x)
   }
 }
