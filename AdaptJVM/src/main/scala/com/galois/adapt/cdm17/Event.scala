@@ -28,7 +28,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,
@@ -56,6 +56,10 @@ case class Event(
   )
 
   def getUuid = uuid
+
+  def compare(x: Event, y: Event) = x.sequence compare y.sequence
+
+  def compareTo(o: Event) = this.sequence.compare(o.sequence)
 }
 
 case object Event extends CDM17Constructor[Event] {
