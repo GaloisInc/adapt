@@ -347,7 +347,23 @@ case class DiscardTraversal[S,E](value: Traversal[_,_], `then`: Query[E]) extend
 }
 case class FinalTraversal[E](traversal: Traversal[_,E]) extends Query[E] {
   override def run(graph: Graph, context: Map[String,Value[_]]) = Try {
-    traversal.buildTraversal(graph, context).asScala.toStream
+    /*
+    val iterator = traversal.buildTraversal(graph, context)
+    val results = collection.mutable.ListBuffer.empty[E]
+    Thread.sleep(1000)
+    while (iterator.hasNext()) {
+      results += iterator.next()
+      Thread.sleep(20)
+    }
+    results.toStream
+    */
+    
+    val javaList: java.util.ArrayList[E] = new java.util.ArrayList[E]()
+    traversal.buildTraversal(graph, context).fill(javaList)
+    javaList.asScala.toStream
+    
+    
+    // traversal.buildTraversal(graph, context).asScala.toStream
   }
 }
 
