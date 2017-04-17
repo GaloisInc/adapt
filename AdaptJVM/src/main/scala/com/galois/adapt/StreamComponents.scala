@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.io.File
+import java.nio.file.Paths
 import java.util.UUID
 
 import akka.actor.{Actor, ActorSystem, Props}
@@ -11,6 +12,7 @@ import com.galois.adapt.cdm17._
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
+import akka.util.ByteString
 import org.mapdb.DB.TreeSetMaker
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
@@ -167,23 +169,29 @@ object Streams {
 
 object FlowComponents {
 
-  val processTrees = Flow[CDM17]
-    .filter(c => (c.isInstanceOf[Subject] && c.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS) || c.isInstanceOf[AdaptProcessingInstruction])
-    .statefulMapConcat{() =>
-      val p = MutableSet.empty[UUID]
+  sealed trait EventsKey
+  case object PredicateObjectKey extends EventsKey
+  case class SubjectKey(t: Option[EventType]) extends EventsKey
 
-      { case s: Subject => p += s.localPrincipal; List.empty
-        case AdaptProcessingInstruction(i) => p.toList }
-  }
-
-  def eventsPerPredObj(cmdSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID,mutable.SortedSet[Event]]) = Flow[CDM17]
-      .collect{ case c: Event if c.predicateObject.isDefined => c }
-      .mapConcat(e =>
-        if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
-        else List((e.predicateObject.get, e)))
-      .filter(_._1 != UUID.fromString("00000000-0000-0000-0000-000000000000"))
+  def eventsGroupedByKey(commandSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID,mutable.SortedSet[Event]], key: EventsKey) = {
+    val keyPredicate = key match {
+      case PredicateObjectKey => Flow[CDM17]
+        .collect { case e: Event if e.predicateObject.isDefined => e }
+        .mapConcat(e =>
+          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
+          else List((e.predicateObject.get, e)))
+      case SubjectKey(Some(t)) => Flow[CDM17]
+        .collect { case e: Event if e.eventType == t => e.subject -> e }
+      case SubjectKey(None) => Flow[CDM17]
+        .collect { case e: Event => e.subject -> e }
+    }
+    keyPredicate
+      .filter(_._2.timestampNanos != 0L)
+      .filter{ tup =>
+        val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
+        ! excluded.contains(tup._1) }   // TODO: why are there these special cases?!?!?!?!?
       .groupBy(Int.MaxValue, _._1)   // TODO: Limited to ~4 billion unique UUIDs!!!
-      .merge(cmdSource)
+      .merge(commandSource)
       .statefulMapConcat { () =>
         var uuid: Option[UUID] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by[Event,Long](_.sequence))
@@ -199,8 +207,8 @@ object FlowComponents {
           case CleanUp =>
             if (events.nonEmpty) {
               val existingSet = dbMap.get(uuid.get)
-              val newSet = existingSet ++= events
-              dbMap.put(uuid.get, newSet)
+              existingSet ++= events
+              dbMap.put(uuid.get, existingSet)
               events.clear()
             }
             List.empty
@@ -214,42 +222,125 @@ object FlowComponents {
             events += e
             List.empty
         }
-      }//.mergeSubstreams
+      }
+  }//.mergeSubstreams
 
 
   val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
 
-  val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
-
   val fileFeatures = Flow[(UUID, mutable.SortedSet[Event])]
-    .map{ case (u, es) =>
+    .map{ case (u, eSet) =>
+      val eList = eSet.toList
       val m = MutableMap.empty[String,Any]
-      m("execAfterWriteByNetFlowReadingProcess") = false   // TODO
-      m("execAfterPermissionChangeToExecutable") = false   // TODO
-      m("deletedImmediatelyAfterExec") = es.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
-      m("deletedRightAfterProcessWithOpenNetFlowsWrites") = false   // TODO
-      m("isReadByAProcessWritingWritingToNetFlows") = false   // TODO
-      m("isInsideTempDirectory") = false   // TODO
-      m("execDeleteGapMillis") = es.timeBetween(EVENT_EXECUTE, EVENT_UNLINK)
-      m("attribChangeEventGapMillis") = es.timeBetween(EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_EXECUTE)
-      m("downloadExecutionGapMillis") = 0   // TODO
-      m("uploadDeletionGapMillis") = 0   // TODO
-      m("countDistinctProcessesHaveEventToFile") = es.map(_.subject).size
-      m("countDistinctNetFlowConnectionsByProcess") = 0   // TODO
-      m("totalBytesRead") = es.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
-      m("totalBytesWritten") = es.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
-
+      m("execAfterWriteByNetFlowReadingProcess") = "TODO"            // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("execAfterPermissionChangeToExecutable") = eList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).contains(EVENT_EXECUTE)
+      m("deletedImmediatelyAfterExec") = eList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
+      m("deletedRightAfterProcessWithOpenNetFlowsWrites") = "TODO"   // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("isReadByAProcessWritingToNetFlows") = "TODO"                // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("isInsideTempDirectory") = eList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
+      m("execDeleteGapMillis") = eList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
+      m("attribChangeEventGapMillis") = eList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
+      m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("countDistinctProcessesHaveEventToFile") = eSet.map(_.subject).size
+      m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
+      m("totalBytesRead") = eList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
+      m("totalBytesWritten") = eList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
       fileEventTypes.foreach( t =>
-        m("count_"+ t.toString) = es.count(_.eventType == t)
+        m("count_"+ t.toString) = eSet.count(_.eventType == t)
       )
       u -> m
     }
+
+  def testFileFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    Flow[CDM17]
+      .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
+      .via(eventsGroupedByKey(commandSource, fileEventsDBMap, PredicateObjectKey).mergeSubstreams)
+      .via(fileFeatures)
+  }
+
+
+  val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
+
+  def netFlowFeatureExtractor = Flow[(UUID, mutable.SortedSet[Event])]
+    .map { case (u, eSet) =>
+      val eList = eSet.toList
+      val m = MutableMap.empty[String, Any]
+      m("execCountByThisNetFlowsProcess") = "This should probably be on the Process"   // TODO: don't do.
+      m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
+      m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
+      m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1000
+      m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subject).size
+      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
+      m("totalBytesRead") = eList.collect{ case e if e.eventType == EVENT_READ => e.size.getOrElse(0L)}.sum
+      m("totalBytesWritten") = eList.collect{ case e if e.eventType == EVENT_WRITE => e.size.getOrElse(0L)}.sum
+      netflowEventTypes.foreach( t =>
+        m("count_"+ t.toString) = eSet.count(_.eventType == t)
+      )
+      u -> m
+    }
+
+  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    Flow[CDM17]
+      .collect{ case e: Event if FlowComponents.netflowEventTypes.contains(e.eventType) => e}
+      .via(eventsGroupedByKey(commandSource, netFlowEventsDBMap, PredicateObjectKey).mergeSubstreams)
+      .via(netFlowFeatureExtractor)
+  }
+
+
+
+
+  val processEventTypes = EventType.values.toList
+
+  def processFeatureExtractor = Flow[(UUID, mutable.SortedSet[Event])]
+    .map { case (u, eSet) =>
+      val eList = eSet.toList
+      val m = MutableMap.empty[String, Any]
+      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
+      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
+      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows
+      m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
+      // TODO: consider emitting the collected Process Tree
+      m("countOfDistinctMemoryObjectsMProtected") = eSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
+      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
+      m("countOfAllConnect+AcceptEventsToPorts22or443") = "TODO"                          // TODO: needs pairing with NetFlows
+      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows
+      m("isReferringPasswordFile") = "I HAVE NO IDEA WHAT THIS MEANS"                     // TODO: ¯\_(ツ)_/¯
+      m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = "TODO"                    // TODO: needs pairing with NetFlows
+      m("changesFilePermissionsThenExecutesIt") = eList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
+      m("executedThenImmediatelyDeletedAFile") = eList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
+      m("readFromNetFlowThenDeletedFile") = "TODO"                                        // TODO: needs pairing with NetFlows
+      // TODO: consider: process takes any local action after reading from NetFlow
+      m("countOfDistinctFileWrites") = eSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
+      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
+      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
+      m("isAccessingTempDirectory") = eList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
+      m("thisProcessIsTheObjectOfA_SETUID_Event") = "TODO"                                // TODO: needs process UUID from predicateObject field (not subject)
+      m("totalBytesSentToNetFlows") = eList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
+      m("totalBytesReceivedFromNetFlows") = eList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
+      processEventTypes.foreach( t =>
+        m("count_"+ t.toString) = eSet.count(_.eventType == t)
+      )
+      u -> m
+    }
+
+  def testProcessFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val processEventsDBMap = db.hashMap("ProcessEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    Flow[CDM17]
+      .via(eventsGroupedByKey(commandSource, processEventsDBMap, SubjectKey(None)).mergeSubstreams)
+      .via(processFeatureExtractor)
+  }
+
+
+
 
 
   def printCounter[T](name: String, every: Int = 10000) = Flow[CDM17].statefulMapConcat { () =>
     var counter = 0
 
-    { case item: T =>  // Type is a hack to compile!! No runtime effect because Generic.
+    { case item: T =>  // Type T is a hack to enable compilation!! No runtime effect because Generic.
         counter = counter + 1
         if (counter % every == 0)
           println(s"$name ingested: $counter")
@@ -257,11 +348,41 @@ object FlowComponents {
     }
   }
 
+
+  val uuidMapToCSVPrinterSink = Flow[(UUID, mutable.Map[String,Any])]
+    .map{ case (u, m) =>
+      s"$u,${m.toList.sortBy(_._1).map(_._2).mkString(",")}"
+    }.toMat(Sink.foreach(println))(Keep.right)
+
+
+  def csvFileSink(path: String) = Flow[(UUID, mutable.Map[String,Any])]
+    .statefulMapConcat{ () =>
+      var wroteHeader = false
+
+      { case Tuple2(u: UUID, m: mutable.Map[String,Any]) =>
+        val headerList = if (! wroteHeader) {
+          wroteHeader = true
+          List(ByteString(s"uuid,${m.toList.sortBy(_._1).map(_._1).mkString(",")}\n"))
+        } else List.empty
+        headerList ++ List(ByteString(s"$u,${m.toList.sortBy(_._1).map(_._2).mkString(",")}\n"))
+      }
+    }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)
+
+
+  type Milliseconds = Long
+
   implicit class EventCollection(es: Iterable[Event]) {
-    def timeBetween(first: EventType, second: EventType): Long = {
-      val foundFirst = es.dropWhile(_.eventType != first)
-      val foundSecond = foundFirst.drop(1).find(_.eventType == second)
+    def timeBetween(first: Option[EventType], second: Option[EventType]): Milliseconds = {
+      val foundFirst = if (first.isDefined) es.dropWhile(_.eventType != first.get) else es
+      val foundSecond = if (second.isDefined) foundFirst.drop(1).find(_.eventType == second.get) else es.lastOption
       foundFirst.headOption.flatMap(f => foundSecond.map(s => (s.timestampNanos / 1e6 - (f.timestampNanos / 1e6)).toLong)).getOrElse(0L)
+    }
+
+    def sizePerSecond(t: EventType): Float = {
+      val events = es.filter(_.eventType == t)
+      val lengthOpt = events.headOption.flatMap(h => events.lastOption.map(l => l.timestampNanos / 1e9 - (h.timestampNanos / 1e9)))
+      val totalSize = events.toList.map(_.size.getOrElse(0L)).sum
+      lengthOpt.map(l => if (l > 0D) totalSize / l else 0D).getOrElse(0D).toFloat
     }
   }
 }
@@ -274,38 +395,33 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
   val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
-  val source = Source.fromIterator(() => CDM17.readData(path, None).get._2.map(_.get))
-    .via(FlowComponents.printCounter("CDM Source", 1000000))
+  val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
+    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 
+  val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
-  val sink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
-
-  def commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](10 seconds, 10 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
+  val commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+    .merge(Source.tick[ProcessingCommand](120 seconds, 620 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
   val dbFilePath = "/Users/ryan/Desktop/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
-  val dbMap = db.hashMap("eventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
-  new File(dbFilePath).deleteOnExit()
+  new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
 
-  Flow[CDM17]
-    .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
-    .via(FlowComponents.eventsPerPredObj(commandSource, dbMap).mergeSubstreams)
-    .via(FlowComponents.fileFeatures)
-    .runWith(source, sink)
+//  FlowComponents.testFileFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 
-//    .map {
-//      case (u, es) => u -> es.toList.sliding(2).forall(l => if (l.length > 1) l(0).sequence < l(1).sequence else true)   //es.toList.reverse.dropWhile(_.eventType != EVENT_EXECUTE).find(_.eventType == EVENT_UNLINK).fold(false)(_ => true)
-//    }
-//    .mergeSubstreams
-//    .recover{ case e: Throwable => e.printStackTrace() }
-//    .filter(_.isInstanceOf[Tuple2[UUID,_]])
-//    .filterNot(_._2)
-//    .runWith(source, sink)
+  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
 
-//  commandSource.runWith(sink)
+//  FlowComponents.testProcessFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
+
+
+
+  //  commandSource.runWith(sink)
 }
 
 
