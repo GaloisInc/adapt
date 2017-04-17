@@ -110,12 +110,12 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         // any previous nodes (see next comment for more on this).
         nodeIdsCurrent += (uuid -> newTitanVertex)
         
-        incrementWrites()
+        numWrites += 1
         
         // See if this is the destination of any previous node from this transaction
         for ((fromTitanVertex,label) <- missingToUuidCurrent.getOrElse(uuid,Nil)) {
           fromTitanVertex.addEdge(label, newTitanVertex)
-          incrementWrites()
+          numWrites += 1
         }
         missingToUuidCurrent -= uuid
  
@@ -123,7 +123,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         for ((fromTitanVertex,label) <- missingToUuidPast.getOrElse(uuid,Nil)) {
           transaction.getVertex(fromTitanVertex.longId()).addEdge(label, newTitanVertex)
           //fromTitanVertex.addEdge(label, newTitanVertex)
-          incrementWrites()
+          numWrites += 1
         }
         missingToUuidPast -= uuid
      
@@ -137,7 +137,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
             case Some(toTitanVertex) =>
               assert(toTitanVertex != null, "findNode should never return null")
               newTitanVertex.addEdge(label, toTitanVertex)
-              incrementWrites()
+              numWrites += 1
           }
       }
     }
@@ -290,25 +290,17 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   // Schedule a 'heartbeat' message to make sure transactions occur regularly
   val heartbeat: Cancellable = context.system.scheduler.schedule(1 second, 1 second)(self ! Heartbeat)
 
-  // Count the number of writes that we get. Whenever this number exceeds 'writesThreshold', trigger
-  // a transaction
-  var numWrites = 0
-  val writesThreshold = 1000
-  def incrementWrites(): Unit = {
-    numWrites += 1
-    if (numWrites > writesThreshold) {
-      triggerTransaction(false)
-      numWrites = 0
-    }
-  }
-
-
   // 'process' does the same work as 'messageHandler', but additionally tries to trigger a
   // transaction after every message.
   var doneIngest = false
+  var numWrites = 0
   override def process: PartialFunction[Any,Unit] = messageHandler andThen { _ =>
     if (!doneIngest && (System.currentTimeMillis() - lastTransactionTime) > 1000)
       triggerTransaction(false)
+    else if (!doneIngest && (numWrites > 1000)) {
+      triggerTransaction(false)
+      numWrites = 0
+    }
   }
 
   // Main handler of messages. Due to type inference issues, it is better to put this inside its own
@@ -332,7 +324,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
     
     case cdm16: DBNodeable =>
       buffered += cdm16
-      incrementWrites()
+      numWrites += 1
 
     case NodeQuery(q) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
