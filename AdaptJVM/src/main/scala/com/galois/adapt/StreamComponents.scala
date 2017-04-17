@@ -1,15 +1,19 @@
 package com.galois.adapt
 
 import java.util.UUID
+import java.io.{File, FileWriter, FileReader, BufferedReader, IOException}
 import akka.actor.Actor
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
+import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, ListBuffer}
 import GraphDSL.Implicits._
+import scala.concurrent.Future
+import scala.sys.process._
 
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext
 
 case class SubjectEventCount(
   subjectUuid: UUID,
@@ -91,11 +95,80 @@ object Streams {
     }
   )
 
+  def iforest(implicit ec: ExecutionContext) = Flow[Any]
+    .statefulMapConcat[Future[Map[UUID,Float]]]{ () =>
+
+      // Accumulate 'SubjectEventCount' rows
+      val subjectEventCountRows = ListBuffer.empty[SubjectEventCount]
+      val subjectEventCountHeader = Seq("subjectUuid", "filesExecuted", "netflowsConnected") ++ EventType.values.map(_.toString)
+      
+      // Receiving function
+      {
+        case s: SubjectEventCount =>
+          subjectEventCountRows += s
+          Nil
+ 
+        case t: AdaptProcessingInstruction =>
+  
+          println("hi")
+          List(Future {
+  
+            // Make temporary input/output files
+            val inputFile: File = File.createTempFile("input",".csv")
+            val outputFile: File = File.createTempFile("output",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
+            
+            // Write in data
+            val writer: FileWriter = new FileWriter(inputFile)
+            writer.write(subjectEventCountHeader.mkString("",",","\n"))
+            for (SubjectEventCount(uuid, filesExecuted, netflowsConnected, eventCounts) <- subjectEventCountRows) {
+                val row = Seq(uuid, filesExecuted, netflowsConnected) ++ EventType.values.map(k => eventCounts.getOrElse(k,0))
+                writer.write(row.map(_.toString).mkString("",",","\n"))
+            }
+            writer.close()
+         
+            // Call IForest
+            val succeeded = Seq[String]( "../ad/osu_iforest/iforest.exe"
+                                       , "-i", inputFile.getCanonicalPath   // input file
+                                       , "-o", outputFile.getCanonicalPath  // output file
+                                       , "-m", "1"                          // ignore the first column
+                                       , "-t", "100"                        // number of trees
+                                       ).! == 0
+            println(s"Call to IForest ${if (succeeded) "succeeded" else "failed"}.")
+  
+            // Read out data
+            val buffer = MutableMap[UUID, Float]()
+            
+            if (succeeded) {
+              val reader: BufferedReader = new BufferedReader(new FileReader(outputFile))
+              var line: String = reader.readLine() // first line is the header
+  
+              do {
+                line = reader.readLine()
+                if (line != null) {
+                  val cols = line.split(",").map(_.trim)
+                  buffer += UUID.fromString(cols(0)) -> cols.last.toFloat
+                }
+              } while (line != null)
+  
+              reader.close()
+            }
+            
+            // Final map
+            buffer.toMap
+          })
+        case _ => Nil 
+      }
+     
+    }
+    .mapAsync[Map[UUID,Float]](1)(x => x)
+
 
   // Aggregate some statistics for each process. See 'SubjectEventCount' for specifically what is
   // aggregated. Emit downstream a stream of these records every time a 'AdaptProcessingInstruction'
   // is recieved.
-  def processEventCount(source: Source[CDM17,_], sink: Sink[SubjectEventCount,_]) = RunnableGraph.fromGraph(
+  def processEventCount(source: Source[CDM17,_], sink: Sink[Map[UUID,Float]/*SubjectEventCount*/,_])(implicit ec: ExecutionContext) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>
       val netflowEventTypes = List(
         EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, 
@@ -103,7 +176,7 @@ object Streams {
       )
 
       // TODO remove this
-      val timestamps = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
+      val timestamps = Source.tick[AdaptProcessingInstruction](180 seconds, 10 seconds, AdaptProcessingInstruction(0))
       
       source
         .collect[CDM17]{
@@ -111,7 +184,7 @@ object Streams {
             case t: AdaptProcessingInstruction => t
         }
         .merge(timestamps)   // TODO remove this
-        .statefulMapConcat[SubjectEventCount]{ () =>
+        .statefulMapConcat[Any /*SubjectEventCount*/]{ () =>
 
           // Note these map is closed over by the following function
           val filesExecuted     = MutableMap[/* Subject */UUID, Set[/* FileObject */UUID]]()
@@ -139,17 +212,17 @@ object Streams {
               Nil
 
             case t: AdaptProcessingInstruction =>
-              subjectUuids.toList.map { uuid =>
+              (subjectUuids.toList.map(uuid =>
                 SubjectEventCount(
                   uuid,
                   filesExecuted.get(uuid).map(_.size).getOrElse(0),
                   netflowsConnected.get(uuid).map(_.size).getOrElse(0),
                   typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
-                )
-              }
+                ).asInstanceOf[Any]
+              ) ++ List(t))
           }
 
-        } ~> sink
+        } ~> iforest(ec) ~> sink
       
       ClosedShape
     }
