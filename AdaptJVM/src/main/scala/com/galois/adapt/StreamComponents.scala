@@ -22,6 +22,11 @@ import scala.sys.process._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, ExecutionContext}
 
+import com.thinkaurelius.titan.core.{TitanTransaction, TitanFactory, TitanGraph, TitanVertex, Multiplicity}
+import com.thinkaurelius.titan.graphdb.database.management.{ManagementSystem}
+import com.thinkaurelius.titan.core.schema.{TitanGraphIndex,SchemaAction, SchemaStatus}
+import org.apache.tinkerpop.gremlin.structure.{Graph, Edge, Vertex}
+
 case class SubjectEventCount(
   subjectUuid: UUID,
   filesExecuted: Int,
@@ -104,6 +109,9 @@ object Streams {
       ClosedShape
     }
   )
+
+   //   .map(messages => InsertMessage.ack(messages.last))
+
 
   def iforest(implicit ec: ExecutionContext) = Flow[Any]
     .statefulMapConcat[Future[Map[UUID,Float]]]{ () =>
@@ -409,14 +417,14 @@ object FlowComponents {
 
 
 
-  def printCounter[T](name: String, every: Int = 10000) = Flow[CDM17].statefulMapConcat { () =>
+  def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = 0
 
     { case item: T =>  // Type T is a hack to enable compilation!! No runtime effect because Generic.
         counter = counter + 1
         if (counter % every == 0)
           println(s"$name ingested: $counter")
-        List(item)
+        List[T](item)
     }
   }
 
@@ -459,6 +467,79 @@ object FlowComponents {
   }
 }
 
+object TitanUtils {
+
+  /* Open a Cassandra-backed Titan graph. If this is failing, make sure you've run something like
+   * the following first:
+   *
+   *   $ rm -rf /usr/local/var/lib/cassandra/data/*            # clear information from previous run */
+   *   $ rm -rf /usr/local/var/lib/cassandra/commitlog/*       # clear information from previous run */
+   *   $ /usr/local/opt/cassandra@2.1/bin/cassandra -f         # start Cassandra
+   *
+   * The following also sets up a key index for UUIDs.
+   */
+  val graph = {
+    val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
+
+    val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
+    management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
+    if (null == management.getGraphIndex("byUuidUnique")) {
+    
+      var idKey = if (management.getPropertyKey("uuid") != null) {
+        management.getPropertyKey("uuid")
+      } else {
+        management.makePropertyKey("uuid").dataType(classOf[UUID]).make()
+      }
+      management.buildIndex("byUuidUnique", classOf[Vertex]).addKey(idKey).unique().buildCompositeIndex()
+    
+      idKey = management.getPropertyKey("uuid")
+      val idx = management.getGraphIndex("byUuidUnique")
+      if (idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED)) {
+        ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.REGISTERED).call()
+      }
+     
+      management.updateIndex(
+        management.getGraphIndex("byUuidUnique"),
+        SchemaAction.ENABLE_INDEX
+      ) 
+      management.commit()
+      ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
+    } else {
+      management.commit()
+    }
+
+    graph
+  }
+
+  /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
+   */
+  def titanWrites(graph: TitanGraph) = Flow[CDM17]
+    .collect { case cdm: DBNodeable => cdm }
+ //   .mapAsync(1)(identity)                     // TODO: what does this do?
+    .groupedWithin(10000, 10 second)
+    .map{ cdms =>
+      println("opened transaction")
+      val transaction = graph.newTransaction()
+      
+      for (cdm <- cdms) {
+        val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+        assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+        val newTitanVertex: TitanVertex = transaction.addVertex(props: _*)
+
+        for ((label,toUuid) <- cdm.asDBEdges) {
+          val i = graph.traversal().V().has("uuid",cdm.getUuid)
+          if (i.hasNext) {
+            val toTitanVertex = i.next()
+            newTitanVertex.addEdge(label, toTitanVertex)
+          }
+        }
+      }
+
+      transaction.commit()
+      println("Committed transaction")
+    }
+
+}
 
 
 object TestGraph extends App {
@@ -466,9 +547,15 @@ object TestGraph extends App {
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
 
-  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
+ 
+
+  val path = "/Users/atheriault/Downloads/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+  //  .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+//    .via(Streams.titanWrites(graph))
+
+  TitanUtils.titanWrites(TitanUtils.graph)
+    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
 
   val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
@@ -477,16 +564,17 @@ object TestGraph extends App {
     .merge(Source.tick[ProcessingCommand](120 seconds, 620 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
-  val dbFilePath = "/Users/ryan/Desktop/map.db"
+  val dbFilePath = "/Users/atheriault/Desktop/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
+
 
 
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 
-  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
-    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
+//  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
 
 //  FlowComponents.testProcessFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
