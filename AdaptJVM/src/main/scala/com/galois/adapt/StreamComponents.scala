@@ -1,8 +1,8 @@
 package com.galois.adapt
 
-import java.io.File
 import java.nio.file.Paths
 import java.util.UUID
+import java.io.{File, FileWriter, FileReader, BufferedReader, IOException}
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.stream._
@@ -10,7 +10,7 @@ import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
 
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
+import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, ListBuffer}
 import GraphDSL.Implicits._
 import akka.util.ByteString
 import org.mapdb.DB.TreeSetMaker
@@ -18,8 +18,15 @@ import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
 import collection.JavaConverters._
 import scala.collection.mutable
+import scala.sys.process._
 import scala.concurrent.duration._
 import scala.util.Random
+import scala.concurrent.{Future, ExecutionContext}
+
+import com.thinkaurelius.titan.core.{TitanTransaction, TitanFactory, TitanGraph, TitanVertex, Multiplicity}
+import com.thinkaurelius.titan.graphdb.database.management.{ManagementSystem}
+import com.thinkaurelius.titan.core.schema.{TitanGraphIndex,SchemaAction, SchemaStatus}
+import org.apache.tinkerpop.gremlin.structure.{Graph, Edge, Vertex}
 
 case class SubjectEventCount(
   subjectUuid: UUID,
@@ -104,11 +111,83 @@ object Streams {
     }
   )
 
+   //   .map(messages => InsertMessage.ack(messages.last))
+
+
+  def iforest(implicit ec: ExecutionContext) = Flow[Any]
+    .statefulMapConcat[Future[Map[UUID,Float]]]{ () =>
+
+      // Accumulate 'SubjectEventCount' rows
+      val subjectEventCountRows = ListBuffer.empty[SubjectEventCount]
+      val subjectEventCountHeader = Seq("subjectUuid", "filesExecuted", "netflowsConnected") ++ EventType.values.map(_.toString)
+      
+      // Receiving function
+      {
+        case s: SubjectEventCount =>
+          subjectEventCountRows += s
+          Nil
+ 
+        case t: AdaptProcessingInstruction =>
+  
+          println("hi")
+          List(Future {
+  
+            // Make temporary input/output files
+            val inputFile: File = File.createTempFile("input",".csv")
+            val outputFile: File = File.createTempFile("output",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
+            
+            // Write in data
+            val writer: FileWriter = new FileWriter(inputFile)
+            writer.write(subjectEventCountHeader.mkString("",",","\n"))
+            for (SubjectEventCount(uuid, filesExecuted, netflowsConnected, eventCounts) <- subjectEventCountRows) {
+                val row = Seq(uuid, filesExecuted, netflowsConnected) ++ EventType.values.map(k => eventCounts.getOrElse(k,0))
+                writer.write(row.map(_.toString).mkString("",",","\n"))
+            }
+            writer.close()
+         
+            // Call IForest
+            val succeeded = Seq[String]( "../ad/osu_iforest/iforest.exe"
+                                       , "-i", inputFile.getCanonicalPath   // input file
+                                       , "-o", outputFile.getCanonicalPath  // output file
+                                       , "-m", "1"                          // ignore the first column
+                                       , "-t", "100"                        // number of trees
+                                       ).! == 0
+            println(s"Call to IForest ${if (succeeded) "succeeded" else "failed"}.")
+  
+            // Read out data
+            val buffer = MutableMap[UUID, Float]()
+            
+            if (succeeded) {
+              val reader: BufferedReader = new BufferedReader(new FileReader(outputFile))
+              var line: String = reader.readLine() // first line is the header
+  
+              do {
+                line = reader.readLine()
+                if (line != null) {
+                  val cols = line.split(",").map(_.trim)
+                  buffer += UUID.fromString(cols(0)) -> cols.last.toFloat
+                }
+              } while (line != null)
+  
+              reader.close()
+            }
+            
+            // Final map
+            buffer.toMap
+          })
+        case _ => Nil 
+      }
+     
+    }
+    .mapAsync[Map[UUID,Float]](1)(x => x)
+
 
   // Aggregate some statistics for each process. See 'SubjectEventCount' for specifically what is
   // aggregated. Emit downstream a stream of these records every time a 'AdaptProcessingInstruction'
   // is recieved.
-  def processEventCount(source: Source[CDM17,_], sink: Sink[SubjectEventCount,_]) = RunnableGraph.fromGraph(
+  def processEventCount(source: Source[CDM17,_], sink: Sink[Map[UUID,Float]/*SubjectEventCount*/,_])(implicit ec: ExecutionContext) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>
       val netflowEventTypes = List(
         EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, 
@@ -124,7 +203,7 @@ object Streams {
             case t: AdaptProcessingInstruction => t
         }
         .merge(executions)   // TODO remove this
-        .statefulMapConcat[SubjectEventCount]{ () =>
+        .statefulMapConcat[Any /*SubjectEventCount*/]{ () =>
 
           // Note these map is closed over by the following function
           val filesExecuted     = MutableMap[/* Subject */UUID, Set[/* FileObject */UUID]]()
@@ -152,16 +231,17 @@ object Streams {
               Nil
 
             case t: AdaptProcessingInstruction =>
-              subjectUuids.toList.map { uuid =>
+              (subjectUuids.toList.map(uuid =>
                 SubjectEventCount(
                   uuid,
                   filesExecuted.get(uuid).map(_.size).getOrElse(0),
                   netflowsConnected.get(uuid).map(_.size).getOrElse(0),
                   typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
-                )
-              }
+                ).asInstanceOf[Any]
+              ) ++ List(t))
           }
-        } ~> sink
+        } ~> iforest(ec) ~> sink
+      
       ClosedShape
     }
   )
@@ -203,30 +283,30 @@ object FlowComponents {
         var uuid: Option[UUID] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
 
-      {
-        case Emit =>
-          val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
-          existingSet ++= events
-          dbMap.put(uuid.get, existingSet)
-          events.clear()
-          List(uuid.get -> existingSet)
-
-        case CleanUp =>
-          if (events.nonEmpty) {
+        {
+          case Emit =>
             val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
             existingSet ++= events
             dbMap.put(uuid.get, existingSet)
             events.clear()
-          }
-          List.empty
+            List(uuid.get -> existingSet)
 
-        case Tuple2(u: UUID, e: Event) =>
-          if (uuid.isEmpty) uuid = Some(u)
-          //            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
-          //            dbMap.put(u, emptySet)
-          events += e
-          List.empty
-      }
+          case CleanUp =>
+            if (events.nonEmpty) {
+              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
+              existingSet ++= events
+              dbMap.put(uuid.get, existingSet)
+              events.clear()
+            }
+            List.empty
+
+          case Tuple2(u: UUID, e: Event) =>
+            if (uuid.isEmpty) uuid = Some(u)
+            //            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
+            //            dbMap.put(u, emptySet)
+            events += e
+            List.empty
+        }
       }
   }
 
@@ -650,14 +730,14 @@ object FlowComponents {
 
 
 
-  def printCounter[T](name: String, every: Int = 10000) = Flow[CDM17].statefulMapConcat { () =>
+  def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = 0
 
     { case item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
         counter = counter + 1
         if (counter % every == 0)
           println(s"$name ingested: $counter")
-        List(item)
+        List[T](item)
     }
   }
 
@@ -700,6 +780,79 @@ object FlowComponents {
   }
 }
 
+object TitanUtils {
+
+  /* Open a Cassandra-backed Titan graph. If this is failing, make sure you've run something like
+   * the following first:
+   *
+   *   $ rm -rf /usr/local/var/lib/cassandra/data/*            # clear information from previous run */
+   *   $ rm -rf /usr/local/var/lib/cassandra/commitlog/*       # clear information from previous run */
+   *   $ /usr/local/opt/cassandra@2.1/bin/cassandra -f         # start Cassandra
+   *
+   * The following also sets up a key index for UUIDs.
+   */
+  val graph = {
+    val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
+
+    val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
+    management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
+    if (null == management.getGraphIndex("byUuidUnique")) {
+    
+      var idKey = if (management.getPropertyKey("uuid") != null) {
+        management.getPropertyKey("uuid")
+      } else {
+        management.makePropertyKey("uuid").dataType(classOf[UUID]).make()
+      }
+      management.buildIndex("byUuidUnique", classOf[Vertex]).addKey(idKey).unique().buildCompositeIndex()
+    
+      idKey = management.getPropertyKey("uuid")
+      val idx = management.getGraphIndex("byUuidUnique")
+      if (idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED)) {
+        ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.REGISTERED).call()
+      }
+     
+      management.updateIndex(
+        management.getGraphIndex("byUuidUnique"),
+        SchemaAction.ENABLE_INDEX
+      ) 
+      management.commit()
+      ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
+    } else {
+      management.commit()
+    }
+
+    graph
+  }
+
+  /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
+   */
+  def titanWrites(graph: TitanGraph) = Flow[CDM17]
+    .collect { case cdm: DBNodeable => cdm }
+ //   .mapAsync(1)(identity)                     // TODO: what does this do?
+    .groupedWithin(10000, 10 second)
+    .map{ cdms =>
+      println("opened transaction")
+      val transaction = graph.newTransaction()
+      
+      for (cdm <- cdms) {
+        val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+        assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+        val newTitanVertex: TitanVertex = transaction.addVertex(props: _*)
+
+        for ((label,toUuid) <- cdm.asDBEdges) {
+          val i = graph.traversal().V().has("uuid",cdm.getUuid)
+          if (i.hasNext) {
+            val toTitanVertex = i.next()
+            newTitanVertex.addEdge(label, toTitanVertex)
+          }
+        }
+      }
+
+      transaction.commit()
+      println("Committed transaction")
+    }
+
+}
 
 
 object TestGraph extends App {
@@ -707,11 +860,15 @@ object TestGraph extends App {
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
 
-  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
+ 
+
+  val path = "/Users/atheriault/Downloads/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
     .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+  //  .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+//    .via(Streams.titanWrites(graph))
 
   val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
@@ -720,10 +877,13 @@ object TestGraph extends App {
     .merge(Source.tick[ProcessingCommand](120 seconds, 120 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
-  val dbFilePath = "/Users/ryan/Desktop/map.db"
+  val dbFilePath = "/Users/atheriault/Desktop/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
+
+//  TitanUtils.titanWrites(TitanUtils.graph)
+//    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
 
   FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
     .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
@@ -737,6 +897,10 @@ object TestGraph extends App {
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 //
+
+//  FlowComponents.testFileFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+
 //  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
 
@@ -776,15 +940,15 @@ object TestGraph extends App {
 
 
 
-sealed trait Multiplicity
-case object One extends Multiplicity
-case object Many extends Multiplicity
+sealed trait JoinMultiplicity
+case object One extends JoinMultiplicity
+case object Many extends JoinMultiplicity
 
 case class Join[A,B,K](
   in0Key: A => K,
   in1Key: B => K,
-  in0Multiplicity: Multiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
-  in1Multiplicity: Multiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
+  in0Multiplicity: JoinMultiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
+  in1Multiplicity: JoinMultiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
 ) extends GraphStage[FanInShape2[A, B, (K,A,B)]] {
   val shape = new FanInShape2[A, B, (K,A,B)]("Join")
   
