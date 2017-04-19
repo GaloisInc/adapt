@@ -19,6 +19,7 @@ import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
+import scala.util.Random
 
 case class SubjectEventCount(
   subjectUuid: UUID,
@@ -170,10 +171,12 @@ object Streams {
 object FlowComponents {
 
   sealed trait EventsKey
+
   case object PredicateObjectKey extends EventsKey
+
   case class SubjectKey(t: Option[EventType]) extends EventsKey
 
-  def eventsGroupedByKey(commandSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID,mutable.SortedSet[Event]], key: EventsKey) = {
+  def eventsGroupedByKey(commandSource: Source[ProcessingCommand, _], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]], key: EventsKey) = {
     val keyPredicate = key match {
       case PredicateObjectKey => Flow[CDM17]
         .collect { case e: Event if e.predicateObject.isDefined => e }
@@ -187,26 +190,67 @@ object FlowComponents {
     }
     keyPredicate
       .filter(_._2.timestampNanos != 0L)
-      .filter{ tup =>
+      .filterNot { tup =>
         val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
-        ! excluded.contains(tup._1) }   // TODO: why are there these special cases?!?!?!?!?
-      .groupBy(Int.MaxValue, _._1)   // TODO: Limited to ~4 billion unique UUIDs!!!
+        excluded.contains(tup._1)
+      } // TODO: why are there these special cases?!?!?!?!?
+      .groupBy(Int.MaxValue, _._1) // TODO: Limited to ~4 billion unique UUIDs!!!
+      //      .via(sortedSetEmitter(commandSource, dbMap))
+      //  }
+      //  def sortedSetEmitter(commandSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]]) = Flow[(UUID,Event)]
       .merge(commandSource)
       .statefulMapConcat { () =>
         var uuid: Option[UUID] = None
-        val events = mutable.SortedSet.empty[Event](Ordering.by[Event,Long](_.sequence))
+        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
+
+      {
+        case Emit =>
+          val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
+          existingSet ++= events
+          dbMap.put(uuid.get, existingSet)
+          events.clear()
+          List(uuid.get -> existingSet)
+
+        case CleanUp =>
+          if (events.nonEmpty) {
+            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
+            existingSet ++= events
+            dbMap.put(uuid.get, existingSet)
+            events.clear()
+          }
+          List.empty
+
+        case Tuple2(u: UUID, e: Event) =>
+          if (uuid.isEmpty) uuid = Some(u)
+          //            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
+          //            dbMap.put(u, emptySet)
+          events += e
+          List.empty
+      }
+      }
+  }
+
+
+  def sortedEventAccumulator[K](groupBy: ((UUID,Event)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("sortedEventAccumulator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    Flow[(UUID,Event)]
+      .groupBy(Int.MaxValue, groupBy) // TODO: Limited to ~4 billion unique UUIDs!!!
+      .merge(commandSource)
+      .statefulMapConcat { () =>
+        var uuid: Option[UUID] = None
+        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
 
         {
           case Emit =>
-            val existingSet = dbMap.get(uuid.get)
-            val newSet = existingSet ++= events
-            dbMap.put(uuid.get, newSet)
+            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
+            existingSet ++= events
+            dbMap.put(uuid.get, existingSet)
             events.clear()
-            List(uuid.get -> newSet)
+            List(uuid.get -> existingSet)
 
           case CleanUp =>
             if (events.nonEmpty) {
-              val existingSet = dbMap.get(uuid.get)
+              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
               existingSet ++= events
               dbMap.put(uuid.get, existingSet)
               events.clear()
@@ -214,51 +258,80 @@ object FlowComponents {
             List.empty
 
           case Tuple2(u: UUID, e: Event) =>
-            if (uuid.isEmpty) {
-              uuid = Some(u)
-              val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event,Long](_.sequence))
-              dbMap.put(u, emptySet)
-            }
+            if (uuid.isEmpty) uuid = Some(u)
             events += e
             List.empty
         }
-      }
-  }//.mergeSubstreams
-
-
-  val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
-
-  val fileFeatures = Flow[(UUID, mutable.SortedSet[Event])]
-    .map{ case (u, eSet) =>
-      val eList = eSet.toList
-      val m = MutableMap.empty[String,Any]
-      m("execAfterWriteByNetFlowReadingProcess") = "TODO"            // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("execAfterPermissionChangeToExecutable") = eList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).contains(EVENT_EXECUTE)
-      m("deletedImmediatelyAfterExec") = eList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
-      m("deletedRightAfterProcessWithOpenNetFlowsWrites") = "TODO"   // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("isReadByAProcessWritingToNetFlows") = "TODO"                // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("isInsideTempDirectory") = eList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
-      m("execDeleteGapMillis") = eList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
-      m("attribChangeEventGapMillis") = eList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
-      m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("countDistinctProcessesHaveEventToFile") = eSet.map(_.subject).size
-      m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
-      m("totalBytesRead") = eList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
-      m("totalBytesWritten") = eList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
-      fileEventTypes.foreach( t =>
-        m("count_"+ t.toString) = eSet.count(_.eventType == t)
-      )
-      u -> m
-    }
-
-  def testFileFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-    Flow[CDM17]
-      .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
-      .via(eventsGroupedByKey(commandSource, fileEventsDBMap, PredicateObjectKey).mergeSubstreams)
-      .via(fileFeatures)
+      }.mergeSubstreams
   }
+
+
+
+  def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("typeSorter").createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+    Flow[CDM17]
+      .collect {
+        case e: Event if e.predicateObject.isDefined => e
+        case n: NetFlowObject => n.uuid -> "NetFlowObject"
+        case f: FileObject => f.uuid -> "FileObject"
+        case s: Subject => s.uuid -> "Subject" }
+      .mapConcat {
+        case e: Event =>
+          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
+          else List((e.predicateObject.get, e))
+        case msg @ Tuple2(u: UUID, label: String) => List(msg) }
+      .filterNot {
+        case (uuid, e) =>
+          val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
+          excluded.contains(uuid) // TODO: why are there these special cases?!?!?!?!?
+        case _ => false }
+      .groupBy(Int.MaxValue, _._1)
+      .merge(commandSource)
+      .statefulMapConcat { () =>
+        var uuidOpt: Option[UUID] = None
+        var labelOpt: Option[String] = None
+        val events = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
+
+      {
+        case Tuple2(predicateUuid: UUID, e: Event) =>
+          if (uuidOpt.isEmpty) uuidOpt = Some(predicateUuid)
+          List(labelOpt.map(label => (label, predicateUuid, e))).flatten
+
+        case Tuple2(objectUuid: UUID, labelName: String) =>
+          if (uuidOpt.isEmpty) uuidOpt = Some(objectUuid)
+          if (labelOpt.isEmpty) {
+            labelOpt = Some(labelName)
+            val existingSet = dbMap.getOrDefault(objectUuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+            events ++= existingSet
+            dbMap.remove(objectUuid)
+          }
+          val toSend = events.toList.map(event => (labelName, objectUuid, event))
+          events.clear()
+          toSend
+
+        case CleanUp =>
+          if (events.nonEmpty) {
+            val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+            events ++= existingSet
+            dbMap.put(uuidOpt.get, events)
+            events.clear()
+          }
+          List.empty
+
+        case Emit => List.empty
+      }
+      }.mergeSubstreams
+  }
+
+//  def test(commandSource: Source[ProcessingCommand,_], db: DB) =
+//    typeSorter(commandSource, db.hashMap("typeSorter").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]])
+//    .collect { case (name, uuid, event) if name == "NetFlowObject" => uuid -> event }
+//    .via(sortedSetEmitter(commandSource, db.hashMap("sortedSetEmitter").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]))
+//      .mergeSubstreams
+//    .via(netFlowFeatureExtractor)
+
+
+
 
 
   val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
@@ -267,12 +340,12 @@ object FlowComponents {
     .map { case (u, eSet) =>
       val eList = eSet.toList
       val m = MutableMap.empty[String, Any]
-      m("execCountByThisNetFlowsProcess") = "This should probably be on the Process"   // TODO: don't do.
+      //      m("execCountByThisNetFlowsProcess") = "This should probably be on the Process"   // TODO: don't do.
       m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
       m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
       m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1000
       m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subject).size
-      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
+      //      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
       m("totalBytesRead") = eList.collect{ case e if e.eventType == EVENT_READ => e.size.getOrElse(0L)}.sum
       m("totalBytesWritten") = eList.collect{ case e if e.eventType == EVENT_WRITE => e.size.getOrElse(0L)}.sum
       netflowEventTypes.foreach( t =>
@@ -281,29 +354,268 @@ object FlowComponents {
       u -> m
     }
 
-  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+  def netFlowFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
     val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
     Flow[CDM17]
-      .collect{ case e: Event if FlowComponents.netflowEventTypes.contains(e.eventType) => e}
+      .collect { case e: Event if FlowComponents.netflowEventTypes.contains(e.eventType) => e }
       .via(eventsGroupedByKey(commandSource, netFlowEventsDBMap, PredicateObjectKey).mergeSubstreams)
+  }
+
+//  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+//    netFlowFeatureEventAccumulator(commandSource, db).via(netFlowFeatureExtractor)
+//  }
+  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    predicateTypeLabeler(commandSource, db)
+      .collect{ case ("NetFlowObject", predUuid, event) => (predUuid, event) }
+      .via(sortedEventAccumulator(_._1, commandSource, db))
       .via(netFlowFeatureExtractor)
   }
 
 
 
 
+
+
+  def fileFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+
+    predicateTypeLabeler(commandSource, db)
+      .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
+      .groupBy(Int.MaxValue, _._3.subject)
+      .merge(commandSource)
+      .statefulMapConcat{ () =>
+        var processUuidOpt: Option[UUID] = None
+        var fileUuids = MutableSet.empty[UUID]
+        val fileEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+        val netFlowUuids = MutableSet.empty[UUID]
+        val netFlowEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+
+        {
+          case Tuple3("NetFlowObject", uuid: UUID, event: Event) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
+            List.empty
+
+          case Tuple3("FileObject", uuid: UUID, event: Event) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
+            List.empty
+
+          case CleanUp =>
+            if (fileEvents.nonEmpty) {
+              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+              fileEvents.foreach { case (u, es) =>
+                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+              }
+              dbMap.putAll(mergedEvents.asJava)
+              fileUuids ++= fileEvents.keySet
+              fileEvents.clear()
+            }
+            if (netFlowEvents.nonEmpty) {
+              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+              netFlowEvents.foreach { case (u, es) =>
+                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+              }
+              dbMap.putAll(mergedEvents.asJava)
+              netFlowUuids ++= netFlowEvents.keySet
+              netFlowEvents.clear()
+            }
+            List.empty
+
+          case Emit =>
+            fileUuids.foreach(u =>
+              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
+                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+            )
+            netFlowUuids.foreach(u =>
+              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
+                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+            fileEvents.toList.map{ case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+        }
+      }
+      .mergeSubstreams
+      .via(fileFeatures)
+  }
+
+
+
+
+  val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
+
+  val fileFeatures = Flow[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])])]
+    .map{ case ((fileUuid, fileEventSet), netFlowEventsFromTheSameProcess) =>
+      val fileEventList = fileEventSet.toList
+      val m = MutableMap.empty[String,Any]
+      m("execAfterWriteByNetFlowReadingProcess") = {
+        var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
+        var found = false
+        while (remainder.nonEmpty) {
+          val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subject == x.subject))
+          found = execOpt.exists(x => netFlowEventsFromTheSameProcess.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
+          if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
+        }
+        found
+      }
+      m("execAfterPermissionChangeToExecutable") = fileEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
+      m("deletedImmediatelyAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
+      m("deletedRightAfterProcessWithOpenNetFlowsWrites") = "TODO"   // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("isReadByAProcessWritingToNetFlows") = "TODO"                // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
+      m("execDeleteGapMillis") = fileEventList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
+      m("attribChangeEventThenExecuteGapMillis") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
+      m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subject).size
+      m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
+      m("totalBytesRead") = fileEventList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
+      m("totalBytesWritten") = fileEventList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
+      fileEventTypes.foreach( t =>
+        m("count_"+ t.toString) = fileEventSet.count(_.eventType == t)
+      )
+      fileUuid -> m
+    }
+
+
+  def testFileFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    Flow[CDM17]
+      .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
+      .via(eventsGroupedByKey(commandSource, fileEventsDBMap, PredicateObjectKey).mergeSubstreams)
+  }
+
+//  def testFileFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+//    testFileFeatureEventAccumulator(commandSource, db).via(fileFeatures)
+//  }
+
+
+//  def shuffleJoinOnProcessUuid(commandSource: Source[ProcessingCommand,_], db: DB) = Flow[(String, UUID, mutable.SortedSet[Event])]
+//    .mapConcat { pair =>
+//      val processUUIDs = pair._3.map(_.subject)
+//      processUUIDs.toList.map(pUUID => (pUUID, pair._1, pair._2, pair._3))}
+//    .groupBy(Int.MaxValue, _._1)
+//    .merge(commandSource)
+//    .statefulMapConcat { () =>
+//      var joinProcessUuid: Option[UUID] = None
+//      val fileMap = mutable.Map.empty[UUID, mutable.SortedSet[Event]]
+//      val netFlowMap = mutable.Map.empty[UUID, mutable.SortedSet[Event]]
+//
+//      val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+//      val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+//      val processEventsDBMap = db.hashMap("ProcessEventsForFilesAndNetFlows")
+//
+//      {
+//        case Emit =>
+//          fileMap ++= fileEventsDBMap.get(joinProcessUuid.get)
+//          val newNetFlowEvents = netFlowEventsDBMap.get(joinProcessUuid.get) ++ netFlowMap
+//          fileEventsDBMap.put(joinProcessUuid.get, fileMap)
+//          List((joinProcessUuid.get, , ))
+//
+//        case CleanUp => List.empty
+//
+//        case Tuple4(processUuid: UUID, "FileEventsByPredicate", eventGroupTypeUuid: UUID, events: mutable.SortedSet[Event]) =>
+//          if (joinProcessUuid.isEmpty) joinProcessUuid = Some(processUuid)
+//          fileMap(eventGroupTypeUuid) = events
+//          List.empty
+//
+//        case Tuple4(processUuid: UUID, "NetFlowEventsByPredicate", eventGroupTypeUuid: UUID, events: mutable.SortedSet[Event]) =>
+//          if (joinProcessUuid.isEmpty) joinProcessUuid = Some(processUuid)
+//          netFlowMap(eventGroupTypeUuid) = events
+//          List.empty
+//      }
+//    }
+
+
+
+  def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+
+    predicateTypeLabeler(commandSource, db)
+      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
+      .groupBy(Int.MaxValue, _._3.subject)
+      .merge(commandSource)
+      .statefulMapConcat{ () =>
+        var processUuidOpt: Option[UUID] = None
+        val processEvents = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
+        val fileUuids = MutableSet.empty[UUID]
+        val fileEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+        val netFlowUuids = MutableSet.empty[UUID]
+        val netFlowEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+
+        {
+          case Tuple3("Subject", uuid: UUID, event: Event) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(uuid)
+            processEvents += event
+            List.empty
+
+          case Tuple3("NetFlowObject", uuid: UUID, event: Event) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
+            List.empty
+
+          case Tuple3("FileObject", uuid: UUID, event: Event) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
+            List.empty
+
+          case CleanUp =>
+            if (fileEvents.nonEmpty) {
+              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+              fileEvents.foreach { case (u, es) =>
+                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+              }
+              dbMap.putAll(mergedEvents.asJava)
+              fileUuids ++= fileEvents.keySet
+              fileEvents.clear()
+            }
+            if (netFlowEvents.nonEmpty) {
+              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+              netFlowEvents.foreach { case (u, es) =>
+                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+              }
+              dbMap.putAll(mergedEvents.asJava)
+              netFlowUuids ++= netFlowEvents.keySet
+              netFlowEvents.clear()
+            }
+            if (processEvents.nonEmpty) {
+              val mergedEvents = dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ processEvents
+              dbMap.put(processUuidOpt.get, mergedEvents)
+              processEvents.clear()
+            }
+            List.empty
+
+          case Emit =>
+            fileUuids.foreach(u =>
+              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
+                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+            )
+            netFlowUuids.foreach(u =>
+              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
+                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+
+            processEvents ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+
+            List(((processUuidOpt.get, processEvents), netFlowEvents.toSet, fileEvents.toSet))
+  //          fileEvents.toList.map{ case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+        }
+      }
+      .mergeSubstreams
+      .via(processFeatureExtractor)
+  }
+
+
+
   val processEventTypes = EventType.values.toList
 
-  def processFeatureExtractor = Flow[(UUID, mutable.SortedSet[Event])]
-    .map { case (u, eSet) =>
-      val eList = eSet.toList
+  def processFeatureExtractor = Flow[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])], Set[(UUID, mutable.SortedSet[Event])])]
+    .map { case ((processUuid, processEventSet), netFlowEventSets, fileEventSets) =>
+      val eList = processEventSet.toList
       val m = MutableMap.empty[String, Any]
       m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
       m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
       m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows
       m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
       // TODO: consider emitting the collected Process Tree
-      m("countOfDistinctMemoryObjectsMProtected") = eSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
+      m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
       m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
       m("countOfAllConnect+AcceptEventsToPorts22or443") = "TODO"                          // TODO: needs pairing with NetFlows
       m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows
@@ -313,7 +625,7 @@ object FlowComponents {
       m("executedThenImmediatelyDeletedAFile") = eList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
       m("readFromNetFlowThenDeletedFile") = "TODO"                                        // TODO: needs pairing with NetFlows
       // TODO: consider: process takes any local action after reading from NetFlow
-      m("countOfDistinctFileWrites") = eSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
+      m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
       m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
       m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
       m("isAccessingTempDirectory") = eList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
@@ -321,17 +633,18 @@ object FlowComponents {
       m("totalBytesSentToNetFlows") = eList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
       m("totalBytesReceivedFromNetFlows") = eList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
       processEventTypes.foreach( t =>
-        m("count_"+ t.toString) = eSet.count(_.eventType == t)
+        m("count_"+ t.toString) = processEventSet.count(_.eventType == t)
       )
-      u -> m
+      processUuid -> m
     }
 
-  def testProcessFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val processEventsDBMap = db.hashMap("ProcessEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-    Flow[CDM17]
-      .via(eventsGroupedByKey(commandSource, processEventsDBMap, SubjectKey(None)).mergeSubstreams)
-      .via(processFeatureExtractor)
-  }
+//  def testProcessFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+//    val processEventsDBMap = db.hashMap("ProcessEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+//    Flow[CDM17]
+//      .via(eventsGroupedByKey(commandSource, processEventsDBMap, SubjectKey(None)).mergeSubstreams)
+//      .via(processFeatureExtractor)
+//  }
+
 
 
 
@@ -340,7 +653,7 @@ object FlowComponents {
   def printCounter[T](name: String, every: Int = 10000) = Flow[CDM17].statefulMapConcat { () =>
     var counter = 0
 
-    { case item: T =>  // Type T is a hack to enable compilation!! No runtime effect because Generic.
+    { case item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
         counter = counter + 1
         if (counter % every == 0)
           println(s"$name ingested: $counter")
@@ -357,14 +670,14 @@ object FlowComponents {
 
   def csvFileSink(path: String) = Flow[(UUID, mutable.Map[String,Any])]
     .statefulMapConcat{ () =>
-      var wroteHeader = false
+      var needsHeader = true
 
       { case Tuple2(u: UUID, m: mutable.Map[String,Any]) =>
-        val headerList = if (! wroteHeader) {
-          wroteHeader = true
-          List(ByteString(s"uuid,${m.toList.sortBy(_._1).map(_._1).mkString(",")}\n"))
-        } else List.empty
-        headerList ++ List(ByteString(s"$u,${m.toList.sortBy(_._1).map(_._2).mkString(",")}\n"))
+        val row = List(ByteString(s"$u,${m.toList.sortBy(_._1).map(_._2).mkString(",")}\n"))
+        if (needsHeader) {
+          needsHeader = false
+          List(ByteString(s"uuid,${m.toList.sortBy(_._1).map(_._1).mkString(",")}\n")) ++ row
+        } else row
       }
     }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)
 
@@ -396,13 +709,15 @@ object TestGraph extends App {
 
   val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
+//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
+//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
     .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 
   val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
   // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
   val commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](120 seconds, 620 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+    .merge(Source.tick[ProcessingCommand](120 seconds, 120 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
   val dbFilePath = "/Users/ryan/Desktop/map.db"
@@ -410,15 +725,25 @@ object TestGraph extends App {
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
 
+  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
+
+  FlowComponents.fileFeatureGenerator(commandSource, db)
+    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+
+  FlowComponents.processFeatureGenerator(commandSource, db)
+    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
+
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
-
-  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
-    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
+//
+//  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
 
 //  FlowComponents.testProcessFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
 
+//  FlowComponents.test(commandSource, db).runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures9000.csv"))
 
 
   //  commandSource.runWith(sink)
