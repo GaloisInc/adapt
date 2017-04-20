@@ -2,7 +2,7 @@ package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
-import org.apache.tinkerpop.gremlin.process.traversal.{P, Path}
+import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -47,7 +47,7 @@ import scala.language.existentials
  *
  *   predicate   ::= 'eq(' literal ')'
  *                 | 'neq(' literal ')'
- *                 | 'within(' literal ',' literal ')'
+ *                 | 'within([' literal ',' ... '])'
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
  *                 | 'between(' literal ',' literal ')'   
@@ -116,6 +116,7 @@ import scala.language.existentials
  *                 | traversal '.property(' string ',' literal ',' ... ')'
  *                 | traversal '.properties()'
  *                 | traversal '.path()'
+ *                 | traversal '.unrollPath()'
  *
  *   query     ::= ( ident '=' literal ';'
  *                 | ident '=' traversal ';'
@@ -279,6 +280,7 @@ object Query {
             Property(_: Tr, RawArr(s.map { case k~_~v => k }), RawArr(s.map { case k~_~v => v}))
           }
         | ".path()"                        ^^ { case _          => PathTraversal(_: Tr) }
+        | ".unrollPath()"                  ^^ { case _          => UnrollPath(_: Traversal[_,Path]) }
         | ".aggregate(" ~ str ~ ")"        ^^ { case _~k~_      => Aggregate(_: Tr, k) }
         | ".toList()"                      ^^ { case _          => identity(_: Tr) }
         | ".choose(" ~ trav ~ ")"          ^^ { case _~t~_      => Choose(_:Tr, t) }
@@ -588,6 +590,13 @@ case class SelectMult[S,T](traversal: Traversal[S,_], keys: Value[Seq[String]]) 
   }
   case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).path()
+  }
+  case class UnrollPath[S](traversal: Traversal[S,Path]) extends Traversal[S,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+      traversal.buildTraversal(graph,context).flatMap(new java.util.function.Function[Traverser[Path],Iterator[Vertex]]() {
+        def apply(t: Traverser[Path]): Iterator[Vertex] =
+          t.get().objects().iterator().asInstanceOf[Iterator[Vertex]]
+      })
   }
   
   
