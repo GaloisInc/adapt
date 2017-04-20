@@ -2,7 +2,7 @@ package com.galois.adapt
 
 import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
-import org.apache.tinkerpop.gremlin.process.traversal.{P, Path}
+import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
@@ -47,7 +47,7 @@ import scala.language.existentials
  *
  *   predicate   ::= 'eq(' literal ')'
  *                 | 'neq(' literal ')'
- *                 | 'within(' literal ',' literal ')'
+ *                 | 'within([' literal ',' ... '])'
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
  *                 | 'between(' literal ',' literal ')'   
@@ -116,6 +116,7 @@ import scala.language.existentials
  *                 | traversal '.property(' string ',' literal ',' ... ')'
  *                 | traversal '.properties()'
  *                 | traversal '.path()'
+ *                 | traversal '.unrollPath()'
  *
  *   query     ::= ( ident '=' literal ';'
  *                 | ident '=' traversal ';'
@@ -187,7 +188,12 @@ object Query {
       def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
       def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
       def lit: Parser[Value[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
-      def pred: Parser[Value[P[_]]] = predicate(uid) | predicate(int) | predicate(lng) | predicate(str)
+      def pred: Parser[Value[P[Any]]] =
+        ( predicate(uid)
+        | predicate(int)
+        | predicate(lng)
+        | predicate(str)
+        ).asInstanceOf[Parser[Value[P[Any]]]]
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
@@ -203,10 +209,10 @@ object Query {
       def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
-        | "within(" ~ elem ~ "," ~ elem ~ ")"    ^^ { case _~l~_~h~_ => RawWithinPred(l,h) }
         | "lte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawLtePred(l) }
         | "gte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawGtePred(l) }
         | "between(" ~ elem ~ ',' ~ elem ~ ")"   ^^ { case _~l~_~h~_ => RawBetweenPred(l,h) }
+        | "within(" ~ arr(elem) ~ ")"            ^^ { case _~l~_     => RawWithinPred(l) }
         )
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
@@ -230,7 +236,7 @@ object Query {
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
         | ".limit(" ~ lng ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
-        | ".is(" ~ pred ~ ")"              ^^ { case _~p~_      => IsPredicate(_: Tr, p.asInstanceOf[Value[P[Any]]]) }
+        | ".is(" ~ pred ~ ")"              ^^ { case _~p~_      => IsPredicate(_: Tr, p) }
         | ".simplePath()"                  ^^ { case _          => SimplePath(_: Tr) }
         | ".times(" ~ int ~ ")"            ^^ { case _~l~_      => Times(_: Tr, l) }
         | ".order()"                       ^^ { case _          => Order(_: Tr) }
@@ -275,6 +281,8 @@ object Query {
             Property(_: Tr, RawArr(s.map { case k~_~v => k }), RawArr(s.map { case k~_~v => v}))
           }
         | ".path()"                        ^^ { case _          => PathTraversal(_: Tr) }
+        | ".unrollPath()"                  ^^ { case _          => UnrollPath(_: Traversal[_,Path]) }
+        | ".aggregate(" ~ str ~ ")"        ^^ { case _~k~_      => Aggregate(_: Tr, k) }
         | ".toList()"                      ^^ { case _          => identity(_: Tr) }
         | ".choose(" ~ trav ~ ")"          ^^ { case _~t~_      => Choose(_:Tr, t) }
         | ".option(" ~lit~ "," ~trav~ ")"  ^^ { case _~x~_~t~_  => OptionTrav(_:Tr, x, t) }
@@ -392,8 +400,8 @@ object QueryLanguage {
   case class RawGtePred[T](comp: Value[T]) extends Value[P[T]] {
     override def eval(context: Map[String,Value[_]]): P[T] = P.gte(comp.eval(context))
   }
-  case class RawWithinPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.within(lo.eval(context),hi.eval(context))
+  case class RawWithinPred[T](col: Value[Seq[T]]) extends Value[P[T]] {
+    override def eval(context: Map[String,Value[_]]): P[T] = P.within(col.eval(context): _*)
   }
   case class RawBetweenPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
     override def eval(context: Map[String,Value[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
@@ -525,7 +533,10 @@ object QueryLanguage {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]])
       = traversal.buildTraversal(graph,context).until(cond.buildTraversal(graph, context))
   }
-  
+  case class Aggregate[S,E](traversal: Traversal[S,E], key: Value[String]) extends Traversal[S,E] {
+    override def buildTraversal(graph: Graph, context: Map[String,Value[_]])
+      = traversal.buildTraversal(graph,context).aggregate(key.eval(context))
+  } 
   
   // Reduce/extract
   case class Values[S,T,V](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,V] {
@@ -579,6 +590,13 @@ object QueryLanguage {
   }
   case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).path()
+  }
+  case class UnrollPath[S](traversal: Traversal[S,Path]) extends Traversal[S,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+      traversal.buildTraversal(graph,context).flatMap(new java.util.function.Function[Traverser[Path],Iterator[Vertex]]() {
+        def apply(t: Traverser[Path]): Iterator[Vertex] =
+          t.get().objects().iterator().asInstanceOf[Iterator[Vertex]]
+      })
   }
   
   
