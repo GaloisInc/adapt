@@ -29,6 +29,8 @@ case class Event(
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
+  val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
+  
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,
@@ -52,7 +54,8 @@ case class Event(
   def asDBEdges = List.concat(
     List(("subject",subject)),
     predicateObject.map(p => ("predicateObject",p)),
-    predicateObject2.map(p => ("predicateObject2",p))
+    predicateObject2.map(p => ("predicateObject2",p)),
+    foldedParameters.map(p => ("parameter",p.getUuid))
   )
 
   def getUuid = uuid
@@ -60,6 +63,9 @@ case class Event(
   def compare(x: Event, y: Event) = x.sequence compare y.sequence
 
   def compareTo(o: Event) = this.sequence.compare(o.sequence)
+  
+  override val supportNodes =
+    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
 }
 
 case object Event extends CDM17Constructor[Event] {

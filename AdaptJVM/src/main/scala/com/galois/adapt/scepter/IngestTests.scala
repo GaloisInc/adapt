@@ -12,9 +12,10 @@ import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.util.Timeout
 
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Success, Try}
 import scala.language.postfixOps
 import org.scalatest.FlatSpec
 
@@ -53,8 +54,9 @@ class General_TA1_Tests(
     if (incompleteCount == 0) assert(incompleteCount == 0)
     else {
       val (code, color) = colors.next()
-      val uuidsToPrint = incompleteEdges.keys.mkString("\n" + color)
-      val message = s"\nThe following UUIDs are all referenced as the end of an edge, but nodes with these UUIDs do not exist in this dataset:\n$color$uuidsToPrint${Console.RED}\n"
+      val edgesToPrint = incompleteEdges.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
+      toDisplay += s"g.V(${incompleteEdges.flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
+      val message = s"\nThe following edges (ExistingUUID --> MissingUUID) are all referenced in this data set, but nodes with these MissingUUIDs do not exist in this dataset:\n$color$edgesToPrint${Console.RED}\n"
       assert(incompleteCount == 0, message)
     }
   }
@@ -134,42 +136,77 @@ class General_TA1_Tests(
     }
   }
 
-  // Test deduplication of Files
-  // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
-  it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
-    val files = graph.traversal().V().hasLabel("FileObject").dedup()
+//  // Test deduplication of Files
+//  // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
+//  it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
+//    val files = graph.traversal().V().hasLabel("FileObject").dedup()
+//
+//    while (files.hasNext) {
+//      val file: Vertex = files.next()
+//
+//      val urls = file.properties("url").toList
+//      if (urls.nonEmpty) {
+//        val url: String = urls.head.value()
+//        val version: Int = file.property("version").value()
+//        val filesWithUrl: java.util.List[Vertex] =
+//          graph.traversal().V().hasLabel("FileObject")
+//           .has("url",url)
+//           .has("version",version)
+//           .dedup()
+//           .by("uuid")
+//           .toList
+//
+//
+//        if (filesWithUrl.length <= 1) {
+//          assert(filesWithUrl.length <= 1)
+//        } else {
+//          val (code,color) = colors.next()
+//          toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
+//          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+//
+//          assert(
+//            filesWithUrl.length <= 1,
+//            s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
+//          )
+//        }
+//      }
+//    }
+//  }
 
-    while (files.hasNext) {
-      val file: Vertex = files.next()
 
-      val urls = file.properties("url").toList
-      if (urls.nonEmpty) {
-        val url: String = urls.head.value()
-        val version: Int = file.property("version").value()
-        val filesWithUrl: java.util.List[Vertex] =
-          graph.traversal().V().hasLabel("FileObject")
-           .has("url",url)
-           .has("version",version)
-           .dedup()
-           .by("uuid")
-           .toList
-        
-        
-        if (filesWithUrl.length <= 1) {
-          assert(filesWithUrl.length <= 1)
-        } else {
-          val (code,color) = colors.next()
-          toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
-          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-        
-          assert(
-            filesWithUrl.length <= 1,
-            s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
-          )
+  if (graph.traversal().V().hasLabel("UnitDependency").count().next() > 0L) {
+    it should "contain UnitDependency statements which connect only SUBJECT_UNITs that have a common parent, and not as general edges" in {
+      val unitDepIds = graph.traversal().V().hasLabel("UnitDependency").asScala.toSet[Vertex].map(v => v.id().asInstanceOf[Long] -> (v.value("unit").asInstanceOf[UUID], v.value("dependentUnit").asInstanceOf[UUID]))
+      val unitEvals = unitDepIds map { case (id,uuids) =>
+        val unitTry = Try(graph.traversal().V().has("uuid",uuids._1).next())
+        val dependentUnitTry = Try(graph.traversal().V().has("uuid",uuids._2).next())
+        val isValid = for {
+          unit <- unitTry
+          dependentUnit <- dependentUnitTry
+        } yield {
+          val areUnitTypes = Try(unit.value("subjectType").asInstanceOf[SubjectType]) == Success(SUBJECT_UNIT) && Try(dependentUnit.value("subjectType").asInstanceOf[SubjectType]) == Success(SUBJECT_UNIT)
+          val l = Try(unit.value("parentSubject"))
+          val r = Try(dependentUnit.value("parentSubject"))
+          val vsHaveSameParent = l.isSuccess && l == r
+          areUnitTypes && vsHaveSameParent
         }
+        (id, uuids) -> isValid.getOrElse(false)
+      }
+      val offendingUnits = unitEvals.toList.collect { case (ids,b) if ! b => ids}
+      val onlyValidUnitDependencies = offendingUnits.isEmpty
+      if (onlyValidUnitDependencies) {
+        assert(onlyValidUnitDependencies)
+      } else {
+        val (code,color) = colors.next()
+        val depsToPrint = offendingUnits.take(20).map { case (id, (u1, u2)) => s"$color$u1 -[dependentUnit]-> $u2" }.mkString("\n")
+        val uuidList = offendingUnits.flatMap(t => List(t._1, t._2))
+        val orListString = uuidList.take(20).map(u => s"_.has('uuid',$u)").mkString(",")
+        toDisplay += s"g.V().or($orListString).values('uuid').dedup():$code"
+        toDisplay += s"g.V(${offendingUnits.take(20).map(_._1).mkString(",")}):$code"
+        assert(onlyValidUnitDependencies, s"\nNot all UnitDependencies connect SUBJECT_UNIT types with a common parent:\n$depsToPrint\n${Console.RED}")
       }
     }
-  } 
+  }
 } 
 
 // Provider specific test classes:

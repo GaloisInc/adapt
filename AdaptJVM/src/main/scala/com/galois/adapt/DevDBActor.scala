@@ -113,29 +113,31 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
     case cdm15: DBNodeable =>
       nodesReceived += 1
-      // Get the uuid of the node
-      val uuid = cdm15.getUuid
 
-      // Create a new vertex with the properties on the node
-      val props: List[Object] = cdm15.asDBKeyValues.asInstanceOf[List[Object]]
-      assert(props.length % 2 == 0, s"Node ($cdm15) has odd length properties list: $props.")
-      val newVertex: Vertex = graph.addVertex(props: _*)
+      val nodes = (cdm15.getUuid, cdm15.asDBKeyValues, cdm15.asDBEdges) :: cdm15.supportNodes
+      
+      for ((uuid, props, edges) <- nodes) {
 
-      // Add this vertex to the map of vertices we know about and see if it is the destination of
-      // any previous nodes (see next comment for more on this).
-      nodeIds += (uuid -> newVertex)
-      for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
-        fromVertex.addEdge(label, newVertex)
-      missingToUuid -= uuid
+        // Create a new vertex with the properties on the node
+        assert(props.length % 2 == 0, s"Node ($uuid) has odd length properties list: $props.")
+        val newVertex: Vertex = graph.addVertex(props.asInstanceOf[List[Object]]: _*)
 
-      // Recall all edges are treated as outgoing. In general, we expect that the 'toUuid' has
-      // already been found. However, if it hasn't, we add it to a map of edges keyed by the UUID
-      // they point to (for which no corresponding vertex exists, as of yet). 
-      for ((label,toUuid) <- cdm15.asDBEdges)
-        nodeIds.get(toUuid) match {
-          case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil) 
-          case Some(toVertex) => newVertex.addEdge(label, toVertex)
-        }
+        // Add this vertex to the map of vertices we know about and see if it is the destination of
+        // any previous nodes (see next comment for more on this).
+        nodeIds += (uuid -> newVertex)
+        for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
+          fromVertex.addEdge(label, newVertex)
+        missingToUuid -= uuid
+
+        // Recall all edges are treated as outgoing. In general, we expect that the 'toUuid' has
+        // already been found. However, if it hasn't, we add it to a map of edges keyed by the UUID
+        // they point to (for which no corresponding vertex exists, as of yet). 
+        for ((label,toUuid) <- edges)
+          nodeIds.get(toUuid) match {
+            case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil) 
+            case Some(toVertex) => newVertex.addEdge(label, toVertex)
+          }
+      }
 
     case NodeQuery(q) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
