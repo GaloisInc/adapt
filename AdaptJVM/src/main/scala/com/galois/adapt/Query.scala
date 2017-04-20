@@ -62,6 +62,7 @@ import scala.language.existentials
  *                 | traversal '.has(' string ',' literal ')'
  *                 | traversal '.has(' string ',' regex ')'
  *                 | traversal '.has(' string ',' traversal ')'
+ *                 | traversal '.has(' string ',' predicate ')'
  *                 | traversal '.hasLabel(' string ')'
  *                 | traversal '.has(label,' string ')'
  *                 | traversal '.hasId(' long ')'
@@ -224,6 +225,7 @@ object Query {
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~regex~ ")"  ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
+        | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
@@ -446,6 +448,10 @@ object QueryLanguage {
   case class HasTraversal[S,T](traversal: Traversal[S,T], k: Value[String], v: Traversal[_,_]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context), v.buildTraversal(graph, context))
+  }
+  case class HasPredicate[S,T](traversal: Traversal[S,T], k: Value[String], p: Value[P[_]]) extends Traversal[S,T] {
+    def buildTraversal(graph: Graph, context: Map[String, Value[_]]) =
+      traversal.buildTraversal(graph,context).has(k.eval(context), p.eval(context))
   }
   case class HasLabel[S,T](traversal: Traversal[S,T], label: Value[String]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
