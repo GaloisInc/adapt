@@ -55,13 +55,13 @@ case class Event(
     List(("subject",subject)),
     predicateObject.map(p => ("predicateObject",p)),
     predicateObject2.map(p => ("predicateObject2",p)),
-    foldedParameters.map(p => ("parameter",p.getUuid))
+    foldedParameters.flatMap(value => value.tagsFolded.map(tag => ("parameterTagId", tag.tagId)))
   )
 
   def getUuid = uuid
 
-  override val supportNodes =
-    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
+//  override val supportNodes =
+//    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
 }
 
 case object Event extends CDM17Constructor[Event] {
