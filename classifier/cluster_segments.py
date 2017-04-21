@@ -14,8 +14,15 @@ if __name__ == '__main__':
         featureExtractor = FeatureExtractor()
         activityClassifier = UnsupervisedClassifier(provenanceGraph, featureExtractor)
         classification = activityClassifier.classifyNew()
+
+        label2cluster = {}
         for segmentId, label in classification:
-            activity = provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            lbl = 'activity' + str(label)
+            print(lbl)
+            if lbl not in label2cluster.keys():
+                cluster = provenanceGraph.createActivityCluster(lbl)
+                label2cluster[lbl] = cluster['id']
+
+            activity = provenanceGraph.createActivity(segmentId, lbl, clusterId=label2cluster[lbl])
             print("New activity node {} of type '{}' for segment {}.".format(activity['id'],
-                                                                             activity['properties']['activity:type'][0]['value'],
-                                                                             segmentId))
+                            activity['properties']['activity:type'][0]['value'], segmentId))

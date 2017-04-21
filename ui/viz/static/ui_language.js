@@ -35,7 +35,11 @@ var starting_queries = [
         name : "find APTs labeled by DX",
         base_query : "g.V().has(label,'APT')",
         default_values : []
-    }
+    }, {
+            name : "find clusters of activities",
+            base_query : "g.V().has(label,'ActivityCluster')",
+            default_values : []
+        }
 ]
 
 var node_appearance = [
@@ -196,6 +200,14 @@ var node_appearance = [
             return "APT"
         }
     }, {
+        name : "ActivityCluster",
+        is_relevant : function(n) { return n.label === "ActivityCluster" },
+        icon_unicode : "\uf139",
+        size: 30,
+        make_node_label : function(node) {
+            return addr = (node['properties'].hasOwnProperty('cluster:type') ? node['properties']['cluster:type'][0]['value'] : "None")
+        }
+    }, {
         name : "Default",   // This will override anything below here!!!!
         is_relevant : function(n) { return true },
         icon_unicode : "\uf3a6",
@@ -213,6 +225,15 @@ var predicates = [
         is_relevant : function(n) {return n.label === "Segment"},
         floating_query : ".out('segment:activity')",
     }, {
+        name : "Get Activities",
+        is_relevant : function(n) {return n.label === "ActivityCluster"},
+        floating_query : ".in('activity:cluster')",
+    }, {
+        name : "Get Activity Cluster",
+        is_relevant : function(n) {return n.label === "Activity"},
+        floating_query : ".out('activity:cluster')",
+     },
+     {
         name : "Segment Low-level Events",
         is_relevant : function(n) {return n.label === "Segment"},
         floating_query : ".out('segment:includes')",

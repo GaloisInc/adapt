@@ -91,8 +91,16 @@ class TopLevelClassifier(object):
         classification = self.activityClassifier.classifyNew()
 
         self.producer.send("ac-log", b'** Adding Activities to DB. **')
+
+        label2cluster = {}
         for segmentId, label in classification:
-            activity = self.provenanceGraph.createActivity(segmentId, 'activity' + str(label))
+            lbl = 'activity' + str(label)
+            print(lbl)
+            if lbl not in label2cluster.keys():
+                cluster = self.provenanceGraph.createActivityCluster(lbl)
+                label2cluster[lbl] = cluster['id']
+
+            activity = self.provenanceGraph.createActivity(segmentId, lbl, clusterId=label2cluster[lbl])
             self.producer.send("ac-log",
                                bytes("new activity node {} of type '{}' for segment {}.".format(activity['id'],
                                                                                                 activity['properties']['activity:type'][0]['value'],
