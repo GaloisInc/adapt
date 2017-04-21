@@ -11,8 +11,9 @@ import com.galois.adapt.cdm17._
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
-import akka.kafka.{ConsumerSettings, ProducerSettings}
+import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
 import akka.kafka.scaladsl.Producer
+import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
 import org.apache.kafka.common.serialization.ByteArraySerializer
@@ -37,8 +38,9 @@ object Streams {
     }
   )
 
-  def kafkaConsumer(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]]) = RunnableGraph.fromGraph(
+  def kafkaIngest(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
     GraphDSL.create() { implicit graph =>
+      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{msg => println(msg); msg}.map(msg => msg.committableOffset.commitScaladsl()) ~> Sink.ignore
       ClosedShape
     }
   )

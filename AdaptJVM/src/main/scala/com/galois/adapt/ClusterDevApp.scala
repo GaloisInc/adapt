@@ -20,7 +20,7 @@ import akka.kafka.ProducerSettings
 import akka.kafka.scaladsl.Producer
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, RunnableGraph, Sink, Source}
-import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 import akka.kafka._
 
 import scala.collection.JavaConversions._
@@ -164,11 +164,18 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
       childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
     )
 
-   case "kafkaProducer" =>
+    case "kafkaProducer" =>
       val file = config.getStringList("adapt.loadfiles").head
-      val producerSettings = ProducerSettings(config, new ByteArraySerializer, new ByteArraySerializer)
+      val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
       val streamActor = {
         context.actorOf(Props(classOf[GraphRunner], Streams.kafkaProducer(file, producerSettings, "kafkaTest")))
+      }
+      childActors = childActors + (roleName -> Set(streamActor))
+
+    case "kafkaIngest" =>
+      val consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]] = ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer)
+      val streamActor = {
+        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaIngest(consumerSettings, "kafkaTest")))
       }
       childActors = childActors + (roleName -> Set(streamActor))
 
