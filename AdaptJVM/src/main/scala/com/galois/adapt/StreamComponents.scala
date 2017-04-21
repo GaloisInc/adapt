@@ -792,10 +792,16 @@ object TitanUtils {
    * The following also sets up a key index for UUIDs.
    */
   val graph = {
-    val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
+    val graph = TitanFactory.build.set("storage.backend","cassandra")
+                                  .set("storage.hostname","localhost")
+                                  .open
 
     val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
+    
+    // This allows multiple edges when they are labelled 'tagId'
     management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
+    
+    // This makes a unique index for 'uuid'
     if (null == management.getGraphIndex("byUuidUnique")) {
     
       var idKey = if (management.getPropertyKey("uuid") != null) {
@@ -826,32 +832,74 @@ object TitanUtils {
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph) = Flow[CDM17]
+  def titanWrites(graph: TitanGraph, buffer: Int, time: FiniteDuration) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
- //   .mapAsync(1)(identity)                     // TODO: what does this do?
-    .groupedWithin(10000, 10 second)
+ //   .mapAsync(1)(identity)                 // TODO: what does this do? It was in the blog post example
+    .groupedWithin(buffer, time)
     .map{ cdms =>
       println("opened transaction")
       val transaction = graph.newTransaction()
-      
+
+      // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
+      // during this transaction (since we can't look those up in the usual manner).
+      val newVertices = collection.mutable.Map.empty[UUID,Vertex]
+
+      // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
+      // handle cases where nodes are out of order).
+      var missingToUuid = collection.mutable.Map.empty[UUID, Set[(Vertex,String)]]
+
+      // Accordingly, we define a function which lets us look up a vetex by UUID - first by checking
+      // the 'newVertices' map, then falling back on a query to Titan.
+      def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
+        val iterator = graph.traversal().V().has("uuid",uuid)
+        if (iterator.hasNext()) { Some(iterator.next()) } else { None }
+      }
+
+      // Process all of the nodes
       for (cdm <- cdms) {
         val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
         assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
         val newTitanVertex: TitanVertex = transaction.addVertex(props: _*)
+        newVertices += (cdm.getUuid -> newTitanVertex)
 
         for ((label,toUuid) <- cdm.asDBEdges) {
-          val i = graph.traversal().V().has("uuid",cdm.getUuid)
-          if (i.hasNext) {
-            val toTitanVertex = i.next()
-            newTitanVertex.addEdge(label, toTitanVertex)
+
+          findNode(toUuid) match {
+            case Some(toTitanVertex) =>
+              println("Adding an edge to a vertex...")
+              newTitanVertex.addEdge(label, toTitanVertex)
+              println("Added the edge.")
+            case None =>
+              missingToUuid(toUuid) =missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
           }
         }
       }
+      
+      // Try to complete missing edges. If the node pointed to is _still_ not found, we
+      // synthetically create it.
+      var nodeCreatedCounter = 0
+      var edgeCreatedCounter = 0
+ 
+      for ((uuid,edges) <- missingToUuid; (fromTitanVertex,label) <- edges) {
+       
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        val toTitanVertex = findNode(uuid) getOrElse {
+          nodeCreatedCounter += 1
+          val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+          newVertices += (uuid -> newNode)
+          newNode
+        }
 
+        // Create the missing edge
+        edgeCreatedCounter += 1
+        fromTitanVertex.addEdge(label, toTitanVertex)
+      }
+
+      println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
+      
       transaction.commit()
       println("Committed transaction")
     }
-
 }
 
 
@@ -870,11 +918,11 @@ object TestGraph extends App {
   //  .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 //    .via(Streams.titanWrites(graph))
 
-  val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
+//  val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
   // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
-  val commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](120 seconds, 120 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+//  val commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+//    .merge(Source.tick[ProcessingCommand](120 seconds, 120 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
   val dbFilePath = "/Users/atheriault/Desktop/map.db"
@@ -882,10 +930,10 @@ object TestGraph extends App {
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
 
-//  TitanUtils.titanWrites(TitanUtils.graph)
-//    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
+  TitanUtils.titanWrites(TitanUtils.graph, 10000, 5 seconds)
+    .runWith(source /*.via(FlowComponents.printCounter("titan write count", 1))*/ , Sink.ignore)
 
-  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+/*  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
     .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
 
   FlowComponents.fileFeatureGenerator(commandSource, db)
@@ -893,7 +941,7 @@ object TestGraph extends App {
 
   FlowComponents.processFeatureGenerator(commandSource, db)
     .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
-
+*/
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 //
