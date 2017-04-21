@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.util.UUID
 
 import akka.actor.Actor
@@ -17,8 +17,8 @@ import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
 import org.apache.kafka.common.serialization.ByteArraySerializer
-import org.apache.avro.io.EncoderFactory
-import org.apache.avro.specific.SpecificDatumWriter
+import org.apache.avro.io.{DecoderFactory, EncoderFactory}
+import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
 
 object Streams {
 
@@ -40,7 +40,15 @@ object Streams {
 
   def kafkaIngest(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
     GraphDSL.create() { implicit graph =>
-      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{msg => println(msg); msg}.map(msg => msg.committableOffset.commitScaladsl()) ~> Sink.ignore
+      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
+        val bais = new ByteArrayInputStream(msg.record.value())
+        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+        val cdm = new RawCDM15Type(elem.getDatum)
+        msg.committableOffset.commitScaladsl()
+        cdm
+      }.map(CDM17.parse).map(println) ~> Sink.ignore
       ClosedShape
     }
   )
