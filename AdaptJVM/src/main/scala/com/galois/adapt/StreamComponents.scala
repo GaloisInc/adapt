@@ -801,6 +801,29 @@ object TitanUtils {
     // This allows multiple edges when they are labelled 'tagId'
     management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
     
+    val edgeLabels = List("localPrincipal", "subject", "predicateObject", "predicateObject2",
+    "parameterTagId", "flowObject", "prevTagId", "parentSubject", "dependentUnit", "unit",
+    "tag")
+    for (edgeLabel <- edgeLabels)
+      management.makeEdgeLabel(edgeLabel).make()
+
+    // TODO: all property keys should specify the dataType.
+//    management.makePropertyKey("permission").dataType(classOf[?]).make()
+    val propertyKeys = List("permission", "epoch", "type", "hash", "uuid", "sequence", "eventType",
+    "threadId", "subjectUuid", "timestampNanos", "predicateObjectUuid", "predicateObjectPath",
+    "predicateObject2Uuid", "predicateObject2Path", "name", "parameters", "location", "size",
+    "programPoint", "fileObjectType", "fileDescriptor", "localPrincipalUuid", "peInfo", "hashes",
+    "memoryAddress", "pageNumber", "pageOffset", "localAddress", "localPort", "remoteAddress",
+    "remotePort", "ipProtocol", "userId", "principalType", "groupIds", "username", "flowObjectUuid",
+    "systemCall", "programPoint", "prevTagIdUuid", "opcode", "tagIds", "itag", "ctag", "key", "value",
+    "srcSinkType", "subjectType", "cid", "startTimestampNanos", "parentSubjectUuid", "unitId",
+    "iteration", "count", "cmdLine", "privilegeLevel", "importedLibraries", "exportedLibraries",
+    "numValueElements", "unitUuid", "dependentUnitUuid", "sourceFileDescriptor", "sinkFileDescriptor",
+    "valueType", "valueDataType", "isNull", "name", "runtimeDataType", "valueBytes", "tag",
+    "components")
+    for (propertyKey <- propertyKeys)
+      management.makePropertyKey(propertyKey).make()
+    
     // This makes a unique index for 'uuid'
     if (null == management.getGraphIndex("byUuidUnique")) {
     
@@ -930,7 +953,8 @@ object TestGraph extends App {
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
 
-  TitanUtils.titanWrites(TitanUtils.graph, 10000, 5 seconds)
+TitanUtils.titanWrites(TitanUtils.graph, 10000, 5 seconds)
+    .recover{ case e: Throwable => e.printStackTrace() }
     .runWith(source /*.via(FlowComponents.printCounter("titan write count", 1))*/ , Sink.ignore)
 
 /*  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)

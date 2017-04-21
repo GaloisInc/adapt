@@ -31,7 +31,7 @@ case class Value(
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     runtimeDataType.fold[List[Any]](List.empty)(v => List("runtimeDataType", v)) ++
     valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v.toString)) ++
-    tag.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tag", v.map(_.asDBKeyValues).mkString(", "))) ++
+    tag.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tagUuid", v.map(_.asDBKeyValues).mkString(", "))) ++
     components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 
   val getUuid = UUID.randomUUID()
