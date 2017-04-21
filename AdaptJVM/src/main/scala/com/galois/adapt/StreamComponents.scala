@@ -11,9 +11,10 @@ import com.galois.adapt.cdm17._
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
-import akka.kafka.ProducerSettings
+import akka.kafka.{ConsumerSettings, ProducerSettings}
 import akka.kafka.scaladsl.Producer
 import org.apache.kafka.clients.producer.ProducerRecord
+import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.avro.io.EncoderFactory
 import org.apache.avro.specific.SpecificDatumWriter
@@ -22,7 +23,7 @@ object Streams {
 
   def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>
-      val datums = CDM17.readAvroAsTCCDMDatum(file)
+      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
       Source.fromIterator(() => datums).map(elem => {
         val baos = new ByteArrayOutputStream
         val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
@@ -32,6 +33,12 @@ object Streams {
         baos.toByteArray
       }).map(elem => new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)) ~> Producer.plainSink(producerSettings)
 
+      ClosedShape
+    }
+  )
+
+  def kafkaConsumer(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]]) = RunnableGraph.fromGraph(
+    GraphDSL.create() { implicit graph =>
       ClosedShape
     }
   )
