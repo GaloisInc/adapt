@@ -2,7 +2,7 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
-import java.io.{File, FileWriter, FileReader, BufferedReader, IOException}
+import java.io._
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.stream._
@@ -10,7 +10,7 @@ import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
 
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, ListBuffer}
+import scala.collection.mutable.{ListBuffer, Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
 import org.mapdb.DB.TreeSetMaker
@@ -21,12 +21,14 @@ import scala.collection.mutable
 import scala.sys.process._
 import scala.concurrent.duration._
 import scala.util.Random
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future}
 
-import com.thinkaurelius.titan.core.{TitanTransaction, TitanFactory, TitanGraph, TitanVertex, Multiplicity}
-import com.thinkaurelius.titan.graphdb.database.management.{ManagementSystem}
-import com.thinkaurelius.titan.core.schema.{TitanGraphIndex,SchemaAction, SchemaStatus}
-import org.apache.tinkerpop.gremlin.structure.{Graph, Edge, Vertex}
+import com.thinkaurelius.titan.core._
+import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
+import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus, TitanGraphIndex}
+import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
+import scala.io.{Source => FileSource}
+
 
 case class SubjectEventCount(
   subjectUuid: UUID,
@@ -231,14 +233,14 @@ object Streams {
               Nil
 
             case t: AdaptProcessingInstruction =>
-              (subjectUuids.toList.map(uuid =>
+              subjectUuids.toList.map(uuid =>
                 SubjectEventCount(
                   uuid,
                   filesExecuted.get(uuid).map(_.size).getOrElse(0),
                   netflowsConnected.get(uuid).map(_.size).getOrElse(0),
                   typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
                 ).asInstanceOf[Any]
-              ) ++ List(t))
+              ) ++ List(t)
           }
         } ~> iforest(ec) ~> sink
       
@@ -275,9 +277,6 @@ object FlowComponents {
         excluded.contains(tup._1)
       } // TODO: why are there these special cases?!?!?!?!?
       .groupBy(Int.MaxValue, _._1) // TODO: Limited to ~4 billion unique UUIDs!!!
-      //      .via(sortedSetEmitter(commandSource, dbMap))
-      //  }
-      //  def sortedSetEmitter(commandSource: Source[ProcessingCommand,_], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]]) = Flow[(UUID,Event)]
       .merge(commandSource)
       .statefulMapConcat { () =>
         var uuid: Option[UUID] = None
@@ -447,6 +446,7 @@ object FlowComponents {
   def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
     predicateTypeLabeler(commandSource, db)
       .collect{ case ("NetFlowObject", predUuid, event) => (predUuid, event) }
+      .via(printCounter("NetFlow counter", 100))
       .via(sortedEventAccumulator(_._1, commandSource, db))
       .via(netFlowFeatureExtractor)
   }
@@ -461,6 +461,7 @@ object FlowComponents {
 
     predicateTypeLabeler(commandSource, db)
       .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
+      .via(printCounter("NetFlow or File Counter", 100))
       .groupBy(Int.MaxValue, _._3.subject)
       .merge(commandSource)
       .statefulMapConcat{ () =>
@@ -469,6 +470,11 @@ object FlowComponents {
         val fileEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
         val netFlowUuids = MutableSet.empty[UUID]
         val netFlowEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+
+
+        // TODO: Use the right EC!  (if using Futures below)
+        import scala.concurrent.ExecutionContext.Implicits.global
+
 
         {
           case Tuple3("NetFlowObject", uuid: UUID, event: Event) =>
@@ -482,24 +488,27 @@ object FlowComponents {
             List.empty
 
           case CleanUp =>
-            if (fileEvents.nonEmpty) {
-              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-              fileEvents.foreach { case (u, es) =>
-                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
-              }
-              dbMap.putAll(mergedEvents.asJava)
-              fileUuids ++= fileEvents.keySet
-              fileEvents.clear()
-            }
-            if (netFlowEvents.nonEmpty) {
-              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-              netFlowEvents.foreach { case (u, es) =>
-                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
-              }
-              dbMap.putAll(mergedEvents.asJava)
-              netFlowUuids ++= netFlowEvents.keySet
-              netFlowEvents.clear()
-            }
+//            if (netFlowEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              netFlowEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+//              }
+//              dbMap.putAll(mergedEvents.asJava)
+//              netFlowUuids ++= netFlowEvents.keySet
+//              netFlowEvents.clear()
+//            }
+//            if (fileEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              fileEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ es
+//              }
+//
+//              // This gets slower as Event Set gets larger.
+//              dbMap.putAll(mergedEvents.asJava)
+//
+//              fileUuids ++= fileEvents.keySet
+//              fileEvents.clear()
+//            }
             List.empty
 
           case Emit =>
@@ -510,6 +519,7 @@ object FlowComponents {
             netFlowUuids.foreach(u =>
               netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
                 netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+
             fileEvents.toList.map{ case (u, fes) => ((u, fes), netFlowEvents.toSet) }
         }
       }
@@ -690,26 +700,26 @@ object FlowComponents {
     .map { case ((processUuid, processEventSet), netFlowEventSets, fileEventSets) =>
       val eList = processEventSet.toList
       val m = MutableMap.empty[String, Any]
-      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
-      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
-      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows
-      m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
+//      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
+//      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
+//      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows
+//      m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
       // TODO: consider emitting the collected Process Tree
       m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
-      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
-      m("countOfAllConnect+AcceptEventsToPorts22or443") = "TODO"                          // TODO: needs pairing with NetFlows
-      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows
-      m("isReferringPasswordFile") = "I HAVE NO IDEA WHAT THIS MEANS"                     // TODO: ¯\_(ツ)_/¯
-      m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = "TODO"                    // TODO: needs pairing with NetFlows
+//      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
+//      m("countOfAllConnect+AcceptEventsToPorts22or443") = "TODO"                          // TODO: needs pairing with NetFlows
+//      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows
+//      m("isReferringPasswordFile") = "I HAVE NO IDEA WHAT THIS MEANS"                     // TODO: ¯\_(ツ)_/¯
+//      m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = "TODO"                    // TODO: needs pairing with NetFlows
       m("changesFilePermissionsThenExecutesIt") = eList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
       m("executedThenImmediatelyDeletedAFile") = eList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
-      m("readFromNetFlowThenDeletedFile") = "TODO"                                        // TODO: needs pairing with NetFlows
+//      m("readFromNetFlowThenDeletedFile") = "TODO"                                        // TODO: needs pairing with NetFlows
       // TODO: consider: process takes any local action after reading from NetFlow
       m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
-      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
-      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
+//      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
+//      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
       m("isAccessingTempDirectory") = eList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
-      m("thisProcessIsTheObjectOfA_SETUID_Event") = "TODO"                                // TODO: needs process UUID from predicateObject field (not subject)
+//      m("thisProcessIsTheObjectOfA_SETUID_Event") = "TODO"                                // TODO: needs process UUID from predicateObject field (not subject)
       m("totalBytesSentToNetFlows") = eList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
       m("totalBytesReceivedFromNetFlows") = eList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
       processEventTypes.foreach( t =>
@@ -731,12 +741,22 @@ object FlowComponents {
 
 
   def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    var counter = 0
+    var counter = 0L
+    var originalStartTime = 0L
+    var lastTimestampNanos = 0L
 
     { case item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
+        if (lastTimestampNanos == 0L) {
+          originalStartTime = System.nanoTime()
+          lastTimestampNanos = System.nanoTime()
+        }
         counter = counter + 1
-        if (counter % every == 0)
-          println(s"$name ingested: $counter")
+        if (counter % every == 0) {
+          val nowNanos = System.nanoTime()
+          val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
+          println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second")
+          lastTimestampNanos = System.nanoTime()
+        }
         List[T](item)
     }
   }
@@ -760,6 +780,64 @@ object FlowComponents {
         } else row
       }
     }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)
+
+
+  def anomalyScoreCalculator(commandSource: Source[ProcessingCommand,_]) = Flow[(UUID, mutable.Map[String,Any])]
+    .merge(commandSource)
+    .statefulMapConcat{ () =>
+      var matrix = MutableMap.empty[UUID, String]
+      var headerOpt: Option[String] = None
+
+      {
+        case Tuple2(uuid: UUID, featureMap: mutable.Map[String,Any]) =>
+          if (headerOpt.isEmpty) headerOpt = Some(s"uuid,${featureMap.toList.sortBy(_._1).map(_._1).mkString(",")}\n")
+          val row = s"${featureMap.toList.sortBy(_._1).map(_._2).mkString(",")}\n"
+          matrix(uuid) = row
+          List.empty
+
+        case CleanUp => List.empty
+
+        case Emit =>
+          val randomNum = Random.nextLong()
+//          val inputFile = new File(s"/Users/ryan/Desktop/temp.in_$randomNum.csv")
+//          val outputFile = new File(s"/Users/ryan/Desktop/temp.out_$randomNum.csv")
+          val inputFile  = File.createTempFile(s"input_$randomNum",".csv")
+          val outputFile = File.createTempFile(s"output_$randomNum",".csv")
+          inputFile.deleteOnExit()
+          outputFile.deleteOnExit()
+          val writer: FileWriter = new FileWriter(inputFile)
+          writer.write(headerOpt.get)
+          matrix.map(row => s"${row._1},${row._2}").foreach(writer.write)
+          writer.close()
+          val result = Seq[String](
+            this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
+            "-i", inputFile.getCanonicalPath,   // input file
+            "-o", outputFile.getCanonicalPath,  // output file
+            "-m", "1",                          // ignore the first column
+            "-t", "100"                         // number of trees
+          ).!!
+          println(s"AD output: $result")
+
+          val normalizedFile = new File(s"/Users/ryan/Desktop/normalized_$randomNum.csv")
+          normalizedFile.deleteOnExit()
+
+          val normalizationCommand = Seq(
+            "Rscript",
+            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
+            "-i", outputFile.getCanonicalPath,       // input file
+            "-o", normalizedFile.getCanonicalPath)   // output file
+
+          val normResult = normalizationCommand.!!
+          println(s"Normalization output: $normResult")
+
+          val fileLines = FileSource.fromFile(normalizedFile).getLines()
+          fileLines.next()  // Throw away the header row
+          fileLines.take(20).toSeq.map{ l =>
+            val columns = l.split(",")
+            UUID.fromString(columns.head) -> columns.last.toFloat
+          }.toList
+      }
+    }
 
 
   type Milliseconds = Long
@@ -827,13 +905,13 @@ object TitanUtils {
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
   def titanWrites(graph: TitanGraph) = Flow[CDM17]
-    .collect { case cdm: DBNodeable => cdm }
- //   .mapAsync(1)(identity)                     // TODO: what does this do?
-    .groupedWithin(10000, 10 second)
-    .map{ cdms =>
+    .collect{ case cdm: DBNodeable => cdm }
+    .groupedWithin(10000, 10 seconds)
+    .toMat(
+      Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
       println("opened transaction")
       val transaction = graph.newTransaction()
-      
+
       for (cdm <- cdms) {
         val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
         assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
@@ -847,12 +925,14 @@ object TitanUtils {
           }
         }
       }
-
       transaction.commit()
       println("Committed transaction")
     }
+  )(Keep.right)
 
 }
+
+
 
 
 object TestGraph extends App {
@@ -862,22 +942,24 @@ object TestGraph extends App {
 
  
 
-  val path = "/Users/atheriault/Downloads/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
+  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
-//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
+    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
+    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
     .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
-  //  .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 //    .via(Streams.titanWrites(graph))
 
   val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
   // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
-  val commandSource = Source.tick[ProcessingCommand](1 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](120 seconds, 120 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+  val fastCommandSource = Source.tick[ProcessingCommand](6 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+    .merge(Source.tick[ProcessingCommand](20 seconds, 20 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 //    .via(FlowComponents.printCounter("Command Source", 1))
 
-  val dbFilePath = "/Users/atheriault/Desktop/map.db"
+  val slowCommandSource = Source.tick[ProcessingCommand](30 seconds, 30 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+
+  val dbFilePath = "/Users/ryan/Desktop/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
@@ -885,18 +967,44 @@ object TestGraph extends App {
 //  TitanUtils.titanWrites(TitanUtils.graph)
 //    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
 
-  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
-    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
+//  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
 
-  FlowComponents.fileFeatureGenerator(commandSource, db)
-    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+//  FlowComponents.fileFeatureGenerator(commandSource, db)
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 
-  FlowComponents.processFeatureGenerator(commandSource, db)
-    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
+
+
+//  Flow[CDM17].collect{ case e: Event => e }.groupBy(Int.MaxValue, _.toString).mergeSubstreams.via(FlowComponents.printCounter[Event]("Event counter", 100)).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.ignore)
+
+  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
+
+
+
+//  FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db)
+//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+//    .recover{ case e: Throwable => e.printStackTrace() }
+//    .runWith(source, printSink)
+
+//  FlowComponents.fileFeatureGenerator(fastCommandSource, db)
+//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+//    .recover{ case e: Throwable => e.printStackTrace() }
+//    .runWith(source, printSink)
+
+
+//  FlowComponents.processFeatureGenerator(fastCommandSource, db)
+//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+//    .recover{ case e: Throwable => e.printStackTrace() }
+//    .runWith(source.take(3000000), printSink)
+
+//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
 
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
 //
+
+
+
 
 //  FlowComponents.testFileFeatureExtractor(commandSource, db)
 //    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
