@@ -1,6 +1,6 @@
-val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on other having that recent a version
-val akkaV = "2.4.16"
-val akkaHttpV = "10.0.0"
+val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on others having that recent a version
+val akkaV = "2.4.17"
+val akkaHttpV = "10.0.5"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
@@ -9,14 +9,6 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.1",
   organization := "com.galois",
   scalaVersion := scalaV,
-//  scalacOptions := Seq(
-//    "-unchecked",
-//    "-deprecation",
-//    "-feature",
-//    "-Yno-adapted-args",
-//    "-Ywarn-numeric-widen",
-//    "-Ywarn-unused"
-//  ),
 
   libraryDependencies ++= Seq(
     "com.typesafe" % "config" % "1.3.1",
@@ -33,10 +25,17 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     "com.typesafe.akka" %% "akka-persistence" % akkaV,
     "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
+    "com.typesafe.akka" %% "akka-stream" % akkaV,
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.14",
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18"
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
+    "org.mapdb" % "mapdb" % "3.0.3",
+    // Titan related
+    "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
+    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0",
+    "org.apache.cassandra" % "cassandra-all" % "2.1" 
   ),
 
   {

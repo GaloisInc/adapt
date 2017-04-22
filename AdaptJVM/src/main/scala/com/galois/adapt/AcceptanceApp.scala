@@ -8,7 +8,7 @@ package com.galois.adapt
  * That config is in 'src/main/resources/accept.conf'
  */
 object AcceptanceApp {
-  println(s"Spinning up an acceptance system.")
+  println(s"Spinning up an acceptance testing system.")
 
   def run(): Unit = {
     ClusterDevApp.run(Application.config.getConfig("accept") withFallback Application.config)

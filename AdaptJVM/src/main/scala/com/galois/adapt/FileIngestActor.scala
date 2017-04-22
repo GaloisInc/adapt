@@ -6,15 +6,18 @@ import collection.mutable.Queue
 import scala.util.{Try,Success,Failure}
 
 class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM17] {
+  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[CDM17] with ReportsStatus {
 
-  log.info("FileIngestActor created")
+//  log.info("FileIngestActor created")
+
+
+  def process = PartialFunction.empty
 
   val dependencies = List.empty
   val subscriptions = Set[Subscription]()
 
   val jobQueue = Queue.empty[IngestFile]
-  var errors = Nil
+  var errors: List[Throwable] = Nil
 
   /*
    * This function checks to see if it has the right number of subscribers and something to ingest.
@@ -35,11 +38,6 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
       log.info(s"Starting ingest from file: ${j.path}" + j.loadLimit.fold("")(i => "  of " +
       i.toString + s" CDM statements"))
 
-      log.info(s"Ingesting from file: ${j.path}")
-      log.info("subscribers: " + subscribers.toString)
-
-      Thread.sleep(2000)
-
       CDM17.readData(j.path, j.loadLimit) match {
         case Failure(t) =>
           // Can't ingest file
@@ -52,7 +50,9 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
   
           var counter = 0
           data.foreach {
-            case Failure(t) => broadCastUnsafe(ErrorReadingStatement(t))
+            case Failure(t) =>
+              errors = t :: errors
+              broadCastUnsafe(ErrorReadingStatement(t))
             case Success(cdm) =>
               broadCast(cdm)
               counter += 1
@@ -64,17 +64,22 @@ class FileIngestActor(val registry: ActorRef, val minSubscribers: Int)
       broadCastUnsafe(DoneFile(j.path))
     }
     
-    println("Done ingest")
+//    println("Finished ingest")
     // Emptied job queue
     broadCastUnsafe(DoneIngest)
   }
 
   def beginService() = {
-    log.info("Ingest Actor is starting up")
+//    log.info("Ingest Actor is starting up")
     initialize()
     processJobQueue()
   }
   def endService() = ()  // TODO
+
+  def statusReport = Map(
+    "job_queue_size" -> jobQueue.size,
+    "errors" -> errors.groupBy(_.toString).mapValues(_.size)
+  )
 
   override def receive: PartialFunction[Any,Unit] = ({
     case msg @ IngestFile(path, limitOpt) =>

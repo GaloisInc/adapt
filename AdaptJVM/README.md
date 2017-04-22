@@ -17,11 +17,11 @@ This should hopefully download all dependencies, compile everything, and start r
 should now see a rapidly increasing count of the number of ingested events. Once this is done, you
 will see the message
 
-        Server online at http://localhost:8080/
+        Server online at http://0.0.0.0:8080/
 
     Press RETURN to stop..
 
-At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly. However, there are some restrictions on the queries you can make... 
+At this point you can open up the interactive UI at <http://0.0.0.0:8080/> or start querying the REST api directly. However, there are some restrictions on the queries you can make...
 
 ### Gremlin queries
 
@@ -55,15 +55,15 @@ Here are some examples of valid queries:
 
 After you've started up the system using `sbt run` (passing in whatever options you may need) and all data has been ingested, you can query the loaded data via a REST API. Depending on the type of result you expect back, POST to one of
 
-  * for querying vertices <http://localhost:8080/query/nodes>
-  * for querying edges <http://localhost:8080/query/edges>
-  * for any other raw query <http://localhost:8080/query/generic>
+  * for querying vertices <http://0.0.0.0:8080/query/nodes>
+  * for querying edges <http://0.0.0.0:8080/query/edges>
+  * for any other raw query <http://0.0.0.0:8080/query/generic>
   
 your string query with the key `"query"`. You'll get back an appropriate JSON string reponse for the first two of these, and a list of raw strings for the third. In Python, for the query `g.V().limit(10)`, that could look like
 
 ```python
 >>> import requests
->>> requests.post('http://localhost:8080/query/nodes', data={'query': 'g.V().limit(10)'}).json
+>>> requests.post('http://0.0.0.0:8080/query/nodes', data={'query': 'g.V().limit(10)'}).json
 [{'type': 'vertex', 'id': 0, 'label': 'Principal', 'properties': {'source': [{'id': 3, 'value': 'SOURCE_FREEBSD_DTRACE_CADETS'}], 'uuid': [{'id': 1, 'value':  # output snipped
 ```
 

@@ -21,7 +21,7 @@ import scala.language.postfixOps
 
 class AcceptanceTestsActor(val registry: ActorRef)
   extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
-  
+    
   import context.dispatcher
  
   val dependencies = "DevDBActor" :: "UIActor" :: Nil
@@ -32,6 +32,9 @@ class AcceptanceTestsActor(val registry: ActorRef)
 
   def beginService(): Unit = initialize()
   def endService(): Unit = ()
+
+
+  def statusReport = Map()
 
   // Some stats to keep
   var failedStatements: Int = 0

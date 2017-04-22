@@ -165,12 +165,12 @@ object Query {
       var arrs: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
-      def lng: Parser[Value[java.lang.Long]] = 
+      def lng: Parser[Value[java.lang.Long]] =
         ( variable(lngs)
         | wholeNumber ~ "L" ^^ { case x~_ => Raw(x.toLong) }
         | wholeNumber       ^^ { x => Raw(x.toLong) }
         ).asInstanceOf[Parser[Value[java.lang.Long]]]
-      def int: Parser[Value[Int]] = 
+      def int: Parser[Value[Int]] =
         ( variable[Int](ints)
         | wholeNumber ~ "I" ^^ { case x~_ => Raw(x.toInt) }
         )
@@ -179,10 +179,11 @@ object Query {
         | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         )
-      def uid: Parser[Value[java.util.UUID]] = variable(uids) | 
+      def uid: Parser[Value[java.util.UUID]] = variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(java.util.UUID.fromString(s))
         }
+
       def uidArr: Parser[Value[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
       def lngArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
       def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
@@ -206,7 +207,7 @@ object Query {
          ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
            case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
          }
-      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] = 
+      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
         | "lte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawLtePred(l) }
@@ -260,7 +261,7 @@ object Query {
         | ".emit()"                        ^^ { case _          => Emit(_: Tr) }
         | ".emit(" ~ trav ~ ")"            ^^ { case _~t~_      => EmitTrav(_: Tr, t) }
         | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
-        | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s) 
+        | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s)
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
@@ -290,7 +291,7 @@ object Query {
         ).asInstanceOf[Parser[Tr => Tr]]
 
       // Possible sources for traversals
-      def travSource: Parser[Tr] = 
+      def travSource: Parser[Tr] =
         ( "g.V(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Vertices(ids) }
         | "g.V(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Vertices(RawArr(ids)) }
         | "g.E(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Edges(ids) }
@@ -299,7 +300,7 @@ object Query {
         | "_(" ~ repsep(lng,",") ~ ")"              ^^ { case _~ids~_ => Anon(RawArr(ids)) }
         ).asInstanceOf[Parser[Tr]]
 
-      // Parser for a traversal 
+      // Parser for a traversal
       def trav: Parser[Tr] = travSource ~ rep(travSuffix) ^^ {
           case src ~ sufs => sufs.foldLeft[Tr](src)((t,suf) => suf(t))
         }
@@ -307,13 +308,13 @@ object Query {
       // Queries are _not_ left recursive (unlike the traversals), but we still need to abstract
       // prefixes (and then repeat them) so that variables of different types get noted before we
       // get to the queries that use them.
-      def queryPrefix: Parser[Qy => Qy] = 
+      def queryPrefix: Parser[Qy => Qy] =
         ( ident ~ "=" ~ int ~ ";"               ^^ { case i~_~v~_ => ints += i; AssignLiteral(i,v,_: Qy).asInstanceOf[Qy] }
         | ident ~ "=" ~ lng ~ ";"               ^^ { case i~_~v~_ => lngs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ str ~ ";"               ^^ { case i~_~v~_ => strs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ (intArr|strArr|lngArr) ~ ";" ^^ { case i~_~v~_ => arrs += i; AssignLiteral(i,v,_: Qy) }
         | ident ~ "=" ~ trav ~ ";"              ^^ { case i~_~t~_ => arrs += i; AssignTraversal(i,t,_: Qy) }
-        | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) } 
+        | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) }
         ).asInstanceOf[Parser[Qy => Qy]]
 
 
@@ -322,7 +323,7 @@ object Query {
           case pres ~ src => pres.foldRight[Qy](FinalTraversal(src))((pre,t) => pre(t))
         }
     }
- 
+
     Parsers.parseAll(Parsers.query, input.filterNot(_.isWhitespace)) match {
       case Parsers.Success(matched, _) => Success(matched)
       case Parsers.Error(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
@@ -331,7 +332,6 @@ object Query {
     }
   }
 }
-
 
 // Contains all the AST of the query language - inside an object to avoid name collisions
 object QueryLanguage {
@@ -344,7 +344,7 @@ object QueryLanguage {
     def run(graph: Graph, context: Map[String,Value[_]] = Map()): Try[Stream[T]]
     def apply(graph: Graph): Try[Stream[T]] = run(graph)
   }
-
+  
   case class AssignLiteral[E](name: String, value: Value[_], `then`: Query[E]) extends Query[E] {
     override def run(graph: Graph, context: Map[String,Value[_]]) = `then`.run(graph, context + (name -> value))
   }
@@ -356,7 +356,7 @@ object QueryLanguage {
       } yield s1
   }
   case class DiscardTraversal[S,E](value: Traversal[_,_], `then`: Query[E]) extends Query[E] {
-    override def run(graph: Graph, context: Map[String,Value[_]]) = for {
+      override def run(graph: Graph, context: Map[String,Value[_]]) = for {
         _ <- Try { value.buildTraversal(graph, context) }
         s1 <- `then`.run(graph, context)
       } yield s1
@@ -402,11 +402,11 @@ object QueryLanguage {
   case class RawGtePred[T](comp: Value[T]) extends Value[P[T]] {
     override def eval(context: Map[String,Value[_]]): P[T] = P.gte(comp.eval(context))
   }
-  case class RawBetweenPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
-  }
   case class RawWithinPred[T](col: Value[Seq[T]]) extends Value[P[T]] {
     override def eval(context: Map[String,Value[_]]): P[T] = P.within(col.eval(context): _*)
+  }
+  case class RawBetweenPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
+    override def eval(context: Map[String,Value[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
   }
   case class Variable[T](name: String) extends Value[T] {
     override def eval(context: Map[String,Value[_]]): T = context(name).eval(context).asInstanceOf[T]
@@ -542,7 +542,7 @@ object QueryLanguage {
   case class Aggregate[S,E](traversal: Traversal[S,E], key: Value[String]) extends Traversal[S,E] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]])
       = traversal.buildTraversal(graph,context).aggregate(key.eval(context))
-  }
+  } 
   
   // Reduce/extract
   case class Values[S,T,V](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,V] {
@@ -579,7 +579,7 @@ object QueryLanguage {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
       traversal.buildTraversal(graph,context).select(key.eval(context))
   }
-case class SelectMult[S,T](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,java.util.Map[String,T]] {
+  case class SelectMult[S,T](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,java.util.Map[String,T]] {
     override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
       val keys1 = keys.eval(context)
       traversal.buildTraversal(graph,context).select(keys1(0), keys1(1), keys1.drop(2): _*)

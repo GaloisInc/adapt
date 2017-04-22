@@ -21,8 +21,8 @@ object ProductionApp {
     // TODO: Use an actor which distributes to external DB:
     val dbActor = system.actorOf(Props[DevDBActor])
 
-    val bindingFuture = Http().bindAndHandle(Routes.mainRoute(dbActor), interface, port)
+    val bindingFuture = Http().bindAndHandle(Routes.mainRoute(dbActor, List.empty, List.empty), interface, port)
 
-    println(s"Server online at http://localhost:8080/")
+    println(s"Server online at http://0.0.0.0:8080/")
   }
 }

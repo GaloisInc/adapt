@@ -12,11 +12,11 @@ import scala.collection.mutable.{Map => MutableMap}
  * `super.receive`.
  */
 trait BaseActorBehavior { s: Actor with ActorLogging =>
-  def receive: PartialFunction[Any,Unit] = PartialFunction.empty
+  def receive: PartialFunction[Any,Unit] = { case msg => log.error(s"Received unhandled message: $msg") } //PartialFunction.empty
 }
 
 
-trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
+trait ServiceClient extends BaseActorBehavior with ReportsStatus { s: Actor with ActorLogging with SubscriptionActor[_] =>
   lazy val thisName = this.getClass.getSimpleName
 
   val registry: ActorRef
@@ -37,14 +37,14 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
       beginService()
       registry.!(PublishService(thisName, context.self, clusterName))(context.self)
     } else {
-      log.info(s"$thisName is waiting to satisfy more dependencies before publing service availability: $dependencyMap")
+      log.info(s"$thisName is waiting to satisfy more dependencies before publishing service availability: $dependencyMap")
     }
   }
 
   private def handleServiceManagerMessages: PartialFunction[Any,Unit] = {
 
     case ServiceAvailable(serviceName, actorRef) =>
-      log.info(s"$serviceName has announced its availability to $thisName")
+//      log.info(s"$serviceName has announced its availability to $thisName")
       if (dependencyMap.keySet contains serviceName) {
         dependencyMap(serviceName) foreach ( s =>
           log.warning(s"Dependency is already available at actor: $s Replacing with: $actorRef")
@@ -56,7 +56,7 @@ trait ServiceClient extends BaseActorBehavior { s: Actor with ActorLogging =>
       }
 
     case ServiceUnAvailable(serviceName) =>
-      log.info(s"$serviceName has announced its UNavailability to $thisName")
+//      log.info(s"$serviceName has announced its UNavailability to $thisName")
       if (dependencyMap.keySet contains serviceName) {
         dependencyMap += (serviceName -> None)
 //        registry ! UnSubscribeToService()
