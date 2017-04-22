@@ -9,14 +9,6 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.1",
   organization := "com.galois",
   scalaVersion := scalaV,
-//  scalacOptions := Seq(
-//    "-unchecked",
-//    "-deprecation",
-//    "-feature",
-//    "-Yno-adapted-args",
-//    "-Ywarn-numeric-widen",
-//    "-Ywarn-unused"
-//  ),
 
   libraryDependencies ++= Seq(
     "com.typesafe" % "config" % "1.3.1",
@@ -34,11 +26,16 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-persistence" % akkaV,
     "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.14",
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
-    "com.typesafe.akka" %% "akka-stream-kafka" % "0.14"
+    "org.mapdb" % "mapdb" % "3.0.3",
+    // Titan related
+    "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
+    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0",
+    "org.apache.cassandra" % "cassandra-all" % "2.1" 
   ),
 
   {

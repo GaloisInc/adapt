@@ -21,7 +21,7 @@ import scala.language.postfixOps
 
 class AcceptanceTestsActor(val registry: ActorRef)
   extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
-  
+    
   import context.dispatcher
  
   val dependencies = "DevDBActor" :: "UIActor" :: Nil
@@ -99,18 +99,22 @@ class AcceptanceTestsActor(val registry: ActorRef)
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
       
-      if (toDisplay.nonEmpty) {
-        println("Opening up a webserver...")
-       
-        // Open up the failed tests
-        Desktop.getDesktop().browse(new URI("http://0.0.0.0:8080/graph#" + toDisplay.mkString("&")))
-        println("To navigate the UI, try right-clicking or double-clicking nodes")
-        println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
-        println("")
-      
-        // let it run until user kills the process
-        println("Press CTRL^C to kill the webserver")
+      if (toDisplay.length > 0) {
+        println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
+        Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
+      } else {
+        println("If you would like to explore your data, open browser at http://localhost:8080 to use our interactive GUI.")
+        println("This GUI uses (a slightly modified version of) the gremlin query language. Try executing a search query in the GUI like any of the following to get started:")
+        println("    g.V().limit(50)")
+        println("    g.V().has('uuid',YOUR-UUID-HERE-NOTINQUOTES)")
+        println("    g.V().has('eventType','EVENT_WRITE')")
+        println("    g.V().hasLabel('FileObject').limit(20)")
       }
+      println("To navigate the UI, try right-clicking or double-clicking nodes")
+      println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
+      println("")
+
+      println("Press CTRL^C to kill the webserver")
     }
 }
 

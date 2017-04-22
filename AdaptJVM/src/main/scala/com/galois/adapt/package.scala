@@ -20,5 +20,8 @@ package object adapt {
     // Outgoing edges coming off the node. The string is the label on the edge, the UUID the node
     // (which should be 'DBNodeable' too) the edge goes to.
     def asDBEdges: List[(String,UUID)]
+
+    // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
+    def supportNodes: List[(UUID, List[Any], List[(String,UUID)])] = List()
   }
 }
