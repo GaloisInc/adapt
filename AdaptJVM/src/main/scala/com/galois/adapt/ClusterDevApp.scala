@@ -186,6 +186,8 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     val sink = Sink.actorRef(printActor, TimeMarker(System.nanoTime))
     val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processEventCount(cdmSource.map(_.get), sink)))
     childActors = childActors + (roleName -> Set(streamActor))
+
+    case s => throw new IllegalArgumentException(s"Unknown role: $s")
   }
 
   implicit val ec = context.dispatcher
