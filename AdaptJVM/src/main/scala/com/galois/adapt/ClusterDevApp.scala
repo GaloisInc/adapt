@@ -137,11 +137,11 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
     childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))   // TODO: These sets are not used correctly
   
-  case "devfeatures" =>
-    val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
-    val processWrites = context.actorOf(Props(classOf[ProcessEvents], registryProxy), "ProcessWrites")
-    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
-    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
+//  case "devfeatures" =>
+//    val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
+//    val processWrites = context.actorOf(Props(classOf[ProcessEvents], registryProxy), "ProcessWrites")
+//    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
+//    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
 
   case "rankedui" =>
     val rankedDataActor = context.actorOf(Props(classOf[RankedDataActor], registryProxy), "RankedDataActor")
@@ -178,33 +178,6 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
         context.actorOf(Props(classOf[GraphRunner], Streams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
       }
       childActors = childActors + (roleName -> Set(streamActor))
-
-  case "stream1" =>
-    val files = config.getStringList("adapt.loadfiles")
-    val (ta1, cdmData) = CDM17.readData(files.head, None).get
-    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
-    val rankedData = context.actorOf(Props(classOf[RankedDataActor]))
-    val rankedDataSink = Sink.actorRef(rankedData, TimeMarker(0L))
-    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processWritesFile(cdmSource.map(_.get), rankedDataSink)))
-    childActors = childActors + (roleName -> Set(streamActor))
-
-  case "stream2" =>
-    val files = config.getStringList("adapt.loadfiles")
-    val (ta1, cdmData) = CDM17.readData(files.head, None).get
-    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
-    val checkOpenRatioActor = context.actorOf(Props(classOf[ProcessCheckOpenActor]))
-    val sink = Sink.actorRef(checkOpenRatioActor, TimeMarker(System.nanoTime))
-    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processCheckOpenGraph(cdmSource.map(_.get), sink)))
-    childActors = childActors + (roleName -> Set(streamActor))
-
-  case "stream3" =>
-    val files = config.getStringList("adapt.loadfiles")
-    val (ta1, cdmData) = CDM17.readData(files.head, None).get
-    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
-    val printActor = context.actorOf(Props(classOf[PrintActor]))
-    val sink = Sink.actorRef(printActor, TimeMarker(System.nanoTime))
-    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processEventCount(cdmSource.map(_.get), sink)))
-    childActors = childActors + (roleName -> Set(streamActor))
 
     case s => throw new IllegalArgumentException(s"Unknown role: $s")
   }

@@ -41,7 +41,7 @@ object ProductionApp {
     val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
     val dbSink = TitanFlowComponents.titanWrites()
 
-    val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
+    val printSink = Sink.foreach(println)
 
     // Flow only consumes and writes to Titan
     Flow[CDM17].runWith(source, dbSink)

@@ -89,218 +89,13 @@ object Streams {
       ClosedShape
     }
   )
-
-  def processWritesFile(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-      val bcast = graph.add(Broadcast[CDM17](3))
-      val eventBroadcast = graph.add(Broadcast[Event](2))
-
-      val processFilter = Flow[CDM17].filter(s => s.isInstanceOf[Subject] && s.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS).map(_.asInstanceOf[Subject])
-      def eventFilter(eType: EventType) = Flow[CDM17].filter(e => e.isInstanceOf[Event] && e.asInstanceOf[Event].eventType == eType).map(_.asInstanceOf[Event])
-      val fileFilter = Flow[CDM17].filter(f => f.isInstanceOf[FileObject] && f.asInstanceOf[FileObject].fileObjectType == FILE_OBJECT_FILE).map(_.asInstanceOf[FileObject])
-
-      val processEvents = graph.add(ProcessEvents())
-      val fileEvents = graph.add(FileWrites())
-      val processEventsFile = graph.add(ProcessWritesFile())
-
-      source ~> bcast.in;                                   eventBroadcast.out(0) ~> processEvents.in1
-                bcast.out(0) ~> processFilter ~>                                     processEvents.in0
-                bcast.out(1) ~> eventFilter(EVENT_WRITE) ~> eventBroadcast.in;       processEvents.out ~> processEventsFile.in0
-                bcast.out(2) ~> fileFilter ~>                                        fileEvents.in0
-                                                            eventBroadcast.out(1) ~> fileEvents.in1
-                                                                                     fileEvents.out  ~>   processEventsFile.in1
-                                                                                                          processEventsFile.out ~> sink
-      ClosedShape
-    }
-  )
-
-
-  def processCheckOpenGraph(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-      source.filter(cdm =>
-        (cdm.isInstanceOf[Subject] && cdm.asInstanceOf[Subject].subjectType == SUBJECT_PROCESS) ||
-        (cdm.isInstanceOf[Event] && cdm.asInstanceOf[Event].eventType == EVENT_OPEN) ||
-        (cdm.isInstanceOf[Event] && cdm.asInstanceOf[Event].eventType == EVENT_CHECK_FILE_ATTRIBUTES)
-      ) ~> sink
-      ClosedShape
-    }
-  )
-
-  def processEventCounter(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-
-      source
-        .collect{ case cdm: Event => cdm }
-        .groupBy(1000000, _.subject)   // TODO: pull this number out to somewhere else
-        .fold[(Option[UUID], Map[EventType,Int])]((None, Map.empty)) { (a, b) =>
-          Some(b.subject) -> (a._2 + (b.eventType -> (a._2.getOrElse(b.eventType, 0) + 1)))
-        }
-        .mergeSubstreams ~> sink
-
-      ClosedShape
-    }
-  )
-
-
-  def processUsedNetFlow(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-      val bcast = graph.add(Broadcast[CDM17](2))
-      val processUsedNetFlow = graph.add(ProcessUsedNetFlow())
-
-      val eventTypesWeCareAbout = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
-
-      source ~> bcast.in
-      bcast.out(0).collect{ case n: NetFlowObject => n} ~> processUsedNetFlow.in0
-      bcast.out(1).collect{ case e: Event if eventTypesWeCareAbout.contains(e.eventType) => e} ~> processUsedNetFlow.in1
-      processUsedNetFlow.out ~> sink
-
-      ClosedShape
-    }
-  )
-
-   //   .map(messages => InsertMessage.ack(messages.last))
-
-
-  def iforest(implicit ec: ExecutionContext) = Flow[Any]
-    .statefulMapConcat[Future[Map[UUID,Float]]]{ () =>
-
-      // Accumulate 'SubjectEventCount' rows
-      val subjectEventCountRows = ListBuffer.empty[SubjectEventCount]
-      val subjectEventCountHeader = Seq("subjectUuid", "filesExecuted", "netflowsConnected") ++ EventType.values.map(_.toString)
-
-      // Receiving function
-      {
-        case s: SubjectEventCount =>
-          subjectEventCountRows += s
-          Nil
-
-        case t: AdaptProcessingInstruction =>
-
-          println("hi")
-          List(Future {
-
-            // Make temporary input/output files
-            val inputFile: File = File.createTempFile("input",".csv")
-            val outputFile: File = File.createTempFile("output",".csv")
-            inputFile.deleteOnExit()
-            outputFile.deleteOnExit()
-
-            // Write in data
-            val writer: FileWriter = new FileWriter(inputFile)
-            writer.write(subjectEventCountHeader.mkString("",",","\n"))
-            for (SubjectEventCount(uuid, filesExecuted, netflowsConnected, eventCounts) <- subjectEventCountRows) {
-                val row = Seq(uuid, filesExecuted, netflowsConnected) ++ EventType.values.map(k => eventCounts.getOrElse(k,0))
-                writer.write(row.map(_.toString).mkString("",",","\n"))
-            }
-            writer.close()
-
-            // Call IForest
-            val succeeded = Seq[String]( "../ad/osu_iforest/iforest.exe"
-                                       , "-i", inputFile.getCanonicalPath   // input file
-                                       , "-o", outputFile.getCanonicalPath  // output file
-                                       , "-m", "1"                          // ignore the first column
-                                       , "-t", "100"                        // number of trees
-                                       ).! == 0
-            println(s"Call to IForest ${if (succeeded) "succeeded" else "failed"}.")
-
-            // Read out data
-            val buffer = MutableMap[UUID, Float]()
-
-            if (succeeded) {
-              val reader: BufferedReader = new BufferedReader(new FileReader(outputFile))
-              var line: String = reader.readLine() // first line is the header
-
-              do {
-                line = reader.readLine()
-                if (line != null) {
-                  val cols = line.split(",").map(_.trim)
-                  buffer += UUID.fromString(cols(0)) -> cols.last.toFloat
-                }
-              } while (line != null)
-
-              reader.close()
-            }
-
-            // Final map
-            buffer.toMap
-          })
-        case _ => Nil
-      }
-
-    }
-    .mapAsync[Map[UUID,Float]](1)(x => x)
-
-
-  // Aggregate some statistics for each process. See 'SubjectEventCount' for specifically what is
-  // aggregated. Emit downstream a stream of these records every time a 'AdaptProcessingInstruction'
-  // is recieved.
-  def processEventCount(source: Source[CDM17,_], sink: Sink[Map[UUID,Float]/*SubjectEventCount*/,_])(implicit ec: ExecutionContext) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-      val netflowEventTypes = List(
-        EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO,
-        EVENT_SENDMSG, EVENT_WRITE
-      )
-
-      // TODO remove this
-      val executions = Source.tick[AdaptProcessingInstruction](10 seconds, 10 seconds, AdaptProcessingInstruction(0))
-
-      source
-        .collect[CDM17]{
-            case e: Event => e
-            case t: AdaptProcessingInstruction => t
-        }
-        .merge(executions)   // TODO remove this
-        .statefulMapConcat[Any /*SubjectEventCount*/]{ () =>
-
-          // Note these map is closed over by the following function
-          val filesExecuted     = MutableMap[/* Subject */UUID, Set[/* FileObject */UUID]]()
-          val netflowsConnected = MutableMap[/* Subject */UUID, Set[/* Netflow    */UUID]]()
-          val typesOfEvents     = MutableMap[/* Subject */UUID, Map[EventType, Int]]()
-          val subjectUuids      = MutableSet[/* Subject */UUID]()
-
-          // This is the 'flatMap'ing function that gets called for every CDM passed
-          {
-            case e: Event  =>
-
-              if (EVENT_EXECUTE == e.eventType)
-                filesExecuted(e.subject) = filesExecuted.getOrElse(e.subject, Set()) + e.predicateObject.get
-
-              if (netflowEventTypes contains e.eventType)
-                netflowsConnected(e.subject) = netflowsConnected.getOrElse(e.subject, Set()) + e.predicateObject.get
-
-              typesOfEvents(e.subject) = {
-                val v = typesOfEvents.getOrElse(e.subject,Map())
-                v.updated(e.eventType, 1 + v.getOrElse(e.eventType, 0))
-              }
-
-              subjectUuids += e.subject
-
-              Nil
-
-            case t: AdaptProcessingInstruction =>
-              subjectUuids.toList.map(uuid =>
-                SubjectEventCount(
-                  uuid,
-                  filesExecuted.get(uuid).map(_.size).getOrElse(0),
-                  netflowsConnected.get(uuid).map(_.size).getOrElse(0),
-                  typesOfEvents.get(uuid).map(_.toMap).getOrElse(Map())
-                ).asInstanceOf[Any]
-              ) ++ List(t)
-          }
-        } ~> iforest(ec) ~> sink
-
-      ClosedShape
-    }
-  )
 }
 
 
 object FlowComponents {
 
   sealed trait EventsKey
-
   case object PredicateObjectKey extends EventsKey
-
   case class SubjectKey(t: Option[EventType]) extends EventsKey
 
   def eventsGroupedByKey(commandSource: Source[ProcessingCommand, _], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]], key: EventsKey) = {
@@ -355,9 +150,9 @@ object FlowComponents {
   }
 
 
-  def sortedEventAccumulator[K](groupBy: ((UUID,Event)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
+  def sortedEventAccumulator[K](groupBy: ((UUID,Event,CDM17)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
     val dbMap = db.hashMap("sortedEventAccumulator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-    Flow[(UUID,Event)]
+    Flow[(UUID,Event,CDM17)]
       .groupBy(Int.MaxValue, groupBy) // TODO: Limited to ~4 billion unique UUIDs!!!
       .merge(commandSource)
       .statefulMapConcat { () =>
@@ -381,7 +176,7 @@ object FlowComponents {
             }
             List.empty
 
-          case Tuple2(u: UUID, e: Event) =>
+          case Tuple3(u: UUID, e: Event, _: CDM17) =>
             if (uuid.isEmpty) uuid = Some(u)
             events += e
             List.empty
@@ -392,75 +187,65 @@ object FlowComponents {
 
 
   def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("typeSorter").createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+    val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
     Flow[CDM17]
-      .collect {
-        case e: Event if e.predicateObject.isDefined => e
-        case n: NetFlowObject => n.uuid -> "NetFlowObject"
-        case f: FileObject => f.uuid -> "FileObject"
-        case s: Subject => s.uuid -> "Subject" }
-      .mapConcat {
-        case e: Event =>
-          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
-          else List((e.predicateObject.get, e))
-        case msg @ Tuple2(u: UUID, label: String) => List(msg) }
+      .mapConcat[(UUID, String, CDM17)] {
+        case e: Event if e.predicateObject.isDefined =>
+          if (e.predicateObject2.isDefined) List((e.predicateObject.get, "Event", e), (e.predicateObject2.get, "Event", e))
+          else List((e.predicateObject.get, "Event", e))
+        case n: NetFlowObject => List((n.uuid, "NetFlowObject", n))
+        case f: FileObject => List((f.uuid, "FileObject", f))
+        case s: Subject => List((s.uuid, "Subject", s))
+        case _ => List.empty }
+//        case msg @ => List(msg) }
       .filterNot {
-        case (uuid, e) =>
+        case (uuid, e, _) =>
           val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
           excluded.contains(uuid) // TODO: why are there these special cases?!?!?!?!?
         case _ => false }
       .groupBy(Int.MaxValue, _._1)
       .merge(commandSource)
-      .statefulMapConcat { () =>
+      .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
         var uuidOpt: Option[UUID] = None
-        var labelOpt: Option[String] = None
+        var idOpt: Option[(UUID,String,CDM17)] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
 
-      {
-        case Tuple2(predicateUuid: UUID, e: Event) =>
-          if (uuidOpt.isEmpty) uuidOpt = Some(predicateUuid)
-          if (labelOpt.isDefined) List((labelOpt.get, predicateUuid, e))
-          else {
-            events += e
-            List.empty
-          }
-//          List(labelOpt.map(label => (label, predicateUuid, e))).flatten   // TODO: interesting. maybe this _should_ throw away events for Objects we never see.
+        {
+          case Tuple3(predicateUuid: UUID, "Event", e: Event) =>
+            if (uuidOpt.isEmpty) uuidOpt = Some(predicateUuid)
+            if (idOpt.isDefined) List((idOpt.get._2, predicateUuid, e, idOpt.get._3))
+            else {
+              events += e
+              List.empty
+            }
+  //          List(labelOpt.map(label => (label, predicateUuid, e))).flatten   // TODO: interesting. maybe this _should_ throw away events for Objects we never see.
 
-        case Tuple2(objectUuid: UUID, labelName: String) =>
-          if (uuidOpt.isEmpty) uuidOpt = Some(objectUuid)
-          if (labelOpt.isEmpty) {
-            labelOpt = Some(labelName)
-            val existingSet = dbMap.getOrDefault(objectUuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
-            events ++= existingSet
-            dbMap.remove(objectUuid)
-          }
-          val toSend = events.toList.map(event => (labelName, objectUuid, event))
-          events.clear()
-          toSend
-
-        case CleanUp =>
-          if (events.nonEmpty) {
-            val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
-            events ++= existingSet
-//            println(s"UNMATCHED: ${uuidOpt}  size: ${events.size}    ${events.map(_.eventType)}")  // TODO
-            dbMap.put(uuidOpt.get, events)
+          case Tuple3(objectUuid: UUID, labelName: String, cdm: CDM17) =>
+            if (uuidOpt.isEmpty) uuidOpt = Some(objectUuid)
+            if (idOpt.isEmpty) {
+              idOpt = Some((objectUuid, labelName, cdm))
+              val existingSet = dbMap.getOrDefault(objectUuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+              events ++= existingSet
+              dbMap.remove(objectUuid)
+            }
+            val toSend = events.toList.map(event => (labelName, objectUuid, event, cdm))
             events.clear()
-          }
-          List.empty
+            toSend
 
-        case Emit => List.empty
-      }
+          case CleanUp =>
+//            if (events.nonEmpty) {
+//              val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+//              events ++= existingSet
+//  //            println(s"UNMATCHED: ${uuidOpt}  size: ${events.size}    ${events.map(_.eventType)}")  // TODO
+//              dbMap.put(uuidOpt.get, events)
+//              events.clear()
+//            }
+            List.empty
+
+          case Emit => List.empty
+        }
       }.mergeSubstreams
   }
-
-//  def test(commandSource: Source[ProcessingCommand,_], db: DB) =
-//    typeSorter(commandSource, db.hashMap("typeSorter").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]])
-//    .collect { case (name, uuid, event) if name == "NetFlowObject" => uuid -> event }
-//    .via(sortedSetEmitter(commandSource, db.hashMap("sortedSetEmitter").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]))
-//      .mergeSubstreams
-//    .via(netFlowFeatureExtractor)
-
-
 
 
 
@@ -484,20 +269,17 @@ object FlowComponents {
       u -> m
     }
 
-  def netFlowFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-    Flow[CDM17]
-      .collect { case e: Event if FlowComponents.netflowEventTypes.contains(e.eventType) => e }
-      .via(eventsGroupedByKey(commandSource, netFlowEventsDBMap, PredicateObjectKey).mergeSubstreams)
-  }
-
-//  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
-//    netFlowFeatureEventAccumulator(commandSource, db).via(netFlowFeatureExtractor)
+//  def netFlowFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
+//    val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+//    Flow[CDM17]
+//      .collect { case e: Event if FlowComponents.netflowEventTypes.contains(e.eventType) => e }
+//      .via(eventsGroupedByKey(commandSource, netFlowEventsDBMap, PredicateObjectKey).mergeSubstreams)
 //  }
+
   def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
     predicateTypeLabeler(commandSource, db)
-      .collect{ case ("NetFlowObject", predUuid, event) => (predUuid, event) }
-      .via(printCounter("NetFlow counter", 100))
+      .collect{ case Tuple4("NetFlowObject", predUuid, event, netFlowOpt: CDM17) => (predUuid, event, netFlowOpt) }
+//      .via(printCounter("NetFlow counter", 100))
       .via(sortedEventAccumulator(_._1, commandSource, db))
       .via(netFlowFeatureExtractor)
   }
@@ -512,10 +294,10 @@ object FlowComponents {
 
     predicateTypeLabeler(commandSource, db)
       .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
-      .via(printCounter("NetFlow or File Counter", 100))
+//      .via(printCounter("NetFlow or File Counter", 100))
       .groupBy(Int.MaxValue, _._3.subject)
       .merge(commandSource)
-      .statefulMapConcat{ () =>
+      .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])])]{ () =>
         var processUuidOpt: Option[UUID] = None
         var fileUuids = MutableSet.empty[UUID]
         val fileEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
@@ -528,12 +310,12 @@ object FlowComponents {
 
 
         {
-          case Tuple3("NetFlowObject", uuid: UUID, event: Event) =>
+          case Tuple4("NetFlowObject", uuid: UUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
 
-          case Tuple3("FileObject", uuid: UUID, event: Event) =>
+          case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
@@ -565,13 +347,13 @@ object FlowComponents {
           case Emit =>
             fileUuids.foreach(u =>
               fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
-                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
-            )
+                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+
             netFlowUuids.foreach(u =>
               netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
                 netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
 
-            fileEvents.toList.map{ case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+            fileEvents.toList.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
         }
       }
       .mergeSubstreams
@@ -590,7 +372,7 @@ object FlowComponents {
       m("execAfterWriteByNetFlowReadingProcess") = {
         var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
         var found = false
-        while (remainder.nonEmpty) {
+        while (remainder.nonEmpty && remainder.exists(_.eventType == EVENT_EXECUTE)) {
           val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subject == x.subject))
           found = execOpt.exists(x => netFlowEventsFromIntersectingProcesses.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
           if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
@@ -600,25 +382,27 @@ object FlowComponents {
       m("execAfterPermissionChangeToExecutable") = fileEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
       m("deletedImmediatelyAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
       m("deletedRightAfterProcessWithOpenNetFlowsWrites") =
-        fileEventList.collect { case writeEvent if writeEvent.eventType == EVENT_WRITE =>
-          val deleteAfterWriteOpt = fileEventList.find( deleteEvent =>
-            deleteEvent.eventType == EVENT_UNLINK &&
-            (deleteEvent.timestampNanos - writeEvent.timestampNanos >= 0) &&  // delete happened AFTER the write
-            (deleteEvent.timestampNanos - writeEvent.timestampNanos <= 3e10)  // within 30 seconds. This is the interpretation of "right after"
-          )
-          deleteAfterWriteOpt.exists { deleteAfterWriteEvent =>        // IFF we found a Delete after WRITE...
-            netFlowEventsFromIntersectingProcesses.exists(t => t._2    // t._2 is a process's events, in order.
-              .dropWhile(_.eventType != EVENT_OPEN)
-              .takeWhile(_.eventType != EVENT_CLOSE)
-              .exists( testEvent =>                                    // in the events between OPEN and CLOSE...
-                testEvent.subject == deleteAfterWriteEvent.subject &&  // event by the same process as the UNLINK?
-                  t._2.find(_.eventType == EVENT_CLOSE).exists( closeEvent =>  // If so, get the CLOSE event and
-                  deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos  // test if the UNLINK occurred before the CLOSE
+        if (fileEventList.exists(_.eventType == EVENT_UNLINK)) {
+          fileEventList.collect { case writeEvent if writeEvent.eventType == EVENT_WRITE =>
+            val deleteAfterWriteOpt = fileEventList.find(deleteEvent =>
+              deleteEvent.eventType == EVENT_UNLINK &&
+                (deleteEvent.timestampNanos - writeEvent.timestampNanos >= 0) && // delete happened AFTER the write
+                (deleteEvent.timestampNanos - writeEvent.timestampNanos <= 3e10) // within 30 seconds. This is the interpretation of "right after"
+            )
+            deleteAfterWriteOpt.exists { deleteAfterWriteEvent => // IFF we found a Delete after WRITE...
+              netFlowEventsFromIntersectingProcesses.exists(t => t._2 // t._2 is a process's events, in order.
+                .dropWhile(_.eventType != EVENT_OPEN)
+                .takeWhile(_.eventType != EVENT_CLOSE)
+                .exists(testEvent => // in the events between OPEN and CLOSE...
+                  testEvent.subject == deleteAfterWriteEvent.subject && // event by the same process as the UNLINK?
+                    t._2.find(_.eventType == EVENT_CLOSE).exists(closeEvent => // If so, get the CLOSE event and
+                      deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos // test if the UNLINK occurred before the CLOSE
+                    )
                 )
               )
-            )
-          }
-        }.foldLeft(false)(_ || _) // is there a single `true`?
+            }
+          }.foldLeft(false)(_ || _) // is there a single `true`?
+        } else false
 
       m("isReadByAProcessWritingToNetFlows") = fileEventList
         .collect{ case e if e.eventType == EVENT_READ => e.subject}
@@ -645,82 +429,43 @@ object FlowComponents {
 
 
   def testFileFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
+    val fileEventsDBMap = db.hashMap("FileEventsByPredicate_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
     Flow[CDM17]
       .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
       .via(eventsGroupedByKey(commandSource, fileEventsDBMap, PredicateObjectKey).mergeSubstreams)
   }
 
-//  def testFileFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
-//    testFileFeatureEventAccumulator(commandSource, db).via(fileFeatures)
-//  }
-
-
-//  def shuffleJoinOnProcessUuid(commandSource: Source[ProcessingCommand,_], db: DB) = Flow[(String, UUID, mutable.SortedSet[Event])]
-//    .mapConcat { pair =>
-//      val processUUIDs = pair._3.map(_.subject)
-//      processUUIDs.toList.map(pUUID => (pUUID, pair._1, pair._2, pair._3))}
-//    .groupBy(Int.MaxValue, _._1)
-//    .merge(commandSource)
-//    .statefulMapConcat { () =>
-//      var joinProcessUuid: Option[UUID] = None
-//      val fileMap = mutable.Map.empty[UUID, mutable.SortedSet[Event]]
-//      val netFlowMap = mutable.Map.empty[UUID, mutable.SortedSet[Event]]
-//
-//      val fileEventsDBMap = db.hashMap("FileEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-//      val netFlowEventsDBMap = db.hashMap("NetFlowEventsByPredicate").createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-//      val processEventsDBMap = db.hashMap("ProcessEventsForFilesAndNetFlows")
-//
-//      {
-//        case Emit =>
-//          fileMap ++= fileEventsDBMap.get(joinProcessUuid.get)
-//          val newNetFlowEvents = netFlowEventsDBMap.get(joinProcessUuid.get) ++ netFlowMap
-//          fileEventsDBMap.put(joinProcessUuid.get, fileMap)
-//          List((joinProcessUuid.get, , ))
-//
-//        case CleanUp => List.empty
-//
-//        case Tuple4(processUuid: UUID, "FileEventsByPredicate", eventGroupTypeUuid: UUID, events: mutable.SortedSet[Event]) =>
-//          if (joinProcessUuid.isEmpty) joinProcessUuid = Some(processUuid)
-//          fileMap(eventGroupTypeUuid) = events
-//          List.empty
-//
-//        case Tuple4(processUuid: UUID, "NetFlowEventsByPredicate", eventGroupTypeUuid: UUID, events: mutable.SortedSet[Event]) =>
-//          if (joinProcessUuid.isEmpty) joinProcessUuid = Some(processUuid)
-//          netFlowMap(eventGroupTypeUuid) = events
-//          List.empty
-//      }
-//    }
-
-
 
   def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
 
     predicateTypeLabeler(commandSource, db)
-      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
+//      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subject)
       .merge(commandSource)
-      .statefulMapConcat{ () =>
+      .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(UUID, mutable.SortedSet[Event])])] { () =>
         var processUuidOpt: Option[UUID] = None
-        val processEvents = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
+        val eventsToThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
+//        val allEventsByThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.sequence))
         val fileUuids = MutableSet.empty[UUID]
         val fileEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
         val netFlowUuids = MutableSet.empty[UUID]
-        val netFlowEvents = MutableMap.empty[UUID, mutable.SortedSet[Event]]
+        val netFlowEvents = MutableMap.empty[UUID, mutable.SortedSet[(Event,NetFlowObject)]]
 
         {
-          case Tuple3("Subject", uuid: UUID, event: Event) =>
+          case Tuple4("Subject", uuid: UUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(uuid)
-            processEvents += event
+//            if (event.subject == processUuidOpt.get) allEventsByThisProcess += event
+            eventsToThisProcess += event
             List.empty
 
-          case Tuple3("NetFlowObject", uuid: UUID, event: Event) =>
+          case Tuple4("NetFlowObject", uuid: UUID, event: Event, cdmOpt: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
-            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
+            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.sequence))) +
+              (event -> cdmOpt.asInstanceOf[NetFlowObject])
             List.empty
 
-          case Tuple3("FileObject", uuid: UUID, event: Event) =>
+          case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
@@ -744,26 +489,26 @@ object FlowComponents {
 //              netFlowUuids ++= netFlowEvents.keySet
 //              netFlowEvents.clear()
 //            }
-//            if (processEvents.nonEmpty) {
-//              val mergedEvents = dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ processEvents
+//            if (eventsToThisProcess.nonEmpty) {
+//              val mergedEvents = dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++ eventsToThisProcess
 //              dbMap.put(processUuidOpt.get, mergedEvents)
-//              processEvents.clear()
+//              eventsToThisProcess.clear()
 //            }
+//            and similar for all events BY this process
             List.empty
 
           case Emit =>
             fileUuids.foreach(u =>
               fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
-                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
-            )
+                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+
             netFlowUuids.foreach(u =>
-              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
-                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
+              netFlowEvents(u) = //dbMap.getOrDefault(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.sequence))) ++
+                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.sequence))) )
 
-            processEvents ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
+            eventsToThisProcess ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.sequence)))
 
-            List(((processUuidOpt.get, processEvents), netFlowEvents.toSet, fileEvents.toSet))
-  //          fileEvents.toList.map{ case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents.toSet, fileEvents.toSet))
         }
       }
       .mergeSubstreams
@@ -774,13 +519,15 @@ object FlowComponents {
 
   val processEventTypes = EventType.values.toList
 
-  def processFeatureExtractor = Flow[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])], Set[(UUID, mutable.SortedSet[Event])])]
-    .map { case ((processUuid, processEventSet), netFlowEventSets, fileEventSets) =>
-      val eList = processEventSet.toList
+  val processFeatureExtractor = Flow[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(UUID, mutable.SortedSet[Event])])]
+    .map { case ((processUuid, eventsDoneToThisProcessSet), netFlowEventSets, fileEventSets) =>
+      val eventsDoneToThisProcessList = eventsDoneToThisProcessSet.toList
+      val processEventSet: mutable.SortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++ fileEventSets.flatMap(_._2)
+      val processEventList: List[Event] = processEventSet.toList
       val m = MutableMap.empty[String, Any]
 //      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
 //      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
-//      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows
+//      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows —— not just events!
 //      m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
       // TODO: consider emitting the collected Process Tree
       m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
@@ -789,20 +536,39 @@ object FlowComponents {
 //        netFlowEventSets.head._2.head.
         "TODO"
       }
-//      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows
-//      m("isReferringPasswordFile") = "I HAVE NO IDEA WHAT THIS MEANS"                     // TODO: ¯\_(ツ)_/¯
-//      m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = "TODO"                    // TODO: needs pairing with NetFlows
-      m("changesFilePermissionsThenExecutesIt") = eList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
-      m("executedThenImmediatelyDeletedAFile") = eList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
-//      m("readFromNetFlowThenDeletedFile") = "TODO"                                        // TODO: needs pairing with NetFlows
+//      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows —— not just events!
+//      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files
+      m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
+          _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+        ).toList.sorted.headOption.exists(netFlowReadTime =>
+          fileEventSets.exists(
+            _._2.dropWhile(write =>
+              write.eventType != EVENT_WRITE && write.timestampNanos > netFlowReadTime
+            ).exists(ex => ex.eventType == EVENT_EXECUTE)
+          )
+        )
+
+      m("changesFilePermissionsThenExecutesIt") = processEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
+      m("executedThenImmediatelyDeletedAFile") = processEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
+      m("readFromNetFlowThenDeletedFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
+        _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+      ).toList.sorted.headOption.exists(netFlowReadTime =>
+        fileEventSets.exists(
+          _._2.exists(delete =>
+            delete.eventType != EVENT_UNLINK && delete.timestampNanos > netFlowReadTime
+          )
+        )
+      )
+
       // TODO: consider: process takes any local action after reading from NetFlow
+
       m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
-//      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
-//      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
-      m("isAccessingTempDirectory") = eList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
+//      m("countOfPossibleFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
+//      m("countOfPossibleFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
+      m("isAccessingTempDirectory") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
 //      m("thisProcessIsTheObjectOfA_SETUID_Event") = "TODO"                                // TODO: needs process UUID from predicateObject field (not subject)
-      m("totalBytesSentToNetFlows") = eList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
-      m("totalBytesReceivedFromNetFlows") = eList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
+      m("totalBytesSentToNetFlows") = processEventList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
+      m("totalBytesReceivedFromNetFlows") = processEventList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
       processEventTypes.foreach( t =>
         m("count_"+ t.toString) = processEventSet.count(_.eventType == t)
       )
@@ -826,7 +592,7 @@ object FlowComponents {
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
 
-    { case item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
+    { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
         if (lastTimestampNanos == 0L) {
           originalStartTime = System.nanoTime()
           lastTimestampNanos = System.nanoTime()
@@ -838,7 +604,7 @@ object FlowComponents {
           println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second")
           lastTimestampNanos = System.nanoTime()
         }
-        List[T](item)
+        List(item)
     }
   }
 
@@ -950,6 +716,24 @@ object FlowComponents {
   )
 
 
+  def kafkaSource(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = Source.fromGraph(
+    GraphDSL.create() { implicit graph =>
+      val kafkaSource = Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
+        val bais = new ByteArrayInputStream(msg.record.value())
+        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+        val cdm = new RawCDM15Type(elem.getDatum)
+        msg.committableOffset.commitScaladsl()
+        cdm
+      }.map(CDM17.parse)
+      SourceShape(kafkaSource.shape.out)
+    }
+  )
+
+
+
+
   type Milliseconds = Long
 
   implicit class EventCollection(es: Iterable[Event]) {
@@ -967,6 +751,7 @@ object FlowComponents {
     }
   }
 }
+
 
 object TitanFlowComponents {
 
@@ -1051,13 +836,12 @@ object TestGraph extends App {
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
 
- 
 
-  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+    .via(FlowComponents.printCounter("CDM Source", 1e5.toInt))
 //    .via(Streams.titanWrites(graph))
 
 
@@ -1094,7 +878,7 @@ object TestGraph extends App {
 //  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
 
 
-  FlowComponents.normalizedScores(db).runWith(source, Sink.foreach(println))
+  FlowComponents.normalizedScores(db).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.foreach(println))
 
 
 //      .recover{ case e: Throwable => e.printStackTrace() } ~> printSink
@@ -1142,27 +926,6 @@ object TestGraph extends App {
 
   //  commandSource.runWith(sink)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1235,265 +998,6 @@ case class Join[A,B,K](
       def onPull() = {
         if (!hasBeenPulled(shape.in0)) pull(shape.in0)
         if (!hasBeenPulled(shape.in1)) pull(shape.in1)
-      }
-    })
-  }
-}
-
-
-
-
-class PrintActor extends Actor {
-  def receive = {
-    case t: TimeMarker => println("TimeMarker!!!")
-    case p: AdaptProcessingInstruction => println("Make it so!")
-    case x: ProcessingCommand => println(s"Processing Command: $x")
-    case x => println(x)
-  }
-}
-
-
-
-case class ProcessUsedNetFlow() extends GraphStage[FanInShape2[NetFlowObject, Event, UUID]] {
-  val shape = new FanInShape2[NetFlowObject, Event, UUID]("ProcessUsedNetFlow")
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-    type ProcessUUID = UUID
-    type EventUUID = UUID
-    type NetFlowUUID = UUID
-
-    val netflows = MutableSet.empty[NetFlowUUID]
-    val events = MutableSet.empty[Event]
-    val alreadySent = MutableSet.empty[ProcessUUID]
-
-    setHandler(shape.in0, new InHandler {
-      def onPush() = {
-        val n = grab(shape.in0)
-        netflows += n.uuid
-        events.collect {
-          case e if e.predicateObject.isDefined && e.predicateObject.get == n.uuid => e
-        }.headOption.fold(
-          pull(shape.in0)
-        ) { e =>
-          events -= e
-          if ( ! alreadySent.contains(e.subject)) {
-            push(shape.out, e.subject)
-            alreadySent += e.subject
-          }
-          else pull(shape.in0)
-        }
-      }
-    })
-
-    setHandler(shape.in1, new InHandler {
-      def onPush() = {
-        val e = grab(shape.in1)
-        e.predicateObject match {
-          case None =>
-            pull(shape.in1)
-          case Some(netflowUuid) =>
-            if (netflows.contains(netflowUuid)) {
-              if (alreadySent contains e.subject) {
-                pull(shape.in1)
-              } else {
-                push(shape.out, e.subject)
-                alreadySent += e.subject
-              }
-            } else {
-              events += e
-              pull(shape.in1)
-            }
-        }
-      }
-    })
-
-    setHandler(shape.out, new OutHandler {
-      def onPull() = {
-        if ( ! hasBeenPulled(shape.in0)) pull(shape.in0)
-        if ( ! hasBeenPulled(shape.in1)) pull(shape.in1)
-      }
-    })
-  }
-
-}
-
-
-class ProcessCheckOpenActor() extends Actor {
-  type ProcessUUID = UUID
-  val processes = MutableMap.empty[ProcessUUID, Subject]
-  val opens = MutableMap.empty[ProcessUUID, List[Event]]
-  val checks = MutableMap.empty[ProcessUUID, List[Event]]
-  def receive = {
-    case e: Event if e.eventType == EVENT_OPEN =>
-      opens(e.subject) = opens.getOrElse(e.subject, List.empty[Event]) :+ e
-    case e: Event if e.eventType == EVENT_CHECK_FILE_ATTRIBUTES =>
-      checks(e.subject) = checks.getOrElse(e.subject, List.empty[Event]) :+ e
-      println("check")
-    case p: Subject =>
-      processes(p.uuid) = p
-    case t: TimeMarker =>
-      println(s"Opens: ${opens.size}\nChecks: ${checks.size}")
-      val ratio = opens.map{ case (k,v) => k -> (checks.getOrElse(k, List.empty).length / v.length) }.filterNot(_._2 == 0)
-      val sorted = ratio.toList.sortBy(_._2).reverse
-      sorted foreach println
-  }
-}
-
-
-case class ProcessEvents() extends GraphStage[FanInShape2[Subject, Event, (Subject,Event)]] {
-  val shape = new FanInShape2[Subject, Event, (Subject,Event)]("ProcessEvents")
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-    type ProcessUUID = UUID
-    val processes = MutableMap.empty[ProcessUUID, Subject]
-    val unmatchedWrites = MutableMap.empty[ProcessUUID, Set[Event]]
-    var sendingBuffer = List.empty[(Subject,Event)]
-
-    setHandler(shape.in0, new InHandler {
-      def onPush() = {
-        val p = grab(shape.in0)
-        processes(p.uuid) = p
-        unmatchedWrites.get(p.uuid) match {
-          case None =>
-            pull(shape.in0)
-          case Some(writes) => {
-            unmatchedWrites -= p.uuid
-            val wList = writes.toList
-            wList.headOption foreach { w =>
-              push(shape.out, p -> w)
-            }
-            if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(p -> _)
-          }
-        }
-      }
-    })
-
-    setHandler(shape.in1, new InHandler {
-      def onPush() = {
-        val e = grab(shape.in1)
-        val processUuid = e.subject
-        processes.get(processUuid) match {
-          case None =>
-            unmatchedWrites(processUuid) = unmatchedWrites.getOrElse(processUuid, Set.empty[Event]) + e
-            pull(shape.in1)
-          case Some(p) =>
-            push(shape.out, p -> e)
-        }
-      }
-    })
-
-    setHandler(shape.out, new OutHandler {
-      def onPull() = {
-        if (sendingBuffer.nonEmpty) {
-          push(shape.out, sendingBuffer.head)
-          sendingBuffer = sendingBuffer.drop(1)
-        } else {
-          if ( ! hasBeenPulled(shape.in0)) pull(shape.in0)
-          if ( ! hasBeenPulled(shape.in1)) pull(shape.in1)
-        }
-      }
-    })
-  }
-}
-
-
-case class FileWrites() extends GraphStage[FanInShape2[FileObject, Event, (FileObject,Event)]] {
-  val shape = new FanInShape2[FileObject, Event, (FileObject,Event)]("FileWrites")
-
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-    type FileUUID = UUID
-    val files = MutableMap.empty[FileUUID, FileObject]
-    val unmatchedWrites = MutableMap.empty[FileUUID, Set[Event]]
-    var sendingBuffer = List.empty[(FileObject, Event)]
-
-    setHandler(shape.in0, new InHandler {
-      def onPush() = {
-        val f = grab(shape.in0)
-        files(f.uuid) = f
-        unmatchedWrites.get(f.uuid)match {
-          case None =>
-            pull(shape.in0)
-          case Some(writes) => {
-            unmatchedWrites -= f.uuid
-            val wList = writes.toList
-            wList.headOption foreach { w =>
-              push(shape.out, f -> w)
-            }
-            if (wList.size > 1) sendingBuffer = sendingBuffer ++ wList.tail.map(f -> _)
-          }
-        }
-      }
-    })
-
-    setHandler(shape.in1, new InHandler {
-      def onPush() = {
-        val e = grab(shape.in1)
-        val fileUuids = List(e.predicateObject, e.predicateObject2).flatten
-        fileUuids foreach { fu =>
-          files.get(fu) match {
-            case None =>
-              unmatchedWrites(fu) = unmatchedWrites.getOrElse(fu, Set.empty[Event]) + e
-              pull(shape.in1)
-            case Some(file) =>
-              push(shape.out, file -> e)
-          }
-        }
-      }
-    })
-
-    setHandler(shape.out, new OutHandler {
-      def onPull() = {
-        if (sendingBuffer.nonEmpty) {
-          push(shape.out, sendingBuffer.head)
-          sendingBuffer = sendingBuffer.drop(1)
-        } else {
-          if ( ! hasBeenPulled(shape.in0)) pull(shape.in0)
-          if ( ! hasBeenPulled(shape.in1)) pull(shape.in1)
-        }
-      }
-    })
-  }
-}
-
-
-case class ProcessWritesFile() extends GraphStage[FanInShape2[(Subject, Event), (FileObject, Event), (Subject, Event, FileObject)]] {
-  val shape = new FanInShape2[(Subject, Event), (FileObject, Event), (Subject, Event, FileObject)]("ProcessWritesFile")
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-
-    //    val unmatchedProcesses = MutableMap.empty[Subject,Set[Event]]   // ???
-    //    val unmatchedFiles = MutableMap.empty[FileObject, Set[Event]]   // ???
-    val unmatchesProcesses = MutableMap.empty[Event, Subject]  // todo: probably inefficient copies of Subject when Event differs, but Subject doesn't.
-    val unmatchedFiles = MutableMap.empty[Event, FileObject]
-
-    setHandler(shape.in0, new InHandler {
-      def onPush() = {
-        val (p, e) = grab(shape.in0)
-        unmatchedFiles.get(e) match {
-          case None =>
-            unmatchesProcesses(e) = p
-            pull(shape.in0)
-          case Some(file) =>
-            push(shape.out, (p, e, file))
-             unmatchedFiles -= e
-        }
-      }
-    })
-
-    setHandler(shape.in1, new InHandler {
-      def onPush() = {
-        val (f, e) = grab(shape.in1)
-        unmatchesProcesses.get(e) match {
-          case None =>
-            unmatchedFiles(e) = f
-            pull(shape.in1)
-          case Some(process) =>
-            push(shape.out, (process, e, f))
-        }
-      }
-    })
-
-    setHandler(shape.out, new OutHandler {
-      def onPull() = {
-        if ( ! hasBeenPulled(shape.in0)) pull(shape.in0)
-        if ( ! hasBeenPulled(shape.in1)) pull(shape.in1)
       }
     })
   }
