@@ -1,46 +1,34 @@
 package com.galois.adapt
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import java.util.UUID
-
-import akka.actor.Actor
 import java.nio.file.Paths
 import java.util.UUID
 import java.io._
-
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
-
-import scala.collection.mutable.{ListBuffer, Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
 import akka.kafka.scaladsl.Producer
 import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
-import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
-import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, ListBuffer}
+import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
-import org.mapdb.DB.TreeSetMaker
-import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
-
+import org.mapdb.{DB, DBMaker, HTreeMap}
 import collection.JavaConverters._
 import scala.collection.mutable
 import scala.sys.process._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
-import scala.concurrent.{ExecutionContext, Future}
 import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
-import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus, TitanGraphIndex}
-import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
-
+import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
+import org.apache.tinkerpop.gremlin.structure.Vertex
 import scala.io.{Source => FileSource}
 
 
@@ -532,12 +520,18 @@ object FlowComponents {
       // TODO: consider emitting the collected Process Tree
       m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
 //      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
-      m("countOfAllConnect+AcceptEventsToPorts22or443") = {                                 // TODO: needs pairing with NetFlows
-//        netFlowEventSets.head._2.head.
-        "TODO"
-      }
-//      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") = "TODO"                 // TODO: needs pairing with NetFlows —— not just events!
-//      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files
+      m("countOfAllConnect+AcceptEventsToPorts22or443") =
+        netFlowEventSets.toList.map(s => s._2.toList.collect{
+          case (e,n) if List(EVENT_CONNECT, EVENT_ACCEPT).contains(e.eventType) &&
+            (List(22,443).contains(n.localPort) || List(22.443).contains(n.remotePort)) => 1
+        }.sum).sum
+      m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") =
+        netFlowEventSets.toList.map(s => s._2.toList.collect{
+          case (e,n) if List(EVENT_CONNECT, EVENT_ACCEPT).contains(e.eventType) &&
+            ( ! List(22,443).contains(n.localPort) || ! List(22.443).contains(n.remotePort)) => 1
+        }.sum).sum
+
+//      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files. Or does it? Path is probably on events.
       m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
           _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
         ).toList.sorted.headOption.exists(netFlowReadTime =>
@@ -563,10 +557,11 @@ object FlowComponents {
       // TODO: consider: process takes any local action after reading from NetFlow
 
       m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
-//      m("countOfPossibleFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
-//      m("countOfPossibleFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
+//      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
+//      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
       m("isAccessingTempDirectory") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
-//      m("thisProcessIsTheObjectOfA_SETUID_Event") = "TODO"                                // TODO: needs process UUID from predicateObject field (not subject)
+      m("thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_CHANGE_PRINCIPAL)
+      m("thisProcessIsTheObjectOfAMODIFY_PROCESSEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_MODIFY_PROCESS)
       m("totalBytesSentToNetFlows") = processEventList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
       m("totalBytesReceivedFromNetFlows") = processEventList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
       processEventTypes.foreach( t =>
@@ -631,7 +626,7 @@ object FlowComponents {
 
   def anomalyScoreCalculator(commandSource: Source[ProcessingCommand,_]) = Flow[(UUID, mutable.Map[String,Any])]
     .merge(commandSource)
-    .statefulMapConcat{ () =>
+    .statefulMapConcat[(UUID, Double)] { () =>
       var matrix = MutableMap.empty[UUID, String]
       var headerOpt: Option[String] = None
 
@@ -692,6 +687,7 @@ object FlowComponents {
           }.toList
       }
     }
+
 
   def commandSource(cleanUpSeconds: Int, emitSeconds: Int) =
     Source.tick[ProcessingCommand](cleanUpSeconds seconds, cleanUpSeconds seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
@@ -837,7 +833,7 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //
+  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
