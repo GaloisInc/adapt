@@ -1,5 +1,9 @@
 package com.galois.adapt
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.util.UUID
+
+import akka.actor.Actor
 import java.nio.file.Paths
 import java.util.UUID
 import java.io._
@@ -11,6 +15,16 @@ import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
 
 import scala.collection.mutable.{ListBuffer, Map => MutableMap, Set => MutableSet}
+import GraphDSL.Implicits._
+import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
+import akka.kafka.scaladsl.Producer
+import akka.kafka.scaladsl.Consumer
+import org.apache.kafka.clients.producer.ProducerRecord
+import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
+import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.avro.io.{DecoderFactory, EncoderFactory}
+import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
+import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, ListBuffer}
 import GraphDSL.Implicits._
 import akka.util.ByteString
 import org.mapdb.DB.TreeSetMaker
@@ -44,6 +58,37 @@ case object Emit extends ProcessingCommand
 case object CleanUp extends ProcessingCommand
 
 object Streams {
+
+  def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
+      Source.fromIterator(() => datums).map(elem => {
+        val baos = new ByteArrayOutputStream
+        val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+        val encoder = EncoderFactory.get.binaryEncoder(baos, null)
+        writer.write(elem, encoder)
+        encoder.flush()
+        baos.toByteArray
+      }).map(elem => new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)) ~> Producer.plainSink(producerSettings)
+
+      ClosedShape
+    }
+  )
+
+  def kafkaIngest(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
+    GraphDSL.create() { implicit graph =>
+      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
+        val bais = new ByteArrayInputStream(msg.record.value())
+        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+        val cdm = new RawCDM15Type(elem.getDatum)
+        msg.committableOffset.commitScaladsl()
+        cdm
+      }.map(CDM17.parse).map(println) ~> Sink.ignore
+      ClosedShape
+    }
+  )
 
   def processWritesFile(source: Source[CDM17,_], sink: Sink[Any,_]) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>
