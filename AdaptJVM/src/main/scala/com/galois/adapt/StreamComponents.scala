@@ -882,6 +882,28 @@ object FlowComponents {
       }
     }
 
+  def commandSource(cleanUpSeconds: Int, emitSeconds: Int) =
+    Source.tick[ProcessingCommand](cleanUpSeconds seconds, cleanUpSeconds seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+      .merge(Source.tick[ProcessingCommand](emitSeconds seconds, emitSeconds seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+
+
+  def normalizedScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50) = Flow.fromGraph(
+    GraphDSL.create(){ implicit graph =>
+      val bcast = graph.add(Broadcast[CDM17](3))
+      val merge = graph.add(Merge[(String,UUID,Double)](3))
+
+      val fastCommandSource = commandSource(fastClean, fastEmit)   // TODO
+      val slowCommandSource = commandSource(slowClean, slowEmit)   // TODO
+
+      bcast.out(0) ~> FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => ("NetFlow", t._1, t._2)) ~> merge
+      bcast.out(1) ~> FlowComponents.fileFeatureGenerator(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => ("File", t._1, t._2)) ~> merge
+      bcast.out(2) ~> FlowComponents.processFeatureGenerator(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => ("Process", t._1, t._2)) ~> merge
+      merge.out
+
+      FlowShape(bcast.in, merge.out)
+    }
+  )
+
 
   type Milliseconds = Long
 
@@ -901,7 +923,7 @@ object FlowComponents {
   }
 }
 
-object TitanUtils {
+object TitanFlowComponents {
 
   /* Open a Cassandra-backed Titan graph. If this is failing, make sure you've run something like
    * the following first:
@@ -947,12 +969,13 @@ object TitanUtils {
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph) = Flow[CDM17]
+  def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
     .collect{ case cdm: DBNodeable => cdm }
-    .groupedWithin(10000, 10 seconds)
+    .groupedWithin(10000, 5 seconds)
+    .via(FlowComponents.printCounter("Titan Writer"))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-      println("opened transaction")
+//      println("opened transaction")
       val transaction = graph.newTransaction()
 
       for (cdm <- cdms) {
@@ -992,15 +1015,15 @@ object TestGraph extends App {
     .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 //    .via(Streams.titanWrites(graph))
 
-  val printSink = Sink.actorRef(system.actorOf(Props[PrintActor]()), TimeMarker(0L))
 
-  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
-  val fastCommandSource = Source.tick[ProcessingCommand](6 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](20 seconds, 20 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
-//    .via(FlowComponents.printCounter("Command Source", 1))
+//  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
+//  val fastCommandSource = Source.tick[ProcessingCommand](6 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+//    .merge(Source.tick[ProcessingCommand](20 seconds, 20 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+////    .via(FlowComponents.printCounter("Command Source", 1))
+//
+//  val slowCommandSource = Source.tick[ProcessingCommand](30 seconds, 30 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+//    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 
-  val slowCommandSource = Source.tick[ProcessingCommand](30 seconds, 30 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 
   val dbFilePath = "/Users/ryan/Desktop/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
@@ -1026,19 +1049,7 @@ object TestGraph extends App {
 //  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
 
 
-  val normalizedScores = Flow.fromGraph(GraphDSL.create(){ implicit graph =>
-    val bcast = graph.add(Broadcast[CDM17](3))
-    val merge = graph.add(Merge[(String,(UUID,Double))](3))
-
-    bcast.out(0) ~> FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => "NetFlow" -> t) ~> merge
-    bcast.out(1) ~> FlowComponents.fileFeatureGenerator(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => "File" -> t) ~> merge
-    bcast.out(2) ~> FlowComponents.processFeatureGenerator(fastCommandSource, db).via(FlowComponents.anomalyScoreCalculator(slowCommandSource)).map(t => "Process" -> t) ~> merge
-    merge.out
-
-    FlowShape(bcast.in, merge.out)
-  })
-
-  normalizedScores.runWith(source, printSink)
+  FlowComponents.normalizedScores(db).runWith(source, Sink.foreach(println))
 
 
 //      .recover{ case e: Throwable => e.printStackTrace() } ~> printSink
