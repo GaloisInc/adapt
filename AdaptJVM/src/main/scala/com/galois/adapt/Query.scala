@@ -62,6 +62,7 @@ import scala.language.existentials
  *                 | traversal '.has(' string ',' literal ')'
  *                 | traversal '.has(' string ',' regex ')'
  *                 | traversal '.has(' string ',' traversal ')'
+ *                 | traversal '.has(' string ',' predicate ')'
  *                 | traversal '.hasLabel(' string ')'
  *                 | traversal '.has(label,' string ')'
  *                 | traversal '.hasId(' long ')'
@@ -97,6 +98,7 @@ import scala.language.existentials
  *                 | traversal '.select(' string ',' ... ')'
  *                 | traversal '.choose(' traversal ')'
  *                 | traversal '.option(' literal ',' traversal ')'
+ *                 | traversal '.fold()'
  *                 | traversal '.unfold()'
  *                 | traversal '.count()'
  *                 | traversal '.groupCount()'
@@ -164,49 +166,48 @@ object Query {
       var arrs: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
-      def lng: Parser[Value[java.lang.Long]] =
+      def lng: Parser[QueryValue[java.lang.Long]] =
         ( variable(lngs)
         | wholeNumber ~ "L" ^^ { case x~_ => Raw(x.toLong) }
         | wholeNumber       ^^ { x => Raw(x.toLong) }
-        ).asInstanceOf[Parser[Value[java.lang.Long]]]
-      def int: Parser[Value[Int]] =
+        ).asInstanceOf[Parser[QueryValue[java.lang.Long]]]
+      def int: Parser[QueryValue[Int]] =
         ( variable[Int](ints)
         | wholeNumber ~ "I" ^^ { case x~_ => Raw(x.toInt) }
         )
-      def str: Parser[Value[String]] =
+      def str: Parser[QueryValue[String]] =
         ( variable(strs)
         | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         )
-      def uid: Parser[Value[java.util.UUID]] = variable(uids) |
+      def uid: Parser[QueryValue[java.util.UUID]] = variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(java.util.UUID.fromString(s))
         }
-
-      def uidArr: Parser[Value[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
-      def lngArr: Parser[Value[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
-      def intArr: Parser[Value[Seq[Int]]] = variable(arrs) | arr(int)
-      def strArr: Parser[Value[Seq[String]]] = variable(arrs) | arr(str)
-      def lit: Parser[Value[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
-      def pred: Parser[Value[P[Any]]] =
+      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
+      def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
+      def intArr: Parser[QueryValue[Seq[Int]]] = variable(arrs) | arr(int)
+      def strArr: Parser[QueryValue[Seq[String]]] = variable(arrs) | arr(str)
+      def lit: Parser[QueryValue[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
+      def pred: Parser[QueryValue[P[Any]]] =
         ( predicate(uid)
         | predicate(int)
         | predicate(lng)
         | predicate(str)
-        ).asInstanceOf[Parser[Value[P[Any]]]]
+        ).asInstanceOf[Parser[QueryValue[P[Any]]]]
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
-      def variable[T](store: Set[String]): Parser[Value[T]] = ident.withFilter(store.contains(_)).map(Variable(_))
+      def variable[T](store: Set[String]): Parser[QueryValue[T]] = ident.withFilter(store.contains(_)).map(Variable(_))
       // Parse an array.
-      def arr[T](elem: Parser[Value[T]]): Parser[Value[Seq[T]]] =
+      def arr[T](elem: Parser[QueryValue[T]]): Parser[QueryValue[Seq[T]]] =
         "["~repsep(elem,",")~"]"~".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
       // Parse a regex
       def regex[T]: Parser[Regex] =
          ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
            case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
          }
-      def predicate[T](elem: Parser[Value[T]]): Parser[Value[P[T]]] =
+      def predicate[T](elem: Parser[QueryValue[T]]): Parser[QueryValue[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
         | "lte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawLtePred(l) }
@@ -225,6 +226,7 @@ object Query {
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~regex~ ")"  ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
+        | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
@@ -261,6 +263,7 @@ object Query {
         | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
         | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s)
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
+        | ".fold()"                        ^^ { case _          => Fold(_: Tr) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
         | ".groupCount()"                  ^^ { case _          => GroupCount(_: Tr) }
@@ -339,181 +342,187 @@ object QueryLanguage {
   trait Query[T] {
     // Remark: running the query may actually involve _multiple_ queries to the DB, depending on the
     // nature of the query.
-    def run(graph: Graph, context: Map[String,Value[_]] = Map()): Try[Stream[T]]
+    def run(graph: Graph, context: Map[String,QueryValue[_]] = Map()): Try[Stream[T]]
     def apply(graph: Graph): Try[Stream[T]] = run(graph)
   }
-  
-  case class AssignLiteral[E](name: String, value: Value[_], `then`: Query[E]) extends Query[E] {
-    override def run(graph: Graph, context: Map[String,Value[_]]) = `then`.run(graph, context + (name -> value))
+
+  case class AssignLiteral[E](name: String, value: QueryValue[_], `then`: Query[E]) extends Query[E] {
+    override def run(graph: Graph, context: Map[String,QueryValue[_]]) = `then`.run(graph, context + (name -> value))
   }
   case class AssignTraversal[S,E](name: String, value: Traversal[_,_], `then`: Query[E]) extends Query[E] {
-    override def run(graph: Graph, context: Map[String,Value[_]]) = for {
+    override def run(graph: Graph, context: Map[String,QueryValue[_]]) = for {
         s <- Try { value.buildTraversal(graph, context).asScala.toSeq }
         result = s.toSeq
         s1 <- `then`.run(graph, context + (name -> Raw(result)))
       } yield s1
   }
   case class DiscardTraversal[S,E](value: Traversal[_,_], `then`: Query[E]) extends Query[E] {
-      override def run(graph: Graph, context: Map[String,Value[_]]) = for {
-        _ <- Try { value.buildTraversal(graph, context) }
-        s1 <- `then`.run(graph, context)
-      } yield s1
+    override def run(graph: Graph, context: Map[String, QueryValue[_]]) = for {
+      _ <- Try {
+        value.buildTraversal(graph, context)
+      }
+      s1 <- `then`.run(graph, context)
+    } yield s1
   }
   case class FinalTraversal[E](traversal: Traversal[_,E]) extends Query[E] {
-    override def run(graph: Graph, context: Map[String,Value[_]]) = Try {
+    override def run(graph: Graph, context: Map[String,QueryValue[_]]) = Try {
       traversal.buildTraversal(graph, context).asScala.toStream
     }
   }
-  
-  
+
+
   // Represents a traversal across a graph where 'S' is the source type and 'T' the destination type
   sealed trait Traversal[S,T] {
     // Convert into a Gremlin traversal by "running" the current traversal on the graph passed in.
-    def buildTraversal(graph: Graph, context: Map[String,Value[_]]): GraphTraversal[S,T]
-  
+    def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]): GraphTraversal[S,T]
+
     // Run our traversal on a graph.
     def run(graph: Graph): Try[Stream[T]] = Try { buildTraversal(graph, Map()).asScala.toStream }
     def apply(graph: Graph): Try[Stream[T]] = run(graph)
   }
-  
-  
-  
+
+
+
   // Something that at runtime will be of type `T`
-  sealed trait Value[+T] {
-    def eval(context: Map[String,Value[_]]): T
+  sealed trait QueryValue[+T] {
+    def eval(context: Map[String,QueryValue[_]]): T
   }
-  case class Raw[T](value: T) extends Value[T] {
-    override def eval(context: Map[String,Value[_]]): T = value
+  case class Raw[T](value: T) extends QueryValue[T] {
+    override def eval(context: Map[String,QueryValue[_]]): T = value
   }
-  case class RawArr[T](values: Seq[Value[T]]) extends Value[Seq[T]] {
-    override def eval(context: Map[String,Value[_]]): Seq[T] = values.map(_.eval(context))
+  case class RawArr[T](values: Seq[QueryValue[T]]) extends QueryValue[Seq[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): Seq[T] = values.map(_.eval(context))
   }
-  case class RawEqPred[T](comp: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.eq(comp.eval(context))
+  case class RawEqPred[T](comp: QueryValue[T]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.eq(comp.eval(context))
   }
-  case class RawNeqPred[T](comp: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.neq(comp.eval(context))
+  case class RawNeqPred[T](comp: QueryValue[T]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.neq(comp.eval(context))
   }
-  case class RawLtePred[T](comp: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.lte(comp.eval(context))
+  case class RawLtePred[T](comp: QueryValue[T]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.lte(comp.eval(context))
   }
-  case class RawGtePred[T](comp: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.gte(comp.eval(context))
+  case class RawGtePred[T](comp: QueryValue[T]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.gte(comp.eval(context))
   }
-  case class RawWithinPred[T](col: Value[Seq[T]]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.within(col.eval(context): _*)
+  case class RawBetweenPred[T](lo: QueryValue[T], hi: QueryValue[T]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
   }
-  case class RawBetweenPred[T](lo: Value[T], hi: Value[T]) extends Value[P[T]] {
-    override def eval(context: Map[String,Value[_]]): P[T] = P.between(lo.eval(context),hi.eval(context))
+  case class RawWithinPred[T](col: QueryValue[Seq[T]]) extends QueryValue[P[T]] {
+    override def eval(context: Map[String,QueryValue[_]]): P[T] = P.within(col.eval(context): _*)
   }
-  case class Variable[T](name: String) extends Value[T] {
-    override def eval(context: Map[String,Value[_]]): T = context(name).eval(context).asInstanceOf[T]
+  case class Variable[T](name: String) extends QueryValue[T] {
+    override def eval(context: Map[String,QueryValue[_]]): T = context(name).eval(context).asInstanceOf[T]
   }
-  
-  
+
+
   // Sources of traversals
   // TODO: Maybe we should reconsider what the first generic parameter in 'Vertices' should do. We
   // could change it such that it is the _possible_ starting types. It would be '_' for Vertices and
   // Edges (since those don't need to assume anything), but still 'A' for Anon (since it depends on
   // what immediately preceded it).
-  case class Vertices(ids: Value[Seq[java.lang.Long]]) extends Traversal[Vertex,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Vertices(ids: QueryValue[Seq[java.lang.Long]]) extends Traversal[Vertex,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       graph.traversal().V(ids.eval(context): _*)
   }
-  case class Edges(ids: Value[Seq[java.lang.Long]]) extends Traversal[Edge,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Edges(ids: QueryValue[Seq[java.lang.Long]]) extends Traversal[Edge,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       graph.traversal().E(ids.eval(context): _*)
   }
-  case class Anon[A](starts: Value[Seq[A]]) extends Traversal[A,A] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Anon[A](starts: QueryValue[Seq[A]]) extends Traversal[A,A] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       __.__(starts.eval(context): _*)
   }
-  
-  
+
+
   // Filters of traversals
-  case class Has[S,T](traversal: Traversal[S,T], key: Value[String]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Has[S,T](traversal: Traversal[S,T], key: QueryValue[String]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(key.eval(context))
   }
-  case class HasValue[S,T,V](traversal: Traversal[S,T], k: Value[String], v: Value[V]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasValue[S,T,V](traversal: Traversal[S,T], k: QueryValue[String], v: QueryValue[V]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context),v.eval(context))
   }
-  case class HasRegex[S,T](traversal: Traversal[S,T], k: Value[String], regex: Regex) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasRegex[S,T](traversal: Traversal[S,T], k: QueryValue[String], regex: Regex) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
   }
-  case class HasTraversal[S,T](traversal: Traversal[S,T], k: Value[String], v: Traversal[_,_]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasTraversal[S,T](traversal: Traversal[S,T], k: QueryValue[String], v: Traversal[_,_]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context), v.buildTraversal(graph, context))
   }
-  case class HasLabel[S,T](traversal: Traversal[S,T], label: Value[String]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasPredicate[S,T](traversal: Traversal[S,T], k: QueryValue[String], p: QueryValue[P[_]]) extends Traversal[S,T] {
+    def buildTraversal(graph: Graph, context: Map[String, QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).has(k.eval(context), p.eval(context))
+  }
+  case class HasLabel[S,T](traversal: Traversal[S,T], label: QueryValue[String]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).hasLabel(label.eval(context))
   }
-  case class HasId[S,T](traversal: Traversal[S,T], id: Value[java.lang.Long]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasId[S,T](traversal: Traversal[S,T], id: QueryValue[java.lang.Long]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).hasId(id.eval(context))
   }
-  case class HasNot[S,T](traversal: Traversal[S,T], id: Value[String]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class HasNot[S,T](traversal: Traversal[S,T], id: QueryValue[String]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).hasNot(id.eval(context))
   }
   case class Where[S,T](traversal: Traversal[S,T], where: Traversal[_,_]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).where(where.buildTraversal(graph, context))
   }
-  case class WherePredicate[S,T](traversal: Traversal[S,T], where: Value[P[String]]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class WherePredicate[S,T](traversal: Traversal[S,T], where: QueryValue[P[String]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).where(where.eval(context))
   }
   case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).and(anded.map(_.buildTraversal(graph, context)): _*)
   }
   case class Or[S,T](traversal: Traversal[S,T], ored: Seq[Traversal[_,_]]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).or(ored.map(_.buildTraversal(graph, context)): _*)
   }
   case class Dedup[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).dedup()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).dedup()
   }
-  case class Limit[S,T](traversal: Traversal[S,T], lim: Value[java.lang.Long]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Limit[S,T](traversal: Traversal[S,T], lim: QueryValue[java.lang.Long]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).limit(lim.eval(context))
   }
-  case class Is[S,T](traversal: Traversal[S,T], value: Value[Any]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Is[S,T](traversal: Traversal[S,T], value: QueryValue[Any]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).is(value.eval(context))
   }
   // TODO: figure out how to get this to compile with pred: Value[P[T]]
-  case class IsPredicate[S,T](traversal: Traversal[S,T], pred: Value[P[Any]]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class IsPredicate[S,T](traversal: Traversal[S,T], pred: QueryValue[P[Any]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).is(pred.eval(context))
   }
-  case class Times[S,T](traversal: Traversal[S,T], limit: Value[Int]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Times[S,T](traversal: Traversal[S,T], limit: QueryValue[Int]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).times(limit.eval(context))
   }
   case class SimplePath[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).simplePath()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).simplePath()
   }
-  
-  
+
+
   // Indirect
   case class Order[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).order()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).order()
   }
-  case class By[S,T](traversal: Traversal[S,T], key: Value[String]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class By[S,T](traversal: Traversal[S,T], key: QueryValue[String]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).by(key.eval(context))
   }
   case class ByToken[S,T](traversal: Traversal[S,T], token: Token) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).by(token)
   }
   case class ByTraversal[S,T](traversal: Traversal[S,T], comp: Traversal[_,_], incr: Boolean) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = {
       val incrComp = new Comparator[java.lang.Long] {
         override def compare(x1: java.lang.Long, x2: java.lang.Long): Int = x1.compareTo(x2)
       }
@@ -523,150 +532,154 @@ object QueryLanguage {
       )
     }
   }
-  case class As[S,T](traversal: Traversal[S,T], labels: Value[Seq[String]]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
+  case class As[S,T](traversal: Traversal[S,T], labels: QueryValue[Seq[String]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = {
       val labels1 = labels.eval(context)
       traversal.buildTraversal(graph,context).as(labels1(0), labels1.drop(1): _*)
     }
   }
   case class Until[S,E](traversal: Traversal[S,E], cond: Traversal[_,_]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]])
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]])
       = traversal.buildTraversal(graph,context).until(cond.buildTraversal(graph, context))
   }
-  case class Aggregate[S,E](traversal: Traversal[S,E], key: Value[String]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]])
+  case class Aggregate[S,E](traversal: Traversal[S,E], key: QueryValue[String]) extends Traversal[S,E] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]])
       = traversal.buildTraversal(graph,context).aggregate(key.eval(context))
-  } 
-  
+  }
+
+
   // Reduce/extract
-  case class Values[S,T,V](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,V] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Values[S,T,V](traversal: Traversal[S,T], keys: QueryValue[Seq[String]]) extends Traversal[S,V] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).values(keys.eval(context): _*)
   }
-  case class ValueMap[S,T,E](traversal: Traversal[S,T], keys: Value[Seq[String]]) extends Traversal[S,java.util.Map[String,E]] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class ValueMap[S,T,E](traversal: Traversal[S,T], keys: QueryValue[Seq[String]]) extends Traversal[S,java.util.Map[String,E]] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).valueMap(keys.eval(context): _*)
   }
   case class Label[S,T](traversal: Traversal[S,T]) extends Traversal[S,String] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).label()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).label()
   }
   case class Id[S,T](traversal: Traversal[S,T]) extends Traversal[S,java.lang.Object] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).id()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).id()
   }
   case class Emit[S,E](traversal: Traversal[S,E]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).emit()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).emit()
   }
   case class EmitTrav[S,E](traversal: Traversal[S,E], emit: Traversal[_,_]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).emit(emit.buildTraversal(graph,context))
   }
   case class Max[S](traversal: Traversal[S,java.lang.Long]) extends Traversal[S,java.lang.Long] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).max()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).max()
   }
   case class Min[S](traversal: Traversal[S,java.lang.Long]) extends Traversal[S,java.lang.Long] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).min()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).min()
   }
   case class Sum[S](traversal: Traversal[S,java.lang.Double]) extends Traversal[S,java.lang.Double] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).sum()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).sum()
   }
-  case class Select[S,T](traversal: Traversal[S,_], key: Value[String]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Select[S,T](traversal: Traversal[S,_], key: QueryValue[String]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).select(key.eval(context))
   }
-  case class SelectMult[S,T](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,java.util.Map[String,T]] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
+  case class SelectMult[S,T](traversal: Traversal[S,_], keys: QueryValue[Seq[String]]) extends Traversal[S,java.util.Map[String,T]] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = {
       val keys1 = keys.eval(context)
       traversal.buildTraversal(graph,context).select(keys1(0), keys1(1), keys1.drop(2): _*)
     }
   }
+  case class Fold[S,T](traversal: Traversal[S,T]) extends Traversal[S,java.util.List[T]] {
+    def buildTraversal(graph: Graph, context: Map[String, QueryValue[_]]) = traversal.buildTraversal(graph,context).fold()
+  }
   case class Unfold[S,T](traversal: Traversal[S,_]) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).unfold()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).unfold()
   }
   case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Long] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).count()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).count()
   }
   case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).groupCount()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).groupCount()
   }
   case class PathTraversal[S](traversal: Traversal[S,_]) extends Traversal[S,Path] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).path()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).path()
   }
   case class UnrollPath[S](traversal: Traversal[S,Path]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).flatMap(new java.util.function.Function[Traverser[Path],Iterator[Vertex]]() {
         def apply(t: Traverser[Path]): Iterator[Vertex] =
           t.get().objects().iterator().asInstanceOf[Iterator[Vertex]]
       })
   }
-  
-  
+
+
   // Extend outwards
-  case class Both[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Both[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).both(edgeLabels.eval(context): _*)
   }
   case class BothV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).bothV()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).bothV()
   }
-  case class Out[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Out[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).out(edgeLabels.eval(context): _*)
   }
   case class OutV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).outV()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).outV()
   }
-  case class In[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class In[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Vertex] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).in(edgeLabels.eval(context): _*)
   }
   case class InV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).inV()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inV()
   }
   case class BothE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).bothE()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).bothE()
   }
-  case class OutE[S](traversal: Traversal[S,Vertex], edgeLabels: Value[Seq[String]]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class OutE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).outE(edgeLabels.eval(context): _*)
   }
   case class InE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = traversal.buildTraversal(graph,context).inE()
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inE()
   }
   case class Repeat[S](traversal: Traversal[S,Edge], rep: Traversal[_,Edge]) extends Traversal[S,Edge]{
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).repeat(rep.buildTraversal(graph, context))
   }
   case class Union[S,E](traversal: Traversal[S,_], unioned: Seq[Traversal[_,E]]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).union(unioned.map(_.buildTraversal(graph, context)): _*)
   }
   case class Local[S,E](traversal: Traversal[S,_], loc: Traversal[_,E]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).local(loc.buildTraversal(graph, context))
   }
   case class Match[S,E](traversal: Traversal[S,_], matches: Seq[Traversal[_,_]]) extends Traversal[S,java.util.Map[String,E]] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).`match`(matches.map(_.buildTraversal(graph, context)): _*)
   }
-  case class Properties[S](traversal: Traversal[S,_], keys: Value[Seq[String]]) extends Traversal[S,GremlinProperty[_]] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class Properties[S](traversal: Traversal[S,_], keys: QueryValue[Seq[String]]) extends Traversal[S,GremlinProperty[_]] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).properties(keys.eval(context)
       :_*).asInstanceOf[GraphTraversal[S,GremlinProperty[_]]]
   }
   case class Choose[S,E](traversal: Traversal[S,E], choice: Traversal[_,_]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).choose(choice.buildTraversal(graph, context))
   }
-  case class OptionTrav[S,E](traversal: Traversal[S,E], value: Value[_], option: Traversal[_,_]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) =
+  case class OptionTrav[S,E](traversal: Traversal[S,E], value: QueryValue[_], option: Traversal[_,_]) extends Traversal[S,E] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).option(value.eval(context), option.asInstanceOf[Traversal[E,_]].buildTraversal(graph, context))
   }
-  
-  
-  
+
+
+
   // Mutating
-  case class Property[S,E](traversal: Traversal[S,E], keys: Value[Seq[String]], values: Value[Seq[_]]) extends Traversal[S,E] {
-    override def buildTraversal(graph: Graph, context: Map[String,Value[_]]) = {
+  case class Property[S,E](traversal: Traversal[S,E], keys: QueryValue[Seq[String]], values: QueryValue[Seq[_]]) extends Traversal[S,E] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = {
       val keys1 = keys.eval(context)
       val values1 = values.eval(context)
       traversal.buildTraversal(graph,context).property(

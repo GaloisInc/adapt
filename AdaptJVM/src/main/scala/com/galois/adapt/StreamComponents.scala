@@ -42,7 +42,7 @@ case class SubjectEventCount(
 // TODO: put this somewhere else
 trait ProcessingCommand extends CDM17
 case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
-case object Emit extends ProcessingCommand
+case object EmitCmd extends ProcessingCommand
 case object CleanUp extends ProcessingCommand
 
 object Streams {
@@ -111,7 +111,7 @@ object FlowComponents {
         val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
 
         {
-          case Emit =>
+          case EmitCmd =>
             val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
             existingSet ++= events
             dbMap.put(uuid.get, existingSet)
@@ -148,7 +148,7 @@ object FlowComponents {
         val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence))
 
         {
-          case Emit =>
+          case EmitCmd =>
             val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.sequence)))
             existingSet ++= events
             dbMap.put(uuid.get, existingSet)
@@ -230,7 +230,7 @@ object FlowComponents {
 //            }
             List.empty
 
-          case Emit => List.empty
+          case EmitCmd => List.empty
         }
       }.mergeSubstreams
   }
@@ -332,7 +332,7 @@ object FlowComponents {
 //            }
             List.empty
 
-          case Emit =>
+          case EmitCmd =>
             fileUuids.foreach(u =>
               fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
                 fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
@@ -485,7 +485,7 @@ object FlowComponents {
 //            and similar for all events BY this process
             List.empty
 
-          case Emit =>
+          case EmitCmd =>
             fileUuids.foreach(u =>
               fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) ++
                 fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) )
@@ -639,7 +639,7 @@ object FlowComponents {
 
         case CleanUp => List.empty
 
-        case Emit =>
+        case EmitCmd =>
           val randomNum = Random.nextLong()
           val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_$randomNum.csv")
           val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_$randomNum.csv")
@@ -691,7 +691,7 @@ object FlowComponents {
 
   def commandSource(cleanUpSeconds: Int, emitSeconds: Int) =
     Source.tick[ProcessingCommand](cleanUpSeconds seconds, cleanUpSeconds seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-      .merge(Source.tick[ProcessingCommand](emitSeconds seconds, emitSeconds seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+      .merge(Source.tick[ProcessingCommand](emitSeconds seconds, emitSeconds seconds, EmitCmd).buffer(1, OverflowStrategy.backpressure))
 
 
   def normalizedScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50) = Flow.fromGraph(
