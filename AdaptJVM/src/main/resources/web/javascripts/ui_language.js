@@ -1,41 +1,36 @@
+
 var starting_queries = [
-    {
-        name : "find file by name & version",
-        base_query : "g.V().has(label,'Entity-File').has('url','{_}').has('file-version',{_}).dedup()",
-        default_values : ["file:///tmp/zqxf1",1]
+
+     {
+        name : "find file by predicateObject file path",
+        base_query : "g.V().hasLabel('FileObject').as('file').in('predicateObject').hasLabel('Event').has('predicateObjectPath','{_}').select('file')",
+        default_values : ["<filename>"]
     }, {
-        name : "find file by partial name",
-        base_query : "g.V().has(label,'Entity-File').has('url',regex('.*{_}.*')).has('file-version',{_}).dedup()",
-        default_values : ["file:///tmp/zqxf1",1]
+        name : "find file by predicateObject2 file path",
+        base_query : "g.V().hasLabel('FileObject').as('file').in('predicateObject2').hasLabel('Event').has('predicateObjectPath2','{_}').select('file')",
+        default_values : ["<filename>"]
     }, {
-        name : "find anomalous processes",
-        base_query : "g.V().has(label,'Subject').has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
-        default_values : [10]
-    }, {
-        name : "find anomalous netflows",
-        base_query : "g.V().has('eventType',6).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup().has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
-        default_values : [10]
-    }, {
-        name : "find anomalous files",
-        base_query : "g.V().has('eventType',21).out('EDGE_EVENT_AFFECTS_FILE out').out('EDGE_EVENT_AFFECTS_FILE in').dedup().has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit({_})",
-        default_values : [10]
+        name : "find file by file descriptor",
+        base_query : "g.V().hasLabel('FileObject').has('fileDescriptor',{_}).dedup()",
+        default_values : ["1"]
     }, {
         name : "find process by pid",
-        base_query : "g.V().has(label,'Subject').has('subjectType',0).has('pid',{_}).dedup().by('pid')",
-        default_values : [1001]
+        base_query : "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').has('cid',{_})",
+        default_values : ["1001"]
     }, {
         name : "find up to n processes of an owner",
-        base_query : "g.V().has(label,'localPrincipal').has('userID',{_}).both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out().has('label','Subject').has('subjectType',0).limit({_})",
-        default_values : [1234,10]
+        base_query : "g.V().hasLabel('Principal').has('userId','{_}').in('localPrincipal').hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').limit({_})",
+        default_values : ["10004",10]
     }, {
-        name : "find NetFlow by dstAddress & port",
-        base_query : "g.V().has(label,'Entity_NetFlow').has('dstAddress','{_}').has('port',{_}).dedup()",
+        name : "find NetFlow by local address & port",
+        base_query : "g.V().hasLabel('NetFlowObject').has('localAddress','{_}').has('localPort',{_}).dedup()",
         default_values : ["127.0.0.1",80]
     }, {
-        name : "find APTs labeled by DX",
-        base_query : "g.V().has(label,'APT')",
-        default_values : []
+        name : "find NetFlow by remote address & port",
+        base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_}).dedup()",
+        default_values : ["127.0.0.1",80]
     }
+
 ]
 
 var node_appearance = [
@@ -48,155 +43,119 @@ var node_appearance = [
         size: 54
         // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
     }, {
-        name : "AnomFile",
-        is_relevant : function(n) { return n.label === "Entity-File" && n['properties'].hasOwnProperty('anomalyScore') },
-        icon_unicode : "\uf41b",
-        size: 40,
-        color: "red",
-        make_node_label : function(node) {
-            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
-            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
-            var anom = anomtype + anomscore
-            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-            return url + " ; " + file_version + " " + anom
-        }
-    }, {
         name : "File",
-        is_relevant : function(n) { return n.label === "Entity-File" },
+        is_relevant : function(n) { return n.label === "FileObject" },
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
-            var url = (node['properties'].hasOwnProperty('url') ? node['properties']['url'][0]['value'] : "None")
-            var file_version = (node['properties'].hasOwnProperty('file-version') ? node['properties']['file-version'][0]['value'] : "None")
-            return url + " ; " + file_version
+           var fd = (node.hasOwnProperty('fileDescriptor') ? node['fileDescriptor'][0]['value'] : "None")
+            var fp = (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "None")
+            var fsize = (node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "None")
+            return fp + " \n of size " + fsize + " @ descr " + fd
         }
-    }, {
-        name : "Memory",
-        is_relevant : function(n) { return n.label === "Entity-Memory" },
+    },
+    {
+        name : "MemoryObject",
+        is_relevant : function(n) { return n.label === "MemoryObject" },
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
-            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
-            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
-            var anom = anomtype + anomscore
-            var addr = (node['properties'].hasOwnProperty('address') ? node['properties']['address'][0]['value'] : "None")
-            var size = (node['properties'].hasOwnProperty('properties') ? node['properties']['properties'][0]['value'] : "None")
-            return size + "@" + addr + " " + anom
+            var addr = (node['properties'].hasOwnProperty('memoryAddress') ? node['properties']['memoryAddress'][0]['value'] : "None")
+            var size = (node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "None")
+            return size + "@" + addr
         }
     }, {
-        name : "Agent",
-        is_relevant : function(n) { return n.label === "Agent" },
-        icon_unicode : "\uf25d",
+        name : "Pipe",
+        is_relevant : function(n) { return n.label === "UnnamedPipeObject" },
+        icon_unicode : "\uf2c0",
+        size: 40,
+        make_node_label : function(node) {
+            var source = (node['properties'].hasOwnProperty('sourceFileDescriptor') ? node['properties']['sourceFileDescriptor'][0]['value'] : "None")
+            var sink = (node['properties'].hasOwnProperty('sinkFileDescriptor') ? node['properties']['sinkFileDescriptor'][0]['value'] : "None")
+            return "src:" + source + ", sink:" + sink
+        }
+    }, {
+        name : "Principal",
+        is_relevant : function(n) { return n.label === "Principal" },
+        icon_unicode : "\uf419",
         size: 50,
         make_node_label : function(node) {
-            var at = (node['properties'].hasOwnProperty('agentType') ? node['properties']['agentType'][0]['value'] : "None")
-            return at + " userID " + node['properties']['userID'][0]['value']
+            var at = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'][0]['value'] : "None")
+            return at + " userId " + node['properties']['userId'][0]['value']
         }
-    }, {
-        name : "AnomEntity-NetFlow",
-        is_relevant : function(n) { return n.label === "Entity-NetFlow" &&  n['properties'].hasOwnProperty('anomalyScore') },
-        icon_unicode : "\uf262",
-        color: "red",
-        make_node_label : function(node) {
-            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
-            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
-            var anom = anomtype + anomscore
-            var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
-            var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-            return dest + " : " + port + " " + anom
-        }
-    }, {
-        name : "Entity-NetFlow",
-        is_relevant : function(n) { return n.label === "Entity-NetFlow" },
+   }, {
+        name : "NetFlow",
+        is_relevant : function(n) { return n.label === "NetFlowObject" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
-            var dest = (node['properties'].hasOwnProperty('dstAddress') ? node['properties']['dstAddress'][0]['value'] : "None")
-            var port = (node['properties'].hasOwnProperty('dstPort') ? node['properties']['dstPort'][0]['value'] : "None")
-            return dest + " : " + port + " "
+            var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None")
+            var localP = (node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None")
+            var remoteA = (node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None")
+            var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None")
+            return "local: " + localA + ":" + localP + ", remote: " + remoteA + ":" + remoteP
         }
-    }, {
-        name : "AnomSubject",
-        is_relevant : function(n) { return n.label === "Subject" &&  n['properties'].hasOwnProperty('anomalyScore') },
+   }, {
+        name : "RegistryKey",
+        is_relevant : function(n) { return n.label === "RegistryKeyObject" },
+        icon_unicode : "\uf296",
+        make_node_label : function(node) {
+            var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'][0]['value'] : "None")
+            var val = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
+            return key + ": " + value
+        }
+   }, {
+        name : "Event",
+        is_relevant : function(n) { return n.label === "Event" },
         icon_unicode : "\uf375",
-        color: "red",
         make_node_label : function(node) {
-            var anomscore = (node['properties'].hasOwnProperty('anomalyScore') ? ": " + node['properties']['anomalyScore'][0]['value'] : "")
-            var anomtype = (node['properties'].hasOwnProperty('anomalyType') ? "\n" + node['properties']['anomalyType'][0]['value'] : "")
-            var anom = anomtype + anomscore
-            var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-            var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
-            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-            var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
-            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? new Date(node['properties']['startedAtTime'][0]['value']/1000).toGMTString() + " ." + node['properties']['startedAtTime'][0]['value']%1000 : "no timestamp")
-            switch(t) {
-                case "Process":
-                    return t + " " + pid + " \n " + timestamp + " " + anom
-                case "Thread":
-                    return t + " of " + pid + " \n " + timestamp + " " + anom
-                case "Event":
-                    if (e === "Write" || e === "Read") {
-                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ") #" + seq + "\n" + timestamp
-                    } else { 
-                        return t + " " + e + " #" + seq + "\n" + timestamp
-                    }
-                default:
-                    return t + " seq:" + seq + ", @" + timestamp + " " + anom
-            }
+            var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "None")
+            var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+            var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "None")
+            var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
+            return type + ", seq:" + sequence + " \n ppt:" + programPoint // + " \n " + name
+        }
+   }, {
+        name : "SrcSink",
+        is_relevant : function(n) { return n.label === "SrcSinkObject" },
+        icon_unicode : "\uf313",
+        make_node_label : function(node) {
+            var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'][0]['value'] : "None")
+            var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "None")
+            return type + " \n uuid: " + uuid
+        }
+   }, {
+        name : "PTN",
+        is_relevant : function(n) { return n.label === "ProvenanceTagNode" },
+        icon_unicode : "\uf277",
+        make_node_label : function(node) {
+            var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
+            var opcode = (node['properties'].hasOwnProperty('opcode') ? node['properties']['opcode'][0]['value'] : "None")
+            var itag = (node['properties'].hasOwnProperty('itag') ? node['properties']['itag'][0]['value'] : "None")
+            var ctag = (node['properties'].hasOwnProperty('ctag') ? node['properties']['ctag'][0]['value'] : "None")
+            return "function:" + opcode +  /* ", call:" + systemCall +  */ " \n itag:" + itag + ", ctag: " + ctag
         }
     }, {
-        name : "Subject",
+       name : "Subject",
         is_relevant : function(n) { return n.label === "Subject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-           var e = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-            var pid = (node['properties'].hasOwnProperty('pid') ? node['properties']['pid'][0]['value'] : "None")
+            var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
             var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-            var seq = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "no seq #")
-            var timestamp = (node['properties'].hasOwnProperty('startedAtTime') ? new Date(node['properties']['startedAtTime'][0]['value']/1000).toGMTString() + " ." + node['properties']['startedAtTime'][0]['value']%1000 : "no timestamp")
+            var cmd = (node['properties'].hasOwnProperty('cmdLine') ? node['properties']['cmdLine'][0]['value'] : "no cmd line")
+            var timestamp = (node['properties'].hasOwnProperty('startedTimestampNanos') ? new Date(node['properties']['startTimestampNanos'][0]['value']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos'][0]['value']%1000 : "no timestamp")
             switch(t) {
-                case "Process":
-                    return t + " " + pid + " \n " + timestamp
-                case "Thread":
-                    return t + " of " + pid + " \n " + timestamp
-                case "Event":
-                    if (e === "Write" || e === "Read") {
-                        var temp = node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "size unknown"
-                        return t + " " + e + " (" + temp + ") #" + seq + "\n" + timestamp
-                    } else { 
-                        return t + " " + e + " #" + seq + "\n" + timestamp
-                    }
+                case "SUBJECT_PROCESS":
+                    return "Process: " + cid + " \n cmd: " + cmd + " \n " + timestamp
+                case "SUBJECT_THREAD":
+                    return "Thread " + cid + " \n " + timestamp
+                case "SUBJECT_UNIT":
+                    return "Unit " + cid + " \n " + timestamp
                 default:
-                    return t + " seq:" + seq + ", @" + timestamp
+                    return t + ", @" + timestamp
             }
         }
     }, {
-        name : "Activity",
-        is_relevant : function(n) { return n.label === "Activity" },
-        icon_unicode : "\uf29a",
-        size: 30,
-        make_node_label : function(node) {
-            return addr = (node['properties'].hasOwnProperty('activity:type') ? node['properties']['activity:type'][0]['value'] : "None")
-        }
-    }, {
-        name : "Phase",
-        is_relevant : function(n) { return n.label === "Phase" },
-        icon_unicode : "\uf228",
-        size: 30,
-        make_node_label : function(node) {
-            return addr = (node['properties'].hasOwnProperty('phase:name') ? node['properties']['phase:name'][0]['value'] : "None")
-        }
-    }, {
-        name : "APT",
-        is_relevant : function(n) { return n.label === "APT" },
-        icon_unicode : "\uf229",
-        size: 30,
-        make_node_label : function(node) {
-            return "APT"
-        }
-    }, {
-        name : "Default",   // This will override anything below here!!!!
+        name : "Default",   // This default will override anything below!
         is_relevant : function(n) { return true },
         icon_unicode : "\uf3a6",
         size: 30,
@@ -207,167 +166,220 @@ var node_appearance = [
     }
 ]
 
+
 var predicates = [
+// ProvenanceTagNode
     {
-        name : "Annotated Activities",
-        is_relevant : function(n) {return n.label === "Segment"},
-        floating_query : ".out('segment:activity')",
+       name: "refObject",
+       is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+       floating_query : ".out('flowObject')",
+       is_default : true
     }, {
-        name : "Segment Low-level Events",
-        is_relevant : function(n) {return n.label === "Segment"},
-        floating_query : ".out('segment:includes')",
+        name: "refSubject",
+        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        floating_query : ".out('subject')"
     }, {
-        name : "APT Phases",
-        is_relevant : function(n) {return n.label === "APT"},
-        floating_query : ".out('apt:includes')",
+        name: "ancestor tags",
+        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        floating_query : ".emit().repeat(_.out('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
     }, {
-        name : "APT Phase Segments",
-        is_relevant : function(n) {return n.label === "Phase"},
-        floating_query : ".out('phase:includes')",
-    }, {
-        name : "APT Phase Low-level Events",
-        is_relevant : function(n) {return n.label === "Phase"},
-        floating_query : ".out('phase:includes').out('segment:includes')",
-    }, {
-        name : "File Events",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".out().or(_.hasLabel('EDGE_EVENT_AFFECTS_FILE'),_.hasLabel('EDGE_FILE_AFFECTS_EVENT')).out()",
+        name: "descendant tags",
+        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        floating_query : ".emit().repeat(_.in('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
+    },
+// File Object
+    {
+       name : "Events",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
-        name : "Event By...",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'][0]['value'] === 4},
-        floating_query : ".out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out()",
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
+    }, {
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".in('flowObject')"
+    }, {
+        name : "Progenance",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup()"
+    }, {
+        name : "Subjects reading",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
+    }, {
+        name : "Subjects Executing",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_EXECUTE').out('subject')"
+    }, {
+        name : "Subjects Writing",
+        is_relevant : function(n) {return n.label === "FileObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
+    }, 
+// Memory Object
+    {
+       name : "Events",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
-        name : "Agent's Processes",
-        is_relevant : function(n) { return n.label === "Agent"},
-        floating_query: ".in().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').in()",
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
+    }, {
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".in('flowObject')"
+    }, {
+        name : "Progenance",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup()"
+    }, {
+        name : "Subjects reading",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
+    }, {
+        name : "Subjects Executing",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_EXECUTE').out('subject')"
+    }, {
+        name : "Subjects Writing",
+        is_relevant : function(n) {return n.label === "MemoryObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
+    }, 
+// Subject
+        {
+        name : "Events Caused",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'][0]['value'] === 'SUBJECT_PROCESS'},
+        floating_query : ".in('subject').hasLabel('Event')",
         is_default : true
     }, {
-        name : "Agent's Segments",
-        is_relevant : function(n) { return n.label === "Agent"},
-        floating_query: ".in('segment:includes')",
+        name : "Principal",
+        is_relevant : function(n) {return n.label === "Subject" },
+        floating_query : ".out('localPrincipal')",
         is_default : true
     }, {
-        name : "File Lineage",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".union(_.until(_.out().hasLabel('EDGE_OBJECT_PREV_VERSION').count().is(0)).repeat(_.out().hasLabel('EDGE_OBJECT_PREV_VERSION').out().as('a')).select('a').unfold(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',17).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().hasLabel('Subject').has('eventType',20).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File').dedup(),_.in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().dedup())"
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "Subject"},
+        floating_query : ".as('subjectOfInterest').emit().repeat(_.out('parentSubject')).select('subjectOfInterest').union(_,_.out('localPrincipal')).select('subjectOfInterest').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).path().unrollPath().dedup()"
     }, {
-        name : "Previous version",
-        is_relevant : function(n) {return n.label === "Entity-File" && n['properties']['file-version'][0]['value'] > 0},
-        floating_query : ".outE('EDGE_OBJECT_PREV_VERSION out').inV().outE('EDGE_OBJECT_PREV_VERSION in').inV()"
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "Subject"},
+        floating_query : ".in('subject').hasLabel('ProvenanceTagNode')"
     }, {
-        name : "Process Owner",
-        is_relevant : function(n) {return n.label === "Subject" /*&& n['properties']['subjectType'][0]['value'] == 0 */},
-        floating_query : ".both().hasLabel('EDGE_SUBJECT_HASLOCALPRINCIPAL').out()",
+        name : "Children",
+        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 'SUBJECT_PROCESS'},
+        floating_query : ".in('parentSubject')"
+    }, 
+// Unnamed Pipe Object
+        {
+        name : "Processes connected",
+        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        floating_query : ".union(_.in('predicateObject',_.in('predicateObject2')).out('subject')"
+    }, {
+        name : "Events",
+        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
+        is_default : true
+    }, 
+// NetFlowObject
+    {
+       name : "Events",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
-        name : "Next version",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".in().hasLabel('EDGE_OBJECT_PREV_VERSION').in()"
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "Readers",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',17).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".in('flowObject')"
     }, {
-        name : "Executor",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".out().hasLabel('EDGE_FILE_AFFECTS_EVENT').out().has('eventType',9).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
+        name : "Progenance",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "Writer",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',21).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
+        name : "Subjects Reading",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
-        name : "ChModder",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_FILE').in().has('eventType',14).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out()"
+        name : "Subjects Writing",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
-        name : "Mmaps to",
-        is_relevant : function(n) {return n.label === "Entity-File"},
-        floating_query : ".out().hasLabel('EDGE_FILE_AFFECTS_EVENT').out().has('eventType',13).both().hasLabel('EDGE_EVENT_AFFECTS_MEMORY').out().hasLabel('Entity-Memory')"
+        name : "Processes connected",
+        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).out('subject')"
+   }, 
+// SrcSinkObject
+    {
+       name : "Events",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
+        is_default : true
     }, {
-        name : "My commands (text)",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".as('parent').union(_.values('commandLine').as('cmd'), _.until(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).count().is(0)).repeat(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',10).out().has(label,'EDGE_EVENT_AFFECTS_SUBJECT').out().has(label,'Subject').has('subjectType',0)).values('commandLine').as('cmd')).select('parent').dedup().values('pid').as('parent_pid').select('parent_pid','cmd')"
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "My mmaps",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',13).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in()"
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".in('flowObject')"
     }, {
-        name : "My protects",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',15).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in()"
+        name : "Progenance",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "My parent",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".as('child').in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().both().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().has('pid',_.select('child').values('ppid'))"
+        name : "Subjects Reading",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
-        name : "Files I wrote",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',21).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"
+        name : "Subjects Writing",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
-        name : "Files I read",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',17).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File').dedup().by('url')"
+        name : "Processes connected",
+        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        floating_query : ".union(_.in('predicateObject',_.in('predicateObject2')).out('subject')"
+   }, 
+// Registry Key Object
+    {
+       name : "Events",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
+        is_default : true
     }, {
-        name : "Files I created",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',7).in().hasLabel('EDGE_FILE_AFFECTS_EVENT').in().hasLabel('Entity-File')"
+        name : "Provenance",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "Files I deleted",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().has('eventType',12).out().hasLabel('EDGE_EVENT_AFFECTS_FILE').out().hasLabel('Entity-File')"
+        name : "PTN",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".in('flowObject')"
     }, {
-        name : "My children",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',10).outE().inV().hasLabel('Subject')"
+        name : "Progenance",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup()"
     }, {
-        name : "My ancestors",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".until(_.both().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').count().is(0)).repeat(_.has('subjectType',0).in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).as('b')).select('b').unfold()"
+        name : "Subjects Reading",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
-        name : "Owner changed by",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_SUBJECT').in().hasLabel('Subject').has('subjectType',4).has('eventType',2).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "URLs Executed",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',9).in('EDGE_FILE_AFFECTS_EVENT in').in('EDGE_FILE_AFFECTS_EVENT out').dedup()"
-    }, {
-        name : "NetFlow Read",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',17).in('EDGE_NETFLOW_AFFECTS_EVENT in').in('EDGE_NETFLOW_AFFECTS_EVENT out').dedup()"
-    }, {
-        name : "NetFlow Written",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 0},
-        floating_query : ".in('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').in('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').has('eventType',21).out('EDGE_EVENT_AFFECTS_NETFLOW out').out('EDGE_EVENT_AFFECTS_NETFLOW in').dedup()"
-    }, {
-        name : "Receiver",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".out().hasLabel('EDGE_NETFLOW_AFFECTS_EVENT').out().hasLabel('Subject').has('eventType',19).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').out().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "Sender",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_NETFLOW').in().has('eventType',34).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "Closer",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_NETFLOW').in().has('eventType',5).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "Binder",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_NETFLOW').in().has('eventType',1).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "Connected to",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".in().hasLabel('EDGE_EVENT_AFFECTS_NETFLOW').in().has('eventType',6).out().hasLabel('EDGE_EVENT_ISGENERATEDBY_SUBJECT').both().hasLabel('Subject').has('subjectType',0).dedup().by('pid')"
-    }, {
-        name : "Reader",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".out('EDGE_NETFLOW_AFFECTS_EVENT out').out('EDGE_NETFLOW_AFFECTS_EVENT in').has('eventType',17).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
-    }, {
-        name : "Writer",
-        is_relevant : function(n) {return n.label === "Entity-NetFlow"},
-        floating_query : ".in('EDGE_EVENT_AFFECTS_NETFLOW in').in('EDGE_EVENT_AFFECTS_NETFLOW out').has('eventType',21).out('EDGE_EVENT_ISGENERATEDBY_SUBJECT out').out('EDGE_EVENT_ISGENERATEDBY_SUBJECT in').dedup().by('pid')"
+        name : "Subjects Writing",
+        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
+   }, 
+
+// Principal
+        {
+        name : "Processes owned",
+        is_relevant : function(n) { return n.label === "Principal"},
+        floating_query: ".in('localPrincipal').hasLabel('Subject')",
+        is_default : true
     }
 ]
+
