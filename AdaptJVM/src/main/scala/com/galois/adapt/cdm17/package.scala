@@ -5,7 +5,6 @@ import java.util.UUID
 import java.nio.ByteBuffer
 
 import com.bbn.tc.schema.avro.cdm17.TCCDMDatum
-
 import com.bbn.tc.schema.avro.{cdm17 => bbnCDM15}
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
@@ -32,10 +31,14 @@ package object cdm17 {
       }
     }
 
-    def readAvroFile(filePath: String): Try[(InstrumentationSource, Iterator[RawCDM15Type])] = Try {
+    def readAvroAsTCCDMDatum(filePath: String): Iterator[TCCDMDatum] = {
       val tcDatumReader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
       val tcFileReader: DataFileReader[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = new DataFileReader(new java.io.File(filePath), tcDatumReader)
-      val tcIterator = tcFileReader.iterator.asScala
+      tcFileReader.iterator().asScala
+    }
+
+    def readAvroFile(filePath: String): Try[(InstrumentationSource, Iterator[RawCDM15Type])] = Try {
+      val tcIterator = readAvroAsTCCDMDatum(filePath)
 
       val cdm = tcIterator.next()
       val first: RawCDM15Type = {
@@ -43,7 +46,7 @@ package object cdm17 {
           throw new Exception(s"Expected CDM17, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM15Type(cdm.getDatum)
       }
-      (cdm.getSource, Iterator(first) ++ tcFileReader.iterator.asScala.map(cdm => new RawCDM15Type(cdm.getDatum)))
+      (cdm.getSource, Iterator(first) ++ tcIterator.map(cdm => new RawCDM15Type(cdm.getDatum)))
     }
 
     def parse(cdm: RawCDM15Type) = cdm.o match {
