@@ -16,12 +16,8 @@ import com.galois.adapt.cdm17.{CDM17, EVENT_READ, EVENT_WRITE, EpochMarker, Even
 import java.io.File
 
 import akka.NotUsed
-import akka.kafka.ProducerSettings
-import akka.kafka.scaladsl.Producer
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, RunnableGraph, Sink, Source}
-import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
-import akka.kafka._
 
 import scala.collection.JavaConversions._
 import scala.util.Try
@@ -137,49 +133,38 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     val accept = context.actorOf(Props(classOf[AcceptanceTestsActor], registryProxy), "AcceptanceTestsActor")
     childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(accept)))   // TODO: These sets are not used correctly
   
-//  case "devfeatures" =>
-//    val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
-//    val processWrites = context.actorOf(Props(classOf[ProcessEvents], registryProxy), "ProcessWrites")
-//    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
-//    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
+  case "devfeatures" =>
+    val fileWrites = context.actorOf(Props(classOf[FileWrites], registryProxy), "FileWrites")
+    val processWrites = context.actorOf(Props(classOf[ProcessEvents], registryProxy), "ProcessWrites")
+    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
+    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
 
-  case "rankedui" =>
-    val rankedDataActor = context.actorOf(Props(classOf[RankedDataActor], registryProxy), "RankedDataActor")
-    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(rankedDataActor)))   // TODO: These sets are not used correctly
+  case "stream1" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val rankedData = context.actorOf(Props(classOf[RankedDataActor]))
+    val rankedDataSink = Sink.actorRef(rankedData, TimeMarker(0L))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processWritesFile(cdmSource.map(_.get), rankedDataSink)))
+    childActors = childActors + (roleName -> Set(streamActor))
 
-  case "features" =>
-    val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
+  case "stream2" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val checkOpenRatioActor = context.actorOf(Props(classOf[ProcessCheckOpenActor]))
+    val sink = Sink.actorRef(checkOpenRatioActor, TimeMarker(System.nanoTime))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processCheckOpenGraph(cdmSource.map(_.get), sink)))
+    childActors = childActors + (roleName -> Set(streamActor))
 
-    // The two feature extractors subscribe to the CDM produced by the ER actor
-    val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
-    val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
-
-    // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
-    val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
-      Subscription(featureExtractor1, { _ => true }),
-      Subscription(featureExtractor2, { _ => true })
-    )), "IForestAnomalyDetector")
-
-    childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
-    )
-
-    case "kafkaProducer" =>
-      val file = config.getStringList("adapt.loadfiles").head
-      val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
-      val streamActor = {
-        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaProducer(file, producerSettings, config.getString("adapt.kafka-cdm-source"))))
-      }
-      childActors = childActors + (roleName -> Set(streamActor))
-
-    case "kafkaIngest" =>
-      val consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]] = ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer)
-      val streamActor = {
-        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
-      }
-      childActors = childActors + (roleName -> Set(streamActor))
-
-    case s => throw new IllegalArgumentException(s"Unknown role: $s")
+  case "stream3" =>
+    val files = config.getStringList("adapt.loadfiles")
+    val (ta1, cdmData) = CDM17.readData(files.head, None).get
+    val cdmSource: Source[Try[CDM17], NotUsed] = Source.fromIterator(() => cdmData)
+    val printActor = context.actorOf(Props(classOf[PrintActor]))
+    val sink = Sink.actorRef(printActor, TimeMarker(System.nanoTime))
+    val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.processEventCount(cdmSource.map(_.get), sink)))
+    childActors = childActors + (roleName -> Set(streamActor))
   }
 
   implicit val ec = context.dispatcher
