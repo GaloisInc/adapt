@@ -920,7 +920,6 @@ object TitanFlowComponents {
     .via(FlowComponents.printCounter("Titan Writer", 1000))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-//      println("opened transaction")
       val transaction = graph.newTransaction()
 
       // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
@@ -939,31 +938,42 @@ object TitanFlowComponents {
       }
 
       // Process all of the nodes
-      for (cdm <- cdms) {
-        val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
-        assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-        val newTitanVertex = transaction.addVertex(props: _*)
-        newVertices += (cdm.getUuid -> newTitanVertex)
+        for (cdm <- cdms) {
+          // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
+          // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
+          try {
+            println("Start new CDM statement: "+cdm.toString)
+            val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+            assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+            // HANG IS HERE
+            val newTitanVertex = transaction.addVertex(props: _*)
+            newVertices += (cdm.getUuid -> newTitanVertex)
 
-        for ((label,toUuid) <- cdm.asDBEdges) {
-          findNode(toUuid) match {
-              case Some(toTitanVertex) =>
-                println("Adding an edge to a vertex...")
-                newTitanVertex.addEdge(label, toTitanVertex)
-                println("Added the edge")
-              case None =>
-                missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
+            for ((label,toUuid) <- cdm.asDBEdges) {
+              findNode(toUuid) match {
+                case Some(toTitanVertex) =>
+                  println("Adding an edge to a vertex...")
+                  newTitanVertex.addEdge(label, toTitanVertex)
+                  println("Added the edge")
+                case None =>
+                  missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
+              }
+            }
+          }
+          catch {
+            // TODO make this more useful
+            case unk => println(unk)
+          }
         }
-      }
-      }
-      
+        println("!!! Done processing nodes !!!")
+
       // Try to complete missing edges. If the node pointed to is _still_ not found, we
       // synthetically create it.
       var nodeCreatedCounter = 0
       var edgeCreatedCounter = 0
- 
+
       for ((uuid,edges) <- missingToUuid; (fromTitanVertex,label) <- edges) {
-       
+
         // Find or create the missing vertex (it may have been created earlier in this loop)
         val toTitanVertex = findNode(uuid) getOrElse {
           nodeCreatedCounter += 1
@@ -978,12 +988,11 @@ object TitanFlowComponents {
       }
 
       println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
-      
+
       transaction.commit()
       println(s"Committed transaction with ${cdms.length}")
     }
   )(Keep.right)
-
 }
 
 
@@ -995,7 +1004,7 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin.1" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
