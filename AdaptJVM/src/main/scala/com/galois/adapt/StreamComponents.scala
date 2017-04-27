@@ -4,6 +4,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.file.Paths
 import java.util.UUID
 import java.io._
+
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
@@ -16,10 +17,13 @@ import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
+import ch.qos.logback.classic.LoggerContext
 import org.mapdb.{DB, DBMaker, HTreeMap}
+
 import collection.JavaConverters._
 import scala.collection.mutable
 import scala.sys.process._
@@ -29,6 +33,8 @@ import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.slf4j.LoggerFactory
+
 import scala.io.{Source => FileSource}
 
 
@@ -764,7 +770,120 @@ object TitanFlowComponents {
     val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
 
     val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
-    management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
+
+    // This allows multiple edges when they are labelled 'tagId'
+    if(!management.containsEdgeLabel("tagId")) { management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make() }
+
+    val edgeLabels = List("localPrincipal", "subject", "predicateObject", "predicateObject2",
+    "parameterTagId", "flowObject", "prevTagId", "parentSubject", "dependentUnit", "unit",
+    "tag")
+    for (edgeLabel <- edgeLabels)
+      if(!management.containsEdgeLabel(edgeLabel)) { management.makeEdgeLabel(edgeLabel).make() }
+
+    val propertyKeys = List(
+      ("cid", classOf[Integer]),
+      ("cmdLine", classOf[String]),
+      ("count", classOf[Integer]),
+//      ("ctag", classOf[ConfidentialityTag]),
+      ("ctag", classOf[String]),
+//      ("components", classOf[Seq[Value]]),
+      ("compoents", classOf[String]),
+      ("dependentUnitUuid", classOf[UUID]),
+      ("epoch", classOf[Integer]),
+//      ("exportedLibraries", classOf[Seq[String]]),
+      ("exportedLibraries", classOf[String]),
+//      ("eventType", classOf[EventType]),
+      ("eventType", classOf[String]),
+      ("fileDescriptor", classOf[Integer]),
+//      ("fileObjectType", classOf[FileObjectType]),
+      ("fileObjectType", classOf[String]),
+      ("flowObjectUuid", classOf[UUID]),
+//      ("groupIds", classOf[Seq[String]]),
+      ("groupIds", classOf[String]),
+      ("hash", classOf[String]),
+//      ("hashes", classOf[Seq[CryptographicHash]]),
+      ("hashes", classOf[String]),
+//      ("importedLibraries", classOf[Seq[String]]),
+      ("importedLibraries", classOf[String]),
+      ("ipProtocol", classOf[Integer]),
+      ("isNull", classOf[java.lang.Boolean]),
+//      ("itag", classOf[IntegrityTag]),
+      ("itag", classOf[String]),
+      ("iteration", classOf[Integer]),
+      ("registryKeyOrPath", classOf[String]),
+      ("localAddress", classOf[String]),
+      ("localPort", classOf[Integer]),
+      ("localPrincipalUuid", classOf[UUID]),
+      ("location", classOf[java.lang.Long]),
+      ("memoryAddress", classOf[java.lang.Long]),
+      ("name", classOf[String]),
+      ("numValueElements", classOf[Integer]),
+//      ("opcode", classOf[TagOpCode]),
+      ("opcode", classOf[String]),
+      ("pageNumber", classOf[java.lang.Long]),
+      ("pageOffset", classOf[java.lang.Long]),
+//      ("parameters", classOf[Seq[Value]]),
+      ("parameters", classOf[String]),
+      ("parentSubjectUuid", classOf[UUID]),
+      ("peInfo", classOf[String]),
+//      ("permission", classOf[FixedShort]),
+      ("permission", classOf[String]),
+      ("predicateObjectPath", classOf[String]),
+      ("predicateObjectUuid", classOf[UUID]),
+      ("predicateObject2Path", classOf[String]),
+      ("predicateObject2Uuid", classOf[UUID]),
+      ("prevTagIdUuid", classOf[UUID]),
+//      ("principalType", classOf[PrincipalType]),
+      ("principalType", classOf[String]),
+//      ("privilegeLevel", classOf[PrivilegeLevel]),
+      ("privilegeLevel", classOf[String]),
+      ("programPoint", classOf[String]),
+      ("remoteAddress", classOf[String]),
+      ("remotePort", classOf[Integer]),
+      ("runtimeDataType", classOf[String]),
+      ("sequence", classOf[java.lang.Long]),
+      ("sinkFileDescriptor", classOf[Integer]),
+      ("size", classOf[java.lang.Long]),
+      ("sourceFileDescriptor", classOf[Integer]),
+//      ("srcSinkType", classOf[SrcSinkType]),
+      ("srcSinkType", classOf[String]),
+      ("startTimestampNanos", classOf[java.lang.Long]),
+//      ("subjectType", classOf[SubjectType]),
+      ("subjectType", classOf[String]),
+      ("subjectUuid", classOf[UUID]),
+      ("systemCall", classOf[String]),
+//      ("tag", classOf[Seq[TagRunLengthTuple]]),
+      ("tagRunLengthTuples", classOf[String]),
+      ("tagIds", classOf[UUID], Cardinality.LIST),
+      ("threadId", classOf[Integer]),
+      ("timestampNanos", classOf[java.lang.Long]),
+//      ("type", classOf[CryptoHashType]),
+      ("type", classOf[String]),
+      ("unitId", classOf[Integer]),
+      ("unitUuid", classOf[UUID]),
+      ("userId", classOf[String]),
+      ("username", classOf[String]),
+      ("uuid", classOf[UUID]),
+//      ("value", classOf[Value]),
+      ("value", classOf[String]),
+//      ("valueBytes", classOf[Array[Byte]]),
+      ("valueBytes", classOf[String]),
+//      ("valueDataType", classOf[ValueDataType]),
+      ("valueDataType", classOf[String]),
+//      ("valueType", classOf[ValueType])
+      ("valueType", classOf[String])
+    )
+    for (propertyKey <- propertyKeys)
+      //if(!management.containsPropertyKey(propertyKey._1)) { management.makePropertyKey(propertyKey._1).dataType(propertyKey._2).make() }
+      propertyKey match {
+        case (name: String, pClass: Class[_]) if !management.containsPropertyKey(name) =>
+          management.makePropertyKey(name).dataType(pClass).cardinality(Cardinality.SINGLE).make()
+        case (name: String, pClass: Class[_], cardinality: Cardinality) if !management.containsPropertyKey(name) =>
+          management.makePropertyKey(name).dataType(pClass).cardinality(cardinality).make()
+        case _ => ()
+      }
+
+    // This makes a unique index for 'uuid'
     if (null == management.getGraphIndex("byUuidUnique")) {
     
       var idKey = if (management.getPropertyKey("uuid") != null) {
@@ -797,26 +916,69 @@ object TitanFlowComponents {
    */
   def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
     .collect{ case cdm: DBNodeable => cdm }
-    .groupedWithin(10000, 5 seconds)
-    .via(FlowComponents.printCounter("Titan Writer"))
+    .groupedWithin(20000, 5 seconds)
+    .via(FlowComponents.printCounter("Titan Writer", 1000))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
 //      println("opened transaction")
       val transaction = graph.newTransaction()
 
+      // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
+      // during this transaction (since we don't look those up in the usual manner).
+      val newVertices = collection.mutable.Map.empty[UUID,Vertex]
+
+      // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
+      // handle cases where nodes are out of order).
+      var missingToUuid = collection.mutable.Map.empty[UUID, Set[(Vertex,String)]]
+
+      // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
+      // the 'newVertices' map, then falling back on a query to Titan.
+      def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
+        val iterator = graph.traversal().V().has("uuid", uuid)
+        if (iterator.hasNext()) { Some(iterator.next()) } else { None}
+      }
+
+      // Process all of the nodes
       for (cdm <- cdms) {
         val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
         assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
         val newTitanVertex = transaction.addVertex(props: _*)
+        newVertices += (cdm.getUuid -> newTitanVertex)
 
         for ((label,toUuid) <- cdm.asDBEdges) {
-          val i = graph.traversal().V().has("uuid",cdm.getUuid)
-          if (i.hasNext) {
-            val toTitanVertex = i.next()
-            newTitanVertex.addEdge(label, toTitanVertex)
-          }
+          findNode(toUuid) match {
+              case Some(toTitanVertex) =>
+                println("Adding an edge to a vertex...")
+                newTitanVertex.addEdge(label, toTitanVertex)
+                println("Added the edge")
+              case None =>
+                missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
         }
       }
+      }
+      
+      // Try to complete missing edges. If the node pointed to is _still_ not found, we
+      // synthetically create it.
+      var nodeCreatedCounter = 0
+      var edgeCreatedCounter = 0
+ 
+      for ((uuid,edges) <- missingToUuid; (fromTitanVertex,label) <- edges) {
+       
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        val toTitanVertex = findNode(uuid) getOrElse {
+          nodeCreatedCounter += 1
+          val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+          newVertices += (uuid -> newNode)
+          newNode
+        }
+
+        // Create the missing edge
+        edgeCreatedCounter += 1
+        fromTitanVertex.addEdge(label, toTitanVertex)
+      }
+
+      println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
+      
       transaction.commit()
       println(s"Committed transaction with ${cdms.length}")
     }
@@ -833,11 +995,11 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-    .via(FlowComponents.printCounter("CDM Source", 1e5.toInt))
+    .via(FlowComponents.printCounter("CDM Source", 1e3.toInt))
 //    .via(Streams.titanWrites(graph))
 
 
@@ -850,7 +1012,7 @@ object TestGraph extends App {
 //    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 
 
-  val dbFilePath = "/Users/ryan/Desktop/map.db"
+  val dbFilePath = "/tmp/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
@@ -871,10 +1033,10 @@ object TestGraph extends App {
 
 
 
-//  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
+  Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
 
 
-  FlowComponents.normalizedScores(db).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.foreach(println))
+//  FlowComponents.normalizedScores(db).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.foreach(println))
 
 
 //      .recover{ case e: Throwable => e.printStackTrace() } ~> printSink

@@ -19,7 +19,7 @@ case class RegistryKeyObject(
   def asDBKeyValues = List(
     label, "RegistryKeyObject",
     "uuid", uuid,
-    "key", key
+    "registryKeyOrPath", key
   ) ++
     baseObject.asDBKeyValues ++
     value.fold[List[Any]](List.empty)(v => List("value", v.asDBKeyValues)) ++

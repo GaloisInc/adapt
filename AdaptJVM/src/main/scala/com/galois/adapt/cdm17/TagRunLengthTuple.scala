@@ -13,7 +13,7 @@ case class TagRunLengthTuple(
   numValueElements: Int,
   tagId: UUID
 ) extends CDM17 with DBWritable with DBNodeable {
-  val getUuid = UUID.randomUUID()
+  lazy val getUuid = UUID.randomUUID()
 
   def asDBKeyValues = List(
     label, "TagRunLengthTuple",

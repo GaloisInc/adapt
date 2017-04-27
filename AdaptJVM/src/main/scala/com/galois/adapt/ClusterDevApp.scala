@@ -143,27 +143,6 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 //    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
 //    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
 
-  case "rankedui" =>
-    val rankedDataActor = context.actorOf(Props(classOf[RankedDataActor], registryProxy), "RankedDataActor")
-    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(rankedDataActor)))   // TODO: These sets are not used correctly
-
-  case "features" =>
-    val erActor = context.actorOf(Props(classOf[ErActor], registryProxy), "er-actor")
-
-    // The two feature extractors subscribe to the CDM produced by the ER actor
-    val featureExtractor1 = context.actorOf(FileEventsFeature.props(registryProxy, erActor), "file-events-actor")
-    val featureExtractor2 = context.actorOf(NetflowFeature.props(registryProxy, erActor), "netflow-actor")
-
-    // The IForest anomaly detector is going to subscribe to the output of the two feature extractors
-    val ad = context.actorOf(IForestAnomalyDetector.props(registryProxy, Set(
-      Subscription(featureExtractor1, { _ => true }),
-      Subscription(featureExtractor2, { _ => true })
-    )), "IForestAnomalyDetector")
-
-    childActors = childActors + (roleName ->
-      childActors.getOrElse(roleName, Set(erActor, featureExtractor1, featureExtractor2, ad))
-    )
-
     case "kafkaProducer" =>
       val file = config.getStringList("adapt.loadfiles").head
       val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)

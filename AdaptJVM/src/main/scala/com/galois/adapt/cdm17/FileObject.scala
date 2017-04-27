@@ -26,7 +26,7 @@ case class FileObject(
       "fileObjectType", fileObjectType.toString
     ) ++
     fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v)) ++
-    localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipal", v)) ++
+    localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipaliUuid", v)) ++
     size.fold[List[Any]](List.empty)(v => List("size", v)) ++
     peInfo.fold[List[Any]](List.empty)(v => List("peInfo", v)) ++
     hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", ")))  // TODO: Revisit how we should represent this in the DB

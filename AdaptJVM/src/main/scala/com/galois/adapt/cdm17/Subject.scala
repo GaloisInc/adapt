@@ -30,10 +30,10 @@ case class Subject(
     "uuid", uuid,
     "subjectType", subjectType.toString,
     "cid", cid,
-    "localPrincipal", localPrincipal,
+    "localPrincipalUuid", localPrincipal,
     "startTimestampNanos", startTimestampNanos
   ) ++
-    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubject", v)) ++
+    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubjectUuid", v)) ++
     unitId.fold[List[Any]](List.empty)(v => List("unitId", v)) ++
     iteration.fold[List[Any]](List.empty)(v => List("iteration", v)) ++
     count.fold[List[Any]](List.empty)(v => List("count", v)) ++

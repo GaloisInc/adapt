@@ -40,9 +40,9 @@ case class Event(
     "subject", subject,
     "timestampNanos", timestampNanos
   ) ++
-    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObject", v)) ++
+    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObjectUuid", v)) ++
     predicateObjectPath.fold[List[Any]](List.empty)(v => List("predicateObjectPath", v)) ++
-    predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2", v.toString)) ++
+    predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2Uuid", v)) ++
     predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     parameters.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("parameters", v.map(_.asDBKeyValues).mkString(", "))) ++
