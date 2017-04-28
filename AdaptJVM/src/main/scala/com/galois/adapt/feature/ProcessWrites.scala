@@ -58,8 +58,8 @@ class ProcessWrites(val registry: ActorRef)
     case e: Event if e.eventType == EVENT_WRITE =>
 //      log.info(s"ProcessWrites got: $e")
       totalReceived = totalReceived + 1
-      processes.get(e.subject).fold(
-        unmatchedWrites(e.subject) = unmatchedWrites.getOrElse(e.subject, Set.empty) + e
+      processes.get(e.subjectUuid).fold(
+        unmatchedWrites(e.subjectUuid) = unmatchedWrites.getOrElse(e.subjectUuid, Set.empty) + e
       ){ subject =>
         broadCast(subject -> e)
         totalSent = totalSent + 1

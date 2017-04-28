@@ -100,9 +100,9 @@ object FlowComponents {
           if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
           else List((e.predicateObject.get, e)))
       case SubjectKey(Some(t)) => Flow[CDM17]
-        .collect { case e: Event if e.eventType == t => e.subject -> e }
+        .collect { case e: Event if e.eventType == t => e.subjectUuid -> e }
       case SubjectKey(None) => Flow[CDM17]
-        .collect { case e: Event => e.subject -> e }
+        .collect { case e: Event => e.subjectUuid -> e }
     }
     keyPredicate
       .filter(_._2.timestampNanos != 0L)
@@ -253,7 +253,7 @@ object FlowComponents {
       m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
       m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
       m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1000
-      m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subject).size
+      m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subjectUuid).size
 //      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
       m("totalBytesRead") = eList.collect{ case e if e.eventType == EVENT_READ => e.size.getOrElse(0L)}.sum
       m("totalBytesWritten") = eList.collect{ case e if e.eventType == EVENT_WRITE => e.size.getOrElse(0L)}.sum
@@ -289,7 +289,7 @@ object FlowComponents {
     predicateTypeLabeler(commandSource, db)
       .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
 //      .via(printCounter("NetFlow or File Counter", 100))
-      .groupBy(Int.MaxValue, _._3.subject)
+      .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
       .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])])]{ () =>
         var processUuidOpt: Option[UUID] = None
@@ -305,12 +305,12 @@ object FlowComponents {
 
         {
           case Tuple4("NetFlowObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
 
           case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
 
@@ -367,7 +367,7 @@ object FlowComponents {
         var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
         var found = false
         while (remainder.nonEmpty && remainder.exists(_.eventType == EVENT_EXECUTE)) {
-          val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subject == x.subject))
+          val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subjectUuid == x.subjectUuid))
           found = execOpt.exists(x => netFlowEventsFromIntersectingProcesses.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
           if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
         }
@@ -388,7 +388,7 @@ object FlowComponents {
                 .dropWhile(_.eventType != EVENT_OPEN)
                 .takeWhile(_.eventType != EVENT_CLOSE)
                 .exists(testEvent => // in the events between OPEN and CLOSE...
-                  testEvent.subject == deleteAfterWriteEvent.subject && // event by the same process as the UNLINK?
+                  testEvent.subjectUuid == deleteAfterWriteEvent.subjectUuid && // event by the same process as the UNLINK?
                     t._2.find(_.eventType == EVENT_CLOSE).exists(closeEvent => // If so, get the CLOSE event and
                       deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos // test if the UNLINK occurred before the CLOSE
                     )
@@ -399,10 +399,10 @@ object FlowComponents {
         } else false
 
       m("isReadByAProcessWritingToNetFlows") = fileEventList
-        .collect{ case e if e.eventType == EVENT_READ => e.subject}
+        .collect{ case e if e.eventType == EVENT_READ => e.subjectUuid}
         .flatMap( processUuid =>
           netFlowEventsFromIntersectingProcesses.toList.map(_._2.exists(ne =>
-            ne.subject == processUuid &&
+            ne.subjectUuid == processUuid &&
             List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
           ))
         ).foldLeft(false)(_ || _)
@@ -411,7 +411,7 @@ object FlowComponents {
       m("attribChangeEventThenExecuteGapMillis") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
       m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
       m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subject).size
+      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subjectUuid).size
       m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
       m("totalBytesRead") = fileEventList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
       m("totalBytesWritten") = fileEventList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
@@ -435,7 +435,7 @@ object FlowComponents {
 
     predicateTypeLabeler(commandSource, db)
 //      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
-      .groupBy(Int.MaxValue, _._3.subject)
+      .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
       .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(UUID, mutable.SortedSet[Event])])] { () =>
         var processUuidOpt: Option[UUID] = None
@@ -454,13 +454,13 @@ object FlowComponents {
             List.empty
 
           case Tuple4("NetFlowObject", uuid: UUID, event: Event, cdmOpt: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.sequence))) +
               (event -> cdmOpt.asInstanceOf[NetFlowObject])
             List.empty
 
           case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.sequence))) + event
             List.empty
 
@@ -539,7 +539,7 @@ object FlowComponents {
 
 //      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files. Or does it? Path is probably on events.
       m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-          _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+          _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
         ).toList.sorted.headOption.exists(netFlowReadTime =>
           fileEventSets.exists(
             _._2.dropWhile(write =>
@@ -551,7 +551,7 @@ object FlowComponents {
       m("changesFilePermissionsThenExecutesIt") = processEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
       m("executedThenImmediatelyDeletedAFile") = processEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.sequence).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
       m("readFromNetFlowThenDeletedFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-        _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+        _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
       ).toList.sorted.headOption.exists(netFlowReadTime =>
         fileEventSets.exists(
           _._2.exists(delete =>
@@ -917,7 +917,7 @@ object TitanFlowComponents {
   def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
     .collect{ case cdm: DBNodeable => cdm }
     .groupedWithin(20000, 5 seconds)
-    .via(FlowComponents.printCounter("Titan Writer", 1000))
+    .via(FlowComponents.printCounter("Titan Writer", 10000))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
       val transaction = graph.newTransaction()
@@ -942,19 +942,15 @@ object TitanFlowComponents {
           // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
           // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
           try {
-            println("Start new CDM statement: "+cdm.toString)
             val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
             assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-            // HANG IS HERE
             val newTitanVertex = transaction.addVertex(props: _*)
             newVertices += (cdm.getUuid -> newTitanVertex)
 
             for ((label,toUuid) <- cdm.asDBEdges) {
               findNode(toUuid) match {
                 case Some(toTitanVertex) =>
-                  println("Adding an edge to a vertex...")
                   newTitanVertex.addEdge(label, toTitanVertex)
-                  println("Added the edge")
                 case None =>
                   missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
               }
@@ -962,10 +958,16 @@ object TitanFlowComponents {
           }
           catch {
             // TODO make this more useful
-            case unk => println(unk)
+            case e: java.lang.IllegalArgumentException =>
+              if (!e.getMessage.contains("byUuidUnique")) {
+                println("Failed CDM statement: " + cdm)
+                println(e.getMessage) // Bad query
+                e.printStackTrace()
+                throw e
+              }
+            case unk: Throwable => println(unk)
           }
         }
-        println("!!! Done processing nodes !!!")
 
       // Try to complete missing edges. If the node pointed to is _still_ not found, we
       // synthetically create it.
@@ -1004,12 +1006,15 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin.1" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val data = CDM17.readData(path, None).get._2.map(_.get)
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-    .via(FlowComponents.printCounter("CDM Source", 1e3.toInt))
+    .via(FlowComponents.printCounter("CDM Source", 1e5.toInt))
 //    .via(Streams.titanWrites(graph))
+
+  println("Total CDM statements: " + data.length)
 
 
 //  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
