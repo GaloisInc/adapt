@@ -72,7 +72,7 @@ var node_appearance = [
         make_node_label : function(node) {
             var source = (node['properties'].hasOwnProperty('sourceFileDescriptor') ? node['properties']['sourceFileDescriptor'][0]['value'] : "None")
             var sink = (node['properties'].hasOwnProperty('sinkFileDescriptor') ? node['properties']['sinkFileDescriptor'][0]['value'] : "None")
-            return "src:" + source + ", sink:" + sink
+            return "src: " + source + ", sink: " + sink
         }
     }, {
         name : "Principal",
@@ -81,7 +81,7 @@ var node_appearance = [
         size: 50,
         make_node_label : function(node) {
             var at = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'][0]['value'] : "None")
-            return at + " userId " + node['properties']['userId'][0]['value']
+            return "userId: " + at
         }
    }, {
         name : "NetFlow",
