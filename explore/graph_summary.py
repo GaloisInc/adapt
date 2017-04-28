@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import requests, readline, sys, json
+import query as q
 
 # get available labels and their counts
 
@@ -27,49 +27,25 @@ def edgeInCountQ(lbl):
     return "g.E().hasLabel('" + lbl + "').inV().label().groupCount()"
 
 
-def getQuery(query):
-    try:
-        resp = requests.post("http://localhost:8080/query/generic", data={"query": query}).json()
-        return resp
-    except Exception as e:
-        print("There was an error processing your query:")
-        print(e)
 
-def getSingletonQuery(query):
-    return getQuery(query)[0]
-
-
-def getGroupCountQuery(query):
-    dict = getSingletonQuery(query)
-    return {k:int(dict[k]) for k in dict.keys()}
-
-
-def printResp(resp):  
-    if isinstance(resp,list):
-        for line in resp:
-            print(line)
-    else:
-        print(resp)
-        
-
-def getVertices():
-    vertices = getGroupCountQuery(vertexQ)
+def getVertexSummary():
+    vertices = q.getGroupCountQuery(vertexQ)
     vdict = {}
     print("Vertex types/counts:")
     for v in vertices.keys():
         vdict[v] = {'count':vertices[v],
-                    'in': getGroupCountQuery(vertexInCountQ(v)),
-                    'out': getGroupCountQuery(vertexOutCountQ(v))}
+                    'in': q.getGroupCountQuery(vertexInCountQ(v)),
+                    'out': q.getGroupCountQuery(vertexOutCountQ(v))}
     return vdict
 
-def getEdges():
-    edges = getGroupCountQuery(edgeQ)
+def getEdgeSummary():
+    edges = q.getGroupCountQuery(edgeQ)
     edict = {}
     print("Edge types/counts:")
     for e in edges.keys():
         edict[e] = {'count':edges[e],
-                    'in': getGroupCountQuery(edgeInCountQ(e)),
-                    'out': getGroupCountQuery(edgeOutCountQ(e))}
+                    'in': q.getGroupCountQuery(edgeInCountQ(e)),
+                    'out': q.getGroupCountQuery(edgeOutCountQ(e))}
     return edict
 
 def emitWithCount(k,c):
@@ -89,10 +65,10 @@ def printSummary(vdict):
 
 if __name__ == '__main__':
     print("Graph summarizer 0.1.")
-    vdict = getVertices()
-    print(vdict)
+    vdict = getVertexSummary()
+    printSummary(vdict)
 
-    edict = getEdges()
-    print(edict)
+    edict = getEdgeSummary()
+    printSummary(edict)
     
 
