@@ -38,9 +38,9 @@ def countAttPair(d,pair):
     return (len([x for x in d if pair <= d[x]]))
 
 
-def countAttPairs(d,thresh=5):
+def countAttPairs(d,pairs,thresh=5):
     counts = {}
-    for pair in attPairs(getAtts(d)):
+    for pair in pairs:
         count = countAttPair(d,pair)
         if count > thresh:
             counts[pair] = count
@@ -67,7 +67,7 @@ def oneStepRePair(context,dictionary,thresh=5):
     attCounts = countAtts(context)
     atts = {att for att in attCounts.keys() if attCounts[att] > thresh}
     pairs = attPairs(atts)
-    attPairCounts = countAttPairs(context,thresh)
+    attPairCounts = countAttPairs(context,pairs,thresh)
     topPairs = sorted(attPairCounts, key=attPairCounts.get, reverse=True)
     if len(topPairs) > 0:
         (newContext,newDictionary) = mergePair((context,dictionary),topPairs[0],gensym('new_att'))
