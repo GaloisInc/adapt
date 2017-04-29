@@ -10,17 +10,16 @@ def getQuery(query):
         print("There was an error processing your query:")
         print(e)
 
-def getSingletonQuery(query):
-    return getQuery(query)[0]
-
+def the(result):
+    return result[0]
 
 def getCountQuery(query):
-    count = getSingletonQuery(query)
-    return (int(count))
+    counts = getQuery(query)
+    return [int(count) for count in counts]
 
-def getGroupCountQuery(query):
-    dict = getSingletonQuery(query)
-    return {k:int(dict[k]) for k in dict.keys()}
+def getGroupCountQuery(q):
+    result = getQuery(q)
+    return [{k : int(dict[k]) for k in dict.keys()} for dict in result]
 
 
 def printResp(resp):  
@@ -34,5 +33,5 @@ def printResp(resp):
 if __name__ == '__main__':
     print("Graph querying 0.1.")
     print("g.V().count()")
-    printResp(getCountQuery("g.V().count()"))
+    printResp(the(getCountQuery("g.V().count()")))
 

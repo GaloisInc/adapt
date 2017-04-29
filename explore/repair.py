@@ -9,6 +9,16 @@ def getAtts(d):
         atts = atts | x
     return atts
 
+def countAtts(d):
+    attCounts = {}
+    for x in d.values():
+        for a in x:
+            if a in attCounts.keys():
+                attCounts[a] = attCounts[a]+1
+            else:
+                attCounts[a] = 1
+    return attCounts
+
 
 def cost(context,dictionary): 
     ctxCost = 0.0
@@ -28,7 +38,7 @@ def countAttPair(d,pair):
     return (len([x for x in d if pair <= d[x]]))
 
 
-def countAttPairs(d,thresh):
+def countAttPairs(d,thresh=5):
     counts = {}
     for pair in attPairs(getAtts(d)):
         count = countAttPair(d,pair)
@@ -53,8 +63,9 @@ def gensym(s):
     return (s + str(i))
 
 
-def oneStepRePair(context,dictionary,thresh=2):
-    atts = getAtts(context)
+def oneStepRePair(context,dictionary,thresh=5):
+    attCounts = countAtts(context)
+    atts = {att for att in attCounts.keys() if attCounts[att] > thresh}
     pairs = attPairs(atts)
     attPairCounts = countAttPairs(context,thresh)
     topPairs = sorted(attPairCounts, key=attPairCounts.get, reverse=True)
@@ -64,9 +75,11 @@ def oneStepRePair(context,dictionary,thresh=2):
     else:
         return (False,context,dictionary)
 
-def rePair(context,dictionary):
-    (b,newContext,newDictionary) = oneStepRePair(context,dictionary)
+def rePair(context,dictionary,thresh=5,showCost=False):
+    if showCost:
+        print(cost(context,dictionary))
+    (b,newContext,newDictionary) = oneStepRePair(context,dictionary,thresh)
     if b:
-        return (rePair(newContext,newDictionary))
+        return (rePair(newContext,newDictionary,thresh,showCost))
     else:
         return (newContext,newDictionary)
