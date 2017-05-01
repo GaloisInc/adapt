@@ -57,7 +57,7 @@ object ProductionApp extends App {
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
     // Flow only consumes and writes to Titan
-    Flow[CDM17].runWith(CDMSource(ta1).take(1000).via(FlowComponents.printCounter("DB Writes", 100)), TitanFlowComponents.titanWrites())
+    Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writes", 100)), TitanFlowComponents.titanWrites())
 
     // Flow calculates all streaming results.
 //    Ta1Flows(ta1)(db).runWith(CDMSource(ta1), Sink.actorRef[RankingCard](anomalyActor, None))

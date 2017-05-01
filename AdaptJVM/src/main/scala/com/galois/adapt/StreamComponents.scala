@@ -834,16 +834,16 @@ object TitanFlowComponents {
   val graph = {
     val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
 
-    val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
+    val management = graph.openManagement().asInstanceOf[ManagementSystem]
 
     // This allows multiple edges when they are labelled 'tagId'
-    if(!management.containsEdgeLabel("tagId")) { management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make() }
+    if ( ! management.containsEdgeLabel("tagId"))
+      management.makeEdgeLabel("tagId").multiplicity(Multiplicity.SIMPLE).make()
 
     val edgeLabels = List("localPrincipal", "subject", "predicateObject", "predicateObject2",
-    "parameterTagId", "flowObject", "prevTagId", "parentSubject", "dependentUnit", "unit",
-    "tag")
+    "parameterTagId", "flowObject", "prevTagId", "parentSubject", "dependentUnit", "unit", "tag")
     for (edgeLabel <- edgeLabels)
-      if(!management.containsEdgeLabel(edgeLabel)) { management.makeEdgeLabel(edgeLabel).make() }
+      if ( ! management.containsEdgeLabel(edgeLabel)) management.makeEdgeLabel(edgeLabel).make()
 
     val propertyKeys = List(
       ("cid", classOf[Integer]),
@@ -941,9 +941,9 @@ object TitanFlowComponents {
     for (propertyKey <- propertyKeys)
       //if(!management.containsPropertyKey(propertyKey._1)) { management.makePropertyKey(propertyKey._1).dataType(propertyKey._2).make() }
       propertyKey match {
-        case (name: String, pClass: Class[_]) if !management.containsPropertyKey(name) =>
+        case (name: String, pClass: Class[_]) if ! management.containsPropertyKey(name) =>
           management.makePropertyKey(name).dataType(pClass).cardinality(Cardinality.SINGLE).make()
-        case (name: String, pClass: Class[_], cardinality: Cardinality) if !management.containsPropertyKey(name) =>
+        case (name: String, pClass: Class[_], cardinality: Cardinality) if ! management.containsPropertyKey(name) =>
           management.makePropertyKey(name).dataType(pClass).cardinality(cardinality).make()
         case _ => ()
       }
@@ -980,59 +980,58 @@ object TitanFlowComponents {
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
   def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
-    .collect{ case cdm: DBNodeable => cdm }
+    .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
-    .via(FlowComponents.printCounter("Titan Writer", 1000))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
       val transaction = graph.newTransaction()
 
       // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
       // during this transaction (since we don't look those up in the usual manner).
-      val newVertices = collection.mutable.Map.empty[UUID,Vertex]
+      val newVertices = MutableMap.empty[UUID,Vertex]
 
       // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
       // handle cases where nodes are out of order).
-      var missingToUuid = collection.mutable.Map.empty[UUID, Set[(Vertex,String)]]
+      var missingToUuid = MutableMap.empty[UUID, Set[(Vertex,String)]]
 
       // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
       // the 'newVertices' map, then falling back on a query to Titan.
       def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
-        val iterator = graph.traversal().V().has("uuid", uuid)
-        if (iterator.hasNext()) { Some(iterator.next()) } else { None}
+        val iterator = transaction.traversal().V().has("uuid", uuid)
+        if (iterator.hasNext()) Some(iterator.next()) else None
       }
 
       // Process all of the nodes
-        for (cdm <- cdms) {
-          // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
-          // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
-          try {
-            val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
-            assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-            val newTitanVertex = transaction.addVertex(props: _*)
-            newVertices += (cdm.getUuid -> newTitanVertex)
+      for (cdm <- cdms) {
+        // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
+        // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
+        try {
+          val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+          assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+          val newTitanVertex = transaction.addVertex(props: _*)
+          newVertices += (cdm.getUuid -> newTitanVertex)
 
-            for ((label,toUuid) <- cdm.asDBEdges) {
-              findNode(toUuid) match {
-                case Some(toTitanVertex) =>
-                  newTitanVertex.addEdge(label, toTitanVertex)
-                case None =>
-                  missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
-              }
+          for ((label,toUuid) <- cdm.asDBEdges) {
+            findNode(toUuid) match {
+              case Some(toTitanVertex) =>
+                newTitanVertex.addEdge(label, toTitanVertex)
+              case None =>
+                missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
             }
           }
-          catch {
-            // TODO make this more useful
-            case e: java.lang.IllegalArgumentException =>
-              if (!e.getMessage.contains("byUuidUnique")) {
-                println("Failed CDM statement: " + cdm)
-                println(e.getMessage) // Bad query
-                e.printStackTrace()
-                throw e
-              }
-            case unk: Throwable => println(unk)
-          }
         }
+        catch {
+          // TODO make this more useful
+          case e: java.lang.IllegalArgumentException =>
+            if (!e.getMessage.contains("byUuidUnique")) {
+              println("Failed CDM statement: " + cdm)
+              println(e.getMessage) // Bad query
+              e.printStackTrace()
+              throw e
+            }
+          case unk: Throwable => println(unk)
+        }
+      }
 
       // Try to complete missing edges. If the node pointed to is _still_ not found, we
       // synthetically create it.
