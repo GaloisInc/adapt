@@ -32,7 +32,7 @@ case class UnnamedPipeObject(
 case object UnnamedPipeObject extends CDM17Constructor[UnnamedPipeObject] {
   type RawCDMType = cdm17.UnnamedPipeObject
 
-  def from(cdm: RawCDM15Type): Try[UnnamedPipeObject] = Try {
+  def from(cdm: RawCDM17Type): Try[UnnamedPipeObject] = Try {
     UnnamedPipeObject(
       cdm.getUuid,
       cdm.getBaseObject,

@@ -48,7 +48,7 @@ case class ProvenanceTagNode(
 case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
   type RawCDMType = cdm17.ProvenanceTagNode
 
-  def from(cdm: RawCDM15Type): Try[ProvenanceTagNode] = Try(
+  def from(cdm: RawCDM17Type): Try[ProvenanceTagNode] = Try(
     ProvenanceTagNode(
       cdm.getTagId,
       cdm.getSubject,

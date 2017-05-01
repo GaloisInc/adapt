@@ -33,9 +33,9 @@ lazy val adapt = (project in file(".")).settings(
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
     "org.mapdb" % "mapdb" % "3.0.3",
     // Titan related
-    "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
-    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0",
-    "org.apache.cassandra" % "cassandra-all" % "2.1" 
+    "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
+    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
+    "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j")
   ),
 
   {
@@ -55,8 +55,6 @@ lazy val adapt = (project in file(".")).settings(
 
   // Do not buffer test output (which is the default) so that all test results are shown as they happen (helpful for async or timeout results)
   logBuffered in Test := false,
-
-//  mainClass in Test := Some("com.galois.adapt.scepter.SimpleTestRunner"),
 
   assemblyMergeStrategy in assembly := {
     case PathList("reference.conf") => MergeStrategy.concat

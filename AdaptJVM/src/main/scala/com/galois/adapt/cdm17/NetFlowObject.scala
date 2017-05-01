@@ -40,7 +40,7 @@ case class NetFlowObject(
 case object NetFlowObject extends CDM17Constructor[NetFlowObject] {
   type RawCDMType = cdm17.NetFlowObject
 
-  def from(cdm: RawCDM15Type): Try[NetFlowObject] = Try(
+  def from(cdm: RawCDM17Type): Try[NetFlowObject] = Try(
     NetFlowObject(
       cdm.getUuid,
       cdm.getBaseObject,

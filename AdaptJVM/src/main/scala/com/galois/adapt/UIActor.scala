@@ -65,7 +65,6 @@ class UIActor(val registry: ActorRef, interface: String, port: Int) extends Acto
 
     case UIStatusReport(l) =>
       allStatusReports = l
-
   }
 }
 

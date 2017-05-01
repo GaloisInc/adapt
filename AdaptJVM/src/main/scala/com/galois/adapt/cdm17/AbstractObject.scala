@@ -23,7 +23,7 @@ case class AbstractObject(
 case object AbstractObject extends CDM17Constructor[AbstractObject] {
   type RawCDMType = cdm17.AbstractObject
 
-  def from(cdm: RawCDM15Type): Try[AbstractObject] = Try {
+  def from(cdm: RawCDM17Type): Try[AbstractObject] = Try {
     AbstractObject(
       AvroOpt.fixedShort(cdm.getPermission),
       AvroOpt.int(cdm.getEpoch),

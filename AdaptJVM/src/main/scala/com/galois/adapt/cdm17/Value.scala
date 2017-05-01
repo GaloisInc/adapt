@@ -46,7 +46,7 @@ case class Value(
 case object Value extends CDM17Constructor[Value] {
   type RawCDMType = cdm17.Value
 
-  def from(cdm: RawCDM15Type): Try[Value] = Try(
+  def from(cdm: RawCDM17Type): Try[Value] = Try(
     Value(
       cdm.getSize,
       cdm.getType,

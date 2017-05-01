@@ -71,7 +71,7 @@ case class Event(
 case object Event extends CDM17Constructor[Event] {
   type RawCDMType = cdm17.Event
 
-  def from(cdm: RawCDM15Type): Try[Event] = Try(
+  def from(cdm: RawCDM17Type): Try[Event] = Try(
     Event(
       cdm.getUuid,
       cdm.getSequence,

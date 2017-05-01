@@ -33,7 +33,7 @@ case class RegistryKeyObject(
 case object RegistryKeyObject extends CDM17Constructor[RegistryKeyObject] {
   type RawCDMType = cdm17.RegistryKeyObject
 
-  def from(cdm: RawCDM15Type): Try[RegistryKeyObject] = Try(
+  def from(cdm: RawCDM17Type): Try[RegistryKeyObject] = Try(
     RegistryKeyObject(
       cdm.getUuid,
       cdm.getBaseObject,

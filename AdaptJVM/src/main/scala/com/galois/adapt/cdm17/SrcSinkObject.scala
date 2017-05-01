@@ -31,7 +31,7 @@ case class SrcSinkObject(
 case object SrcSinkObject extends CDM17Constructor[SrcSinkObject] {
   type RawCDMType = cdm17.SrcSinkObject
 
-  def from(cdm: RawCDM15Type): Try[SrcSinkObject] = Try(
+  def from(cdm: RawCDM17Type): Try[SrcSinkObject] = Try(
     SrcSinkObject(
       cdm.getUuid,
       cdm.getBaseObject,

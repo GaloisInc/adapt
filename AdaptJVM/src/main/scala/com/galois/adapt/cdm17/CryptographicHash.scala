@@ -21,7 +21,7 @@ case class CryptographicHash(
 case object CryptographicHash extends CDM17Constructor[CryptographicHash] {
   type RawCDMType = cdm17.CryptographicHash
 
-  def from(cdm: RawCDM15Type): Try[CryptographicHash] = Try {
+  def from(cdm: RawCDM17Type): Try[CryptographicHash] = Try {
     CryptographicHash(
       cdm.getType,
       cdm.getHash

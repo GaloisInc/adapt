@@ -37,19 +37,19 @@ package object cdm17 {
       tcFileReader.iterator().asScala
     }
 
-    def readAvroFile(filePath: String): Try[(InstrumentationSource, Iterator[RawCDM15Type])] = Try {
+    def readAvroFile(filePath: String): Try[(InstrumentationSource, Iterator[RawCDM17Type])] = Try {
       val tcIterator = readAvroAsTCCDMDatum(filePath)
 
       val cdm = tcIterator.next()
-      val first: RawCDM15Type = {
+      val first: RawCDM17Type = {
         if (cdm.CDMVersion.toString != "17")
           throw new Exception(s"Expected CDM17, but received CDM${cdm.CDMVersion.toString}")
-        new RawCDM15Type(cdm.getDatum)
+        new RawCDM17Type(cdm.getDatum)
       }
-      (cdm.getSource, Iterator(first) ++ tcIterator.map(cdm => new RawCDM15Type(cdm.getDatum)))
+      (cdm.getSource, Iterator(first) ++ tcIterator.map(cdm => new RawCDM17Type(cdm.getDatum)))
     }
 
-    def parse(cdm: RawCDM15Type) = cdm.o match {
+    def parse(cdm: RawCDM17Type) = cdm.o match {
       case _: Principal.RawCDMType => Principal.from(cdm)
       case _: ProvenanceTagNode.RawCDMType => ProvenanceTagNode.from(cdm)
       case _: TagRunLengthTuple.RawCDMType => TagRunLengthTuple.from(cdm)
@@ -76,12 +76,12 @@ package object cdm17 {
 
   trait CDM17Constructor[T <: CDM17] extends CDM17 {
     type RawCDMType <: org.apache.avro.specific.SpecificRecordBase
-    implicit def convertRawTypes(r: RawCDM15Type): RawCDMType = r.asType[RawCDMType]
-    def from(cdm: RawCDM15Type): Try[T]
+    implicit def convertRawTypes(r: RawCDM17Type): RawCDMType = r.asType[RawCDMType]
+    def from(cdm: RawCDM17Type): Try[T]
 
   }
 
-  class RawCDM15Type(val o: Object) extends AnyVal {
+  class RawCDM17Type(val o: Object) extends AnyVal {
     def asType[T]: T = o.asInstanceOf[T]
   }
 
@@ -98,20 +98,20 @@ package object cdm17 {
     def tagOpCode(x: => bbnCDM15.TagOpCode): Option[TagOpCode] = Try(makeTagOpCode(x)).toOption
     def integrityTag(x: => bbnCDM15.IntegrityTag): Option[IntegrityTag] = Try(makeIntegrityTag(x)).toOption
     def confidentialityTag(x: => bbnCDM15.ConfidentialityTag): Option[ConfidentialityTag] = Try(makeConfidentialityTag(x)).toOption
-    def value(x: => bbnCDM15.Value): Option[Value] = Value.from(new RawCDM15Type(x)).toOption
+    def value(x: => bbnCDM15.Value): Option[Value] = Value.from(new RawCDM17Type(x)).toOption
     def privilegeLevel(x: => bbnCDM15.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
     def fixedShort(x: => bbnCDM15.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
     def listValue(x: java.util.List[bbnCDM15.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => Value.from(new RawCDM15Type(x)).get))
+      _.asScala.toList.map(x => Value.from(new RawCDM17Type(x)).get))
     def listProvTagNode(x: java.util.List[bbnCDM15.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM15Type(x)).get))
+      _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM17Type(x)).get))
     def listCryptographicHash(x: java.util.List[bbnCDM15.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => CryptographicHash.from(new RawCDM15Type(x)).get))
+      _.asScala.toList.map(x => CryptographicHash.from(new RawCDM17Type(x)).get))
     def listUuid(x: java.util.List[bbnCDM15.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(makeJavaUUID(_)))
     def listTagRunLengthTuple(x: java.util.List[bbnCDM15.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM15Type(x)).get))
+      _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM17Type(x)).get))
   }
 
   implicit def makeSubjectType(s: bbnCDM15.SubjectType): SubjectType = SubjectType.from(s.toString).get
@@ -134,8 +134,8 @@ package object cdm17 {
   implicit def makeString(c: CharSequence): String = c.toString
   implicit def makeStringList(l: java.util.List[CharSequence]): Seq[String] = l.asScala.map(_.toString)
   implicit def makeShort(s: bbnCDM15.SHORT): FixedShort = new FixedShort(s.bytes)
-  implicit def makeAbstractObject(o: bbnCDM15.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM15Type(o)).get
-  implicit def makeTagRunLength(x: bbnCDM15.TagRunLengthTuple): TagRunLengthTuple = TagRunLengthTuple.from(new RawCDM15Type(x)).get
+  implicit def makeAbstractObject(o: bbnCDM15.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM17Type(o)).get
+  implicit def makeTagRunLength(x: bbnCDM15.TagRunLengthTuple): TagRunLengthTuple = TagRunLengthTuple.from(new RawCDM17Type(x)).get
 
   object DBOpt {
     // Flattens out nested "properties":

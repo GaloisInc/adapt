@@ -36,7 +36,7 @@ case class Principal(
 case object Principal extends CDM17Constructor[Principal] {
   type RawCDMType = cdm17.Principal
 
-  def from(cdm: RawCDM15Type): Try[Principal] = Try {
+  def from(cdm: RawCDM17Type): Try[Principal] = Try {
     Principal(
       cdm.getUuid,
       cdm.getUserId,

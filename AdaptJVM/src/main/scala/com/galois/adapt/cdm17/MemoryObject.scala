@@ -33,7 +33,7 @@ case class MemoryObject(
 case object MemoryObject extends CDM17Constructor[MemoryObject] {
   type RawCDMType = cdm17.MemoryObject
 
-  def from(cdm: RawCDM15Type): Try[MemoryObject] = Try(
+  def from(cdm: RawCDM17Type): Try[MemoryObject] = Try(
     MemoryObject(
       cdm.getUuid,
       cdm.getBaseObject,

@@ -53,7 +53,7 @@ case class Subject(
 case object Subject extends CDM17Constructor[Subject] {
   type RawCDMType = cdm17.Subject
 
-  def from(cdm: RawCDM15Type): Try[Subject] = Try {
+  def from(cdm: RawCDM17Type): Try[Subject] = Try {
     Subject(
       cdm.getUuid,
       cdm.getType,

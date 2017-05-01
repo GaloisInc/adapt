@@ -30,7 +30,7 @@ case class UnitDependency(
 case object UnitDependency extends CDM17Constructor[UnitDependency] {
   type RawCDMType = cdm17.UnitDependency
 
-  def from(cdm: RawCDM15Type): Try[UnitDependency] = Try {
+  def from(cdm: RawCDM17Type): Try[UnitDependency] = Try {
     UnitDependency(
       cdm.getUnit,
       cdm.getDependentUnit

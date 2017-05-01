@@ -42,7 +42,7 @@ case class FileObject(
 case object FileObject extends CDM17Constructor[FileObject] {
   type RawCDMType = cdm17.FileObject
 
-  def from(cdm: RawCDM15Type): Try[FileObject] = Try(
+  def from(cdm: RawCDM17Type): Try[FileObject] = Try(
     FileObject(
       cdm.getUuid,
       cdm.getBaseObject,

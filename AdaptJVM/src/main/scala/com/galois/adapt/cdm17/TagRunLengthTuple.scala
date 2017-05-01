@@ -28,7 +28,7 @@ case class TagRunLengthTuple(
 case object TagRunLengthTuple extends CDM17Constructor[TagRunLengthTuple] {
   type RawCDMType = cdm17.TagRunLengthTuple
 
-  def from(cdm: RawCDM15Type): Try[TagRunLengthTuple] = Try {
+  def from(cdm: RawCDM17Type): Try[TagRunLengthTuple] = Try {
     TagRunLengthTuple(
       cdm.getNumValueElements,
       cdm.getTagId
