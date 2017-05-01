@@ -1,40 +1,48 @@
 <html>
 <header>
-    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
-    <script type="text/javascript" src="javascripts/underscore.js"></script>
-    <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
-    <script type="text/javascript" src="javascripts/ui_language.js"></script>
-    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
+	<title>Adapt Suspicion Rankings</title>
+	<script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+	<script type="text/javascript" src="javascripts/underscore.js"></script>
+	<script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
+	<script type="text/javascript" src="javascripts/ui_language.js"></script>
+	<script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
 
-    <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
-    <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+	<link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
+	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
 
-    <meta charset="utf-8">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adapt Suspicion Rankings</title>
-    <link rel="stylesheet" href="stylesheets/foundation.css">
-    <link rel="stylesheet" href="stylesheets/app.css">
+	<meta charset="utf-8">
+	<meta http-equiv="x-ua-compatible" content="ie=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="stylesheets/foundation.css">
+	<link rel="stylesheet" href="stylesheets/app.css">
+
+	<script type="text/javascript">
+		$(function(){
+			$.getJSON("http://localhost:8080/ranked/all", function(top_anoms){
+				_.map(top_anoms, function(a){
+					var key_uuid = Object.keys(a)[0]
+					var anom_types = Object.keys(a[key_uuid])
+					var scores = _.map(anom_types, function(t){
+						return a[key_uuid][t]['score']
+					})
+					var sum = _.reduce(scores, function(a, b){ return a + b })
+					var type_names = _.reduce(anom_types, function(a, b){ return a + ", " + b})
+					var subgraph_array = _.map(anom_types, function(b){
+						return a[key_uuid][b]['subgraph']
+					})
+					var unique_subgraph = Array.from(new Set(_.flatten(subgraph_array)))
+					var subgraph = _.reduce(unique_subgraph, function(a,b){
+						return a + ", " + b
+					})
+
+					$("#cards").append('<div class="column row small-12"><div class="column small-8">'+ key_uuid +'</div><div class="column small-4">STARS HERE</div><div class="column small-2">'+ sum +'</div><div class="column small-9">'+ type_names +'</div><div class="column small-1">BUTTON</div><div class="column snamm-12">'+ subgraph +'</div></div>')
+				})
+			})
+		})
+	</script>
 </header>
 <body>
-<div class="row">
-	<div class="column row small-12">
-		<div class="column small-8">
-		 Insert more UI here.
-		</div>
-		<div class="column small-4">
-		STARS HERE
-		</div>
-		<div class="column small-offset-11">BUTTON</div>
-	</div>
-	<div class="column row small-12">
-		<div class="column small-8">
-		 Insert more UI here.
-		</div>
-		<div class="column small-4">
-		STARS HERE
-		</div>
-	</div>
+<div id="cards" class="row">
 </div>
 </body>
 </html>

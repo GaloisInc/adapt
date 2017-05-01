@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.marshalling._
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import org.mapdb.DBMaker
@@ -11,6 +12,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+
 import scala.collection.mutable.{Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
@@ -32,19 +34,20 @@ class AnomalyManager extends Actor with ActorLogging {
       if (existing.isEmpty) anomalies -= card.keyNode
       else anomalies += (card.keyNode -> existing)
 
-    case QueryAnomaly(uuid) =>
-      sender() ! anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
+    case QueryAnomalies(uuids) =>
+      sender() ! anomalies.filter(t => uuids.contains(t._1)).mapValues(_.toMap).toMap  //anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
 
     case GetRankedAnomalies(topK) =>
-      sender() ! anomalies.toList.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK)
+      sender() ! anomalies.toList.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK).map(t => t._1 -> t._2.toMap)
 
     case SetThreshold(limit) => threshold = limit
   }
 }
 
 case class SetThreshold(threshold: Double)
-case class QueryAnomaly(uuid: UUID)
+case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
+
 
 
 object ProdRoutes {
@@ -69,13 +72,13 @@ object ProdRoutes {
       case _: EdgeQuery   => "edge"
       case _: StringQuery => "generic"
     }
-    Application.debug(s"Got $qType query: ${query.query}")
+    println(s"Got $qType query: ${query.query}")
     val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
-      Application.debug("returning...")
+      println("returning...")
       val toReturn = s match {
         case Success(json) => json
         case Failure(e) =>
-          Application.debug(e.getMessage)
+          println(e.getMessage)
           "\"" + e.getMessage + "\""
       }
       HttpEntity(ContentTypes.`application/json`, toReturn)
@@ -83,11 +86,22 @@ object ProdRoutes {
     complete(futureResponse)
   }
 
+  implicit val mapMarshaller: ToEntityMarshaller[Map[String, Any]] = Marshaller.opaque { map =>
+    HttpEntity(ContentType(MediaTypes.`application/json`), map.toString)
+  }
+
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
     get {
       pathPrefix("ranked") {
-        complete((anomalyActor ? GetRankedAnomalies()).mapTo[List[_]].map(_.mkString("\n\n")))
+        path(RemainingPath) { count =>
+          val limit = Try(count.toString.toInt).getOrElse(Int.MaxValue)
+          complete(
+            (anomalyActor ? GetRankedAnomalies(limit))
+              .mapTo[List[(UUID, Map[String, (Double, Set[UUID])])]]
+              .map(convertToJsonTheOtherHardWay)
+          )
+        }
       } ~
       pathPrefix("status") {
         complete(
@@ -119,13 +133,14 @@ object ProdRoutes {
     } ~
     post {
       pathPrefix("query") {
-//        path("anomalyScores") {
-//          formField('uuids) { commaSeparatedUuidString =>
-//            val uuids = commaSeparatedUuidString.split(",").map(s => UUID.fromString(s.trim))
-//            val scores = uuids.map(u => u.toString -> anomalies.mapValues(_.suspicionScore).getOrElse(Set(u), 0D))   // TODO: revisit this to return multiple anomaly scores per node!
-//            complete(HttpEntity(ContentType(MediaTypes.`application/json`), scores.map{ case (k, v) => s""""$k":$v""" }.mkString("{",",","}")))  // lazy cheating.
-//          }
-//        } ~
+        path("anomalyScores") {
+          formField('uuids) { commaSeparatedUuidString =>
+            val uuids = commaSeparatedUuidString.split(",").map(s => UUID.fromString(s.trim))
+            val mapF = (anomalyActor ? QueryAnomalies(uuids)).mapTo[Map[UUID, Map[String, (Double, Set[UUID])]]]
+            val f = mapF.map(anoms => convertToJsonTheHardWay(anoms) )
+            complete(f.map(s => HttpEntity(ContentTypes.`application/json`, s)))
+          }
+        } ~
         path("nodes") {
           formField('query) { queryString =>
             completedQuery(NodeQuery(queryString), dbActor)
@@ -152,5 +167,13 @@ object ProdRoutes {
         }
       }
     }
+
+
+  def convertToJsonTheHardWay(anomalyMap: Map[UUID, Map[String, (Double, Set[UUID])]]): String =    // Bad programmer! You know better than this. You should be ashamed of yourself.
+    anomalyMap.mapValues(inner => inner.mapValues(t => s"""{"score":${t._1},"subgraph":${t._2.toList.map(u => s""""$u"""").mkString("[",",","]")}}""").map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")  ).map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")
+
+  def convertToJsonTheOtherHardWay(anomalyList: List[(UUID, Map[String, (Double, Set[UUID])])]): String = {   // Bad programmer! You know better than this. You should be ashamed of yourself.
+    anomalyList.map(anom => s"""{"${anom._1}":${anom._2.map(x => s""""${x._1}":{"score":${x._2._1},"subgraph":${x._2._2.map(u => s""""$u"""").mkString("[",",","]")}}""").mkString("{",",","}")}}""").mkString("[",",","]")
+  }
 
 }
