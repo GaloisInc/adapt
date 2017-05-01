@@ -34,10 +34,11 @@ proc_execQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as(
 # A context is represented as a dictionary with keys = objects
 # and values = sets of attributes
 
-
+# Make a context out of a collection of records, grouping by 'key'
 def makeContext(l,key,val): 
     return {x[key]:{y[val] for y in l if x[key] == y[key]} for x in l}
 
+# Prefixes of a 
 def prefixes(s):
     if s.rfind('/') > 0:
         pref = s.rsplit('/',1)[0]
@@ -51,3 +52,48 @@ def allprefixes(s):
     for x in s:
         prefs = prefs | prefixes(x)
     return prefs
+
+# Convert an attribute into a bag of nonempty words
+def bagofwords(s,sep):
+    return {w for w in s.split(sep) if w != ''}
+
+# Convert a set of attributes into the union of bags of words
+def allbagofwords(s,sep):
+    bags = set()
+    for x in s:
+        bags = bags | bagofwords(x,sep)
+    return bags
+
+def getAtts(d): 
+    atts = set()
+    for x in d.values():
+        atts = atts | x
+    return atts
+
+def countAtts(d):
+    attCounts = {}
+    for x in d.values():
+        for a in x:
+            if a in attCounts.keys():
+                attCounts[a] = attCounts[a]+1
+            else:
+                attCounts[a] = 1
+    return attCounts
+
+# Estimate the cost of a context, i.e. |total number of attributes of all objects| * log_2 |number of possible attributes|
+# If a dictionary mapping some attributes to sets fo other attributes is given,
+# count its cost too.
+
+def cost(context,dictionary={}): 
+    ctxCost = 0.0
+    atts = getAtts(context)
+    attCost = numpy.log2(len(atts))
+    for k in context.values():
+        ctxCost = ctxCost + len(k)*attCost
+    dictCost = 0.0
+    for k in dictionary.values():
+        dictCost = dictCost + len(k)*attCost
+    return (ctxCost+dictCost)
+
+
+

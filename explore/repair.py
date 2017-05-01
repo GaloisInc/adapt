@@ -3,34 +3,6 @@ from query import *
 from contexts import *
 
 
-def getAtts(d): 
-    atts = set()
-    for x in d.values():
-        atts = atts | x
-    return atts
-
-def countAtts(d):
-    attCounts = {}
-    for x in d.values():
-        for a in x:
-            if a in attCounts.keys():
-                attCounts[a] = attCounts[a]+1
-            else:
-                attCounts[a] = 1
-    return attCounts
-
-
-def cost(context,dictionary): 
-    ctxCost = 0.0
-    atts = getAtts(context)
-    attCost = numpy.log2(len(atts))
-    for k in context.values():
-        ctxCost = ctxCost + len(k)*attCost
-    dictCost = 0.0
-    for k in dictionary.values():
-        dictCost = dictCost + len(k)*attCost
-    return (ctxCost+dictCost)
-
 def attPairs(s): 
     return {frozenset({x,y}) for x in s for y in s if x < y}
 
