@@ -32,12 +32,13 @@ case class ProvenanceTagNode(
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
     prevTagId.fold[List[Any]](List.empty)(v => List("prevTagIdUuid", v.toString)) ++
     opcode.fold[List[Any]](List.empty)(v => List("opcode", v.toString)) ++
-    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v.mkString(", "))) ++
+    // TODO FIXME: tagIds.fold[List[Any]](List.empty)(v => v.toList.map(u => ("tagIds", u))) ++
+    tagIds.fold[List[Any]](List.empty)(v => v.toList.flatMap(u => List("tagIds", u))) ++
     itag.fold[List[Any]](List.empty)(v => List("itag", v.toString)) ++
     ctag.fold[List[Any]](List.empty)(v => List("ctag", v.toString)) ++
     DBOpt.fromKeyValMap(properties)
 
-  def asDBEdges =  List(("subjectUuid",subjectUuid)) ++
+  def asDBEdges =  List(("subject",subjectUuid)) ++
     flowObject.fold[List[(String,UUID)]](Nil)(f => List(("flowObject", f))) ++
     prevTagId.fold[List[(String,UUID)]](Nil)(p => List(("prevTagId", p))) ++
     tagIds.fold[List[(String,UUID)]](Nil)(ts => ts.toList.map(t => ("tagId", t)))

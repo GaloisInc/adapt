@@ -52,7 +52,7 @@ case class Event(
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List(("subjectUuid",subjectUuid)),
+    List(("subject",subjectUuid)),
     predicateObject.map(p => ("predicateObject",p)),
     predicateObject2.map(p => ("predicateObject2",p)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => ("parameterTagId", tag.tagId)))

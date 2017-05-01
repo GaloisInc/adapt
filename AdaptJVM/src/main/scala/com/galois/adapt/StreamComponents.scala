@@ -1047,6 +1047,8 @@ object TestGraph extends App {
 
 
 
+  source.runForeach(println)
+
   Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
 
 
