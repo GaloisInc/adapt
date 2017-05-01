@@ -12,15 +12,15 @@ case class Value(
   size: Int = -1,
   valueType: ValueType,
   valueDataType: ValueDataType,
-  isNull: Boolean = false,     // TODO: What are the semantics of this?!?
+  isNull: Boolean = false, // TODO: What are the semantics of this?!?
   name: Option[String] = None,
   runtimeDataType: Option[String] = None,
   valueBytes: Option[Array[Byte]] = None,
-  tag: Option[Seq[TagRunLengthTuple]] = None,
+  tagRunLengthTuples: Option[Seq[TagRunLengthTuple]] = None,
   components: Option[Seq[Value]] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  val tagsFolded = tag.fold[List[TagRunLengthTuple]](List.empty)(_.toList)
-  
+  val tagsFolded = tagRunLengthTuples.fold[List[TagRunLengthTuple]](List.empty)(_.toList)
+
   def asDBKeyValues = List(
     label, "Value",
     "size", size,
@@ -31,7 +31,7 @@ case class Value(
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     runtimeDataType.fold[List[Any]](List.empty)(v => List("runtimeDataType", v)) ++
     valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v.toString)) ++
-    tag.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tag", v.map(_.asDBKeyValues).mkString(", "))) ++
+    tagRunLengthTuples.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tagRunLengthTuples", v.map(_.asDBKeyValues).mkString(", "))) ++
     components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 
   val getUuid = UUID.randomUUID()

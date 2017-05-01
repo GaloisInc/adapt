@@ -4,6 +4,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.file.Paths
 import java.util.UUID
 import java.io._
+
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
@@ -16,10 +17,13 @@ import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
+import ch.qos.logback.classic.LoggerContext
 import org.mapdb.{DB, DBMaker, HTreeMap}
+
 import collection.JavaConverters._
 import scala.collection.mutable
 import scala.sys.process._
@@ -29,6 +33,8 @@ import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.slf4j.LoggerFactory
+
 import scala.io.{Source => FileSource}
 
 
@@ -94,9 +100,9 @@ object FlowComponents {
           if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
           else List((e.predicateObject.get, e)))
       case SubjectKey(Some(t)) => Flow[CDM17]
-        .collect { case e: Event if e.eventType == t => e.subject -> e }
+        .collect { case e: Event if e.eventType == t => e.subjectUuid -> e }
       case SubjectKey(None) => Flow[CDM17]
-        .collect { case e: Event => e.subject -> e }
+        .collect { case e: Event => e.subjectUuid -> e }
     }
     keyPredicate
       .filter(_._2.timestampNanos != 0L)
@@ -248,7 +254,7 @@ object FlowComponents {
       m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
       m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
       m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1000
-      m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subject).size
+      m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subjectUuid).size
 //      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
       m("totalBytesRead") = eList.collect{ case e if List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.size.getOrElse(0L)}.sum
       m("totalBytesWritten") = eList.collect{ case e if List(EVENT_WRITE, EVENT_SENDTO, EVENT_SENDMSG).contains(e.eventType) => e.size.getOrElse(0L)}.sum
@@ -299,7 +305,8 @@ object FlowComponents {
 
     predicateTypeLabeler(commandSource, db)
       .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
-      .groupBy(Int.MaxValue, _._3.subject)
+//      .via(printCounter("NetFlow or File Counter", 100))
+      .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
       .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[Event])])]{ () =>
         var processUuidOpt: Option[UUID] = None
@@ -315,12 +322,12 @@ object FlowComponents {
 
         {
           case Tuple4("NetFlowObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
             List.empty
 
           case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
             List.empty
 
@@ -378,7 +385,7 @@ object FlowComponents {
         var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
         var found = false
         while (remainder.nonEmpty && remainder.exists(_.eventType == EVENT_EXECUTE)) {
-          val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subject == x.subject))
+          val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subjectUuid == x.subjectUuid))
           found = execOpt.exists(x => netFlowEventsFromIntersectingProcesses.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
           if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
         }
@@ -399,7 +406,7 @@ object FlowComponents {
                 .dropWhile(_.eventType != EVENT_OPEN)
                 .takeWhile(_.eventType != EVENT_CLOSE)
                 .exists(testEvent => // in the events between OPEN and CLOSE...
-                  testEvent.subject == deleteAfterWriteEvent.subject && // event by the same process as the UNLINK?
+                  testEvent.subjectUuid == deleteAfterWriteEvent.subjectUuid && // event by the same process as the UNLINK?
                     t._2.find(_.eventType == EVENT_CLOSE).exists(closeEvent => // If so, get the CLOSE event and
                       deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos // test if the UNLINK occurred before the CLOSE
                     )
@@ -410,10 +417,10 @@ object FlowComponents {
         } else false
 
       m("isReadByAProcessWritingToNetFlows") = fileEventList
-        .collect{ case e if e.eventType == EVENT_READ => e.subject}
+        .collect{ case e if e.eventType == EVENT_READ => e.subjectUuid}
         .flatMap( processUuid =>
           netFlowEventsFromIntersectingProcesses.toList.map(_._2.exists(ne =>
-            ne.subject == processUuid &&
+            ne.subjectUuid == processUuid &&
             List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
           ))
         ).foldLeft(false)(_ || _)
@@ -422,7 +429,7 @@ object FlowComponents {
       m("attribChangeEventThenExecuteGapMillis") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
       m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
       m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subject).size
+      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subjectUuid).size
       m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
       m("totalBytesRead") = fileEventList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
       m("totalBytesWritten") = fileEventList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
@@ -465,7 +472,7 @@ object FlowComponents {
 
     predicateTypeLabeler(commandSource, db)
 //      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
-      .groupBy(Int.MaxValue, _._3.subject)
+      .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
       .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(UUID, mutable.SortedSet[Event])])] { () =>
         var processUuidOpt: Option[UUID] = None
@@ -484,13 +491,13 @@ object FlowComponents {
             List.empty
 
           case Tuple4("NetFlowObject", uuid: UUID, event: Event, cdmOpt: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
               (event -> cdmOpt.asInstanceOf[NetFlowObject])
             List.empty
 
           case Tuple4("FileObject", uuid: UUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subject)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
             List.empty
 
@@ -572,7 +579,7 @@ object FlowComponents {
 
 //      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files. Or does it? Path is probably on events.
       m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-          _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+          _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
         ).toList.sorted.headOption.exists(netFlowReadTime =>
           fileEventSets.exists(
             _._2.dropWhile(write =>
@@ -584,7 +591,7 @@ object FlowComponents {
       m("changesFilePermissionsThenExecutesIt") = processEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
       m("executedThenImmediatelyDeletedAFile") = processEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.timestampNanos).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK))
       m("readFromNetFlowThenDeletedFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-        _._2.collect{ case e if e.subject == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+        _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
       ).toList.sorted.headOption.exists(netFlowReadTime =>
         fileEventSets.exists(
           _._2.exists(delete =>
@@ -828,7 +835,120 @@ object TitanFlowComponents {
     val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
 
     val management: ManagementSystem = graph.openManagement().asInstanceOf[ManagementSystem]
-    management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make()
+
+    // This allows multiple edges when they are labelled 'tagId'
+    if(!management.containsEdgeLabel("tagId")) { management.makeEdgeLabel("tagId").multiplicity(Multiplicity.MULTI).make() }
+
+    val edgeLabels = List("localPrincipal", "subject", "predicateObject", "predicateObject2",
+    "parameterTagId", "flowObject", "prevTagId", "parentSubject", "dependentUnit", "unit",
+    "tag")
+    for (edgeLabel <- edgeLabels)
+      if(!management.containsEdgeLabel(edgeLabel)) { management.makeEdgeLabel(edgeLabel).make() }
+
+    val propertyKeys = List(
+      ("cid", classOf[Integer]),
+      ("cmdLine", classOf[String]),
+      ("count", classOf[Integer]),
+//      ("ctag", classOf[ConfidentialityTag]),
+      ("ctag", classOf[String]),
+//      ("components", classOf[Seq[Value]]),
+      ("compoents", classOf[String]),
+      ("dependentUnitUuid", classOf[UUID]),
+      ("epoch", classOf[Integer]),
+//      ("exportedLibraries", classOf[Seq[String]]),
+      ("exportedLibraries", classOf[String]),
+//      ("eventType", classOf[EventType]),
+      ("eventType", classOf[String]),
+      ("fileDescriptor", classOf[Integer]),
+//      ("fileObjectType", classOf[FileObjectType]),
+      ("fileObjectType", classOf[String]),
+      ("flowObjectUuid", classOf[UUID]),
+//      ("groupIds", classOf[Seq[String]]),
+      ("groupIds", classOf[String]),
+      ("hash", classOf[String]),
+//      ("hashes", classOf[Seq[CryptographicHash]]),
+      ("hashes", classOf[String]),
+//      ("importedLibraries", classOf[Seq[String]]),
+      ("importedLibraries", classOf[String]),
+      ("ipProtocol", classOf[Integer]),
+      ("isNull", classOf[java.lang.Boolean]),
+//      ("itag", classOf[IntegrityTag]),
+      ("itag", classOf[String]),
+      ("iteration", classOf[Integer]),
+      ("registryKeyOrPath", classOf[String]),
+      ("localAddress", classOf[String]),
+      ("localPort", classOf[Integer]),
+      ("localPrincipalUuid", classOf[UUID]),
+      ("location", classOf[java.lang.Long]),
+      ("memoryAddress", classOf[java.lang.Long]),
+      ("name", classOf[String]),
+      ("numValueElements", classOf[Integer]),
+//      ("opcode", classOf[TagOpCode]),
+      ("opcode", classOf[String]),
+      ("pageNumber", classOf[java.lang.Long]),
+      ("pageOffset", classOf[java.lang.Long]),
+//      ("parameters", classOf[Seq[Value]]),
+      ("parameters", classOf[String]),
+      ("parentSubjectUuid", classOf[UUID]),
+      ("peInfo", classOf[String]),
+//      ("permission", classOf[FixedShort]),
+      ("permission", classOf[String]),
+      ("predicateObjectPath", classOf[String]),
+      ("predicateObjectUuid", classOf[UUID]),
+      ("predicateObject2Path", classOf[String]),
+      ("predicateObject2Uuid", classOf[UUID]),
+      ("prevTagIdUuid", classOf[UUID]),
+//      ("principalType", classOf[PrincipalType]),
+      ("principalType", classOf[String]),
+//      ("privilegeLevel", classOf[PrivilegeLevel]),
+      ("privilegeLevel", classOf[String]),
+      ("programPoint", classOf[String]),
+      ("remoteAddress", classOf[String]),
+      ("remotePort", classOf[Integer]),
+      ("runtimeDataType", classOf[String]),
+      ("sequence", classOf[java.lang.Long]),
+      ("sinkFileDescriptor", classOf[Integer]),
+      ("size", classOf[java.lang.Long]),
+      ("sourceFileDescriptor", classOf[Integer]),
+//      ("srcSinkType", classOf[SrcSinkType]),
+      ("srcSinkType", classOf[String]),
+      ("startTimestampNanos", classOf[java.lang.Long]),
+//      ("subjectType", classOf[SubjectType]),
+      ("subjectType", classOf[String]),
+      ("subjectUuid", classOf[UUID]),
+      ("systemCall", classOf[String]),
+//      ("tag", classOf[Seq[TagRunLengthTuple]]),
+      ("tagRunLengthTuples", classOf[String]),
+      ("tagIds", classOf[UUID], Cardinality.LIST),
+      ("threadId", classOf[Integer]),
+      ("timestampNanos", classOf[java.lang.Long]),
+//      ("type", classOf[CryptoHashType]),
+      ("type", classOf[String]),
+      ("unitId", classOf[Integer]),
+      ("unitUuid", classOf[UUID]),
+      ("userId", classOf[String]),
+      ("username", classOf[String]),
+      ("uuid", classOf[UUID]),
+//      ("value", classOf[Value]),
+      ("value", classOf[String]),
+//      ("valueBytes", classOf[Array[Byte]]),
+      ("valueBytes", classOf[String]),
+//      ("valueDataType", classOf[ValueDataType]),
+      ("valueDataType", classOf[String]),
+//      ("valueType", classOf[ValueType])
+      ("valueType", classOf[String])
+    )
+    for (propertyKey <- propertyKeys)
+      //if(!management.containsPropertyKey(propertyKey._1)) { management.makePropertyKey(propertyKey._1).dataType(propertyKey._2).make() }
+      propertyKey match {
+        case (name: String, pClass: Class[_]) if !management.containsPropertyKey(name) =>
+          management.makePropertyKey(name).dataType(pClass).cardinality(Cardinality.SINGLE).make()
+        case (name: String, pClass: Class[_], cardinality: Cardinality) if !management.containsPropertyKey(name) =>
+          management.makePropertyKey(name).dataType(pClass).cardinality(cardinality).make()
+        case _ => ()
+      }
+
+    // This makes a unique index for 'uuid'
     if (null == management.getGraphIndex("byUuidUnique")) {
 
       var idKey = if (management.getPropertyKey("uuid") != null) {
@@ -861,30 +981,85 @@ object TitanFlowComponents {
    */
   def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
     .collect{ case cdm: DBNodeable => cdm }
-    .groupedWithin(10000, 5 seconds)
-    .via(FlowComponents.printCounter("Titan Writer"))
+    .groupedWithin(1000, 1 seconds)
+    .via(FlowComponents.printCounter("Titan Writer", 1000))
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
       val transaction = graph.newTransaction()
 
-      for (cdm <- cdms) {
-        val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
-        assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-        val newTitanVertex = transaction.addVertex(props: _*)
+      // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
+      // during this transaction (since we don't look those up in the usual manner).
+      val newVertices = collection.mutable.Map.empty[UUID,Vertex]
 
-        for ((label,toUuid) <- cdm.asDBEdges) {
-          val i = graph.traversal().V().has("uuid",cdm.getUuid)
-          if (i.hasNext) {
-            val toTitanVertex = i.next()
-            newTitanVertex.addEdge(label, toTitanVertex)
+      // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
+      // handle cases where nodes are out of order).
+      var missingToUuid = collection.mutable.Map.empty[UUID, Set[(Vertex,String)]]
+
+      // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
+      // the 'newVertices' map, then falling back on a query to Titan.
+      def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
+        val iterator = graph.traversal().V().has("uuid", uuid)
+        if (iterator.hasNext()) { Some(iterator.next()) } else { None}
+      }
+
+      // Process all of the nodes
+        for (cdm <- cdms) {
+          // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
+          // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
+          try {
+            val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+            assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+            val newTitanVertex = transaction.addVertex(props: _*)
+            newVertices += (cdm.getUuid -> newTitanVertex)
+
+            for ((label,toUuid) <- cdm.asDBEdges) {
+              findNode(toUuid) match {
+                case Some(toTitanVertex) =>
+                  newTitanVertex.addEdge(label, toTitanVertex)
+                case None =>
+                  missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
+              }
+            }
+          }
+          catch {
+            // TODO make this more useful
+            case e: java.lang.IllegalArgumentException =>
+              if (!e.getMessage.contains("byUuidUnique")) {
+                println("Failed CDM statement: " + cdm)
+                println(e.getMessage) // Bad query
+                e.printStackTrace()
+                throw e
+              }
+            case unk: Throwable => println(unk)
           }
         }
+
+      // Try to complete missing edges. If the node pointed to is _still_ not found, we
+      // synthetically create it.
+      var nodeCreatedCounter = 0
+      var edgeCreatedCounter = 0
+
+      for ((uuid,edges) <- missingToUuid; (fromTitanVertex,label) <- edges) {
+
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        val toTitanVertex = findNode(uuid) getOrElse {
+          nodeCreatedCounter += 1
+          val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+          newVertices += (uuid -> newNode)
+          newNode
+        }
+
+        // Create the missing edge
+        edgeCreatedCounter += 1
+        fromTitanVertex.addEdge(label, toTitanVertex)
       }
+
+      println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
+
       transaction.commit()
       println(s"Committed transaction with ${cdms.length}")
     }
   )(Keep.right)
-
 }
 
 
@@ -896,12 +1071,15 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val data = CDM17.readData(path, None).get._2.map(_.get)
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
     .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
 //    .via(Streams.titanWrites(graph))
+
+  println("Total CDM statements: " + data.length)
 
 
 //  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
@@ -913,7 +1091,7 @@ object TestGraph extends App {
 //    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
 
 
-  val dbFilePath = "/Users/ryan/Desktop/map.db"
+  val dbFilePath = "/tmp/map.db"
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
@@ -944,9 +1122,6 @@ object TestGraph extends App {
 
 
   //  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
-
-
-
 
 
 

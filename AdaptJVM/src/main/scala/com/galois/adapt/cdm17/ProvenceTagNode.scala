@@ -10,8 +10,8 @@ import scala.util.Try
 
 
 case class ProvenanceTagNode(
-  tagId: UUID,
-  subject: UUID,
+  tagIdUuid: UUID,
+  subjectUuid: UUID,
   flowObject: Option[UUID] = None,
   systemCall: Option[String] = None,
   programPoint: Option[String] = None,
@@ -24,25 +24,26 @@ case class ProvenanceTagNode(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
-    "tagId", tagId,
-    "subject", subject
+    "tagIdUuid", tagIdUuid,
+    "subjectUuid", subjectUuid
   ) ++
-    flowObject.fold[List[Any]](List.empty)(v => List("flowObject", v)) ++
+    flowObject.fold[List[Any]](List.empty)(v => List("flowObjectUuid", v)) ++
     systemCall.fold[List[Any]](List.empty)(v => List("systemCall", v)) ++
     programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
-    prevTagId.fold[List[Any]](List.empty)(v => List("prevTagId", v.toString)) ++
+    prevTagId.fold[List[Any]](List.empty)(v => List("prevTagIdUuid", v.toString)) ++
     opcode.fold[List[Any]](List.empty)(v => List("opcode", v.toString)) ++
-    tagIds.fold[List[Any]](List.empty)(v => List("tagIds", v.mkString(", "))) ++
+    // TODO FIXME: tagIds.fold[List[Any]](List.empty)(v => v.toList.map(u => ("tagIds", u))) ++
+    tagIds.fold[List[Any]](List.empty)(v => v.toList.flatMap(u => List("tagIds", u))) ++
     itag.fold[List[Any]](List.empty)(v => List("itag", v.toString)) ++
     ctag.fold[List[Any]](List.empty)(v => List("ctag", v.toString)) ++
     DBOpt.fromKeyValMap(properties)
 
-  def asDBEdges =  List(("subject",subject)) ++
+  def asDBEdges =  List(("subject",subjectUuid)) ++
     flowObject.fold[List[(String,UUID)]](Nil)(f => List(("flowObject", f))) ++
     prevTagId.fold[List[(String,UUID)]](Nil)(p => List(("prevTagId", p))) ++
     tagIds.fold[List[(String,UUID)]](Nil)(ts => ts.toList.map(t => ("tagId", t)))
 
-  def getUuid = tagId
+  def getUuid = tagIdUuid
 }
 
 case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {

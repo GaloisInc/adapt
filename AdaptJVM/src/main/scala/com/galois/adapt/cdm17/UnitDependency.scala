@@ -16,7 +16,7 @@ case class UnitDependency(
   def asDBKeyValues = List(
     label, "UnitDependency",
     "unit", unit,
-    "dependentUnit", dependentUnit
+    "dependentUnitUuid", dependentUnit
   )
 
   def asDBEdges = List(("dependentUnit",dependentUnit),("unit",unit))

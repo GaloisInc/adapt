@@ -16,7 +16,7 @@ case class Event(
   sequence: Long = 0,
   eventType: EventType,
   threadId: Int,
-  subject: UUID,
+  subjectUuid: UUID,
   timestampNanos: Long,
   predicateObject: Option[UUID] = None,
   predicateObjectPath: Option[String] = None,
@@ -30,19 +30,19 @@ case class Event(
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
-  
+
   def asDBKeyValues = List(
     label, "Event",
     "uuid", uuid,
     "sequence", sequence,
     "eventType", eventType.toString,
     "threadId", threadId,
-    "subject", subject,
+    "subjectUuid", subjectUuid,
     "timestampNanos", timestampNanos
   ) ++
-    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObject", v)) ++
+    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObjectUuid", v)) ++
     predicateObjectPath.fold[List[Any]](List.empty)(v => List("predicateObjectPath", v)) ++
-    predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2", v.toString)) ++
+    predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2Uuid", v)) ++
     predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     parameters.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("parameters", v.map(_.asDBKeyValues).mkString(", "))) ++
@@ -52,7 +52,7 @@ case class Event(
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List(("subject",subject)),
+    List(("subject",subjectUuid)),
     predicateObject.map(p => ("predicateObject",p)),
     predicateObject2.map(p => ("predicateObject2",p)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => ("parameterTagId", tag.tagId)))

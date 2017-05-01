@@ -170,30 +170,14 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
      }
 
     case StringQuery(q) =>
-
-      import scala.collection.JavaConverters._
-      def serializeObject(o: java.lang.Object): String = {
-        o match {
-          case map: java.util.Map[AnyRef,AnyRef] =>
-            map.entrySet().iterator().asScala.map{ mapEntry =>
-              val k = serializeObject(mapEntry.getKey().toString);
-              val v = serializeObject(mapEntry.getValue());
-              k + ": " + v
-            }.mkString("{",",","}")
-          case str: String =>
-            "\"" + str.replace("\\","\\\\").replace("\"", "\\\"") + "\""
-          case other =>
-            serializeObject(other.toString)
-        }
-      }
-
       sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
         
         // Give a lower bound on the number of vertices
         Application.debug(s"Found: ${results.length}")
 
         // Generate JSON to send back
-        results.map(serializeObject).mkString("[",",","]")
+        results.map(r => s""""${r.toString.replace("\\","\\\\").replace("\"","\\\"")}"""")
+               .mkString("[",",","]")
       }
    
     case EdgesForNodes(nodeIdList) =>
@@ -209,7 +193,6 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       sender() !  missingToUuid.size
   }
 }
-
 
 case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
 
