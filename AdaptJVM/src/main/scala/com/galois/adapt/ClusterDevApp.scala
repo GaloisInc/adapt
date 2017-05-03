@@ -146,16 +146,12 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
     case "kafkaProducer" =>
       val file = config.getStringList("adapt.loadfiles").head
       val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
-      val streamActor = {
-        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaProducer(file, producerSettings, config.getString("adapt.kafka-cdm-source"))))
-      }
+      val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.kafkaProducer(file, producerSettings, config.getString("adapt.kafka-cdm-source"))))
       childActors = childActors + (roleName -> Set(streamActor))
 
     case "kafkaIngest" =>
       val consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]] = ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer)
-      val streamActor = {
-        context.actorOf(Props(classOf[GraphRunner], Streams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
-      }
+      val streamActor = context.actorOf(Props(classOf[GraphRunner], Streams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
       childActors = childActors + (roleName -> Set(streamActor))
 
     case s => throw new IllegalArgumentException(s"Unknown role: $s")

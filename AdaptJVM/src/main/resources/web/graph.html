@@ -487,21 +487,21 @@
 
 
         function translateAllEnums(node) {  // Mutates 'node' in place.
-            var translateEnum = function(prop_key, ordered_list) {
-                var keys = Object.keys(node['properties'])
-                var node_has_prop = $.inArray(prop_key, keys) >= 0
-                if (node_has_prop) {
-                    var idx = node['properties'][prop_key][0]['value']
-                    if (ordered_list.length > idx) { 
-                        node['properties'][prop_key][0]['value'] = ordered_list[idx]
-                    }
-                }
-            }
-            translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
-            translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
-            translateEnum("srcSinkType", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
-            translateEnum("source", ["LINUX_AUDIT_TRACE","LINUX_PROC_TRACE","LINUX_BEEP_TRACE","FREEBSD_OPENBSM_TRACE","ANDROID_JAVA_CLEARSCOPE","ANDROID_NATIVE_CLEARSCOPE","LINUX_AUDIT_CADETS","WINDOWS_DIFT_FAROS"])
-            translateEnum("agentType", ["Local","Remote"])
+            // var translateEnum = function(prop_key, ordered_list) {
+            //     var keys = Object.keys(node['properties'])  // TODO: properties doesn't always exist!!!
+            //     var node_has_prop = $.inArray(prop_key, keys) >= 0
+            //     if (node_has_prop) {
+            //         var idx = node['properties'][prop_key][0]['value']
+            //         if (ordered_list.length > idx) { 
+            //             node['properties'][prop_key][0]['value'] = ordered_list[idx]
+            //         }
+            //     }
+            // }
+            // translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
+            // translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
+            // translateEnum("srcSinkType", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
+            // translateEnum("source", ["LINUX_AUDIT_TRACE","LINUX_PROC_TRACE","LINUX_BEEP_TRACE","FREEBSD_OPENBSM_TRACE","ANDROID_JAVA_CLEARSCOPE","ANDROID_NATIVE_CLEARSCOPE","LINUX_AUDIT_CADETS","WINDOWS_DIFT_FAROS"])
+            // translateEnum("agentType", ["Local","Remote"])
         }
         
 

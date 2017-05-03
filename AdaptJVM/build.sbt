@@ -18,7 +18,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
     //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
-    //  "org.slf4j" % "slf4j-simple" % "1.7.21",
+    //  "org.slf4j" % "slf4j-api" % "1.7.25",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
@@ -26,7 +26,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-persistence" % akkaV,
     "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "0.14",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",

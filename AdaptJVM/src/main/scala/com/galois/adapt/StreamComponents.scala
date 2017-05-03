@@ -10,7 +10,6 @@ import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import com.galois.adapt.cdm17._
-import GraphDSL.Implicits._
 import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
 import akka.kafka.scaladsl.Producer
 import akka.kafka.scaladsl.Consumer
@@ -32,9 +31,11 @@ import scala.util.{Failure, Random, Success, Try}
 import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
+import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.io.{Source => FileSource}
 
 
@@ -53,10 +54,12 @@ case object CleanUp extends ProcessingCommand
 
 object Streams {
 
+//  val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
+
   def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
     GraphDSL.create(){ implicit graph =>
-      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
-      Source.fromIterator(() => datums).map(elem => {
+//      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
+      Source.fromIterator(() => CDM17.readAvroAsTCCDMDatum(file)).map(elem => {
         val baos = new ByteArrayOutputStream
         val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
         val encoder = EncoderFactory.get.binaryEncoder(baos, null)
@@ -979,86 +982,90 @@ object TitanFlowComponents {
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph = graph) = Flow[CDM17]
+  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-      val transaction = graph.newTransaction()
+        val transaction = //graph.newTransaction()
+          graph.buildTransaction()
+            //          .enableBatchLoading()
+            //          .checkExternalVertexExistence(false)
+            .start()
 
-      // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
-      // during this transaction (since we don't look those up in the usual manner).
-      val newVertices = MutableMap.empty[UUID,Vertex]
+        // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
+        // during this transaction (since we don't look those up in the usual manner).
+        val newVertices = MutableMap.empty[UUID, Vertex]
 
-      // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
-      // handle cases where nodes are out of order).
-      var missingToUuid = MutableMap.empty[UUID, Set[(Vertex,String)]]
+        // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
+        // handle cases where nodes are out of order).
+        var missingToUuid = MutableMap.empty[UUID, Set[(Vertex, String)]]
 
-      // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
-      // the 'newVertices' map, then falling back on a query to Titan.
-      def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
-        val iterator = transaction.traversal().V().has("uuid", uuid)
-        if (iterator.hasNext()) Some(iterator.next()) else None
-      }
+        // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
+        // the 'newVertices' map, then falling back on a query to Titan.
+        def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
+          val iterator = transaction.traversal().V().has("uuid", uuid)
+          if (iterator.hasNext()) Some(iterator.next()) else None
+        }
 
-      // Process all of the nodes
-      for (cdm <- cdms) {
-        // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
-        // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
-        try {
-          val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
-          assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-          val newTitanVertex = transaction.addVertex(props: _*)
-          newVertices += (cdm.getUuid -> newTitanVertex)
+        // Process all of the nodes
+        for (cdm <- cdms) {
+          // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
+          // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
+          try {
+            val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+            assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+            val newTitanVertex = transaction.addVertex(props: _*)
+            newVertices += (cdm.getUuid -> newTitanVertex)
 
-          for ((label,toUuid) <- cdm.asDBEdges) {
-            findNode(toUuid) match {
-              case Some(toTitanVertex) =>
-                newTitanVertex.addEdge(label, toTitanVertex)
-              case None =>
-                missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex,String)]()) + (newTitanVertex -> label)
+            for ((label, toUuid) <- cdm.asDBEdges) {
+              findNode(toUuid) match {
+                case Some(toTitanVertex) =>
+                  newTitanVertex.addEdge(label, toTitanVertex)
+                case None =>
+                  missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
+              }
             }
           }
+          catch {
+            // TODO make this more useful
+            case e: java.lang.IllegalArgumentException =>
+              if (!e.getMessage.contains("byUuidUnique")) {
+                println("Failed CDM statement: " + cdm)
+                println(e.getMessage) // Bad query
+                e.printStackTrace()
+                throw e
+              }
+            case unk: Throwable => println(unk)
+          }
         }
-        catch {
-          // TODO make this more useful
-          case e: java.lang.IllegalArgumentException =>
-            if (!e.getMessage.contains("byUuidUnique")) {
-              println("Failed CDM statement: " + cdm)
-              println(e.getMessage) // Bad query
-              e.printStackTrace()
-              throw e
-            }
-          case unk: Throwable => println(unk)
+
+        // Try to complete missing edges. If the node pointed to is _still_ not found, we
+        // synthetically create it.
+        var nodeCreatedCounter = 0
+        var edgeCreatedCounter = 0
+
+        for ((uuid, edges) <- missingToUuid; (fromTitanVertex, label) <- edges) {
+
+          // Find or create the missing vertex (it may have been created earlier in this loop)
+          val toTitanVertex = findNode(uuid) getOrElse {
+            nodeCreatedCounter += 1
+            val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+            newVertices += (uuid -> newNode)
+            newNode
+          }
+
+          // Create the missing edge
+          edgeCreatedCounter += 1
+          fromTitanVertex.addEdge(label, toTitanVertex)
         }
+
+//        println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
+
+        transaction.commit()
+//        println(s"Committed transaction with ${cdms.length}")
       }
-
-      // Try to complete missing edges. If the node pointed to is _still_ not found, we
-      // synthetically create it.
-      var nodeCreatedCounter = 0
-      var edgeCreatedCounter = 0
-
-      for ((uuid,edges) <- missingToUuid; (fromTitanVertex,label) <- edges) {
-
-        // Find or create the missing vertex (it may have been created earlier in this loop)
-        val toTitanVertex = findNode(uuid) getOrElse {
-          nodeCreatedCounter += 1
-          val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
-          newVertices += (uuid -> newNode)
-          newNode
-        }
-
-        // Create the missing edge
-        edgeCreatedCounter += 1
-        fromTitanVertex.addEdge(label, toTitanVertex)
-      }
-
-      println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
-
-      transaction.commit()
-      println(s"Committed transaction with ${cdms.length}")
-    }
-  )(Keep.right)
+    )(Keep.right)
 }
 
 
@@ -1070,7 +1077,7 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/erin/Documents/proj/adapt/git/Adapt/AdaptJVM/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
   val data = CDM17.readData(path, None).get._2.map(_.get)
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))

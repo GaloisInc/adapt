@@ -139,7 +139,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
           }
       }
 
-    case NodeQuery(q) =>
+    case NodeQuery(q,_) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
 
         // Give a lower bound on the number of vertices
@@ -157,7 +157,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         }.mkString("[", ",", "]")
       }
 
-    case EdgeQuery(q) =>
+    case EdgeQuery(q,_) =>
       sender() ! Query.run[Edge](q, graph).map { edges =>
 
         // Give a lower bound on the number of vertices
@@ -169,7 +169,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         byteStream.toString.split("\\}\\{").mkString("[", "},{", "]")
      }
 
-    case StringQuery(q) =>
+    case StringQuery(q,_) =>
       sender() ! Query.run[java.lang.Object](q, graph).map { results =>  
         
         // Give a lower bound on the number of vertices
@@ -197,9 +197,9 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
 
 sealed trait RestQuery { val query: String }
-case class NodeQuery(query: String) extends RestQuery
-case class EdgeQuery(query: String) extends RestQuery
-case class StringQuery(query: String) extends RestQuery
+case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
+case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
+case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
