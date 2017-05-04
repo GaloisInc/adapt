@@ -35,6 +35,7 @@ import scala.concurrent.duration._
 object ProductionApp extends App {
   println(s"Running the production system.")
 
+  println(ConfigFactory.load())
   run()
 
   def run() {
@@ -102,20 +103,23 @@ object CDMSource {
   private val config = ConfigFactory.load()
   val scenario = config.getString("adapt.scenario")
 
-  def apply(ta1: String): Source[CDM17, NotUsed] = ta1.toLowerCase match {
-    case "cadets"         => kafkaSource(s"ta1-cadets-$scenario-cdm17")
-    case "clearscope"     => kafkaSource(s"ta1-clearscope-$scenario-cdm17")
-    case "faros"          => kafkaSource(s"ta1-faros-$scenario-cdm17")
-    case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
-    case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17")
-    case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
-    case x => kafkaSource("kafkaTest")
-    case _ =>
-      val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
-      Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-        .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
-        .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-        .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+  def apply(ta1: String): Source[CDM17, NotUsed] = {
+    println(s"setting source for: $ta1")
+    ta1.toLowerCase match {
+      case "cadets"         => kafkaSource(s"ta1-cadets-$scenario-cdm17")
+      case "clearscope"     => kafkaSource(s"ta1-clearscope-$scenario-cdm17")
+      case "faros"          => kafkaSource(s"ta1-faros-$scenario-cdm17")
+      case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
+      case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17")
+      case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
+      case x => kafkaSource("kafkaTest").take(10000)
+      case _ =>
+        val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
+        Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
+          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
+          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
+          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+    }
   }
 
 
@@ -145,6 +149,6 @@ object Ta1Flows {
 //    case "fivedirections" =>
 //    case "theia" =>
 //    case "trace" =>
-    case _ => normalizedScores(_: DB, 10, 20, 30, 60).map((RankingCard.apply _).tupled)
+    case _ => normalizedScores(_: DB, 1, 2, 3, 6).map[RankingCard]((RankingCard.apply _).tupled).recover[RankingCard]{ case e: Throwable => e.printStackTrace().asInstanceOf[RankingCard] }
   }
 }

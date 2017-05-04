@@ -18,7 +18,14 @@
 
 	<script type="text/javascript">
 		$(function(){
-			$.getJSON("http://localhost:8080/ranked/all", function(top_anoms){
+
+
+
+			var testing_Prefix = "http://localhost:8080"
+
+
+
+			$.getJSON(testing_Prefix + "/ranked/all", function(top_anoms){
 				_.map(top_anoms, function(a){
 					var key_uuid = Object.keys(a)[0]
 					var anom_types = Object.keys(a[key_uuid])
@@ -30,19 +37,83 @@
 					var subgraph_array = _.map(anom_types, function(b){
 						return a[key_uuid][b]['subgraph']
 					})
+					// subgraph_array.push([key_uuid])
 					var unique_subgraph = Array.from(new Set(_.flatten(subgraph_array)))
+					unique_subgraph = _.filter(unique_subgraph, function(i){ return i != key_uuid })
 					var subgraph = _.reduce(unique_subgraph, function(a,b){
-						return a + ", " + b
+						return a + "," + b
 					})
 
-					$("#cards").append('<div class="column row small-12"><div class="column small-8">'+ key_uuid +'</div><div class="column small-4">STARS HERE</div><div class="column small-2">'+ sum +'</div><div class="column small-9">'+ type_names +'</div><div class="column small-1">BUTTON</div><div class="column snamm-12">'+ subgraph +'</div></div>')
+
+					var container = $("<div>", {
+						class: "column row small-12"
+					})
+					container.append($("<div>", {
+						class: "column small-8",
+						text: key_uuid
+					}))
+					container.append($("<div>", {
+						class: "column small-4",
+						text: "STARS HERE"
+					}))
+					container.append($("<div>", {
+						class: "column small-2",
+						text: sum
+					}))
+					container.append($("<div>", {
+						class: "column small-9",
+						text: type_names
+					}))
+					var keyNodeQuery = "g.V().has(\"uuid\","+key_uuid+"):f00"
+					var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph+"]))"
+					var queries = keyNodeQuery + subgraphQuery
+					var graphFrame = $("<div>")
+					var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='column small-12'>")
+					var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css({"font-size": "50px"})
+					graphFrame.append(iframe)
+					graphFrame.append(fullscreenIcon)
+					container.append($("<div>", {
+						class: "column small-1",
+						text: "Show Graph",
+						click: function() {
+							container.hide().append(graphFrame).slideToggle()
+							$(this).text("Hide Graph")
+							$(this).unbind("click").click(function(){UI.toggleGraph($(this), graphFrame)})
+						}
+					}))
+					container.append($("<div>", {
+						class: "column small-12",
+						text: subgraph
+					}))
+					$("#cards").append(container)
 				})
 			})
+
+			var UI = {
+				toggleGraph : function(button, graphFrame) {
+					if (button.text() == "Show Graph") { 
+						button.text("Hide Graph")
+					} else {
+						button.text("Show Graph")
+					}
+					graphFrame.slideToggle()
+				},
+				toggleFullScreen : function(button, iframe) {
+					if ( ! iframe.attr('style')) {
+						iframe.css({"position": "fixed", "top": 0, "left": 0, "background-color": "white", "width": "100%", "height": "100%"})
+						button.css({"position": "fixed", "left": 0, "bottom": 0, "z-index": 10})
+					} else {
+						iframe.removeAttr('style')
+						button.removeAttr('style').css({"font-size": "50px"})
+					}
+				}
+			}
 		})
 	</script>
 </header>
 <body>
 <div id="cards" class="row">
+	<!-- <iframe src="/graph" class="column small-12" height=800></iframe> -->
 </div>
 </body>
 </html>
