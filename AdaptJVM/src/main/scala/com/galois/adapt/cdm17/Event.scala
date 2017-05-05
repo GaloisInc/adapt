@@ -60,9 +60,9 @@ case class Event(
 
   def getUuid = uuid
 
-  def compare(x: Event, y: Event) = x.sequence compare y.sequence
+  def compare(x: Event, y: Event) = x.timestampNanos compare y.timestampNanos
 
-  def compareTo(o: Event) = this.sequence.compare(o.sequence)
+  def compareTo(o: Event) = this.timestampNanos.compare(o.timestampNanos)
   
 //  override val supportNodes =
 //    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
