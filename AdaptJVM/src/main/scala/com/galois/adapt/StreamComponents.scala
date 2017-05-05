@@ -261,31 +261,36 @@ object FlowComponents {
 //      m("execCountByThisNetFlowsProcess") = "This should probably be on the Process"   // TODO: don't do.
       m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
       m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
-      m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1000
+      m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1e9
       m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subjectUuid).size
 //      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
       m("totalBytesRead") = eList.collect{ case e if List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.size.getOrElse(0L)}.sum
       m("totalBytesWritten") = eList.collect{ case e if List(EVENT_WRITE, EVENT_SENDTO, EVENT_SENDMSG).contains(e.eventType) => e.size.getOrElse(0L)}.sum
+//      m("stdDevBetweenNetFlowWrites") = TODO
+//      m("averageWriteSize") = TODO
       netflowEventTypes.foreach( t =>
         m("count_"+ t.toString) = eSet.count(_.eventType == t)
       )
+      // TODO: Alarm: port 1337
+
 
       val viewDefinitions = Map(
-          "NetflowProducerConsumerRatio" -> List("totalBytesRead", "totalBytesWritten")
-        , "NetflowConnectedToExecViaProcess" -> List("duration-SecondsBetweenFirstAndLastEvent", "lifetimeReadRateBytesPerSecond", "lifetimeWriteRateBytesPerSecond")
-        , "NetflowLongWrite" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "duration-SecondsBetweenFirstAndLastEvent")
-        , "NetflowLongRead" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "duration-SecondsBetweenFirstAndLastEvent")
-        , "NetflowWrite" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE")
-        , "NetflowRead" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "count_EVENT_READ", "count_EVENT_RECVFROM", "count_EVENT_RECVMSG")
+//          "NetflowProducerConsumerRatio" -> List("totalBytesRead", "totalBytesWritten")
+        , "Netflow Read Write Rate Lifetime" -> List("duration-SecondsBetweenFirstAndLastEvent", "lifetimeReadRateBytesPerSecond", "lifetimeWriteRateBytesPerSecond")
+//        , "NetflowLongWrite" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "duration-SecondsBetweenFirstAndLastEvent")
+//        , "NetflowLongRead" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "duration-SecondsBetweenFirstAndLastEvent")
+        , "Netflow Write Stats" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE")
+        , "Netflow Read Stats" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "count_EVENT_READ", "count_EVENT_RECVFROM", "count_EVENT_RECVMSG")
+//  TODO      , "Beaconing Behavior" -> List("stdDevBetweenNetFlowWrites", "duration-SecondsBetweenFirstAndLastEvent", "averageWriteSize")
       )
 
-//      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-//      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+    // TODO: remove
+      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
       viewDefinitions.toList.map { case (name, columnList) =>
         (name, netFlowUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
-      }
-//      List(("AllNetFlowFeatures", netFlowUuid, m, uuidSet.toSet))
+      } ++ List(("All NetFlow Features", netFlowUuid, m, allRelatedUUIDs.toSet))
     }
 
 
@@ -420,38 +425,44 @@ object FlowComponents {
             List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
           ))
         ).foldLeft(false)(_ || _)
-      m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
-      m("execDeleteGapMillis") = fileEventList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
-      m("attribChangeEventThenExecuteGapMillis") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
-      m("downloadExecutionGapMillis") = "TODO"                       // TODO: needs pairing with NetFlow events (and join on process UUID)
-      m("uploadDeletionGapMillis") = "TODO"                          // TODO: needs pairing with NetFlow events (and join on process UUID)
+      m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") )))  // TODO: revisit the list of temp locations.
+      m("execDeleteGapNanos") = fileEventList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
+      m("attribChangeEventThenExecuteGapNanos") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
+      m("writeExecutionGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_EXECUTE))
+      m("readDeletionGapNanos") = fileEventList.timeBetween(Some(EVENT_READ), Some(EVENT_UNLINK))
       m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subjectUuid).size
-      m("countDistinctNetFlowConnectionsByProcess") = "This should probably be on Processes"  // TODO: don't do.
       m("totalBytesRead") = fileEventList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
       m("totalBytesWritten") = fileEventList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
+
+      m("writeToLoadLibraryGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_LOADLIBRARY))
+      m("writeToMMapLibraryGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_MMAP))
+
       fileEventTypes.foreach( t =>
         m("count_"+ t.toString) = fileEventSet.count(_.eventType == t)
       )
 
+      // TODO:  "Download Exec Delete Alarm" -> List("execAfterWriteByNetFlowReadingProcess")
+      // TODO: alarm: deletedImmediatelyAfterExec,
+      // TODO: alarm: deletedRightAfterProcessWithOpenNetFlowsWrites
 
       val viewDefinitions = Map(
-        "FileExecutedAfterWriteByProcessReadFromNetflow" -> List("execAfterWriteByNetFlowReadingProcess", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_CHECK_FILE_ATTRIBUTES", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
-      , "FileConnectedToNetflowViaProcess" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "isReadByAProcessWritingToNetFlows")
-      , "FileExecuted" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "isReadByAProcessWritingToNetFlows", "attribChangeEventThenExecuteGapMillis", "execAfterPermissionChangeToExecutable", "execDeleteGapMillis")
-      , "FileExecFeaturesOnly" -> List("attribChangeEventThenExecuteGapMillis", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "downloadExecutionGapMillis", "execAfterPermissionChangeToExecutable", "execAfterWriteByNetFlowReadingProcess", "execDeleteGapMillis", "isInsideTempDirectory")
-      , "FileMMAPEvent" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
-      , "FilePermissionEvent" -> List("attribChangeEventThenExecuteGapMillis", "count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES")
-      , "FileModifyEvent" -> List("attribChangeEventThenExecuteGapMillis", "count_EVENT_DUP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UPDATE", "count_EVENT_WRITE", "totalBytesWritten")
-      , "FileNetflowEvent" -> List("countDistinctNetFlowConnectionsByProcess", "deletedRightAfterProcessWithOpenNetFlowsWrites", "downloadExecutionGapMillis", "isReadByAProcessWritingToNetFlows", "deletedImmediatelyAfterExec", "uploadDeletionGapMillis", "execAfterWriteByNetFlowReadingProcess")
+        "Downloaded File Execution" -> List("execAfterWriteByNetFlowReadingProcess", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
+      , "NetFlow-related File Anomaly" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "isInsideTempDirectory")
+      , "File Executed" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "attribChangeEventThenExecuteGapNanos", "execAfterPermissionChangeToExecutable", "execDeleteGapNanos")
+//      , "FileExecFeaturesOnly" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "downloadExecutionGapNanos", "execAfterPermissionChangeToExecutable", "execAfterWriteByNetFlowReadingProcess", "execDeleteGapNanos", "isInsideTempDirectory")
+      , "File MMap Event" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
+      , "File Permission Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES")
+      , "File Modify Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_DUP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UPDATE", "count_EVENT_WRITE", "totalBytesWritten")
+      , "File Affected By NetFlow" -> List("countDistinctNetFlowConnectionsByProcess", "deletedRightAfterProcessWithOpenNetFlowsWrites", "downloadExecutionGapNanos", "isReadByAProcessWritingToNetFlows", "deletedImmediatelyAfterExec", "uploadDeletionGapNanos", "execAfterWriteByNetFlowReadingProcess")
+      , "Exfil Staging File" -> List("count_EVENT_OPEN", "count_EVENT_WRITE", "count_EVENT_READ", "count_EVENT_UNLINK")
       )
 
-//      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-//      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
       viewDefinitions.toList.map { case (name, columnList) =>
         (name, fileUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
-      }
-//      List(("AllFileFeatures", fileUuid, m, allRelatedUUIDs.toSet))
+      } ++ List(("AllFileFeatures", fileUuid, m, allRelatedUUIDs.toSet))
     }
 
 
@@ -558,19 +569,18 @@ object FlowComponents {
 //      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
 //      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
 //      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows —— not just events!
-//      m("parentProcessUUID") = "I THINK WE DON'T NEED THIS"                               // TODO: don't do.
       // TODO: consider emitting the collected Process Tree
       m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
 //      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
       m("countOfAllConnect+AcceptEventsToPorts22or443") =
         netFlowEventSets.toList.map(s => s._2.toList.collect{
           case (e,n) if List(EVENT_CONNECT, EVENT_ACCEPT).contains(e.eventType) &&
-            (List(22,443).contains(n.localPort) || List(22.443).contains(n.remotePort)) => 1
+            (List(22,443).contains(n.localPort) || List(22,443).contains(n.remotePort)) => 1
         }.sum).sum
       m("countOfAllConnect+AcceptEventsToPortsOtherThan22or443") =
         netFlowEventSets.toList.map(s => s._2.toList.collect{
           case (e,n) if List(EVENT_CONNECT, EVENT_ACCEPT).contains(e.eventType) &&
-            ( ! List(22,443).contains(n.localPort) || ! List(22.443).contains(n.remotePort)) => 1
+            ( ! List(22,443).contains(n.localPort) || ! List(22,443).contains(n.remotePort)) => 1
         }.sum).sum
 
 //      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files. Or does it? Path is probably on events.
@@ -601,33 +611,37 @@ object FlowComponents {
       m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
 //      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
 //      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
-      m("isAccessingTempDirectory") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp)))  // TODO: revisit the list of temp locations.
+      m("isAccessingTempDirectory") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") ) ))  // TODO: revisit the list of temp locations.
       m("thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_CHANGE_PRINCIPAL)
       m("thisProcessIsTheObjectOfAMODIFY_PROCESSEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_MODIFY_PROCESS)
       m("totalBytesSentToNetFlows") = processEventList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
       m("totalBytesReceivedFromNetFlows") = processEventList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
+
+      m("totalUniqueCheckFileEvents") = processEventSet.filter(_.eventType == EVENT_CHECK_FILE_ATTRIBUTES).flatMap(_.predicateObject).size
       processEventTypes.foreach( t =>
         m("count_"+ t.toString) = processEventSet.count(_.eventType == t)
       )
 
+    // TODO: alarms: "executedThenImmediatelyDeletedAFile", "readsFromNetFlowThenWritesAFileThenExecutesTheFile", "changesFilePermissionsThenExecutesIt", "thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent", others?
+    // todo: alarms for executing: net.exe, ipconfig.exe,  netstat.exe, nmap, whoami.exe, hostname.exe, powershell.exe, cmd.exe
+    // todo: alarm for opening a file with the substring: 'git' and 'commit'
+
       val viewDefinitions = Map(
-        "ProcessConnectNetflowWithHighCountOfChild" -> List("count_EVENT_EXECUTE", "readsFromNetFlowThenWritesAFileThenExecutesTheFile","executedThenImmediatelyDeletedAFile", "changesFilePermissionsThenExecutesIt"),
-        "ProcessDirectoryScan" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_OPEN"),
-        "ProcessMProtectExecution" -> List("count_EVENT_MPROTECT", "count_EVENT_EXECUTE", "readsFromNetFlowThenWritesAFileThenExecutesTheFile", "executedThenImmediatelyDeletedAFile", "changesFilePermissionsThenExecutesIt"),
-        "ProcessNetflowEvents" -> List("count_EVENT_RECVFROM", "count_EVENT_RECVMSG", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE", "count_EVENT_READ", "count_EVENT_UPDATE", "totalBytesReceivedFromNetFlows", "totalBytesSentToNetFlows", "readsFromNetFlowThenWritesAFileThenExecutesTheFile", "readFromNetFlowThenDeletedFile"),
-        "ProcessFileEvents" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_DUP", "count_EVENT_EXECUTE", "count_EVENT_LINK", "count_EVENT_LOADLIBRARY", "count_EVENT_LSEEK", "count_EVENT_MMAP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_READ", "count_EVENT_WRITE", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UNLINK", "count_EVENT_UPDATE", "changesFilePermissionsThenExecutesIt", "countOfDistinctFileWrites", "executedThenImmediatelyDeletedAFile", "isAccessingTempDirectory", "readFromNetFlowThenDeletedFile", "readsFromNetFlowThenWritesAFileThenExecutesTheFile"),
-        "ProcessMemoryEvents" -> List("countOfDistinctMemoryObjectsMProtected", "count_EVENT_LOADLIBRARY", "count_EVENT_MMAP", "count_EVENT_MPROTECT", "count_EVENT_UPDATE"),
-        "ProcessProcessEvents" -> List("count_EVENT_CHANGE_PRINCIPAL", "count_EVENT_CLONE", "count_EVENT_FORK", "count_EVENT_LOGCLEAR", "count_EVENT_LOGIN", "count_EVENT_LOGOUT", "count_EVENT_MODIFY_PROCESS", "count_EVENT_SHM", "count_EVENT_SIGNAL", "count_EVENT_STARTSERVICE", "count_EVENT_WAIT", "isAccessingTempDirectory"),
-        "ProcessExecFeatures" -> List("changesFilePermissionsThenExecutesIt", "count_EVENT_EXECUTE", "readsFromNetFlowThenWritesAFileThenExecutesTheFile", "executedThenImmediatelyDeletedAFile", "readsFromNetFlowThenWritesAFileThenExecutesTheFile")
+        "Process Exec from Network" -> List("count_EVENT_EXECUTE", "readsFromNetFlowThenWritesAFileThenExecutesTheFile","executedThenImmediatelyDeletedAFile", "changesFilePermissionsThenExecutesIt"),
+        "Process Directory Scan" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_OPEN", "totalUniqueCheckFileEvents"),
+        "Process Netflow Events" -> List("count_EVENT_RECVFROM", "count_EVENT_RECVMSG", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE", "count_EVENT_READ", "totalBytesReceivedFromNetFlows", "totalBytesSentToNetFlows"),
+        "Process File Events" -> List("count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_DUP", "count_EVENT_EXECUTE", "count_EVENT_LINK", "count_EVENT_LOADLIBRARY", "count_EVENT_LSEEK", "count_EVENT_MMAP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_READ", "count_EVENT_WRITE", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UNLINK", "count_EVENT_UPDATE", "changesFilePermissionsThenExecutesIt", "countOfDistinctFileWrites", "isAccessingTempDirectory"),
+        "Process Memory Events" -> List("countOfDistinctMemoryObjectsMProtected", "count_EVENT_LOADLIBRARY", "count_EVENT_MMAP", "count_EVENT_MPROTECT", "count_EVENT_UPDATE"),
+        "Process Process Events" -> List("count_EVENT_CHANGE_PRINCIPAL", "thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent", "count_EVENT_CLONE", "count_EVENT_FORK", "count_EVENT_LOGCLEAR", "count_EVENT_LOGIN", "count_EVENT_LOGOUT", "count_EVENT_MODIFY_PROCESS", "count_EVENT_SHM", "count_EVENT_SIGNAL", "count_EVENT_STARTSERVICE", "isAccessingTempDirectory")
       )
 
-//      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-//      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+    // TODO: REMOVE:
+      val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
       viewDefinitions.toList.map { case (name, columnList) =>
         (name, processUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
-      }
-//      List(("AllProcessFeatures", processUuid, m, uuidSet.toSet))
+      } ++ List(("AllProcessFeatures", processUuid, m, allRelatedUUIDs.toSet))
     }
 
 //  def testProcessFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
@@ -803,7 +817,7 @@ object FlowComponents {
     def timeBetween(first: Option[EventType], second: Option[EventType]): Milliseconds = {
       val foundFirst = if (first.isDefined) es.dropWhile(_.eventType != first.get) else es
       val foundSecond = if (second.isDefined) foundFirst.drop(1).find(_.eventType == second.get) else es.lastOption
-      foundFirst.headOption.flatMap(f => foundSecond.map(s => (s.timestampNanos / 1e6 - (f.timestampNanos / 1e6)).toLong)).getOrElse(0L)
+      foundFirst.headOption.flatMap(f => foundSecond.map(s => s.timestampNanos - f.timestampNanos)).getOrElse(0L)
     }
 
     def sizePerSecond(t: EventType): Float = {
