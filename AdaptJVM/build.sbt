@@ -10,7 +10,9 @@ lazy val adapt = (project in file(".")).settings(
   organization := "com.galois",
   scalaVersion := scalaV,
 
+  autoScalaLibrary := false,
   libraryDependencies ++= Seq(
+    "org.scala-lang" % "scala-library" % scalaV,
     "com.typesafe" % "config" % "1.3.1",
     "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
