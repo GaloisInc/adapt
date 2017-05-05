@@ -16,6 +16,15 @@
 	<link rel="stylesheet" href="stylesheets/foundation.css">
 	<link rel="stylesheet" href="stylesheets/app.css">
 
+	<style type="text/css">
+		.card {
+			margin-bottom: 2em;
+		}
+		i {
+			font-size: 2em;
+		}
+	</style>
+
 	<script type="text/javascript">
 		$(function(){
 
@@ -25,51 +34,108 @@
 
 
 
+
+			$.getJSON(testing_Prefix + "/api/weights", function(weights){
+				var weightString = _.map(weights, function(v,k){ return k+":"+v}).join(";")
+				var form = $("<form>", {action: testing_Prefix + "/api/weights", method: "post"})
+				form.append(
+					$("<input>", {
+						type: 'text',
+						placeholder: 'Weights:  k:v;k:v…',
+						name: 'weights',
+						style: 'width: 80%',
+						value: weightString,
+						class: "column small-10"
+					})
+				)
+				form.append(
+					$("<input>", {
+						type: 'submit',
+						value: "Re-Weight",
+						class: "column small-2"
+					})
+				)
+				$("#weights").append(form)
+			})
+
+
+			$.getJSON(testing_Prefix + "/api/threshold", function(threshold){
+				var form = $("<form>", {action: testing_Prefix + "/api/threshold", method: "post"})
+				form.append($("<input>", {
+					type: "text",
+					name: "threshold",
+					value: threshold,
+					style: "width: 80%",
+					class: "column small-10"
+				}))
+				form.append($("<input>", {
+					type: 'submit',
+					value: "Set Threshold",
+					class: "column small-2"
+				}))
+				$("#threshold").append(form)
+			})
+
+
+
 			$.getJSON(testing_Prefix + "/ranked/all", function(top_anoms){
 				_.map(top_anoms, function(a){
 					var key_uuid = Object.keys(a)[0]
 					var anom_types = Object.keys(a[key_uuid])
+					var anom_type_scores = _.map(anom_types, function(t){
+						return t + ": " + a[key_uuid][t]['score']
+					})
 					var scores = _.map(anom_types, function(t){
 						return a[key_uuid][t]['score']
 					})
 					var sum = _.reduce(scores, function(a, b){ return a + b })
-					var type_names = _.reduce(anom_types, function(a, b){ return a + ", " + b})
+					var type_names = anom_types.join(", ")
 					var subgraph_array = _.map(anom_types, function(b){
 						return a[key_uuid][b]['subgraph']
 					})
-					// subgraph_array.push([key_uuid])
 					var unique_subgraph = Array.from(new Set(_.flatten(subgraph_array)))
-					unique_subgraph = _.filter(unique_subgraph, function(i){ return i != key_uuid })
-					var subgraph = _.reduce(unique_subgraph, function(a,b){
-						return a + "," + b
-					})
+					var subgraph = _.filter(unique_subgraph, function(i){ return i != key_uuid })
 
 
 					var container = $("<div>", {
-						class: "column row small-12"
+						class: "column row small-12 card"
 					})
 					container.append($("<div>", {
 						class: "column small-8",
 						text: key_uuid
 					}))
-					container.append($("<div>", {
-						class: "column small-4",
-						text: "STARS HERE"
-					}))
+
+					var star1 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
+						.hover(function(){UI.hoverStars([$(this)])}, function(){UI.hoverStars([$(this)])})
+					var star2 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
+						.hover(function(){UI.hoverStars([$(this), star1])}, function(){UI.hoverStars([$(this), star1])})
+					var star3 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
+						.hover(function(){UI.hoverStars([$(this), star1, star2])}, function(){UI.hoverStars([$(this), star1, star2])})
+					var star4 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
+						.hover(function(){UI.hoverStars([$(this), star1, star2, star3])}, function(){UI.hoverStars([$(this), star1, star2, star3])})
+					var star5 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
+						.hover(function(){UI.hoverStars([$(this), star1, star2, star3, star4])}, function(){UI.hoverStars([$(this), star1, star2, star3, star4])})
+
+					container.append(
+						$("<div>", {
+							class: "column small-4"
+							// text: "STARS HERE"
+						}).append(star1).append(star2).append(star3).append(star4).append(star5)
+					)
 					container.append($("<div>", {
 						class: "column small-2",
 						text: sum
 					}))
 					container.append($("<div>", {
 						class: "column small-9",
-						text: type_names
+						text: anom_type_scores.join(", ")
 					}))
 					var keyNodeQuery = "g.V().has(\"uuid\","+key_uuid+"):f00"
-					var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph+"]))"
+					var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph.join(",")+"]))"
 					var queries = keyNodeQuery + subgraphQuery
 					var graphFrame = $("<div>")
 					var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='column small-12'>")
-					var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css({"font-size": "50px"})
+					var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css(UI.fullscreenIconCSS)
 					graphFrame.append(iframe)
 					graphFrame.append(fullscreenIcon)
 					container.append($("<div>", {
@@ -83,13 +149,14 @@
 					}))
 					container.append($("<div>", {
 						class: "column small-12",
-						text: subgraph
+						text: "Subgraph Size: " + (subgraph.length + 1)
 					}))
 					$("#cards").append(container)
 				})
 			})
 
 			var UI = {
+				fullscreenIconCSS : {"font-size": "50px", "opacity": 0.5},
 				toggleGraph : function(button, graphFrame) {
 					if (button.text() == "Show Graph") { 
 						button.text("Hide Graph")
@@ -102,18 +169,27 @@
 					if ( ! iframe.attr('style')) {
 						iframe.css({"position": "fixed", "top": 0, "left": 0, "background-color": "white", "width": "100%", "height": "100%"})
 						button.css({"position": "fixed", "left": 0, "bottom": 0, "z-index": 10})
+						button.toggleClass("ion-arrow-expand").toggleClass("ion-arrow-shrink")
 					} else {
 						iframe.removeAttr('style')
-						button.removeAttr('style').css({"font-size": "50px"})
+						button.removeAttr('style').css(UI.fullscreenIconCSS)
+						button.toggleClass("ion-arrow-expand").toggleClass("ion-arrow-shrink")
 					}
+				},
+				hoverStars : function(starArray) {
+					_.map(starArray, function(star){
+						star.toggleClass("ion-ios-star-outline").toggleClass("ion-ios-star")
+					})
 				}
 			}
 		})
 	</script>
 </header>
 <body>
-<div id="cards" class="row">
-	<!-- <iframe src="/graph" class="column small-12" height=800></iframe> -->
-</div>
+	<div id="settings" class="row">
+		<div id="weights"></div>
+		<div id="threshold"></div>
+	</div>
+	<div id="cards" class="row"></div>
 </body>
 </html>

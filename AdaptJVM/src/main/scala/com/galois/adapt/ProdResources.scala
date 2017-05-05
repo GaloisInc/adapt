@@ -1,8 +1,6 @@
 package com.galois.adapt
 
-import java.util
-import java.util.{Properties, UUID}
-
+import java.util.UUID
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.http.scaladsl.marshalling._
 import akka.util.Timeout
@@ -10,10 +8,7 @@ import org.mapdb.DBMaker
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
-import com.galois.adapt.cdm17.{CDM17, TimeMarker}
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-
 import scala.collection.mutable.{Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
@@ -24,12 +19,13 @@ import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 
 class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
   implicit val ec = context.dispatcher
-  val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var threshold = 0.7D
+  val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
+  var weights = MutableMap.empty[String, Double]
 
-  def query(uuid: UUID): Unit = {
+  def query(startUuid: UUID): Unit = {
     implicit val timeout = Timeout(10 seconds)
-    val provQueryString = s"g.V().has('uuid',$uuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
+    val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
     val resultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
     resultF.map{x => println(x.get.head.value[UUID]("uuid")); query(anomalies.head._1)}.recover{ case e: Throwable => e.printStackTrace()}
   }
@@ -71,13 +67,34 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
       sender() ! anomalies.filter(t => uuids.contains(t._1)).mapValues(_.toMap).toMap  //anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
 
     case GetRankedAnomalies(topK) =>
-      sender() ! anomalies.toList.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK).map(t => t._1 -> t._2.toMap)
+      val weightedScores = anomalies.toList.map(a => a._1 -> a._2.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)})
+      val response = weightedScores.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK).map(t => t._1 -> t._2.toMap)
+      sender() ! response
 
     case SetThreshold(limit) => threshold = limit
+
+    case GetThreshold =>
+      println("got threshold request")
+      sender() ! threshold
+
+    case SetWeight(key, weight) => weights(key) = weight
+
+    case GetWeights =>
+      sender() ! anomalies.map { anom =>
+        println(anom._2.keys)
+//        weights.toMap ++  // show only the weights for actual anomaly scores
+        anom._2.keys.map(k =>
+          k -> weights.getOrElse(k, 1D)
+        ).toMap
+      }.fold(Map.empty[String,Double])((a,b) => a ++ b)
+//        .getOrElse(Map.empty[String,Double])
   }
 }
 
 case class SetThreshold(threshold: Double)
+case class SetWeight(key: String, weight: Double)
+case object GetThreshold
+case object GetWeights
 case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
 
@@ -145,6 +162,22 @@ object ProdRoutes {
 //          )
         )
       } ~
+      pathPrefix("api") {
+        pathPrefix("weights") {
+          complete{
+            val mapF = (anomalyActor ? GetWeights).mapTo[Map[String, Double]]
+            mapF.map{ x =>
+              val s = x.map{ case (k,v) => s""""${k.trim}": $v"""}.mkString("{",",","}")
+              HttpEntity(ContentTypes.`application/json`, s)
+            }
+          }
+        } ~
+        pathPrefix("threshold") {
+          complete{
+            (anomalyActor ? GetThreshold).mapTo[Double].map(_.toString)
+          }
+        }
+      } ~
       pathPrefix("query") {
           pathPrefix("nodes") {
             path(RemainingPath) { queryString =>
@@ -165,6 +198,28 @@ object ProdRoutes {
       serveStaticFilesRoute
     } ~
     post {
+      pathPrefix("api") {
+        pathPrefix("weights") {
+          formField('weights) { `k:v;k:v` =>
+            complete {
+              `k:v;k:v`.split(";").foreach{ `k:v` =>
+                val pair = `k:v`.split(":")
+                anomalyActor ! SetWeight(pair(0), pair(1).toDouble)
+              }
+//              redirect(Uri("/"), StatusCodes.TemporaryRedirect)
+              "OK"
+            }
+          }
+        } ~
+          pathPrefix("threshold") {
+            formField('threshold) { threshold =>
+              complete {
+                anomalyActor ! SetThreshold(threshold.toDouble)
+                "OK"
+              }
+            }
+          }
+      } ~
       pathPrefix("query") {
         path("anomalyScores") {
           formField('uuids) { commaSeparatedUuidString =>

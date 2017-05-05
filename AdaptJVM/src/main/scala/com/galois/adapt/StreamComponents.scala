@@ -82,7 +82,7 @@ object Streams {
         val cdm = new RawCDM17Type(elem.getDatum)
         msg.committableOffset.commitScaladsl()
         cdm
-      }.map(CDM17.parse).map(println) ~> Sink.ignore
+      }.map(CDM17.parse) ~> Sink.foreach[Try[CDM17]](x => println(s"kafka ingest end of the line for: $x")) //.map(println) ~> Sink.ignore
       ClosedShape
     }
   )
@@ -276,7 +276,7 @@ object FlowComponents {
 
       val viewDefinitions = Map(
 //          "NetflowProducerConsumerRatio" -> List("totalBytesRead", "totalBytesWritten")
-        , "Netflow Read Write Rate Lifetime" -> List("duration-SecondsBetweenFirstAndLastEvent", "lifetimeReadRateBytesPerSecond", "lifetimeWriteRateBytesPerSecond")
+          "Netflow Read Write Rate Lifetime" -> List("duration-SecondsBetweenFirstAndLastEvent", "lifetimeReadRateBytesPerSecond", "lifetimeWriteRateBytesPerSecond")
 //        , "NetflowLongWrite" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "duration-SecondsBetweenFirstAndLastEvent")
 //        , "NetflowLongRead" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "duration-SecondsBetweenFirstAndLastEvent")
         , "Netflow Write Stats" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE")
@@ -453,16 +453,16 @@ object FlowComponents {
       , "File MMap Event" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
       , "File Permission Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES")
       , "File Modify Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_DUP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UPDATE", "count_EVENT_WRITE", "totalBytesWritten")
-      , "File Affected By NetFlow" -> List("countDistinctNetFlowConnectionsByProcess", "deletedRightAfterProcessWithOpenNetFlowsWrites", "downloadExecutionGapNanos", "isReadByAProcessWritingToNetFlows", "deletedImmediatelyAfterExec", "uploadDeletionGapNanos", "execAfterWriteByNetFlowReadingProcess")
+      , "File Affected By NetFlow" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "deletedImmediatelyAfterExec", "execAfterWriteByNetFlowReadingProcess")
       , "Exfil Staging File" -> List("count_EVENT_OPEN", "count_EVENT_WRITE", "count_EVENT_READ", "count_EVENT_UNLINK")
       )
 
       val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-      if (! req) println(viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+      if (! req) println("Requirement failed: s" + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
       viewDefinitions.toList.map { case (name, columnList) =>
         (name, fileUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
-      } ++ List(("AllFileFeatures", fileUuid, m, allRelatedUUIDs.toSet))
+      } ++ List(("All File Features", fileUuid, m, allRelatedUUIDs.toSet))
     }
 
 
@@ -641,7 +641,7 @@ object FlowComponents {
 
       viewDefinitions.toList.map { case (name, columnList) =>
         (name, processUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
-      } ++ List(("AllProcessFeatures", processUuid, m, allRelatedUUIDs.toSet))
+      } ++ List(("All Process Features", processUuid, m, allRelatedUUIDs.toSet))
     }
 
 //  def testProcessFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
@@ -1043,7 +1043,7 @@ object TitanFlowComponents {
                 e.printStackTrace()
                 throw e
               }
-            case unk: Throwable => println(unk)
+            case unk: Throwable => println(s"Unknown exception:\n${unk.printStackTrace()}")
           }
         }
 
@@ -1195,11 +1195,11 @@ object TestGraph extends App {
 
 
 
-  FlowComponents.normalizedScores(db, 2, 4, 8, 20)
-    .via(Flow.fromGraph(QueryCollector(0.5D, 10000)))
-    .throttle(1, 2 seconds, 1, ThrottleMode.shaping)
-    .recover { case e: Throwable => e.printStackTrace() }
-    .runWith(source, Sink.foreach(println))
+//  FlowComponents.normalizedScores(db, 2, 4, 8, 20)
+//    .via(Flow.fromGraph(QueryCollector(0.5D, 10000)))
+//    .throttle(1, 2 seconds, 1, ThrottleMode.shaping)
+//    .recover { case e: Throwable => e.printStackTrace() }
+//    .runWith(source, Sink.foreach(println))
 
 }
 
