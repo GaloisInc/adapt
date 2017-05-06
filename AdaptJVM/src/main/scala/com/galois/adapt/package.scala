@@ -24,4 +24,10 @@ package object adapt {
     // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
     def supportNodes: List[(UUID, List[Any], List[(String,UUID)])] = List()
   }
+
+  type ProcessUUID = UUID
+  type FileUUID = UUID
+  type NetFlowUUID = UUID
+  type EventUUID = UUID
+  type PredicateUUID = UUID
 }

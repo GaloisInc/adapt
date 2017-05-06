@@ -164,8 +164,8 @@
 						}))
 						container.append($("<div>", {
 							class: "column small-9",
-							text: anom_type_scores.join(", ")
-						}))
+							// text: anom_type_scores.join(", ").replace("ALARM",'<span style="color: red;">ALARM</span>')
+						}).append(anom_type_scores.join(", ").replace("ALARM",'<span style="color: red;">ALARM</span>')))
 						var keyNodeQuery = "g.V().has(\"uuid\","+key_uuid+"):f00"
 						var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph.join(",")+"]))"
 						var queries = keyNodeQuery + subgraphQuery
