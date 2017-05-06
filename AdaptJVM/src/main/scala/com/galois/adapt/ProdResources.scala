@@ -1,6 +1,8 @@
 package com.galois.adapt
 
+import java.io.PrintWriter
 import java.util.UUID
+
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.http.scaladsl.marshalling._
 import akka.util.Timeout
@@ -9,6 +11,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+
 import scala.collection.mutable.{Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
@@ -16,12 +19,16 @@ import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Random, Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 
+import scala.collection.mutable
+
 
 class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
   implicit val ec = context.dispatcher
-  var threshold = 0.7D
+  var threshold = 0.8D
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
+
+  val savedNotes = mutable.MutableList.empty[SaveNotes]
 
   def query(startUuid: UUID): Unit = {
     implicit val timeout = Timeout(10 seconds)
@@ -68,6 +75,13 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 
     case GetRankedAnomalies(topK) =>
       val weightedScores = anomalies.toList.map(a => a._1 -> a._2.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)})
+      // Add subgraph scores:
+      val weightedScoresLookupMap = weightedScores.map(t => t._1 -> t._2.toMap).toMap  // Make a stable, immutable copy.
+      weightedScores.foreach { case (u, scored) =>
+        val subgraphUuids = scored.values.flatMap(_._2).toSet.filterNot(_ == u)
+        val subgraphScore = subgraphUuids.toList.map(u => weightedScoresLookupMap.get(u).map(nodeDetails => nodeDetails.values.toList.map(_._1).sum).getOrElse(0D)).sum
+        scored += ("Subgraph" -> (weights.getOrElse("Subgraph", 1D) * subgraphScore, subgraphUuids))
+      }
       val response = weightedScores.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK).map(t => t._1 -> t._2.toMap)
       sender() ! response
 
@@ -81,13 +95,21 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 
     case GetWeights =>
       sender() ! anomalies.map { anom =>
-        println(anom._2.keys)
+//        println(anom._2.keys)
 //        weights.toMap ++  // show only the weights for actual anomaly scores
-        anom._2.keys.map(k =>
+        anom._2.keys.++(List("Subgraph")).map(k =>
           k -> weights.getOrElse(k, 1D)
         ).toMap
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
-//        .getOrElse(Map.empty[String,Double])
+
+    case msg @ SaveNotes(keyUuid, rating, notes, subgraph) =>
+      println(msg.toJsonString)
+      savedNotes += msg
+      new PrintWriter("/Users/ryan/Desktop/notes.json") { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
+      sender() ! Success(())
+
+    case GetRating(uuid) =>
+      sender() ! savedNotes.reverse.find(_.keyUuid == uuid)
   }
 }
 
@@ -97,6 +119,10 @@ case object GetThreshold
 case object GetWeights
 case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
+case class SaveNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[UUID]) {
+  def toJsonString: String = s"""{"keyUuid": "$keyUuid", "rating": $rating, "notes":"$notes", "subgraph":${subgraph.map(u => s""""$u"""").mkString("[",",","]")}, "ratingTimeMillis": ${System.currentTimeMillis()} }"""
+}
+case class GetRating(uuid: UUID)
 
 
 
@@ -199,6 +225,20 @@ object ProdRoutes {
     } ~
     post {
       pathPrefix("api") {
+        pathPrefix("notes") {
+          formFieldMap { fields =>
+            complete {
+//              println(s"fields: $fields")
+              val notes = fields.getOrElse("notes", "")
+              val keyUuid = UUID.fromString(fields("keyUuid"))
+              val rating = fields("rating").toInt
+              val subgraph = fields("subgraph").split(",").map(s => UUID.fromString(s.trim())).toSet
+              (anomalyActor ? SaveNotes(keyUuid, rating, notes, subgraph)).mapTo[Try[Unit]]
+              .map(_.map(_ => "OK").getOrElse("FAILED"))
+            }
+          }
+//          formField(')
+        } ~
         pathPrefix("weights") {
           formField('weights) { `k:v;k:v` =>
             complete {

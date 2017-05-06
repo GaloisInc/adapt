@@ -112,7 +112,7 @@ object CDMSource {
       case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
       case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17")
       case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
-      case x => kafkaSource("kafkaTest").take(10000)
+      case x => kafkaSource("kafkaTest")
       case _ =>
         val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
         Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))

@@ -105,23 +105,40 @@
 						text: key_uuid
 					}))
 
-					var star1 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
-						.hover(function(){UI.hoverStars([$(this)])}, function(){UI.hoverStars([$(this)])})
-					var star2 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
-						.hover(function(){UI.hoverStars([$(this), star1])}, function(){UI.hoverStars([$(this), star1])})
-					var star3 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
-						.hover(function(){UI.hoverStars([$(this), star1, star2])}, function(){UI.hoverStars([$(this), star1, star2])})
-					var star4 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
-						.hover(function(){UI.hoverStars([$(this), star1, star2, star3])}, function(){UI.hoverStars([$(this), star1, star2, star3])})
-					var star5 = $("<i>", {class: "ion-ios-star-outline", click: function(){prompt("Enter your notes:", "nothing happens with these right now.")}})
-						.hover(function(){UI.hoverStars([$(this), star1, star2, star3, star4])}, function(){UI.hoverStars([$(this), star1, star2, star3, star4])})
+					var stars = {
+						existing : [],
+						makeNewStar : function() {
+							var existing_so_far = stars.existing.slice()
+							var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
+								var unit_label = existing_so_far.length > 1 ? " stars" : " star"
+								var notes = prompt(key_uuid + "\n" + (existing_so_far.length + 1) + unit_label + ". Enter your notes:")
+								if (null != notes) {
+									_.map(stars.existing, function(s){s.unbind('mouseenter mouseleave click')})
+									$.post(testing_Prefix + "/api/notes", {
+										"keyUuid": key_uuid,
+										"rating": existing_so_far.length + 1,
+										"notes": notes, 
+										"subgraph": subgraph.join(",")
+									}, function(response){
+										if (response != "OK") {
+											alert("Could not save your "+ (existing_so_far+1) +" star rating with notes: " + notes)
+											// rebind handlers!
+											// _.map(stars.existing, function(s){
+											// 	s.click()
+											// })
+										}
+									})
+								}
+							}}).hover(function(){UI.hoverStars([$(this)].concat(existing_so_far))}, function(){UI.hoverStars([$(this)].concat(existing_so_far))})
+							stars.existing.push(newStar)
+							return newStar
+						}
+					}
 
-					container.append(
-						$("<div>", {
-							class: "column small-4"
-							// text: "STARS HERE"
-						}).append(star1).append(star2).append(star3).append(star4).append(star5)
-					)
+					var starDiv = $("<div>", {class: "column small-4"})
+					_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
+
+					container.append(starDiv)
 					container.append($("<div>", {
 						class: "column small-2",
 						text: sum
@@ -134,7 +151,7 @@
 					var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph.join(",")+"]))"
 					var queries = keyNodeQuery + subgraphQuery
 					var graphFrame = $("<div>")
-					var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='column small-12'>")
+					var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='row column small-12'>")
 					var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css(UI.fullscreenIconCSS)
 					graphFrame.append(iframe)
 					graphFrame.append(fullscreenIcon)
