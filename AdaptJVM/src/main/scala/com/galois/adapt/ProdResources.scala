@@ -28,7 +28,7 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
 
-  val savedNotes = mutable.MutableList.empty[SaveNotes]
+  val savedNotes = mutable.MutableList.empty[SavedNotes]
 
   def query(startUuid: UUID): Unit = {
     implicit val timeout = Timeout(10 seconds)
@@ -87,9 +87,7 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 
     case SetThreshold(limit) => threshold = limit
 
-    case GetThreshold =>
-      println("got threshold request")
-      sender() ! threshold
+    case GetThreshold => sender() ! threshold
 
     case SetWeight(key, weight) => weights(key) = weight
 
@@ -102,14 +100,16 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
         ).toMap
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
 
-    case msg @ SaveNotes(keyUuid, rating, notes, subgraph) =>
+    case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
       println(msg.toJsonString)
       savedNotes += msg
       new PrintWriter("/Users/ryan/Desktop/notes.json") { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
       sender() ! Success(())
 
-    case GetRating(uuid) =>
-      sender() ! savedNotes.reverse.find(_.keyUuid == uuid)
+    case GetNotes(uuids) =>
+      val notes = uuids.flatMap(u => savedNotes.reverse.find(_.keyUuid == u))
+      val toSend = if (notes.isEmpty) savedNotes.reverse else notes
+      sender() ! toSend
   }
 }
 
@@ -119,10 +119,10 @@ case object GetThreshold
 case object GetWeights
 case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
-case class SaveNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[UUID]) {
+case class SavedNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[UUID]) {
   def toJsonString: String = s"""{"keyUuid": "$keyUuid", "rating": $rating, "notes":"$notes", "subgraph":${subgraph.map(u => s""""$u"""").mkString("[",",","]")}, "ratingTimeMillis": ${System.currentTimeMillis()} }"""
 }
-case class GetRating(uuid: UUID)
+case class GetNotes(uuid: Seq[UUID])
 
 
 
@@ -225,40 +225,51 @@ object ProdRoutes {
     } ~
     post {
       pathPrefix("api") {
-        pathPrefix("notes") {
+        pathPrefix("saveNotes") {
           formFieldMap { fields =>
             complete {
-//              println(s"fields: $fields")
-              val notes = fields.getOrElse("notes", "")
+              println(fields)
+              val notes = fields.getOrElse("notes", "").replaceAll(""""""","")
               val keyUuid = UUID.fromString(fields("keyUuid"))
               val rating = fields("rating").toInt
-              val subgraph = fields("subgraph").split(",").map(s => UUID.fromString(s.trim())).toSet
-              (anomalyActor ? SaveNotes(keyUuid, rating, notes, subgraph)).mapTo[Try[Unit]]
-              .map(_.map(_ => "OK").getOrElse("FAILED"))
+              val subgraph = fields("subgraph").split(",").filter(_.nonEmpty).map(s => UUID.fromString(s.trim())).toSet
+              (anomalyActor ? SavedNotes(keyUuid, rating, notes, subgraph)).mapTo[Try[Unit]]
+                .map(_.map(_ => "OK").getOrElse("FAILED"))
             }
           }
-//          formField(')
+        } ~
+        pathPrefix("getNotes") {
+          formField('uuids) { uuids =>
+            complete {
+              val uuidSeq = if (uuids.isEmpty) Seq.empty[UUID] else uuids.split(",").map(UUID.fromString).toSeq
+              val notesF = (anomalyActor ? GetNotes(uuidSeq)).mapTo[Seq[SavedNotes]]
+              notesF.map{n =>
+                val s = n.map(_.toJsonString).mkString("[",",","]")
+                HttpEntity(ContentTypes.`application/json`, s)
+              }
+            }
+          }
         } ~
         pathPrefix("weights") {
           formField('weights) { `k:v;k:v` =>
             complete {
               `k:v;k:v`.split(";").foreach{ `k:v` =>
                 val pair = `k:v`.split(":")
-                anomalyActor ! SetWeight(pair(0), pair(1).toDouble)
+                if (pair.length == 2) anomalyActor ! SetWeight(pair(0), pair(1).toDouble)
               }
 //              redirect(Uri("/"), StatusCodes.TemporaryRedirect)
               "OK"
             }
           }
         } ~
-          pathPrefix("threshold") {
-            formField('threshold) { threshold =>
-              complete {
-                anomalyActor ! SetThreshold(threshold.toDouble)
-                "OK"
-              }
+        pathPrefix("threshold") {
+          formField('threshold) { threshold =>
+            complete {
+              anomalyActor ! SetThreshold(threshold.toDouble)
+              "OK"
             }
           }
+        }
       } ~
       pathPrefix("query") {
         path("anomalyScores") {

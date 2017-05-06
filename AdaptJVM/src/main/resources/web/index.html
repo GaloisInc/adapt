@@ -76,100 +76,121 @@
 				$("#threshold").append(form)
 			})
 
-
-
-			$.getJSON(testing_Prefix + "/ranked/all", function(top_anoms){
-				_.map(top_anoms, function(a){
-					var key_uuid = Object.keys(a)[0]
-					var anom_types = Object.keys(a[key_uuid])
-					var anom_type_scores = _.map(anom_types, function(t){
-						return t + ": " + a[key_uuid][t]['score']
-					})
-					var scores = _.map(anom_types, function(t){
-						return a[key_uuid][t]['score']
-					})
-					var sum = _.reduce(scores, function(a, b){ return a + b })
-					var type_names = anom_types.join(", ")
-					var subgraph_array = _.map(anom_types, function(b){
-						return a[key_uuid][b]['subgraph']
-					})
-					var unique_subgraph = Array.from(new Set(_.flatten(subgraph_array)))
-					var subgraph = _.filter(unique_subgraph, function(i){ return i != key_uuid })
-
-
-					var container = $("<div>", {
-						class: "column row small-12 card"
-					})
-					container.append($("<div>", {
-						class: "column small-8",
-						text: key_uuid
-					}))
-
-					var stars = {
-						existing : [],
-						makeNewStar : function() {
-							var existing_so_far = stars.existing.slice()
-							var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
-								var unit_label = existing_so_far.length > 1 ? " stars" : " star"
-								var notes = prompt(key_uuid + "\n" + (existing_so_far.length + 1) + unit_label + ". Enter your notes:")
-								if (null != notes) {
-									_.map(stars.existing, function(s){s.unbind('mouseenter mouseleave click')})
-									$.post(testing_Prefix + "/api/notes", {
-										"keyUuid": key_uuid,
-										"rating": existing_so_far.length + 1,
-										"notes": notes, 
-										"subgraph": subgraph.join(",")
-									}, function(response){
-										if (response != "OK") {
-											alert("Could not save your "+ (existing_so_far+1) +" star rating with notes: " + notes)
-											// rebind handlers!
-											// _.map(stars.existing, function(s){
-											// 	s.click()
-											// })
-										}
-									})
-								}
-							}}).hover(function(){UI.hoverStars([$(this)].concat(existing_so_far))}, function(){UI.hoverStars([$(this)].concat(existing_so_far))})
-							stars.existing.push(newStar)
-							return newStar
-						}
-					}
-
-					var starDiv = $("<div>", {class: "column small-4"})
-					_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
-
-					container.append(starDiv)
-					container.append($("<div>", {
-						class: "column small-2",
-						text: sum
-					}))
-					container.append($("<div>", {
-						class: "column small-9",
-						text: anom_type_scores.join(", ")
-					}))
-					var keyNodeQuery = "g.V().has(\"uuid\","+key_uuid+"):f00"
-					var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph.join(",")+"]))"
-					var queries = keyNodeQuery + subgraphQuery
-					var graphFrame = $("<div>")
-					var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='row column small-12'>")
-					var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css(UI.fullscreenIconCSS)
-					graphFrame.append(iframe)
-					graphFrame.append(fullscreenIcon)
-					container.append($("<div>", {
-						class: "column small-1",
-						text: "Show Graph",
-						click: function() {
-							container.hide().append(graphFrame).slideToggle()
-							$(this).text("Hide Graph")
-							$(this).unbind("click").click(function(){UI.toggleGraph($(this), graphFrame)})
-						}
-					}))
-					container.append($("<div>", {
-						class: "column small-12",
-						text: "Subgraph Size: " + (subgraph.length + 1)
-					}))
-					$("#cards").append(container)
+			$.post(testing_Prefix + "/api/getNotes", {"uuids":""}, function(existing_notes_array) {
+				var existing_notes = {}
+				_.map(existing_notes_array, function(n){ 
+					if (! (n.keyUuid in existing_notes)) { 
+						existing_notes[n.keyUuid] = n 
+					} 
 				})
+
+				$.getJSON(testing_Prefix + "/ranked/all", function(top_anoms){
+					_.map(top_anoms, function(a){
+						var key_uuid = Object.keys(a)[0]
+						var anom_types = Object.keys(a[key_uuid])
+						var anom_type_scores = _.map(anom_types, function(t){
+							return t + ": " + a[key_uuid][t]['score']
+						})
+						var scores = _.map(anom_types, function(t){
+							return a[key_uuid][t]['score']
+						})
+						var sum = _.reduce(scores, function(a, b){ return a + b })
+						var type_names = anom_types.join(", ")
+						var subgraph_array = _.map(anom_types, function(b){
+							return a[key_uuid][b]['subgraph']
+						})
+						var unique_subgraph = Array.from(new Set(_.flatten(subgraph_array)))
+						var subgraph = _.filter(unique_subgraph, function(i){ return i != key_uuid })
+
+
+						var container = $("<div>", {
+							class: "column row small-12 card"
+						})
+						container.append($("<div>", {
+							class: "column small-8",
+							text: key_uuid
+						}))
+
+						var stars = {
+							existing : [],
+							makeNewStar : function() {
+								var existing_so_far = stars.existing.slice()
+								var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
+									var unit_label = existing_so_far.length > 1 ? " stars" : " star"
+									var notes = prompt(key_uuid + "\n" + (existing_so_far.length + 1) + unit_label + ". Enter your notes:")
+									if (null != notes) {
+										_.map(stars.existing, function(s){s.unbind("mouseenter mouseleave" // + " click"
+											)})
+										$.post(testing_Prefix + "/api/saveNotes", {
+											"keyUuid": key_uuid,
+											"rating": existing_so_far.length + 1,
+											"notes": notes, 
+											"subgraph": subgraph.join(",")
+										}, function(response){
+											if (response != "OK") {
+												alert("Could not save your "+ (existing_so_far.length+1) +" star rating with notes:\n" + notes)
+												// rebind handlers!
+											}
+										})
+									}
+								}}).hover(function(){UI.hoverStars([$(this)].concat(existing_so_far))}, function(){UI.hoverStars([$(this)].concat(existing_so_far))})
+								stars.existing.push(newStar)
+								return newStar
+							}
+						}
+
+						var starDiv = $("<div>", {class: "column small-4"})
+						_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
+
+						if (key_uuid in existing_notes) {
+							var note = existing_notes[key_uuid]
+							var colored = note.subgraph.length == subgraph.length ? "" : " color: red;"
+
+							var previous_ranking = $("<span>", {
+								// "data-tooltip": "data-tooltip",
+								"style": "font-size: 2em; margin-left: 1em;" + colored, 
+								"text": "["+note.rating+"]",
+								"aria-haspopup": "true",
+								"class": "has-tip",
+								"title": note.notes + "\nPrevious Subgraph Size: " + (note.subgraph.length + 1)
+							})  //.prop("data-tooltip", "true")
+							starDiv.append(previous_ranking)
+						}
+
+						container.append(starDiv)
+						container.append($("<div>", {
+							class: "column small-2",
+							text: sum
+						}))
+						container.append($("<div>", {
+							class: "column small-9",
+							text: anom_type_scores.join(", ")
+						}))
+						var keyNodeQuery = "g.V().has(\"uuid\","+key_uuid+"):f00"
+						var subgraphQuery = _.isEmpty(subgraph) ? "" : "&g.V().has(\"uuid\",within(["+subgraph.join(",")+"]))"
+						var queries = keyNodeQuery + subgraphQuery
+						var graphFrame = $("<div>")
+						var iframe = $("<iframe id='graph_"+key_uuid+"' src='"+testing_Prefix+"/graph#"+queries+"' height=600 class='row column small-12'>")
+						var fullscreenIcon = $('<i>',{class: "ion-arrow-expand", click: function(){UI.toggleFullScreen($(this), iframe)}}).css(UI.fullscreenIconCSS)
+						graphFrame.append(iframe)
+						graphFrame.append(fullscreenIcon)
+						container.append($("<div>", {
+							class: "column small-1",
+							text: "Show Graph",
+							click: function() {
+								container.hide().append(graphFrame).slideToggle()
+								$(this).text("Hide Graph")
+								$(this).unbind("click").click(function(){UI.toggleGraph($(this), graphFrame)})
+							}
+						}))
+						container.append($("<div>", {
+							class: "column small-12",
+							text: "Subgraph Size: " + (subgraph.length + 1)
+						}))
+						$("#cards").append(container)
+					})
+				})
+
 			})
 
 			var UI = {
