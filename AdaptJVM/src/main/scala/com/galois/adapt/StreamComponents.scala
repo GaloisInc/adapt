@@ -247,62 +247,71 @@ object FlowComponents {
         case Tuple4(name: String, uuid: UUID, featureMap: mutable.Map[String,Any], relatedUuids: Set[UUID]) =>
           if (nameOpt.isEmpty) nameOpt = Some(name)
           if (headerOpt.isEmpty) headerOpt = Some(s"uuid,${featureMap.toList.sortBy(_._1).map(_._1).mkString(",")}\n")
-          val row = s"${featureMap.toList.sortBy(_._1).map(_._2).mkString(",")}\n" -> relatedUuids
+          val csvFeatures = s"${featureMap.toList.sortBy(_._1).map(_._2).mkString(",")}\n"
+          val row = csvFeatures -> relatedUuids
           matrix(uuid) = row
           List.empty
 
         case CleanUp => List.empty
 
         case EmitCmd =>
-          val randomNum = Random.nextLong()
-          val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv")    // TODO
-          val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv")  // TODO
-//          val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-//          val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
-          inputFile.deleteOnExit()
-          outputFile.deleteOnExit()
-          val writer: FileWriter = new FileWriter(inputFile)
-          writer.write(headerOpt.get)
-          matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
-          writer.close()
+          if (nameOpt.isEmpty) List.empty
+          else if (nameOpt.get.startsWith("ALARM")) {
+            matrix.toList.map{row =>
+              val alarmValue = if (row._2._1.trim == "true") 1D else 0D
+              (nameOpt.get, row._1, alarmValue, row._2._2)
+            }
+          } else {
+            val randomNum = Random.nextLong()
+            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+            val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+            //          val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+            //          val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
+            val writer: FileWriter = new FileWriter(inputFile)
+            writer.write(headerOpt.get)
+            matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
+            writer.close()
 
-          Try( Seq[String](
-            this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
-            "-i", inputFile.getCanonicalPath,   // input file
-            "-o", outputFile.getCanonicalPath,  // output file
-            "-m", "1",                          // ignore the first column
-            "-t", "250"                         // number of trees
-          ).!!) match {
-            case Success(output) => //println(s"AD output: $randomNum\n$output")
-            case Failure(e)      => println(s"AD failure: $randomNum"); e.printStackTrace()
+            Try(Seq[String](
+              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
+              "-i", inputFile.getCanonicalPath, // input file
+              "-o", outputFile.getCanonicalPath, // output file
+              "-m", "1", // ignore the first column
+              "-t", "250" // number of trees
+            ).!!) match {
+              case Success(output) => //println(s"AD output: $randomNum\n$output")
+              case Failure(e) => println(s"AD failure: $randomNum"); e.printStackTrace()
+            }
+
+            //          val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
+            //          val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
+            //          normalizedFile.createNewFile()
+            //          normalizedFile.deleteOnExit()
+
+            //          val normalizationCommand = Seq(
+            //            "Rscript",
+            //            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
+            //            "-i", outputFile.getCanonicalPath,       // input file
+            //            "-o", normalizedFile.getCanonicalPath)   // output file
+            //
+            //          val normResultTry = Try(normalizationCommand.!!) match {
+            //            case Success(output) => println(s"Normalization output: $randomNum\n$output")
+            //            case Failure(e)      => e.printStackTrace()
+            //          }
+
+
+            //          val fileLines = FileSource.fromFile(normalizedFile).getLines()
+            val fileLines = FileSource.fromFile(outputFile).getLines()
+            if (fileLines.hasNext) fileLines.next() // Throw away the header row
+            fileLines
+              .toSeq.map { l =>
+              val columns = l.split(",")
+              val uuid = UUID.fromString(columns.head)
+              (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
+            }.toList
           }
-
-//          val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
-//          val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
-//          normalizedFile.createNewFile()
-//          normalizedFile.deleteOnExit()
-
-//          val normalizationCommand = Seq(
-//            "Rscript",
-//            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
-//            "-i", outputFile.getCanonicalPath,       // input file
-//            "-o", normalizedFile.getCanonicalPath)   // output file
-//
-//          val normResultTry = Try(normalizationCommand.!!) match {
-//            case Success(output) => println(s"Normalization output: $randomNum\n$output")
-//            case Failure(e)      => e.printStackTrace()
-//          }
-
-
-//          val fileLines = FileSource.fromFile(normalizedFile).getLines()
-          val fileLines = FileSource.fromFile(outputFile).getLines()
-          if (fileLines.hasNext) fileLines.next()  // Throw away the header row
-          fileLines
-            .toSeq.map{ l =>
-            val columns = l.split(",")
-            val uuid = UUID.fromString(columns.head)
-            (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
-          }.toList
       }
     }
 
@@ -320,7 +329,7 @@ object FlowComponents {
       val fastCommandSource = commandSource(fastClean, fastEmit)   // TODO
       val slowCommandSource = commandSource(slowClean, slowEmit)   // TODO
 
-      bcast.out(0) ~> testNetFlowFeatureExtractor(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
+      bcast.out(0) ~> netFlowFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       bcast.out(1) ~> fileFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       bcast.out(2) ~> processFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       merge.out

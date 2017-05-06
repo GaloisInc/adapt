@@ -36,9 +36,8 @@ object NetFlowStream {
       val writes = eList.filter(e => List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE) contains e.eventType)
       writes.flatMap(_.size).sum.toDouble / writes.length
     }
-    // TODO: Alarm: port 1337
+    // TODO: Alarm: port 1337 ???
 //    m("ALARM: Port 1337") =
-
 
     netflowEventTypes.foreach( t =>
       m("count_"+ t.toString) = eSet.count(_.eventType == t)
@@ -63,7 +62,7 @@ object NetFlowStream {
   }
 
 
-  def testNetFlowFeatureExtractor(commandSource: Source[ProcessingCommand,_], db: DB) = {
+  def netFlowFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
     predicateTypeLabeler(commandSource, db)
       .collect{ case Tuple4("NetFlowObject", predUuid, event, netFlow: CDM17) => (predUuid, event, netFlow) }
       .via(sortedEventAccumulator(_._1, commandSource, db))

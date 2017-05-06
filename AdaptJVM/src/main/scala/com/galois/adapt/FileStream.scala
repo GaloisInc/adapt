@@ -98,11 +98,12 @@ object FileStream {
         if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
       }
       found
-    }
+    }: Boolean
     m("execAfterPermissionChangeToExecutable") = fileEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
-    m("deletedImmediatelyAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)
+    m("deletedAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).exists(_.eventType == EVENT_UNLINK): Boolean
+    m("deletedRightAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK): Boolean
     m("deletedRightAfterProcessWithOpenNetFlowsWrites") =
-      if (fileEventList.exists(_.eventType == EVENT_UNLINK)) {
+      (if (fileEventList.exists(_.eventType == EVENT_UNLINK)) {
         fileEventList.collect { case writeEvent if writeEvent.eventType == EVENT_WRITE =>
           val deleteAfterWriteOpt = fileEventList.find(deleteEvent =>
             deleteEvent.eventType == EVENT_UNLINK &&
@@ -122,7 +123,7 @@ object FileStream {
             )
           }
         }.foldLeft(false)(_ || _) // is there a single `true`?
-      } else false
+      } else false): Boolean
 
     m("isReadByAProcessWritingToNetFlows") = fileEventList
       .collect{ case e if e.eventType == EVENT_READ => e.subjectUuid}
@@ -148,19 +149,22 @@ object FileStream {
       m("count_"+ t.toString) = fileEventSet.count(_.eventType == t)
     )
 
-    // TODO:  "Download Exec Delete Alarm" -> List("execAfterWriteByNetFlowReadingProcess")
-    // TODO: alarm: deletedImmediatelyAfterExec,
-    // TODO: alarm: deletedRightAfterProcessWithOpenNetFlowsWrites
 
     val viewDefinitions = Map(
-      "Downloaded File Execution" -> List("execAfterWriteByNetFlowReadingProcess", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
-    , "NetFlow-related File Anomaly" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "isInsideTempDirectory")
-    , "File Executed" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedImmediatelyAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "attribChangeEventThenExecuteGapNanos", "execAfterPermissionChangeToExecutable", "execDeleteGapNanos")
+      "Downloaded File Execution" -> List("execAfterWriteByNetFlowReadingProcess", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
+    , "NetFlow-related File Anomaly" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "isInsideTempDirectory")
+    , "File Executed" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "attribChangeEventThenExecuteGapNanos", "execAfterPermissionChangeToExecutable", "execDeleteGapNanos")
     , "File MMap Event" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
     , "File Permission Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES")
     , "File Modify Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_DUP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UPDATE", "count_EVENT_WRITE", "totalBytesWritten")
-    , "File Affected By NetFlow" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "deletedImmediatelyAfterExec", "execAfterWriteByNetFlowReadingProcess")
+    , "File Affected By NetFlow" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "deletedAfterExec", "execAfterWriteByNetFlowReadingProcess")
     , "Exfil Staging File" -> List("count_EVENT_OPEN", "count_EVENT_WRITE", "count_EVENT_READ", "count_EVENT_UNLINK")
+
+    // An alarm must have a name beginning with "ALARM", and contain exactly one boolean feature. See the EmitCmd case in anomalyScoreCalculator.
+    , "ALARM: Deleted After Exec" -> List("deletedAfterExec")
+    , "ALARM: Deleted Immediately After Exec" -> List("deletedRightAfterExec")
+    , "ALARM: Deleted Right After Process With Open NetFlow Writes" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites")
+    , "ALARM: Download Then Execute" -> List("execAfterWriteByNetFlowReadingProcess")
     )
 
     val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
