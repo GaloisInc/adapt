@@ -15,7 +15,7 @@ case class UnitDependency(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "UnitDependency",
-    "unit", unit,
+    "unitUuid", unit,
     "dependentUnitUuid", dependentUnit
   )
 

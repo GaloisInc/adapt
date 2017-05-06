@@ -141,9 +141,11 @@ package object cdm17 {
     // Flattens out nested "properties":
     def fromKeyValMap(mapOpt: Option[Map[String,String]]): List[Any] = mapOpt.fold[List[Any]](List.empty)(aMap =>
       if (aMap.isEmpty) List.empty
-      else aMap.toList.flatMap { case (k,value) => List(
-        k.toString, Try(value.toLong).getOrElse(value)
-      ) }
+      else aMap.toList.flatMap {
+        case ("key", value) => List("keyFromProperties", Try(value.toLong).getOrElse(value))
+        case ("size", value) => List("sizeFromProperties", Try(value.toLong).getOrElse(value))
+        case (k,value) => List(k.toString, Try(value.toLong).getOrElse(value))
+      }
     )
   }
 }

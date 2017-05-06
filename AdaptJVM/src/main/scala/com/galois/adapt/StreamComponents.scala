@@ -832,6 +832,8 @@ object FlowComponents {
 
 object TitanFlowComponents {
 
+  val bw = new java.io.BufferedWriter(new java.io.FileWriter(new java.io.File("/Users/erin/Documents/proj/adapt/git/adapt/AdaptJVM/errors.txt")))
+
   /* Open a Cassandra-backed Titan graph. If this is failing, make sure you've run something like
    * the following first:
    *
@@ -885,7 +887,7 @@ object TitanFlowComponents {
 //      ("itag", classOf[IntegrityTag]),
       ("itag", classOf[String]),
       ("iteration", classOf[Integer]),
-      ("registryKeyOrPath", classOf[String]),
+      ("keyFromProperties", classOf[java.lang.Long]),
       ("localAddress", classOf[String]),
       ("localPort", classOf[Integer]),
       ("localPrincipalUuid", classOf[UUID]),
@@ -913,12 +915,16 @@ object TitanFlowComponents {
 //      ("privilegeLevel", classOf[PrivilegeLevel]),
       ("privilegeLevel", classOf[String]),
       ("programPoint", classOf[String]),
+      ("registryKeyOrPath", classOf[String]),
       ("remoteAddress", classOf[String]),
       ("remotePort", classOf[Integer]),
       ("runtimeDataType", classOf[String]),
       ("sequence", classOf[java.lang.Long]),
+      ("shmflg", classOf[java.lang.Long]),
+      ("shmid", classOf[java.lang.Long]),
       ("sinkFileDescriptor", classOf[Integer]),
       ("size", classOf[java.lang.Long]),
+      ("sizeFromProperties", classOf[java.lang.Long]),
       ("sourceFileDescriptor", classOf[Integer]),
 //      ("srcSinkType", classOf[SrcSinkType]),
       ("srcSinkType", classOf[String]),
@@ -1041,7 +1047,10 @@ object TitanFlowComponents {
                 println("Failed CDM statement: " + cdm)
                 println(e.getMessage) // Bad query
                 e.printStackTrace()
-                throw e
+                bw.write(e.getMessage)
+                bw.write("\n")
+                bw.write(cdm.toString)
+                bw.write("\n")
               }
             case unk: Throwable => println(s"Unknown exception:\n${unk.printStackTrace()}")
           }
@@ -1084,7 +1093,7 @@ object TestGraph extends App {
   implicit val mat = ActorMaterializer()
 
 
-  val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+  val path = "/Users/erin/Documents/proj/adapt/git/adapt/data/ta1-theia-bovia-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
   val data = CDM17.readData(path, None).get._2.map(_.get)
   val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
@@ -1109,7 +1118,7 @@ object TestGraph extends App {
   new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
 
 
-//  TitanUtils.titanWrites(TitanUtils.graph)
+//  TitanFlowComponents.titanWrites(TitanFlowComponents.graph)
 //    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
 
 //  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
@@ -1134,7 +1143,7 @@ object TestGraph extends App {
 //  }.recover{ case e: Throwable => e.printStackTrace() }.runForeach(println)
 
 
-  //  Flow[CDM17].runWith(source, TitanUtils.titanWrites(TitanUtils.graph))
+    Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
 
 
 
