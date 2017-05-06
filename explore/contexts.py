@@ -19,6 +19,8 @@ proc_childQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as
 
 proc_child_nameQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('parent').select('x').in('parentSubject').as('y').values('name').as('child').select('parent','child').dedup()"
 
+proc_nameQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').values('name').as('name').select('pid','name').dedup()"
+
 proc_child_cmdLineQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('parent').select('x').in('parentSubject').as('y').values('cmdLine').as('child').select('parent','child').dedup()"
 
 proc_fileQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').in().hasLabel('Event').out().hasLabel('FileObject').as('z').values('path').as('file').select('pid','file').dedup()"
