@@ -93,7 +93,6 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 
     case GetWeights =>
       sender() ! anomalies.map { anom =>
-//        println(anom._2.keys)
 //        weights.toMap ++  // show only the weights for actual anomaly scores
         anom._2.keys.++(List("Subgraph")).map(k =>
           k -> weights.getOrElse(k, 1D)
@@ -101,7 +100,6 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
 
     case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
-      println(msg.toJsonString)
       savedNotes += msg
       new PrintWriter("/Users/ryan/Desktop/notes.json") { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
       sender() ! Success(())
@@ -228,7 +226,7 @@ object ProdRoutes {
         pathPrefix("saveNotes") {
           formFieldMap { fields =>
             complete {
-              println(fields)
+//              println(fields)
               val notes = fields.getOrElse("notes", "").replaceAll(""""""","")
               val keyUuid = UUID.fromString(fields("keyUuid"))
               val rating = fields("rating").toInt
