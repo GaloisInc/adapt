@@ -36,6 +36,7 @@ import NetFlowStream._
 import FileStream._
 import ProcessStream._
 import MemoryStream._
+import com.typesafe.config.ConfigFactory
 
 
 object FlowComponents {
@@ -133,7 +134,7 @@ object FlowComponents {
 
 
 
-  def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB) = {
+  def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB): Flow[CDM17, (String, UUID, Event, CDM17), _] = {
     val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
     Flow[CDM17]
       .mapConcat[(UUID, String, CDM17)] {
@@ -275,8 +276,11 @@ object FlowComponents {
             matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
             writer.close()
 
+            val config = ConfigFactory.load()
+
             Try(Seq[String](
-              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
+              config.getString("adapt.iforestpath"),
+//              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
               "-i", inputFile.getCanonicalPath, // input file
               "-o", outputFile.getCanonicalPath, // output file
               "-m", "1", // ignore the first column

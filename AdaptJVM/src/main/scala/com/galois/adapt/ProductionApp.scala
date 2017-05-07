@@ -43,11 +43,13 @@ object ProductionApp extends App {
     // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
     org.slf4j.LoggerFactory.getILoggerFactory
 
-    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 
     val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("production"))
     val interface = config.getString("akka.http.server.interface")
     val port = config.getInt("akka.http.server.port")
+
+//    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
+    new File(config.getString("adapt.iforestpath")).setExecutable(true)
 
     implicit val system = ActorSystem("production-actor-system")
     implicit val materializer = ActorMaterializer()
@@ -71,7 +73,7 @@ object ProductionApp extends App {
 //    Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writes", 1000)), TitanFlowComponents.titanWrites())
 
     // Flow calculates all streaming results.
-//    Ta1Flows(ta1)(db).runWith(CDMSource(ta1), Sink.actorRef[RankingCard](anomalyActor, None))
+//    Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Combined", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
     val combined = RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
       import GraphDSL.Implicits._
@@ -83,7 +85,14 @@ object ProductionApp extends App {
 
       ClosedShape
     })
-    combined.run()
+
+    config.getString("adapt.runflow") match {
+      case "database" | "db" =>
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writes", 1000)), TitanFlowComponents.titanWrites())
+      case "anomalies" | "anomaly" =>
+        Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
+      case _ => combined.run()
+    }
 
   }
 }
@@ -114,11 +123,11 @@ object CDMSource {
       case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
       case "kafkaTest"      => kafkaSource("kafkaTest").throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
-        val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
+        val path = "/Users/ryan/Desktop/ta1-fivedirections-bovia-cdm17.bin" //ta1-trace-cdm17.bin" // ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" //
         Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
-          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt)).throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+//          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
+//          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
+          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 
@@ -149,6 +158,6 @@ object Ta1Flows {
 //    case "fivedirections" =>
 //    case "theia" =>
 //    case "trace" =>
-    case _ => anomalyScores(_: DB, 1, 2, 3, 6).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
+    case _ => anomalyScores(_: DB, 4, 8, 10, 20).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
 }

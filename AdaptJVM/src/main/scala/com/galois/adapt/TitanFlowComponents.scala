@@ -205,7 +205,8 @@ object TitanFlowComponents {
           if (iterator.hasNext()) Some(iterator.next()) else None
         }
 
-        // Process all of the nodes
+        val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
+
         for (cdm <- cdms) {
           // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
           // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
@@ -216,11 +217,14 @@ object TitanFlowComponents {
             newVertices += (cdm.getUuid -> newTitanVertex)
 
             for ((label, toUuid) <- cdm.asDBEdges) {
-              findNode(toUuid) match {
-                case Some(toTitanVertex) =>
-                  newTitanVertex.addEdge(label, toTitanVertex)
-                case None =>
-                  missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
+              if (toUuid == skipEdgesToThisUuid) Success(())
+              else {
+                findNode(toUuid) match {
+                  case Some(toTitanVertex) =>
+                    newTitanVertex.addEdge(label, toTitanVertex)
+                  case None =>
+                    missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
+                }
               }
             }
           } match {
@@ -242,28 +246,29 @@ object TitanFlowComponents {
         var edgeCreatedCounter = 0
 
         for ((uuid, edges) <- missingToUuid; (fromTitanVertex, label) <- edges) {
+          if (uuid != skipEdgesToThisUuid) {
+            // Find or create the missing vertex (it may have been created earlier in this loop)
+            val toTitanVertex = findNode(uuid) getOrElse {
+              nodeCreatedCounter += 1
+              val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+              newVertices += (uuid -> newNode)
+              newNode
+            }
 
-          // Find or create the missing vertex (it may have been created earlier in this loop)
-          val toTitanVertex = findNode(uuid) getOrElse {
-            nodeCreatedCounter += 1
-            val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
-            newVertices += (uuid -> newNode)
-            newNode
-          }
-
-          // Create the missing edge
-          Try {
-            fromTitanVertex.addEdge(label, toTitanVertex)
-            edgeCreatedCounter += 1
-          } match {
-            case Success(_) =>
-            case Failure(e: SchemaViolationException) =>  // TODO??
-            case Failure(e: java.lang.IllegalArgumentException) =>
-              if (!e.getMessage.contains("byUuidUnique")) {
-                println(e.getMessage) // Bad query
-                e.printStackTrace()
-              }
-            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+            // Create the missing edge
+            Try {
+              fromTitanVertex.addEdge(label, toTitanVertex)
+              edgeCreatedCounter += 1
+            } match {
+              case Success(_) =>
+              case Failure(e: SchemaViolationException) => // TODO??
+              case Failure(e: java.lang.IllegalArgumentException) =>
+                if (!e.getMessage.contains("byUuidUnique")) {
+                  println(e.getMessage) // Bad query
+                  e.printStackTrace()
+                }
+              case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+            }
           }
         }
 
@@ -272,7 +277,7 @@ object TitanFlowComponents {
         Try(
           transaction.commit()
         ) match {
-          case Success(_) => // println(s"Ccommitted transaction with ${cdms.length} statements")
+          case Success(_) => // println(s"Committed transaction with ${cdms.length} statements")
           case Failure(e) => e.printStackTrace()
         }
       }
