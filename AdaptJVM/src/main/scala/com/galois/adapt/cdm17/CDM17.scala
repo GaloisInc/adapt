@@ -260,6 +260,12 @@ case object AUTHENTIHASH extends CryptoHashType
 case object SSDEEP extends CryptoHashType
 case object IMPHASH extends CryptoHashType
 
+sealed trait TheiaQueryType extends CDM17
+case object TheiaQueryType extends CustomEnum[TheiaQueryType] { val values = Seq(BACKWARD, FORWARD, POINT_TO_POINT) }
+case object BACKWARD extends TheiaQueryType
+case object FORWARD extends TheiaQueryType
+case object POINT_TO_POINT extends TheiaQueryType
+
 //  /* Some Python for generating the CustomEnum[T] code above */
 //def make_enum(name, string_array):
 //    trait = "sealed trait " + name + "\n"
