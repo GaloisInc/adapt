@@ -645,12 +645,58 @@
       "doc" : "Timestamp in nanoseconds"
     } ]
   }, {
+    "type" : "enum",
+    "name" : "TheiaQueryType",
+    "doc" : "* TheiaQueryType used to indicate the type of TheiaQuery",
+    "symbols" : [ "BACKWARD", "FORWARD", "POINT_TO_POINT" ]
+  }, {
+    "type" : "record",
+    "name" : "TheiaQuery",
+    "doc" : "* TheiaQuery record used to request a fine-grained analysis to THEIA system",
+    "fields" : [ {
+      "name" : "queryId",
+      "type" : "UUID"
+    }, {
+      "name" : "type",
+      "type" : "TheiaQueryType"
+    }, {
+      "name" : "sourceId",
+      "type" : [ "null", "UUID" ],
+      "default" : null
+    }, {
+      "name" : "sinkId",
+      "type" : [ "null", "UUID" ],
+      "default" : null
+    }, {
+      "name" : "startTimestamp",
+      "type" : [ "null", "long" ],
+      "default" : null
+    }, {
+      "name" : "endTimestamp",
+      "type" : [ "null", "long" ],
+      "default" : null
+    } ]
+  }, {
+    "type" : "record",
+    "name" : "TheiaQueryResult",
+    "doc" : "* TheiaQueryResult used to indicate that the fine-grained analysis created\n     * by a query has finished",
+    "fields" : [ {
+      "name" : "queryId",
+      "type" : "UUID"
+    }, {
+      "name" : "tagIds",
+      "type" : {
+        "type" : "array",
+        "items" : "UUID"
+      }
+    } ]
+  }, {
     "type" : "record",
     "name" : "TCCDMDatum",
     "doc" : "* A record representing either a vertex or an edge. This is the top level record that allows\n     * us to easily mix the vertices and edges defined above on the wire.",
     "fields" : [ {
       "name" : "datum",
-      "type" : [ "Principal", "ProvenanceTagNode", "Subject", "FileObject", "UnnamedPipeObject", "RegistryKeyObject", "NetFlowObject", "MemoryObject", "SrcSinkObject", "Event", "UnitDependency", "TimeMarker" ]
+      "type" : [ "Principal", "ProvenanceTagNode", "Subject", "FileObject", "UnnamedPipeObject", "RegistryKeyObject", "NetFlowObject", "MemoryObject", "SrcSinkObject", "Event", "UnitDependency", "TheiaQuery", "TheiaQueryResult", "TimeMarker" ]
     }, {
       "name" : "CDMVersion",
       "type" : "string",
