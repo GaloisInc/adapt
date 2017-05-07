@@ -24,7 +24,7 @@ case class ProvenanceTagNode(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
-    "tagIdUuid", tagIdUuid,
+    "uuid", tagIdUuid,
     "subjectUuid", subjectUuid
   ) ++
     flowObject.fold[List[Any]](List.empty)(v => List("flowObjectUuid", v)) ++

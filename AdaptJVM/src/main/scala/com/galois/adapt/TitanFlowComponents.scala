@@ -4,13 +4,15 @@ import java.util.UUID
 
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import com.galois.adapt.cdm17.CDM17
-import com.thinkaurelius.titan.core.{Cardinality, Multiplicity, TitanFactory, TitanGraph}
+import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import org.apache.tinkerpop.gremlin.structure.Vertex
+
 import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.ExecutionContext
+import scala.util.{Success, Failure, Try}
 
 
 object TitanFlowComponents {
@@ -207,7 +209,7 @@ object TitanFlowComponents {
         for (cdm <- cdms) {
           // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
           // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
-          try {
+          Try {
             val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
             assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
             val newTitanVertex = transaction.addVertex(props: _*)
@@ -221,17 +223,16 @@ object TitanFlowComponents {
                   missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
               }
             }
-          }
-          catch {
-            // TODO make this more useful
-            case e: java.lang.IllegalArgumentException =>
+          } match {
+            case Success(_) =>
+            case Failure(e: SchemaViolationException) =>
+            case Failure(e: java.lang.IllegalArgumentException) =>
               if (!e.getMessage.contains("byUuidUnique")) {
                 println("Failed CDM statement: " + cdm)
                 println(e.getMessage) // Bad query
                 e.printStackTrace()
-                throw e
               }
-            case unk: Throwable => println(s"Unknown exception:\n${unk.printStackTrace()}")
+            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
           }
         }
 
@@ -251,14 +252,28 @@ object TitanFlowComponents {
           }
 
           // Create the missing edge
-          edgeCreatedCounter += 1
-          fromTitanVertex.addEdge(label, toTitanVertex)
+          Try {
+            fromTitanVertex.addEdge(label, toTitanVertex)
+            edgeCreatedCounter += 1
+          } match {
+            case Success(_) =>
+            case Failure(e: java.lang.IllegalArgumentException) =>
+//              if (!e.getMessage.contains("byUuidUnique")) {
+                println(e.getMessage) // Bad query
+                e.printStackTrace()
+//              }
+            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+          }
         }
 
         //        println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
 
-        transaction.commit()
-        //        println(s"Committed transaction with ${cdms.length}")
+        Try(
+          transaction.commit()
+        ) match {
+          case Success(_) => // println(s"Ccommitted transaction with ${cdms.length} statements")
+          case Failure(e) => e.printStackTrace()
+        }
       }
     )(Keep.right)
 }

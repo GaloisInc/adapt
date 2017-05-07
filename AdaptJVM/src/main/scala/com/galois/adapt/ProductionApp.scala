@@ -78,7 +78,7 @@ object ProductionApp extends App {
       val bcast = graph.add(Broadcast[CDM17](2))
 
       CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-      bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[RankingCard](anomalyActor, None)
+      bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
       bcast.out(1) ~> TitanFlowComponents.titanWrites()
 
       ClosedShape
@@ -96,7 +96,7 @@ class StatusActor extends Actor with ActorLogging {
 }
 
 
-case class RankingCard(name: String, keyNode: UUID, suspicionScore: Double, subgraph: Set[UUID])
+case class ViewScore(viewName: String, keyNode: UUID, suspicionScore: Double, subgraph: Set[UUID])
 
 
 object CDMSource {
@@ -114,11 +114,11 @@ object CDMSource {
       case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
       case "kafkaTest"      => kafkaSource("kafkaTest").throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
-        val path = "/Users/ryan/Desktop/ta1-cadets-cdm17-3.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
+        val path = "/Users/ryan/Desktop/ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //
         Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
           .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
           .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt)).throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
     }
   }
 
@@ -149,6 +149,6 @@ object Ta1Flows {
 //    case "fivedirections" =>
 //    case "theia" =>
 //    case "trace" =>
-    case _ => anomalyScores(_: DB, 1, 2, 3, 6).map[RankingCard]((RankingCard.apply _).tupled).recover[RankingCard]{ case e: Throwable => e.printStackTrace().asInstanceOf[RankingCard] }
+    case _ => anomalyScores(_: DB, 1, 2, 3, 6).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
 }

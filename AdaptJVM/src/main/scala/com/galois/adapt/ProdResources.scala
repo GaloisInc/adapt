@@ -4,22 +4,15 @@ import java.io.PrintWriter
 import java.util.UUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
-import akka.http.scaladsl.marshalling._
 import akka.util.Timeout
 import org.mapdb.DBMaker
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
-import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 
-import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.mutable.{Map => MutableMap, MutableList}
 import scala.language.postfixOps
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
-
-import scala.collection.mutable
 
 
 class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
@@ -28,14 +21,10 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
 
-  val savedNotes = mutable.MutableList.empty[SavedNotes]
+  val savedNotes = MutableList.empty[SavedNotes]
 
-  def query(startUuid: UUID): Unit = {
-    implicit val timeout = Timeout(10 seconds)
-    val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.out('parentSubject'))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup()"
-    val resultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
-    resultF.map{x => println(x.get.head.value[UUID]("uuid")); query(anomalies.head._1)}.recover{ case e: Throwable => e.printStackTrace()}
-  }
+  def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
+  def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
 
 
 //  val topic: String = "test"
@@ -55,26 +44,84 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 //  producer.close()
 
 
-
-//  context.system.scheduler.schedule(10 seconds, 10 seconds)(anomalies.headOption.map(_._1).map(query))
-
+  var queryQueue = List.empty[UUID]
+  context.system.scheduler.schedule(10 seconds, 10 seconds)(context.self ! MakeExpansionQueries)
 
 
   def receive = {
-    case card: RankingCard =>
-      val existing = anomalies.getOrElse(card.keyNode, MutableMap.empty[String, (Double, Set[UUID])])
+    case view: ViewScore =>
+      val existing = anomalies.getOrElse(view.keyNode, MutableMap.empty[String, (Double, Set[UUID])])
 
-      if (card.suspicionScore < threshold) existing -= card.name
-      else existing += (card.name -> (card.suspicionScore, card.subgraph))
+      if (view.suspicionScore < threshold) existing -= view.viewName
+      else existing += (view.viewName -> (view.suspicionScore, view.subgraph))
 
-      if (existing.isEmpty) anomalies -= card.keyNode
-      else anomalies += (card.keyNode -> existing)
+      if (existing.isEmpty) {
+        anomalies -= view.keyNode
+        if (queryQueue.contains(view.keyNode)) queryQueue = queryQueue.filterNot(_ == view.keyNode)
+      } else {
+        anomalies += (view.keyNode -> existing)
+        if ( ! queryQueue.contains(view.keyNode)) queryQueue = view.keyNode :: queryQueue
+      }
+
+    case MakeExpansionQueries =>
+      println(s"Expansion Query Q: $queryQueue")
+        queryQueue.lastOption.foreach { startUuid =>
+          queryQueue = queryQueue.take(queryQueue.length - 1)
+          implicit val timeout = Timeout(10 seconds)
+          val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+          val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+          provResultF.flatMap { v =>
+            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
+            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+            progResultF.map { g =>
+              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
+              context.self ! MakeExpansionQueries
+            }
+          }.recover { case e: Throwable => e.printStackTrace() }
+        }
+
+
+    case ExpansionQueryResults(Provenance, uuid, vertices) => Try {
+      val newViews = List(
+        "Has Network In Provenance" -> (if (vertices.exists(_.label() == "NetFlowObject")) 1D else 0D),
+        "May Be Confidential (SrcSink)" -> (if (vertices.exists(_.label() == "SrcSinkObject")) 1D else 0D),
+        "Max Provenance Suspicion Score" -> vertices.map(_.value[UUID]("uuid")).map( u =>
+          anomalies.get(u).map(calculateSuspicionScore).getOrElse(0D)
+        ).:+(0D).max
+      )
+      newViews.foreach { v =>
+        val existing = anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
+
+        if (v._2 < threshold) existing -= v._1
+        else existing += (v._1 -> (v._2, vertices.map(_.value[UUID]("uuid")).toSet))
+
+        if (existing.isEmpty) anomalies -= uuid
+        else anomalies += (uuid -> existing)
+      }
+    }.recover{ case e: Throwable => e.printStackTrace()}
+
+    case ExpansionQueryResults(Progenance, uuid, vertices) => Try {
+      val newViews = List(
+        "Has Network In Progenance" -> (if (vertices.exists(_.label() == "NetFlowObject")) 1D else 0D)
+      )
+      newViews.foreach { v =>
+        val existing = anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
+
+        if (v._2 < threshold) existing -= v._1
+        else existing += (v._1 -> (v._2, vertices.map(_.value[UUID]("uuid")).toSet))
+
+        if (existing.isEmpty) anomalies -= uuid
+        else anomalies += (uuid -> existing)
+      }
+    }.recover{ case e: Throwable => e.printStackTrace()}
+
 
     case QueryAnomalies(uuids) =>
       sender() ! anomalies.filter(t => uuids.contains(t._1)).mapValues(_.toMap).toMap  //anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
 
     case GetRankedAnomalies(topK) =>
-      val weightedScores = anomalies.toList.map(a => a._1 -> a._2.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)})
+      val weightedScores = anomalies.toList.map(a => a._1 -> calculateWeightedScorePerView(a._2))// a._2.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)})
       // Add subgraph scores:
       val weightedScoresLookupMap = weightedScores.map(t => t._1 -> t._2.toMap).toMap  // Make a stable, immutable copy.
       weightedScores.foreach { case (u, scored) =>
@@ -82,7 +129,8 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
         val subgraphScore = subgraphUuids.toList.map(u => weightedScoresLookupMap.get(u).map(nodeDetails => nodeDetails.values.toList.map(_._1).sum).getOrElse(0D)).sum
         scored += ("Subgraph" -> (weights.getOrElse("Subgraph", 1D) * subgraphScore, subgraphUuids))
       }
-      val response = weightedScores.sortBy(_._2.values.map(_._1).sum)(Ordering.by[Double,Double](identity).reverse).take(topK).map(t => t._1 -> t._2.toMap)
+      val response = weightedScores.sortBy(ws => calculateSuspicionScore(ws._2))(Ordering.by[Double,Double](identity).reverse)
+        .take(topK).map(t => t._1 -> t._2.toMap)
       sender() ! response
 
     case SetThreshold(limit) => threshold = limit
@@ -92,9 +140,10 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
     case SetWeight(key, weight) => weights(key) = weight
 
     case GetWeights =>
-      sender() ! anomalies.map { anom =>
-//        weights.toMap ++  // show only the weights for actual anomaly scores
-        anom._2.keys.++(List("Subgraph")).map(k =>
+      sender() ! anomalies.values.map { views =>
+//        weights.toMap ++  // uncomment to show only the weights for actual anomaly scores
+        val weightKeys = views.keys.toList.++(List("Subgraph"))
+        weightKeys.map(k =>
           k -> weights.getOrElse(k, 1D)
         ).toMap
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
@@ -122,195 +171,10 @@ case class SavedNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[U
 }
 case class GetNotes(uuid: Seq[UUID])
 
+case object MakeExpansionQueries
+case class ExpansionQueryResults(expType: ExpansionQuery, uuid: UUID, resultVertices: List[Vertex])
+sealed trait ExpansionQuery
+case object Provenance extends ExpansionQuery
+case object Progenance extends ExpansionQuery
 
 
-object ProdRoutes {
-
-  val serveStaticFilesRoute =
-    path("") {
-      getFromResource("web/index.html")
-    } ~
-    path("graph") {
-      getFromResource("web/graph.html")
-    } ~
-    pathPrefix("") {
-      getFromResourceDirectory("web")
-    }
-
-
-  implicit val timeout = Timeout(20 seconds)
-
-  def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
-    val qType = query match {
-      case _: NodeQuery   => "node"
-      case _: EdgeQuery   => "edge"
-      case _: StringQuery => "generic"
-    }
-    println(s"Got $qType query: ${query.query}")
-    val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
-//      println("returning...")
-      val toReturn = s match {
-        case Success(json) => json
-        case Failure(e) =>
-          println(e.getMessage)
-          "\"" + e.getMessage + "\""
-      }
-      HttpEntity(ContentTypes.`application/json`, toReturn)
-    }
-    complete(futureResponse)
-  }
-
-  implicit val mapMarshaller: ToEntityMarshaller[Map[String, Any]] = Marshaller.opaque { map =>
-    HttpEntity(ContentType(MediaTypes.`application/json`), map.toString)
-  }
-
-
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
-    get {
-      pathPrefix("ranked") {
-        path(RemainingPath) { count =>
-          val limit = Try(count.toString.toInt).getOrElse(Int.MaxValue)
-          complete(
-            (anomalyActor ? GetRankedAnomalies(limit))
-              .mapTo[List[(UUID, Map[String, (Double, Set[UUID])])]]
-              .map(convertToJsonTheOtherHardWay)
-          )
-        }
-      } ~
-      pathPrefix("status") {
-        complete(
-          "todo"
-//          Map(
-//            "nodes" -> statusList.map(s => UINode(s.from.toString, s.from.path.elements.last, s.measurements.mapValues(_.toString).toList.map(t => s"${t._1}: ${t._2}").mkString("<br />"))).map(ApiJsonProtocol.c.write),
-//            "edges" -> statusList.flatMap(s => s.subscribers.map(x => UIEdge(s.from.toString, x.toString, ""))).map(ApiJsonProtocol.d.write)
-//          )
-        )
-      } ~
-      pathPrefix("api") {
-        pathPrefix("weights") {
-          complete{
-            val mapF = (anomalyActor ? GetWeights).mapTo[Map[String, Double]]
-            mapF.map{ x =>
-              val s = x.map{ case (k,v) => s""""${k.trim}": $v"""}.mkString("{",",","}")
-              HttpEntity(ContentTypes.`application/json`, s)
-            }
-          }
-        } ~
-        pathPrefix("threshold") {
-          complete{
-            (anomalyActor ? GetThreshold).mapTo[Double].map(_.toString)
-          }
-        }
-      } ~
-      pathPrefix("query") {
-          pathPrefix("nodes") {
-            path(RemainingPath) { queryString =>
-              completedQuery(NodeQuery(queryString.toString), dbActor)
-            }
-          } ~
-          pathPrefix("edges") {
-            path(RemainingPath) { queryString =>
-              completedQuery(EdgeQuery(queryString.toString), dbActor)
-            }
-          } ~
-          pathPrefix("generic") {
-            path(RemainingPath) { queryString =>
-              completedQuery(StringQuery(queryString.toString), dbActor)
-            }
-          }
-      } ~
-      serveStaticFilesRoute
-    } ~
-    post {
-      pathPrefix("api") {
-        pathPrefix("saveNotes") {
-          formFieldMap { fields =>
-            complete {
-//              println(fields)
-              val notes = fields.getOrElse("notes", "").replaceAll(""""""","")
-              val keyUuid = UUID.fromString(fields("keyUuid"))
-              val rating = fields("rating").toInt
-              val subgraph = fields("subgraph").split(",").filter(_.nonEmpty).map(s => UUID.fromString(s.trim())).toSet
-              (anomalyActor ? SavedNotes(keyUuid, rating, notes, subgraph)).mapTo[Try[Unit]]
-                .map(_.map(_ => "OK").getOrElse("FAILED"))
-            }
-          }
-        } ~
-        pathPrefix("getNotes") {
-          formField('uuids) { uuids =>
-            complete {
-              val uuidSeq = if (uuids.isEmpty) Seq.empty[UUID] else uuids.split(",").map(UUID.fromString).toSeq
-              val notesF = (anomalyActor ? GetNotes(uuidSeq)).mapTo[Seq[SavedNotes]]
-              notesF.map{n =>
-                val s = n.map(_.toJsonString).mkString("[",",","]")
-                HttpEntity(ContentTypes.`application/json`, s)
-              }
-            }
-          }
-        } ~
-        pathPrefix("weights") {
-          formField('weights) { `k:v;k:v` =>
-            complete {
-              `k:v;k:v`.split(";").foreach{ `k:v` =>
-                val pair = `k:v`.split(":")
-                if (pair.length == 2) anomalyActor ! SetWeight(pair(0), pair(1).toDouble)
-              }
-//              redirect(Uri("/"), StatusCodes.TemporaryRedirect)
-              "OK"
-            }
-          }
-        } ~
-        pathPrefix("threshold") {
-          formField('threshold) { threshold =>
-            complete {
-              anomalyActor ! SetThreshold(threshold.toDouble)
-              "OK"
-            }
-          }
-        }
-      } ~
-      pathPrefix("query") {
-        path("anomalyScores") {
-          formField('uuids) { commaSeparatedUuidString =>
-            val uuids = commaSeparatedUuidString.split(",").map(s => UUID.fromString(s.trim))
-            val mapF = (anomalyActor ? QueryAnomalies(uuids)).mapTo[Map[UUID, Map[String, (Double, Set[UUID])]]]
-            val f = mapF.map(anoms => convertToJsonTheHardWay(anoms) )
-            complete(f.map(s => HttpEntity(ContentTypes.`application/json`, s)))
-          }
-        } ~
-        path("nodes") {
-          formField('query) { queryString =>
-            completedQuery(NodeQuery(queryString), dbActor)
-          }
-        } ~
-        path("edges") {
-          formField('query) { queryString =>
-            completedQuery(EdgeQuery(queryString), dbActor)
-          } ~
-          formField('nodes) { nodeListString =>
-            println(s"getting edges for nodes: $nodeListString")
-            val idList = nodeListString.split(",").map(_.toInt)
-            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
-//                println("returning...")
-              HttpEntity(ContentTypes.`application/json`, s.get)
-            }
-            complete(futureResponse)
-          }
-        } ~
-        path("generic") {
-          formField('query) { queryString =>
-            completedQuery(StringQuery(queryString), dbActor)
-          }
-        }
-      }
-    }
-
-
-  def convertToJsonTheHardWay(anomalyMap: Map[UUID, Map[String, (Double, Set[UUID])]]): String =    // Bad programmer! You know better than this. You should be ashamed of yourself.
-    anomalyMap.mapValues(inner => inner.mapValues(t => s"""{"score":${t._1},"subgraph":${t._2.toList.map(u => s""""$u"""").mkString("[",",","]")}}""").map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")  ).map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")
-
-  def convertToJsonTheOtherHardWay(anomalyList: List[(UUID, Map[String, (Double, Set[UUID])])]): String = {   // Bad programmer! You know better than this. You should be ashamed of yourself.
-    anomalyList.map(anom => s"""{"${anom._1}":${anom._2.map(x => s""""${x._1}":{"score":${x._2._1},"subgraph":${x._2._2.map(u => s""""$u"""").mkString("[",",","]")}}""").mkString("{",",","}")}}""").mkString("[",",","]")
-  }
-
-}
