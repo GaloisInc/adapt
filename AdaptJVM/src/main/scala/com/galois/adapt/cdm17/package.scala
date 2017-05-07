@@ -42,7 +42,7 @@ package object cdm17 {
 
       val cdm = tcIterator.next()
       val first: RawCDM17Type = {
-        if (cdm.CDMVersion.toString != "17")
+        if (cdm.getCDMVersion.toString != "17")
           throw new Exception(s"Expected CDM17, but received CDM${cdm.CDMVersion.toString}")
         new RawCDM17Type(cdm.getDatum)
       }
@@ -66,6 +66,7 @@ package object cdm17 {
       case _: Event.RawCDMType => Event.from(cdm)
       case _: UnitDependency.RawCDMType => UnitDependency.from(cdm)
       case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
+      case _: TheiaQueryResult.RawCDMType => TheiaQueryResult.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }
   }

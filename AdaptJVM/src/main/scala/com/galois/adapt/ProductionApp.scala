@@ -62,7 +62,7 @@ object ProductionApp extends App {
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
     val dbActor = system.actorOf(Props[TitanDBQueryProxy])
-    val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor))
+    val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
@@ -110,7 +110,7 @@ object CDMSource {
       case "clearscope"     => kafkaSource(s"ta1-clearscope-$scenario-cdm17")
       case "faros"          => kafkaSource(s"ta1-faros-$scenario-cdm17")
       case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
-      case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17")
+      case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17").merge(kafkaSource(s"ta1-theia-$scenario-qr"))
       case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
       case "kafkaTest"      => kafkaSource("kafkaTest").throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>

@@ -1,21 +1,29 @@
 package com.galois.adapt
 
-import java.io.PrintWriter
-import java.util.UUID
+import java.io.{ByteArrayOutputStream, PrintWriter}
+import java.nio.ByteBuffer
+import java.util.{Properties, UUID}
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
 import org.mapdb.DBMaker
 import akka.pattern.ask
+import com.bbn.tc.schema.avro.{TheiaQuery, TheiaQueryType}
+import com.typesafe.config.Config
+import org.apache.avro.io.EncoderFactory
+import org.apache.avro.specific.SpecificDatumWriter
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
-import scala.collection.mutable.{Map => MutableMap, MutableList}
+import scala.collection.mutable.{MutableList, Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.util.{Random, Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 
+import scala.concurrent.Future
 
-class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
+
+class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with ActorLogging {
   implicit val ec = context.dispatcher
   var threshold = 0.8D
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
@@ -23,29 +31,44 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
 
   val savedNotes = MutableList.empty[SavedNotes]
 
+  var queryQueue = List.empty[UUID]
+  context.system.scheduler.schedule(10 seconds, 10 seconds)(context.self ! MakeExpansionQueries)
+
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
 
+  def makeTheiaQuery(uuid: UUID): Future[String] = Future {
+    val theia = new TheiaQuery()
+    val bb = ByteBuffer.allocate(16)
+    bb.putLong(uuid.getMostSignificantBits)
+    bb.putLong(uuid.getLeastSignificantBits)
+    val newUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
+    theia.put("sinkId", newUuid)
+    theia.put("queryId", new com.bbn.tc.schema.avro.cdm17.UUID(Array.fill(16)((scala.util.Random.nextInt(256) - 128).toByte)))
+    theia.put("type", TheiaQueryType.BACKWARD)
 
-//  val topic: String = "test"
-//  val brokers: String = "localhost:9092"
-//  val props = new Properties()
-//  props.put("bootstrap.servers", brokers)
-//  props.put("client.id", "AdaptToTheiaRequestProducer")
-//  props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-//  props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-//
-//  val producer = new KafkaProducer[String, String](props)
-//  val key = "test_key"
-//  val msg = "test_message"
-//  val data = new ProducerRecord[String, String](topic, TimeMarker(0L).toString)
-//
-//  producer.send(data)
-//  producer.close()
+    val baos = new ByteArrayOutputStream
+    val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TheiaQuery])
+    val encoder = EncoderFactory.get.binaryEncoder(baos, null)
+    writer.write(theia, encoder)
+    encoder.flush()
+    val elem = baos.toByteArray
 
+    val scenario = config.getString("adapt.scenario")
+    val topic: String = s"ta1-theia-$scenario-q"
+    val brokers: String = config.getString("akka.kafka.producer.kafka-clients.bootstrap.servers")
+    val props = new Properties()
+    props.put("bootstrap.servers", brokers)
+    props.put("client.id", "AdaptToTheiaRequestProducer")
+    props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+    props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
 
-  var queryQueue = List.empty[UUID]
-  context.system.scheduler.schedule(10 seconds, 10 seconds)(context.self ! MakeExpansionQueries)
+    val data = new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)
+    val producer = new KafkaProducer[Array[Byte], Array[Byte]](props)
+    val resultF = producer.send(data)
+    producer.close()
+    resultF.get(10L, java.util.concurrent.TimeUnit.SECONDS).toString
+  }
 
 
   def receive = {
@@ -116,6 +139,11 @@ class AnomalyManager(dbActor: ActorRef) extends Actor with ActorLogging {
       }
     }.recover{ case e: Throwable => e.printStackTrace()}
 
+    case MakeTheiaQuery(uuid) =>
+      val result = makeTheiaQuery(uuid)
+      result.map(r => println(s"Theia query result for $uuid: $r"))
+        .recover { case e: Throwable => println(s"Theia query failed with: ${e.getMessage}") }
+      sender() ! result
 
     case QueryAnomalies(uuids) =>
       sender() ! anomalies.filter(t => uuids.contains(t._1)).mapValues(_.toMap).toMap  //anomalies.getOrElse(uuid, MutableMap.empty[String, (Double, Set[UUID])])
@@ -177,4 +205,5 @@ sealed trait ExpansionQuery
 case object Provenance extends ExpansionQuery
 case object Progenance extends ExpansionQuery
 
+case class MakeTheiaQuery(uuid: UUID)
 

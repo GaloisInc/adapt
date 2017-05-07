@@ -3,7 +3,7 @@ package com.galois.adapt
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -138,6 +138,15 @@ object ProdRoutes {
                 val s = n.map(_.toJsonString).mkString("[",",","]")
                 HttpEntity(ContentTypes.`application/json`, s)
               }
+            }
+          }
+        } ~
+        pathPrefix("makeTheiaQuery") {
+          formField('uuid) { uuid =>
+            complete {
+              Try(UUID.fromString(uuid)).map(u =>
+                (anomalyActor ? MakeTheiaQuery(u)).mapTo[Future[String]].flatMap(identity)
+              )
             }
           }
         } ~

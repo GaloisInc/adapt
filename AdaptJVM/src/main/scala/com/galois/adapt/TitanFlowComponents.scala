@@ -225,7 +225,7 @@ object TitanFlowComponents {
             }
           } match {
             case Success(_) =>
-            case Failure(e: SchemaViolationException) =>
+            case Failure(e: SchemaViolationException) =>  // TODO??
             case Failure(e: java.lang.IllegalArgumentException) =>
               if (!e.getMessage.contains("byUuidUnique")) {
                 println("Failed CDM statement: " + cdm)
@@ -257,11 +257,12 @@ object TitanFlowComponents {
             edgeCreatedCounter += 1
           } match {
             case Success(_) =>
+            case Failure(e: SchemaViolationException) =>  // TODO??
             case Failure(e: java.lang.IllegalArgumentException) =>
-//              if (!e.getMessage.contains("byUuidUnique")) {
+              if (!e.getMessage.contains("byUuidUnique")) {
                 println(e.getMessage) // Bad query
                 e.printStackTrace()
-//              }
+              }
             case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
           }
         }
