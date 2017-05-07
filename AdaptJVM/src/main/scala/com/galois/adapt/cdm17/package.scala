@@ -19,7 +19,7 @@ package object cdm17 {
   trait CDM17
 
   object CDM17 {
-    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
+    val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker, TheiaQuery, TheiaQueryResult)
 
     def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM17]])] = {
       val fileContents = readAvroFile(filePath)
@@ -66,6 +66,8 @@ package object cdm17 {
       case _: Event.RawCDMType => Event.from(cdm)
       case _: UnitDependency.RawCDMType => UnitDependency.from(cdm)
       case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
+      case _: TheiaQuery.RawCDMType => TheiaQuery.from(cdm)
+      case _: TheiaQueryResult.RawCDMType => TheiaQueryResult.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }
   }
@@ -136,6 +138,7 @@ package object cdm17 {
   implicit def makeShort(s: bbnCDM15.SHORT): FixedShort = new FixedShort(s.bytes)
   implicit def makeAbstractObject(o: bbnCDM15.AbstractObject): AbstractObject = AbstractObject.from(new RawCDM17Type(o)).get
   implicit def makeTagRunLength(x: bbnCDM15.TagRunLengthTuple): TagRunLengthTuple = TagRunLengthTuple.from(new RawCDM17Type(x)).get
+  implicit def makeTheiaQueryType(x: bbnCDM15.TheiaQueryType): TheiaQueryType = TheiaQueryType.from(x.toString).get
 
   object DBOpt {
     // Flattens out nested "properties":
