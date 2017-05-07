@@ -35,6 +35,7 @@ import scala.io.{Source => FileSource}
 import NetFlowStream._
 import FileStream._
 import ProcessStream._
+import MemoryStream._
 
 
 object FlowComponents {
@@ -191,7 +192,7 @@ object FlowComponents {
       }.mergeSubstreams
   }
 
-
+//case class LabeledPredicateType(labelName: String, predicateObjectUuid: UUID, event: Event, cdm: CDM17)
 
 
   def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
@@ -323,8 +324,8 @@ object FlowComponents {
 
   def anomalyScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50) = Flow.fromGraph(
     GraphDSL.create(){ implicit graph =>
-      val bcast = graph.add(Broadcast[CDM17](3))
-      val merge = graph.add(Merge[(String,UUID,Double, Set[UUID])](3))
+      val bcast = graph.add(Broadcast[CDM17](4))
+      val merge = graph.add(Merge[(String,UUID,Double, Set[UUID])](4))
 
       val fastCommandSource = commandSource(fastClean, fastEmit)   // TODO
       val slowCommandSource = commandSource(slowClean, slowEmit)   // TODO
@@ -332,6 +333,7 @@ object FlowComponents {
       bcast.out(0) ~> netFlowFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       bcast.out(1) ~> fileFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       bcast.out(2) ~> processFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
+      bcast.out(3) ~> memoryFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       merge.out
 
       FlowShape(bcast.in, merge.out)

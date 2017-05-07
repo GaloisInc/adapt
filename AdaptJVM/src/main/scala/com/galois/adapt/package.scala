@@ -27,6 +27,7 @@ package object adapt {
 
   type ProcessUUID = UUID
   type FileUUID = UUID
+  type MemoryUUID = UUID
   type NetFlowUUID = UUID
   type EventUUID = UUID
   type PredicateUUID = UUID

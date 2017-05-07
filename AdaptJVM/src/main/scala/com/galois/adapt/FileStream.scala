@@ -18,63 +18,63 @@ object FileStream {
 
     predicateTypeLabeler(commandSource, db)
       .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
-      .groupBy(Int.MaxValue, _._3.subjectUuid)
+      .groupBy(Int.MaxValue, _._3.subjectUuid)   // TODO: should this really refer to the subjectUuid?!??
       .merge(commandSource)
       .statefulMapConcat[((FileUUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[Event])])]{ () =>
-      var processUuidOpt: Option[ProcessUUID] = None
-      //        var fileUuids = MutableSet.empty[UUID]
-      val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[Event]]
-      //        val netFlowUuids = MutableSet.empty[NetFlowUUID]
-      val netFlowEvents = MutableMap.empty[NetFlowUUID, mutable.SortedSet[Event]]
+        var processUuidOpt: Option[ProcessUUID] = None
+  //        var fileUuids = MutableSet.empty[UUID]
+        val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[Event]]
+  //        val netFlowUuids = MutableSet.empty[NetFlowUUID]
+        val netFlowEvents = MutableMap.empty[NetFlowUUID, mutable.SortedSet[Event]]
 
 
-    {
-      case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, _: CDM17) =>
-        if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-        netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
-        List.empty
+        {
+          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, _: CDM17) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
+            List.empty
 
-      case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
-        if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-        fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
-        List.empty
+          case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
+            List.empty
 
-      case CleanUp =>
-        //            if (netFlowEvents.nonEmpty) {
-        //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-        //              netFlowEvents.foreach { case (u, es) =>
-        //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-        //              }
-        //              dbMap.putAll(mergedEvents.asJava)
-        //              netFlowUuids ++= netFlowEvents.keySet
-        //              netFlowEvents.clear()
-        //            }
-        //            if (fileEvents.nonEmpty) {
-        //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-        //              fileEvents.foreach { case (u, es) =>
-        //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-        //              }
-        //
-        //              // This gets slower as Event Set gets larger.
-        //              dbMap.putAll(mergedEvents.asJava)
-        //
-        //              fileUuids ++= fileEvents.keySet
-        //              fileEvents.clear()
-        //            }
-        List.empty
+          case CleanUp =>
+    //            if (netFlowEvents.nonEmpty) {
+    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+    //              netFlowEvents.foreach { case (u, es) =>
+    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+    //              }
+    //              dbMap.putAll(mergedEvents.asJava)
+    //              netFlowUuids ++= netFlowEvents.keySet
+    //              netFlowEvents.clear()
+    //            }
+    //            if (fileEvents.nonEmpty) {
+    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+    //              fileEvents.foreach { case (u, es) =>
+    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+    //              }
+    //
+    //              // This gets slower as Event Set gets larger.
+    //              dbMap.putAll(mergedEvents.asJava)
+    //
+    //              fileUuids ++= fileEvents.keySet
+    //              fileEvents.clear()
+    //            }
+            List.empty
 
-      case EmitCmd =>
-        //            fileUuids.foreach(u =>
-        //              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-        //                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
-        //
-        //            netFlowUuids.foreach(u =>
-        //              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-        //                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+          case EmitCmd =>
+    //            fileUuids.foreach(u =>
+    //              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+    //                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+    //
+    //            netFlowUuids.foreach(u =>
+    //              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+    //                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
 
-        fileEvents.toList.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
-    }
-    }
+            fileEvents.toList.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+        }
+      }
       .mergeSubstreams
       .via(fileFeatures)
   }
@@ -133,7 +133,7 @@ object FileStream {
             List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
         ))
       ).foldLeft(false)(_ || _)
-    m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") )))  // TODO: revisit the list of temp locations.
+    m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") )))
     m("execDeleteGapNanos") = fileEventList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
     m("attribChangeEventThenExecuteGapNanos") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
     m("writeExecutionGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_EXECUTE))
@@ -144,6 +144,13 @@ object FileStream {
 
     m("writeToLoadLibraryGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_LOADLIBRARY))
     m("writeToMMapLibraryGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_MMAP))
+
+    m("stringsInFilePathOrName") =  fileEventSet.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path, e.name).flatten)
+      .exists(path =>
+        List("screengrab", "netrecon", "recordaudio", "imagegrab", "keylogger", "kudu", "samplelib", "accutrack", "flexispy",
+          "gpspy", "ackposts", "godwon", "antares", "antammi", "pjapps", "sndapps", "snadapps", "placeraider", "dropper", "dropbear"
+        ).exists(name => path.toLowerCase.contains(name))
+    ): Boolean
 
     fileEventTypes.foreach( t =>
       m("count_"+ t.toString) = fileEventSet.count(_.eventType == t)
@@ -165,6 +172,7 @@ object FileStream {
     , "ALARM: Deleted Immediately After Exec" -> List("deletedRightAfterExec")
     , "ALARM: Deleted Right After Process With Open NetFlow Writes" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites")
     , "ALARM: Download Then Execute" -> List("execAfterWriteByNetFlowReadingProcess")
+    , "ALARM: Suspicious Name in File Path" -> List("stringsInFilePathOrName")
     )
 
     val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)

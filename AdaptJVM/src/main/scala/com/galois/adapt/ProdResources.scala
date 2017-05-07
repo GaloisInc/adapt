@@ -42,9 +42,14 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     val bb = ByteBuffer.allocate(16)
     bb.putLong(uuid.getMostSignificantBits)
     bb.putLong(uuid.getLeastSignificantBits)
-    val newUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
-    theia.put("sinkId", newUuid)
-    theia.put("queryId", new com.bbn.tc.schema.avro.cdm17.UUID(Array.fill(16)((scala.util.Random.nextInt(256) - 128).toByte)))
+    val targetUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
+    theia.put("sinkId", targetUuid)
+    val idUuid = UUID.randomUUID()
+    val bb2 = ByteBuffer.allocate(16)
+    bb2.putLong(idUuid.getMostSignificantBits)
+    bb2.putLong(idUuid.getLeastSignificantBits)
+    val queryID = new com.bbn.tc.schema.avro.cdm17.UUID(bb2.array())
+    theia.put("queryId", queryID)
     theia.put("type", TheiaQueryType.BACKWARD)
 
     val baos = new ByteArrayOutputStream
@@ -62,6 +67,8 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     props.put("client.id", "AdaptToTheiaRequestProducer")
     props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+
+    println(s"Making Theia query with id: $idUuid to get provenance of node: $uuid")
 
     val data = new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](props)
@@ -158,7 +165,9 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
         scored += ("Subgraph" -> (weights.getOrElse("Subgraph", 1D) * subgraphScore, subgraphUuids))
       }
       val response = weightedScores.sortBy(ws => calculateSuspicionScore(ws._2))(Ordering.by[Double,Double](identity).reverse)
-        .take(topK).map(t => t._1 -> t._2.toMap)
+        .take(topK)
+        .filter(ws => calculateSuspicionScore(ws._2) >= threshold)
+        .map(t => t._1 -> t._2.toMap)
       sender() ! response
 
     case SetThreshold(limit) => threshold = limit
