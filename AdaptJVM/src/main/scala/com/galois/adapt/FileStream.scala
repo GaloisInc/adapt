@@ -17,10 +17,10 @@ object FileStream {
     val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
 
     predicateTypeLabeler(commandSource, db)
-      .filter(x => x._1 == "NetFlowObject" || x._1 == "FileObject")
-      .groupBy(Int.MaxValue, _._3.subjectUuid)   // TODO: should this really refer to the subjectUuid?!??
+      .filter(x => x._1 == "FileObject") // || x._1 == "NetFlowObject")
+      .groupBy(Int.MaxValue, _._2)
       .merge(commandSource)
-      .statefulMapConcat[((FileUUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[Event])])]{ () =>
+      .statefulMapConcat[(FileUUID, mutable.SortedSet[Event])]{ () => //, Set[(NetFlowUUID, mutable.SortedSet[Event])])]{ () =>
         var processUuidOpt: Option[ProcessUUID] = None
   //        var fileUuids = MutableSet.empty[UUID]
         val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[Event]]
@@ -29,10 +29,10 @@ object FileStream {
 
 
         {
-          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, _: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
-            List.empty
+//          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, _: CDM17) =>
+//            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+//            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
+//            List.empty
 
           case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
@@ -72,7 +72,7 @@ object FileStream {
     //              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
     //                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
 
-            fileEvents.toList.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+            fileEvents.toList //.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
         }
       }
       .mergeSubstreams
@@ -84,55 +84,73 @@ object FileStream {
 
   val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
 
-  val fileFeatures = Flow[((FileUUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[Event])])]
-    .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case ((fileUuid, fileEventSet), netFlowEventsFromIntersectingProcesses) =>
+  val fileFeatures = Flow[(FileUUID, mutable.SortedSet[Event])] ///, Set[(NetFlowUUID, mutable.SortedSet[Event])])]
+    .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case (fileUuid, fileEventSet) => //, netFlowEventsFromIntersectingProcesses) =>
     val fileEventList = fileEventSet.toList
     var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
     val m = MutableMap.empty[String,Any]
-    m("execAfterWriteByNetFlowReadingProcess") = {
-      var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
-      var found = false
-      while (remainder.nonEmpty && remainder.exists(_.eventType == EVENT_EXECUTE)) {
-        val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subjectUuid == x.subjectUuid))
-        found = execOpt.exists(x => netFlowEventsFromIntersectingProcesses.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
-        if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
-      }
-      found
-    }: Boolean
+//    m("execAfterWriteByNetFlowReadingProcess") = {
+//      var remainder = fileEventList.dropWhile(_.eventType != EVENT_WRITE)
+//      var found = false
+//      while (remainder.nonEmpty && remainder.exists(_.eventType == EVENT_EXECUTE)) {
+//        val execOpt = remainder.find(_.eventType == EVENT_WRITE).flatMap(w => remainder.find(x => x.eventType == EVENT_EXECUTE && w.subjectUuid == x.subjectUuid))
+//        found = execOpt.exists(x => netFlowEventsFromIntersectingProcesses.exists(p => p._2.exists(e => List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType))))
+//        if ( ! found) remainder = remainder.drop(1).dropWhile(_.eventType != EVENT_WRITE)
+//      }
+//      found
+//    }: Boolean
+    m("execSoonAfterWrite") = {
+      val write = fileEventList.find(_.eventType != EVENT_WRITE)
+      val exec = fileEventList.dropWhile(_.eventType != EVENT_WRITE).find(_.eventType == EVENT_EXECUTE)
+      val answer = for {
+        w <- write
+        e <- exec
+      } yield (e.timestampNanos - w.timestampNanos) <= 3e10  // within 30 seconds. This is the interpretation of "soon after"
+      answer.getOrElse(false)
+    }
     m("execAfterPermissionChangeToExecutable") = fileEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE)
     m("deletedAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).exists(_.eventType == EVENT_UNLINK): Boolean
     m("deletedRightAfterExec") = fileEventList.dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK): Boolean
-    m("deletedRightAfterProcessWithOpenNetFlowsWrites") =
-      (if (fileEventList.exists(_.eventType == EVENT_UNLINK)) {
-        fileEventList.collect { case writeEvent if writeEvent.eventType == EVENT_WRITE =>
-          val deleteAfterWriteOpt = fileEventList.find(deleteEvent =>
-            deleteEvent.eventType == EVENT_UNLINK &&
-              (deleteEvent.timestampNanos - writeEvent.timestampNanos >= 0) && // delete happened AFTER the write
-              (deleteEvent.timestampNanos - writeEvent.timestampNanos <= 3e10) // within 30 seconds. This is the interpretation of "right after"
-          )
-          deleteAfterWriteOpt.exists { deleteAfterWriteEvent => // IFF we found a Delete after WRITE...
-            netFlowEventsFromIntersectingProcesses.exists(t => t._2 // t._2 is a process's events, in order.
-              .dropWhile(_.eventType != EVENT_OPEN)
-              .takeWhile(_.eventType != EVENT_CLOSE)
-              .exists(testEvent => // in the events between OPEN and CLOSE...
-                testEvent.subjectUuid == deleteAfterWriteEvent.subjectUuid && // event by the same process as the UNLINK?
-                  t._2.find(_.eventType == EVENT_CLOSE).exists(closeEvent => // If so, get the CLOSE event and
-                    deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos // test if the UNLINK occurred before the CLOSE
-                  )
-              )
-            )
-          }
-        }.foldLeft(false)(_ || _) // is there a single `true`?
-      } else false): Boolean
+//    m("deletedRightAfterProcessWithOpenNetFlowsWrites") =
+//      (if (fileEventList.exists(_.eventType == EVENT_UNLINK)) {
+//        fileEventList.collect { case writeEvent if writeEvent.eventType == EVENT_WRITE =>
+//          val deleteAfterWriteOpt = fileEventList.find(deleteEvent =>
+//            deleteEvent.eventType == EVENT_UNLINK &&
+//              (deleteEvent.timestampNanos - writeEvent.timestampNanos >= 0) && // delete happened AFTER the write
+//              (deleteEvent.timestampNanos - writeEvent.timestampNanos <= 3e10) // within 30 seconds. This is the interpretation of "right after"
+//          )
+//          deleteAfterWriteOpt.exists { deleteAfterWriteEvent => // IFF we found a Delete after WRITE...
+//            netFlowEventsFromIntersectingProcesses.exists(t => t._2 // t._2 is a process's events, in order.
+//              .dropWhile(_.eventType != EVENT_OPEN)
+//              .takeWhile(_.eventType != EVENT_CLOSE)
+//              .exists(testEvent => // in the events between OPEN and CLOSE...
+//                testEvent.subjectUuid == deleteAfterWriteEvent.subjectUuid && // event by the same process as the UNLINK?
+//                  t._2.find(_.eventType == EVENT_CLOSE).exists(closeEvent => // If so, get the CLOSE event and
+//                    deleteAfterWriteEvent.timestampNanos <= closeEvent.timestampNanos // test if the UNLINK occurred before the CLOSE
+//                  )
+//              )
+//            )
+//          }
+//        }.foldLeft(false)(_ || _) // is there a single `true`?
+//      } else false): Boolean
+    m("deleteSoonAfterWrite") = {
+      val write = fileEventList.find(_.eventType != EVENT_WRITE)
+      val delete = fileEventList.dropWhile(_.eventType != EVENT_WRITE).find(_.eventType == EVENT_UNLINK)
+      val answer = for {
+        w <- write
+        d <- delete
+      } yield (d.timestampNanos - w.timestampNanos) <= 3e10  // within 30 seconds. This is the interpretation of "soon after"
+      answer.getOrElse(false)
+    }
 
-    m("isReadByAProcessWritingToNetFlows") = fileEventList
-      .collect{ case e if e.eventType == EVENT_READ => e.subjectUuid}
-      .flatMap( processUuid =>
-        netFlowEventsFromIntersectingProcesses.toList.map(_._2.exists(ne =>
-          ne.subjectUuid == processUuid &&
-            List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
-        ))
-      ).foldLeft(false)(_ || _)
+//    m("isReadByAProcessWritingToNetFlows") = fileEventList
+//      .collect{ case e if e.eventType == EVENT_READ => e.subjectUuid}
+//      .flatMap( processUuid =>
+//        netFlowEventsFromIntersectingProcesses.toList.map(_._2.exists(ne =>
+//          ne.subjectUuid == processUuid &&
+//            List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE).contains(ne.eventType)
+//        ))
+//      ).foldLeft(false)(_ || _)
     m("isInsideTempDirectory") = fileEventList.flatMap(_.predicateObjectPath).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") )))
     m("execDeleteGapNanos") = fileEventList.timeBetween(Some(EVENT_EXECUTE), Some(EVENT_UNLINK))
     m("attribChangeEventThenExecuteGapNanos") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
@@ -158,21 +176,23 @@ object FileStream {
 
 
     val viewDefinitions = Map(
-      "Downloaded File Execution" -> List("execAfterWriteByNetFlowReadingProcess", "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
-    , "NetFlow-related File Anomaly" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "isInsideTempDirectory")
-    , "File Executed" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", "deletedRightAfterProcessWithOpenNetFlowsWrites", "isInsideTempDirectory", "attribChangeEventThenExecuteGapNanos", "execAfterPermissionChangeToExecutable", "execDeleteGapNanos")
-    , "File MMap Event" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
+      "Downloaded File Execution" -> List(/*"execAfterWriteByNetFlowReadingProcess",*/ "count_EVENT_EXECUTE", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "deletedAfterExec", /*"deletedRightAfterProcessWithOpenNetFlowsWrites",*/ "execAfterPermissionChangeToExecutable", "isInsideTempDirectory")
+    , "NetFlow-related File Anomaly" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", /*"deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows",*/ "isInsideTempDirectory")
+    , "File Executed Stats" -> List("count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_EXECUTE", "count_EVENT_MMAP", "count_EVENT_UNLINK", "deletedAfterExec", /*"deletedRightAfterProcessWithOpenNetFlowsWrites",*/ "isInsideTempDirectory", "attribChangeEventThenExecuteGapNanos", "execAfterPermissionChangeToExecutable", "execDeleteGapNanos")
+    , "File MMap Stats" -> List("count_EVENT_MMAP", "count_EVENT_LSEEK", "count_EVENT_READ", "countDistinctProcessesHaveEventToFile")
     , "File Permission Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_CHECK_FILE_ATTRIBUTES", "count_EVENT_MODIFY_FILE_ATTRIBUTES")
     , "File Modify Event" -> List("attribChangeEventThenExecuteGapNanos", "count_EVENT_DUP", "count_EVENT_MODIFY_FILE_ATTRIBUTES", "count_EVENT_RENAME", "count_EVENT_TRUNCATE", "count_EVENT_UPDATE", "count_EVENT_WRITE", "totalBytesWritten")
-    , "File Affected By NetFlow" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows", "deletedAfterExec", "execAfterWriteByNetFlowReadingProcess")
+//    , "File Affected By NetFlow" -> List(/*"deletedRightAfterProcessWithOpenNetFlowsWrites", "isReadByAProcessWritingToNetFlows",*/ "deletedAfterExec", /*"execAfterWriteByNetFlowReadingProcess"*/)
     , "Exfil Staging File" -> List("count_EVENT_OPEN", "count_EVENT_WRITE", "count_EVENT_READ", "count_EVENT_UNLINK")
 
     // An alarm must have a name beginning with "ALARM", and contain exactly one boolean feature. See the EmitCmd case in anomalyScoreCalculator.
     , "ALARM: Deleted After Exec" -> List("deletedAfterExec")
     , "ALARM: Deleted Immediately After Exec" -> List("deletedRightAfterExec")
-    , "ALARM: Deleted Right After Process With Open NetFlow Writes" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites")
-    , "ALARM: Download Then Execute" -> List("execAfterWriteByNetFlowReadingProcess")
+//    , "ALARM: Deleted Right After Process With Open NetFlow Writes" -> List("deletedRightAfterProcessWithOpenNetFlowsWrites")
+//    , "ALARM: Download Then Execute" -> List("execAfterWriteByNetFlowReadingProcess")
     , "ALARM: Suspicious Name in File Path" -> List("stringsInFilePathOrName")
+    , "ALARM: Exec Soon After Write" -> List("execSoonAfterWrite")
+    , "ALARM: Delete Soon After Write" -> List("deleteSoonAfterWrite")
     )
 
     val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)

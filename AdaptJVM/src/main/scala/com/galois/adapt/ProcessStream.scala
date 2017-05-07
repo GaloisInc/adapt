@@ -18,34 +18,42 @@ object ProcessStream {
     val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
 
     predicateTypeLabeler(commandSource, db)
-      //      .filter(x => List("NetFlowObject", "FileObject", "Subject").contains(x._1))
+      .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
-      .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(UUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(UUID, mutable.SortedSet[Event])])] { () =>
+      .statefulMapConcat[((UUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(FileUUID, mutable.SortedSet[(Event, FileObject)])], Set[(MemoryUUID, mutable.SortedSet[(Event,MemoryObject)])])] { () =>
         var processUuidOpt: Option[UUID] = None
         val eventsToThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
-        //        val allEventsByThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
-        //        val fileUuids = MutableSet.empty[UUID]
-        val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[Event]]
-        //        val netFlowUuids = MutableSet.empty[UUID]
+//        val allEventsByThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
+//        val fileUuids = MutableSet.empty[UUID]
+        val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[(Event, FileObject)]]
+//        val netFlowUuids = MutableSet.empty[UUID]
         val netFlowEvents = MutableMap.empty[NetFlowUUID, mutable.SortedSet[(Event,NetFlowObject)]]
+        val memoryEvents = MutableMap.empty[MemoryUUID, mutable.SortedSet[(Event,MemoryObject)]]
 
         {
           case Tuple4("Subject", uuid: ProcessUUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(uuid)
-            //            if (event.subject == processUuidOpt.get) allEventsByThisProcess += event
+//            if (event.subject == processUuidOpt.get) allEventsByThisProcess += event
             eventsToThisProcess += event
             List.empty
 
-          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdmOpt: CDM17) =>
+          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdm: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
-              (event -> cdmOpt.asInstanceOf[NetFlowObject])
+              (event -> cdm.asInstanceOf[NetFlowObject])
             List.empty
 
-          case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
+          case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, cdm: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-            fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
+            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,MemoryObject)](Ordering.by(_._1.timestampNanos))) +
+              (event -> cdm.asInstanceOf[MemoryObject])
+            List.empty
+
+          case Tuple4("FileObject", uuid: FileUUID, event: Event, cdm: CDM17) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[(Event,FileObject)](Ordering.by(_._1.timestampNanos))) +
+              (event -> cdm.asInstanceOf[FileObject])
             List.empty
 
           case CleanUp =>
@@ -86,7 +94,7 @@ object ProcessStream {
 
             //            eventsToThisProcess ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
 
-            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents.toSet, fileEvents.toSet))
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents.toSet, fileEvents.toSet, memoryEvents.toSet))
         }
       }
       .mergeSubstreams
@@ -97,20 +105,21 @@ object ProcessStream {
 
   val processEventTypes = EventType.values.toList
 
-  val processFeatureExtractor = Flow[((ProcessUUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(FileUUID, mutable.SortedSet[Event])])]
-    .mapConcat[(String, ProcessUUID, MutableMap[String,Any], Set[EventUUID])] { case ((processUuid, eventsDoneToThisProcessSet), netFlowEventSets, fileEventSets) =>
+  val processFeatureExtractor = Flow[((ProcessUUID, mutable.SortedSet[Event]), Set[(NetFlowUUID, mutable.SortedSet[(Event,NetFlowObject)])], Set[(FileUUID, mutable.SortedSet[(Event, FileObject)])], Set[(MemoryUUID, mutable.SortedSet[(Event,MemoryObject)])])]
+    .mapConcat[(String, ProcessUUID, MutableMap[String,Any], Set[EventUUID])] { case ((processUuid, eventsDoneToThisProcessSet), netFlowEventSets, fileEventSets, memoryEventSets) =>
     val eventsDoneToThisProcessList = eventsDoneToThisProcessSet.toList
-    val processEventSet: mutable.SortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++ fileEventSets.flatMap(_._2)
-    val processEventList: List[Event] = processEventSet.toList
+    val allProcessEventSet: mutable.SortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++ fileEventSets.flatMap(_._2.map(_._1)) ++ memoryEventSets.flatMap(_._2.map(_._1))
+    val allProcessEventList: List[Event] = allProcessEventSet.toList
 
     var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+
 
     val m = MutableMap.empty[String, Any]
     //      m("countOfImmediateChildProcesses") = "TODO"                                        // TODO: needs process tree
     //      m("countOfAllChildProcessesInTree") = "TODO"                                        // TODO: needs process tree
     //      m("countOfUniquePortAccesses") = "TODO"                                             // TODO: needs pairing with NetFlows —— not just events!
     // TODO: consider emitting the collected Process Tree
-    m("countOfDistinctMemoryObjectsMProtected") = processEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
+    m("countOfDistinctMemoryObjectsMProtected") = allProcessEventSet.collect { case e if e.eventType == EVENT_MPROTECT && e.predicateObject.isDefined => e.predicateObject }.size
     //      m("isProcessRunning_cmd.exe_or-powershell.exe_whileParentRunsAnotherExe") = "TODO"  // TODO: needs process tree
     m("countOfAllConnect+AcceptEventsToPorts22or443") =
       netFlowEventSets.toList.map(s => s._2.toList.collect{
@@ -128,19 +137,19 @@ object ProcessStream {
       _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
     ).toList.sorted.headOption.exists(netFlowReadTime =>
       fileEventSets.exists(
-        _._2.dropWhile(write =>
+        _._2.map(_._1).dropWhile(write =>
           write.eventType != EVENT_WRITE && write.timestampNanos > netFlowReadTime
         ).exists(ex => ex.eventType == EVENT_EXECUTE)
       )
     ): Boolean
 
-    m("changesFilePermissionsThenExecutesIt") = processEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE): Boolean
-    m("executedThenImmediatelyDeletedAFile") = processEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.timestampNanos).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)): Boolean
+    m("changesFilePermissionsThenExecutesIt") = allProcessEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE): Boolean
+    m("executedThenImmediatelyDeletedAFile") = allProcessEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.timestampNanos).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)): Boolean
     m("readFromNetFlowThenDeletedFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
       _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
     ).toList.sorted.headOption.exists(netFlowReadTime =>
       fileEventSets.exists(
-        _._2.exists(delete =>
+        _._2.map(_._1).exists(delete =>
           delete.eventType != EVENT_UNLINK && delete.timestampNanos > netFlowReadTime
         )
       )
@@ -148,34 +157,32 @@ object ProcessStream {
 
     // TODO: consider: process takes any local action after reading from NetFlow
 
-    m("countOfDistinctFileWrites") = processEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
+    m("countOfDistinctFileWrites") = allProcessEventSet.collect { case e if e.eventType == EVENT_WRITE && e.predicateObject.isDefined => e.predicateObject }.size
     //      m("countOfFileUploads") = "TODO"                                                    // TODO: needs pairing with Files (to ensure reads are from Files)
     //      m("countOfFileDownloads") = "TODO"                                                  // TODO: needs pairing with Files (to ensure writes are to Files)
-    m("isAccessingTempDirectory") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") ) ))  // TODO: revisit the list of temp locations.
+    m("isAccessingTempDirectory") = allProcessEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path).flatten).exists(path => List("/tmp", "/temp", "\\temp").exists(tmp => path.toLowerCase.contains(tmp) || (path.toLowerCase.startsWith("c:\\") && ! path.drop(3).contains("\\") ) ))  // TODO: revisit the list of temp locations.
     m("thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_CHANGE_PRINCIPAL): Boolean
     m("thisProcessIsTheObjectOfAMODIFY_PROCESSEvent") = eventsDoneToThisProcessList.exists(e => e.eventType == EVENT_MODIFY_PROCESS)
-    m("totalBytesSentToNetFlows") = processEventList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
-    m("totalBytesReceivedFromNetFlows") = processEventList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
+    m("totalBytesSentToNetFlows") = allProcessEventList.collect { case e if e.eventType == EVENT_SENDTO => e.size.getOrElse(0L)}.sum
+    m("totalBytesReceivedFromNetFlows") = allProcessEventList.collect { case e if e.eventType == EVENT_RECVFROM => e.size.getOrElse(0L)}.sum
 
-    m("commandLineStringOfInterest") = processEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path, e.name).flatten).exists(path =>
-      List("putfile", "getfile", "execfile", "shell", "elevate", "refload", "screengrab", "netrecon", "recordaudio", "imagegrab", "keylogger", "kudu", "dropper", "dropbear").exists(name => path.toLowerCase.contains(name) || (path.toLowerCase.contains("git") && path.toLowerCase.contains("commit")))
+    m("commandLineStringOfInterest") = allProcessEventList.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path, e.name).flatten).exists(path =>
+      List("putfile", "getfile", "execfile", "shell", "elevate", "refload", "screengrab", "netrecon", "recordaudio", "imagegrab",
+        "keylogger", "kudu", "dropper", "dropbear", "net.exe", "ipconfig", "ifconfig", "netstat", "nmap", "whoami", "hostname", "powershell.exe", "cmd.exe")
+        .exists(name => path.toLowerCase.contains(name) || (path.toLowerCase.contains("git") && path.toLowerCase.contains("commit")))
     ): Boolean
 
-    m("mProtectWithAcceptOrConnect") = processEventSet.exists(_.eventType == EVENT_MPROTECT) &&
-      processEventSet.exists(e => e.eventType == EVENT_ACCEPT || e.eventType == EVENT_CONNECT)
+    m("mProtectWithAcceptOrConnect") = allProcessEventSet.exists(_.eventType == EVENT_MPROTECT) &&
+      allProcessEventSet.exists(e => e.eventType == EVENT_ACCEPT || e.eventType == EVENT_CONNECT)
 
-    m("powershellAndInboundNetflow") = processEventSet.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path, e.name).flatten).exists(path =>
+    m("powershellAndInboundNetflow") = allProcessEventSet.flatMap(e => List(e.predicateObjectPath, e.predicateObject2Path, e.name).flatten).exists(path =>
       path.toLowerCase.contains("powershell")
-    ) && processEventSet.exists(e => List(EVENT_ACCEPT, EVENT_RECVMSG, EVENT_RECVFROM).contains(e.eventType))
+    ) && allProcessEventSet.exists(e => List(EVENT_ACCEPT, EVENT_RECVMSG, EVENT_RECVFROM).contains(e.eventType))
 
-    m("totalUniqueCheckFileEvents") = processEventSet.filter(_.eventType == EVENT_CHECK_FILE_ATTRIBUTES).flatMap(_.predicateObject).size
+    m("totalUniqueCheckFileEvents") = allProcessEventSet.filter(_.eventType == EVENT_CHECK_FILE_ATTRIBUTES).flatMap(_.predicateObject).size
     processEventTypes.foreach( t =>
-      m("count_"+ t.toString) = processEventSet.count(_.eventType == t)
+      m("count_"+ t.toString) = allProcessEventSet.count(_.eventType == t)
     )
-
-    // TODO: alarms: "executedThenImmediatelyDeletedAFile", "readsFromNetFlowThenWritesAFileThenExecutesTheFile", "changesFilePermissionsThenExecutesIt", "thisProcessIsTheObjectOfACHANGE_PRINCIPALEvent", others?
-    // todo: alarms for executing: net.exe, ipconfig.exe,  netstat.exe, nmap, whoami.exe, hostname.exe, powershell.exe, cmd.exe
-    // todo: alarm for opening a file with the substring: 'git' and 'commit'
 
     val viewDefinitions = Map(
       "Process Exec from Network" -> List("count_EVENT_EXECUTE", "readsFromNetFlowThenWritesAFileThenExecutesTheFile","executedThenImmediatelyDeletedAFile", "changesFilePermissionsThenExecutesIt")

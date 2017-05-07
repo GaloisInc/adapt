@@ -13,7 +13,6 @@ object NetFlowStream {
 
   val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_CLOSE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
 
-
   def netFlowFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) =
     predicateTypeLabeler(commandSource, db)
       .collect{ case Tuple4("NetFlowObject", predUuid, event, netFlow: CDM17) => (predUuid, event, netFlow) }
