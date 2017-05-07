@@ -27,6 +27,9 @@ package object cdm17 {
   type SubjectType           = toplevel.SubjectType
   type TCCDMDataProtocol     = toplevel.TCCDMDataProtocol
   type TCCDMDatum            = toplevel.TCCDMDatum
+  type TheiaQuery            = toplevel.TheiaQuery
+  type TheiaQueryResult      = toplevel.TheiaQueryResult
+  type TheiaQueryType        = toplevel.TheiaQueryType
   type TagOpCode             = toplevel.TagOpCode
   type TagRunLengthTuple     = toplevel.TagRunLengthTuple
   type TimeMarker            = toplevel.TimeMarker
