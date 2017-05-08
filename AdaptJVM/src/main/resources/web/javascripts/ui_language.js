@@ -111,7 +111,7 @@ var node_appearance = [
             var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
             // var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "None")
             // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
-            return type + "\n#" + sequence
+            return type + "\n# " + sequence
         }
    }, {
         name : "SrcSink",

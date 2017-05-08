@@ -187,7 +187,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
 
     case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
       savedNotes += msg
-      new PrintWriter("/Users/ryan/Desktop/notes.json") { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
+      new PrintWriter(config.getString("adapt.notesfile")) { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
       sender() ! Success(())
 
     case GetNotes(uuids) =>
