@@ -27,7 +27,7 @@ class ServiceRegistry extends PersistentActor with ActorLogging {
   log.info(s"ServiceRegistry created")
 
   override val persistenceId: String = ServiceRegistry.identity
-  val clusterName = Application.config.getString("adapt.name")
+  val clusterName = Application.config.getString("adapt.systemname")
 
   def recordSubscriberPublisher(subpub: AddSubscriberPublisher): Unit = {
     subscribersPublishers += subpub.subscriberPublisher

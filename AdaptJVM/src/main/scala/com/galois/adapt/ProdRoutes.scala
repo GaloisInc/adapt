@@ -31,7 +31,7 @@ object ProdRoutes {
     }
 
 
-  implicit val timeout = Timeout(20 seconds)
+  implicit val timeout = Timeout(30 seconds)
 
   def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
     val qType = query match {
@@ -39,7 +39,7 @@ object ProdRoutes {
       case _: EdgeQuery   => "edge"
       case _: StringQuery => "generic"
     }
-    println(s"Got $qType query: ${query.query}")
+//    println(s"Got $qType query: ${query.query}")
     val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
       //      println("returning...")
       val toReturn = s match {
@@ -119,7 +119,6 @@ object ProdRoutes {
         pathPrefix("saveNotes") {
           formFieldMap { fields =>
             complete {
-              //              println(fields)
               val notes = fields.getOrElse("notes", "").replaceAll(""""""","")
               val keyUuid = UUID.fromString(fields("keyUuid"))
               val rating = fields("rating").toInt
@@ -157,7 +156,7 @@ object ProdRoutes {
                 val pair = `k:v`.split(":")
                 if (pair.length == 2) anomalyActor ! SetWeight(pair(0), pair(1).toDouble)
               }
-              //              redirect(Uri("/"), StatusCodes.TemporaryRedirect)
+//              redirect(Uri("/"), StatusCodes.TemporaryRedirect)
               "OK"
             }
           }
@@ -193,7 +192,6 @@ object ProdRoutes {
               println(s"getting edges for nodes: $nodeListString")
               val idList = nodeListString.split(",").map(_.toInt)
               val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
-                //                println("returning...")
                 HttpEntity(ContentTypes.`application/json`, s.get)
               }
               complete(futureResponse)
@@ -211,7 +209,7 @@ object ProdRoutes {
   def convertToJsonTheHardWay(anomalyMap: Map[UUID, Map[String, (Double, Set[UUID])]]): String =    // Bad programmer! You know better than this. You should be ashamed of yourself.
     anomalyMap.mapValues(inner => inner.mapValues(t => s"""{"score":${t._1},"subgraph":${t._2.toList.map(u => s""""$u"""").mkString("[",",","]")}}""").map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")  ).map(t => s""""${t._1}":${t._2}""").mkString("{",",","}")
 
-  def convertToJsonTheOtherHardWay(anomalyList: List[(UUID, Map[String, (Double, Set[UUID])])]): String = {   // Bad programmer! You know better than this. You should be ashamed of yourself.
+  def convertToJsonTheOtherHardWay(anomalyList: List[(UUID, Map[String, (Double, Set[UUID])])]): String = {   // Didn't I already tell you shouldn't be doing this...?!
     anomalyList.map(anom => s"""{"${anom._1}":${anom._2.map(x => s""""${x._1}":{"score":${x._2._1},"subgraph":${x._2._2.map(u => s""""$u"""").mkString("[",",","]")}}""").mkString("{",",","}")}}""").mkString("[",",","]")
   }
 

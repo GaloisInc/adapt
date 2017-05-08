@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{CDM17, RawCDM17Type, TimeMarker}
+import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
@@ -25,7 +25,7 @@ import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
-
+import collection.JavaConverters._
 import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.Random
@@ -69,12 +69,6 @@ object ProductionApp extends App {
 
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
-    // Flow only consumes and writes to Titan
-//    Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writes", 1000)), TitanFlowComponents.titanWrites())
-
-    // Flow calculates all streaming results.
-//    Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Combined", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
-
     val combined = RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
       import GraphDSL.Implicits._
       val bcast = graph.add(Broadcast[CDM17](2))
@@ -88,7 +82,7 @@ object ProductionApp extends App {
 
     config.getString("adapt.runflow") match {
       case "database" | "db" =>
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writes", 1000)), TitanFlowComponents.titanWrites())
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
       case "anomalies" | "anomaly" =>
         Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
       case _ => combined.run()
@@ -121,20 +115,20 @@ object CDMSource {
       case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
       case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17").merge(kafkaSource(s"ta1-theia-$scenario-qr"))
       case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
-      case "kafkaTest"      => kafkaSource("kafkaTest").throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+      case "kafkaTest"      => kafkaSource("kafkaTest") //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
-        val path = "/Users/ryan/Desktop/ta1-fivedirections-bovia-cdm17.bin" //ta1-trace-cdm17.bin" // ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" //
+        val path = config.getStringList("adapt.loadfiles").asScala.head // "/Users/ryan/Desktop/ta1-fivedirections-bovia-cdm17.bin" //ta1-trace-cdm17.bin" // ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" //
         Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 //          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 //          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-          .via(FlowComponents.printCounter("CDM Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+          .via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 
 
   private def kafkaSource(ta1Topic: String): Source[CDM17, NotUsed] = Consumer.committableSource(
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-    Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = 0L)
+    Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
   ).map { msg =>
     val bais = new ByteArrayInputStream(msg.record.value())
     val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
@@ -144,7 +138,10 @@ object CDMSource {
     msg.committableOffset.commitScaladsl()
     cdm
   }.map(CDM17.parse)
-  .map(_.get).asInstanceOf[Source[CDM17, NotUsed]]   // TODO: handle errors!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  .mapConcat(c => if (c.isSuccess) List(c.get) else {
+    println(s"Failed to parse CDM statement: $c")
+    List.empty
+  }).asInstanceOf[Source[CDM17, NotUsed]]
 }
 
 

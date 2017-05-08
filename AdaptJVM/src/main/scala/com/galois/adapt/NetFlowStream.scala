@@ -55,12 +55,12 @@ object NetFlowStream {
     , "Netflow Write Stats" -> List("lifetimeWriteRateBytesPerSecond", "totalBytesWritten", "count_EVENT_SENDMSG", "count_EVENT_SENDTO", "count_EVENT_WRITE")
     , "Netflow Read Stats" -> List("lifetimeReadRateBytesPerSecond", "totalBytesRead", "count_EVENT_READ", "count_EVENT_RECVFROM", "count_EVENT_RECVMSG")
     , "Beaconing Behavior" -> List("stdDevBetweenNetFlowWrites", "duration-SecondsBetweenFirstAndLastEvent", "averageWriteSize")
-    //    , "ALARM: Port 1337" -> List()
+//    , "ALARM: Port 1337" -> List()
     )
 
     // TODO: remove
-    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-    if (!req) println("WARNING: " + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => !x._2))
+//    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+//    if (!req) println("WARNING: " + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => !x._2))
 
     viewDefinitions.toList.map { case (name, columnList) =>
       (name, netFlowUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)

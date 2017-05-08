@@ -29,7 +29,7 @@ trait ServiceClient extends BaseActorBehavior with ReportsStatus { s: Actor with
 
   lazy val dependencyMap: MutableMap[String, Option[ActorRef]] = MutableMap(dependencies.map(_ -> None):_*)
   
-  val clusterName = Application.config.getString("adapt.name")
+  val clusterName = Application.config.getString("adapt.systemname")
 
   private def startIfReady() = {
     val depsSatisfied = dependencyMap forall (_._2.isDefined)

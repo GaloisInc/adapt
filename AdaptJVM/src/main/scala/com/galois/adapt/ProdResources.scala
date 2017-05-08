@@ -94,7 +94,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       }
 
     case MakeExpansionQueries =>
-      println(s"Expansion Query Q: $queryQueue")
+//      println(s"Expansion Query Q: $queryQueue")
         queryQueue.lastOption.foreach { startUuid =>
           queryQueue = queryQueue.take(queryQueue.length - 1)
           implicit val timeout = Timeout(10 seconds)

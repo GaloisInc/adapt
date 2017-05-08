@@ -18,7 +18,6 @@ import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
-import ch.qos.logback.classic.LoggerContext
 import org.mapdb.{DB, DBMaker, HTreeMap}
 import collection.JavaConverters._
 import scala.collection.mutable
@@ -41,61 +40,61 @@ import com.typesafe.config.ConfigFactory
 
 object FlowComponents {
 
-  sealed trait EventsKey
-  case object PredicateObjectKey extends EventsKey
-  case class SubjectKey(t: Option[EventType]) extends EventsKey
+//  sealed trait EventsKey
+//  case object PredicateObjectKey extends EventsKey
+//  case class SubjectKey(t: Option[EventType]) extends EventsKey
 
 
-  def eventsGroupedByKey(commandSource: Source[ProcessingCommand, _], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]], key: EventsKey) = {
-    val keyPredicate = key match {
-      case PredicateObjectKey => Flow[CDM17]
-        .collect { case e: Event if e.predicateObject.isDefined => e }
-        .mapConcat(e =>
-          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
-          else List((e.predicateObject.get, e)))
-      case SubjectKey(Some(t)) => Flow[CDM17]
-        .collect { case e: Event if e.eventType == t => e.subjectUuid -> e }
-      case SubjectKey(None) => Flow[CDM17]
-        .collect { case e: Event => e.subjectUuid -> e }
-    }
-    keyPredicate
-      .filter(_._2.timestampNanos != 0L)
-      .filterNot { tup =>
-        val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
-        excluded.contains(tup._1)
-      } // TODO: why are there these special cases?!?!?!?!?
-      .groupBy(Int.MaxValue, _._1) // TODO: Limited to ~4 billion unique UUIDs!!!
-      .merge(commandSource)
-      .statefulMapConcat { () =>
-        var uuid: Option[UUID] = None
-        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
-
-        {
-          case EmitCmd =>
-            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-            existingSet ++= events
-            dbMap.put(uuid.get, existingSet)
-            events.clear()
-            List(uuid.get -> existingSet)
-
-          case CleanUp =>
-            if (events.nonEmpty) {
-              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-              existingSet ++= events
-              dbMap.put(uuid.get, existingSet)
-              events.clear()
-            }
-            List.empty
-
-          case Tuple2(u: UUID, e: Event) =>
-            if (uuid.isEmpty) uuid = Some(u)
-            //            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
-            //            dbMap.put(u, emptySet)
-            events += e
-            List.empty
-        }
-      }
-  }
+//  def eventsGroupedByKey(commandSource: Source[ProcessingCommand, _], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]], key: EventsKey) = {
+//    val keyPredicate = key match {
+//      case PredicateObjectKey => Flow[CDM17]
+//        .collect { case e: Event if e.predicateObject.isDefined => e }
+//        .mapConcat(e =>
+//          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
+//          else List((e.predicateObject.get, e)))
+//      case SubjectKey(Some(t)) => Flow[CDM17]
+//        .collect { case e: Event if e.eventType == t => e.subjectUuid -> e }
+//      case SubjectKey(None) => Flow[CDM17]
+//        .collect { case e: Event => e.subjectUuid -> e }
+//    }
+//    keyPredicate
+//      .filterNot(_._2.timestampNanos == 0L)
+//      .filterNot { tup =>
+//        val excluded = List("00000000-0000-0000-0000-000000000000"/*, "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e"*/).map(UUID.fromString)
+//        excluded.contains(tup._1)
+//      } // TODO: why are there these special cases?!?!?!?!?
+//      .groupBy(Int.MaxValue, _._1) // TODO: Limited to ~4 billion unique UUIDs!!!
+//      .merge(commandSource)
+//      .statefulMapConcat { () =>
+//        var uuid: Option[UUID] = None
+//        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
+//
+//        {
+//          case EmitCmd =>
+//            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+//            existingSet ++= events
+//            dbMap.put(uuid.get, existingSet)
+//            events.clear()
+//            List(uuid.get -> existingSet)
+//
+//          case CleanUp =>
+//            if (events.nonEmpty) {
+//              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+//              existingSet ++= events
+//              dbMap.put(uuid.get, existingSet)
+//              events.clear()
+//            }
+//            List.empty
+//
+//          case Tuple2(u: UUID, e: Event) =>
+//            if (uuid.isEmpty) uuid = Some(u)
+////            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
+////            dbMap.put(u, emptySet)
+//            events += e
+//            List.empty
+//        }
+//      }
+//  }
 
 
   def sortedEventAccumulator[K](groupBy: ((UUID,Event,CDM17)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
@@ -138,19 +137,14 @@ object FlowComponents {
     val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
     Flow[CDM17]
       .mapConcat[(UUID, String, CDM17)] {
-        case e: Event if e.predicateObject.isDefined =>
+        case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER =>    // Throw away all EVENT_OTHERs
           if (e.predicateObject2.isDefined) List((e.predicateObject.get, "Event", e), (e.predicateObject2.get, "Event", e))
           else List((e.predicateObject.get, "Event", e))
         case n: NetFlowObject => List((n.uuid, "NetFlowObject", n))
         case f: FileObject => List((f.uuid, "FileObject", f))
         case s: Subject => List((s.uuid, "Subject", s))
-        case _ => List.empty }
 //        case msg @ => List(msg) }
-      .filterNot {
-        case (uuid, e, _) =>
-          val excluded = List("00000000-0000-0000-0000-000000000000", "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e").map(UUID.fromString)
-          excluded.contains(uuid) // TODO: why are there these special cases in cadets data?!?!?!?!?
-        case _ => false }
+        case _ => List.empty }
       .groupBy(Int.MaxValue, _._1)
       .merge(commandSource)
       .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
@@ -265,12 +259,12 @@ object FlowComponents {
             }
           } else {
             val randomNum = Random.nextLong()
-            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
-            val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
-            //          val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-            //          val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
-            inputFile.deleteOnExit()
-            outputFile.deleteOnExit()
+//            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+//            val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+            val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+//            inputFile.deleteOnExit()
+//            outputFile.deleteOnExit()
             val writer: FileWriter = new FileWriter(inputFile)
             writer.write(headerOpt.get)
             matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
@@ -290,32 +284,35 @@ object FlowComponents {
               case Failure(e) => println(s"AD failure: $randomNum"); e.printStackTrace()
             }
 
-            //          val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
-            //          val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
-            //          normalizedFile.createNewFile()
-            //          normalizedFile.deleteOnExit()
+//          val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
+//          val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
+//          normalizedFile.createNewFile()
+//          normalizedFile.deleteOnExit()
 
-            //          val normalizationCommand = Seq(
-            //            "Rscript",
-            //            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
-            //            "-i", outputFile.getCanonicalPath,       // input file
-            //            "-o", normalizedFile.getCanonicalPath)   // output file
-            //
-            //          val normResultTry = Try(normalizationCommand.!!) match {
-            //            case Success(output) => println(s"Normalization output: $randomNum\n$output")
-            //            case Failure(e)      => e.printStackTrace()
-            //          }
+//          val normalizationCommand = Seq(
+//            "Rscript",
+//            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
+//            "-i", outputFile.getCanonicalPath,       // input file
+//            "-o", normalizedFile.getCanonicalPath)   // output file
+//
+//          val normResultTry = Try(normalizationCommand.!!) match {
+//            case Success(output) => println(s"Normalization output: $randomNum\n$output")
+//            case Failure(e)      => e.printStackTrace()
+//          }
 
 
             //          val fileLines = FileSource.fromFile(normalizedFile).getLines()
             val fileLines = FileSource.fromFile(outputFile).getLines()
             if (fileLines.hasNext) fileLines.next() // Throw away the header row
-            fileLines
+            val toSend = fileLines
               .toSeq.map { l =>
               val columns = l.split(",")
               val uuid = UUID.fromString(columns.head)
               (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
             }.toList
+            inputFile.delete()
+            outputFile.delete()
+            toSend
           }
       }
     }
@@ -345,20 +342,20 @@ object FlowComponents {
   )
 
 
-  def kafkaSource(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = Source.fromGraph(
-    GraphDSL.create() { implicit graph =>
-      val kafkaSource = Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
-        val bais = new ByteArrayInputStream(msg.record.value())
-        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
-        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
-        val cdm = new RawCDM17Type(elem.getDatum)
-        msg.committableOffset.commitScaladsl()
-        cdm
-      }.map(CDM17.parse)
-      SourceShape(kafkaSource.shape.out)
-    }
-  )
+//  def kafkaSource(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = Source.fromGraph(
+//    GraphDSL.create() { implicit graph =>
+//      val kafkaSource = Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
+//        val bais = new ByteArrayInputStream(msg.record.value())
+//        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+//        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+//        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+//        val cdm = new RawCDM17Type(elem.getDatum)
+//        msg.committableOffset.commitScaladsl()
+//        cdm
+//      }.map(CDM17.parse)
+//      SourceShape(kafkaSource.shape.out)
+//    }
+//  )
 
 
   type MilliSeconds = Long
@@ -390,281 +387,281 @@ case object CleanUp extends ProcessingCommand
 
 
 
-object TestGraph extends App {
-  implicit val system = ActorSystem("test")
-  implicit val ec = system.dispatcher
-  implicit val mat = ActorMaterializer()
-
-
-  val path = "/Users/erin/Documents/proj/adapt/git/adapt/data/ta1-theia-bovia-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
-  val data = CDM17.readData(path, None).get._2.map(_.get)
-  val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
-//    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
-//    .via(Streams.titanWrites(graph))
-
-  println("Total CDM statements: " + data.length)
-
-
-//  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
-//  val fastCommandSource = Source.tick[ProcessingCommand](6 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-//    .merge(Source.tick[ProcessingCommand](20 seconds, 20 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
-////    .via(FlowComponents.printCounter("Command Source", 1))
+//object TestGraph extends App {
+//  implicit val system = ActorSystem("test")
+//  implicit val ec = system.dispatcher
+//  implicit val mat = ActorMaterializer()
 //
-//  val slowCommandSource = Source.tick[ProcessingCommand](30 seconds, 30 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
-//    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
-
-
-  val dbFilePath = "/tmp/map.db"
-  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
-  new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
-
-
-//  TitanFlowComponents.titanWrites(TitanFlowComponents.graph)
-//    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
-
-//  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
-
-//  FlowComponents.fileFeatureGenerator(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
-
-
-
-//  Flow[CDM17].collect{ case e: Event => e }.groupBy(Int.MaxValue, _.toString).mergeSubstreams.via(FlowComponents.printCounter[Event]("Event counter", 100)).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.ignore)
-
-
-
-  // Print out all unique property/edge keys and their corresponding types. Should be done for all 6 TA1 teams in the same source!
-//  source.statefulMapConcat{ () =>
-//    val seen = mutable.Set.empty[String];
-//    { case d: DBNodeable =>
-//      val keys: List[String] = (d.asDBKeyValues.grouped(2).map(t => t.head.toString + " : " + t(1).getClass.getCanonicalName) ++ d.asDBEdges.map(_._1 + " : -[Edge]->")).toList
-//      val newOnes = keys.filter(s => !seen.contains(s))
-//      newOnes.map { n => seen += n; n } }
-//  }.recover{ case e: Throwable => e.printStackTrace() }.runForeach(println)
-
-
-    Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
-
-
-
-
-
-  //  FlowComponents.normalizedScores(db).statefulMapConcat { () =>
-//    val rankedPendingQueries = mutable.SortedSet.empty[(String, UUID, Double)](Ordering.by(1D - _._3))
 //
-//    {
-//      case msg @ ("File", _, _) => List.empty
-//      case msg @ ("NetFlow", _, _) => List.empty
-//      case msg @ ("Process", _, _) => List.empty
+//  val path = "/Users/erin/Documents/proj/adapt/git/adapt/data/ta1-theia-bovia-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+//  val data = CDM17.readData(path, None).get._2.map(_.get)
+//  val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
+////    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
+////    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
+//    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+////    .via(Streams.titanWrites(graph))
+//
+//  println("Total CDM statements: " + data.length)
+//
+//
+////  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
+////  val fastCommandSource = Source.tick[ProcessingCommand](6 seconds, 6 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+////    .merge(Source.tick[ProcessingCommand](20 seconds, 20 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+//////    .via(FlowComponents.printCounter("Command Source", 1))
+////
+////  val slowCommandSource = Source.tick[ProcessingCommand](30 seconds, 30 seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
+////    .merge(Source.tick[ProcessingCommand](50 seconds, 50 seconds, Emit).buffer(1, OverflowStrategy.backpressure))
+//
+//
+//  val dbFilePath = "/tmp/map.db"
+//  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+//  new File(dbFilePath).deleteOnExit()  // Only meant as ephemeral on-disk storage.
+//
+//
+////  TitanFlowComponents.titanWrites(TitanFlowComponents.graph)
+////    .runWith(source.via(FlowComponents.printCounter("titan write count", 1)), Sink.ignore)
+//
+////  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netFlowFeatures.csv"))
+//
+////  FlowComponents.fileFeatureGenerator(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+//
+//
+//
+////  Flow[CDM17].collect{ case e: Event => e }.groupBy(Int.MaxValue, _.toString).mergeSubstreams.via(FlowComponents.printCounter[Event]("Event counter", 100)).recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.ignore)
+//
+//
+//
+//  // Print out all unique property/edge keys and their corresponding types. Should be done for all 6 TA1 teams in the same source!
+////  source.statefulMapConcat{ () =>
+////    val seen = mutable.Set.empty[String];
+////    { case d: DBNodeable =>
+////      val keys: List[String] = (d.asDBKeyValues.grouped(2).map(t => t.head.toString + " : " + t(1).getClass.getCanonicalName) ++ d.asDBEdges.map(_._1 + " : -[Edge]->")).toList
+////      val newOnes = keys.filter(s => !seen.contains(s))
+////      newOnes.map { n => seen += n; n } }
+////  }.recover{ case e: Throwable => e.printStackTrace() }.runForeach(println)
+//
+//
+//    Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
+//
+//
+//
+//
+//
+//  //  FlowComponents.normalizedScores(db).statefulMapConcat { () =>
+////    val rankedPendingQueries = mutable.SortedSet.empty[(String, UUID, Double)](Ordering.by(1D - _._3))
+////
+////    {
+////      case msg @ ("File", _, _) => List.empty
+////      case msg @ ("NetFlow", _, _) => List.empty
+////      case msg @ ("Process", _, _) => List.empty
+////    }
+////  }.recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.foreach(println))
+//
+//
+////      .recover{ case e: Throwable => e.printStackTrace() } ~> printSink
+//
+////    FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db)
+////      .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+////      .runWith(source, printSink)
+//
+////  FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db)
+////    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+////    .recover{ case e: Throwable => e.printStackTrace() }
+////    .runWith(source, printSink)
+//
+////  FlowComponents.fileFeatureGenerator(fastCommandSource, db)
+////    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+////    .recover{ case e: Throwable => e.printStackTrace() }
+////    .runWith(source, printSink)
+//
+//
+////  FlowComponents.processFeatureGenerator(fastCommandSource, db)
+////    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
+////    .recover{ case e: Throwable => e.printStackTrace() }
+////    .runWith(source.take(3000000), printSink)
+//
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
+//
+////  FlowComponents.testFileFeatureExtractor(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+////
+//
+//
+//
+//
+////  FlowComponents.testFileFeatureExtractor(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+//
+////  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
+//
+////  FlowComponents.testProcessFeatureExtractor(commandSource, db)
+////    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
+//
+////  FlowComponents.test(commandSource, db).runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures9000.csv"))
+//
+//
+//
+////  FlowComponents.normalizedScores(db, 2, 4, 8, 20)
+////    .via(Flow.fromGraph(QueryCollector(0.5D, 10000)))
+////    .throttle(1, 2 seconds, 1, ThrottleMode.shaping)
+////    .recover { case e: Throwable => e.printStackTrace() }
+////    .runWith(source, Sink.foreach(println))
+//
+//}
+
+
+//object KafkaStreams {
+//
+//  //  val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
+//
+//  def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
+//    GraphDSL.create(){ implicit graph =>
+//      //      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
+//      Source.fromIterator(() => CDM17.readAvroAsTCCDMDatum(file)).map(elem => {
+//        val baos = new ByteArrayOutputStream
+//        val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+//        val encoder = EncoderFactory.get.binaryEncoder(baos, null)
+//        writer.write(elem, encoder)
+//        encoder.flush()
+//        baos.toByteArray
+//      }).map(elem => new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)) ~> Producer.plainSink(producerSettings)
+//
+//      ClosedShape
 //    }
-//  }.recover{ case e: Throwable => e.printStackTrace()}.runWith(source, Sink.foreach(println))
-
-
-//      .recover{ case e: Throwable => e.printStackTrace() } ~> printSink
-
-//    FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db)
-//      .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
-//      .runWith(source, printSink)
-
-//  FlowComponents.testNetFlowFeatureExtractor(fastCommandSource, db)
-//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
-//    .recover{ case e: Throwable => e.printStackTrace() }
-//    .runWith(source, printSink)
-
-//  FlowComponents.fileFeatureGenerator(fastCommandSource, db)
-//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
-//    .recover{ case e: Throwable => e.printStackTrace() }
-//    .runWith(source, printSink)
-
-
-//  FlowComponents.processFeatureGenerator(fastCommandSource, db)
-//    .via(FlowComponents.anomalyScoreCalculator(slowCommandSource))
-//    .recover{ case e: Throwable => e.printStackTrace() }
-//    .runWith(source.take(3000000), printSink)
-
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
-
-//  FlowComponents.testFileFeatureExtractor(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
+//  )
 //
+//  def kafkaIngest(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
+//    GraphDSL.create() { implicit graph =>
+//      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
+//        val bais = new ByteArrayInputStream(msg.record.value())
+//        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+//        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+//        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+//        val cdm = new RawCDM17Type(elem.getDatum)
+//        msg.committableOffset.commitScaladsl()
+//        cdm
+//      }.map(CDM17.parse) ~> Sink.foreach[Try[CDM17]](x => println(s"kafka ingest end of the line for: $x")) //.map(println) ~> Sink.ignore
+//      ClosedShape
+//    }
+//  )
+//}
 
 
-
-
-//  FlowComponents.testFileFeatureExtractor(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/fileFeatures.csv"))
-
-//  FlowComponents.testNetFlowFeatureExtractor(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures.csv"))
-
-//  FlowComponents.testProcessFeatureExtractor(commandSource, db)
-//    .runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/processFeatures.csv"))
-
-//  FlowComponents.test(commandSource, db).runWith(source, FlowComponents.csvFileSink("/Users/ryan/Desktop/netflowFeatures9000.csv"))
-
-
-
-//  FlowComponents.normalizedScores(db, 2, 4, 8, 20)
-//    .via(Flow.fromGraph(QueryCollector(0.5D, 10000)))
-//    .throttle(1, 2 seconds, 1, ThrottleMode.shaping)
-//    .recover { case e: Throwable => e.printStackTrace() }
-//    .runWith(source, Sink.foreach(println))
-
-}
-
-
-object KafkaStreams {
-
-  //  val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
-
-  def kafkaProducer(file: String, producerSettings: ProducerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
-    GraphDSL.create(){ implicit graph =>
-      //      val datums: Iterator[com.bbn.tc.schema.avro.cdm17.TCCDMDatum] = CDM17.readAvroAsTCCDMDatum(file)
-      Source.fromIterator(() => CDM17.readAvroAsTCCDMDatum(file)).map(elem => {
-        val baos = new ByteArrayOutputStream
-        val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
-        val encoder = EncoderFactory.get.binaryEncoder(baos, null)
-        writer.write(elem, encoder)
-        encoder.flush()
-        baos.toByteArray
-      }).map(elem => new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)) ~> Producer.plainSink(producerSettings)
-
-      ClosedShape
-    }
-  )
-
-  def kafkaIngest(consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]], topic: String) = RunnableGraph.fromGraph(
-    GraphDSL.create() { implicit graph =>
-      Consumer.committableSource(consumerSettings, Subscriptions.topics(topic)).map{ msg =>
-        val bais = new ByteArrayInputStream(msg.record.value())
-        val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
-        val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
-        val cdm = new RawCDM17Type(elem.getDatum)
-        msg.committableOffset.commitScaladsl()
-        cdm
-      }.map(CDM17.parse) ~> Sink.foreach[Try[CDM17]](x => println(s"kafka ingest end of the line for: $x")) //.map(println) ~> Sink.ignore
-      ClosedShape
-    }
-  )
-}
-
-
-case class QueryCollector(scoreThreshhold: Double, queueLimit: Int) extends GraphStage[FlowShape[(String,UUID,Double,Set[UUID]),(String,UUID,Double,Set[UUID])]] {
-
-  val in = Inlet[(String,UUID,Double,Set[UUID])]("Name -> UUID -> Score -> Subgraph")
-  val out = Outlet[(String,UUID,Double,Set[UUID])]("Graph Query Package")
-  val shape = FlowShape.of(in, out)
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-
-    var priorityQueue = mutable.SortedSet.empty[(String, UUID, Double, Set[UUID])](Ordering.by[(String, UUID, Double, Set[UUID]), Double](_._3).reverse)
-    val alreadySent = mutable.Set.empty[UUID]
-
-    def popAndSend() = if (priorityQueue.nonEmpty) {
-      println(s"Queue size: ${priorityQueue.size}")
-      if ( ! alreadySent.contains(priorityQueue.head._2)) {
-        push(out, priorityQueue.head)
-        alreadySent += priorityQueue.head._2
-      }
-      priorityQueue = priorityQueue.tail
-    }
-
-    setHandler(in, new InHandler {
-      def onPush() = {
-        val scored = grab(in)
-        if (scored._3 >= scoreThreshhold && ! alreadySent.contains(scored._2)) {  // TODO: revisit how to handle updated scores.
-          priorityQueue += scored
-          priorityQueue = priorityQueue.take(queueLimit)
-        }
-        if (isAvailable(out)) popAndSend()
-        pull(in)
-      }
-    })
-
-    setHandler(out, new OutHandler {
-      def onPull() = {
-        popAndSend()
-        if ( ! hasBeenPulled(in)) pull(in)
-      }
-    })
-
-  }
-
-}
-
-
-
-
-
-sealed trait JoinMultiplicity
-case object One extends JoinMultiplicity
-case object Many extends JoinMultiplicity
-
-case class Join[A,B,K](
-  in0Key: A => K,
-  in1Key: B => K,
-  in0Multiplicity: JoinMultiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
-  in1Multiplicity: JoinMultiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
-) extends GraphStage[FanInShape2[A, B, (K,A,B)]] {
-  val shape = new FanInShape2[A, B, (K,A,B)]("Join")
-  
-  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-
-    val in0Stored = MutableMap.empty[K,Set[A]]
-    val in1Stored = MutableMap.empty[K,Set[B]]
-
-    setHandler(shape.in0, new InHandler {
-      def onPush() = {
-        val a: A = grab(shape.in0)
-        val k: K = in0Key(a)
-
-        in1Stored.getOrElse(k,Set()) match {
-          case s if s.isEmpty =>
-            in0Stored(k) = in0Stored.getOrElse(k,Set[A]()) + a
-
-          case bs =>
-            for (b <- bs)
-              push(shape.out, (k,a,b))
-
-            if (in0Multiplicity == One)
-              in0Stored -= k
-
-            if (in1Multiplicity == One)
-              in1Stored -= k
-        }
-      }
-    })
-
-    setHandler(shape.in1, new InHandler {
-      def onPush() = {
-        val b: B = grab(shape.in1)
-        val k: K = in1Key(b)
-
-        in0Stored.getOrElse(k,Set()) match {
-          case s if s.isEmpty =>
-            in1Stored(k) = in1Stored.getOrElse(k,Set[B]()) + b
-
-          case as =>
-            for (a <- as)
-              push(shape.out, (k,a,b))
-
-            if (in0Multiplicity == One)
-              in0Stored -= k
-
-            if (in1Multiplicity == One)
-              in1Stored -= k
-        }
-      }
-    })
-
-    setHandler(shape.out, new OutHandler {
-      def onPull() = {
-        if (!hasBeenPulled(shape.in0)) pull(shape.in0)
-        if (!hasBeenPulled(shape.in1)) pull(shape.in1)
-      }
-    })
-  }
-}
+//case class QueryCollector(scoreThreshhold: Double, queueLimit: Int) extends GraphStage[FlowShape[(String,UUID,Double,Set[UUID]),(String,UUID,Double,Set[UUID])]] {
+//
+//  val in = Inlet[(String,UUID,Double,Set[UUID])]("Name -> UUID -> Score -> Subgraph")
+//  val out = Outlet[(String,UUID,Double,Set[UUID])]("Graph Query Package")
+//  val shape = FlowShape.of(in, out)
+//  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+//
+//    var priorityQueue = mutable.SortedSet.empty[(String, UUID, Double, Set[UUID])](Ordering.by[(String, UUID, Double, Set[UUID]), Double](_._3).reverse)
+//    val alreadySent = mutable.Set.empty[UUID]
+//
+//    def popAndSend() = if (priorityQueue.nonEmpty) {
+//      println(s"Queue size: ${priorityQueue.size}")
+//      if ( ! alreadySent.contains(priorityQueue.head._2)) {
+//        push(out, priorityQueue.head)
+//        alreadySent += priorityQueue.head._2
+//      }
+//      priorityQueue = priorityQueue.tail
+//    }
+//
+//    setHandler(in, new InHandler {
+//      def onPush() = {
+//        val scored = grab(in)
+//        if (scored._3 >= scoreThreshhold && ! alreadySent.contains(scored._2)) {  // TODO: revisit how to handle updated scores.
+//          priorityQueue += scored
+//          priorityQueue = priorityQueue.take(queueLimit)
+//        }
+//        if (isAvailable(out)) popAndSend()
+//        pull(in)
+//      }
+//    })
+//
+//    setHandler(out, new OutHandler {
+//      def onPull() = {
+//        popAndSend()
+//        if ( ! hasBeenPulled(in)) pull(in)
+//      }
+//    })
+//
+//  }
+//
+//}
+//
+//
+//
+//
+//
+//sealed trait JoinMultiplicity
+//case object One extends JoinMultiplicity
+//case object Many extends JoinMultiplicity
+//
+//case class Join[A,B,K](
+//  in0Key: A => K,
+//  in1Key: B => K,
+//  in0Multiplicity: JoinMultiplicity = Many, // will there be two elements streamed for which 'in0Key' produces the same value
+//  in1Multiplicity: JoinMultiplicity = Many  // will there be two elements streamed for which 'in1Key' produces the same value
+//) extends GraphStage[FanInShape2[A, B, (K,A,B)]] {
+//  val shape = new FanInShape2[A, B, (K,A,B)]("Join")
+//
+//  def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+//
+//    val in0Stored = MutableMap.empty[K,Set[A]]
+//    val in1Stored = MutableMap.empty[K,Set[B]]
+//
+//    setHandler(shape.in0, new InHandler {
+//      def onPush() = {
+//        val a: A = grab(shape.in0)
+//        val k: K = in0Key(a)
+//
+//        in1Stored.getOrElse(k,Set()) match {
+//          case s if s.isEmpty =>
+//            in0Stored(k) = in0Stored.getOrElse(k,Set[A]()) + a
+//
+//          case bs =>
+//            for (b <- bs)
+//              push(shape.out, (k,a,b))
+//
+//            if (in0Multiplicity == One)
+//              in0Stored -= k
+//
+//            if (in1Multiplicity == One)
+//              in1Stored -= k
+//        }
+//      }
+//    })
+//
+//    setHandler(shape.in1, new InHandler {
+//      def onPush() = {
+//        val b: B = grab(shape.in1)
+//        val k: K = in1Key(b)
+//
+//        in0Stored.getOrElse(k,Set()) match {
+//          case s if s.isEmpty =>
+//            in1Stored(k) = in1Stored.getOrElse(k,Set[B]()) + b
+//
+//          case as =>
+//            for (a <- as)
+//              push(shape.out, (k,a,b))
+//
+//            if (in0Multiplicity == One)
+//              in0Stored -= k
+//
+//            if (in1Multiplicity == One)
+//              in1Stored -= k
+//        }
+//      }
+//    })
+//
+//    setHandler(shape.out, new OutHandler {
+//      def onPull() = {
+//        if (!hasBeenPulled(shape.in0)) pull(shape.in0)
+//        if (!hasBeenPulled(shape.in1)) pull(shape.in1)
+//      }
+//    })
+//  }
+//}

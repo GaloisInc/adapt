@@ -61,7 +61,7 @@ var node_appearance = [
         make_node_label : function(node) {
             var addr = (node['properties'].hasOwnProperty('memoryAddress') ? node['properties']['memoryAddress'][0]['value'] : "None")
             var size = (node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "None")
-            return size + "@" + addr
+            return addr + "\nsize: " + size
         }
     }, {
         name : "Pipe",
@@ -71,7 +71,7 @@ var node_appearance = [
         make_node_label : function(node) {
             var source = (node['properties'].hasOwnProperty('sourceFileDescriptor') ? node['properties']['sourceFileDescriptor'][0]['value'] : "None")
             var sink = (node['properties'].hasOwnProperty('sinkFileDescriptor') ? node['properties']['sinkFileDescriptor'][0]['value'] : "None")
-            return "src: " + source + ", sink: " + sink
+            return "src: " + source + "\nsink: " + sink
         }
     }, {
         name : "Principal",
@@ -91,7 +91,7 @@ var node_appearance = [
             var localP = (node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None")
             var remoteA = (node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None")
             var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None")
-            return "l:" + localA + ":" + localP + ", r:" + remoteA + ":" + remoteP
+            return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
         }
    }, {
         name : "RegistryKey",
@@ -100,7 +100,7 @@ var node_appearance = [
         make_node_label : function(node) {
             var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'][0]['value'] : "None")
             var val = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
-            return key + ":" + value
+            return key + " : " + value
         }
    }, {
         name : "Event",
@@ -109,16 +109,16 @@ var node_appearance = [
         make_node_label : function(node) {
             var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "None")
             var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-            var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "None")
-            var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
-            return type + ", seq:" + sequence
+            // var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "None")
+            // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
+            return type + "\n#" + sequence
         }
    }, {
         name : "SrcSink",
         is_relevant : function(n) { return n.label === "SrcSinkObject" },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
-            var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'][0]['value'] : "None")
+            // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'][0]['value'] : "None")
             var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "None")
             return type
         }
@@ -127,11 +127,11 @@ var node_appearance = [
         is_relevant : function(n) { return n.label === "ProvenanceTagNode" },
         icon_unicode : "\uf277",
         make_node_label : function(node) {
-            var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
+            // var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
             var opcode = (node['properties'].hasOwnProperty('opcode') ? node['properties']['opcode'][0]['value'] : "None")
             var itag = (node['properties'].hasOwnProperty('itag') ? node['properties']['itag'][0]['value'] : "None")
             var ctag = (node['properties'].hasOwnProperty('ctag') ? node['properties']['ctag'][0]['value'] : "None")
-            return "f:" + opcode +  /* ", call:" + systemCall +  */ " \n itag:" + itag + ", ctag: " + ctag
+            return "OpCode: " + opcode +  /* ", call:" + systemCall +  */ " \nItag: " + itag + "\nCtag: " + ctag
         }
     }, {
        name : "Subject",
@@ -144,17 +144,17 @@ var node_appearance = [
             var timestamp = (node['properties'].hasOwnProperty('startedTimestampNanos') ? new Date(node['properties']['startTimestampNanos'][0]['value']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos'][0]['value']%1000 : "no timestamp")
             switch(t) {
                 case "SUBJECT_PROCESS":
-                    return "Proc:" + cid + " \n cmd: " + cmd + " \n " + timestamp
+                    return "Process: " + cid
                 case "SUBJECT_THREAD":
-                    return "Thr:" + cid + " \n " + timestamp
+                    return "Thread: " + cid
                 case "SUBJECT_UNIT":
-                    return "Unit:" + cid + " \n " + timestamp
+                    return "Unit: " + cid
                 default:
-                    return t + ", @" + timestamp
+                    return t + ": " + cid
             }
         }
     }, {
-        name : "Default",   // This default will override anything below!
+        name : "Default",   // This default will override anything that comes below it!
         is_relevant : function(n) { return true },
         icon_unicode : "\uf3a6",
         size: 30,
@@ -169,20 +169,20 @@ var node_appearance = [
 var predicates = [
 // ProvenanceTagNode
     {
-       name: "refObject",
+       name: "RefObject",
        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
        floating_query : ".out('flowObject')",
        is_default : true
     }, {
-        name: "refSubject",
+        name: "RefSubject",
         is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
         floating_query : ".out('subject')"
     }, {
-        name: "ancestor tags",
+        name: "Ancestor tags",
         is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
         floating_query : ".emit().repeat(_.out('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
     }, {
-        name: "descendant tags",
+        name: "Descendant tags",
         is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
         floating_query : ".emit().repeat(_.in('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
     },
@@ -205,7 +205,7 @@ var predicates = [
         is_relevant : function(n) {return n.label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_RENAME','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     },  {
-        name : "direct Causality",
+        name : "Direct Causality",
         is_relevant : function(n) {return n.label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_RENAME','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).path().unrollPath().dedup().hasNot('eventType')"
     },  {
@@ -217,7 +217,7 @@ var predicates = [
         is_relevant : function(n) {return n.label === "FileObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
-        name : "Subjects reading",
+        name : "Subjects Reading",
         is_relevant : function(n) {return n.label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
@@ -386,7 +386,7 @@ var predicates = [
         is_relevant : function(n) {return n.label === "NetFlowObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
-        name : "Processes connected",
+        name : "Processes Connected",
         is_relevant : function(n) {return n.label === "NetFlowObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).out('subject')"
    }, 
@@ -467,7 +467,7 @@ var predicates = [
 
 // Principal
         {
-        name : "Processes owned",
+        name : "Processes Owned",
         is_relevant : function(n) { return n.label === "Principal"},
         floating_query: ".in('localPrincipal').hasLabel('Subject')",
         is_default : true

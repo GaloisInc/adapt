@@ -186,8 +186,8 @@ object TitanFlowComponents {
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
         val transaction = //graph.newTransaction()
           graph.buildTransaction()
-            //          .enableBatchLoading()
-            //          .checkExternalVertexExistence(false)
+//          .enableBatchLoading()
+//          .checkExternalVertexExistence(false)
             .start()
 
         // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
@@ -272,7 +272,7 @@ object TitanFlowComponents {
           }
         }
 
-        //        println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
+//        println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
 
         Try(
           transaction.commit()

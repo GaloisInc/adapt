@@ -17,62 +17,55 @@ object FileStream {
     val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
 
     predicateTypeLabeler(commandSource, db)
-      .filter(x => x._1 == "FileObject") // || x._1 == "NetFlowObject")
+      .filter(x => x._1 == "FileObject")
       .groupBy(Int.MaxValue, _._2)
       .merge(commandSource)
-      .statefulMapConcat[(FileUUID, mutable.SortedSet[Event])]{ () => //, Set[(NetFlowUUID, mutable.SortedSet[Event])])]{ () =>
+      .statefulMapConcat[(FileUUID, mutable.SortedSet[Event])]{ () =>
         var processUuidOpt: Option[ProcessUUID] = None
-  //        var fileUuids = MutableSet.empty[UUID]
         val fileEvents = MutableMap.empty[FileUUID, mutable.SortedSet[Event]]
-  //        val netFlowUuids = MutableSet.empty[NetFlowUUID]
         val netFlowEvents = MutableMap.empty[NetFlowUUID, mutable.SortedSet[Event]]
 
 
         {
-//          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, _: CDM17) =>
-//            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-//            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
-//            List.empty
-
           case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
             fileEvents(uuid) = fileEvents.getOrElse(uuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
             List.empty
 
           case CleanUp =>
-    //            if (netFlowEvents.nonEmpty) {
-    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-    //              netFlowEvents.foreach { case (u, es) =>
-    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-    //              }
-    //              dbMap.putAll(mergedEvents.asJava)
-    //              netFlowUuids ++= netFlowEvents.keySet
-    //              netFlowEvents.clear()
-    //            }
-    //            if (fileEvents.nonEmpty) {
-    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-    //              fileEvents.foreach { case (u, es) =>
-    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-    //              }
-    //
-    //              // This gets slower as Event Set gets larger.
-    //              dbMap.putAll(mergedEvents.asJava)
-    //
-    //              fileUuids ++= fileEvents.keySet
-    //              fileEvents.clear()
-    //            }
+//            if (netFlowEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              netFlowEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+//              }
+//              dbMap.putAll(mergedEvents.asJava)
+//              netFlowUuids ++= netFlowEvents.keySet
+//              netFlowEvents.clear()
+//            }
+//            if (fileEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              fileEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+//              }
+//
+//              // This gets slower as Event Set gets larger.
+//              dbMap.putAll(mergedEvents.asJava)
+//
+//              fileUuids ++= fileEvents.keySet
+//              fileEvents.clear()
+//            }
             List.empty
 
           case EmitCmd =>
-    //            fileUuids.foreach(u =>
-    //              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-    //                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
-    //
-    //            netFlowUuids.foreach(u =>
-    //              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-    //                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//            fileUuids.foreach(u =>
+//              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+//                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//
+//            netFlowUuids.foreach(u =>
+//              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+//                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
 
-            fileEvents.toList //.map { case (u, fes) => ((u, fes), netFlowEvents.toSet) }
+            fileEvents.toList
         }
       }
       .mergeSubstreams
@@ -80,12 +73,10 @@ object FileStream {
   }
 
 
-
-
   val fileEventTypes = List(EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE)
 
-  val fileFeatures = Flow[(FileUUID, mutable.SortedSet[Event])] ///, Set[(NetFlowUUID, mutable.SortedSet[Event])])]
-    .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case (fileUuid, fileEventSet) => //, netFlowEventsFromIntersectingProcesses) =>
+  val fileFeatures = Flow[(FileUUID, mutable.SortedSet[Event])]
+    .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case (fileUuid, fileEventSet) =>
     val fileEventList = fileEventSet.toList
     var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
     val m = MutableMap.empty[String,Any]
@@ -195,21 +186,11 @@ object FileStream {
     , "ALARM: Delete Soon After Write" -> List("deleteSoonAfterWrite")
     )
 
-    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-    if (! req) println("Requirement failed: s" + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+//    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+//    if (! req) println("Requirement failed: s" + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
     viewDefinitions.toList.map { case (name, columnList) =>
       (name, fileUuid, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)
     } ++ List(("All File Features", fileUuid, m, allRelatedUUIDs.toSet))
   }
-
-
-  //  def testFileFeatureEventAccumulator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-  //    val fileEventsDBMap = db.hashMap("FileEventsByPredicate_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-  //    Flow[CDM17]
-  //      .collect{ case e: Event if FlowComponents.fileEventTypes.contains(e.eventType) => e}
-  //      .via(eventsGroupedByKey(commandSource, fileEventsDBMap, PredicateObjectKey).mergeSubstreams)
-  //  }
-
-
 }

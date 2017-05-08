@@ -143,16 +143,16 @@ class ClusterNodeManager(config: Config, val registryProxy: ActorRef) extends Ac
 //    val processWritesFile = context.actorOf(Props(classOf[ProcessWritesFile], registryProxy), "ProcessWritesFile")
 //    childActors = childActors + (roleName -> childActors.getOrElse(roleName, Set(fileWrites, processWrites, processWritesFile)))   // TODO: These sets are not used correctly
 
-    case "kafkaProducer" =>
-      val file = config.getStringList("adapt.loadfiles").head
-      val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
-      val streamActor = context.actorOf(Props(classOf[GraphRunner], KafkaStreams.kafkaProducer(file, producerSettings, config.getString("adapt.kafka-cdm-source"))))
-      childActors = childActors + (roleName -> Set(streamActor))
-
-    case "kafkaIngest" =>
-      val consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]] = ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer)
-      val streamActor = context.actorOf(Props(classOf[GraphRunner], KafkaStreams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
-      childActors = childActors + (roleName -> Set(streamActor))
+//    case "kafkaProducer" =>
+//      val file = config.getStringList("adapt.loadfiles").head
+//      val producerSettings = ProducerSettings(config.getConfig("akka.kafka.producer"), new ByteArraySerializer, new ByteArraySerializer)
+//      val streamActor = context.actorOf(Props(classOf[GraphRunner], KafkaStreams.kafkaProducer(file, producerSettings, config.getString("adapt.kafka-cdm-source"))))
+//      childActors = childActors + (roleName -> Set(streamActor))
+//
+//    case "kafkaIngest" =>
+//      val consumerSettings: ConsumerSettings[Array[Byte], Array[Byte]] = ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer)
+//      val streamActor = context.actorOf(Props(classOf[GraphRunner], KafkaStreams.kafkaIngest(consumerSettings, config.getString("adapt.kafka-cdm-source"))))
+//      childActors = childActors + (roleName -> Set(streamActor))
 
     case s => throw new IllegalArgumentException(s"Unknown role: $s")
   }

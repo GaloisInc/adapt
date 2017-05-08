@@ -27,41 +27,40 @@ object MemoryStream {
             memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
             List.empty
 
-
           case CleanUp =>
-    //            if (netFlowEvents.nonEmpty) {
-    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-    //              netFlowEvents.foreach { case (u, es) =>
-    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-    //              }
-    //              dbMap.putAll(mergedEvents.asJava)
-    //              netFlowUuids ++= netFlowEvents.keySet
-    //              netFlowEvents.clear()
-    //            }
-    //            if (memoryEvents.nonEmpty) {
-    //              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-    //              memoryEvents.foreach { case (u, es) =>
-    //                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-    //              }
-    //
-    //              // This gets slower as Event Set gets larger.
-    //              dbMap.putAll(mergedEvents.asJava)
-    //
-    //              fileUuids ++= memoryEvents.keySet
-    //              memoryEvents.clear()
-    //            }
+//            if (netFlowEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              netFlowEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+//              }
+//              dbMap.putAll(mergedEvents.asJava)
+//              netFlowUuids ++= netFlowEvents.keySet
+//              netFlowEvents.clear()
+//            }
+//            if (memoryEvents.nonEmpty) {
+//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+//              memoryEvents.foreach { case (u, es) =>
+//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+//              }
+//
+//              // This gets slower as Event Set gets larger.
+//              dbMap.putAll(mergedEvents.asJava)
+//
+//              fileUuids ++= memoryEvents.keySet
+//              memoryEvents.clear()
+//            }
             List.empty
 
           case EmitCmd =>
-    //            fileUuids.foreach(u =>
-    //              memoryEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-    //                memoryEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
-    //
-    //            netFlowUuids.foreach(u =>
-    //              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-    //                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//            fileUuids.foreach(u =>
+//              memoryEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+//                memoryEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//
+//            netFlowUuids.foreach(u =>
+//              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+//                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
 
-            memoryEvents.toList //.map { case (u, fes) => (u, fes) }
+            memoryEvents.toList
         }
     }
     .mergeSubstreams
@@ -90,8 +89,9 @@ object MemoryStream {
     , "ALARM: MMap From Temp Directory" -> List("mmapFromTempDirectory")
     )
 
-    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
-    if (! req) println("Memory Requirement failed: s" + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
+    // TODO: remove!
+//    val req = viewDefinitions.values.flatten.toSet.forall(m.keySet.contains)
+//    if (! req) println("Memory Requirement failed: s" + viewDefinitions.values.flatten.toSet[String].map(x => x -> m.keySet.contains(x)).filter(x => ! x._2))
 
     viewDefinitions.toList.map { case (name, columnList) =>
       (name, memoryUUID, m.filter(t => columnList.contains(t._1)), allRelatedUUIDs.toSet)

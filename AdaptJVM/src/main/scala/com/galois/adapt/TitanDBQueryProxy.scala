@@ -18,7 +18,7 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
 
     case NodeQuery(q, shouldParse) =>
       sender() ! Query.run[Vertex](q, graph).map { vertices =>
-        println(s"Found: ${vertices.length}")
+//        println(s"Found: ${vertices.length}")
         if (shouldParse) {
           val byteStream = new ByteArrayOutputStream
           jsonWriter.writeVertices(byteStream, vertices.toIterator.asJava)
@@ -34,7 +34,7 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
     case EdgeQuery(q, shouldParse) =>
       sender() ! Query.run[Edge](q, graph).map { edges =>
         if (shouldParse) {
-          println(s"Found: ${edges.length}")
+//          println(s"Found: ${edges.length}")
           val byteStream = new ByteArrayOutputStream
           edges.foreach { edge =>
             jsonWriter.writeEdge(byteStream, edge)
