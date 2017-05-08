@@ -17,6 +17,26 @@ import scala.util.{Success, Failure, Try}
 
 object TitanFlowComponents {
 
+  def addIndex(graph: TitanGraph, management: ManagementSystem, propKey: String, clazz: Class[_], indexName: String) = {
+
+    var idKey = if (management.getPropertyKey(propKey) != null) {
+      management.getPropertyKey(propKey)
+    } else {
+      management.makePropertyKey(propKey).dataType(clazz).make()
+    }
+    management.buildIndex(indexName, classOf[Vertex]).addKey(idKey).buildCompositeIndex()
+
+    idKey = management.getPropertyKey(propKey)
+    val idx = management.getGraphIndex(indexName)
+    if (idx.getIndexStatus(idKey).equals(SchemaStatus.INSTALLED)) {
+      ManagementSystem.awaitGraphIndexStatus(graph, indexName).status(SchemaStatus.REGISTERED).call()
+    }
+
+    management.updateIndex(
+      management.getGraphIndex(indexName),
+      SchemaAction.ENABLE_INDEX
+    )
+  }
   /* Open a Cassandra-backed Titan graph. If this is failing, make sure you've run something like
    * the following first:
    *
@@ -139,7 +159,6 @@ object TitanFlowComponents {
       ("valueType", classOf[String])
     )
     for (propertyKey <- propertyKeys)
-    //if(!management.containsPropertyKey(propertyKey._1)) { management.makePropertyKey(propertyKey._1).dataType(propertyKey._2).make() }
       propertyKey match {
         case (name: String, pClass: Class[_]) if ! management.containsPropertyKey(name) =>
           management.makePropertyKey(name).dataType(pClass).cardinality(Cardinality.SINGLE).make()
@@ -149,7 +168,8 @@ object TitanFlowComponents {
       }
 
     // This makes a unique index for 'uuid'
-    if (null == management.getGraphIndex("byUuidUnique")) {
+    val uuidIndex = management.getGraphIndex("byUuidUnique")
+    if (null == uuidIndex) {
 
       var idKey = if (management.getPropertyKey("uuid") != null) {
         management.getPropertyKey("uuid")
@@ -168,11 +188,66 @@ object TitanFlowComponents {
         management.getGraphIndex("byUuidUnique"),
         SchemaAction.ENABLE_INDEX
       )
-      management.commit()
-      ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
-    } else {
-      management.commit()
     }
+
+    // This makes an index for 'timestampNanos'
+    val timestampIndex = management.getGraphIndex("byTimestampNanos")
+    if (null == timestampIndex) {
+      addIndex(graph, management, "timestampNanos", classOf[java.lang.Long], "byTimestampNanos")
+    }
+
+    // This makes an index for 'predicateObjectPath'
+    val predicateObjectPathIndex = management.getGraphIndex("byPredicateObjectPath")
+    if (null == predicateObjectPathIndex) {
+      addIndex(graph, management, "predicateObjectPath", classOf[java.lang.String], "byPredicateObjectPath")
+    }
+
+    // Index for 'name'
+    val nameIndex = management.getGraphIndex("byName")
+    if(null == nameIndex) {
+      addIndex(graph, management, "name", classOf[java.lang.String], "byName")
+    }
+
+    // Index for 'remoteAddress'
+    val remoteAddressIndex = management.getGraphIndex("byRemoteAddress")
+    if(null == remoteAddressIndex) {
+      addIndex(graph, management, "remoteAddress", classOf[java.lang.String], "byRemoteAddress")
+    }
+
+    // Index for 'registryKeyOrPath'
+    val registeryKeyOrPathIndex = management.getGraphIndex("byRegistryKeyOrPath")
+    if(null == registeryKeyOrPathIndex) {
+      addIndex(graph, management, "registeryKeyOrPath", classOf[java.lang.String], "byRegistryKeyOrPath")
+    }
+
+    // Index for 'cid'
+    val cidIndex = management.getGraphIndex("byCid")
+    if(null == cidIndex) {
+      addIndex(graph, management, "cid", classOf[java.lang.Integer], "byCid")
+    }
+
+    val cmdLineIndex = management.getGraphIndex("byCmdLine")
+    if(null == cmdLineIndex) {
+      addIndex(graph, management, "cmdLine", classOf[java.lang.String], "byCmdLine")
+    }
+
+    management.commit()
+    if (uuidIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
+    if (timestampIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byTimestampNanos").status(SchemaStatus.ENABLED).call()
+    if (predicateObjectPathIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byPredicateObjectPath").status(SchemaStatus.ENABLED).call()
+    if (nameIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byName").status(SchemaStatus.ENABLED).call()
+    if (remoteAddressIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byRemoteAddress").status(SchemaStatus.ENABLED).call()
+    if (registeryKeyOrPathIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byRegistryKeyOrPath").status(SchemaStatus.ENABLED).call()
+    if (cidIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byCid").status(SchemaStatus.ENABLED).call()
+    if (cmdLineIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byCmdLine").status(SchemaStatus.ENABLED).call()
 
     graph
   }
