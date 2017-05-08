@@ -1,3 +1,4 @@
+import numpy
 from query import *
 
 # Queries to extract objects and attributes
@@ -55,6 +56,9 @@ def allprefixes(s):
         prefs = prefs | prefixes(x)
     return prefs
 
+def prefixCtxt(context):
+    return {k : allprefixes(context[k]) for k in context.keys()}
+
 # Convert an attribute into a bag of nonempty words
 def bagofwords(s,sep):
     return {w for w in s.split(sep) if w != ''}
@@ -65,6 +69,9 @@ def allbagofwords(s,sep):
     for x in s:
         bags = bags | bagofwords(x,sep)
     return bags
+
+def bagofwordsCtxt(context):
+    return {k : allbagofwords(context[k]) for k in context.keys()}
 
 def getAtts(d): 
     atts = set()
