@@ -28,7 +28,7 @@ import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySe
 import collection.JavaConverters._
 import scala.concurrent.Await
 import scala.language.postfixOps
-import scala.util.Random
+import scala.util.{Random, Try}
 import scala.concurrent.duration._
 
 
@@ -109,12 +109,13 @@ object CDMSource {
   def apply(ta1: String): Source[CDM17, NotUsed] = {
     println(s"setting source for: $ta1")
     ta1.toLowerCase match {
-      case "cadets"         => kafkaSource(s"ta1-cadets-$scenario-cdm17")
-      case "clearscope"     => kafkaSource(s"ta1-clearscope-$scenario-cdm17")
-      case "faros"          => kafkaSource(s"ta1-faros-$scenario-cdm17")
-      case "fivedirections" => kafkaSource(s"ta1-fivedirections-$scenario-cdm17")
-      case "theia"          => kafkaSource(s"ta1-theia-$scenario-cdm17").merge(kafkaSource(s"ta1-theia-$scenario-qr"))
-      case "trace"          => kafkaSource(s"ta1-trace-$scenario-cdm17")
+      case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+      case "clearscope"     => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+      case "faros"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+      case "fivedirections" => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+      case "theia"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+        .merge(kafkaSource(config.getString("adapt.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
+      case "trace"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
       case "kafkaTest"      => kafkaSource("kafkaTest") //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
         val path = config.getStringList("adapt.loadfiles").asScala.head // "/Users/ryan/Desktop/ta1-fivedirections-bovia-cdm17.bin" //ta1-trace-cdm17.bin" // ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" //
@@ -130,18 +131,25 @@ object CDMSource {
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
     Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
   ).map { msg =>
-    val bais = new ByteArrayInputStream(msg.record.value())
-    val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
-    val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-    val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
-    val cdm = new RawCDM17Type(elem.getDatum)
-    msg.committableOffset.commitScaladsl()
-    cdm
-  }.map(CDM17.parse)
-  .mapConcat(c => if (c.isSuccess) List(c.get) else {
-    println(s"Failed to parse CDM statement: $c")
-    List.empty
-  }).asInstanceOf[Source[CDM17, NotUsed]]
+    Try {
+      val bais = new ByteArrayInputStream(msg.record.value())
+      val offset = msg.record.offset()
+      val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+      val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+      val t = Try {
+        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+        elem
+      }
+      if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
+      msg.committableOffset.commitScaladsl()
+      val cdm = new RawCDM17Type(t.get.getDatum)
+      CDM17.parse(cdm)
+    }.flatten
+  }
+  .mapConcat(c =>
+    if (c.isSuccess) List(c.get)
+    else List.empty
+  ).asInstanceOf[Source[CDM17, NotUsed]]
 }
 
 
@@ -155,6 +163,6 @@ object Ta1Flows {
 //    case "fivedirections" =>
 //    case "theia" =>
 //    case "trace" =>
-    case _ => anomalyScores(_: DB, 4, 8, 10, 20).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
+    case _ => anomalyScores(_: DB, 4, 8, 10, 20).map[ViewScore]((ViewScore.apply _).tupled)  //.recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
 }
