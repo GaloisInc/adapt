@@ -349,7 +349,9 @@ object TitanFlowComponents {
       transaction.commit()
     ) match {
       case Success(_) => TxSuccess
-      case Failure(e) => TxFailure(e)
+      case Failure(e) =>
+        transaction.rollback()
+        TxFailure(e)
     }
   }
 
