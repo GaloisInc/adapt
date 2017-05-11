@@ -256,6 +256,7 @@ object TitanFlowComponents {
     graph
   }
 
+  // Create a titan transaction to insert a batch of objects
   def titanTx(cdms: Seq[DBNodeable]) = {
     val transaction = //graph.newTransaction()
     graph.buildTransaction()
@@ -350,22 +351,33 @@ object TitanFlowComponents {
     ) match {
       case Success(_) => TxSuccess
       case Failure(e) =>
+        // Item of note: Titan prints out the stack trace as part of throwing a transaction error
+        // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
+        // that exception is handled here, that's just Titan printing out the trace for your information
         transaction.rollback()
         TxFailure(e)
     }
   }
 
+  // Loops on insertion until we either insert the entire batch
+  // A single statement may fail to insert but only after ln(batch size)+1 attempts
   def titanLoop(cdms: Seq[DBNodeable]): Unit = {
     titanTx(cdms) match {
       case TxSuccess() => ()
       case TxFailure(_) =>
-        val (front, back) = cdms.splitAt(cdms.length/2)
-        titanLoop(front)
-        titanLoop(back)
-        ()
+        // If we're trying to ingest a single CDM statement, try it one more time before giving up
+        if (cdms.length == 1) titanTx(cdms) else {
+          // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
+          val (front, back) = cdms.splitAt(cdms.length / 2)
+          titanLoop(front)
+          titanLoop(back)
+        }
     }
   }
 
+  // Create a thread pool and insert batches of CDM objects in parallel
+  // Of note, insertion rates are very data dependent. It involves not only size of the CDM objects, but
+  // also density of immediate reference as that causes transaction errors.
   def asyncTitanTx(poolSize: Int, cdms: Seq[DBNodeable]) = Future {
     titanLoop(cdms)
   }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(poolSize)))
