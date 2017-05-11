@@ -69,20 +69,22 @@ object ProductionApp extends App {
 
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
+    val threadPool = config.getInt("adapt.ingest.threadpool")
+
     val combined = RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
       import GraphDSL.Implicits._
       val bcast = graph.add(Broadcast[CDM17](2))
 
       CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
       bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-      bcast.out(1) ~> TitanFlowComponents.titanWrites()
+      bcast.out(1) ~> TitanFlowComponents.titanWrites(threadPool)
 
       ClosedShape
     })
 
     config.getString("adapt.runflow") match {
       case "database" | "db" =>
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites(threadPool))
       case "anomalies" | "anomaly" =>
         Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
       case _ => combined.run()

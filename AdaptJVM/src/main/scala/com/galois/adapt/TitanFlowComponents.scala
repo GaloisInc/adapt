@@ -353,26 +353,29 @@ object TitanFlowComponents {
     }
   }
 
-  val poolSize = 100
-
-  def asyncTitanTx(cdms: Seq[DBNodeable]) = Future {
-    val retries = 5
-    for(i <- 1 to retries) {
-      titanTx(cdms) match {
-        case TxSuccess() => scala.util.control.Breaks.break()
-        case TxFailure(e) => if (i == 5) println(e.printStackTrace())
-      }
+  def titanLoop(cdms: Seq[DBNodeable]): Unit = {
+    titanTx(cdms) match {
+      case TxSuccess() => ()
+      case TxFailure(_) =>
+        val (front, back) = cdms.splitAt(cdms.length/2)
+        titanLoop(front)
+        titanLoop(back)
+        ()
     }
+  }
+
+  def asyncTitanTx(poolSize: Int, cdms: Seq[DBNodeable]) = Future {
+    titanLoop(cdms)
   }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(poolSize)))
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
+  def titanWrites(poolSize: Int = 10, graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-        asyncTitanTx(cdms)
+        asyncTitanTx(poolSize, cdms)
       }
     )(Keep.right)
 }
