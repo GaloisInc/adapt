@@ -3,11 +3,14 @@
 import requests, readline, sys
 
 if __name__ == '__main__':
-    print("Welcome to the query shell. Queries are sent to 'http://localhost:8080/query/generic'.")
+    url = "http://0.0.0.0:8080"
+    if len(sys.argv) >= 2:
+        url = sys.argv[1]
+    print("Welcome to the query shell. Queries are sent to '" + url +  "/query/generic'.")
     while True:
         query = input("==> ")
         try:
-            req = requests.post("http://localhost:8080/query/generic", data={"query": query}).json()
+            req = requests.post(url + "/query/generic", data={"query": query}).json()
             if isinstance(req,list):
                 for line in req:
                     print(line)
