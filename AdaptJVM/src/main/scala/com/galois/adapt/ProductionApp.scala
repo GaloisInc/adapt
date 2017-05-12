@@ -32,11 +32,10 @@ import scala.util.{Random, Try}
 import scala.concurrent.duration._
 
 
-object ProductionApp extends App {
-  println(s"Running the production system.")
+object ProductionApp {
+//  println(s"Running the production system.")
 
-  println(ConfigFactory.load())
-  run()
+//  println(ConfigFactory.load())
 
   def run() {
 
@@ -107,7 +106,7 @@ object CDMSource {
   val scenario = config.getString("adapt.scenario")
 
   def apply(ta1: String): Source[CDM17, NotUsed] = {
-    println(s"setting source for: $ta1")
+    println(s"Setting source for: $ta1")
     ta1.toLowerCase match {
       case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic"))
       case "clearscope"     => kafkaSource(config.getString("adapt.ta1kafkatopic"))
@@ -118,16 +117,18 @@ object CDMSource {
       case "trace"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
       case "kafkaTest"      => kafkaSource("kafkaTest") //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
-        val path = config.getStringList("adapt.loadfiles").asScala.head // "/Users/ryan/Desktop/ta1-fivedirections-bovia-cdm17.bin" //ta1-trace-cdm17.bin" // ta1-clearscope-cdm17.bin" // cdm17_0407_1607.bin" //  ta1-clearscope-cdm17.bin"  //ta1-cadets-cdm17-3.bin" //
-        Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
-//          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
-//          .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-          .via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+        val paths = config.getStringList("adapt.loadfiles").asScala
+        println(s"Setting file sources to: ${paths.mkString(", ")}")
+        paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
+          .mapConcat( c =>
+            if (c.isSuccess) List(c.get)
+            else List.empty
+          ).via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 
 
-  private def kafkaSource(ta1Topic: String): Source[CDM17, NotUsed] = Consumer.committableSource(
+  def kafkaSource(ta1Topic: String): Source[CDM17, NotUsed] = Consumer.committableSource(
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
     Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
   ).map { msg =>
@@ -145,8 +146,7 @@ object CDMSource {
       val cdm = new RawCDM17Type(t.get.getDatum)
       CDM17.parse(cdm)
     }.flatten
-  }
-  .mapConcat(c =>
+  }.mapConcat(c =>
     if (c.isSuccess) List(c.get)
     else List.empty
   ).asInstanceOf[Source[CDM17, NotUsed]]
@@ -156,6 +156,12 @@ object CDMSource {
 object Ta1Flows {
   import FlowComponents._
 
+  private val config = ConfigFactory.load()
+  val base = config.getInt("adapt.basecleanupseconds")    // 10
+  val fastEmit = base * 2 + base                          // 30
+  val slowClean = fastEmit * 2                            // 60
+  val slowEmit = slowClean * 2 + base                     // 130
+
   def apply(ta1: String) = ta1.toLowerCase match {
 //    case "cadets" =>
 //    case "clearscope" =>
@@ -163,6 +169,11 @@ object Ta1Flows {
 //    case "fivedirections" =>
 //    case "theia" =>
 //    case "trace" =>
-    case _ => anomalyScores(_: DB, 4, 8, 10, 20).map[ViewScore]((ViewScore.apply _).tupled)  //.recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
+    case _ => anomalyScores(_: DB,
+      base,
+      fastEmit,
+      slowClean,
+      slowEmit
+    ).map[ViewScore]((ViewScore.apply _).tupled)  //.recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
 }

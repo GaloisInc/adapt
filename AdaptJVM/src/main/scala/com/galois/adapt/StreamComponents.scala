@@ -107,26 +107,27 @@ object FlowComponents {
         val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
 
         {
-          case EmitCmd =>
-            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-            existingSet ++= events
-            dbMap.put(uuid.get, existingSet)
-            events.clear()
-            List(uuid.get -> existingSet)
-
-          case CleanUp =>
-            if (events.nonEmpty) {
-              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-              existingSet ++= events
-              dbMap.put(uuid.get, existingSet)
-              events.clear()
-            }
-            List.empty
-
           case Tuple3(u: UUID, e: Event, _: CDM17) =>
             if (uuid.isEmpty) uuid = Some(u)
             events += e
             List.empty
+
+          case CleanUp =>
+//            if (events.nonEmpty) {
+//              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+//              existingSet ++= events
+//              dbMap.put(uuid.get, existingSet)
+//              events.clear()
+//            }
+            List.empty
+
+          case EmitCmd =>
+//            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+//            existingSet ++= events
+//            dbMap.put(uuid.get, existingSet)
+//            events.clear()
+//            List(uuid.get -> existingSet)
+            List(uuid.get -> events)
         }
       }.mergeSubstreams
   }
@@ -393,15 +394,13 @@ case object CleanUp extends ProcessingCommand
 //  implicit val mat = ActorMaterializer()
 //
 //
-//  val path = "/Users/erin/Documents/proj/adapt/git/adapt/data/ta1-theia-bovia-cdm17.bin" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
+//  val path = "/Users/ryan/Desktop/e2data-bovia/ta1-fivedirections-bovia-cdm17-3" // cdm17_0407_1607.bin" //ta1-clearscope-cdm17.bin"  //
 //  val data = CDM17.readData(path, None).get._2.map(_.get)
 //  val source = Source.fromIterator[CDM17](() => CDM17.readData(path, None).get._2.map(_.get))
 ////    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".1", None).get._2.map(_.get)))
 ////    .concat(Source.fromIterator[CDM17](() => CDM17.readData(path + ".2", None).get._2.map(_.get)))
-//    .via(FlowComponents.printCounter("CDM Source", 1e6.toInt))
+//    .via(FlowComponents.printCounter("CDM Source", 1e5.toInt))
 ////    .via(Streams.titanWrites(graph))
-//
-//  println("Total CDM statements: " + data.length)
 //
 //
 ////  // TODO: this should be a single source (instead of multiple copies) that broadcasts into all the necessary places.
@@ -443,7 +442,8 @@ case object CleanUp extends ProcessingCommand
 ////  }.recover{ case e: Throwable => e.printStackTrace() }.runForeach(println)
 //
 //
-//    Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
+////    Flow[CDM17].runWith(source, TitanFlowComponents.titanWrites(TitanFlowComponents.graph))
+//    source.runWith(Sink.ignore)
 //
 //
 //
