@@ -29,18 +29,22 @@ object NetFlowStream {
     m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
     m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1e9
     m("countOfDistinctSubjectsWithEventToThisNetFlow") = eSet.map(_.subjectUuid).size
-    //      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
+//      m("distinctFileReadCountByProcessesWritingToThisNetFlow") = "TODO"                                // TODO: needs pairing with Files (and join on Process UUID)
     m("totalBytesRead") = eList.collect { case e if List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.size.getOrElse(0L) }.sum
     m("totalBytesWritten") = eList.collect { case e if List(EVENT_WRITE, EVENT_SENDTO, EVENT_SENDMSG).contains(e.eventType) => e.size.getOrElse(0L) }.sum
     m("stdDevBetweenNetFlowWrites") = {
-      val differences = eList.sliding(2).map(pair => pair.last.timestampNanos - pair.head.timestampNanos)
-      val mean: Double = differences.sum.toDouble / differences.length
-      val dmms = differences.map(d => Math.pow(d - mean, 2)).sum / differences.length
-      Math.sqrt(dmms)
+      val writeList = eList.filter(e => List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE) contains e.eventType)
+      if (writeList.length >= 2) {
+        val differences = writeList.sliding(2).map(pair => pair.last.timestampNanos - pair.head.timestampNanos).toList
+        val mean: Double = differences.sum.toDouble / differences.length
+        val dmms = differences.map(d => Math.pow(d - mean, 2)).sum / differences.length
+        val stdev = Math.sqrt(dmms)
+        if (stdev > 0D) stdev else 0D
+      } else 0D
     }
     m("averageWriteSize") = {
       val writes = eList.filter(e => List(EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE) contains e.eventType)
-      writes.flatMap(_.size).sum.toDouble / writes.length
+      if (writes.nonEmpty) writes.flatMap(_.size).sum.toDouble / writes.length else 0D
     }
     // TODO: Alarm: port 1337 ???
     //    m("ALARM: Port 1337") =

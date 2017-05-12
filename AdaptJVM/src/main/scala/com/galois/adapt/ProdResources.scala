@@ -94,21 +94,21 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       }
 
     case MakeExpansionQueries =>
-        queryQueue.lastOption.foreach { startUuid =>
-          queryQueue = queryQueue.take(queryQueue.length - 1)
-          implicit val timeout = Timeout(60 seconds)
-          val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
-          val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
-          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
-          provResultF.flatMap { v =>
-            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
-            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
-            progResultF.map { g =>
-              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
-              context.self ! MakeExpansionQueries
-            }
-          }.recover { case e: Throwable => e.printStackTrace() }
-        }
+//        queryQueue.lastOption.foreach { startUuid =>
+//          queryQueue = queryQueue.take(queryQueue.length - 1)
+//          implicit val timeout = Timeout(60 seconds)
+//          val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+//          val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+//          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+//          provResultF.flatMap { v =>
+//            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
+//            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+//            progResultF.map { g =>
+//              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
+//              context.self ! MakeExpansionQueries
+//            }
+//          }.recover { case e: Throwable => e.printStackTrace() }
+//        }
 
 
     case ExpansionQueryResults(Provenance, uuid, vertices) => Try {

@@ -66,26 +66,34 @@ object ProductionApp {
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
-    val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
-    val combined = RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-      import GraphDSL.Implicits._
-      val bcast = graph.add(Broadcast[CDM17](2))
 
-      CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-      bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-      bcast.out(1) ~> TitanFlowComponents.titanWrites()
-
-      ClosedShape
-    })
-
-    config.getString("adapt.runflow") match {
+    val srcActor = config.getString("adapt.runflow") match {
       case "database" | "db" =>
         Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+//        CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)).toMat(TitanFlowComponents.titanWrites())(Keep.left)
+
       case "anomalies" | "anomaly" =>
         Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
-      case _ => combined.run()
+
+      case _ => RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+        import GraphDSL.Implicits._
+        val bcast = graph.add(Broadcast[CDM17](2))
+
+        CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+        bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
+        bcast.out(1) ~> TitanFlowComponents.titanWrites()
+
+        ClosedShape
+      }).run()
     }
+
+//    val x = Source.actorRef[Int](1, OverflowStrategy.dropNew).toMat(Sink.ignore)(Keep.left).run()
+//      x
+
+    val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+
+
 
   }
 }
@@ -105,7 +113,7 @@ object CDMSource {
   private val config = ConfigFactory.load()
   val scenario = config.getString("adapt.scenario")
 
-  def apply(ta1: String): Source[CDM17, NotUsed] = {
+  def apply(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
     ta1.toLowerCase match {
       case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic"))
@@ -120,15 +128,22 @@ object CDMSource {
         val paths = config.getStringList("adapt.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
-          .mapConcat( c =>
-            if (c.isSuccess) List(c.get)
-            else List.empty
-          ).via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+          .statefulMapConcat { () =>
+            var counter = 0
+            cdmTry => {
+              counter = counter + 1
+              if (cdmTry.isSuccess) List(cdmTry.get)
+              else {
+                println(s"Couldn't read binary data at offset: $counter")
+                List.empty
+              }
+            }
+          }.via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 
 
-  def kafkaSource(ta1Topic: String): Source[CDM17, NotUsed] = Consumer.committableSource(
+  def kafkaSource(ta1Topic: String): Source[CDM17, _] = Consumer.committableSource(
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
     Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
   ).map { msg =>
@@ -149,7 +164,7 @@ object CDMSource {
   }.mapConcat(c =>
     if (c.isSuccess) List(c.get)
     else List.empty
-  ).asInstanceOf[Source[CDM17, NotUsed]]
+  ) //.asInstanceOf[Source[CDM17, NotUsed]]
 }
 
 

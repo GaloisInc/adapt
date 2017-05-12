@@ -138,7 +138,7 @@ object FlowComponents {
     val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
     Flow[CDM17]
       .mapConcat[(UUID, String, CDM17)] {
-        case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER =>    // Throw away all EVENT_OTHERs
+        case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER && e.eventType != EVENT_CHECK_FILE_ATTRIBUTES =>    // Throw away all EVENT_OTHERs
           if (e.predicateObject2.isDefined) List((e.predicateObject.get, "Event", e), (e.predicateObject2.get, "Event", e))
           else List((e.predicateObject.get, "Event", e))
         case n: NetFlowObject => List((n.uuid, "NetFlowObject", n))
@@ -233,10 +233,11 @@ object FlowComponents {
     }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)
 
 
-  def anomalyScoreCalculator(commandSource: Source[ProcessingCommand,_]) = Flow[(String, UUID, mutable.Map[String,Any], Set[UUID])]
+
+  def anomalyScoreCalculator(commandSource: Source[ProcessingCommand,_])(implicit ec: ExecutionContext) = Flow[(String, UUID, mutable.Map[String,Any], Set[UUID])]
     .merge(commandSource)
-    .statefulMapConcat[(String, UUID, Double, Set[UUID])] { () =>
-      var matrix = MutableMap.empty[UUID, (String, Set[UUID])]
+    .statefulMapConcat[Future[List[(String, UUID, Double, Set[UUID])]]] { () =>
+      var matrix = Map.empty[UUID, (String, Set[UUID])]
       var headerOpt: Option[String] = None
       var nameOpt: Option[String] = None
 
@@ -246,26 +247,26 @@ object FlowComponents {
           if (headerOpt.isEmpty) headerOpt = Some(s"uuid,${featureMap.toList.sortBy(_._1).map(_._1).mkString(",")}\n")
           val csvFeatures = s"${featureMap.toList.sortBy(_._1).map(_._2).mkString(",")}\n"
           val row = csvFeatures -> relatedUuids
-          matrix(uuid) = row
+          matrix = matrix + (uuid -> row)
           List.empty
 
         case CleanUp => List.empty
 
         case EmitCmd =>
           if (nameOpt.isEmpty) List.empty
-          else if (nameOpt.get.startsWith("ALARM")) {
+          else if (nameOpt.get.startsWith("ALARM")) List(Future{
             matrix.toList.map{row =>
               val alarmValue = if (row._2._1.trim == "true") 1D else 0D
               (nameOpt.get, row._1, alarmValue, row._2._2)
             }
-          } else {
+          }) else List(Future{
             val randomNum = Random.nextLong()
-//            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
-//            val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
-            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-            val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
-//            inputFile.deleteOnExit()
-//            outputFile.deleteOnExit()
+            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+            val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+//            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+//            val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
             val writer: FileWriter = new FileWriter(inputFile)
             writer.write(headerOpt.get)
             matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
@@ -311,12 +312,12 @@ object FlowComponents {
               val uuid = UUID.fromString(columns.head)
               (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
             }.toList
-            inputFile.delete()
-            outputFile.delete()
+//            inputFile.delete()
+//            outputFile.delete()
             toSend
-          }
+          })
       }
-    }
+    }.mapAsync(30)(identity).mapConcat(identity)
 
 
   def commandSource(cleanUpSeconds: Int, emitSeconds: Int) =
