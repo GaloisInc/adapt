@@ -245,7 +245,11 @@ object FlowComponents {
         case Tuple4(name: String, uuid: UUID, featureMap: mutable.Map[String,Any], relatedUuids: Set[UUID]) =>
           if (nameOpt.isEmpty) nameOpt = Some(name)
           if (headerOpt.isEmpty) headerOpt = Some(s"uuid,${featureMap.toList.sortBy(_._1).map(_._1).mkString(",")}\n")
-          val csvFeatures = s"${featureMap.toList.sortBy(_._1).map(_._2).mkString(",")}\n"
+          val csvFeatures = s"${featureMap.toList.sortBy(_._1).map(_._2 match {
+            case true => 1
+            case false => 0
+            case other => other
+          }).mkString(",")}\n"
           val row = csvFeatures -> relatedUuids
           matrix = matrix + (uuid -> row)
           List.empty
@@ -256,8 +260,8 @@ object FlowComponents {
           if (nameOpt.isEmpty) List.empty
           else if (nameOpt.get.startsWith("ALARM")) List(Future{
             matrix.toList.map{row =>
-              val alarmValue = if (row._2._1.trim == "true") 1D else 0D
-              (nameOpt.get, row._1, alarmValue, row._2._2)
+//              val alarmValue = if (row._2._1.trim == "true") 1D else 0D
+              (nameOpt.get, row._1, row._2._1.toDouble, row._2._2)
             }
           }) else List(Future{
             val randomNum = Random.nextLong()
@@ -325,7 +329,7 @@ object FlowComponents {
       .merge(Source.tick[ProcessingCommand](emitSeconds seconds, emitSeconds seconds, EmitCmd).buffer(1, OverflowStrategy.backpressure))
 
 
-  def anomalyScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50) = Flow.fromGraph(
+  def anomalyScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50)(implicit ec: ExecutionContext) = Flow.fromGraph(
     GraphDSL.create(){ implicit graph =>
       val bcast = graph.add(Broadcast[CDM17](4))
       val merge = graph.add(Merge[(String,UUID,Double, Set[UUID])](4))

@@ -25,8 +25,9 @@ import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+
 import collection.JavaConverters._
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
 import scala.util.{Random, Try}
 import scala.concurrent.duration._
@@ -71,30 +72,24 @@ object ProductionApp {
     val srcActor = config.getString("adapt.runflow") match {
       case "database" | "db" =>
         Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
-//        CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)).toMat(TitanFlowComponents.titanWrites())(Keep.left)
 
       case "anomalies" | "anomaly" =>
-        Ta1Flows(ta1)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
+        Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
       case _ => RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
         import GraphDSL.Implicits._
         val bcast = graph.add(Broadcast[CDM17](2))
 
         CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-        bcast.out(0) ~> Ta1Flows(ta1)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
+        bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
         bcast.out(1) ~> TitanFlowComponents.titanWrites()
 
         ClosedShape
       }).run()
     }
 
-//    val x = Source.actorRef[Int](1, OverflowStrategy.dropNew).toMat(Sink.ignore)(Keep.left).run()
-//      x
 
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
-
-
-
   }
 }
 
@@ -177,7 +172,7 @@ object Ta1Flows {
   val slowClean = fastEmit * 2                            // 60
   val slowEmit = slowClean * 2 + base                     // 130
 
-  def apply(ta1: String) = ta1.toLowerCase match {
+  def apply(ta1: String)(implicit ec: ExecutionContext) = ta1.toLowerCase match {
 //    case "cadets" =>
 //    case "clearscope" =>
 //    case "faros" =>
