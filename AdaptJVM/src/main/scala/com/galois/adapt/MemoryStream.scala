@@ -15,7 +15,8 @@ object MemoryStream {
   def memoryFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
     val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSortedSet[Event]]]
 
-    predicateTypeLabeler(commandSource, db)
+//    predicateTypeLabeler(commandSource, db)
+    Flow[(String, UUID, Event, CDM17)]
       .filter(x => x._1 == "MemoryObject")
       .groupBy(Int.MaxValue, _._2)
       .merge(commandSource)

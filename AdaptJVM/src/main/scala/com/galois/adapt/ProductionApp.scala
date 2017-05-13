@@ -164,7 +164,7 @@ object CDMSource {
 
 
 object Ta1Flows {
-  import FlowComponents._
+  import AnomalyStream._
 
   private val config = ConfigFactory.load()
   val base = config.getInt("adapt.basecleanupseconds")    // 10

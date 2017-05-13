@@ -16,7 +16,8 @@ object ProcessStream {
   def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
     val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSortedSet[Event]]]
 
-    predicateTypeLabeler(commandSource, db)
+//    predicateTypeLabeler(commandSource, db)
+    Flow[(String, UUID, Event, CDM17)]
       .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)

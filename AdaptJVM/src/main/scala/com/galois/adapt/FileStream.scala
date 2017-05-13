@@ -16,7 +16,8 @@ object FileStream {
   def fileFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
     val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
 
-    predicateTypeLabeler(commandSource, db)
+//    predicateTypeLabeler(commandSource, db)
+    Flow[(String, UUID, Event, CDM17)]
       .filter(x => x._1 == "FileObject")
       .groupBy(Int.MaxValue, _._2)
       .merge(commandSource)
