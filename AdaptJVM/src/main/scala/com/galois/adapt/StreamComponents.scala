@@ -40,97 +40,8 @@ import com.typesafe.config.ConfigFactory
 
 object FlowComponents {
 
-//  sealed trait EventsKey
-//  case object PredicateObjectKey extends EventsKey
-//  case class SubjectKey(t: Option[EventType]) extends EventsKey
 
 
-//  def eventsGroupedByKey(commandSource: Source[ProcessingCommand, _], dbMap: HTreeMap[UUID, mutable.SortedSet[Event]], key: EventsKey) = {
-//    val keyPredicate = key match {
-//      case PredicateObjectKey => Flow[CDM17]
-//        .collect { case e: Event if e.predicateObject.isDefined => e }
-//        .mapConcat(e =>
-//          if (e.predicateObject2.isDefined) List((e.predicateObject.get, e), (e.predicateObject2.get, e))
-//          else List((e.predicateObject.get, e)))
-//      case SubjectKey(Some(t)) => Flow[CDM17]
-//        .collect { case e: Event if e.eventType == t => e.subjectUuid -> e }
-//      case SubjectKey(None) => Flow[CDM17]
-//        .collect { case e: Event => e.subjectUuid -> e }
-//    }
-//    keyPredicate
-//      .filterNot(_._2.timestampNanos == 0L)
-//      .filterNot { tup =>
-//        val excluded = List("00000000-0000-0000-0000-000000000000"/*, "071fbdeb-131c-11e7-bfbf-f55a9065b18e", "19f119de-131b-11e7-bfbf-f55a9065b18e"*/).map(UUID.fromString)
-//        excluded.contains(tup._1)
-//      } // TODO: why are there these special cases?!?!?!?!?
-//      .groupBy(Int.MaxValue, _._1) // TODO: Limited to ~4 billion unique UUIDs!!!
-//      .merge(commandSource)
-//      .statefulMapConcat { () =>
-//        var uuid: Option[UUID] = None
-//        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
-//
-//        {
-//          case EmitCmd =>
-//            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-//            existingSet ++= events
-//            dbMap.put(uuid.get, existingSet)
-//            events.clear()
-//            List(uuid.get -> existingSet)
-//
-//          case CleanUp =>
-//            if (events.nonEmpty) {
-//              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-//              existingSet ++= events
-//              dbMap.put(uuid.get, existingSet)
-//              events.clear()
-//            }
-//            List.empty
-//
-//          case Tuple2(u: UUID, e: Event) =>
-//            if (uuid.isEmpty) uuid = Some(u)
-////            val emptySet = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
-////            dbMap.put(u, emptySet)
-//            events += e
-//            List.empty
-//        }
-//      }
-//  }
-
-
-  def sortedEventAccumulator[K](groupBy: ((UUID,Event,CDM17)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("sortedEventAccumulator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID, mutable.SortedSet[Event]]]
-    Flow[(UUID,Event,CDM17)]
-      .groupBy(Int.MaxValue, groupBy) // TODO: Limited to ~4 billion unique UUIDs!!!
-      .merge(commandSource)
-      .statefulMapConcat { () =>
-        var uuid: Option[UUID] = None
-        val events = mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos))
-
-        {
-          case Tuple3(u: UUID, e: Event, _: CDM17) =>
-            if (uuid.isEmpty) uuid = Some(u)
-            events += e
-            List.empty
-
-          case CleanUp =>
-//            if (events.nonEmpty) {
-//              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-//              existingSet ++= events
-//              dbMap.put(uuid.get, existingSet)
-//              events.clear()
-//            }
-            List.empty
-
-          case EmitCmd =>
-//            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
-//            existingSet ++= events
-//            dbMap.put(uuid.get, existingSet)
-//            events.clear()
-//            List(uuid.get -> existingSet)
-            List(uuid.get -> events)
-        }
-      }.mergeSubstreams
-  }
 
 
 
@@ -148,7 +59,6 @@ object FlowComponents {
 //        case msg @ => List(msg) }
         case _ => List.empty }
       .groupBy(Int.MaxValue, _._1)
-      .merge(commandSource)
       .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
         var idOpt: Option[(UUID,String,CDM17)] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
@@ -174,17 +84,17 @@ object FlowComponents {
             events.clear()
             toSend
 
-          case CleanUp =>
-//            if (events.nonEmpty) {
-//              val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
-//              events ++= existingSet
-//  //            println(s"UNMATCHED: ${uuidOpt}  size: ${events.size}    ${events.map(_.eventType)}")  // TODO
-//              dbMap.put(uuidOpt.get, events)
-//              events.clear()
-//            }
-            List.empty
-
-          case EmitCmd => List.empty
+//          case CleanUp =>
+////            if (events.nonEmpty) {
+////              val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
+////              events ++= existingSet
+////  //            println(s"UNMATCHED: ${uuidOpt}  size: ${events.size}    ${events.map(_.eventType)}")  // TODO
+////              dbMap.put(uuidOpt.get, events)
+////              events.clear()
+////            }
+//            List.empty
+//
+//          case EmitCmd => List.empty
         }
       }.mergeSubstreams
   }

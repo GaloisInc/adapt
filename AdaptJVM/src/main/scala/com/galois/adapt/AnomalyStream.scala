@@ -49,7 +49,8 @@ object AnomalyStream {
       case CleanUp => List.empty
 
       case EmitCmd =>
-        if (nameOpt.isEmpty) List.empty
+        if (nameOpt.isEmpty)
+          List.empty
         else if (nameOpt.get.startsWith("ALARM")) List(Future{
           matrix.toList.map{row =>
   //              val alarmValue = if (row._2._1.trim == "true") 1D else 0D
@@ -58,10 +59,10 @@ object AnomalyStream {
         }) else List(
           Future{
             val randomNum = Random.nextLong()
-//            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
-//            var outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
-            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-            var outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+            var outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+//            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+//            var outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
             inputFile.deleteOnExit()
             outputFile.deleteOnExit()
             val writer: FileWriter = new FileWriter(inputFile)
@@ -116,8 +117,8 @@ object AnomalyStream {
               val uuid = UUID.fromString(columns.head)
               (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
             }.toList
-            inputFile.delete()
-            outputFile.delete()
+//            inputFile.delete()
+//            outputFile.delete()
             toSend
           }
         )

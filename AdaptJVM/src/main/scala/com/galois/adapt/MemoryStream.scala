@@ -2,70 +2,93 @@ package com.galois.adapt
 
 import java.util.UUID
 
+import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Source}
 import com.galois.adapt.FlowComponents.predicateTypeLabeler
 import com.galois.adapt.cdm17._
+import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, HTreeMap}
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, SortedSet => MutableSortedSet}
 import scala.util.Random
+import scala.concurrent.duration._
 
 
 object MemoryStream {
 
+  val config = ConfigFactory.load()
+
   def memoryFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSortedSet[Event]]]
+    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
 
 //    predicateTypeLabeler(commandSource, db)
     Flow[(String, UUID, Event, CDM17)]
       .filter(x => x._1 == "MemoryObject")
       .groupBy(Int.MaxValue, _._2)
-      .merge(commandSource)
-      .statefulMapConcat[(MemoryUUID, MutableSortedSet[Event])]{ () =>
-        val memoryEvents = MutableMap.empty[MemoryUUID, MutableSortedSet[Event]]
+//      .merge(commandSource)
+      .statefulMapConcat[(MemoryUUID, MutableSet[Event])]{ () =>
+        val memoryEvents = MutableSet.empty[Event]
+
+        var shouldStore = true
+        var cleanupCounts = 0
 
         {
           case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, _: CDM17) =>
-            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[Event](Ordering.by(_.timestampNanos))) + event
-            List.empty
+            if (shouldStore) {
+              memoryEvents += event
+              cleanupCounts = 0
+            }
+            if (memoryEvents.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+              println(s"MemoryObject is over the event limit: $uuid")
+              shouldStore = false
+              memoryEvents.clear()
+            }
 
-          case CleanUp =>
-//            if (netFlowEvents.nonEmpty) {
-//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-//              netFlowEvents.foreach { case (u, es) =>
-//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-//              }
-//              dbMap.putAll(mergedEvents.asJava)
-//              netFlowUuids ++= netFlowEvents.keySet
-//              netFlowEvents.clear()
-//            }
-//            if (memoryEvents.nonEmpty) {
-//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-//              memoryEvents.foreach { case (u, es) =>
-//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-//              }
-//
-//              // This gets slower as Event Set gets larger.
-//              dbMap.putAll(mergedEvents.asJava)
-//
-//              fileUuids ++= memoryEvents.keySet
-//              memoryEvents.clear()
-//            }
-            List.empty
+            List(uuid -> memoryEvents)
 
-          case EmitCmd =>
-//            fileUuids.foreach(u =>
-//              memoryEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-//                memoryEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//          case CleanUp =>
+////            if (netFlowEvents.nonEmpty) {
+////              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+////              netFlowEvents.foreach { case (u, es) =>
+////                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+////              }
+////              dbMap.putAll(mergedEvents.asJava)
+////              netFlowUuids ++= netFlowEvents.keySet
+////              netFlowEvents.clear()
+////            }
+////            if (memoryEvents.nonEmpty) {
+////              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+////              memoryEvents.foreach { case (u, es) =>
+////                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+////              }
+////
+////              // This gets slower as Event Set gets larger.
+////              dbMap.putAll(mergedEvents.asJava)
+////
+////              fileUuids ++= memoryEvents.keySet
+////              memoryEvents.clear()
+////            }
+//            List.empty
 //
-//            netFlowUuids.foreach(u =>
-//              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-//                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
-
-            memoryEvents.toList
+//          case EmitCmd =>
+////            fileUuids.foreach(u =>
+////              memoryEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+////                memoryEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+////
+////            netFlowUuids.foreach(u =>
+////              netFlowEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+////                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+//
+//            memoryEvents.toList
         }
-    }
-    .mergeSubstreams
-    .via(memoryFeatures)
+      }
+      .buffer(1, OverflowStrategy.dropHead)
+      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .map(t =>
+          (t._1, MutableSortedSet(t._2.toList:_*)(Ordering.by(_.timestampNanos)))
+      )
+      .mergeSubstreams
+      .via(memoryFeatures)
   }
 
   val memoryEventTypes = List(EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_MPROTECT, EVENT_OPEN, EVENT_READ, EVENT_RENAME, EVENT_SHM, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE, EVENT_LOADLIBRARY)

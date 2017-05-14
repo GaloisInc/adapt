@@ -68,26 +68,35 @@ object ProductionApp {
     val statusActor = system.actorOf(Props[StatusActor])
 
 
-
-    val srcActor = config.getString("adapt.runflow") match {
+//    val srcActor =
+    config.getString("adapt.runflow") match {
       case "database" | "db" =>
+        println("Running database-only flow")
         Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
 
       case "anomalies" | "anomaly" =>
+        println("Running anomaly-only flow")
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
-      case _ => RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-        import GraphDSL.Implicits._
-        val bcast = graph.add(Broadcast[CDM17](2))
+      case _ =>
+        println("Running the combined database ingest + anomaly calculation flow")
+        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+          import GraphDSL.Implicits._
+          val bcast = graph.add(Broadcast[CDM17](2))
 
-        CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-        bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-        bcast.out(1) ~> TitanFlowComponents.titanWrites()
+          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+          bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
+          bcast.out(1) ~> TitanFlowComponents.titanWrites()
 
-        ClosedShape
-      }).run()
+          ClosedShape
+        }).run()
     }
 
+//    val source = Source
+//      .actorRef[Int](0, OverflowStrategy.fail)
+//      .mapMaterializedValue( ref =>
+//        Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, ref), interface, port), 10 seconds)
+//      )
 
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
   }

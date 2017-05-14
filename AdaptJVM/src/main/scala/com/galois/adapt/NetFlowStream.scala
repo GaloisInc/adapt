@@ -3,13 +3,76 @@ package com.galois.adapt
 import java.util.UUID
 
 import akka.stream.scaladsl.{Flow, Source}
-import com.galois.adapt.FlowComponents.{predicateTypeLabeler, sortedEventAccumulator}
+import com.galois.adapt.FlowComponents.predicateTypeLabeler
 import com.galois.adapt.cdm17.{CDM17, EVENT_ACCEPT, EVENT_CLOSE, EVENT_CONNECT, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_WRITE, Event}
-import org.mapdb.DB
-import scala.collection.mutable.{Map => MutableMap, SortedSet => MutableSortedSet}
+import org.mapdb.{DB, HTreeMap}
+
+import scala.concurrent.duration._
+import scala.collection.mutable.{Map => MutableMap, SortedSet => MutableSortedSet, Set => MutableSet}
 import FlowComponents._
+import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
+import com.typesafe.config.ConfigFactory
+
+import scala.util.Random
 
 object NetFlowStream {
+
+  val config = ConfigFactory.load()
+
+  def sortedEventAccumulator[K](groupBy: ((UUID,Event,CDM17)) => K, commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("sortedEventAccumulator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID, MutableSortedSet[Event]]]
+    Flow[(UUID,Event,CDM17)]
+      .groupBy(Int.MaxValue, groupBy) // TODO: Limited to ~4 billion unique UUIDs!!!
+      //      .merge(commandSource)
+      .statefulMapConcat { () =>
+      var uuid: Option[UUID] = None
+      val events = MutableSet.empty[Event] //(Ordering.by[Event, Long](_.timestampNanos))
+
+      var shouldStore = true
+      var cleanupCounts = 0
+
+      {
+        case Tuple3(u: UUID, e: Event, _: CDM17) =>
+          if (uuid.isEmpty) uuid = Some(u)
+
+          if (shouldStore) {
+            events += e
+            cleanupCounts = 0
+          }
+          if (events.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            println(s"NewFlowObject is over the event limit: $uuid")
+            shouldStore = false
+            events.clear()
+          }
+
+          List(uuid.get -> events)
+
+  //          case CleanUp =>
+  ////            if (events.size > serializationThreashold) {
+  ////              val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+  ////              existingSet ++= events
+  ////              dbMap.put(uuid.get, existingSet)
+  ////              events.clear()
+  ////              didSerialize = true
+  ////            }
+  //            List.empty
+  //
+  //          case EmitCmd =>
+  ////            val existingSet = dbMap.getOrDefault(uuid.get, mutable.SortedSet.empty[Event](Ordering.by[Event, Long](_.timestampNanos)))
+  ////            existingSet ++= events
+  ////            dbMap.put(uuid.get, existingSet)
+  ////            events.clear()
+  ////            List(uuid.get -> existingSet)
+  //            List(uuid.get -> events)
+      }
+    }
+      .buffer(1, OverflowStrategy.dropHead)
+      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .map(t =>
+        t._1 -> MutableSortedSet(t._2.toList:_*)(Ordering.by(_.timestampNanos))
+      )
+      .mergeSubstreams
+  }
 
   val netflowEventTypes = List(EVENT_ACCEPT, EVENT_CONNECT, EVENT_OPEN, EVENT_CLOSE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDTO, EVENT_SENDMSG, EVENT_WRITE)
 

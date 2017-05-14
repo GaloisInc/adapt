@@ -7,96 +7,162 @@ import com.galois.adapt.FlowComponents.predicateTypeLabeler
 import com.galois.adapt.cdm17.{CDM17, EVENT_ACCEPT, EVENT_CONNECT, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, Event, EventType, NetFlowObject}
 import org.mapdb.{DB, HTreeMap}
 import FlowComponents._
+import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
 import cdm17._
+import com.typesafe.config.ConfigFactory
+
+import scala.collection.immutable.SortedSet
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet, SortedSet => MutableSortedSet}
 import scala.util.Random
+import scala.concurrent.duration._
 
 object ProcessStream {
 
-  def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSortedSet[Event]]]
+  val config = ConfigFactory.load()
 
-//    predicateTypeLabeler(commandSource, db)
+  def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
+    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, MutableSet[Event]]]
+
     Flow[(String, UUID, Event, CDM17)]
       .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subjectUuid)
       .merge(commandSource)
-      .statefulMapConcat[((UUID, MutableSortedSet[Event]), Set[(NetFlowUUID, MutableSortedSet[(Event,NetFlowObject)])], Set[(FileUUID, MutableSortedSet[(Event, FileObject)])], Set[(MemoryUUID, MutableSortedSet[(Event,MemoryObject)])])] { () =>
+      .statefulMapConcat[((UUID, MutableSet[Event]), MutableMap[NetFlowUUID, MutableSet[(Event,NetFlowObject)]], MutableMap[FileUUID, MutableSet[(Event, FileObject)]], MutableMap[MemoryUUID, MutableSet[(Event,MemoryObject)]])] { () =>
         var processUuidOpt: Option[UUID] = None
-        val eventsToThisProcess = MutableSortedSet.empty[Event](Ordering.by(_.timestampNanos))
+        val eventsToThisProcess = MutableSet.empty[Event]
 //        val allEventsByThisProcess = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
 //        val fileUuids = MutableSet.empty[UUID]
-        val fileEvents = MutableMap.empty[FileUUID, MutableSortedSet[(Event, FileObject)]]
+        val fileEvents = MutableMap.empty[FileUUID, MutableSet[(Event, FileObject)]]
 //        val netFlowUuids = MutableSet.empty[UUID]
-        val netFlowEvents = MutableMap.empty[NetFlowUUID, MutableSortedSet[(Event,NetFlowObject)]]
-        val memoryEvents = MutableMap.empty[MemoryUUID, MutableSortedSet[(Event,MemoryObject)]]
+        val netFlowEvents = MutableMap.empty[NetFlowUUID, MutableSet[(Event,NetFlowObject)]]
+        val memoryEvents = MutableMap.empty[MemoryUUID, MutableSet[(Event,MemoryObject)]]
+
+        var shouldStore = true
+        var cleanupCounts = 0
+
 
         {
           case Tuple4("Subject", uuid: ProcessUUID, event: Event, _: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(uuid)
 //            if (event.subject == processUuidOpt.get) allEventsByThisProcess += event
-            eventsToThisProcess += event
-            List.empty
+            if (shouldStore) {
+              eventsToThisProcess += event
+              cleanupCounts = 0
+            }
+            if (eventsToThisProcess.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+              println(s"Subject in process collector is over the event limit: $uuid")
+              shouldStore = false
+              eventsToThisProcess.clear()
+            }
+//            List.empty
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdm: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
-              (event -> cdm.asInstanceOf[NetFlowObject])
-            List.empty
+//            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
+//              (event -> cdm.asInstanceOf[NetFlowObject])
+            if (shouldStore) {
+              netFlowEvents.getOrElse(uuid, MutableSet.empty[(Event,NetFlowObject)]) += (event -> cdm.asInstanceOf[NetFlowObject])
+              cleanupCounts = 0
+            }
+            if (netFlowEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+              println(s"NetFlowObject in process collector is over the event limit: $uuid")
+              shouldStore = false
+              netFlowEvents.clear()
+            }
+//            List.empty
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, cdm: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,MemoryObject)](Ordering.by(_._1.timestampNanos))) +
-              (event -> cdm.asInstanceOf[MemoryObject])
-            List.empty
+//            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,MemoryObject)](Ordering.by(_._1.timestampNanos))) +
+//              (event -> cdm.asInstanceOf[MemoryObject])
+            if (shouldStore) {
+              memoryEvents.getOrElse(uuid, MutableSet.empty[(Event,MemoryObject)]) += (event -> cdm.asInstanceOf[MemoryObject])
+              cleanupCounts = 0
+            }
+            if (memoryEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+              println(s"MemoryObject in process collector is over the event limit: $uuid")
+              shouldStore = false
+              memoryEvents.clear()
+            }
+//            List.empty
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("FileObject", uuid: FileUUID, event: Event, cdm: CDM17) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
-            fileEvents(uuid) = fileEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,FileObject)](Ordering.by(_._1.timestampNanos))) +
-              (event -> cdm.asInstanceOf[FileObject])
-            List.empty
+//            fileEvents(uuid) = fileEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,FileObject)](Ordering.by(_._1.timestampNanos))) +
+//              (event -> cdm.asInstanceOf[FileObject])
+            if (shouldStore) {
+              fileEvents.getOrElse(uuid, MutableSet.empty[(Event,FileObject)]) += (event -> cdm.asInstanceOf[FileObject])
+              cleanupCounts = 0
+            }
+            if (fileEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+              println(s"FileObject in process collector is over the event limit: $uuid")
+              shouldStore = false
+              fileEvents.clear()
+            }
+//            List.empty
+            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case CleanUp =>
-//            if (fileEvents.nonEmpty) {
-//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-//              fileEvents.foreach { case (u, es) =>
-//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-//              }
-//              dbMap.putAll(mergedEvents.asJava)
-//              fileUuids ++= fileEvents.keySet
-//              fileEvents.clear()
+//            cleanupCounts = cleanupCounts + 1
+//            if (cleanupCounts > 2) {
+//
 //            }
-//            if (netFlowEvents.nonEmpty) {
-//              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
-//              netFlowEvents.foreach { case (u, es) =>
-//                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
-//              }
-//              dbMap.putAll(mergedEvents.asJava)
-//              netFlowUuids ++= netFlowEvents.keySet
-//              netFlowEvents.clear()
-//            }
-//            if (eventsToThisProcess.nonEmpty) {
-//              val mergedEvents = dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ eventsToThisProcess
-//              dbMap.put(processUuidOpt.get, mergedEvents)
-//              eventsToThisProcess.clear()
-//            }
-//            and similar for all events BY this process
             List.empty
 
           case EmitCmd =>
-//            fileUuids.foreach(u =>
-//              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
-//                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+            List.empty
+
+//          case CleanUp =>
+////            if (fileEvents.nonEmpty) {
+////              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+////              fileEvents.foreach { case (u, es) =>
+////                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+////              }
+////              dbMap.putAll(mergedEvents.asJava)
+////              fileUuids ++= fileEvents.keySet
+////              fileEvents.clear()
+////            }
+////            if (netFlowEvents.nonEmpty) {
+////              val mergedEvents = MutableMap.empty[UUID,mutable.SortedSet[Event]]
+////              netFlowEvents.foreach { case (u, es) =>
+////                mergedEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ es
+////              }
+////              dbMap.putAll(mergedEvents.asJava)
+////              netFlowUuids ++= netFlowEvents.keySet
+////              netFlowEvents.clear()
+////            }
+////            if (eventsToThisProcess.nonEmpty) {
+////              val mergedEvents = dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++ eventsToThisProcess
+////              dbMap.put(processUuidOpt.get, mergedEvents)
+////              eventsToThisProcess.clear()
+////            }
+////            and similar for all events BY this process
+//            List.empty
 //
-//            netFlowUuids.foreach(u =>
-//              netFlowEvents(u) = //dbMap.getOrDefault(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) ++
-//                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) )
-
-//            eventsToThisProcess ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
-
-            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents.toSet, fileEvents.toSet, memoryEvents.toSet))
+//          case EmitCmd =>
+////            fileUuids.foreach(u =>
+////              fileEvents(u) = dbMap.getOrDefault(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) ++
+////                fileEvents.getOrElse(u, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))) )
+////
+////            netFlowUuids.foreach(u =>
+////              netFlowEvents(u) = //dbMap.getOrDefault(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) ++
+////                netFlowEvents.getOrElse(u, mutable.SortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) )
+//
+////            eventsToThisProcess ++= dbMap.getOrDefault(processUuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
+//
+//            List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents.toSet, fileEvents.toSet, memoryEvents.toSet))
         }
       }
+      .buffer(1, OverflowStrategy.dropHead)
+      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .map(t => (
+        (t._1._1, MutableSortedSet(t._1._2.toList:_*)(Ordering.by(_.timestampNanos))),
+        t._2.mapValues(s => SortedSet(s.toList:_*)(Ordering.by[(Event, NetFlowObject), Long](_._1.timestampNanos))).toSet,
+        t._3.mapValues(s => SortedSet(s.toList:_*)(Ordering.by[(Event, FileObject), Long](_._1.timestampNanos))).toSet,
+        t._4.mapValues(s => SortedSet(s.toList:_*)(Ordering.by[(Event, MemoryObject), Long](_._1.timestampNanos))).toSet))
       .mergeSubstreams
       .via(processFeatureExtractor)
   }
@@ -105,10 +171,10 @@ object ProcessStream {
 
   val processEventTypes = EventType.values.toList
 
-  val processFeatureExtractor = Flow[((ProcessUUID, MutableSortedSet[Event]), Set[(NetFlowUUID, MutableSortedSet[(Event,NetFlowObject)])], Set[(FileUUID, MutableSortedSet[(Event, FileObject)])], Set[(MemoryUUID, MutableSortedSet[(Event,MemoryObject)])])]
+  val processFeatureExtractor = Flow[((ProcessUUID, MutableSortedSet[Event]), Set[(NetFlowUUID, SortedSet[(Event,NetFlowObject)])], Set[(FileUUID, SortedSet[(Event, FileObject)])], Set[(MemoryUUID, SortedSet[(Event,MemoryObject)])])]
     .mapConcat[(String, ProcessUUID, MutableMap[String,Any], Set[EventUUID])] { case ((processUuid, eventsDoneToThisProcessSet), netFlowEventSets, fileEventSets, memoryEventSets) =>
     val eventsDoneToThisProcessList = eventsDoneToThisProcessSet.toList
-    val allProcessEventSet: MutableSortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++ fileEventSets.flatMap(_._2.map(_._1)) ++ memoryEventSets.flatMap(_._2.map(_._1))
+    val allProcessEventSet: MutableSortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++= fileEventSets.flatMap(_._2.map(_._1)) ++= memoryEventSets.flatMap(_._2.map(_._1))
     val allProcessEventList: List[Event] = allProcessEventSet.toList
 
     var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
