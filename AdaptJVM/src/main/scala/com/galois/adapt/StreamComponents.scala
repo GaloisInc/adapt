@@ -40,13 +40,11 @@ import com.typesafe.config.ConfigFactory
 
 object FlowComponents {
 
-
-
-
+  val config = ConfigFactory.load()
 
 
   def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB): Flow[CDM17, (String, UUID, Event, CDM17), _] = {
-    val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
+//    val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
     Flow[CDM17]
       .mapConcat[(UUID, String, CDM17)] {
         case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER && e.eventType != EVENT_CHECK_FILE_ATTRIBUTES =>    // Throw away all EVENT_OTHERs
@@ -56,26 +54,36 @@ object FlowComponents {
         case f: FileObject => List((f.uuid, "FileObject", f))
         case s: Subject => List((s.uuid, "Subject", s))
         case m: MemoryObject => List((m.uuid, "MemoryObject", m))
+        case s: SrcSinkObject => List((s.uuid, "SrcSinkObject", s))
+        case u: UnnamedPipeObject => List((u.uuid, "UnnamedPipeObject", u))
+        case p: Principal => List((p.uuid, "Principal", p))
 //        case msg @ => List(msg) }
         case _ => List.empty }
       .groupBy(Int.MaxValue, _._1)
+      .merge(commandSource)
       .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
+        var targetUuid: Option[UUID] = None
         var idOpt: Option[(UUID,String,CDM17)] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
+        var cleanupCount = 0
+        var shouldStore = true
 
         {
           case Tuple3(predicateUuid: UUID, "Event", e: Event) =>
+            if (targetUuid.isEmpty) targetUuid = Some(predicateUuid)
             if (idOpt.isDefined)
               List((idOpt.get._2, predicateUuid, e, idOpt.get._3))
             else {
-              events += e
+              if (shouldStore) events += e
               List.empty
             }
-  //          List(labelOpt.map(label => (label, predicateUuid, e))).flatten   // TODO: interesting. maybe this _should_ throw away events for Objects we never see.
 
           case Tuple3(objectUuid: UUID, labelName: String, cdm: CDM17) =>
+            cleanupCount = 0
+            if (targetUuid.isEmpty) targetUuid = Some(objectUuid)
             if (idOpt.isEmpty) {
               idOpt = Some((objectUuid, labelName, cdm))
+              if (! shouldStore) println(s"WARNING: Previously gave up trying to predicate-type-label events for $objectUuid, but the object has now just arrived.")
 //              val existingSet = dbMap.getOrDefault(objectUuid, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
 //              events ++= existingSet
 //              dbMap.remove(objectUuid)
@@ -84,7 +92,15 @@ object FlowComponents {
             events.clear()
             toSend
 
-//          case CleanUp =>
+          case CleanUp =>
+            if (idOpt.isEmpty) cleanupCount += 1
+            if (idOpt.isEmpty && events.nonEmpty && cleanupCount >= config.getInt("adapt.cleanupthreshold")) {
+              println(s"Never received the object for events with a predicate to: ${targetUuid.getOrElse("never known")}")
+              shouldStore = false
+              events.clear()
+            }
+            List.empty
+
 ////            if (events.nonEmpty) {
 ////              val existingSet = dbMap.getOrDefault(uuidOpt.get, mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos)))
 ////              events ++= existingSet
@@ -94,7 +110,7 @@ object FlowComponents {
 ////            }
 //            List.empty
 //
-//          case EmitCmd => List.empty
+          case EmitCmd => List.empty
         }
       }.mergeSubstreams
   }

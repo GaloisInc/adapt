@@ -193,6 +193,6 @@ object Ta1Flows {
       fastEmit,
       slowClean,
       slowEmit
-    ).map[ViewScore]((ViewScore.apply _).tupled)  //.recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
+    ).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
 }

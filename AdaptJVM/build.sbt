@@ -33,7 +33,7 @@ lazy val adapt = (project in file(".")).settings(
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
-    "org.mapdb" % "mapdb" % "3.0.3",
+    "org.mapdb" % "mapdb" % "3.0.4",
     // Titan related
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
     "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),

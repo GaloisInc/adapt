@@ -21,7 +21,7 @@ object ProcessStream {
   val config = ConfigFactory.load()
 
   def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, MutableSet[Event]]]
+//    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, MutableSet[Event]]]
 
     Flow[(String, UUID, Event, CDM17)]
       .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))

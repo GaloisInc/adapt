@@ -45,7 +45,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     }
 
   var queryQueue = List.empty[UUID]
-  context.system.scheduler.schedule(10 seconds, 20 seconds)(context.self ! MakeExpansionQueries)
+  context.system.scheduler.schedule(10 seconds, config.getInt("adapt.expansionqueryfreq") seconds)(context.self ! MakeExpansionQueries)
 
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
@@ -121,24 +121,30 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       }
 
     case MakeExpansionQueries =>
-//        queryQueue.lastOption.foreach { startUuid =>
-//          queryQueue = queryQueue.take(queryQueue.length - 1)
-//          implicit val timeout = Timeout(60 seconds)
-//          val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
-//          val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
-//          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
-//          provResultF.flatMap { v =>
-//            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
-//            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
-//            progResultF.map { g =>
-//              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
-//              context.self ! MakeExpansionQueries
-//            }
-//          }.recover { case e: Throwable => e.printStackTrace() }
-//        }
+//          println("Q: " + queryQueue.size)
+        queryQueue.lastOption.foreach { startUuid =>
+
+          // remove this now so if there is some data problem keeping this from ever returning, we can guarantee some forward progress
+          queryQueue = queryQueue.take(queryQueue.length - 1)
+          // TODO: this will mean some potentially successful second tries never get tried.
+
+          implicit val timeout = Timeout(10 seconds)
+          val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+          val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
+          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+          provResultF.flatMap { v =>
+            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
+            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+            progResultF.map { g =>
+              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
+              context.self ! MakeExpansionQueries
+            }
+          }.recover { case e: Throwable => println(s"Expansion query failed for $startUuid with message ${e.getMessage}") }
+        }
 
 
     case ExpansionQueryResults(Provenance, uuid, vertices) => Try {
+//      println(s"Found ${vertices.length} provenance results")
       val newViews = List(
         "Has Network In Provenance" -> (if (vertices.exists(_.label() == "NetFlowObject")) 1D else 0D),
         "May Be Confidential (SrcSink)" -> (if (vertices.exists(_.label() == "SrcSinkObject")) 1D else 0D),
@@ -158,6 +164,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     }.recover{ case e: Throwable => e.printStackTrace()}
 
     case ExpansionQueryResults(Progenance, uuid, vertices) => Try {
+//      println(s"Found ${vertices.length} proGenance results")
       val newViews = List(
         "Has Network In Progenance" -> (if (vertices.exists(_.label() == "NetFlowObject")) 1D else 0D)
       )

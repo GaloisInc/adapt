@@ -19,7 +19,7 @@ object MemoryStream {
   val config = ConfigFactory.load()
 
   def memoryFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
+//    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
 
 //    predicateTypeLabeler(commandSource, db)
     Flow[(String, UUID, Event, CDM17)]

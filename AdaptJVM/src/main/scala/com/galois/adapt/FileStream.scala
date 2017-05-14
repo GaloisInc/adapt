@@ -18,7 +18,7 @@ object FileStream {
   val config = ConfigFactory.load()
 
   def fileFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
-    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
+//    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
 
     Flow[(String, UUID, Event, CDM17)]
       .filter(x => x._1 == "FileObject")
