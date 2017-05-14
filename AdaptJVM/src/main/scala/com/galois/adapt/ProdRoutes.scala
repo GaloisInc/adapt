@@ -7,6 +7,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import com.bbn.tc.schema.avro.TheiaQueryType
 //import akka.http.scaladsl.marshalling._
 import java.util.UUID
 import akka.actor.ActorRef
@@ -31,7 +32,7 @@ object ProdRoutes {
     }
 
 
-  implicit val timeout = Timeout(61 seconds)
+  implicit val timeout = Timeout(121 seconds)
 
   def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
     val qType = query match {
@@ -141,10 +142,22 @@ object ProdRoutes {
           }
         } ~
         pathPrefix("makeTheiaQuery") {
-          formField('uuid) { uuid =>
+          formFieldMap { fields =>
             complete {
-              Try(UUID.fromString(uuid)).map(u =>
-                (anomalyActor ? MakeTheiaQuery(u)).mapTo[Future[String]].flatMap(identity)
+              Try(
+                MakeTheiaQuery(
+                  fields("type").toLowerCase match {
+                    case "backward" | "backwards" => TheiaQueryType.BACKWARD
+                    case "forward"  | "forwards"   => TheiaQueryType.FORWARD
+                    case "point_to_point" | "pointtopoint" => TheiaQueryType.POINT_TO_POINT
+                  },
+                  fields.get("sourceId").map(UUID.fromString),
+                  fields.get("sinkId").map(UUID.fromString),
+                  fields.get("startTimestamp").map(_.toLong),
+                  fields.get("endTimestamp").map(_.toLong)
+                )
+              ).map(q =>
+                (anomalyActor ? q).mapTo[Future[String]].flatMap(identity)
               )
             }
           }

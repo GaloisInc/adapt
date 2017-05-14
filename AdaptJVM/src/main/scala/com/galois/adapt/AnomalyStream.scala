@@ -55,65 +55,75 @@ object AnomalyStream {
   //              val alarmValue = if (row._2._1.trim == "true") 1D else 0D
             (nameOpt.get, row._1, row._2._1.toDouble, row._2._2)
           }
-        }) else List(Future{
-          val randomNum = Random.nextLong()
-          val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
-          val outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
-  //            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-  //            val outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
-          inputFile.deleteOnExit()
-          outputFile.deleteOnExit()
-          val writer: FileWriter = new FileWriter(inputFile)
-          writer.write(headerOpt.get)
-          matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
-          writer.close()
+        }) else List(
+          Future{
+            val randomNum = Random.nextLong()
+//            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+//            var outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+            var outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
+            val writer: FileWriter = new FileWriter(inputFile)
+            writer.write(headerOpt.get)
+            matrix.map(row => s"${row._1},${row._2._1}").foreach(writer.write)
+            writer.close()
 
-          val config = ConfigFactory.load()
+            val config = ConfigFactory.load()
 
-          Try(Seq[String](
-            config.getString("adapt.iforestpath"),
-  //              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
-            "-i", inputFile.getCanonicalPath, // input file
-            "-o", outputFile.getCanonicalPath, // output file
-            "-m", "1", // ignore the first column
-            "-t", "250" // number of trees
-          ).!!) match {
-            case Success(output) => //println(s"AD output: $randomNum\n$output")
-            case Failure(e) => println(s"AD failure: $randomNum"); e.printStackTrace()
+            Try(Seq[String](
+              config.getString("adapt.iforestpath"),
+//              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
+              "-i", inputFile.getCanonicalPath, // input file
+              "-o", outputFile.getCanonicalPath, // output file
+              "-m", "1", // ignore the first column
+              "-t", "250" // number of trees
+            ).!!) match {
+              case Success(output) => //println(s"AD output: $randomNum\n$output")
+              case Failure(e) => println(s"AD failure: $randomNum"); e.printStackTrace()
+            }
+
+            val shouldNormalize = config.getBoolean("adapt.shouldnoramlizeanomalyscores")
+
+            val fileLines = if (shouldNormalize) {
+              val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
+//              val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
+//              normalizedFile.createNewFile()
+              normalizedFile.deleteOnExit()
+
+              val normalizationCommand = Seq(
+                "Rscript",
+                this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
+                "-i", outputFile.getCanonicalPath, // input file
+                "-o", normalizedFile.getCanonicalPath) // output file
+
+              val normResultTry = Try(normalizationCommand.!!) match {
+                case Success(output) => //println(s"Normalization output: $randomNum\n$output")
+                case Failure(e) => e.printStackTrace()
+              }
+
+              outputFile.delete()
+              outputFile = normalizedFile
+
+              FileSource.fromFile(normalizedFile).getLines()
+            } else FileSource.fromFile(outputFile).getLines()
+
+            if (fileLines.hasNext) fileLines.next() // Throw away the header row
+
+            val toSend = fileLines
+              .toSeq.map { l =>
+              val columns = l.split(",")
+              val uuid = UUID.fromString(columns.head)
+              (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
+            }.toList
+            inputFile.delete()
+            outputFile.delete()
+            toSend
           }
-
-  //          val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
-  //          val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
-  //          normalizedFile.createNewFile()
-  //          normalizedFile.deleteOnExit()
-
-  //          val normalizationCommand = Seq(
-  //            "Rscript",
-  //            this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
-  //            "-i", outputFile.getCanonicalPath,       // input file
-  //            "-o", normalizedFile.getCanonicalPath)   // output file
-  //
-  //          val normResultTry = Try(normalizationCommand.!!) match {
-  //            case Success(output) => println(s"Normalization output: $randomNum\n$output")
-  //            case Failure(e)      => e.printStackTrace()
-  //          }
-
-
-  //          val fileLines = FileSource.fromFile(normalizedFile).getLines()
-          val fileLines = FileSource.fromFile(outputFile).getLines()
-          if (fileLines.hasNext) fileLines.next() // Throw away the header row
-          val toSend = fileLines
-            .toSeq.map { l =>
-            val columns = l.split(",")
-            val uuid = UUID.fromString(columns.head)
-            (nameOpt.get, uuid, columns.last.toDouble, matrix(uuid)._2)
-          }.toList
-  //            inputFile.delete()
-  //            outputFile.delete()
-          toSend
-        })
+        )
     }
-  }.mapAsyncUnordered(8)(identity).mapConcat(identity)
+  }.mapAsyncUnordered(ConfigFactory.load().getInt("adapt.iforestparallelism"))(identity)
+    .mapConcat(identity)
 
 
   def anomalyScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50)(implicit ec: ExecutionContext) = Flow.fromGraph(
@@ -127,9 +137,9 @@ object AnomalyStream {
 
       start ~> predicateTypeLabeler(fastCommandSource, db) ~> bcast.in
       bcast.out(0) ~> netFlowFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
-      bcast.out(1) ~> fileFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
-      bcast.out(2) ~> processFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
-      bcast.out(3) ~> memoryFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
+      bcast.out(1) ~> memoryFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
+      bcast.out(2) ~> fileFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
+      bcast.out(3) ~> processFeatureGenerator(fastCommandSource, db).groupBy(100, _._1).via(anomalyScoreCalculator(slowCommandSource)).mergeSubstreams ~> merge
       merge.out
 
       FlowShape(start.in, merge.out)

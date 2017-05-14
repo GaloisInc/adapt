@@ -6,7 +6,8 @@
     <script type="text/javascript" src="javascripts/underscore.js"></script>
     <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
     <script type="text/javascript" src="javascripts/ui_language.js"></script>
-    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script> 
+    <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
+    <!--<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>-->
 
     <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
     <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
@@ -509,10 +510,17 @@
             var keys = Object.keys(node['properties'])
             var prop_lines = _.map(keys, function(key) {
                 x = node['properties'][key]
-                var value_list = _.map(x, function(s){ 
-                    return String(s.value) } )
+                var value_list = _.map(x, function(s){ return String(s.value) } )
                 return key + " : " + value_list.join(", ")
             })
+
+            if (_.contains(keys, "timestampNanos")) {
+                prop_lines.push('timestamp : ' + new Date(node['properties']['timestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
+            }
+            if (_.contains(keys, "startTimestampNanos")) {
+                prop_lines.push('startTimestamp : ' + new Date(node['properties']['startTimestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
+            }
+
             return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
         }
 

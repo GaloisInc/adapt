@@ -37,20 +37,34 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
 
-  def makeTheiaQuery(uuid: UUID): Future[String] = Future {
+  def makeTheiaQuery(q: MakeTheiaQuery): Future[String] = Future {
     val theia = new TheiaQuery()
-    val bb = ByteBuffer.allocate(16)
-    bb.putLong(uuid.getMostSignificantBits)
-    bb.putLong(uuid.getLeastSignificantBits)
-    val targetUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
-    theia.put("sinkId", targetUuid)
-    val idUuid = UUID.randomUUID()
+    if (q.sinkId.isDefined) {
+      val bb = ByteBuffer.allocate(16)
+      bb.putLong(q.sinkId.get.getMostSignificantBits)
+      bb.putLong(q.sinkId.get.getLeastSignificantBits)
+      val targetUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
+      theia.put("sinkId", targetUuid)
+    }
+    if (q.sourceId.isDefined) {
+      val bb = ByteBuffer.allocate(16)
+      bb.putLong(q.sourceId.get.getMostSignificantBits)
+      bb.putLong(q.sourceId.get.getLeastSignificantBits)
+      val targetUuid = new com.bbn.tc.schema.avro.cdm17.UUID(bb.array())
+      theia.put("sourceId", targetUuid)
+    }
+    if (q.startTimestamp.isDefined) {
+      theia.put("startTimestamp", q.startTimestamp.get)
+    }
+    if (q.endTimestamp.isDefined) {
+      theia.put("endTimestamp", q.endTimestamp.get)
+    }
     val bb2 = ByteBuffer.allocate(16)
-    bb2.putLong(idUuid.getMostSignificantBits)
-    bb2.putLong(idUuid.getLeastSignificantBits)
+    bb2.putLong(q.queryId.getMostSignificantBits)
+    bb2.putLong(q.queryId.getLeastSignificantBits)
     val queryID = new com.bbn.tc.schema.avro.cdm17.UUID(bb2.array())
     theia.put("queryId", queryID)
-    theia.put("type", TheiaQueryType.BACKWARD)
+    theia.put("type", q.`type`)
 
     val baos = new ByteArrayOutputStream
     val writer = new SpecificDatumWriter(classOf[com.bbn.tc.schema.avro.cdm17.TheiaQuery])
@@ -68,7 +82,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
 
-    println(s"Making Theia query with id: $idUuid to get provenance of node: $uuid")
+    println(s"Making Theia query: $q")
 
     val data = new ProducerRecord[Array[Byte], Array[Byte]](topic, elem)
     val producer = new KafkaProducer[Array[Byte], Array[Byte]](props)
@@ -145,9 +159,9 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       }
     }.recover{ case e: Throwable => e.printStackTrace()}
 
-    case MakeTheiaQuery(uuid) =>
-      val result = makeTheiaQuery(uuid)
-      result.map(r => println(s"Theia query result for $uuid: $r"))
+    case q: MakeTheiaQuery =>
+      val result = makeTheiaQuery(q)
+      result.map(r => println(s"Theia query: $q returned result: $r"))
         .recover { case e: Throwable => println(s"Theia query failed with: ${e.getMessage}") }
       sender() ! result
 
@@ -213,5 +227,11 @@ sealed trait ExpansionQuery
 case object Provenance extends ExpansionQuery
 case object Progenance extends ExpansionQuery
 
-case class MakeTheiaQuery(uuid: UUID)
-
+case class MakeTheiaQuery(
+  `type`: TheiaQueryType,
+  sourceId: Option[UUID] = None,
+  sinkId: Option[UUID] = None,
+  startTimestamp: Option[Long] = None,
+  endTimestamp: Option[Long] = None,
+  queryId: UUID = UUID.randomUUID()
+)

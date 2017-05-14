@@ -47,7 +47,11 @@ object TitanFlowComponents {
    * The following also sets up a key index for UUIDs.
    */
   val graph = {
-    val graph = TitanFactory.build.set("storage.backend","cassandra").set("storage.hostname","localhost").open
+    val graph = TitanFactory.build
+      .set("storage.backend","cassandra")
+      .set("storage.hostname","localhost")
+      .set("storage.read-time",120000)
+      .open
 
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
 
