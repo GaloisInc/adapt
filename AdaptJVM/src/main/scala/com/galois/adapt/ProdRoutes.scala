@@ -120,7 +120,7 @@ object ProdRoutes {
         pathPrefix("saveNotes") {
           formFieldMap { fields =>
             complete {
-              val notes = fields.getOrElse("notes", "").replaceAll(""""""","")
+              val notes = fields.getOrElse("notes", "").replaceAll(""""""","").replaceAll("\\\\", "")
               val keyUuid = UUID.fromString(fields("keyUuid"))
               val rating = fields("rating").toInt
               val subgraph = fields("subgraph").split(",").filter(_.nonEmpty).map(s => UUID.fromString(s.trim())).toSet

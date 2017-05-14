@@ -17,8 +17,10 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import scala.collection.mutable.{MutableList, Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
-import scala.util.{Random, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+import ApiJsonProtocol._
+import spray.json._
 
 import scala.concurrent.Future
 
@@ -29,7 +31,18 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
 
-  val savedNotes = MutableList.empty[SavedNotes]
+  val notesFilePath = config.getString("adapt.notesfile")
+
+  var savedNotes = Try(scala.io.Source.fromFile(notesFilePath))
+    .map { notesSource =>
+      val notesString = try notesSource.mkString finally notesSource.close()
+      notesString.parseJson.convertTo[List[SavedNotes]]
+    } match {
+      case Success(parsedNotes) => parsedNotes
+      case Failure(e) =>
+        println("Failed to load saved notes file: " + e.getMessage)
+        List.empty[SavedNotes]
+    }
 
   var queryQueue = List.empty[UUID]
   context.system.scheduler.schedule(10 seconds, 20 seconds)(context.self ! MakeExpansionQueries)
@@ -199,13 +212,19 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
 
     case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
-      savedNotes += msg
-      new PrintWriter(config.getString("adapt.notesfile")) { savedNotes.foreach(n => write(n.toJsonString + "\n")); close() }
-      sender() ! Success(())
+      savedNotes = savedNotes :+ msg
+      sender() ! Try {
+        new PrintWriter(notesFilePath) {
+          write(savedNotes.toJson.toString)
+          close()
+        }
+      }.map(_ => ())
 
     case GetNotes(uuids) =>
-      val notes = uuids.flatMap(u => savedNotes.reverse.find(_.keyUuid == u))
-      val toSend = if (notes.isEmpty) savedNotes.reverse else notes
+      val revOrderNotes = savedNotes.reverse
+      val toSend =
+        if (uuids.isEmpty) revOrderNotes
+        else uuids.flatMap(u => revOrderNotes.find(_.keyUuid == u))
       sender() ! toSend
   }
 }
