@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import numpy
 from query import *
 
@@ -106,3 +108,11 @@ def cost(context,dictionary={}):
 
 
 
+def combineContexts(ctx1,ctx2):
+    ctx = ctx1.copy()
+    for k in ctx2.keys():
+        if k in ctx1.keys(): 
+            ctx[k] = ctx[k] | ctx2[k]
+        else:
+            ctx[k] = ctx2[k]
+    return ctx

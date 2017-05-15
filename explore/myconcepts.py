@@ -44,6 +44,12 @@ def getSupports(context,concepts):
     return {concept: getSupport(context,concept) for concept in concepts}
 
 
+def getScaledSupports(context,concepts):
+    supps = getSupports(context,concepts)
+    n = len(context)
+    return {k : supps[k]/n for k in supps.keys()}
+
+
 def findAllConceptsWithMinSupp(context,minsupp):
     knownConcepts = set()
     conceptsTodo = [frozenset()]
@@ -57,3 +63,14 @@ def findAllConceptsWithMinSupp(context,minsupp):
             for newConcept in newConcepts:
                 conceptsTodo = conceptsTodo + [newConcept]
     return knownConcepts
+
+
+
+# build successor relation and edges among concepts
+
+def successor(concepts,c1,c2):
+    return c1 < c2 and {c for c in concepts if c1 < c and c < c2} == set()
+
+def edges(concepts):
+    return {(c1,c2) for c1 in concepts for c2 in concepts if successor(concepts,c1,c2)}
+
