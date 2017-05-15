@@ -74,20 +74,29 @@ object AnomalyStream {
             val writer: FileWriter = new FileWriter(inputFile)
             writer.write(headerOpt.get)
 
-            // normalize each column of counts:
-            var normalizedFeatures = MutableMap(featureCollection.mapValues(t => MutableMap(t._1.toList:_*) -> t._2).toList:_*)
-            val countKeys = featureCollection.headOption.map(_._2._1.keySet.filter(_.startsWith("count_"))).getOrElse(Set.empty[String])
-            countKeys.foreach { key =>
-              val total = normalizedFeatures.values.map(_._1(key).asInstanceOf[Int]).sum.toDouble
-              normalizedFeatures.transform { case (uuid, (features, subgraph)) =>
-                val normalized = if (total > 0) features(key).asInstanceOf[Int].toDouble / total else 0D
-                features += (key -> normalized)
-                features -> subgraph
-              }
+            // normalize counts per row:
+            val normalizedFeatures = featureCollection.mapValues { case (features, subgraph) =>
+              val total = features.collect { case (k,v) if k.startsWith("count_") => v.asInstanceOf[Int] }.sum
+              val normalized = if (total > 0) features.map {
+                case (k,v) => if (k.startsWith("count_")) k -> (v.asInstanceOf[Int].toDouble / total) else (k,v)
+              } else features
+              normalized -> subgraph
             }
 
+//            // normalize each column of counts:
+//            var normalizedFeatures = MutableMap(featureCollection.mapValues(t => MutableMap(t._1.toList:_*) -> t._2).toList:_*)
+//            val countKeys = featureCollection.headOption.map(_._2._1.keySet.filter(_.startsWith("count_"))).getOrElse(Set.empty[String])
+//            countKeys.foreach { key =>
+//              val total = normalizedFeatures.values.map(_._1(key).asInstanceOf[Int]).sum.toDouble
+//              normalizedFeatures.transform { case (uuid, (features, subgraph)) =>
+//                val normalized = if (total > 0) features(key).asInstanceOf[Int].toDouble / total else 0D
+//                features += (key -> normalized)
+//                features -> subgraph
+//              }
+//            }
+
             normalizedFeatures.map { case (uuid, (features, subgraph)) =>
-              val rowFeatures = features.toList.sortBy(_._1).map(x => x._2 match {
+              val rowFeatures = features.toList.sortBy(_._1).map(x => x._2 match {  // TODO: should only sort once instead of on each iteration
                 case true => 1
                 case false => 0
                 case other => other
