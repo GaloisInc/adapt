@@ -26,7 +26,7 @@ object ProcessStream {
     Flow[(String, UUID, Event, CDM17)]
       .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subjectUuid)
-      .merge(commandSource)
+//      .merge(commandSource)
       .statefulMapConcat[((UUID, MutableSet[Event]), MutableMap[NetFlowUUID, MutableSet[(Event,NetFlowObject)]], MutableMap[FileUUID, MutableSet[(Event, FileObject)]], MutableMap[MemoryUUID, MutableSet[(Event,MemoryObject)]])] { () =>
         var processUuidOpt: Option[UUID] = None
         val eventsToThisProcess = MutableSet.empty[Event]
@@ -105,15 +105,11 @@ object ProcessStream {
 //            List.empty
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
-          case CleanUp =>
-//            cleanupCounts = cleanupCounts + 1
-//            if (cleanupCounts > 2) {
+//          case CleanUp =>
+//            List.empty
 //
-//            }
-            List.empty
-
-          case EmitCmd =>
-            List.empty
+//          case EmitCmd =>
+//            List.empty
 
 //          case CleanUp =>
 ////            if (fileEvents.nonEmpty) {

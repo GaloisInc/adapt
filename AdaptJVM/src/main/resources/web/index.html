@@ -85,7 +85,7 @@
 				})
 
 				$.getJSON(testing_Prefix + "/ranked/all", function(top_anoms){
-					_.map(top_anoms, function(a){
+					_.map(top_anoms, function(a, idx){
 						var key_uuid = Object.keys(a)[0]
 						var anom_types = Object.keys(a[key_uuid])
 						var anom_type_scores = _.map(anom_types, function(t){
@@ -107,7 +107,11 @@
 							class: "column row small-12 card"
 						})
 						container.append($("<div>", {
-							class: "column small-8",
+							class: "column small-2",
+							text: "Rank: " + (idx + 1)
+						}))
+						container.append($("<div>", {
+							class: "column small-7",
 							text: key_uuid
 						}))
 
@@ -139,7 +143,7 @@
 							}
 						}
 
-						var starDiv = $("<div>", {class: "column small-4"})
+						var starDiv = $("<div>", {class: "column small-3"})
 						_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
 
 						if (key_uuid in existing_notes) {

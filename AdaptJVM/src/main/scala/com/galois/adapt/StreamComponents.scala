@@ -58,7 +58,8 @@ object FlowComponents {
         case u: UnnamedPipeObject => List((u.uuid, "UnnamedPipeObject", u))
         case p: Principal => List((p.uuid, "Principal", p))
 //        case msg @ => List(msg) }
-        case _ => List.empty }
+        case _ => List.empty
+    }
       .groupBy(Int.MaxValue, _._1)
       .merge(commandSource)
       .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
