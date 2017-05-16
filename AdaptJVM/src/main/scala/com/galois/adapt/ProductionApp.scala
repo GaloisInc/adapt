@@ -80,13 +80,15 @@ object ProductionApp {
 
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
+	val threadPool = config.getInt("adapt.ingest.threadpool")
+	
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
           val bcast = graph.add(Broadcast[CDM17](2))
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites()
+          bcast.out(1) ~> TitanFlowComponents.titanWrites(threadPool)
 
           ClosedShape
         }).run()

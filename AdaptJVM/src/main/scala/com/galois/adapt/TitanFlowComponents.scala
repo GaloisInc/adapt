@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.util.UUID
+import java.util.concurrent.{Executors}
 
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import com.galois.adapt.cdm17.CDM17
@@ -11,11 +12,14 @@ import org.apache.tinkerpop.gremlin.structure.Vertex
 
 import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
-import scala.concurrent.ExecutionContext
-import scala.util.{Success, Failure, Try}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 
 object TitanFlowComponents {
+  sealed trait TxStatus {}
+  final case class TxSuccess() extends TxStatus
+  final case class TxFailure(error: Throwable) extends TxStatus
 
   def addIndex(graph: TitanGraph, management: ManagementSystem, propKey: String, clazz: Class[_], indexName: String) = {
 
@@ -256,109 +260,140 @@ object TitanFlowComponents {
     graph
   }
 
+  // Create a titan transaction to insert a batch of objects
+  def titanTx(cdms: Seq[DBNodeable]) = {
+    val transaction = //graph.newTransaction()
+    graph.buildTransaction()
+    //          .enableBatchLoading()
+    //          .checkExternalVertexExistence(false)
+    .start()
+
+    // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
+    // during this transaction (since we don't look those up in the usual manner).
+    val newVertices = MutableMap.empty[UUID, Vertex]
+
+    // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
+    // handle cases where nodes are out of order).
+    var missingToUuid = MutableMap.empty[UUID, Set[(Vertex, String)]]
+
+    // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
+    // the 'newVertices' map, then falling back on a query to Titan.
+    def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
+      val iterator = transaction.traversal().V().has("uuid", uuid)
+      if (iterator.hasNext()) Some(iterator.next()) else None
+    }
+
+    val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
+
+    for (cdm <- cdms) {
+      // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
+      // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
+      Try {
+        val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
+        assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
+        val newTitanVertex = transaction.addVertex(props: _*)
+        newVertices += (cdm.getUuid -> newTitanVertex)
+
+        for ((label, toUuid) <- cdm.asDBEdges) {
+          if (toUuid == skipEdgesToThisUuid) Success(())
+          else {
+            findNode(toUuid) match {
+            case Some(toTitanVertex) =>
+              newTitanVertex.addEdge(label, toTitanVertex)
+            case None =>
+              missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
+            }
+          }
+        }
+      } match {
+        case Success(_) =>
+        case Failure(e: SchemaViolationException) =>  // TODO??
+        case Failure(e: java.lang.IllegalArgumentException) =>
+          if (!e.getMessage.contains("byUuidUnique")) {
+            println("Failed CDM statement: " + cdm)
+            println(e.getMessage) // Bad query
+            e.printStackTrace()
+          }
+        case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+      }
+    }
+
+    // Try to complete missing edges. If the node pointed to is _still_ not found, we
+    // synthetically create it.
+    var nodeCreatedCounter = 0
+    var edgeCreatedCounter = 0
+
+    for ((uuid, edges) <- missingToUuid; (fromTitanVertex, label) <- edges) {
+      if (uuid != skipEdgesToThisUuid) {
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        val toTitanVertex = findNode(uuid) getOrElse {
+          nodeCreatedCounter += 1
+          val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
+          newVertices += (uuid -> newNode)
+          newNode
+        }
+
+        // Create the missing edge
+        Try {
+          fromTitanVertex.addEdge(label, toTitanVertex)
+          edgeCreatedCounter += 1
+        } match {
+          case Success(_) =>
+          case Failure(e: SchemaViolationException) => // TODO??
+          case Failure(e: java.lang.IllegalArgumentException) =>
+            if (!e.getMessage.contains("byUuidUnique")) {
+              println(e.getMessage) // Bad query
+              e.printStackTrace()
+            }
+          case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+        }
+      }
+    }
+
+    Try(
+      transaction.commit()
+    ) match {
+      case Success(_) => TxSuccess
+      case Failure(e) =>
+        // Item of note: Titan prints out the stack trace as part of throwing a transaction error
+        // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
+        // that exception is handled here, that's just Titan printing out the trace for your information
+        transaction.rollback()
+        TxFailure(e)
+    }
+  }
+
+  // Loops on insertion until we either insert the entire batch
+  // A single statement may fail to insert but only after ln(batch size)+1 attempts
+  def titanLoop(cdms: Seq[DBNodeable]): Unit = {
+    titanTx(cdms) match {
+      case TxSuccess() => ()
+      case TxFailure(_) =>
+        // If we're trying to ingest a single CDM statement, try it one more time before giving up
+        if (cdms.length == 1) titanTx(cdms) else {
+          // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
+          val (front, back) = cdms.splitAt(cdms.length / 2)
+          titanLoop(front)
+          titanLoop(back)
+        }
+    }
+  }
+
+  // Create a thread pool and insert batches of CDM objects in parallel
+  // Of note, insertion rates are very data dependent. It involves not only size of the CDM objects, but
+  // also density of immediate reference as that causes transaction errors.
+  def asyncTitanTx(poolSize: Int, cdms: Seq[DBNodeable]) = Future {
+    titanLoop(cdms)
+  }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(poolSize)))
+
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
+  def titanWrites(poolSize: Int = 10, graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-        val transaction = //graph.newTransaction()
-          graph.buildTransaction()
-//          .enableBatchLoading()
-//          .checkExternalVertexExistence(false)
-            .start()
-
-        // For the duration of the transaction, we keep a 'Map[UUID -> Vertex]' of vertices created
-        // during this transaction (since we don't look those up in the usual manner).
-        val newVertices = MutableMap.empty[UUID, Vertex]
-
-        // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
-        // handle cases where nodes are out of order).
-        var missingToUuid = MutableMap.empty[UUID, Set[(Vertex, String)]]
-
-        // Accordingly, we define a function which lets us look up a vertex by UUID - first by checking
-        // the 'newVertices' map, then falling back on a query to Titan.
-        def findNode(uuid: UUID): Option[Vertex] = newVertices.get(uuid) orElse {
-          val iterator = transaction.traversal().V().has("uuid", uuid)
-          if (iterator.hasNext()) Some(iterator.next()) else None
-        }
-
-        val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
-
-        for (cdm <- cdms) {
-          // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
-          // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
-          Try {
-            val props: List[Object] = cdm.asDBKeyValues.asInstanceOf[List[Object]]
-            assert(props.length % 2 == 0, s"Node ($cdm) has odd length properties list: $props.")
-            val newTitanVertex = transaction.addVertex(props: _*)
-            newVertices += (cdm.getUuid -> newTitanVertex)
-
-            for ((label, toUuid) <- cdm.asDBEdges) {
-              if (toUuid == skipEdgesToThisUuid) Success(())
-              else {
-                findNode(toUuid) match {
-                  case Some(toTitanVertex) =>
-                    newTitanVertex.addEdge(label, toTitanVertex)
-                  case None =>
-                    missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set[(Vertex, String)]()) + (newTitanVertex -> label)
-                }
-              }
-            }
-          } match {
-            case Success(_) =>
-            case Failure(e: SchemaViolationException) =>  // TODO??
-            case Failure(e: java.lang.IllegalArgumentException) =>
-              if (!e.getMessage.contains("byUuidUnique")) {
-                println("Failed CDM statement: " + cdm)
-                println(e.getMessage) // Bad query
-                e.printStackTrace()
-              }
-            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
-          }
-        }
-
-        // Try to complete missing edges. If the node pointed to is _still_ not found, we
-        // synthetically create it.
-        var nodeCreatedCounter = 0
-        var edgeCreatedCounter = 0
-
-        for ((uuid, edges) <- missingToUuid; (fromTitanVertex, label) <- edges) {
-          if (uuid != skipEdgesToThisUuid) {
-            // Find or create the missing vertex (it may have been created earlier in this loop)
-            val toTitanVertex = findNode(uuid) getOrElse {
-              nodeCreatedCounter += 1
-              val newNode = transaction.addVertex("uuid", UUID.randomUUID()) // uuid)
-              newVertices += (uuid -> newNode)
-              newNode
-            }
-
-            // Create the missing edge
-            Try {
-              fromTitanVertex.addEdge(label, toTitanVertex)
-              edgeCreatedCounter += 1
-            } match {
-              case Success(_) =>
-              case Failure(e: SchemaViolationException) => // TODO??
-              case Failure(e: java.lang.IllegalArgumentException) =>
-                if (!e.getMessage.contains("byUuidUnique")) {
-                  println(e.getMessage) // Bad query
-                  e.printStackTrace()
-                }
-              case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
-            }
-          }
-        }
-
-//        println(s"Created $nodeCreatedCounter synthetic nodes and $edgeCreatedCounter edges")
-
-        Try(
-          transaction.commit()
-        ) match {
-          case Success(_) => // println(s"Committed transaction with ${cdms.length} statements")
-          case Failure(e) => e.printStackTrace()
-        }
+        asyncTitanTx(poolSize, cdms)
       }
     )(Keep.right)
 }
