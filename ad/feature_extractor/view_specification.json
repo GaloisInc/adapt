@@ -113,7 +113,7 @@
 
     "files_connected_with_netflow" : {
         "description" : "Analyze files that have connection with netflow (potential downloaded files)",
-        "instance_set" : "IDS=g.V().has(STYPE,EVENT).as('net_events').both(E_A_N_O,N_A_E_I).select('net_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).dedup().id().toList()",
+        "instance_set" : "IDS=g.V().has(STYPE,EVENT).as('net_events').both(E_A_N_O,N_A_E_I).select('net_events').out(E_G_B_S_O).out(E_G_B_S_I).dedup().where(__.in(E_G_B_S_I).count().is(lt(100000))).in(E_G_B_S_I).in(E_G_B_S_O).both(E_A_F_O,F_A_E_I).both(E_A_F_I,F_A_E_O).dedup().id().toList()",
         "feature_set" : {
             "num_exec":
                 "g.V(IDS).local(__.both(F_A_E_O,E_A_F_I).both(F_A_E_I,E_A_F_O).has(ETYPE,EXECUTE).count())",
