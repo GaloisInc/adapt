@@ -379,21 +379,23 @@ object TitanFlowComponents {
     }
   }
 
+  val titanTxEc = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
+
   // Create a thread pool and insert batches of CDM objects in parallel
   // Of note, insertion rates are very data dependent. It involves not only size of the CDM objects, but
   // also density of immediate reference as that causes transaction errors.
-  def asyncTitanTx(poolSize: Int, cdms: Seq[DBNodeable]) = Future {
+  def asyncTitanTx(cdms: Seq[DBNodeable]) = Future {
     titanLoop(cdms)
-  }(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(poolSize)))
+  }(titanTxEc)
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(poolSize: Int = 10, graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
+  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .toMat(
       Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-        asyncTitanTx(poolSize, cdms)
+        asyncTitanTx(cdms)
       }
     )(Keep.right)
 }

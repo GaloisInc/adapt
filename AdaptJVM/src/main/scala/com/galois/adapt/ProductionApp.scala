@@ -88,7 +88,7 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites(threadPool)
+          bcast.out(1) ~> TitanFlowComponents.titanWrites()
 
           ClosedShape
         }).run()
