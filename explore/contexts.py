@@ -16,7 +16,7 @@ all_principalsQ = "g.V().hasLabel('Principal').as('x').values('euid').as('euid')
 all_netflowQ = "g.V().hasLabel('NetFlowObject').values('remoteAddress').dedup()"
 
 
-proc_netflowQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().hasLabel('Event').both().hasLabel('NetFlowObject').values('remoteAddress').as('dest').select('pid','dest')"
+proc_netflowQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().hasLabel('Event').both().hasLabel('NetFlowObject').values('remoteAddress').as('dest').select('pid','dest').dedup()"
 
 proc_childQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('parent').select('x').in('parentSubject').as('y').values('cid').as('child').select('parent','child')"
 
