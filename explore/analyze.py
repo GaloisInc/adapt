@@ -71,7 +71,8 @@ def exactRules(context,concepts):
 
 def printVios(vios):
     for v in vios:
-        print(v[0] + ' with score ' + str(v[1]))
+        if v[1] > 0.0:
+            print(v[0] + ' with score ' + str(v[1]))
 
 def snd(x): return x[1]
 
