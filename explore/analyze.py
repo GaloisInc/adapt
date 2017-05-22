@@ -125,7 +125,7 @@ def druleViolationsCtxt(context,drules):
 
 def doImpRules(context,concepts):
     rules = findImpRules(context,concepts,0.95)
-    print("Found high-confidence implication rules:")
+    print("Found implication rules with confidence > 0.95:")
     print("========================================")
     printRules(rules)
     print("The top 10 implication rule violators are:")
@@ -136,7 +136,7 @@ def doImpRules(context,concepts):
 def doDisjRules(context,concepts):
     drules = disjointRules(context,concepts)
     drulesSupp = getDisjRuleScaledSupports(context,drules)
-    print("Found high-confidence disjointness rules:")
+    print("Found disjointness rules with confidence < 0.05:")
     print("========================================")
     printDisjRules(drulesSupp)
     print("The top 10 disjointness rules violators are:")

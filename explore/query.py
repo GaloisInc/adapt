@@ -4,8 +4,9 @@ import requests, readline, sys, json
 
 def getQuery(query):
     try:
-        resp = requests.post("http://localhost:8080/query/generic", data={"query": query}).json()
-        return resp
+        resp = requests.post("http://localhost:8080/query/generic", data={"query": query},timeout=120)
+        print('Response: '+ str(resp.status_code))
+        return (resp.json())
     except Exception as e:
         print("There was an error processing your query:")
         print(e)
