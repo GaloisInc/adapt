@@ -148,13 +148,13 @@ object CDMSource {
   }
 
 
-  def kafkaSource(ta1Topic: String): Source[CDM17, _] = Consumer.committableSource(
+  def kafkaSource(ta1Topic: String): Source[CDM17, _] = Consumer.plainSource(  // commitableSource
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
     Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
   ).map { msg =>
     Try {
-      val bais = new ByteArrayInputStream(msg.record.value())
-      val offset = msg.record.offset()
+      val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
+      val offset = msg.offset()   // msg.record.offset()
       val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
       val decoder = DecoderFactory.get.binaryDecoder(bais, null)
       val t = Try {
@@ -162,7 +162,7 @@ object CDMSource {
         elem
       }
       if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
-      msg.committableOffset.commitScaladsl()
+//      msg.committableOffset.commitScaladsl()
       val cdm = new RawCDM17Type(t.get.getDatum)
       CDM17.parse(cdm)
     }.flatten

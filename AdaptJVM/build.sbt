@@ -6,7 +6,7 @@ resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
-  version := "0.4.1",
+  version := "0.4.3",
   organization := "com.galois",
   scalaVersion := scalaV,
 

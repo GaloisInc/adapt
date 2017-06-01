@@ -7,6 +7,7 @@ import com.galois.adapt.cdm17.CDM17
 import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
+import com.typesafe.config.ConfigFactory
 import org.apache.tinkerpop.gremlin.structure.Vertex
 
 import scala.concurrent.duration._
@@ -16,6 +17,8 @@ import scala.util.{Success, Failure, Try}
 
 
 object TitanFlowComponents {
+
+  val config = ConfigFactory.load()
 
   def addIndex(graph: TitanGraph, management: ManagementSystem, propKey: String, clazz: Class[_], indexName: String) = {
 
@@ -51,6 +54,7 @@ object TitanFlowComponents {
       .set("storage.backend","cassandra")
       .set("storage.hostname","localhost")
       .set("storage.read-time",120000)
+      .set("storage.cassandra.keyspace", config.getString("adapt.titankeyspace"))
       .open
 
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
