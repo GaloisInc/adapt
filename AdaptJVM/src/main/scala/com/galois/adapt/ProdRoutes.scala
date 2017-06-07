@@ -2,12 +2,14 @@ package com.galois.adapt
 
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import com.bbn.tc.schema.avro.TheiaQueryType
+import com.typesafe.config.ConfigFactory
 //import akka.http.scaladsl.marshalling._
 import java.util.UUID
 import akka.actor.ActorRef
@@ -19,6 +21,8 @@ import scala.util.{Failure, Success, Try}
 
 
 object ProdRoutes {
+
+  val config = ConfigFactory.load()
 
   val serveStaticFilesRoute =
     path("") {
@@ -32,7 +36,7 @@ object ProdRoutes {
     }
 
 
-  implicit val timeout = Timeout(121 seconds)
+  implicit val timeout = Timeout(config.getInt("adapt.apitimeout") seconds)
 
   def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
     val qType = query match {
