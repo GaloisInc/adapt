@@ -78,6 +78,9 @@ object ProductionApp {
         println("Running anomaly-only flow")
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
+      case "ui" =>
+        println("Staring only the UI and doing nothing else.")
+
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
 	val threadPool = config.getInt("adapt.ingest.threadpool")
