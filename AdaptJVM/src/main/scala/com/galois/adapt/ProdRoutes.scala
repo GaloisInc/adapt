@@ -39,14 +39,9 @@ object ProdRoutes {
   implicit val timeout = Timeout(config.getInt("adapt.apitimeout") seconds)
 
   def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
-    val qType = query match {
-      case _: NodeQuery   => "node"
-      case _: EdgeQuery   => "edge"
-      case _: StringQuery => "generic"
-    }
-//    println(s"Got $qType query: ${query.query}")
-    val futureResponse = (dbActor ? query).mapTo[Try[String]].map { s =>
-      //      println("returning...")
+    val futureResponse = (dbActor ? query)
+//      .mapTo[Try[String]].map { s =>
+      .mapTo[Future[Try[String]]].flatMap(identity).map { s =>
       val toReturn = s match {
         case Success(json) => json
         case Failure(e) =>

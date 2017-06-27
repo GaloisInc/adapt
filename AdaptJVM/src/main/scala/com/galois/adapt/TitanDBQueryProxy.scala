@@ -6,6 +6,7 @@ import akka.actor._
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import collection.JavaConverters._
+import scala.concurrent.Future
 import scala.util.Try
 
 
@@ -14,41 +15,47 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
   val graph = TitanFlowComponents.graph
   val jsonWriter = TitanFlowComponents.graph.io(IoCore.graphson).writer().create()
 
+  implicit val ec = context.dispatcher
+
   def receive = {
 
     case NodeQuery(q, shouldParse) =>
-      sender() ! Query.run[Vertex](q, graph).map { vertices =>
-//        println(s"Found: ${vertices.length}")
-        if (shouldParse) {
-          val byteStream = new ByteArrayOutputStream
-          jsonWriter.writeVertices(byteStream, vertices.toIterator.asJava)
-          byteStream.toString.split("\n").map { v =>
-            if (v.nonEmpty) {
-              val (first, second) = v.splitAt(1)
-              first + """"type":"vertex",""" + second
-            } else v
-          }.mkString("[", ",", "]")
-        } else vertices
-      }
+      println(s"Received node query: $q")
+      sender() ! Future(
+        Query.run[Vertex](q, graph).map { vertices =>
+          println(s"Found nodes: ${vertices.length}")
+//          println(s"Nodes = $vertices")
+          val x = if (shouldParse) vertices.map(ApiJsonProtocol.vertexToJson).mkString("[",",","]")
+                  else vertices
+//          println(s"Returning: ${vertices.size} nodes")
+          x
+        }
+      )
 
     case EdgeQuery(q, shouldParse) =>
-      sender() ! Query.run[Edge](q, graph).map { edges =>
-        if (shouldParse) {
-//          println(s"Found: ${edges.length}")
-          val byteStream = new ByteArrayOutputStream
-          edges.foreach { edge =>
-            jsonWriter.writeEdge(byteStream, edge)
-          }
-          byteStream.toString.split("\\}\\{").mkString("[", "},{", "]")
-        } else edges
-      }
+      println(s"Received new edge query: $q")
+      sender() ! Future(
+        Query.run[Edge](q, graph).map { edges =>
+          println(s"Found edges: ${edges.length}")
+          val x = if (shouldParse) {
+            edges.map(ApiJsonProtocol.edgeToJson).mkString("[", ",", "]")
+          } else edges
+//          println(s"Returning edges: $x\n\n")
+          x
+        }
+      )
 
     case StringQuery(q, shouldParse) =>
-      sender() ! Query.run[java.lang.Object](q, graph).map { results =>
-        println(s"Found: ${results.length}")
-        results.map(r => s""""${r.toString.replace("\\","\\\\").replace("\"","\\\"")}"""")
-          .mkString("[",",","]")
-      }
+      println(s"Received string query: $q")
+      sender() ! Future(
+        Query.run[java.lang.Object](q, graph).map { results =>
+          println(s"Found: ${results.length} items")
+          val x = results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""")
+            .mkString("[", ",", "]")
+//          println(s"Returning: ${results.size} items")
+          x
+        }
+      )
 
     case EdgesForNodes(nodeIdList) =>
       sender() ! Try {
