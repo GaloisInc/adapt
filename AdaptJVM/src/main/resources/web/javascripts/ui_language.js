@@ -99,7 +99,7 @@ var node_appearance = [
         icon_unicode : "\uf296",
         make_node_label : function(node) {
             var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'][0]['value'] : "None")
-            var val = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
+            var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
             return key + " : " + value
         }
    }, {
