@@ -18,9 +18,6 @@ import scala.util.{Failure, Success, Try}
 
 
 object TitanFlowComponents {
-  sealed trait TxStatus {}
-  final case class TxSuccess() extends TxStatus
-  final case class TxFailure(error: Throwable) extends TxStatus
 
   val config = ConfigFactory.load()
 
@@ -267,7 +264,7 @@ object TitanFlowComponents {
   }
 
   // Create a titan transaction to insert a batch of objects
-  def titanTx(cdms: Seq[DBNodeable]) = {
+  def titanTx(cdms: Seq[DBNodeable]): Try[Unit] = {
     val transaction = //graph.newTransaction()
     graph.buildTransaction()
     //          .enableBatchLoading()
@@ -359,49 +356,52 @@ object TitanFlowComponents {
     Try(
       transaction.commit()
     ) match {
-      case Success(_) => TxSuccess
+      case Success(_) => Success(())
       case Failure(e) =>
         // Item of note: Titan prints out the stack trace as part of throwing a transaction error
         // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
         // that exception is handled here, that's just Titan printing out the trace for your information
         transaction.rollback()
-        TxFailure(e)
+        Failure(e)
     }
   }
 
   // Loops on insertion until we either insert the entire batch
   // A single statement may fail to insert but only after ln(batch size)+1 attempts
-  def titanLoop(cdms: Seq[DBNodeable]): Unit = {
+  // All ultimate failure errors are collected in the sequence and surfaced to the top.
+  // If all statements insert successfully eventually then Seq(Success(())) is returned.
+  def titanLoop(cdms: Seq[DBNodeable]): Seq[Try[Unit]] = {
     titanTx(cdms) match {
-      case TxSuccess() => ()
-      case TxFailure(_) =>
+      case Success(()) => Seq(Success(()))
+      case Failure(_) =>
         // If we're trying to ingest a single CDM statement, try it one more time before giving up
-        if (cdms.length == 1) titanTx(cdms) else {
+        // TODO: map over try, flatmap to compose two tries into a single try
+        if (cdms.length == 1) Seq(titanTx(cdms)) else {
           // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
           val (front, back) = cdms.splitAt(cdms.length / 2)
-          titanLoop(front)
-          titanLoop(back)
+          titanLoop(front) match {
+            case Seq(Success(_)) => titanLoop(back)
+            case fails1 => titanLoop(back) match {
+              case Seq(Success(_)) => fails1
+              case fails2 => fails1++fails2
+            }
+          }
         }
     }
   }
-
-  val titanTxEc = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(threadPool))
-
-  // Create a thread pool and insert batches of CDM objects in parallel
-  // Of note, insertion rates are very data dependent. It involves not only size of the CDM objects, but
-  // also density of immediate reference as that causes transaction errors.
-  def asyncTitanTx(cdms: Seq[DBNodeable]) = Future {
-    titanLoop(cdms)
-  }(titanTxEc)
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
   def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
+    .mapAsyncUnordered(threadPool)(x => Future {titanLoop(x)}) // TODO or check mapasync unordered
     .toMat(
-      Sink.foreach[collection.immutable.Seq[DBNodeable]]{ cdms =>
-        asyncTitanTx(cdms)
+      Sink.foreach{ sOrF =>
+        sOrF match {
+          case Seq(Success(())) => ()
+          case fails => println(s"${fails.length} insertion errors in batch")
+        }
       }
     )(Keep.right)
 }
