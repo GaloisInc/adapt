@@ -24,6 +24,8 @@ object TitanFlowComponents {
 
   val config = ConfigFactory.load()
 
+  val threadPool = config.getInt("adapt.ingest.threadpool")
+
   def addIndex(graph: TitanGraph, management: ManagementSystem, propKey: String, clazz: Class[_], indexName: String) = {
 
     var idKey = if (management.getPropertyKey(propKey) != null) {
@@ -383,7 +385,7 @@ object TitanFlowComponents {
     }
   }
 
-  val titanTxEc = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
+  val titanTxEc = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(threadPool))
 
   // Create a thread pool and insert batches of CDM objects in parallel
   // Of note, insertion rates are very data dependent. It involves not only size of the CDM objects, but

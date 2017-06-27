@@ -67,7 +67,6 @@ object ProductionApp {
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
-
 //    val srcActor =
     config.getString("adapt.runflow") match {
       case "database" | "db" =>
@@ -83,7 +82,6 @@ object ProductionApp {
 
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
-	val threadPool = config.getInt("adapt.ingest.threadpool")
 	
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
