@@ -44,6 +44,19 @@ case class ProvenanceTagNode(
     tagIds.fold[List[(String,UUID)]](Nil)(ts => ts.toList.map(t => ("tagId", t)))
 
   def getUuid = tagIdUuid
+
+  def toMap: Map[String, Any] = Map(
+    "uuid" -> tagIdUuid,
+    "subjectUuid" -> subjectUuid,
+    "flowObjectUuid" -> flowObject.getOrElse(""),
+    "systemCall" -> systemCall.getOrElse(""),
+    "programPoint" -> programPoint.getOrElse(""),
+    "prevTagIdUuid" -> prevTagId.getOrElse(""),
+    "opcode" -> opcode.getOrElse(""),
+    "tagIds" -> tagIds.getOrElse(Seq.empty).mkString("|"),
+    "itag" -> itag.getOrElse(""),
+    "ctag" -> ctag.getOrElse("")
+  )
 }
 
 case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {

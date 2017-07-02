@@ -1,13 +1,11 @@
 package com.galois.adapt.cdm17
 
 import java.util.UUID
-
-import akka.protobuf.Descriptors.FileDescriptor
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
 import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
+
 
 case class NetFlowObject(
   uuid: UUID,
@@ -35,6 +33,17 @@ case class NetFlowObject(
   def asDBEdges = Nil
 
   def getUuid = uuid
+
+  def toMap: Map[String, Any] = Map(
+//    "label" -> "NetFlowObject",
+    "uuid" -> uuid,
+    "localAddress" -> localAddress,
+    "localPort" -> localPort,
+    "remoteAddress" -> remoteAddress,
+    "remotePort" -> remotePort,
+    "ipProtocol" -> ipProtocol.getOrElse(""),
+    "fileDescriptor" -> fileDescriptor.getOrElse("")
+  ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
 case object NetFlowObject extends CDM17Constructor[NetFlowObject] {

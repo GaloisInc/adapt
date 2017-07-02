@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
+import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
@@ -81,6 +81,22 @@ object ProductionApp {
       case "ui" =>
         println("Staring only the UI and doing nothing else.")
 
+      case "csvmaker" | "csv" =>
+        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+          import GraphDSL.Implicits._
+          val bcast = graph.add(Broadcast[CDM17](8))
+          CDMSource(ta1).via(FlowComponents.printCounter("File Input")) ~> bcast.in
+          bcast.out(0).collect{ case c: NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("NetFlowObjects.csv")
+          bcast.out(1).collect{ case c: Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("Events.csv")
+          bcast.out(2).collect{ case c: FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("FileObjets.csv")
+          bcast.out(3).collect{ case c: RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("RegistryKeyObjects.csv")
+          bcast.out(4).collect{ case c: ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink("ProvenanceTagNodes.csv")
+          bcast.out(5).collect{ case c: Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("Subjects.csv")
+          bcast.out(6).collect{ case c: Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("Principals.csv")
+          bcast.out(7).collect{ case c: SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink("SrcSinkObjects.csv")
+          ClosedShape
+        }).run()
+
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -122,20 +138,21 @@ object CDMSource {
 
   def apply(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
+    val start = Try(config.getLong("adapt.startatoffset")).getOrElse(0L)
     ta1.toLowerCase match {
-      case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic"))
-      case "clearscope"     => kafkaSource(config.getString("adapt.ta1kafkatopic"))
-      case "faros"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
-      case "fivedirections" => kafkaSource(config.getString("adapt.ta1kafkatopic"))
-      case "theia"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
+      case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "clearscope"     => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "faros"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "fivedirections" => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "theia"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
         .merge(kafkaSource(config.getString("adapt.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
-      case "trace"          => kafkaSource(config.getString("adapt.ta1kafkatopic"))
-      case "kafkaTest"      => kafkaSource("kafkaTest") //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+      case "trace"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "kafkaTest"      => kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
         val paths = config.getStringList("adapt.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
-          .drop(config.getLong("adapt.startatoffset"))
+          .drop(start)
           .statefulMapConcat { () =>
             var counter = 0
             cdmTry => {

@@ -47,6 +47,22 @@ case class Subject(
     parentSubject.fold[List[(String,UUID)]](Nil)(v => List(("parentSubject", v)))
 
   def getUuid = uuid
+
+  def toMap: Map[String, Any] = Map(
+    "uuid" -> uuid,
+    "subjectType" -> subjectType.toString,
+    "cid" -> cid,
+    "localPrincipalUuid" -> localPrincipal,
+    "startTimestampNanos" -> startTimestampNanos,
+    "parentSubjectUuid" -> parentSubject.getOrElse(""),
+    "unitId" -> unitId.getOrElse(""),
+    "iteration" -> iteration.getOrElse(""),
+    "count" -> count.getOrElse(""),
+    "cmdLine" -> cmdLine.getOrElse(""),
+    "privilegeLevel" -> privilegeLevel.getOrElse(""),
+    "importedLibraries" -> importedLibraries.getOrElse(Seq.empty).mkString("|"),
+    "importedLibraries" -> exportedLibraries.getOrElse(Seq.empty).mkString("|")
+  )
 }
 
 

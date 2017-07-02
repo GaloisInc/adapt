@@ -31,6 +31,14 @@ case class Principal(
   def asDBEdges = Nil
 
   def getUuid = uuid
+
+  def toMap: Map[String, Any] = Map(
+    "uuid" -> uuid,
+    "userId" ->  userId,
+    "principalType" -> principalType,
+    "groupIds" -> groupIds.mkString("|"),
+    "username" -> username.getOrElse("")
+  )
 }
 
 case object Principal extends CDM17Constructor[Principal] {

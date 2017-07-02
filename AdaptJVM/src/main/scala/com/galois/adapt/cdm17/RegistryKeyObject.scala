@@ -28,6 +28,14 @@ case class RegistryKeyObject(
   def asDBEdges = Nil
 
   def getUuid = uuid
+
+  def toMap: Map[String, Any] = Map(
+//    "label" -> "RegistryKeyObject",
+    "uuid" -> uuid,
+    "registryKeyOrPath" -> key,
+    "value" -> value.getOrElse(""),
+    "size" -> size.getOrElse("")
+  ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
 case object RegistryKeyObject extends CDM17Constructor[RegistryKeyObject] {

@@ -147,15 +147,15 @@ object FlowComponents {
     }.toMat(Sink.foreach(println))(Keep.right)
 
 
-  def csvFileSink(path: String) = Flow[(UUID, mutable.Map[String,Any])]
+  def csvFileSink(path: String) = Flow[(UUID, Map[String,Any])]
     .statefulMapConcat{ () =>
-      var needsHeader = true
-
-      { case Tuple2(u: UUID, m: mutable.Map[String,Any]) =>
-        val row = List(ByteString(s"$u,${m.toList.sortBy(_._1).map(_._2).mkString(",")}\n"))
+      var needsHeader = true;
+      { case Tuple2(u: UUID, m: Map[String,Any]) =>
+        val noUuid = m.-("uuid")
+        val row = List(ByteString(s"$u,${noUuid.toList.sortBy(_._1).map(_._2.toString.replaceAll(",","|")).mkString(",")}\n"))
         if (needsHeader) {
           needsHeader = false
-          List(ByteString(s"uuid,${m.toList.sortBy(_._1).map(_._1).mkString(",")}\n")) ++ row
+          List(ByteString(s"uuid,${noUuid.toList.sortBy(_._1).map(_._1.toString.replaceAll(",","|")).mkString(",")}\n")) ++ row
         } else row
       }
     }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)

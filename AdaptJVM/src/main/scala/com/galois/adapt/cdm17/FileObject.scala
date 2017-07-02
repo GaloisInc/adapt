@@ -36,6 +36,17 @@ case class FileObject(
   )
 
   def getUuid = uuid
+
+  def toMap: Map[String,Any] = Map(
+//    "label" -> "FileObject",
+    "uuid" -> uuid,
+    "fileObjectType" -> fileObjectType,
+    "fileDescriptor" -> fileDescriptor.getOrElse(""),
+    "localPrincipalUuid" -> localPrincipal.getOrElse(""),
+    "size" -> size.getOrElse(""),
+    "peInfo" -> peInfo.getOrElse(""),
+    "hashes" -> hashes.getOrElse(Seq.empty).map(h => s"${h.cryptoType}:${h.hash}").mkString("|")
+  ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
 

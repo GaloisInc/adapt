@@ -63,6 +63,25 @@ case class Event(
   def compare(x: Event, y: Event) = x.timestampNanos compare y.timestampNanos
 
   def compareTo(o: Event) = this.timestampNanos.compare(o.timestampNanos)
+
+  def toMap: Map[String,Any] = Map(
+//    "label" -> "Event",
+    "uuid" -> uuid,
+    "sequence" -> sequence,
+    "eventType" -> eventType.toString,
+    "threadId" -> threadId,
+    "subjectUuid" -> subjectUuid,
+    "timestampNanos" -> timestampNanos,
+    "predicateObjectUuid" -> predicateObject.getOrElse(""),
+    "predicateObjectPath" -> predicateObjectPath.getOrElse(""),
+    "predicateObject2Uuid" -> predicateObject2.getOrElse(""),
+    "predicateObject2Path" -> predicateObject2Path.getOrElse(""),
+    "name" -> name.getOrElse(""),
+    "parameters" -> parameters.getOrElse(Seq.empty).mkString("|"),
+    "location" -> location.getOrElse(""),
+    "size" -> size.getOrElse(""),
+    "programPoint" -> programPoint.getOrElse("")
+  ) //++ properties.getOrElse(Map.empty)  // Flattens out nested "properties"
   
 //  override val supportNodes =
 //    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)

@@ -26,6 +26,12 @@ case class SrcSinkObject(
   def asDBEdges = Nil
 
   def getUuid = uuid
+
+  def toMap: Map[String, Any] = Map(
+    "uuid" -> uuid,
+    "srcSinkType" -> srcSinkType,
+    "fileSescriptor" -> fileDescriptor.getOrElse("")
+  )
 }
 
 case object SrcSinkObject extends CDM17Constructor[SrcSinkObject] {
