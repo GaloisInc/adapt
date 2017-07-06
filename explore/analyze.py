@@ -41,9 +41,12 @@ def findImpRules(context,concepts,confidence):
     reducedRules = filterSubsumedImp(rules)
     return reducedRules
 
+def printImpRule(rule,rules):
+    print(str(set(rule[0])) + " implies " + str(set(rule[1])) + " [" + str(rules[rule] * 100) + "%]")
+
 def printRules(rules):
     for rule in rules.keys():
-        print(str(set(rule[0])) + " implies " + str(set(rule[1])) + " [" + str(rules[rule] * 100) + "%]")
+        printImpRule(rule,rules)
 
 
 def violations(s,rules):
@@ -74,6 +77,16 @@ def printVios(vios):
         if v[1] > 0.0:
             print(v[0] + ' with score ' + str(v[1]))
 
+def printViolations(vios,context,rules):
+    for v in vios:
+        if v[1] > 0.0:
+            print('------------------------------------------')
+            print(v[0] + ' with score ' + str(v[1]))
+            print('------------------------------------------')
+            for e in rules.keys():
+                if e[0] <= context[v[0]] and not(e[1] <= context[v[0]]):
+                    printImpRule(e,rules)
+          
 def snd(x): return x[1]
 
 # Disjointness rules
@@ -112,7 +125,10 @@ def getDisjRuleScaledSupports(context,rules):
 
 def printDisjRules(rules): 
     for rule in rules.keys():
-        print(str(set(rule[0])) + " is disjoint from " + str(set(rule[1])) + "[" + str(rules[rule]*100)+ "]")
+        printDisjRule(rule,rules)
+
+def printDisjRule(rule,rules): 
+    print(str(set(rule[0])) + " is disjoint from " + str(set(rule[1])) + "[" + str(rules[rule]*100)+ "]")
 
 def druleViolations(s,drules):
     count = 0
@@ -120,9 +136,20 @@ def druleViolations(s,drules):
         if rule[0] <= s and rule[1] <= s:
             count = count + 1
     return count
+
 def druleViolationsCtxt(context,drules):
     return {label:druleViolations(context[label],drules) for label in context.keys()}
 
+def printDisjViolations(vios,context,drules):
+    for v in vios:
+        if v[1] > 0.0:
+            print('------------------------------------------')
+            print(v[0] + ' with score ' + str(v[1]))
+            print('------------------------------------------')
+            for e in drules.keys():
+                if e[0] <= context[v[0]] and e[1] <= context[v[0]]:
+                    printDisjRule(e,drules)
+          
 
 def doImpRules(context,concepts):
     rules = findImpRules(context,concepts,0.95)
@@ -132,7 +159,7 @@ def doImpRules(context,concepts):
     print("The top 10 implication rule violators are:")
     print("========================================")
     vios = allViolations(context,rules)
-    printVios(sorted(vios.items(),key=snd,reverse=True)[0:10])
+    printViolations(sorted(vios.items(),key=snd,reverse=True)[0:10],context,rules)
 
 def doDisjRules(context,concepts):
     drules = disjointRules(context,concepts)
@@ -143,7 +170,7 @@ def doDisjRules(context,concepts):
     print("The top 10 disjointness rules violators are:")
     print("========================================")
     dvios = druleViolationsCtxt(context,drules)
-    printVios(sorted(dvios.items(),key=snd,reverse=True)[0:10])
+    printDisjViolations(sorted(dvios.items(),key=snd,reverse=True)[0:10],context,drulesSupp)
         
 # this is a little silly, it should be equivalent to just filter out the
 # frequent attributes since any frequent concept consists of frequent attributes
@@ -168,10 +195,11 @@ if __name__ == '__main__':
         elif arg == '--netflow':
             print('Analysis of netflows by processes')
             context = makeContext(getQuery(proc_netflowQ),'pid','dest')
+        print("Done building context...")
         concepts = findAllConceptsWithMinSupp(context,0.05*len(context))
-
+        print("Done building concept lattice...")
         doImpRules(context,concepts)
 
         doDisjRules(context,concepts)
 
-        doAbnormalities(context,concepts)
+        #doAbnormalities(context,concepts)

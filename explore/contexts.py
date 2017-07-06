@@ -40,8 +40,19 @@ proc_execQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as(
 # and values = sets of attributes
 
 # Make a context out of a collection of records, grouping by 'key'
-def makeContext(l,key,val): 
+# ... quadratic, which is not ideal
+def makeContextSlow(l,key,val): 
     return {x[key]:{y[val] for y in l if x[key] == y[key]} for x in l}
+
+
+def makeContext(l,key,val):
+    context = {}
+    for x in l:
+        if x[key] in context:
+            context[x[key]] = context[x[key]] | {x[val]}
+        else:
+            context[x[key]] = {x[val]}
+    return context
 
 # Prefixes of a 
 def prefixes(s):
