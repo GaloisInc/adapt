@@ -64,6 +64,25 @@ def findAllConceptsWithMinSupp(context,minsupp):
                 conceptsTodo = conceptsTodo + [newConcept]
     return knownConcepts
 
+# Variant of the above: keep concepts with supp < minsupp
+# that are on the frontier.  This should be better for finding
+# anti-implication rules.
+
+def findAllConceptsWithMinSuppFrontier(context,minsupp):
+    knownConcepts = set()
+    conceptsTodo = [frozenset()]
+    while conceptsTodo != []:
+        nextConcept = conceptsTodo[0]
+        conceptsTodo.remove(nextConcept)
+        supp = getSupport(context,nextConcept)
+        if nextConcept not in knownConcepts:
+            knownConcepts.add(nextConcept)
+            if supp >= minsupp:
+                newConcepts = extendConcept(context,nextConcept)
+                for newConcept in newConcepts:
+                    conceptsTodo = conceptsTodo + [newConcept]
+    return knownConcepts
+
 
 
 # build successor relation and edges among concepts

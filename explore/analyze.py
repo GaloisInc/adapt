@@ -59,19 +59,6 @@ def violations(s,rules):
 def allViolations(context,rules):
     return {k:violations(context[k],rules) for k in context.keys()}
 
-# exact implications - not found by the above!
-
-def exactRules(context,concepts): 
-    rules = set()
-    for x in concepts:
-        for y in concepts:
-            xy = x | y
-            z = getConcept(context,xy)
-            diff = z - xy
-            if z in concepts and diff != set():
-                rules = rules | {(xy,diff)}
-    return (filterSubsumedImp({rule: 1.0 for rule in rules}))
-
 def printVios(vios):
     for v in vios:
         if v[1] > 0.0:
@@ -87,6 +74,90 @@ def printViolations(vios,context,rules):
                 if e[0] <= context[v[0]] and not(e[1] <= context[v[0]]):
                     printImpRule(e,rules)
           
+
+
+# simple-minded anti-implication rules (X -> ~Y means X implies not Y with high confidence, i.e. X implies Y with low confidence)
+
+def getAntiImpRulesWithLowConfidence(context,concepts,maxconf):
+    supports = getSupports(context,concepts)
+    edg = edges(concepts)
+    return {(e[0],e[1]-e[0]): supports[e[1]]/supports[e[0]] for e in edg if supports[e[0]] > 0 and supports[e[1]]/supports[e[0]] < maxconf}
+
+# a rule X1 -> ~Y1 subsumes another X2 -> ~Y2 if X1 subseteq X2 and Y1 subseteq Y2
+# this is naive, it would be better to filter out rules that are implied
+# by combinations of other rules also
+def antiImpRuleSubsumes(rule1,rule2):
+    return rule1[0] <= rule2[0] and rule1[1] <= rule2[1]
+
+def antiImpRuleRedundant(rules,rule):
+    for exrule in rules:
+        if antiImpRuleSubsumes(exrule,rule):
+            return True
+    return False
+
+def updateAntiImpRules(rules,r):
+    return {rule for rule in rules if not antiImpRuleSubsumes(r,rule)} | {r}
+    
+def filterSubsumedAntiImp(rules):
+    newRules = set()
+    for rule in rules.keys():
+        if not(antiImpRuleRedundant(newRules,rule)):
+            newRules = updateAntiImpRules(newRules,rule)
+    return {newRule : rules[newRule] for newRule in newRules}    
+
+def findAntiImpRules(context,concepts,confidence):
+    rules = getAntiImpRulesWithLowConfidence(context,concepts,confidence)
+    reducedRules = filterSubsumedAntiImp(rules)
+    return reducedRules
+
+def printAntiImpRule(rule,rules):
+    print(str(set(rule[0])) + " implies not " + str(set(rule[1])) + " [" + str(rules[rule] * 100) + "%]")
+
+def printAntiImpRules(rules):
+    for rule in rules.keys():
+        printAntiImpRule(rule,rules)
+
+
+def antiImpViolations(s,rules):
+    ent = 0
+    for e in rules.keys():
+        if e[0] <= s and e[1] <= s:
+            ent = ent - numpy.log2(rules[e])
+    return ent
+
+def allAntiImpViolations(context,rules):
+    return {k:antiImpViolations(context[k],rules) for k in context.keys()}
+
+def printVios(vios):
+    for v in vios:
+        if v[1] > 0.0:
+            print(v[0] + ' with score ' + str(v[1]))
+
+def printAntiImpViolations(vios,context,rules):
+    for v in vios:
+        if v[1] > 0.0:
+            print('------------------------------------------')
+            print(v[0] + ' with score ' + str(v[1]))
+            print('------------------------------------------')
+            for e in rules.keys():
+                if e[0] <= context[v[0]] and not(e[1] <= context[v[0]]):
+                    printAntiImpRule(e,rules)
+          
+
+
+# exact implications - not found by the above!
+
+def exactRules(context,concepts): 
+    rules = set()
+    for x in concepts:
+        for y in concepts:
+            xy = x | y
+            z = getConcept(context,xy)
+            diff = z - xy
+            if z in concepts and diff != set():
+                rules = rules | {(xy,diff)}
+    return (filterSubsumedImp({rule: 1.0 for rule in rules}))
+
 def snd(x): return x[1]
 
 # Disjointness rules
@@ -161,6 +232,16 @@ def doImpRules(context,concepts):
     vios = allViolations(context,rules)
     printViolations(sorted(vios.items(),key=snd,reverse=True)[0:10],context,rules)
 
+def doAntiImpRules(context,concepts):
+    rules = findAntiImpRules(context,concepts,0.05)
+    print("Found anti-implication rules with confidence < 0.05:")
+    print("========================================")
+    printAntiImpRules(rules)
+    print("The top 10 anti-implication rule violators are:")
+    print("========================================")
+    vios = allAntiImpViolations(context,rules)
+    printAntiImpViolations(sorted(vios.items(),key=snd,reverse=True)[0:10],context,rules)
+
 def doDisjRules(context,concepts):
     drules = disjointRules(context,concepts)
     drulesSupp = getDisjRuleScaledSupports(context,drules)
@@ -196,9 +277,11 @@ if __name__ == '__main__':
             print('Analysis of netflows by processes')
             context = makeContext(getQuery(proc_netflowQ),'pid','dest')
         print("Done building context...")
-        concepts = findAllConceptsWithMinSupp(context,0.05*len(context))
+        concepts = findAllConceptsWithMinSuppFrontier(context,0.05*len(context))
         print("Done building concept lattice...")
         doImpRules(context,concepts)
+
+        doAntiImpRules(context,concepts)
 
         doDisjRules(context,concepts)
 
