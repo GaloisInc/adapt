@@ -40,6 +40,9 @@ lazy val adapt = (project in file(".")).settings(
     "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j")
   ),
 
+  fork in run := true,
+  javaOptions in run ++= Seq("-Xmx6G"),
+
   {
   // Compile Avro schema at the command line with `sbt avroCompile`
     lazy val avroCompile = taskKey[Unit]("Compile Avro sources from the schema")

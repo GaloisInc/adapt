@@ -45,7 +45,8 @@ case class FileObject(
     "localPrincipalUuid" -> localPrincipal.getOrElse(""),
     "size" -> size.getOrElse(""),
     "peInfo" -> peInfo.getOrElse(""),
-    "hashes" -> hashes.getOrElse(Seq.empty).map(h => s"${h.cryptoType}:${h.hash}").mkString("|")
+    "hashes" -> hashes.getOrElse(Seq.empty).map(h => s"${h.cryptoType}:${h.hash}").mkString("|"),
+    "properties" -> baseObject.properties.getOrElse(Map.empty)
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 

@@ -24,6 +24,9 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   }
   implicit val savedNotesJsonProtocol = jsonFormat4(SavedNotes)
 
+  val vertexTypeTuple = "type" -> JsString("vertex")
+  val edgeTypeTuple   = "type" -> JsString("edge")
+
   def vertexToJson(v: Vertex): JsValue = {
     val jsProps = v.keys().asScala.toList.map { k =>
       v.value[Any](k) match {
@@ -41,7 +44,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     }.toMap[String,JsValue]
 
     JsObject(
-      "type" -> JsString("vertex"),
+      vertexTypeTuple,
       "id" -> JsNumber(v.id().asInstanceOf[Long]),
       "label" -> JsString(v.label()),
       "properties" -> JsObject(jsProps)
@@ -52,9 +55,9 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   def edgeToJson(e: Edge): JsValue = JsObject(
     "id" -> JsString(e.id().toString),
     "label" -> JsString(e.label()),
-    "type" -> JsString("edge"),
-    "inVLabel" -> JsString(e.inVertex().label()),
-    "outVLabel" -> JsString(e.outVertex().label()),
+    edgeTypeTuple,
+//    "inVLabel" -> JsString(e.inVertex().label()),
+//    "outVLabel" -> JsString(e.outVertex().label()),
     "inV" -> JsNumber(e.inVertex().id().asInstanceOf[Long]),
     "outV" -> JsNumber(e.outVertex().id().asInstanceOf[Long])
   )

@@ -55,7 +55,8 @@ case class ProvenanceTagNode(
     "opcode" -> opcode.getOrElse(""),
     "tagIds" -> tagIds.getOrElse(Seq.empty).mkString("|"),
     "itag" -> itag.getOrElse(""),
-    "ctag" -> ctag.getOrElse("")
+    "ctag" -> ctag.getOrElse(""),
+    "properties" -> properties.getOrElse(Map.empty)
   )
 }
 

@@ -1,5 +1,8 @@
 package com.galois.adapt
 
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import spray.json._
+
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 
@@ -10,6 +13,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
+import spray.json.{JsString, JsValue}
 //import akka.http.scaladsl.marshalling._
 import java.util.UUID
 import akka.actor.ActorRef
@@ -38,24 +42,17 @@ object ProdRoutes {
 
   implicit val timeout = Timeout(config.getInt("adapt.apitimeout") seconds)
 
-  def completedQuery[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
-    val futureResponse = (dbActor ? query)
-//      .mapTo[Try[String]].map { s =>
-      .mapTo[Future[Try[String]]].flatMap(identity).map { s =>
-      val toReturn = s match {
+  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
+     (dbActor ? query)
+      .mapTo[Future[Try[JsValue]]].flatMap(identity).map { s =>
+      s match {
         case Success(json) => json
         case Failure(e) =>
           println(e.getMessage)
-          "\"" + e.getMessage + "\""
+          JsString("\"" + e.getMessage + "\"")
       }
-      HttpEntity(ContentTypes.`application/json`, toReturn)
     }
-    complete(futureResponse)
   }
-
-//  implicit val mapMarshaller: ToEntityMarshaller[Map[String, Any]] = Marshaller.opaque { map =>
-//    HttpEntity(ContentType(MediaTypes.`application/json`), map.toString)
-//  }
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
@@ -98,17 +95,23 @@ object ProdRoutes {
       pathPrefix("query") {
         pathPrefix("nodes") {
           path(RemainingPath) { queryString =>
-            completedQuery(NodeQuery(queryString.toString), dbActor)
+            complete(
+              queryResult(NodeQuery(queryString.toString), dbActor)
+            )
           }
         } ~
         pathPrefix("edges") {
           path(RemainingPath) { queryString =>
-            completedQuery(EdgeQuery(queryString.toString), dbActor)
+            complete(
+              queryResult(EdgeQuery(queryString.toString), dbActor)
+            )
           }
         } ~
         pathPrefix("generic") {
           path(RemainingPath) { queryString =>
-            completedQuery(StringQuery(queryString.toString), dbActor)
+            complete(
+              queryResult(StringQuery(queryString.toString), dbActor)
+            )
           }
         }
       } ~
@@ -193,25 +196,31 @@ object ProdRoutes {
         } ~
         path("nodes") {
           formField('query) { queryString =>
-            completedQuery(NodeQuery(queryString), dbActor)
+            complete(
+              queryResult(NodeQuery(queryString), dbActor)
+            )
           }
         } ~
         path("edges") {
           formField('query) { queryString =>
-            completedQuery(EdgeQuery(queryString), dbActor)
+            complete(
+              queryResult(EdgeQuery(queryString), dbActor)
+            )
           } ~
-            formField('nodes) { nodeListString =>
-              println(s"getting edges for nodes: $nodeListString")
-              val idList = nodeListString.split(",").map(_.toInt)
-              val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
-                HttpEntity(ContentTypes.`application/json`, s.get)
-              }
-              complete(futureResponse)
+          formField('nodes) { nodeListString =>
+            println(s"getting edges for nodes: $nodeListString")
+            val idList = nodeListString.split(",").map(_.toInt)
+            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
+              HttpEntity(ContentTypes.`application/json`, s.get)
             }
+            complete(futureResponse)
+          }
         } ~
         path("generic") {
           formField('query) { queryString =>
-            completedQuery(StringQuery(queryString), dbActor)
+            complete(
+              queryResult(StringQuery(queryString), dbActor)
+            )
           }
         }
       }

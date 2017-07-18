@@ -37,7 +37,8 @@ case class Principal(
     "userId" ->  userId,
     "principalType" -> principalType,
     "groupIds" -> groupIds.mkString("|"),
-    "username" -> username.getOrElse("")
+    "username" -> username.getOrElse(""),
+    "properties" -> properties.getOrElse(Map.empty)
   )
 }
 

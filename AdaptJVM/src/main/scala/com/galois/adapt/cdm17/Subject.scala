@@ -61,7 +61,8 @@ case class Subject(
     "cmdLine" -> cmdLine.getOrElse(""),
     "privilegeLevel" -> privilegeLevel.getOrElse(""),
     "importedLibraries" -> importedLibraries.getOrElse(Seq.empty).mkString("|"),
-    "importedLibraries" -> exportedLibraries.getOrElse(Seq.empty).mkString("|")
+    "importedLibraries" -> exportedLibraries.getOrElse(Seq.empty).mkString("|"),
+    "properties" -> properties.getOrElse(Map.empty)
   )
 }
 

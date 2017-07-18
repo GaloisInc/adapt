@@ -34,7 +34,8 @@ case class RegistryKeyObject(
     "uuid" -> uuid,
     "registryKeyOrPath" -> key,
     "value" -> value.getOrElse(""),
-    "size" -> size.getOrElse("")
+    "size" -> size.getOrElse(""),
+    "properties" -> baseObject.properties.getOrElse(Map.empty)
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 

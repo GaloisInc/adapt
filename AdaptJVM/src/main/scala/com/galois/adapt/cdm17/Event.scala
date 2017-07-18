@@ -80,7 +80,8 @@ case class Event(
     "parameters" -> parameters.getOrElse(Seq.empty).mkString("|"),
     "location" -> location.getOrElse(""),
     "size" -> size.getOrElse(""),
-    "programPoint" -> programPoint.getOrElse("")
+    "programPoint" -> programPoint.getOrElse(""),
+    "properties" -> properties.getOrElse(Map.empty)
   ) //++ properties.getOrElse(Map.empty)  // Flattens out nested "properties"
   
 //  override val supportNodes =

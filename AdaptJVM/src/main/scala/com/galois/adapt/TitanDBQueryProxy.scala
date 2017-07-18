@@ -5,6 +5,8 @@ import java.io.ByteArrayOutputStream
 import akka.actor._
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
+import spray.json.{JsArray, JsString}
+
 import collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.Try
@@ -25,7 +27,7 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
         Query.run[Vertex](q, graph).map { vertices =>
           println(s"Found nodes: ${vertices.length}")
 //          println(s"Nodes = $vertices")
-          val x = if (shouldParse) vertices.map(ApiJsonProtocol.vertexToJson).mkString("[",",","]")
+          val x = if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
                   else vertices
 //          println(s"Returning: ${vertices.size} nodes")
           x
@@ -37,9 +39,8 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
       sender() ! Future(
         Query.run[Edge](q, graph).map { edges =>
           println(s"Found edges: ${edges.length}")
-          val x = if (shouldParse) {
-            edges.map(ApiJsonProtocol.edgeToJson).mkString("[", ",", "]")
-          } else edges
+          val x = if (shouldParse) JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
+          else edges
 //          println(s"Returning edges: $x\n\n")
           x
         }
@@ -50,8 +51,8 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
       sender() ! Future(
         Query.run[java.lang.Object](q, graph).map { results =>
           println(s"Found: ${results.length} items")
-          val x = results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""")
-            .mkString("[", ",", "]")
+          val x = JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
+//            .mkString("[", ",", "]")
 //          println(s"Returning: ${results.size} items")
           x
         }

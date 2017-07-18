@@ -30,7 +30,8 @@ case class SrcSinkObject(
   def toMap: Map[String, Any] = Map(
     "uuid" -> uuid,
     "srcSinkType" -> srcSinkType,
-    "fileSescriptor" -> fileDescriptor.getOrElse("")
+    "fileSescriptor" -> fileDescriptor.getOrElse(""),
+    "properties" -> baseObject.properties.getOrElse(Map.empty)
   )
 }
 

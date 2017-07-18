@@ -42,7 +42,8 @@ case class NetFlowObject(
     "remoteAddress" -> remoteAddress,
     "remotePort" -> remotePort,
     "ipProtocol" -> ipProtocol.getOrElse(""),
-    "fileDescriptor" -> fileDescriptor.getOrElse("")
+    "fileDescriptor" -> fileDescriptor.getOrElse(""),
+    "properties" -> baseObject.properties.getOrElse(Map.empty)
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 

@@ -151,11 +151,11 @@ object FlowComponents {
     .statefulMapConcat{ () =>
       var needsHeader = true;
       { case Tuple2(u: UUID, m: Map[String,Any]) =>
-        val noUuid = m.-("uuid")
-        val row = List(ByteString(s"$u,${noUuid.toList.sortBy(_._1).map(_._2.toString.replaceAll(",","|")).mkString(",")}\n"))
+        val noUuid = m.-("uuid").toList.sortBy(_._1)
+        val row = List(ByteString(s"$u,${noUuid.map(_._2.toString.replaceAll(",","|")).mkString(",")}\n"))
         if (needsHeader) {
           needsHeader = false
-          List(ByteString(s"uuid,${noUuid.toList.sortBy(_._1).map(_._1.toString.replaceAll(",","|")).mkString(",")}\n")) ++ row
+          List(ByteString(s"uuid,${noUuid.map(_._1.toString.replaceAll(",","|")).mkString(",")}\n")) ++ row
         } else row
       }
     }.toMat(FileIO.toPath(Paths.get(path)))(Keep.right)
