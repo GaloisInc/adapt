@@ -150,7 +150,7 @@ object ProdRoutes {
                 MakeTheiaQuery(
                   fields("type").toLowerCase match {
                     case "backward" | "backwards" => TheiaQueryType.BACKWARD
-                    case "forward"  | "forwards"   => TheiaQueryType.FORWARD
+                    case "forward"  | "forwards"  => TheiaQueryType.FORWARD
                     case "point_to_point" | "pointtopoint" => TheiaQueryType.POINT_TO_POINT
                   },
                   fields.get("sourceId").map(UUID.fromString),

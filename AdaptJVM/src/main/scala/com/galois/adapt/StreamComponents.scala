@@ -151,7 +151,10 @@ object FlowComponents {
     .statefulMapConcat{ () =>
       var needsHeader = true;
       { case Tuple2(u: UUID, m: Map[String,Any]) =>
-        val noUuid = m.-("uuid").toList.sortBy(_._1)
+        val noUuid = m.-("uuid").mapValues {
+          case m: Map[_,_] => if (m.isEmpty) "" else m
+          case x => x
+        }.toList.sortBy(_._1)
         val row = List(ByteString(s"$u,${noUuid.map(_._2.toString.replaceAll(",","|")).mkString(",")}\n"))
         if (needsHeader) {
           needsHeader = false
