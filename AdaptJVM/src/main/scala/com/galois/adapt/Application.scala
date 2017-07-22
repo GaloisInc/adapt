@@ -30,7 +30,48 @@ object Application extends App {
     case "accept"  => AcceptanceApp.run()
     case "prod"    => ProductionApp.run()
     case "dev"     => DevelopmentApp.run()
-    case "cluster" => ClusterDevApp.run(config)
+//    case "cluster" => ClusterDevApp.run(config)
   }
 
+}
+
+
+
+
+/*
+ * This is a single-node version of the cluster app.
+ *
+ * All this object does is load up an alternate Config to pass to 'ClusterDevApp'.
+ * That config is in 'src/main/resources/accept.conf'
+ */
+object AcceptanceApp {
+  println(s"Spinning up an acceptance testing system.")
+
+  def run(): Unit = {
+//    ClusterDevApp.run(Application.config.getConfig("accept") withFallback Application.config)
+  }
+}
+
+
+
+/*
+ * This is a single-node version of the cluster app.
+ *
+ * All this object does is load up an alternate Config to pass to 'ClusterDevApp'.
+ * That config is in 'src/main/resources/dev.conf'
+ */
+object DevelopmentApp {
+  println(s"Spinning up a development system.")
+
+  def run(): Unit = {
+    //val devConfigPath = getClass().getClassLoader().getResource("dev.conf").getPath
+    //val devConfigFile = new File(devConfigPath)
+    //val devConfig = ConfigFactory.parseFile(devConfigFile).resolve()
+    //val devConfig1 = ConfigFactory.load("dev")//.resolve()
+    //println("CONFIG: " + devConfig1)
+    println(Application.config.getConfig("dev"))
+
+
+//    ClusterDevApp.run(Application.config.getConfig("dev") withFallback Application.config)
+  }
 }

@@ -19,47 +19,47 @@ import java.net.URI
 import scala.language.postfixOps
 
 
-class AcceptanceTestsActor(val registry: ActorRef)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] {
+class AcceptanceTestsActor(val registry: ActorRef) extends Actor with ActorLogging {
     
   import context.dispatcher
  
-  val dependencies = "DevDBActor" :: "UIActor" :: Nil
-  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("DevDBActor").get, x => true))
+//  val dependencies = "DevDBActor" :: "UIActor" :: Nil
+//  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("DevDBActor").get, x => true))
 
   //implicit val ec = system.dispatcher
   implicit val askTimeout = Timeout(100 seconds)
 
-  def beginService(): Unit = initialize()
-  def endService(): Unit = ()
+//  def beginService(): Unit = initialize()
+//  def endService(): Unit = ()
 
 
-  def statusReport = Map()
+//  def statusReport = Map()
 
   // Some stats to keep
   var failedStatements: Int = 0
   var failedStatementsMsgs: List[String] = Nil // First 5 failed messages
   var instrumentationSource: Option[InstrumentationSource] = None
 
-  override def process = {
+  def receive = {
 
-    case ErrorReadingFile(path, t) =>
-      println(s"Error reading file $path")
+    // TODO: Fix all these! Turned them into strings to just to make them compile. Architecture has changed. Design of this needs to change as well.
+    case "ErrorReadingFile(path, t)" =>
+      println("Error reading file $path")
       failedStatements += 1
-      log.info(s"Error reading file $path")
+      log.info("Error reading file $path")
 
-    case ErrorReadingStatement(t) =>
+    case "ErrorReadingStatement(t)" =>
       log.info("Error reading statement")
       failedStatements += 1
       if (failedStatementsMsgs.length < 10)
-        failedStatementsMsgs = t.getMessage :: failedStatementsMsgs
+        failedStatementsMsgs = "//TODO: t.getMessage" :: failedStatementsMsgs
     
-    case BeginFile(path, source) =>
+    case "BeginFile(path, source)" =>
 
       // Set the instrumentation source and, if it is already set, check that it matches
       instrumentationSource match {
-        case None => instrumentationSource = Some(source);
-        case Some(source2) => assert(source == source2)
+        case None => instrumentationSource = ??? //Some(source);
+        case Some(source2) => ??? //assert(source == source2)
       }
       
     case DoneDevDB(graphOpt, incompleteEdges) =>
@@ -93,15 +93,15 @@ class AcceptanceTestsActor(val registry: ActorRef)
         case Some(s) => { println(s"No tests for: $s"); None }
         case None => { println("Failed to detect provider"); None }
       }
-      providerSpecificTests.foreach(org.scalatest.run(_));
+      providerSpecificTests.foreach(org.scalatest.run(_))
 
       println(s"Total vertices: ${graph.traversal().V().count().next()}")
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
       
-      if (toDisplay.length > 0) {
+      if (toDisplay.nonEmpty) {
         println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
-        Desktop.getDesktop().browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
+        Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
       } else {
         println("If you would like to explore your data, open browser at http://localhost:8080 to use our interactive GUI.")
         println("This GUI uses (a slightly modified version of) the gremlin query language. Try executing a search query in the GUI like any of the following to get started:")
@@ -115,7 +115,13 @@ class AcceptanceTestsActor(val registry: ActorRef)
       println("")
 
       println("Press CTRL^C to kill the webserver")
-    }
+
+
+
+
+    case x => ???   // TODO
+
+  }
 }
 
 //case class DisplayThese(query: String)

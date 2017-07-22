@@ -15,7 +15,7 @@ import scala.util.Try
 class TitanDBQueryProxy() extends Actor with ActorLogging {
 
   val graph = TitanFlowComponents.graph
-  val jsonWriter = TitanFlowComponents.graph.io(IoCore.graphson).writer().create()
+//  val jsonWriter = TitanFlowComponents.graph.io(IoCore.graphson).writer().create()   // This was the cause of a lot of failed queries
 
   implicit val ec = context.dispatcher
 
@@ -63,16 +63,16 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case GiveMeTheGraph => sender() ! graph
+//    case GiveMeTheGraph => sender() ! graph
   }
 }
 
 
-//sealed trait RestQuery { val query: String }
-//case class NodeQuery(query: String) extends RestQuery
-//case class EdgeQuery(query: String) extends RestQuery
-//case class StringQuery(query: String) extends RestQuery
-//
-//case class EdgesForNodes(nodeIdList: Seq[Int])
+sealed trait RestQuery { val query: String }
+case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
+case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
+case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
+
+case class EdgesForNodes(nodeIdList: Seq[Int])
 //case object GiveMeTheGraph
 

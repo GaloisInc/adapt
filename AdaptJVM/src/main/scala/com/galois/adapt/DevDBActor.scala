@@ -12,7 +12,7 @@ import org.apache.tinkerpop.gremlin.structure.T.label
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 
-import com.galois.adapt.ServiceRegistryProtocol.SubscribeToService
+//import com.galois.adapt.ServiceRegistryProtocol.SubscribeToService
 import com.thinkaurelius.titan.core.TitanFactory
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
@@ -21,25 +21,19 @@ import collection.JavaConverters._
 import scala.util.Try
 
 class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
-  extends Actor with ActorLogging with ServiceClient with SubscriptionActor[Nothing] with ReportsStatus {
-
-  val dependencies = "FileIngestActor" :: Nil
-  lazy val subscriptions = {
-    log.info("Forced subcription list")
-    val ingest: ActorRef = dependencyMap("FileIngestActor").get
-    Set[Subscription](Subscription(ingest, _.isInstanceOf[CDM17]))
-  }
-
-  def beginService() = {
-    log.info("Begin service")
-    initialize()    
-  }
-  def endService() = ()  // TODO
+  extends Actor with ActorLogging { //with ServiceClient with SubscriptionActor[Nothing] with ReportsStatus {
 
 
-  def statusReport = {
-    Map("nodes received" -> nodesReceived)
-  }
+//  def beginService() = {
+//    log.info("Begin service")
+//    initialize()
+//  }
+//  def endService() = ()  // TODO
+//
+//
+//  def statusReport = {
+//    Map("nodes received" -> nodesReceived)
+//  }
 
   var nodesReceived = 0
 
@@ -72,11 +66,11 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
     else graph.traversal().V().has(key,value).toList.asScala.headOption
   }
 
-  override def process: PartialFunction[Any,Unit] = {
+  def receive: PartialFunction[Any,Unit] = {
 
-    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.toMap))
+//    case DoneIngest => broadCastUnsafe(DoneDevDB(Some(graph), missingToUuid.toMap))
 
-    case c: IngestControl => broadCastUnsafe(c)
+//    case c: IngestControl => broadCastUnsafe(c)
 
     case EpochMarker =>
       println("EPOCH BOUNDARY!")
@@ -185,23 +179,14 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-    case GiveMeTheGraph => sender() ! graph
+//    case GiveMeTheGraph => sender() ! graph
 
-    case Shutdown =>
-      log.info(s"Incomplete Edge count: ${missingToUuid.size}")
-      localStorage.foreach(path => graph.io(IoCore.graphson()).writeGraph(path))
-      sender() !  missingToUuid.size
+//    case Shutdown =>
+//      log.info(s"Incomplete Edge count: ${missingToUuid.size}")
+//      localStorage.foreach(path => graph.io(IoCore.graphson()).writeGraph(path))
+//      sender() !  missingToUuid.size
   }
 }
 
 case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
-
-sealed trait RestQuery { val query: String }
-case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
-case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
-case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
-
-case class EdgesForNodes(nodeIdList: Seq[Int])
-case object GiveMeTheGraph
-case object Shutdown
 
