@@ -1,6 +1,6 @@
-val scalaV = "2.11.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer. Cannot count on others having that recent a version
-val akkaV = "2.4.17"
-val akkaHttpV = "10.0.5"
+val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val akkaV = "2.5.3"
+val akkaHttpV = "10.0.9"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
@@ -17,7 +17,7 @@ lazy val adapt = (project in file(".")).settings(
     "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "org.apache.avro" % "avro" % "1.8.1",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
     //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-api" % "1.7.25",
@@ -31,9 +31,9 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
-    "org.mapdb" % "mapdb" % "3.0.4",
+    "org.mapdb" % "mapdb" % "3.0.5",
     // Titan related
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
     "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
