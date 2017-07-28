@@ -1,151 +1,132 @@
 # Adapt
 
-ADAPT software for Transparent Computing. This integration repository holds
-copies of the individual component repositories.  From here you can boot up and
-run Adapt-in-a-box, which is a single VM with select Adapt components installed,
-ready for pushing CDM files into the database.  This 'in-a-box' system is
-similar to the ta-3 multi-VM "tc-in-a-box" setup, but less time consuming or
-resource intensive.
+### Prerequistites
 
-The rest of this readme is about using the repository for either:
+You will need to have:
+  - a recent version of the [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+  - the latest version of [SBT](http://www.scala-sbt.org/)
+  - a specific version of the Cassandra database installed: `cassandra 2.1`
 
-- Further infrastructure development (see the 'Development' section)
-- Running Adapt, populating databases and other more interactive research (see
-  'Research')
+Then, you will need to run
 
-# Development (Enhancing adapt-in-a-box)
+    $ cassandra -f           # run in a different tab, or background this with: `&`
+    $ sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
 
-There are a few development activities one can perform from this repository.
-Namely, pulling in commits from component repositories and change the actual
-deployment scripts to install new dependencies or alter the startup.
 
-## Pulling Commits
+At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
 
-To get the latest version:
+### Command Line Options
+The adapt system is configurable at runtime by using the following command-line flags. Each flag should be preceded 
+with `-D` and followed by a equals sign, then value; no spaces. For example: `-Dadapt.runflow=db`
 
-    git checkout master; git pull
+Example:
 
-To begin work on a new feature:
+    sbt -mem 6000 -Dadapt.runflow=db -Dadapt.ingest.loadfiles.0=/Users/ryan/Desktop/ta1-cadets-pandex-cdm17.bin run
 
-    git branch <branch>; git checkout <branch>
+#### `-Dadapt.X` Flags
 
-or
+High-level commands about the primary operations of the system
 
-    git checkout -b <branch>
+| Command Line Flag | Possible Values                      | Default Value | Description |
+| ----------------- |:------------------------------------:|:-------------:|:------------|
+| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
+| adapt.app         | `prod` `accept`                      | `prod`        | previous multiple versions have been combined into `prod`. `accept` is for the acceptance testing app. |
 
-To push your work remotely:
 
-    git push origin <branch>
+#### `-Dadapt.ingest.X` Flags
+| Command Line Flag          | Possible Values             | Default Value                                                     | Description |
+| -------------------------- |:---------------------------:|:-----------------------------------------------------------------:|:------------|
+| adapt.ingest.loadfiles.0   | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
+| adapt.ingest.startatoffset | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
+| adapt.ingest.loadlimit     | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
+| adapt.ingest.parallelism   | Any Integer                 | `1`                                                               | This many parallel threads will be used to write to the database simultaneously. More is faster, but increases system load and lock contention. |
 
-To merge your code to master, open a pull request on GitHub.
+#### `-Dadapt.runtime.X` Flags
+| Command Line Flag                          | Possible Values               | Default Value             | Description |
+| ------------------------------------------ |:-----------------------------:|:-------------------------:|:------------|
+| adapt.runtime.apitimeout                   | Any Integer                   | `301`                     | Number of seconds before a query from the UI should be abandoned. |
+| adapt.runtime.port                         | Any valid port number         | `8080`                    | The UI will run at `localhost` on this port. |
+| adapt.runtime.titankeyspace                | Any string                    | `titan`                   | Ingested data will be written to this namespace. Changing this to other values will allow ingesting data from many TA1s into the same Cassandra database, but will keep each namespace effectively separate. Some sane choices for othe namespaces might be: `cadets-pandex`, `cadets-bovia`, `trace-experiment-1`, `trace-experiment-2`, etc. |
+| adapt.runtime.systemname                   | Any string without spaces     | `Engagement2+`            | The name of this system. |
+| adapt.runtime.notesfile                    | Path to a file on this system | `/home/darpa/notes.json`  | Path to where either an existing notes JSON file resides, or where a new one should be created. The notes file stores the human-provided scores and comments for items shown in the prioritied list of cards |
+| adapt.runtime.iforestpath                  | Path to a file on this system | `/home/darpa/iforest.exe` | Path to the iforest executable built for the system this is running on. |
+| adapt.runtime.iforestparallelism           | Any Integer                   | `4`                       | Number of parallel iforest instances to run for anomaly detection. |
+| adapt.runtime.shouldnoramlizeanomalyscores | Boolean                       | `false`                   | should rows in the CSV fed to iforest be normalized first? |
+| adapt.runtime.cleanupthreshold             |                               |                           | Don't use this. |
+| adapt.runtime.expansionqueryfreq           |                               |                           | Don't use this. |
+| adapt.runtime.basecleanupseconds           |                               |                           | Don't use this. |
+| adapt.runtime.featureextractionseconds     |                               |                           | Don't use this. |
+| adapt.runtime.throwawaythreshold           |                               |                           | Don't use this. |
 
-The infrastructure files of interest are:
 
-- Vagrantfile: Defines the VM and installation scripts.
-- install/boostrap.sh: Invoked by vagrant (first `vagrant up` call and any
-  `vagrant provision` call) to install all dependencies and select Adapt
-  components.
-- start_daemons.sh: Executes infrastructure via supervisord and sets up Kafka
-  topics.
-- config/supervisord.conf.{adapt,tc}inabox: Configuration files for the two VM
-  configurations.
+#### `-Dadapt.env.X` Flags
+| Command Line Flag            | Possible Values                                                                   | Default Value                                    | Description |
+| ---------------------------- |:---------------------------------------------------------------------------------:|:------------------------------------------------:|:------------|
+| adapt.env.ta1                | `cadets` `clearscope` `faros` `fivedirections` `theia` `trace` `kafkaTest` `file` | `file`                                           | Defines which TA1 is the source of the data. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
+| adapt.env.scenario           | `bovia` `pandex`                                                                  | `pandex`                                         | Defines which scenario the data is for. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
+| adapt.env.ta1kafkatopic      | Any string                                                                        | `ta1-{adapt.env.ta1}-{adapt.env.scenario}-cdm17` | Defines which kafka topic to read from in an engagement environment. |
+| adapt.env.theiaresponsetopic | Any String                                                                        | `ta1-theia-{adapt.env.scenario}-qr`              | Defines which kafka topic to read from if the TA1 is Theia (who provides provenance information on demand via a different channel) |
+| adapt.env.kafkabootstrap     | String defining address and port of a Kafka broker; in Kafka's expected syntax    | `ta3-starc-adapt-1-tcip.tc.bbn.com:9092`         | Kafka configuration used during the engagement |
 
-# Research (Using Adapt-in-a-box)
 
-Users who wish to execute Adapt components, put data into the database, and run
-queries can use either the single-vm 'adapt-in-a-box' or the TA-3 multi-vm
-framework 'tc-in-a-box' found on the BBN gitlab site.
+### Gremlin queries
 
-To start adapt-in-a-box ensure you have VirtualBox and Vagrant installed then
-execute `vagrant up` from the root of this repository.  Vagrant will start a new
-VM and run the install script. Once all the configured components are installed,
-the `start_daemons.sh` script will automatically run, providing a complete Adapt
-system:
+Due to several reasons (see below), we don't support the full Gremlin language. Instead, we support a decent-sized subset of it. Almost all existing Gremlin queries are still valid queries in our new DSL. The most important limitations are:
 
+  - since this is a DSL and not Gremlin, you can't put arbitrary Groovy/Java inside your queries
+  - building on the last point, anonymous functions (including queries that use `it`) / closures aren't supported
+  - to make parsing easy, anonymous graph traversals (things like `g.V().and(has('key1'),in())`) need to be made explicit using the `__` syntax (also documented [here][1]). The previous query should now look like `g.V().and(__.has('key1'),__.in())`.
+  - whitespace is completely unimportant
+
+The full grammar of queries supported is documented in `Query.scala` (and is updated whenever features are added). The functions of these mirror the functionality of the correspondingly named functions in the Tinkerpop [`Graph`][0], [`__`][1], and [`GraphTraversal`][2].
+
+#### Examples
+
+Here are some examples of valid queries:
+
+    g.V().has(label,'Subject').has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit(20)`
+  
+    g.V().has(label,'Entity-File').has('url', regex('.*file:///tmp/zqxf1.*')).has('file-version',1).dedup()
+
+    g.V().as('parent').union(_.values('commandLine').as('cmd'),
+                             _.until(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT')
+                                      .in().has('eventType',10).count().is(0))
+                              .repeat(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT')
+                                      .in().has('eventType',10).out().has(label,'EDGE_EVENT_AFFECTS_SUBJECT')
+                                      .out().has(label,'Subject').has('subjectType',0))
+                              .values('commandLine').as('cmd'))
+                      .select('parent').dedup().values('pid').as('parent_pid').select('parent_pid','cmd')"
+
+#### Querying the REST API
+
+After you've started up the system using `sbt run` (passing in whatever options you may need) and all data has been ingested, you can query the loaded data via a REST API. Depending on the type of result you expect back, POST to one of
+
+  * for querying vertices <http://localhost:8080/query/nodes>
+  * for querying edges <http://localhost:8080/query/edges>
+  * for any other raw query <http://localhost:8080/query/generic>
+  
+your string query with the key `"query"`. You'll get back an appropriate JSON string reponse for the first two of these, and a list of raw strings for the third. In Python, for the query `g.V().limit(10)`, that could look like
+
+```python
+>>> import requests
+>>> requests.post('http://localhost:8080/query/nodes', data={'query': 'g.V().limit(10)'}).json
+[{'type': 'vertex', 'id': 0, 'label': 'Principal', 'properties': {'source': [{'id': 3, 'value': 'SOURCE_FREEBSD_DTRACE_CADETS'}], 'uuid': [{'id': 1, 'value':  # output snipped
 ```
-vagrant up
-vagrant ssh
-tail -f /opt/titan/log/gremlin-server.log
-# look for a message at or near the end such as "up on port 8182"
-# to ensure reindexing completed properly.
-```
 
-To use the Adapt in a box, ssh to the system (`vagrant ssh`) and leverage the
-components' executables. You can confirm the database is ready by checking for
-the notice about listening on port 8182 at or near the bottom of
-`/opt/titan/log/gremlin-server.log`. Use Trint to push data from a file into the
-database:
+#### Why not just use Gremlin
+   
+This DSL abstraction exists because:
 
-```
-Trint -p $HOME/adapt/example/bad-ls.avro
-```
+  - We need some way of going from strings to queries. The Groovy reflection based Gremlin engine wasn't working, so we decided to roll our own DSL, then interpret that using the Java tinkerpop API.
+  
+  - The Java datatypes for this (mostly under `tinkerpop.gremlin.process.traversal.dsl.graph`) are unpleasant to handle. For instance, they tie traversals immediately to a graph.
+  
+  - This could be a good first-class representation of a mutation to execute on a graph (for example to add vertices or edges), but without being opaque.
 
-N.B. Trint places the data on ingestd's inbound Kafka queue.  Ingestd manages
-the interaction with Titan.  Once all desired data has pushed to ingestd, and
-the database has stopped processing the insertions, Trint can again be used to
-send the 'finished' signal to Ingestd which then propagates it to the pattern
-extractor and on down the chain:
+#### Bugs / Missing features
 
-```
-Trint -f
-```
+Obviously we don't support all of the functionality we could. However, if you see anything in the Java Tinkerpop APIs ([`Graph`][0], [`__`][1], and [`GraphTraversal`][2]) that you would like to use, open up an issue or/and email <atheriault@galois.com> about it. Even if it is something that isn't straightforard, open an issue and we can discuss it.
 
-While it might be convenient for Trint to automatically append this signal
-after reading in a trace file, such behavior would preclude many desirable mode
-of operation such as 1) ingesting data from TA-3 then sending the signal
-(Adapt-specific) signal  2) ingesting data from multiple Avro files 3) ingesting
-data by replaying Kafka log files produce by some TA-1 performers.
-
-## Helper Scripts for Avro Files, Titan, and More
-
-If you want to do X then use Y:
-
-*Use just the N-th to M-th statements from an avro (.avro or .bin) file:* For
-this you can use the Python command line tool 'avroknife', which is installed in
-the VM by default.  To use knife you must give it a source and destination
-_directory_ along with any desired parameters (copying statements, extracting
-fields, ranges, etc). For example:
-
-```
-$ mkdir /tmp/avro
-$ cp example/bad-ls.avro /tmp/avro
-$ avroknife --index 0-5000 --output local:/tmp/slicedData copy local:/tmp/avro
-$ Trint -p /tmp/slicedData/content.avro
-Sent 5001 statements to kafka[TName {_tName = KString {_kString = "ta2"}}].
-```
-
-*Counting nodes:* Numerous tools exist in `$HOME/adapt/tools` including
-`node_count.py`.  Just run `python3 $HOME/adapt/tools/node_count.py` and be
-aware it performs about a half dozen full database traversals.
-
-*Restarting Everything:* If you have changed titan configurations, or something
-in supervisor.d, and would like to restart services without restarting the VM
-then try running `$HOME/adapt/tools/restart_services.sh`.  Similarly, you can
-follow the steps in that script but insert a `/opt/titan/bin/titan clean`
-command if you'd like to wipe the database at the same time.
-
-*Query based on elastic search index*: The query mechanism for indexed data
-seems to vary more drastically for non-node-indexed   The direct index method
-involves using the graph to query the index then turn around and acquire the
-vertices, edges etc:
-
-    QUERYV = "graph.indexQuery('byURL', 'v.url:/.*null.*/').vertices()"
-
-# Directory Descriptions
-
-- ad: Anomaly Detection
-- classifier: Classifier
-- config: System configuration files for primitive services including the
-  database and communication queues.
-- dashboard: A primitive web interface for displaying messages from each
-  component.
-- dx: Diagnostics
-- example: Basic CDM/Avro container file examples.
-- ingest: The ingester, which takes data from its source (TA-1) and insert it
-  into the database after some basic checks and transformations.
-- install: Scripts to install all available tools in a single virtual machine.
-- kb: Knowledge base (adversarial models etc)
-- px: Pattern Extractor
-- Segment: Graph segmentation
-- trace: Script for working with the data store on seaside.galois.com
-- ui: A fake user interface that was once useful (trash now?)
+[0]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/structure/Graph.html
+[1]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/process/traversal/dsl/graph/__.html
+[2]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/process/traversal/dsl/graph/GraphTraversal.html
