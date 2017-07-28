@@ -8,17 +8,13 @@ object Application extends App {
   val config = ConfigFactory.load()
   val appMode = config.getString("adapt.app")
 
-  val loadPaths = config.getStringList("adapt.loadfiles").toList.map { path =>
+  val loadPaths = config.getStringList("adapt.ingest.loadfiles").toList.map { path =>
     path.replaceFirst("^~",System.getProperty("user.home")); // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
   }
 
-  val loadLimitOpt = config.getInt("adapt.loadlimit") match {
+  val loadLimitOpt = config.getInt("adapt.ingest.loadlimit") match {
     case 0 => None
     case i => Some(i)
-  }
-  val devLocalStorageOpt = config.getString("adapt.dev.localstorage") match {
-    case "" | "none" | "None" => None
-    case path => Some(path)
   }
 
   val debug: String => Unit = appMode.toLowerCase match {
@@ -29,7 +25,7 @@ object Application extends App {
   appMode.toLowerCase match {
     case "accept"  => AcceptanceApp.run()
     case "prod"    => ProductionApp.run()
-    case "dev"     => DevelopmentApp.run()
+//    case "dev"     => DevelopmentApp.run()
 //    case "cluster" => ClusterDevApp.run(config)
   }
 
@@ -38,16 +34,11 @@ object Application extends App {
 
 
 
-/*
- * This is a single-node version of the cluster app.
- *
- * All this object does is load up an alternate Config to pass to 'ClusterDevApp'.
- * That config is in 'src/main/resources/accept.conf'
- */
 object AcceptanceApp {
   println(s"Spinning up an acceptance testing system.")
 
   def run(): Unit = {
+    println(s"\n\n        THE ACCEPTANCE APP IS CURRENTLY BROKEN. \n        Someone please fix this soon.\n\n")
 //    ClusterDevApp.run(Application.config.getConfig("accept") withFallback Application.config)
   }
 }

@@ -49,13 +49,12 @@ object ProductionApp {
     val port = config.getInt("akka.http.server.port")
 
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
-    new File(config.getString("adapt.iforestpath")).setExecutable(true)
+//    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
 
     implicit val system = ActorSystem("production-actor-system")
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
-    val ta1 = config.getString("adapt.ta1")
 
 //    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
 //    dbFile.delete()
@@ -67,7 +66,7 @@ object ProductionApp {
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
-//    val srcActor =
+    val ta1 = config.getString("adapt.env.ta1")
     config.getString("adapt.runflow") match {
       case "database" | "db" =>
         println("Running database-only flow")
@@ -135,22 +134,22 @@ case class ViewScore(viewName: String, keyNode: UUID, suspicionScore: Double, su
 
 object CDMSource {
   private val config = ConfigFactory.load()
-  val scenario = config.getString("adapt.scenario")
+  val scenario = config.getString("adapt.env.scenario")
 
   def apply(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
-    val start = Try(config.getLong("adapt.startatoffset")).getOrElse(0L)
+    val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     ta1.toLowerCase match {
-      case "cadets"         => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
-      case "clearscope"     => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
-      case "faros"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
-      case "fivedirections" => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
-      case "theia"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
-        .merge(kafkaSource(config.getString("adapt.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
-      case "trace"          => kafkaSource(config.getString("adapt.ta1kafkatopic")).drop(start)
+      case "cadets"         => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "clearscope"     => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "faros"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "fivedirections" => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "theia"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
+      case "trace"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
       case "kafkaTest"      => kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
       case _ =>
-        val paths = config.getStringList("adapt.loadfiles").asScala
+        val paths = config.getStringList("adapt.ingest.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
           .drop(start)
@@ -171,7 +170,7 @@ object CDMSource {
 
   def kafkaSource(ta1Topic: String): Source[CDM17, _] = Consumer.plainSource(  // commitableSource
     ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-    Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.startatoffset"))
+    Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))
   ).map { msg =>
     Try {
       val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
@@ -198,7 +197,7 @@ object Ta1Flows {
   import AnomalyStream._
 
   private val config = ConfigFactory.load()
-  val base = config.getInt("adapt.basecleanupseconds")    // 10
+  val base = config.getInt("adapt.runtime.basecleanupseconds")    // 10
   val fastEmit = base * 2 + base                          // 30
   val slowClean = fastEmit * 2                            // 60
   val slowEmit = slowClean * 2 + base                     // 130

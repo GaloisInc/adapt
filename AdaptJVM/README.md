@@ -2,26 +2,72 @@
 
 ### Prerequistites
 
-You will need to have
-
+You will need to have:
   - a recent version of the [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
   - the latest version of [SBT](http://www.scala-sbt.org/)
+  - a specific version of the Cassandra database installed: `cassandra 2.1`
 
 Then, you will need to run
 
-    $ sbt -mem 6000 run \
-        -Dadapt.loadfiles.0=<PATH TO A DATA FILE> \
-        -Dadapt.loadlimit=<MAXIMUM NUMBER OF EVENTS TO INGEST>
+    $ cassandra -f           # run in a different tab, or background this with: `&`
+    $ sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
 
-This should hopefully download all dependencies, compile everything, and start running it. You
-should now see a rapidly increasing count of the number of ingested events. Once this is done, you
-will see the message
 
-        Server online at http://0.0.0.0:8080/
+At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
 
-    Press RETURN to stop..
+### Command Line Options
+The adapt system is configurable at runtime by using the following command-line flags. Each flag should be preceded 
+with `-D` and followed by a equals sign, then value; no spaces. For example: `-Dadapt.runflow=db`
 
-At this point you can open up the interactive UI at <http://0.0.0.0:8080/> or start querying the REST api directly. However, there are some restrictions on the queries you can make...
+Example:
+
+    sbt -mem 6000 -Dadapt.runflow=db -Dadapt.ingest.loadfiles.0=/Users/ryan/Desktop/ta1-cadets-pandex-cdm17.bin run
+
+#### `-Dadapt.X` Flags
+
+High-level commands about the primary operations of the system
+
+| Command Line Flag | Possible Values                      | Default Value | Description |
+| ----------------- |:------------------------------------:|:-------------:|:------------|
+| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
+| adapt.app         | `prod` `accept`                      | `prod`        | previous multiple versions have been combined into `prod`. `accept` is for the acceptance testing app. |
+
+
+#### `-Dadapt.ingest.X` Flags
+| Command Line Flag          | Possible Values             | Default Value                                                     | Description |
+| -------------------------- |:---------------------------:|:-----------------------------------------------------------------:|:------------|
+| adapt.ingest.loadfiles.0   | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
+| adapt.ingest.startatoffset | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
+| adapt.ingest.loadlimit     | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
+| adapt.ingest.parallelism   | Any Integer                 | `1`                                                               | This many parallel threads will be used to write to the database simultaneously. More is faster, but increases system load and lock contention. |
+
+#### `-Dadapt.runtime.X` Flags
+| Command Line Flag                          | Possible Values               | Default Value             | Description |
+| ------------------------------------------ |:-----------------------------:|:-------------------------:|:------------|
+| adapt.runtime.apitimeout                   | Any Integer                   | `301`                     | Number of seconds before a query from the UI should be abandoned. |
+| adapt.runtime.port                         | Any valid port number         | `8080`                    | The UI will run at `localhost` on this port. |
+| adapt.runtime.titankeyspace                | Any string                    | `titan`                   | Ingested data will be written to this namespace. Changing this to other values will allow ingesting data from many TA1s into the same Cassandra database, but will keep each namespace effectively separate. Some sane choices for othe namespaces might be: `cadets-pandex`, `cadets-bovia`, `trace-experiment-1`, `trace-experiment-2`, etc. |
+| adapt.runtime.systemname                   | Any string without spaces     | `Engagement2+`            | The name of this system. |
+| adapt.runtime.notesfile                    | Path to a file on this system | `/home/darpa/notes.json`  | Path to where either an existing notes JSON file resides, or where a new one should be created. The notes file stores the human-provided scores and comments for items shown in the prioritied list of cards |
+| adapt.runtime.iforestpath                  | Path to a file on this system | `/home/darpa/iforest.exe` | Path to the iforest executable built for the system this is running on. |
+| adapt.runtime.iforestparallelism           | Any Integer                   | `4`                       | Number of parallel iforest instances to run for anomaly detection. |
+| adapt.runtime.shouldnoramlizeanomalyscores | Boolean                       | `false`                   | should rows in the CSV fed to iforest be normalized first? |
+| adapt.runtime.cleanupthreshold             |                               |                           | Don't use this. |
+| adapt.runtime.expansionqueryfreq           |                               |                           | Don't use this. |
+| adapt.runtime.basecleanupseconds           |                               |                           | Don't use this. |
+| adapt.runtime.featureextractionseconds     |                               |                           | Don't use this. |
+| adapt.runtime.throwawaythreshold           |                               |                           | Don't use this. |
+
+
+#### `-Dadapt.env.X` Flags
+| Command Line Flag            | Possible Values                                                                   | Default Value                                    | Description |
+| ---------------------------- |:---------------------------------------------------------------------------------:|:------------------------------------------------:|:------------|
+| adapt.env.ta1                | `cadets` `clearscope` `faros` `fivedirections` `theia` `trace` `kafkaTest` `file` | `file`                                           | Defines which TA1 is the source of the data. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
+| adapt.env.scenario           | `bovia` `pandex`                                                                  | `pandex`                                         | Defines which scenario the data is for. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
+| adapt.env.ta1kafkatopic      | Any string                                                                        | `ta1-{adapt.env.ta1}-{adapt.env.scenario}-cdm17` | Defines which kafka topic to read from in an engagement environment. |
+| adapt.env.theiaresponsetopic | Any String                                                                        | `ta1-theia-{adapt.env.scenario}-qr`              | Defines which kafka topic to read from if the TA1 is Theia (who provides provenance information on demand via a different channel) |
+| adapt.env.kafkabootstrap     | String defining address and port of a Kafka broker; in Kafka's expected syntax    | `ta3-starc-adapt-1-tcip.tc.bbn.com:9092`         | Kafka configuration used during the engagement |
+
 
 ### Gremlin queries
 
@@ -55,15 +101,15 @@ Here are some examples of valid queries:
 
 After you've started up the system using `sbt run` (passing in whatever options you may need) and all data has been ingested, you can query the loaded data via a REST API. Depending on the type of result you expect back, POST to one of
 
-  * for querying vertices <http://0.0.0.0:8080/query/nodes>
-  * for querying edges <http://0.0.0.0:8080/query/edges>
-  * for any other raw query <http://0.0.0.0:8080/query/generic>
+  * for querying vertices <http://localhost:8080/query/nodes>
+  * for querying edges <http://localhost:8080/query/edges>
+  * for any other raw query <http://localhost:8080/query/generic>
   
 your string query with the key `"query"`. You'll get back an appropriate JSON string reponse for the first two of these, and a list of raw strings for the third. In Python, for the query `g.V().limit(10)`, that could look like
 
 ```python
 >>> import requests
->>> requests.post('http://0.0.0.0:8080/query/nodes', data={'query': 'g.V().limit(10)'}).json
+>>> requests.post('http://localhost:8080/query/nodes', data={'query': 'g.V().limit(10)'}).json
 [{'type': 'vertex', 'id': 0, 'label': 'Principal', 'properties': {'source': [{'id': 3, 'value': 'SOURCE_FREEBSD_DTRACE_CADETS'}], 'uuid': [{'id': 1, 'value':  # output snipped
 ```
 

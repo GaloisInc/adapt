@@ -9,7 +9,7 @@ import spray.json.{JsArray, JsString}
 
 import collection.JavaConverters._
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 
 class TitanDBQueryProxy() extends Actor with ActorLogging {

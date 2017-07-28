@@ -35,7 +35,10 @@ object AnomalyStream {
     var nameOpt: Option[String] = None
 
     {
-      case Tuple4(name: String, uuid: UUID, featureMap: mutable.Map[String,Any], relatedUuids: Set[UUID]) =>
+      case (name: String, uuid: UUID, fm: mutable.Map[_,_], ru: Set[_]) =>
+        val featureMap = fm.asInstanceOf[mutable.Map[String,Any]]  // shut up compiler warnings.
+        val relatedUuids = ru.asInstanceOf[Set[UUID]]
+
         if (nameOpt.isEmpty) nameOpt = Some(name)
         if (headerOpt.isEmpty) headerOpt = Some(s"uuid,${featureMap.toList.sortBy(_._1).map(_._1).mkString(",")}\n")
 
@@ -109,7 +112,7 @@ object AnomalyStream {
             val config = ConfigFactory.load()
 
             Try(Seq[String](
-              config.getString("adapt.iforestpath"),
+              config.getString("adapt.runtime.iforestpath"),
 //              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
               "-i", inputFile.getCanonicalPath, // input file
               "-o", outputFile.getCanonicalPath, // output file
@@ -120,7 +123,7 @@ object AnomalyStream {
               case Failure(e) => println(s"AD failure: $randomNum"); e.printStackTrace()
             }
 
-            val shouldNormalize = config.getBoolean("adapt.shouldnoramlizeanomalyscores")
+            val shouldNormalize = config.getBoolean("adapt.runtime.shouldnoramlizeanomalyscores")
 
             val fileLines = if (shouldNormalize) {
               val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
@@ -159,7 +162,7 @@ object AnomalyStream {
           }
         )
     }
-  }.mapAsyncUnordered(ConfigFactory.load().getInt("adapt.iforestparallelism"))(identity)
+  }.mapAsyncUnordered(ConfigFactory.load().getInt("adapt.runtime.iforestparallelism"))(identity)
     .mapConcat(identity)
 
 

@@ -38,7 +38,7 @@ object MemoryStream {
               memoryEvents += event
               cleanupCounts = 0
             }
-            if (memoryEvents.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (memoryEvents.size > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"MemoryObject is over the event limit: $uuid")
               shouldStore = false
               memoryEvents.clear()
@@ -83,7 +83,7 @@ object MemoryStream {
         }
       }
       .buffer(1, OverflowStrategy.dropHead)
-      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .delay(config.getInt("adapt.runtime.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
       .map(t =>
           (t._1, MutableSortedSet(t._2.toList:_*)(Ordering.by(_.timestampNanos)))
       )

@@ -6,7 +6,7 @@ resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
-  version := "0.4.3",
+  version := "0.5",
   organization := "com.galois",
   scalaVersion := scalaV,
 
@@ -22,17 +22,17 @@ lazy val adapt = (project in file(".")).settings(
     //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
     //  "org.slf4j" % "slf4j-api" % "1.7.25",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
-    "com.typesafe.akka" %% "akka-cluster" % akkaV,
+//    "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-persistence" % akkaV,
-    "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
+//    "com.typesafe.akka" %% "akka-persistence" % akkaV,
+//    "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
     // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
     // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
+//    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
     "org.mapdb" % "mapdb" % "3.0.5",
     // Titan related
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),

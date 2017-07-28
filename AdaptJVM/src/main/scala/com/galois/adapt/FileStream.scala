@@ -40,7 +40,7 @@ object FileStream {
               fileEvents += event
               cleanupCounts = 0
             }
-            if (fileEvents.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (fileEvents.size > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"FileObject is over the event limit: $uuid")
               shouldStore = false
               fileEvents.clear()
@@ -85,7 +85,7 @@ object FileStream {
         }
       }
       .buffer(1, OverflowStrategy.dropHead)
-      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .delay(config.getInt("adapt.runtime.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
       .map { case (u,s) =>
           u -> MutableSortedSet(s.toList: _*)(Ordering.by(_.timestampNanos))
       }

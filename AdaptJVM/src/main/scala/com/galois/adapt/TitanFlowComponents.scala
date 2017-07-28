@@ -21,7 +21,7 @@ object TitanFlowComponents {
 
   val config = ConfigFactory.load()
 
-  val threadPool = config.getInt("adapt.ingest.threadpool")
+  val threadPool = config.getInt("adapt.ingest.parallelism")
 
   def addIndex(graph: TitanGraph, management: ManagementSystem, propKey: String, clazz: Class[_], indexName: String) = {
 
@@ -53,12 +53,21 @@ object TitanFlowComponents {
    * The following also sets up a key index for UUIDs.
    */
   val graph = {
-    val graph = TitanFactory.build
-      .set("storage.backend","cassandra")
-      .set("storage.hostname","localhost")
-      .set("storage.read-time",120000)
-      .set("storage.cassandra.keyspace", config.getString("adapt.titankeyspace"))
-      .open
+    val graph = Try(
+      TitanFactory.build
+        .set("storage.backend","cassandra")
+        .set("storage.hostname","localhost")
+        .set("storage.read-time",120000)
+        .set("storage.cassandra.keyspace", config.getString("adapt.runtime.titankeyspace"))
+        .open
+    ) match {
+      case Success(g) => g
+      case Failure(e) =>
+        val msg = s"Could not connect to the Cassandra database. Please make sure it is running and try again."
+        println("\n\n  ***  " + msg + "  ***\n\n")
+        class HeyDummyYouForgotToStartTheDatabaseException(s: String) extends RuntimeException
+        throw new HeyDummyYouForgotToStartTheDatabaseException(msg)
+    }
 
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
 

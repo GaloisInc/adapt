@@ -95,7 +95,7 @@ object FlowComponents {
 
           case CleanUp =>
             if (idOpt.isEmpty) cleanupCount += 1
-            if (idOpt.isEmpty && events.nonEmpty && cleanupCount >= config.getInt("adapt.cleanupthreshold")) {
+            if (idOpt.isEmpty && events.nonEmpty && cleanupCount >= config.getInt("adapt.runtime.cleanupthreshold")) {
               println(s"Never received the object for events with a predicate to: ${targetUuid.getOrElse("never known")}")
               shouldStore = false
               events.clear()

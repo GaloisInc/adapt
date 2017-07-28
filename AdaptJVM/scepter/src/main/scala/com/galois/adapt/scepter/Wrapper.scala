@@ -150,10 +150,10 @@ object Wrapper extends App {
       if (file.exists) file.deleteOnExit()
 
       // Run the tests
-      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.loadfiles.$i=$t" }
+      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.loadfiles.$i=$t" }
       val cmd = s"""java -Xmx${opts.heapSize}
                    |     -Dadapt.app=accept
-                   |     -Dadapt.loadlimit=0
+                   |     -Dadapt.ingest.loadlimit=0
                    |     -Dadapt.webserver=${opts.webUi.toString}
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $adaptJarPath

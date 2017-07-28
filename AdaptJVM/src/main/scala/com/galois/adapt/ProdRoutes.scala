@@ -30,29 +30,24 @@ object ProdRoutes {
 
   val serveStaticFilesRoute =
     path("") {
-      getFromResource("web/index.html")
-    } ~
-    path("graph") {
       getFromResource("web/graph.html")
+    } ~
+    path("rank") {
+      getFromResource("web/ranking.html")
     } ~
     pathPrefix("") {
       getFromResourceDirectory("web")
     }
 
+  implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
 
-  implicit val timeout = Timeout(config.getInt("adapt.apitimeout") seconds)
-
-  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = {
-     (dbActor ? query)
-      .mapTo[Future[Try[JsValue]]].flatMap(identity).map { s =>
-      s match {
-        case Success(json) => json
-        case Failure(e) =>
-          println(e.getMessage)
-          JsString("\"" + e.getMessage + "\"")
-      }
+  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = (dbActor ? query)
+    .mapTo[Future[Try[JsValue]]].flatMap(identity).map {
+      case Success(json) => json
+      case Failure(e) =>
+        println(e.getMessage)
+        JsString("\"" + e.getMessage + "\"")
     }
-  }
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =

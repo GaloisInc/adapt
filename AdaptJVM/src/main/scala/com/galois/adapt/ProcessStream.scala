@@ -49,7 +49,7 @@ object ProcessStream {
               eventsToThisProcess += event
               cleanupCounts = 0
             }
-            if (eventsToThisProcess.size > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (eventsToThisProcess.size > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"Subject in process collector is over the event limit: $uuid")
               shouldStore = false
               eventsToThisProcess.clear()
@@ -65,7 +65,7 @@ object ProcessStream {
               netFlowEvents.getOrElse(uuid, MutableSet.empty[(Event,NetFlowObject)]) += (event -> cdm.asInstanceOf[NetFlowObject])
               cleanupCounts = 0
             }
-            if (netFlowEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (netFlowEvents.values.map(_.size).sum > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"NetFlowObject in process collector is over the event limit: $uuid")
               shouldStore = false
               netFlowEvents.clear()
@@ -81,7 +81,7 @@ object ProcessStream {
               memoryEvents.getOrElse(uuid, MutableSet.empty[(Event,MemoryObject)]) += (event -> cdm.asInstanceOf[MemoryObject])
               cleanupCounts = 0
             }
-            if (memoryEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (memoryEvents.values.map(_.size).sum > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"MemoryObject in process collector is over the event limit: $uuid")
               shouldStore = false
               memoryEvents.clear()
@@ -97,7 +97,7 @@ object ProcessStream {
               fileEvents.getOrElse(uuid, MutableSet.empty[(Event,FileObject)]) += (event -> cdm.asInstanceOf[FileObject])
               cleanupCounts = 0
             }
-            if (fileEvents.values.map(_.size).sum > config.getInt("adapt.throwawaythreshold") && shouldStore) {
+            if (fileEvents.values.map(_.size).sum > config.getInt("adapt.runtime.throwawaythreshold") && shouldStore) {
               println(s"FileObject in process collector is over the event limit: $uuid")
               shouldStore = false
               fileEvents.clear()
@@ -153,7 +153,7 @@ object ProcessStream {
         }
       }
       .buffer(1, OverflowStrategy.dropHead)
-      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .delay(config.getInt("adapt.runtime.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
       .map(t => (
         (t._1._1, MutableSortedSet(t._1._2.toList:_*)(Ordering.by(_.timestampNanos))),
         t._2.mapValues(s => SortedSet(s.toList:_*)(Ordering.by[(Event, NetFlowObject), Long](_._1.timestampNanos))).toSet,

@@ -51,7 +51,7 @@ object NetFlowStream {
                 events ++= persistedSet
                 hasPersistedEvents = false
               }
-              if (events.size > config.getInt("adapt.throwawaythreshold")) {
+              if (events.size > config.getInt("adapt.runtime.throwawaythreshold")) {
                 println(s"NewFlowObject is over the event limit: ${uuidOpt.get}")
                 shouldStore = false
                 events.clear()
@@ -61,7 +61,7 @@ object NetFlowStream {
         }
       }
       .buffer(1, OverflowStrategy.dropHead)
-      .delay(config.getInt("adapt.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
+      .delay(config.getInt("adapt.runtime.featureextractionseconds") seconds, DelayOverflowStrategy.backpressure)
       .map(t =>
         t._1 -> MutableSortedSet(t._2.toList:_*)(Ordering.by(_.timestampNanos))
       )

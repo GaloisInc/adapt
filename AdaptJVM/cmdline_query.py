@@ -3,7 +3,7 @@
 import requests, readline, sys
 
 if __name__ == '__main__':
-    url = "http://0.0.0.0:8080"
+    url = "http://localhost:8080"
     if len(sys.argv) >= 2:
     	url = sys.argv[1]
     print("Welcome to the query shell. Queries are sent to '" + url +  "/query/generic'.")

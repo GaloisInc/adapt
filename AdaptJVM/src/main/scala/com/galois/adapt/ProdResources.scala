@@ -31,7 +31,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
 
-  val notesFilePath = config.getString("adapt.notesfile")
+  val notesFilePath = config.getString("adapt.runtime.notesfile")
 
   var savedNotes = Try(scala.io.Source.fromFile(notesFilePath))
     .map { notesSource =>
@@ -40,12 +40,12 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     } match {
       case Success(parsedNotes) => parsedNotes
       case Failure(e) =>
-        println("Failed to load saved notes file: " + e.getMessage + " It will be created on first write.")
+        println("Could not load saved notes file: " + e.getMessage + " It will be created on first write.")
         List.empty[SavedNotes]
     }
 
   var queryQueue = List.empty[UUID]
-  val freq = config.getInt("adapt.expansionqueryfreq")
+  val freq = config.getInt("adapt.runtime.expansionqueryfreq")
   context.system.scheduler.schedule(freq seconds, freq seconds)(context.self ! MakeExpansionQueries)
 
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
@@ -87,7 +87,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     encoder.flush()
     val elem = baos.toByteArray
 
-    val scenario = config.getString("adapt.scenario")
+    val scenario = config.getString("adapt.env.scenario")
     val topic: String = s"ta1-theia-$scenario-q"
     val brokers: String = config.getString("akka.kafka.producer.kafka-clients.bootstrap.servers")
     val props = new Properties()
