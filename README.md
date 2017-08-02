@@ -3,13 +3,13 @@
 ### Prerequistites
 
 You will need to have:
-  - a recent version of the [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+  - a recent version of the Oracle [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
   - the latest version of [SBT](http://www.scala-sbt.org/)
   - a specific version of the Cassandra database installed: `cassandra 2.1`
 
 Then, you will need to run
 
-    $ cassandra -f           # run in a different tab, or background this with: `&`
+    $ cassandra -f           # keep this running in a different tab, or background the process.
     $ sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
 
 
