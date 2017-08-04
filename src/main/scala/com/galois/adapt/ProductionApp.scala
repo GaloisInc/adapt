@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.galois.adapt.cdm17.{AbstractObject, CDM17, CryptographicHash, Event, FileObject, FileObjectType, NetFlowObject, Principal, PrincipalType, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
@@ -31,6 +31,8 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
 import scala.util.{Random, Try}
 import scala.concurrent.duration._
+import scala.pickling.FastTypeTag
+
 
 
 object ProductionApp {
@@ -68,6 +70,39 @@ object ProductionApp {
 
     val ta1 = config.getString("adapt.env.ta1")
     config.getString("adapt.runflow") match {
+      case "quine" =>
+        import com.rrwright.quine.runtime._
+        import scala.pickling.Defaults._
+        import scala.pickling.Pickler
+        import scala.pickling.json.JsonFormats
+
+        implicit val graph = GraphService(system)
+        implicit val ao = Pickler.generate[AbstractObject]
+        implicit val fot = Pickler.generate[FileObjectType]
+        implicit val ch = Pickler.generate[CryptographicHash]
+        implicit val oi = Pickler.generate[Option[Int]]
+
+        implicit val a = Pickler.generate[None.type]
+        implicit val c = Pickler.generate[Some[Map[String,String]]]
+        implicit val b = Pickler.generate[Option[Map[String,String]]]
+        implicit val d = Pickler.generate[PrincipalType]
+        //  implicit val e = scala.pickling.Defaults.stringPickler  //Pickler.generate[Seq[String]]
+        //  implicit val f = Pickler.generate[Option[String]]
+
+        implicit val g = Pickler.generate[AbstractObject]
+        implicit val h = Pickler.generate[FileObjectType]
+        //  implicit val i = Pickler.generate[CryptographicHash]
+        //  implicit val j = Pickler.generate[Some[Int]]
+
+//        implicit def k[T: FastTypeTag] = Pickler.generate[T]
+
+        val quineActor = system.actorOf(Props[QuineDBActor])
+        Flow[CDM17].runWith(CDMSource(ta1), Sink.actorRef(quineActor, None))
+//        Flow[CDM17].collect{ case f: FileObject =>
+//          f.create(Some(f.uuid))
+//            .map(_ => println("got one"))
+//        }.runWith(CDMSource(ta1), Sink.ignore)
+
       case "database" | "db" =>
         println("Running database-only flow")
         Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())

@@ -2,7 +2,8 @@ val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or ne
 val akkaV = "2.5.3"
 val akkaHttpV = "10.0.9"
 
-resolvers += Resolver.jcenterRepo  // for akka persistence in memory
+//resolvers += Resolver.jcenterRepo  // for akka persistence in memory
+resolvers += Resolver.sonatypeRepo("snapshots")  // for scala-pickling 0.10.2-SNAPSHOT  // for Quine
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
@@ -37,7 +38,9 @@ lazy val adapt = (project in file(".")).settings(
     // Titan related
     "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
     "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
-    "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j")
+    "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j"),
+
+    "com.rrwright" %% "quine" % "0.1-SNAPSHOT"
   ),
 
 //  fork in run := true,
