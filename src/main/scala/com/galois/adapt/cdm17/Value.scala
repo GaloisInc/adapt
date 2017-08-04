@@ -30,7 +30,7 @@ case class Value(
   ) ++
     name.fold[List[Any]](List.empty)(v => List("name", v)) ++
     runtimeDataType.fold[List[Any]](List.empty)(v => List("runtimeDataType", v)) ++
-    valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", v.toString)) ++
+    valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", new String(v))) ++
     tagRunLengthTuples.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tagRunLengthTuples", v.map(_.asDBKeyValues).mkString(", "))) ++
     components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 

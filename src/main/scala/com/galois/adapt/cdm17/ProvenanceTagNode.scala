@@ -81,4 +81,4 @@ case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
 }
 
 
-case class ProvTagValueType(o: Any)   // TODO: This is cheating! Consider shapeless coproduct.
+//case class ProvTagValueType(o: Any)   // TODO: This is cheating! Consider shapeless coproduct.
