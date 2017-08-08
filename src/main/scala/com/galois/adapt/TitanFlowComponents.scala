@@ -68,7 +68,7 @@ object TitanFlowComponents {
         class HeyDummyYouForgotToStartTheDatabaseException(s: String) extends RuntimeException
         throw new HeyDummyYouForgotToStartTheDatabaseException(msg)
     }
-
+    
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
 
     // This allows multiple edges when they are labelled 'tagId'
@@ -370,7 +370,6 @@ object TitanFlowComponents {
         // Item of note: Titan prints out the stack trace as part of throwing a transaction error
         // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
         // that exception is handled here, that's just Titan printing out the trace for your information
-        transaction.rollback()
         Failure(e)
     }
   }
