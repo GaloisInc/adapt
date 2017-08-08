@@ -26,3 +26,4 @@ target
 .idea
 out
 
+*.o
