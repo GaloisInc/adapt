@@ -384,8 +384,9 @@ object TitanFlowComponents {
       case Failure(_) =>
         // If we're trying to ingest a single CDM statement, try it one more time before giving up
         if (cdms.length == 1) {
-          // We're too efficient. If the thread doesn't sleep for a millisecond, the final retry also fails. This line gets it to work close to 100% of the time.
-          Thread.sleep(1)
+          // We're too efficient. If the thread doesn't sleep for a fraction of a second, the final retry also fails.
+          // This line gets it to work close to 100% of the time.
+          Thread.sleep(10)
           Seq(titanTx(cdms))
         } else {
           // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
