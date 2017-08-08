@@ -68,7 +68,7 @@ object TitanFlowComponents {
         class HeyDummyYouForgotToStartTheDatabaseException(s: String) extends RuntimeException
         throw new HeyDummyYouForgotToStartTheDatabaseException(msg)
     }
-    
+
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
 
     // This allows multiple edges when they are labelled 'tagId'
@@ -367,9 +367,9 @@ object TitanFlowComponents {
     ) match {
       case Success(_) => Success(())
       case Failure(e) =>
-        // Item of note: Titan prints out the stack trace as part of throwing a transaction error
-        // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
-        // that exception is handled here, that's just Titan printing out the trace for your information
+        // Item of note: <logger name="com.thinkaurelius.titan.graphdb.database.StandardTitanGraph" level="OFF" /> in
+        // logback.xml keeps Titan from spamming the console with transactional failures that we resolve via retry. Otherwise
+        // with our logging level, we spam the console with so many stack traces you don't see the messages we actually want
         Failure(e)
     }
   }
@@ -383,8 +383,11 @@ object TitanFlowComponents {
       case Success(()) => Seq(Success(()))
       case Failure(_) =>
         // If we're trying to ingest a single CDM statement, try it one more time before giving up
-        // TODO: map over try, flatmap to compose two tries into a single try
-        if (cdms.length == 1) Seq(titanTx(cdms)) else {
+        if (cdms.length == 1) {
+          // We're too efficient. If the thread doesn't sleep for a millisecond, the final retry also fails. This line gets it to work close to 100% of the time.
+          Thread.sleep(1)
+          Seq(titanTx(cdms))
+        } else {
           // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
           val (front, back) = cdms.splitAt(cdms.length / 2)
           titanLoop(front) match {
