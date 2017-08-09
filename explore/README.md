@@ -1,6 +1,6 @@
 # Generating Concepts with FCbO and analyzing the concepts
 
-##Brief description of the files (to be found in the explore directory)
+## Brief description of the files (to be found in the explore directory)
 
 The current implementation the FCA analysis is contained in fcbo_core.py (port of the original FCbO C implementation) and fca_script.py (script to launch the concepts generation with FCbO and analyze the generated concepts to find anomalies).  
 Example input files are provided in the directory: context files (one in CXT and one in FIMI format obtained by using the event query on ta1-theia-bovia-cdm17.bin) as well as json specification files (event query in spec_context_event.py, netflow query in spec_context_netflow.py and file execution query in spec_context_execute.py)
@@ -10,7 +10,7 @@ Example input files are provided in the directory: context files (one in CXT and
 
 The concept generation and analysis can be launched after an avro file has been ingested by invoking the following command:
 ```
-python3 fca_script.py [-h] [--inputfile/-i INPUTFILE] [--specfile/-s SPECFILE][--min_support/-m MIN\_SUPPORT] [--disable\_naming/-dn] [--outputfile/-o OUTPUTFILE] [--analysis/-a]
+python3 fca_script.py [-h] [--inputfile/-i INPUTFILE] [--specfile/-s SPECFILE][--min_support/-m MIN_SUPPORT] [--disable_naming/-dn] [--outputfile/-o OUTPUTFILE] [--analysis/-a]
 ```
 
 The command requires either the INPUTFILE or the SPECFILE to be supplied, otherwise an error is thrown. 
