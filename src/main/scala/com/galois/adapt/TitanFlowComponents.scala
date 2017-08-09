@@ -374,6 +374,23 @@ object TitanFlowComponents {
     }
   }
 
+  // Loop indefinetly over locking failures
+  def retryFinalLoop(cdms: Seq[DBNodeable]): Boolean = {
+    titanTx(cdms) match {
+      case Success(_) => false
+      case Failure(f: com.thinkaurelius.titan.diskstorage.locking.PermanentLockingException) => true
+      case Failure(f) =>
+        f.getCause.getCause match {
+          case _: com.thinkaurelius.titan.diskstorage.locking.PermanentLockingException =>
+            true
+          case _ =>
+            // If we had a non-locking failure, rethrow it
+            throw f.getCause.getCause
+        }
+        true
+    }
+  }
+
   // Loops on insertion until we either insert the entire batch
   // A single statement may fail to insert but only after ln(batch size)+1 attempts
   // All ultimate failure errors are collected in the sequence and surfaced to the top.
@@ -384,10 +401,18 @@ object TitanFlowComponents {
       case Failure(_) =>
         // If we're trying to ingest a single CDM statement, try it one more time before giving up
         if (cdms.length == 1) {
-          // We're too efficient. If the thread doesn't sleep for a fraction of a second, the final retry also fails.
-          // This line gets it to work close to 100% of the time.
-          Thread.sleep(10)
-          Seq(titanTx(cdms))
+          // Loop indefinetly over locking failures
+          Try {
+                while (retryFinalLoop(cdms)) {
+                  Thread.sleep(scala.util.Random.nextInt(100))
+                }
+          } match {
+            case Failure(f) =>
+              // If we saw a non-locking failure, try one more time to insert before reporting failure
+              println("Final retry for statement")
+              Seq(titanTx(cdms))
+            case _ => Seq(Success())
+          }
         } else {
           // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
           val (front, back) = cdms.splitAt(cdms.length / 2)
