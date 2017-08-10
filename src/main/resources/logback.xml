@@ -8,4 +8,5 @@
   <root level="warn">
     <appender-ref ref="STDOUT" />
   </root>
+  <logger name="com.thinkaurelius.titan.graphdb.database.StandardTitanGraph" level="OFF" />
 </configuration>
