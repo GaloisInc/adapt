@@ -29,9 +29,19 @@ class QuineDBActor() extends Actor with ActorLogging {
   implicit val a = Pickler.generate[None.type]
   implicit val c = Pickler.generate[Some[Map[String,String]]]
   implicit val b = Pickler.generate[Option[Map[String,String]]]
-  implicit val d = Pickler.generate[PrincipalType]
+  implicit val k = Pickler.generate[Some[UUID]]
+  implicit val l = Pickler.generate[Option[UUID]]
+  implicit val o = Pickler.generate[Some[Seq[CryptographicHash]]]
+  implicit val n = Pickler.generate[Option[Seq[CryptographicHash]]]
+  implicit val m = Pickler.generate[PrincipalType]
+  implicit val p = Pickler.generate[Some[Int]]
+  implicit val q = Pickler.generate[Option[Int]]
+  implicit val r = Pickler.generate[Some[Long]]
+  implicit val s = Pickler.generate[Option[Long]]
   //  implicit val e = scala.pickling.Defaults.stringPickler  //Pickler.generate[Seq[String]]
-  //  implicit val f = Pickler.generate[Option[String]]
+  implicit val t = Pickler.generate[Option[String]]
+  implicit val u = Pickler.generate[Some[String]]
+//  implicit val v = Pickler.generate[UUID]
 
   implicit val g = Pickler.generate[AbstractObject]
   implicit val h = Pickler.generate[FileObjectType]
@@ -41,9 +51,27 @@ class QuineDBActor() extends Actor with ActorLogging {
 //  implicit def k[T: FastTypeTag] = Pickler.generate[T]
 
 
+  import com.rrwright.quine.language._
+  import com.galois.adapt.DSL._
+
   override def receive = {
 //    case p: Principal => p.create(Some(p.uuid))
-    case f: FileObject => f.create(Some(f.uuid))
+    case f: TestObject => f.create()
 
   }
+}
+
+package DSL {
+
+  case class TestObject(
+    s: String
+    //  uuid: UUID
+  ) extends FreeDomainNode[TestObject] {
+    val companion = TestObject
+  }
+
+  object TestObject extends FreeNodeConstructor {
+    type ClassType = TestObject
+  }
+
 }

@@ -3,10 +3,12 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
 import org.apache.tinkerpop.gremlin.structure.T.label
+
 import scala.util.Try
 import com.rrwright.quine.language._
+import com.rrwright.quine.language.EdgeDirections._
 
 
 case class FileObject(
@@ -14,7 +16,7 @@ case class FileObject(
   baseObject: AbstractObject,
   fileObjectType: FileObjectType,
   fileDescriptor: Option[Int] = None,
-  localPrincipal: Option[UUID] = None,
+  localPrincipal: Option[-->[UUID]] = None,
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
@@ -35,7 +37,7 @@ case class FileObject(
     hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", ")))  // TODO: Revisit how we should represent this in the DB
 
   def asDBEdges = List.concat(
-    localPrincipal.map(p => ("localPrincipal",p))
+    localPrincipal.map(p => ("localPrincipal",p.target))
   )
 
   def getUuid = uuid
@@ -65,7 +67,7 @@ case object FileObject extends FreeNodeConstructor with CDM17Constructor[FileObj
       cdm.getBaseObject,
       cdm.getType,
       AvroOpt.int(cdm.getFileDescriptor),
-      AvroOpt.uuid(cdm.getLocalPrincipal),
+      AvroOpt.uuid(cdm.getLocalPrincipal).map(u => out(u)),
       AvroOpt.long(cdm.getSize),
       AvroOpt.str(cdm.getPeInfo),
       AvroOpt.listCryptographicHash(cdm.getHashes)
