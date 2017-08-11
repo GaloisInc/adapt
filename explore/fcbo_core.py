@@ -39,7 +39,7 @@ def isSuccessor(concept1,concept2,list_concepts):
 	c2=set(concept2.intent)
 	return c2<c1 and {c for c in list_concepts if c2 < set(c.intent) and set(c.intent) < c1} == set()
 	
-class ConceptsList():
+class ConceptsList(): #currently not used. Will be used in later version of code
 	def __init__(self):
 		self.concepts=[]
 		self.edges=[]
@@ -86,7 +86,17 @@ class Context():
 	def __init__(self,filepath):
 		self.typefile=detectTypeFile(filepath) #type of input file (cxt,fimi or json specification file)
 		self.read_file(filepath) #generation of context object
-		self.min_support=0 #minimal support. 0 by default, which leads to the generation of all concepts
+		# A context always has the following attributes: 
+		#- num_objects (i.e number of objects in the context)
+	    #- num_attributes (i.e number of attributes in the context)
+	    #- context (i.e the actual context matrix (with each row expressed as a string of 0s and 1s e.g '100010' where 1 means that the object represented by the row has the attribute
+	    # corresponding to the index/position of 1 (in the example, the object has attributes at positions 0 and 4)))
+	    #If the context is derived from a JSON specification file or a CXT file, it also has the following attributes:
+	    #- objects (i.e the list of object names)
+	    #-attributes (i.e the list of attribute names)
+	    
+		self.min_support=0 #minimal support. 0 by default, which leads to the generation of all concepts. A scaled value is expected, i.e a value between 0 and 1: for example if a concept
+		# should have at least 2 objects in a context containing a total of 8 objects, min_support is set to 2/8 i.e 0.25 
 		self.stats={'total':0,'closures':0, 'fail_canon':0, 'fail_fcbo':0, 'fail_support':0} #FCbO-related statistics
 	
 	def setMinSupport(self,support): #set minimal support
