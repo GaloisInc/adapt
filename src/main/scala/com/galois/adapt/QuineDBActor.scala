@@ -2,12 +2,13 @@ package com.galois.adapt
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
+import akka.util.Timeout
 import com.galois.adapt.cdm17._
 import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.GraphService
-
-import scala.pickling.FastTypeTag
+import scala.concurrent.duration._
+import scala.pickling.{FastTypeTag, Unpickler}
 
 
 
@@ -21,6 +22,7 @@ class QuineDBActor() extends Actor with ActorLogging {
 //  def subscriptions = dependencies.toSet[String].map(d => Subscription(dependencyMap(d).get, _.isInstanceOf[DomainNode]))
 
   implicit val graph = GraphService(context.system)
+
 
   import scala.pickling.Pickler
   import scala.pickling.Defaults._
@@ -45,33 +47,46 @@ class QuineDBActor() extends Actor with ActorLogging {
 
   implicit val g = Pickler.generate[AbstractObject]
   implicit val h = Pickler.generate[FileObjectType]
-  //  implicit val i = Pickler.generate[CryptographicHash]
-  //  implicit val j = Pickler.generate[Some[Int]]
+    implicit val i = Pickler.generate[CryptographicHash]
+    implicit val j = Pickler.generate[String]
 
-//  implicit def k[T: FastTypeTag] = Pickler.generate[T]
+    implicit val w = Unpickler.generate[String]
+
 
 
   import com.rrwright.quine.language._
   import com.galois.adapt.DSL._
 
+
+
   override def receive = {
 //    case p: Principal => p.create(Some(p.uuid))
-    case f: TestObject => f.create()
+    case f: FileObject =>
+//      f.create(Some(f.getUuid))
 
+//    case
   }
 }
 
-package DSL {
+object DSL {
+  import com.rrwright.quine.language._
+  import scala.pickling.Defaults._
+  import scala.pickling.json.pickleFormat
 
-  case class TestObject(
-    s: String
-    //  uuid: UUID
-  ) extends FreeDomainNode[TestObject] {
+  case class TestObject(name: String) extends FreeDomainNode[TestObject] {
     val companion = TestObject
   }
 
-  object TestObject extends FreeNodeConstructor {
+  case object TestObject extends FreeNodeConstructor {
     type ClassType = TestObject
   }
+
+
+  implicit val system = ActorSystem("test")
+  implicit val graph = GraphService(system)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(5 seconds)
+
+  TestObject("test").create(None)
 
 }

@@ -67,7 +67,7 @@ case object FileObject extends FreeNodeConstructor with CDM17Constructor[FileObj
       cdm.getBaseObject,
       cdm.getType,
       AvroOpt.int(cdm.getFileDescriptor),
-      AvroOpt.uuid(cdm.getLocalPrincipal).map(u => out(u)),
+      AvroOpt.uuid(cdm.getLocalPrincipal).map(u => toOutgoingId(u)),
       AvroOpt.long(cdm.getSize),
       AvroOpt.str(cdm.getPeInfo),
       AvroOpt.listCryptographicHash(cdm.getHashes)

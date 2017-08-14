@@ -52,8 +52,11 @@
                         // edge_query = "g.V([" + result_node_ids.join(",") + "].toArray()).bothE().dedup()"
                     // } else {
                     //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
-                    //     var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
-                    //     edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
+
+                        var existing_rendered_nodes = node_data_set.getIds().join(",")
+                        var join_string = _.isEmpty(result_node_ids) || _.isEmpty(existing_rendered_nodes) ? "" : ","
+                        var existing = "[" + existing_rendered_nodes + join_string + result_node_ids.join(",") + "].toArray()"
+                        edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); g.V(results).bothE().has('outV', within("+existing+")).dedup()"
                     // }
                     $.post("/query/edges", {"query": edge_query}, function(edge_results) {
                         UI.foundEdges(edge_results.length)
