@@ -167,6 +167,7 @@ object CDMSource {
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
           .drop(start)
+          .take(Application.loadLimitOpt.getOrElse(Long.MaxValue))
           .statefulMapConcat { () =>
             var counter = 0
             cdmTry => {
