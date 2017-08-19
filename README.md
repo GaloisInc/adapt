@@ -39,7 +39,7 @@ High-level commands about the primary operations of the system
 | adapt.ingest.loadfiles.0   | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
 | adapt.ingest.startatoffset | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
 | adapt.ingest.loadlimit     | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
-| adapt.ingest.parallelism   | Any Integer                 | `1`                                                               | This many parallel threads will be used to write to the database simultaneously. More is faster, but increases system load and lock contention. |
+| adapt.ingest.parallelism   | Any Integer                 | `10`                                                               | This many parallel threads will be used to write to the database simultaneously. More is faster, but increases system load and lock contention. |
 
 #### `-Dadapt.runtime.X` Flags
 | Command Line Flag                          | Possible Values               | Default Value             | Description |

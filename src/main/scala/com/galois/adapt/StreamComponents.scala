@@ -48,8 +48,8 @@ object FlowComponents {
     Flow[CDM17]
       .mapConcat[(UUID, String, CDM17)] {
         case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER && e.eventType != EVENT_CHECK_FILE_ATTRIBUTES =>    // Throw away all EVENT_OTHERs
-          if (e.predicateObject2.isDefined) List((e.predicateObject.get, "Event", e), (e.predicateObject2.get, "Event", e))
-          else List((e.predicateObject.get, "Event", e))
+          if (e.predicateObject2.isDefined) List((e.predicateObject.get.target, "Event", e), (e.predicateObject2.get.target, "Event", e))
+          else List((e.predicateObject.get.target, "Event", e))
         case n: NetFlowObject => List((n.uuid, "NetFlowObject", n))
         case f: FileObject => List((f.uuid, "FileObject", f))
         case s: Subject => List((s.uuid, "Subject", s))

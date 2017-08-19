@@ -103,7 +103,7 @@ package object cdm17 {
     def privilegeLevel(x: => bbnCDM15.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
     def fixedShort(x: => bbnCDM15.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
-    def listValue(x: java.util.List[bbnCDM15.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
+    def listValue(x: java.util.List[bbnCDM15.Value]): Option[List[Value]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => Value.from(new RawCDM17Type(x)).get))
     def listProvTagNode(x: java.util.List[bbnCDM15.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM17Type(x)).get))

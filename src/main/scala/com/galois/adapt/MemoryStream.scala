@@ -96,7 +96,7 @@ object MemoryStream {
   val memoryFeatures = Flow[(MemoryUUID, MutableSortedSet[Event])]
     .mapConcat[(String, MemoryUUID, MutableMap[String,Any], Set[UUID])] { case (memoryUUID, memoryEventSet) =>
     val memoryEventList = memoryEventSet.toList
-    var allRelatedUUIDs = memoryEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+    var allRelatedUUIDs = memoryEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject.map(_.target), e.predicateObject2.map(_.target), Some(e.subjectUuid.target)).flatten)
     val m = MutableMap.empty[String,Any]
     m("writeAndMProtectToTheSameMemoryObject") = memoryEventSet.exists(_.eventType == EVENT_WRITE) && memoryEventSet.exists(_.eventType == EVENT_MPROTECT)
     m("mmapAndMProtectToTheSameMemoryObject") = memoryEventSet.exists(_.eventType == EVENT_MMAP) && memoryEventSet.exists(_.eventType == EVENT_MPROTECT)

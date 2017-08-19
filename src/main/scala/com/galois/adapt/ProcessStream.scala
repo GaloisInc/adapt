@@ -58,7 +58,7 @@ object ProcessStream {
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid.target)
 //            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[NetFlowObject])
             if (shouldStore) {
@@ -74,7 +74,7 @@ object ProcessStream {
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid.target)
 //            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,MemoryObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[MemoryObject])
             if (shouldStore) {
@@ -90,7 +90,7 @@ object ProcessStream {
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
           case Tuple4("FileObject", uuid: FileUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid.target)
 //            fileEvents(uuid) = fileEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,FileObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[FileObject])
             if (shouldStore) {
@@ -173,7 +173,7 @@ object ProcessStream {
     val allProcessEventSet: MutableSortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++= fileEventSets.flatMap(_._2.map(_._1)) ++= memoryEventSets.flatMap(_._2.map(_._1))
     val allProcessEventList: List[Event] = allProcessEventSet.toList
 
-    var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+    var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject.map(_.target), e.predicateObject2.map(_.target), Some(e.subjectUuid.target)).flatten)
 
 
     val m = MutableMap.empty[String, Any]

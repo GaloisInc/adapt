@@ -99,7 +99,7 @@ object FileStream {
   val fileFeatures = Flow[(FileUUID, MutableSortedSet[Event])]
     .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case (fileUuid, fileEventSet) =>
       val fileEventList = fileEventSet.toList
-      var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+      var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject.map(_.target), e.predicateObject2.map(_.target), Some(e.subjectUuid.target)).flatten)
       val m = MutableMap.empty[String,Any]
 
   //    m("execAfterWriteByNetFlowReadingProcess") = {

@@ -71,37 +71,8 @@ object ProductionApp {
     val ta1 = config.getString("adapt.env.ta1")
     config.getString("adapt.runflow") match {
       case "quine" =>
-//        import com.rrwright.quine.runtime._
-//        import scala.pickling.Defaults._
-//        import scala.pickling.Pickler
-//        import scala.pickling.json.JsonFormats
-
-//        implicit val graph = GraphService(system)
-//        implicit val ao = Pickler.generate[AbstractObject]
-//        implicit val fot = Pickler.generate[FileObjectType]
-//        implicit val ch = Pickler.generate[CryptographicHash]
-//        implicit val oi = Pickler.generate[Option[Int]]
-
-//        implicit val a = Pickler.generate[None.type]
-//        implicit val c = Pickler.generate[Some[Map[String,String]]]
-//        implicit val b = Pickler.generate[Option[Map[String,String]]]
-//        implicit val d = Pickler.generate[PrincipalType]
-        //  implicit val e = scala.pickling.Defaults.stringPickler  //Pickler.generate[Seq[String]]
-        //  implicit val f = Pickler.generate[Option[String]]
-
-//        implicit val g = Pickler.generate[AbstractObject]
-//        implicit val h = Pickler.generate[FileObjectType]
-        //  implicit val i = Pickler.generate[CryptographicHash]
-        //  implicit val j = Pickler.generate[Some[Int]]
-
-//        implicit def k[T: FastTypeTag] = Pickler.generate[T]
-
         val quineActor = system.actorOf(Props[QuineDBActor])
-        Flow[CDM17].runWith(CDMSource(ta1), Sink.actorRef(quineActor, None))
-//        Flow[CDM17].collect{ case f: FileObject =>
-//          f.create(Some(f.uuid))
-//            .map(_ => println("got one"))
-//        }.runWith(CDMSource(ta1), Sink.ignore)
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 100)).take(2000)/*.throttle(1000, 1 second, 1000, ThrottleMode.shaping)*/, Sink.actorRef(quineActor, None))
 
       case "database" | "db" =>
         println("Running database-only flow")

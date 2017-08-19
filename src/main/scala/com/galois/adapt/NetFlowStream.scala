@@ -76,7 +76,7 @@ object NetFlowStream {
     .mapConcat[(String, UUID, MutableMap[String,Any], Set[UUID])] { case (netFlowUuid, eSet) =>
     val eList = eSet.toList
     val m = MutableMap.empty[String, Any]
-    var allRelatedUUIDs = eSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+    var allRelatedUUIDs = eSet.flatMap(e => List(Some(e.uuid), e.predicateObject.map(_.target), e.predicateObject2.map(_.target), Some(e.subjectUuid.target)).flatten)
     m("lifetimeWriteRateBytesPerSecond") = eSet.sizePerSecond(EVENT_WRITE)
     m("lifetimeReadRateBytesPerSecond") = eSet.sizePerSecond(EVENT_READ)
     m("duration-SecondsBetweenFirstAndLastEvent") = eSet.timeBetween(None, None) / 1e9

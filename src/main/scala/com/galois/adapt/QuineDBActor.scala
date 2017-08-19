@@ -13,58 +13,40 @@ import scala.pickling.{FastTypeTag, Unpickler}
 
 
 class QuineDBActor() extends Actor with ActorLogging {
-//  val dependencies = "FileIngestActor" :: Nil
 
-//  def beginService() = initialize()
-
-//  def endService() = ()
-
-//  def subscriptions = dependencies.toSet[String].map(d => Subscription(dependencyMap(d).get, _.isInstanceOf[DomainNode]))
-
-  implicit val graph = GraphService(context.system)
+  implicit val graph = GraphService(context.system, uiPort = 9090)
 
 
   import scala.pickling.Pickler
   import scala.pickling.Defaults._
   import scala.pickling.json.pickleFormat
 
-  implicit val a = Pickler.generate[None.type]
-  implicit val c = Pickler.generate[Some[Map[String,String]]]
   implicit val b = Pickler.generate[Option[Map[String,String]]]
-  implicit val k = Pickler.generate[Some[UUID]]
   implicit val l = Pickler.generate[Option[UUID]]
-  implicit val o = Pickler.generate[Some[Seq[CryptographicHash]]]
-  implicit val n = Pickler.generate[Option[Seq[CryptographicHash]]]
-  implicit val m = Pickler.generate[PrincipalType]
-  implicit val p = Pickler.generate[Some[Int]]
-  implicit val q = Pickler.generate[Option[Int]]
-  implicit val r = Pickler.generate[Some[Long]]
-  implicit val s = Pickler.generate[Option[Long]]
-  //  implicit val e = scala.pickling.Defaults.stringPickler  //Pickler.generate[Seq[String]]
   implicit val t = Pickler.generate[Option[String]]
-  implicit val u = Pickler.generate[Some[String]]
-//  implicit val v = Pickler.generate[UUID]
-
   implicit val g = Pickler.generate[AbstractObject]
-  implicit val h = Pickler.generate[FileObjectType]
-    implicit val i = Pickler.generate[CryptographicHash]
-    implicit val j = Pickler.generate[String]
-
-    implicit val w = Unpickler.generate[String]
-
-
 
   import com.rrwright.quine.language._
-  import com.galois.adapt.DSL._
-
-
 
   override def receive = {
-//    case p: Principal => p.create(Some(p.uuid))
+    case p: Principal =>
+      implicit val m = Pickler.generate[PrincipalType]
+      implicit val s = Pickler.generate[List[String]]  // canNOT also have this in scope: scala.pickling.Defaults.stringPickler
+      p.create(Some(p.uuid))
     case f: FileObject =>
-//      f.create(Some(f.getUuid))
+      implicit val q = Pickler.generate[Option[Int]]
+      implicit val s = Pickler.generate[Option[Long]]
+      implicit val h = Pickler.generate[FileObjectType]
+      implicit val i = Pickler.generate[CryptographicHash]
+      implicit val n = Pickler.generate[Option[Seq[CryptographicHash]]]
+      f.create(Some(f.getUuid))
+    case e: Event =>
+      implicit val j = Pickler.generate[EventType]
+      implicit val s = Pickler.generate[Option[Long]]
+      implicit val fp = Pickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
+      e.create(Some(e.uuid))
 
-//    case
+    case _ =>
   }
 }
 
