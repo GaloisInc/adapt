@@ -44,7 +44,7 @@ var node_appearance = [
         // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
     }, {
         name : "File",
-        is_relevant : function(n) { return n.label === "FileObject" },
+        is_relevant : function(n) { return n.db_label === "FileObject" },
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
@@ -55,7 +55,7 @@ var node_appearance = [
     },
     {
         name : "MemoryObject",
-        is_relevant : function(n) { return n.label === "MemoryObject" },
+        is_relevant : function(n) { return n.db_label === "MemoryObject" },
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
@@ -65,7 +65,7 @@ var node_appearance = [
         }
     }, {
         name : "Pipe",
-        is_relevant : function(n) { return n.label === "UnnamedPipeObject" },
+        is_relevant : function(n) { return n.db_label === "UnnamedPipeObject" },
         icon_unicode : "\uf2c0",
         size: 40,
         make_node_label : function(node) {
@@ -75,7 +75,7 @@ var node_appearance = [
         }
     }, {
         name : "Principal",
-        is_relevant : function(n) { return n.label === "Principal" },
+        is_relevant : function(n) { return n.db_label === "Principal" },
         icon_unicode : "\uf419",
         size: 50,
         make_node_label : function(node) {
@@ -84,7 +84,7 @@ var node_appearance = [
         }
    }, {
         name : "NetFlow",
-        is_relevant : function(n) { return n.label === "NetFlowObject" },
+        is_relevant : function(n) { return n.db_label === "NetFlowObject" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
             var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None")
@@ -95,7 +95,7 @@ var node_appearance = [
         }
    }, {
         name : "RegistryKey",
-        is_relevant : function(n) { return n.label === "RegistryKeyObject" },
+        is_relevant : function(n) { return n.db_label === "RegistryKeyObject" },
         icon_unicode : "\uf296",
         make_node_label : function(node) {
             var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'][0]['value'] : "None")
@@ -104,7 +104,7 @@ var node_appearance = [
         }
    }, {
         name : "Event",
-        is_relevant : function(n) { return n.label === "Event" },
+        is_relevant : function(n) { return n.db_label === "Event" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "None")
@@ -115,7 +115,7 @@ var node_appearance = [
         }
    }, {
         name : "SrcSink",
-        is_relevant : function(n) { return n.label === "SrcSinkObject" },
+        is_relevant : function(n) { return n.db_label === "SrcSinkObject" },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
             // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'][0]['value'] : "None")
@@ -124,7 +124,7 @@ var node_appearance = [
         }
    }, {
         name : "PTN",
-        is_relevant : function(n) { return n.label === "ProvenanceTagNode" },
+        is_relevant : function(n) { return n.db_label === "ProvenanceTagNode" },
         icon_unicode : "\uf277",
         make_node_label : function(node) {
             // var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
@@ -135,7 +135,7 @@ var node_appearance = [
         }
     }, {
        name : "Subject",
-        is_relevant : function(n) { return n.label === "Subject" },
+        is_relevant : function(n) { return n.db_label === "Subject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
@@ -161,6 +161,7 @@ var node_appearance = [
         make_node_label : function(n) {
             return n['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
         }
+    
      // color : do not set a color for default values, or it will always override query-time color choice.
     }
 ]
@@ -170,321 +171,321 @@ var predicates = [
 // ProvenanceTagNode
        {
         name: "RefObject",
-        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        is_relevant : function(n) {return n.db_label === "ProvenanceTagNode"},
         floating_query : ".out('flowObject')",
         is_default : true
     }, {
         name: "RefSubject",
-        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        is_relevant : function(n) {return n.db_label === "ProvenanceTagNode"},
         floating_query : ".out('subject')"
     }, {
         name: "Ancestor tags",
-        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        is_relevant : function(n) {return n.db_label === "ProvenanceTagNode"},
         floating_query : ".emit().repeat(_.out('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
     }, {
         name: "Descendant tags",
-        is_relevant : function(n) {return n.label === "ProvenanceTagNode"},
+        is_relevant : function(n) {return n.db_label === "ProvenanceTagNode"},
         floating_query : ".emit().repeat(_.in('prevTagId','tagId')).dedup().path().unrollPath().dedup()"
     },
 // File Object
        {
         name : "Events",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "2-hop Causality",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_RENAME','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).dedup().union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "1-hop Causality",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_RENAME','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "Direct Causality",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_RENAME','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('flowObject')"
     }, {
         name : "Progenance",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "Subjects Reading",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
         name : "Subjects Executing",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_EXECUTE').out('subject')"
     }, {
         name : "Subjects Writing",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
         name : "Affected By",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_LSEEK','EVENT_LINK','EVENT_TRUNCATE','EVENT_UNLINK','EVENT_UPDATE','EVENT_MODIFY_FILE_ATTRIBUTES'])).out('subject')"
     }, {
         name : "Affects",
-        is_relevant : function(n) {return n.label === "FileObject"},
+        is_relevant : function(n) {return n.db_label === "FileObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_MMAP','EVENT_MPROTECT','EVENT_RECVFROM','EVENT_RECVMSG'])).out('subject')"
     },
 // Memory Object
       {
        name : "Events",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "2-hop Causality",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_MPROTECT','EVENT_MMAP'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).dedup().union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE','EVENT_SHM'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "1-hop Causality",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_MPROTECT','EVENT_MMAP'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('flowObject')"
     }, {
         name : "Progenance",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "Subjects reading",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
         name : "Subjects Executing",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_EXECUTE').out('subject')"
     }, {
         name : "Subjects Writing",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
         name : "Affected By",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_MMAP','EVENT_MPROTECT'])).out('subject')"
     }, {
         name : "Affects",
-        is_relevant : function(n) {return n.label === "MemoryObject"},
+        is_relevant : function(n) {return n.db_label === "MemoryObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_MMAP','EVENT_MPROTECT'])).out('subject')"
     }, 
 // Subject
        {
         name : "Events Caused",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'][0]['value'] === 'SUBJECT_PROCESS'},
+        is_relevant : function(n) {return n.db_label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'][0]['value'] === 'SUBJECT_PROCESS'},
         floating_query : ".in('subject').hasLabel('Event')",
         is_default : true
     }, {
         name: "NetFlows Affected",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".in('subject').out('predicateObject').hasLabel('NetFlowObject')"
     }, {
         name: "Files Affected",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".in('subject').out('predicateObject').hasLabel('FileObject')"
     }, {
         name: "Memory Access",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".in('subject').out('predicateObject').hasLabel('MemoryObject')"
     }, {
         name : "Principal",
-        is_relevant : function(n) {return n.label === "Subject" },
+        is_relevant : function(n) {return n.db_label === "Subject" },
         floating_query : ".out('localPrincipal')",
         is_default : true
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".as('subjectOfInterest').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo'))).select('subjectOfInterest').union(_,_.out('localPrincipal')).select('subjectOfInterest').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).path().unrollPath().dedup().where(neq('subjectOfInterest'))"
     }, {
         name: "2-hop Causality",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".emit().repeat(_.as('foo').out('parentSubject').where(neq('foo'))).dedup().in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject').union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name: "1-hop Causality",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".emit().repeat(_.as('foo').out('parentSubject').where(neq('foo'))).dedup().in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject').path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".in('subject').hasLabel('ProvenanceTagNode')"
     }, {
         name : "Parent Process",
-        is_relevant : function(n) {return n.label === "Subject"},
+        is_relevant : function(n) {return n.db_label === "Subject"},
         floating_query : ".out('parentSubject')"
     }, {
         name : "Child Processes",
-        is_relevant : function(n) {return n.label === "Subject" && n['properties']['subjectType'][0]['value'] == 'SUBJECT_PROCESS'},
+        is_relevant : function(n) {return n.db_label === "Subject" && n['properties']['subjectType'][0]['value'] == 'SUBJECT_PROCESS'},
         floating_query : ".in('parentSubject')"
     }, 
 // Unnamed Pipe Object
        {
         name : "Processes connected",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
-        floating_query : ".union(_.in('predicateObject',_.in('predicateObject2')).out('subject')"
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).out('subject')"
     }, {
         name : "2-hop Causality",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_READ','EVENT_CLOSE'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).dedup().out('predicateObject')).union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "1-hop Causality",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_READ','EVENT_CLOSE'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).dedup().out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "Affected By",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_OPEN','EVENT_CLOSE'])).out('subject')"
     }, {
         name : "Affects",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_READ'])).out('subject')"
     }, {
         name : "Events",
-        is_relevant : function(n) {return n.label === "UnnamedPipeObject"},
+        is_relevant : function(n) {return n.db_label === "UnnamedPipeObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, 
 // NetFlowObject
        {
         name : "Events",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
         name : "Affected By",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_SENDMSG','EVENT_SEND','EVENT_CLOSE','EVENT_CONNECT','EVENT_ACCEPT'])).out('subject')"
     }, {
         name : "Affects",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_READ','EVENT_RECVMSG','EVENT_RECV'])).out('subject')"
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "2-hop Causality",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_ACCEPT','EVENT_CONNECT','EVENT_CLOSE','EVENT_SENDMSG','EVENT_SEND'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).dedup().out('predicateObject')).union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "1-hop Causality",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_ACCEPT','EVENT_CONNECT','EVENT_CLOSE','EVENT_SENDMSG','EVENT_SEND'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).dedup().out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".in('flowObject')"
     }, {
         name : "Progenance",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "Subjects Reading",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
         name : "Subjects Writing",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
         name : "Processes Connected",
-        is_relevant : function(n) {return n.label === "NetFlowObject"},
+        is_relevant : function(n) {return n.db_label === "NetFlowObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).out('subject')"
     }, 
 // SrcSinkObject
        {
         name : "Events",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
         name : "Affected By",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_WRITE'])).out('subject')"
     }, {
         name : "Affects",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".in('predicateObject').has('eventType',within(['EVENT_READ'])).out('subject')"
     }, {
         name : "2-hop Causality",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_READ'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).dedup().union(_,_.in('predicateObject').has('eventType',within(['EVENT_WRITE','EVENT_CREATE_OBJECT','EVENT_UPDATE'])).out('subject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "1-hop Causality",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).has('eventType',within(['EVENT_WRITE','EVENT_READ'])).out('subject').union(_,_.emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup().union(_,_.in('subject').hasLabel('Event').has('eventType',within(['EVENT_READ','EVENT_EXECUTE','EVENT_LOADLIBRARY','EVENT_MMAP','EVENT_RECVFROM','EVENT_RECVMSG'])).out('predicateObject')).path().unrollPath().dedup().hasNot('eventType')"
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".in('flowObject')"
     }, {
         name : "Progenance",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "Subjects Reading",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
         name : "Subjects Writing",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, {
         name : "Processes connected",
-        is_relevant : function(n) {return n.label === "SrcSinkObject"},
-        floating_query : ".union(_.in('predicateObject',_.in('predicateObject2')).out('subject')"
+        is_relevant : function(n) {return n.db_label === "SrcSinkObject"},
+        floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2')).out('subject')"
     }, 
 // Registry Key Object
        {
         name : "Events",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".union(_.in('predicateObject'),_.in('predicateObject2'))",
         is_default : true
     }, {
         name : "Provenance",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "PTN",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".in('flowObject')"
     }, {
         name : "Progenance",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
     }, {
         name : "Subjects Reading",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_READ').out('subject')"
     }, {
         name : "Subjects Writing",
-        is_relevant : function(n) {return n.label === "RegistryKeyObject"},
+        is_relevant : function(n) {return n.db_label === "RegistryKeyObject"},
         floating_query : ".in('predicateObject').has('eventType','EVENT_WRITE').out('subject')"
     }, 
 
 // Principal
        {
         name : "Processes Owned",
-        is_relevant : function(n) { return n.label === "Principal"},
+        is_relevant : function(n) { return n.db_label === "Principal"},
         floating_query: ".in('localPrincipal').hasLabel('Subject')",
         is_default : true
     }
