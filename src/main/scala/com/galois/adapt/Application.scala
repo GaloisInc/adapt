@@ -12,7 +12,7 @@ object Application extends App {
     path.replaceFirst("^~",System.getProperty("user.home")); // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
   }
 
-  val loadLimitOpt = config.getInt("adapt.ingest.loadlimit") match {
+  val loadLimitOpt = config.getLong("adapt.ingest.loadlimit") match {
     case 0 => None
     case i => Some(i)
   }

@@ -367,11 +367,27 @@ object TitanFlowComponents {
     ) match {
       case Success(_) => Success(())
       case Failure(e) =>
-        // Item of note: Titan prints out the stack trace as part of throwing a transaction error
-        // If you see a line of the form "11:18:28.455 [pool-83-thread-1] ERROR c.t.t.g.database.StandardTitanGraph - Could not commit transaction [40] due to exception"
-        // that exception is handled here, that's just Titan printing out the trace for your information
-        transaction.rollback()
+        // Item of note: <logger name="com.thinkaurelius.titan.graphdb.database.StandardTitanGraph" level="OFF" /> in
+        // logback.xml keeps Titan from spamming the console with transactional failures that we resolve via retry. Otherwise
+        // with our logging level, we spam the console with so many stack traces you don't see the messages we actually want
         Failure(e)
+    }
+  }
+
+  // Loop indefinetly over locking failures
+  def retryFinalLoop(cdms: Seq[DBNodeable]): Boolean = {
+    titanTx(cdms) match {
+      case Success(_) => false
+      case Failure(f: com.thinkaurelius.titan.diskstorage.locking.PermanentLockingException) => true
+      case Failure(f) =>
+        f.getCause.getCause match {
+          case _: com.thinkaurelius.titan.diskstorage.locking.PermanentLockingException =>
+            true
+          case _ =>
+            // If we had a non-locking failure, rethrow it
+            throw f.getCause.getCause
+        }
+        true
     }
   }
 
@@ -384,8 +400,20 @@ object TitanFlowComponents {
       case Success(()) => Seq(Success(()))
       case Failure(_) =>
         // If we're trying to ingest a single CDM statement, try it one more time before giving up
-        // TODO: map over try, flatmap to compose two tries into a single try
-        if (cdms.length == 1) Seq(titanTx(cdms)) else {
+        if (cdms.length == 1) {
+          // Loop indefinetly over locking failures
+          Try {
+                while (retryFinalLoop(cdms)) {
+                  Thread.sleep(scala.util.Random.nextInt(100))
+                }
+          } match {
+            case Failure(f) =>
+              // If we saw a non-locking failure, try one more time to insert before reporting failure
+              println("Final retry for statement")
+              Seq(titanTx(cdms))
+            case _ => Seq(Success())
+          }
+        } else {
           // Split the list of CDM objects in half (less likely to have object contention for each half of the list) and loop on insertion
           val (front, back) = cdms.splitAt(cdms.length / 2)
           titanLoop(front) match {

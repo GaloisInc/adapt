@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.io.{ByteArrayInputStream, File}
+import java.nio.file.Paths
 import java.util.UUID
 
 import akka.NotUsed
@@ -11,7 +12,7 @@ import com.galois.adapt.cdm17.{AbstractObject, CDM17, CryptographicHash, Event, 
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
-import akka.util.Timeout
+//import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -69,7 +70,7 @@ object ProductionApp {
     val statusActor = system.actorOf(Props[StatusActor])
 
     val ta1 = config.getString("adapt.env.ta1")
-    config.getString("adapt.runflow") match {
+    config.getString("adapt.runflow").toLowerCase match {
       case "quine" =>
         val quineActor = system.actorOf(Props[QuineDBActor])
         Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 100)).take(2000)/*.throttle(1000, 1 second, 1000, ThrottleMode.shaping)*/, Sink.actorRef(quineActor, None))
@@ -101,6 +102,19 @@ object ProductionApp {
           bcast.out(7).collect{ case c: SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
           ClosedShape
         }).run()
+
+      case "valuebytes" =>
+        CDMSource(ta1)
+          .collect{ case e: Event if e.parameters.nonEmpty => e}
+          .flatMapConcat(
+            (e: Event) => Source.fromIterator(
+              () => e.parameters.get.flatMap( v =>
+                v.valueBytes.map(b =>
+                  List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
+                ).getOrElse(List.empty)).toIterator
+              )
+            )
+          .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
 
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
@@ -159,6 +173,7 @@ object CDMSource {
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
           .drop(start)
+          .take(Application.loadLimitOpt.getOrElse(Long.MaxValue))
           .statefulMapConcat { () =>
             var counter = 0
             cdmTry => {

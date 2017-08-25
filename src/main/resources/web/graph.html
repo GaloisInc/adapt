@@ -39,41 +39,42 @@
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
             if (query_string.length == 0) { return UI.failHandler() }
-            $.post("/query/nodes", {"query": query_string}, function(node_results) {
-                var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
-                if ( ! all_are_nodes) { UI.failHandler(); return false }
-                
-                UI.foundNodes(node_results.length)
-                if ( ! _.isEmpty(node_results)) {
-                    var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                    var edge_query;
-                    // if (node_data_set.getIds().length == 0) {
-                        edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
-                        // edge_query = "g.V([" + result_node_ids.join(",") + "].toArray()).bothE().dedup()"
-                    // } else {
-                    //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
-
-                        var existing_rendered_nodes = node_data_set.getIds().join(",")
-                        var join_string = _.isEmpty(result_node_ids) || _.isEmpty(existing_rendered_nodes) ? "" : ","
-                        var existing = "[" + existing_rendered_nodes + join_string + result_node_ids.join(",") + "].toArray()"
-                        edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); g.V(results).bothE().has('outV', within("+existing+")).dedup()"
-                    // }
-                    $.post("/query/edges", {"query": edge_query}, function(edge_results) {
-                        UI.foundEdges(edge_results.length)
-                        // var query_color = document.getElementById("query-color").jscolor.value
-                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
-                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
-                        var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
-                        if (query_object.is_collapsed) {
-                            data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
-                        }
-                        success_function(data)
+ 
+            if (UI.alt_is_held) {
+                document.getElementById('query-string').value = query_string
+                UI.loadingUIStop()
+            } else {  
+                $.post("/query/nodes", {"query": query_string}, function(node_results) {
+                    var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
+                    if ( ! all_are_nodes) { 
+                        UI.failHandler()
+                        return false 
+                    }
+                    
+                    UI.foundNodes(node_results.length)
+                    if ( ! _.isEmpty(node_results)) {
+                        var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                        var edge_query = "new = [" + result_node_ids.join(",") + "];" +
+                                         "all = [" + node_data_set.getIds().join(",") + "," + result_node_ids.join(",") + "];" +
+                                         "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
+  
+                        $.post("/query/edges", {"query": edge_query}, function(edge_results) {
+                            UI.foundEdges(edge_results.length)
+                            // var query_color = document.getElementById("query-color").jscolor.value
+                            var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                            var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
+                            var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
+                            if (query_object.is_collapsed) {
+                                data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
+                            }
+                            success_function(data)
+                            UI.loadingUIStop()
+                        }).fail(UI.handler)
+                    } else {
                         UI.loadingUIStop()
-                    }).fail(UI.failHandler)
-                } else {
-                    UI.loadingUIStop()
-                }
-            }).fail(UI.failHandler)
+                    }
+                }).fail(UI.failHandler)
+            }
         }
 
 
@@ -540,6 +541,7 @@
                 }
             },
             shift_is_held : false,
+            alt_is_held : false,
             failHandler : function(response) {
                 UI.queryInputColor("pink")
                 UI.loadingUIStop()
@@ -960,9 +962,11 @@
         })
         $(document).bind("keyup", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = false }
+            if (event.keyCode == 18) { UI.alt_is_held = false }
         })
         $(document).bind("keydown", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = true }
+            if (event.keyCode == 18) { UI.alt_is_held = true }
             if ($("#query-string").is(":focus")) { UI.queryInputColor() }
             if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()
