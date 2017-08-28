@@ -32,7 +32,7 @@ proc_event_fileQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS
 
 proc_eventQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').in().hasLabel('Event').as('y').values('eventType').as('type').select('pid','type').dedup()"
 
-proc_execQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().has('eventType','EVENT_EXECUTE').out().values('cmdLine').as('cmd').select('pid','cmd').dedup()"
+proc_execQ = "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().has('eventType','EVENT_EXECUTE').values('cmdLine').as('cmd').select('pid','cmd').dedup()"
 
 
 

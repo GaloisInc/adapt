@@ -276,13 +276,18 @@ if __name__ == '__main__':
         elif arg == '--netflow':
             print('Analysis of netflows by processes')
             context = makeContext(getQuery(proc_netflowQ),'pid','dest')
+        else:
+            break
         print("Done building context...")
         concepts = findAllConceptsWithMinSuppFrontier(context,0.05*len(context))
         print("Done building concept lattice...")
-        doImpRules(context,concepts)
 
-        doAntiImpRules(context,concepts)
-
-        doDisjRules(context,concepts)
-
-        #doAbnormalities(context,concepts)
+        for arg2 in sys.argv[1:]:
+            if arg2 == '--imp':
+                doImpRules(context,concepts)
+            elif arg2 == '--antiimp':
+                doAntiImpRules(context,concepts)
+            elif arg2 == '--disjoint':
+                doDisjRules(context,concepts)
+            elif arg2 == '--abnormal':
+                doAbnormalities(context,concepts)
