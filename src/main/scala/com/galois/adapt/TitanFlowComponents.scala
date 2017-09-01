@@ -221,6 +221,34 @@ object TitanFlowComponents {
       addIndex(graph, management, "titanType", classOf[java.lang.String], "byTitanType")
     }
 
+    // And this makes an index over both titan type and subject type since the Edinburgh team uses that frequently
+    val titanAndSubjectTypeIndex = management.getGraphIndex("byTitanAndSubjectTypes")
+    if( null == titanAndSubjectTypeIndex) {
+      var typeKey = if (management.getPropertyKey("titanType") != null) {
+        management.getPropertyKey("titanType")
+      } else {
+        management.makePropertyKey("titanType").dataType(classOf[java.lang.String]).make()
+      }
+      var subjectTypeKey = if (management.getPropertyKey("subjectType") != null) {
+        management.getPropertyKey("subjectType")
+      } else {
+        management.makePropertyKey("subjecType").dataType(classOf[java.lang.String]).make()
+      }
+      management.buildIndex("byTitanAndSubjectTypes", classOf[Vertex]).addKey(typeKey).addKey(subjectTypeKey).buildCompositeIndex()
+
+      typeKey = management.getPropertyKey("titanType")
+      subjectTypeKey = management.getPropertyKey("subjectType")
+      val idx = management.getGraphIndex("byTitanAndSubjectTypes")
+      if (idx.getIndexStatus(typeKey).equals(SchemaStatus.INSTALLED) & idx.getIndexStatus(subjectTypeKey).equals(SchemaStatus.INSTALLED)) {
+        ManagementSystem.awaitGraphIndexStatus(graph, "byTitanAndSubjectTypes").status(SchemaStatus.REGISTERED).call()
+      }
+
+      management.updateIndex(
+        management.getGraphIndex("byTitanAndSubjectTypes"),
+        SchemaAction.ENABLE_INDEX
+      )
+    }
+
     // This makes an index for 'timestampNanos'
     val timestampIndex = management.getGraphIndex("byTimestampNanos")
     if (null == timestampIndex) {
