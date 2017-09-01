@@ -24,6 +24,7 @@ case class ProvenanceTagNode(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
+    "titanType", "ProvenanceTagNode",
     "uuid", tagIdUuid,
     "subjectUuid", subjectUuid
   ) ++

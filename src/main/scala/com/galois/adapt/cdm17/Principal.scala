@@ -19,6 +19,7 @@ case class Principal(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Principal",
+    "titanType", "Principal",
     "uuid", uuid,
     "userId", userId,
     //    "groupIds", groupIds.mkString(", "),

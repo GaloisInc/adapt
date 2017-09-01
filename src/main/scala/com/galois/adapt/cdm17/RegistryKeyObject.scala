@@ -18,6 +18,7 @@ case class RegistryKeyObject(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "RegistryKeyObject",
+    "titanType", "RegistryKeyObject",
     "uuid", uuid,
     "registryKeyOrPath", key
   ) ++

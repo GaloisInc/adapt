@@ -33,6 +33,7 @@ case class Event(
 
   def asDBKeyValues = List(
     label, "Event",
+    "titanType", "Event",
     "uuid", uuid,
     "sequence", sequence,
     "eventType", eventType.toString,

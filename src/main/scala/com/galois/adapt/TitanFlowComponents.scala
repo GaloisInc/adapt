@@ -71,6 +71,10 @@ object TitanFlowComponents {
 
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
 
+    val vertexLabels = List("Event", "FileObject", "MemoryObject", "NetFlowObject", "Principal", "ProvenanceTagNode", "RegistryKeyObject", "SrcSinkObject", "Subject", "TagRunLengthTuple", "UnitDependency", "UnnamedPipeObject", "Value")
+    for (vertexLabel <- vertexLabels)
+      if ( ! management.containsVertexLabel(vertexLabel) ) management.makeVertexLabel(vertexLabel)
+
     // This allows multiple edges when they are labelled 'tagId'
     if ( ! management.containsEdgeLabel("tagId"))
       management.makeEdgeLabel("tagId").multiplicity(Multiplicity.SIMPLE).make()
@@ -163,6 +167,7 @@ object TitanFlowComponents {
       ("threadId", classOf[Integer]),
       ("timestampNanos", classOf[java.lang.Long]),
       //      ("type", classOf[CryptoHashType]),
+      ("titanType", classOf[String]),
       ("type", classOf[String]),
       ("unitId", classOf[Integer]),
       ("unitUuid", classOf[UUID]),
@@ -210,6 +215,12 @@ object TitanFlowComponents {
       )
     }
 
+    // This makes an index for the object type since Titan is bloody annoying and won't let us do it using the label
+    val titanTypeIndex = management.getGraphIndex("byTitanType")
+    if (null == titanTypeIndex) {
+      addIndex(graph, management, "titanType", classOf[java.lang.String], "byTitanType")
+    }
+
     // This makes an index for 'timestampNanos'
     val timestampIndex = management.getGraphIndex("byTimestampNanos")
     if (null == timestampIndex) {
@@ -254,6 +265,8 @@ object TitanFlowComponents {
     management.commit()
     if (uuidIndex == null)
       ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
+    if (titanTypeIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byTitanType").status(SchemaStatus.ENABLED).call()
     if (timestampIndex == null)
       ManagementSystem.awaitGraphIndexStatus(graph, "byTimestampNanos").status(SchemaStatus.ENABLED).call()
     if (predicateObjectPathIndex == null)
