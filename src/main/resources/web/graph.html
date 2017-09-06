@@ -396,9 +396,8 @@
         function formatNodes(raw_results) {
             var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
-
+                n["db_label"] = n["label"]
                 n['queries'] = getRelevantQueries(n)  
-
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
                 default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
                 if (typeof node_spec === "object") {
@@ -884,7 +883,12 @@
         }
 
 
-        function downloadJournal() {
+        function downloadJournal(event) {
+            if (event.shiftKey) {
+                downloadSnapshot()
+                return
+            }
+
             addLayout()
             var blob = new Blob([JSON.stringify(journal)], {type: "application/json"})
             var a = document.createElement('a')
@@ -896,6 +900,37 @@
             setTimeout(function(){
                 $("#download-button").addClass("ion-ios-cloud-download-outline").removeClass("ion-checkmark-round")
             }, 2000)
+        }
+
+        function downloadSnapshot() {
+            var positions = network.getPositions(node_data_set.getIds())
+            var pinned_positions = _.mapObject(positions, function (val, key) { 
+                var result =  { pos: val }
+                if (node_data_set.get(key).fixed) { result['fixed'] = true }
+                return result
+            })
+
+            var nodeIds = node_data_set.getIds()
+            var nodes = $.map(node_data_set._data, function(value, index){ return [value] })
+            var edges = _.pick(edge_data_set._data, function(value, index) {
+                            return _.contains(nodeIds, value.to) && _.contains(nodeIds, value.from) })
+            var edges = $.map(edges, function(value, index) { return [value] })
+
+            var snapshot = [{
+                "type": "add",
+                "nodes": nodes,
+                "edges": edges
+            },
+            {   "type": "layout",
+                "positions": pinned_positions
+            }]
+
+            var blob = new Blob([JSON.stringify(snapshot)], {type: "application/json"})
+            var a = document.createElement('a')
+            a.download = "snapshot.json"
+            a.href = URL.createObjectURL(blob)
+            a.target = "_blank"
+            a.click()
         }
 
 
@@ -1113,7 +1148,7 @@
         <i class="ion-ios-skipforward disabled" id="redo-button" title="Redo or apply next change" onclick="redoUpdateNetwork()"></i>
         <i class="ion-ios-fastforward disabled" id="redo-all-button" title="Redo until next checkpoint" onclick="redoMany()"></i>
         <i class="ion-ios-location-outline" id="checkpoint-button" title="Create a checkpoint" onclick="addCheckpoint()"></i>
-        <i class="ion-ios-cloud-download-outline" id="download-button" title="Download the history log up to this point" onclick="downloadJournal()"></i>
+        <i class="ion-ios-cloud-download-outline" id="download-button" title="Download the history log up to this point. Shift click to download the current state." onclick="downloadJournal(event)"></i>
         <i class="ion-ios-cloud-upload-outline" id="upload-button" title="Upload a history log to be replayed through Redo" onclick="document.getElementById('choose-upload').click()"></i>
         <i class="ion-android-radio-button-on right-icon hide" id="found-nodes-icon"><span>0</span></i>
         <i class="ion-arrow-resize right-icon hide" id="found-edges-icon"><span>0</span></i>
