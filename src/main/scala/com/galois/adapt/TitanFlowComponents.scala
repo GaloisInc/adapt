@@ -256,7 +256,7 @@ object TitanFlowComponents {
     } else {
       management.makePropertyKey("titanType").dataType(classOf[java.lang.String]).make()
     }
-    val allEdges: List[String] = "tagId" :: edgeLabels
+    val allEdges: List[String] = /*"tagId" ::*/ edgeLabels
     for (edge <- allEdges) {
       val titanEdge = management.getEdgeLabel(edge)
       if(! management.containsRelationIndex(titanEdge, "titanTypeEdgeIndex")) {
