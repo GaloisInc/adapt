@@ -1,7 +1,7 @@
 package com.galois.adapt
 
 import java.util.UUID
-import java.util.concurrent.{Executors}
+import java.util.concurrent.Executors
 
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import com.galois.adapt.cdm17.CDM17
@@ -9,7 +9,8 @@ import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import com.typesafe.config.ConfigFactory
-import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.apache.tinkerpop.gremlin.process.traversal.Order
+import org.apache.tinkerpop.gremlin.structure.{Direction, Vertex}
 
 import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
@@ -247,6 +248,20 @@ object TitanFlowComponents {
         management.getGraphIndex("byTitanAndSubjectTypes"),
         SchemaAction.ENABLE_INDEX
       )
+    }
+
+    // Edge index on titanType
+    var typeKey = if (management.getPropertyKey("titanType") != null) {
+      management.getPropertyKey("titanType")
+    } else {
+      management.makePropertyKey("titanType").dataType(classOf[java.lang.String]).make()
+    }
+    val allEdges: List[String] = "tagId" :: edgeLabels
+    for (edge <- allEdges) {
+      val titanEdge = management.getEdgeLabel(edge)
+      if(! management.containsRelationIndex(titanEdge, "titanTypeEdgeIndex")) {
+        management.buildEdgeIndex(titanEdge, "titanTypeEdgeIndex", Direction.BOTH, Order.incr, typeKey)
+      }
     }
 
     // This makes an index for 'timestampNanos'
