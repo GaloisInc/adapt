@@ -3,7 +3,8 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -24,7 +25,10 @@ case class Subject(
   importedLibraries: Option[Seq[String]] = None,
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[Subject] with CDM17 with DBWritable with DBNodeable {
+
+  val companion = Subject
+
   def asDBKeyValues = List(
     label, "Subject",
     "uuid", uuid,
@@ -67,7 +71,9 @@ case class Subject(
 }
 
 
-case object Subject extends CDM17Constructor[Subject] {
+case object Subject extends FreeNodeConstructor with CDM17Constructor[Subject] {
+  type ClassType = Subject
+
   type RawCDMType = cdm17.Subject
 
   def from(cdm: RawCDM17Type): Try[Subject] = Try {

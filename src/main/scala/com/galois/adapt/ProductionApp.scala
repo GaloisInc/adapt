@@ -73,7 +73,7 @@ object ProductionApp {
     config.getString("adapt.runflow").toLowerCase match {
       case "quine" =>
         val quineActor = system.actorOf(Props[QuineDBActor])
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 100)).take(2000)/*.throttle(1000, 1 second, 1000, ThrottleMode.shaping)*/, Sink.actorRef(quineActor, None))
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 100)).take(500).throttle(1000, 1 second, 100, ThrottleMode.shaping), Sink.actorRef(quineActor, None))
 
       case "database" | "db" =>
         println("Running database-only flow")

@@ -29,10 +29,12 @@ class QuineDBActor() extends Actor with ActorLogging {
   import com.rrwright.quine.language._
 
   override def receive = {
+
     case p: Principal =>
       implicit val m = Pickler.generate[PrincipalType]
       implicit val s = Pickler.generate[List[String]]  // canNOT also have this in scope: scala.pickling.Defaults.stringPickler
       p.create(Some(p.uuid))
+
     case f: FileObject =>
       implicit val q = Pickler.generate[Option[Int]]
       implicit val s = Pickler.generate[Option[Long]]
@@ -40,13 +42,23 @@ class QuineDBActor() extends Actor with ActorLogging {
       implicit val i = Pickler.generate[CryptographicHash]
       implicit val n = Pickler.generate[Option[Seq[CryptographicHash]]]
       f.create(Some(f.getUuid))
+
     case e: Event =>
       implicit val j = Pickler.generate[EventType]
       implicit val s = Pickler.generate[Option[Long]]
       implicit val fp = Pickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
       e.create(Some(e.uuid))
 
+    case s: Subject =>
+      implicit val j = Pickler.generate[SubjectType]
+      implicit val k = Pickler.generate[Option[PrivilegeLevel]]
+      implicit val l = Pickler.generate[Option[Seq[String]]]
+      implicit val m = Pickler.generate[Option[Int]]
+      implicit val n = Pickler.generate[Option[UUID]]
+      s.create(Some(s.uuid))
+
     case _ =>
+      
   }
 }
 
