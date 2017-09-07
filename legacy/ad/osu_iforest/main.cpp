@@ -326,7 +326,7 @@ void printScoreToFile(const vector<double> &scores, ntstringframe* csv,
 
 	outscore << "anomaly_score\n";
 
-    Obj idx[scores.size()];
+    Obj *idx = new Obj[scores.size()];
 	for (int i = 0; i < (int) scores.size(); i++) {
         idx[i].idx = i;
         idx[i].score = scores[i];
@@ -341,6 +341,7 @@ void printScoreToFile(const vector<double> &scores, ntstringframe* csv,
 			outscore << dt->data[idx[i].idx][j] << ",";
 		outscore << scores[idx[i].idx] << "\n";
 	}
+	delete []idx;
 	outscore.close();
 }
 
