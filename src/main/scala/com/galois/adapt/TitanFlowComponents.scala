@@ -56,7 +56,7 @@ object TitanFlowComponents {
   val graph = {
     val graph = Try(
       TitanFactory.build
-        .set("storage.backend","cassandra")
+        .set("storage.backend","astyanax")
         .set("storage.hostname","localhost")
         .set("storage.read-time",120000)
         .set("storage.cassandra.keyspace", config.getString("adapt.runtime.titankeyspace"))
@@ -260,6 +260,7 @@ object TitanFlowComponents {
     for (edge <- allEdges) {
       val titanEdge = management.getEdgeLabel(edge)
       if(! management.containsRelationIndex(titanEdge, "titanTypeEdgeIndex")) {
+        println("Making edge index")
         management.buildEdgeIndex(titanEdge, "titanTypeEdgeIndex", Direction.BOTH, Order.incr, typeKey)
       }
     }
