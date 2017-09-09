@@ -18,6 +18,7 @@ case class MemoryObject(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     label, "MemoryObject",
+    "titanType", "MemoryObject",
     "uuid", uuid,
     "memoryAddress", memoryAddress
   )  ++

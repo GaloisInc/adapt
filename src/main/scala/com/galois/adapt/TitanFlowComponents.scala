@@ -1,7 +1,7 @@
 package com.galois.adapt
 
 import java.util.UUID
-import java.util.concurrent.{Executors}
+import java.util.concurrent.Executors
 
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import com.galois.adapt.cdm17.CDM17
@@ -9,7 +9,8 @@ import com.thinkaurelius.titan.core._
 import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
 import com.typesafe.config.ConfigFactory
-import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.apache.tinkerpop.gremlin.process.traversal.Order
+import org.apache.tinkerpop.gremlin.structure.{Direction, Vertex}
 
 import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
@@ -55,7 +56,7 @@ object TitanFlowComponents {
   val graph = {
     val graph = Try(
       TitanFactory.build
-        .set("storage.backend","cassandra")
+        .set("storage.backend","astyanax")
         .set("storage.hostname","localhost")
         .set("storage.read-time",120000)
         .set("storage.cassandra.keyspace", config.getString("adapt.runtime.titankeyspace"))
@@ -70,6 +71,10 @@ object TitanFlowComponents {
     }
 
     val management = graph.openManagement().asInstanceOf[ManagementSystem]
+
+    val vertexLabels = List("Event", "FileObject", "MemoryObject", "NetFlowObject", "Principal", "ProvenanceTagNode", "RegistryKeyObject", "SrcSinkObject", "Subject", "TagRunLengthTuple", "UnitDependency", "UnnamedPipeObject", "Value")
+    for (vertexLabel <- vertexLabels)
+      if ( ! management.containsVertexLabel(vertexLabel) ) management.makeVertexLabel(vertexLabel)
 
     // This allows multiple edges when they are labelled 'tagId'
     if ( ! management.containsEdgeLabel("tagId"))
@@ -163,6 +168,7 @@ object TitanFlowComponents {
       ("threadId", classOf[Integer]),
       ("timestampNanos", classOf[java.lang.Long]),
       //      ("type", classOf[CryptoHashType]),
+      ("titanType", classOf[String]),
       ("type", classOf[String]),
       ("unitId", classOf[Integer]),
       ("unitUuid", classOf[UUID]),
@@ -210,6 +216,55 @@ object TitanFlowComponents {
       )
     }
 
+    // This makes an index for the object type since Titan is bloody annoying and won't let us do it using the label
+    val titanTypeIndex = management.getGraphIndex("byTitanType")
+    if (null == titanTypeIndex) {
+      addIndex(graph, management, "titanType", classOf[java.lang.String], "byTitanType")
+    }
+
+    // And this makes an index over both titan type and subject type since the Edinburgh team uses that frequently
+    val titanAndSubjectTypeIndex = management.getGraphIndex("byTitanAndSubjectTypes")
+    if( null == titanAndSubjectTypeIndex) {
+      var typeKey = if (management.getPropertyKey("titanType") != null) {
+        management.getPropertyKey("titanType")
+      } else {
+        management.makePropertyKey("titanType").dataType(classOf[java.lang.String]).make()
+      }
+      var subjectTypeKey = if (management.getPropertyKey("subjectType") != null) {
+        management.getPropertyKey("subjectType")
+      } else {
+        management.makePropertyKey("subjecType").dataType(classOf[java.lang.String]).make()
+      }
+      management.buildIndex("byTitanAndSubjectTypes", classOf[Vertex]).addKey(typeKey).addKey(subjectTypeKey).buildCompositeIndex()
+
+      typeKey = management.getPropertyKey("titanType")
+      subjectTypeKey = management.getPropertyKey("subjectType")
+      val idx = management.getGraphIndex("byTitanAndSubjectTypes")
+      if (idx.getIndexStatus(typeKey).equals(SchemaStatus.INSTALLED) & idx.getIndexStatus(subjectTypeKey).equals(SchemaStatus.INSTALLED)) {
+        ManagementSystem.awaitGraphIndexStatus(graph, "byTitanAndSubjectTypes").status(SchemaStatus.REGISTERED).call()
+      }
+
+      management.updateIndex(
+        management.getGraphIndex("byTitanAndSubjectTypes"),
+        SchemaAction.ENABLE_INDEX
+      )
+    }
+
+    // Edge index on titanType
+    var typeKey = if (management.getPropertyKey("titanType") != null) {
+      management.getPropertyKey("titanType")
+    } else {
+      management.makePropertyKey("titanType").dataType(classOf[java.lang.String]).make()
+    }
+    val allEdges: List[String] = /*"tagId" ::*/ edgeLabels
+    for (edge <- allEdges) {
+      val titanEdge = management.getEdgeLabel(edge)
+      if(! management.containsRelationIndex(titanEdge, "titanTypeEdgeIndex")) {
+        println("Making edge index")
+        management.buildEdgeIndex(titanEdge, "titanTypeEdgeIndex", Direction.BOTH, Order.incr, typeKey)
+      }
+    }
+
     // This makes an index for 'timestampNanos'
     val timestampIndex = management.getGraphIndex("byTimestampNanos")
     if (null == timestampIndex) {
@@ -254,6 +309,8 @@ object TitanFlowComponents {
     management.commit()
     if (uuidIndex == null)
       ManagementSystem.awaitGraphIndexStatus(graph, "byUuidUnique").status(SchemaStatus.ENABLED).call()
+    if (titanTypeIndex == null)
+      ManagementSystem.awaitGraphIndexStatus(graph, "byTitanType").status(SchemaStatus.ENABLED).call()
     if (timestampIndex == null)
       ManagementSystem.awaitGraphIndexStatus(graph, "byTimestampNanos").status(SchemaStatus.ENABLED).call()
     if (predicateObjectPathIndex == null)

@@ -21,6 +21,7 @@ case class NetFlowObject(
     baseObject.asDBKeyValues ++
       List(
         label, "NetFlowObject",
+        "titanType", "NetFlowObject",
         "uuid", uuid,
         "localAddress", localAddress,
         "localPort", localPort,

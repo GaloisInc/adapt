@@ -22,6 +22,7 @@ case class FileObject(
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
       label, "FileObject",
+      "titanType", "FileObject",
       "uuid", uuid,
       "fileObjectType", fileObjectType.toString
     ) ++

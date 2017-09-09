@@ -12,10 +12,7 @@ import scala.util.Try
 case class TimeMarker(
   timestampNanos: Long
 ) extends CDM17 with DBWritable {
-  def asDBKeyValues = List(
-//    label, "TimeMarker",
-    "timestampNanos", timestampNanos
-  )
+  def asDBKeyValues = List()
 }
 
 

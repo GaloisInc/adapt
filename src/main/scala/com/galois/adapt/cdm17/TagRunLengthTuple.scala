@@ -17,6 +17,7 @@ case class TagRunLengthTuple(
 
   def asDBKeyValues = List(
     label, "TagRunLengthTuple",
+    "titanType", "TagRunLengthTuple",
     "numValueElements", numValueElements,
     "uuid", tagId
   )
