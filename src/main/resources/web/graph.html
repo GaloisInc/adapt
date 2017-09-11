@@ -55,7 +55,7 @@
                         // if (node_data_set.getIds().length == 0) {
                           //  edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
                             edge_query = "new = [" + result_node_ids.join(",") + "];" +
-                                         "all = [" + node_data_set.getIds().join(",") + "," + result_node_ids.join(",") + "];" +
+                                         "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
                                          "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
                         // } else {
                         //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
