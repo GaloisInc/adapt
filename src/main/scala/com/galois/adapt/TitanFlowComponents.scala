@@ -233,7 +233,7 @@ object TitanFlowComponents {
       var subjectTypeKey = if (management.getPropertyKey("subjectType") != null) {
         management.getPropertyKey("subjectType")
       } else {
-        management.makePropertyKey("subjecType").dataType(classOf[java.lang.String]).make()
+        management.makePropertyKey("subjectType").dataType(classOf[java.lang.String]).make()
       }
       management.buildIndex("byTitanAndSubjectTypes", classOf[Vertex]).addKey(typeKey).addKey(subjectTypeKey).buildCompositeIndex()
 
