@@ -171,50 +171,77 @@ object Query {
         | wholeNumber ~ "L" ^^ { case x~_ => Raw(x.toLong) }
         | wholeNumber       ^^ { x => Raw(x.toLong) }
         ).asInstanceOf[Parser[QueryValue[java.lang.Long]]]
+         .withFailureMessage("long expected (ex: x, 1L, 1)")
+
       def int: Parser[QueryValue[Int]] =
         ( variable[Int](ints)
         | wholeNumber ~ "I" ^^ { case x~_ => Raw(x.toInt) }
-        )
+        ).withFailureMessage("int expected (ex: x, 1I)")
+
       def str: Parser[QueryValue[String]] =
         ( variable(strs)
         | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
-        | "\'" ~ "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
-        )
-      def uid: Parser[QueryValue[java.util.UUID]] = variable(uids) |
+        | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
+        ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
+
+      def uid: Parser[QueryValue[java.util.UUID]] = ( variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(java.util.UUID.fromString(s))
-        }
-      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] = variable(arrs) | arr(uid)
-      def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] = variable(arrs) | arr(lng)
-      def intArr: Parser[QueryValue[Seq[Int]]] = variable(arrs) | arr(int)
-      def strArr: Parser[QueryValue[Seq[String]]] = variable(arrs) | arr(str)
-      def lit: Parser[QueryValue[_]] = uid | int | lng | str | intArr | lngArr | uidArr | strArr
+        }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
+
+      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] =
+        ( variable(arrs) | arr(uid) ).withFailureMessage("UUID array expected")
+
+      def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] =
+        ( variable(arrs) | arr(lng) ).withFailureMessage("long array expected")
+
+      def intArr: Parser[QueryValue[Seq[Int]]] =
+        ( variable(arrs) | arr(int) ).withFailureMessage("int array expected")
+
+      def strArr: Parser[QueryValue[Seq[String]]] =
+        ( variable(arrs) | arr(str) ).withFailureMessage("string array expected")
+
+      def lit: Parser[QueryValue[_]] =
+        ( uid ||| int ||| lng ||| str
+        ||| intArr ||| lngArr ||| uidArr ||| strArr
+        ).withFailureMessage("literal expected (ex: 9, 12I, \"hello\", [1,2,3])")
+
       def pred: Parser[QueryValue[P[Any]]] =
-        ( predicate(uid)
-        | predicate(int)
-        | predicate(lng)
-        | predicate(str)
+        (   predicate(uid)
+        ||| predicate(int)
+        ||| predicate(lng)
+        ||| predicate(str)
         ).asInstanceOf[Parser[QueryValue[P[Any]]]]
+         .withFailureMessage("predicate expected (ex: within([1,2,3]), eq(x))")
 
       // Parse an identifier iff it is in the store passed in.
       //def variable[T](store: Set[String]): Parser[Value[T]] = ident.map(Variable(_))
-      def variable[T](store: Set[String]): Parser[QueryValue[T]] = ident.withFilter(store.contains(_)).map(Variable(_))
+      def variable[T](store: Set[String]): Parser[QueryValue[T]] =
+        ident.withFilter(store.contains(_)).map(Variable(_)).withFailureMessage("expected variable")
+      
       // Parse an array.
-      def arr[T](elem: Parser[QueryValue[T]]): Parser[QueryValue[Seq[T]]] =
-        "["~repsep(elem,",")~"]"~".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
+      def arr[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[Seq[T]]] =
+        ( "[" ~ repsep(elem,",") ~ "]" ~ ".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
+        ).withFailureMessage(s"array of ${ev.runtimeClass.getSimpleName()} expected")
+
       // Parse a regex
-      def regex[T]: Parser[Regex] =
-         ("regex(" ~ stringLiteral ~ ")" | "newP(REGEX," ~ stringLiteral ~ ")") ^^ {
+      def regex[T]: Parser[Regex] = {
+         val r = ("regex(" ~! stringLiteral ~ ")" | "newP(REGEX," ~! stringLiteral ~ ")") ^^ {
            case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
          }
-      def predicate[T](elem: Parser[QueryValue[T]]): Parser[QueryValue[P[T]]] =
+         r.withFailureMessage("regex expected (ex: 'regex(\"hel{2}o\")'")
+      }
+
+      def predicate[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
         | "lte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawLtePred(l) }
         | "gte(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawGtePred(l) }
         | "between(" ~ elem ~ ',' ~ elem ~ ")"   ^^ { case _~l~_~h~_ => RawBetweenPred(l,h) }
+        | "within(" ~ variable(arrs) ~ ")"       ^^ { case _~v~_     => RawWithinPred(v) }
         | "within(" ~ arr(elem) ~ ")"            ^^ { case _~l~_     => RawWithinPred(l) }
-        )
+        ).asInstanceOf[Parser[QueryValue[P[T]]]]
+         .withFailureMessage(s"predicate of type ${ev.runtimeClass.getSimpleName()} expected")
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
@@ -224,23 +251,23 @@ object Query {
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
-        | ".has(" ~ str ~ "," ~regex~ ")"  ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
+        | ".has(" ~ str ~ "," ~ regex~ ")" ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
-        | ".hasLabel(" ~ str ~ ")"         ^^ { case _~l~_      => HasLabel(_: Tr, l) }
-        | ".has(label," ~ str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
-        | ".hasNot(" ~ str ~ ")"           ^^ { case _~s~_      => HasNot(_: Tr, s) }
-        | ".hasId(" ~ lng ~ ")"            ^^ { case _~l~_      => HasId(_: Tr, l) }
+        | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
+        | ".has(label," ~! str ~ ")"       ^^ { case _~l~_      => HasLabel(_: Tr, l) }
+        | ".hasNot(" ~! str ~ ")"          ^^ { case _~s~_      => HasNot(_: Tr, s) }
+        | ".hasId(" ~! lng ~ ")"           ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
         | ".where(" ~ predicate(str) ~ ")" ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
-        | ".and(" ~ repsep(trav,",") ~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
-        | ".or(" ~ repsep(trav,",") ~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
+        | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
+        | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
-        | ".limit(" ~ lng ~ ")"            ^^ { case _~i~_      => Limit(_: Tr, i) }
-        | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
+        | ".limit(" ~! lng ~ ")"           ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ pred ~ ")"              ^^ { case _~p~_      => IsPredicate(_: Tr, p) }
+        | ".is(" ~ lit ~ ")"               ^^ { case _~l~_      => Is(_: Tr, l) }
         | ".simplePath()"                  ^^ { case _          => SimplePath(_: Tr) }
-        | ".times(" ~ int ~ ")"            ^^ { case _~l~_      => Times(_: Tr, l) }
+        | ".times(" ~! int ~ ")"           ^^ { case _~l~_      => Times(_: Tr, l) }
         | ".order()"                       ^^ { case _          => Order(_: Tr) }
         | ".by(id)"                        ^^ { case _          => ByToken(_: Tr, Token.id) }
         | ".by(key)"                       ^^ { case _          => ByToken(_: Tr, Token.key) }
@@ -249,62 +276,71 @@ object Query {
         | ".by(" ~ str ~ ")"               ^^ { case _~k~_      => By(_: Tr, k) }
         | ".by(" ~ trav ~ (",incr)" | ")") ^^ { case _~t~_      => ByTraversal(_: Tr, t, true) }
         | ".by(" ~ trav ~ ",decr)"         ^^ { case _~t~_      => ByTraversal(_: Tr, t, false) }
-        | ".as(" ~ rep1sep(str,",") ~ ")"  ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
-        | ".until(" ~ trav ~ ")"           ^^ { case _~t~_      => Until(_: Tr, t) }
-        | ".values("~rep1sep(str,",")~")"  ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
-        | ".valueMap("~repsep(str,",")~")" ^^ { case _~s~_      => ValueMap(_: Tr, RawArr(s)) }
-        | ".properties("~repsep(str,",")~")"^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
+        | ".as(" ~! rep1sep(str,",") ~ ")" ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
+        | ".until(" ~! trav ~ ")"          ^^ { case _~t~_      => Until(_: Tr, t) }
+        | ".values(" ~! rep1sep(str,",")~")"    ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
+        | ".valueMap(" ~! repsep(str,",")~")"   ^^ { case _~s~_      => ValueMap(_: Tr, RawArr(s)) }
+        | ".properties(" ~! repsep(str,",")~")" ^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
         | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
         | ".max()"                         ^^ { case _          => Max(_: Traversal[_,java.lang.Long]) }
         | ".min()"                         ^^ { case _          => Min(_: Traversal[_,java.lang.Long]) }
         | ".emit()"                        ^^ { case _          => Emit(_: Tr) }
-        | ".emit(" ~ trav ~ ")"            ^^ { case _~t~_      => EmitTrav(_: Tr, t) }
+        | ".emit(" ~! trav ~ ")"           ^^ { case _~t~_      => EmitTrav(_: Tr, t) }
         | ".sum()"                         ^^ { case _          => Sum(_: Traversal[_,java.lang.Double]) }
-        | ".select("~rep1sep(str,",")~")"  ^^ { case _~Seq(s)~_ => Select(_: Tr, s)
+        | ".select("~!rep1sep(str,",")~")" ^^ { case _~Seq(s)~_ => Select(_: Tr, s)
                                                 case _~s~_      => SelectMult(_: Tr, RawArr(s)) }
         | ".fold()"                        ^^ { case _          => Fold(_: Tr) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
         | ".groupCount()"                  ^^ { case _          => GroupCount(_: Tr) }
-        | ".both(" ~ repsep(str,",") ~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], RawArr(s)) }
+        | ".both(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], RawArr(s)) }
         | ".bothV()"                       ^^ { case _          => BothV(_: Traversal[_,Edge]) }
-        | ".out(" ~ repsep(str,",") ~ ")"  ^^ { case _~s~_      => Out(_: Traversal[_,Vertex], RawArr(s)) }
+        | ".out(" ~! repsep(str,",")~ ")"  ^^ { case _~s~_      => Out(_: Traversal[_,Vertex], RawArr(s)) }
         | ".outV()"                        ^^ { case _          => OutV(_: Traversal[_,Edge]) }
-        | ".in(" ~ repsep(str,",") ~ ")"   ^^ { case _~s~_      => In(_: Traversal[_,Vertex], RawArr(s)) }
+        | ".in(" ~! repsep(str,",")~ ")"   ^^ { case _~s~_      => In(_: Traversal[_,Vertex], RawArr(s)) }
         | ".inV()"                         ^^ { case _          => InV(_: Traversal[_,Edge]) }
         | ".bothE()"                       ^^ { case _          => BothE(_: Traversal[_,Vertex]) }
-        | ".outE(" ~ repsep(str,",") ~ ")" ^^ { case _~s~_      => OutE(_: Traversal[_,Vertex], RawArr(s)) }
+        | ".outE(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => OutE(_: Traversal[_,Vertex], RawArr(s)) }
         | ".inE()"                         ^^ { case _          => InE(_: Traversal[_,Vertex]) }
-        | ".repeat(" ~ trav ~ ")"          ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
-        | ".union(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
-        | ".local(" ~ trav ~ ")"           ^^ { case _~t~_      => Local(_: Tr, t) }
-        | ".match(" ~repsep(trav,",")~ ")" ^^ { case _~t~_      => Match(_: Tr, t) }
-        | ".property(" ~ rep1sep(str ~ "," ~ lit, ",") ~ ")" ^^ { case _~s~_ =>
+        | ".repeat(" ~! trav ~ ")"         ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
+        | ".union(" ~!repsep(trav,",")~")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
+        | ".local(" ~! trav ~ ")"          ^^ { case _~t~_      => Local(_: Tr, t) }
+        | ".match(" ~!repsep(trav,",")~")" ^^ { case _~t~_      => Match(_: Tr, t) }
+        | ".property(" ~! rep1sep(str ~ "," ~! lit, ",") ~ ")" ^^ { case _~s~_ =>
             Property(_: Tr, RawArr(s.map { case k~_~v => k }), RawArr(s.map { case k~_~v => v}))
           }
         | ".path()"                        ^^ { case _          => PathTraversal(_: Tr) }
         | ".unrollPath()"                  ^^ { case _          => UnrollPath(_: Traversal[_,Path]) }
-        | ".aggregate(" ~ str ~ ")"        ^^ { case _~k~_      => Aggregate(_: Tr, k) }
+        | ".aggregate(" ~! str ~ ")"       ^^ { case _~k~_      => Aggregate(_: Tr, k) }
         | ".toList()"                      ^^ { case _          => identity(_: Tr) }
-        | ".choose(" ~ trav ~ ")"          ^^ { case _~t~_      => Choose(_:Tr, t) }
-        | ".option(" ~lit~ "," ~trav~ ")"  ^^ { case _~x~_~t~_  => OptionTrav(_:Tr, x, t) }
+        | ".choose(" ~! trav ~ ")"         ^^ { case _~t~_      => Choose(_:Tr, t) }
+        | ".option(" ~! lit ~ "," ~! trav ~ ")"  ^^ { case _~x~_~t~_  => OptionTrav(_:Tr, x, t) }
         ).asInstanceOf[Parser[Tr => Tr]]
+         .withFailureMessage("traversal step expected (ex: .inV(), .out('foo'))")
+
+      // Either a comma-delimited list of longs, or an array of longs
+      def longs: Parser[QueryValue[Seq[java.lang.Long]]] =
+        ( lngArr
+        | repsep(lng,",") ^^ { case x => RawArr[java.lang.Long](x) }
+        ).withFailureMessage("list (or array) of longs expected (ex: '[1, 2, 3]', '1, 2, 3')")
 
       // Possible sources for traversals
       def travSource: Parser[Tr] =
-        ( "g.V(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Vertices(ids) }
-        | "g.V(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Vertices(RawArr(ids)) }
-        | "g.E(" ~ lngArr ~ ")"                     ^^ { case _~ids~_ => Edges(ids) }
-        | "g.E(" ~ repsep(lng,",") ~ ")"            ^^ { case _~ids~_ => Edges(RawArr(ids)) }
-        | ("__" | "_")                              ^^ { case _       => Anon(Raw(Seq())) }
-        | "_(" ~ repsep(lng,",") ~ ")"              ^^ { case _~ids~_ => Anon(RawArr(ids)) }
+        ( "g.V(" ~! longs ~ ")"                 ^^ { case _~ids~_ => Vertices(ids) }
+        | "g.E(" ~! longs ~ ")"                 ^^ { case _~ids~_ => Edges(ids) }
+        | ("__" | "_")                          ^^ { case _       => Anon(Raw(Seq())) }
+        | "_(" ~! longs ~ ")"                   ^^ { case _~ids~_ => Anon(ids) }
         ).asInstanceOf[Parser[Tr]]
+         .withFailureMessage("traversal source expected (ex: g.V(1, 2), g.V([1,2]), g.E(), _)")
 
       // Parser for a traversal
-      def trav: Parser[Tr] = travSource ~ rep(travSuffix) ^^ {
+      def trav: Parser[Tr] = {
+        val t = travSource ~ rep(travSuffix) ^^ {
           case src ~ sufs => sufs.foldLeft[Tr](src)((t,suf) => suf(t))
         }
+        t.withFailureMessage("traversal expected")
+      }
 
       // Queries are _not_ left recursive (unlike the traversals), but we still need to abstract
       // prefixes (and then repeat them) so that variables of different types get noted before we
@@ -317,6 +353,7 @@ object Query {
         | ident ~ "=" ~ trav ~ ";"              ^^ { case i~_~t~_ => arrs += i; AssignTraversal(i,t,_: Qy) }
         | trav ~ ";"                            ^^ { case t~_     => DiscardTraversal(t,_: Qy) }
         ).asInstanceOf[Parser[Qy => Qy]]
+         .withFailureMessage("query prefix expected (ex: 'x = 1;', 'xs = g.V();')")
 
 
       // Parser for a query
@@ -327,8 +364,8 @@ object Query {
 
     Parsers.parseAll(Parsers.query, input.filterNot(_.isWhitespace)) match {
       case Parsers.Success(matched, _) => Success(matched)
-      case Parsers.Error(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
-      case Parsers.Failure(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg"))
+      case Parsers.Error(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg\n\n${in.pos.longString}"))
+      case Parsers.Failure(msg, in) => Failure(new Exception(s"At ${in.pos}: $msg\n\n${in.pos.longString}"))
       case _ => Failure(new Exception("Parser failed in an unexpected way"))
     }
   }

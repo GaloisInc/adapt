@@ -23,6 +23,7 @@ case class Value(
 
   def asDBKeyValues = List(
     label, "Value",
+    "titanType", "Value",
     "size", size,
     "valueType", valueType.toString,
     "valueDataType", valueDataType.toString,

@@ -17,6 +17,7 @@ case class SrcSinkObject(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "SrcSinkObject",
+    "titanType", "SrcSinkObject",
     "uuid", uuid,
     "srcSinkType", srcSinkType.toString
   ) ++

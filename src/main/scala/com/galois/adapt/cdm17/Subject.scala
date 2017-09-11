@@ -27,6 +27,7 @@ case class Subject(
 ) extends CDM17 with DBWritable with DBNodeable {
   def asDBKeyValues = List(
     label, "Subject",
+    "titanType", "Subject",
     "uuid", uuid,
     "subjectType", subjectType.toString,
     "cid", cid,
