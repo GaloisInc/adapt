@@ -33,7 +33,6 @@ object AnomalyStream {
     var featureCollection = Map.empty[UUID, (Map[String,Any], Set[UUID])]
     var headerOpt: Option[String] = None
     var nameOpt: Option[String] = None
-    val config = ConfigFactory.load()
 
     {
       case (name: String, uuid: UUID, fm: mutable.Map[_,_], ru: Set[_]) =>
@@ -69,23 +68,12 @@ object AnomalyStream {
         }) else List(
           Future{
             val randomNum = Random.nextLong()
-            
-            var (inputFile, outputFile, normalizedFile) = if (config.getBoolean("adapt.runtime.intermediate-csvs.keep")) {
-              val directory = new File(config.getString("adapt.runtime.intermediate-csvs.path"))
-              val inpFile   = File.createTempFile(s"input_${nameOpt.get}_$randomNum",  ".csv", directory)
-              var outFile   = File.createTempFile(s"output_${nameOpt.get}_$randomNum", ".csv", directory)
-              var normFile  = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv", directory)
-              (inpFile, outFile, normFile)
-            } else { 
-              val inpFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
-              var outFile  = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
-              var normFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
-              inpFile.deleteOnExit()
-              outFile.deleteOnExit()
-              normFile.deleteOnExit()
-              (inpFile, outFile, normFile)
-            }
-
+//            val inputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.in_${nameOpt.get}_$randomNum.csv") // TODO
+//            var outputFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/temp.out_${nameOpt.get}_$randomNum.csv") // TODO
+            val inputFile  = File.createTempFile(s"input_${nameOpt.get}_$randomNum",".csv")
+            var outputFile = File.createTempFile(s"output_${nameOpt.get}_$randomNum",".csv")
+            inputFile.deleteOnExit()
+            outputFile.deleteOnExit()
             val writer: FileWriter = new FileWriter(inputFile)
             writer.write(headerOpt.get)
 
@@ -121,6 +109,8 @@ object AnomalyStream {
 
             writer.close()
 
+            val config = ConfigFactory.load()
+
             Try(Seq[String](
               config.getString("adapt.runtime.iforestpath"),
 //              this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath, // "../ad/osu_iforest/iforest.exe",
@@ -136,6 +126,11 @@ object AnomalyStream {
             val shouldNormalize = config.getBoolean("adapt.runtime.shouldnoramlizeanomalyscores")
 
             val fileLines = if (shouldNormalize) {
+              val normalizedFile = File.createTempFile(s"normalized_${nameOpt.get}_$randomNum", ".csv")
+//              val normalizedFile = new File(s"/Users/ryan/Desktop/intermediate_csvs/normalized_${nameOpt.get}_$randomNum.csv")
+//              normalizedFile.createNewFile()
+              normalizedFile.deleteOnExit()
+
               val normalizationCommand = Seq(
                 "Rscript",
                 this.getClass.getClassLoader.getResource("bin/NormalizeScore.R").getPath,
@@ -146,6 +141,9 @@ object AnomalyStream {
                 case Success(output) => //println(s"Normalization output: $randomNum\n$output")
                 case Failure(e) => e.printStackTrace()
               }
+
+              outputFile.delete()
+              outputFile = normalizedFile
 
               FileSource.fromFile(normalizedFile).getLines()
             } else FileSource.fromFile(outputFile).getLines()
@@ -158,13 +156,8 @@ object AnomalyStream {
               val uuid = UUID.fromString(columns.head)
               (nameOpt.get, uuid, columns.last.toDouble, normalizedFeatures(uuid)._2)
             }.toList
-            
-            if (!config.getBoolean("adapt.runtime.intermediate-csvs.keep")) {
-              inputFile.delete()
-              outputFile.delete()
-              normalizedFile.delete()
-            }
-
+            inputFile.delete()
+            outputFile.delete()
             toSend
           }
         )
@@ -191,5 +184,5 @@ object AnomalyStream {
 
       FlowShape(start.in, merge.out)
     }
-  ) 
+  )
 }

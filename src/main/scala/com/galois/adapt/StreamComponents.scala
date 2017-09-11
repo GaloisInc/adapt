@@ -140,7 +140,6 @@ object FlowComponents {
     }
   }
 
-  
 
   val uuidMapToCSVPrinterSink = Flow[(UUID, mutable.Map[String,Any])]
     .map{ case (u, m) =>
@@ -168,39 +167,6 @@ object FlowComponents {
   def commandSource(cleanUpSeconds: Int, emitSeconds: Int) =
     Source.tick[ProcessingCommand](cleanUpSeconds seconds, cleanUpSeconds seconds, CleanUp).buffer(1, OverflowStrategy.backpressure)
       .merge(Source.tick[ProcessingCommand](emitSeconds seconds, emitSeconds seconds, EmitCmd).buffer(1, OverflowStrategy.backpressure))
-
-  // Given an input flow of CDM17 from which time is measured (so not wall-clock time), create a ProcessingCommand flow
-  def commandSourceEventTimed(cleanUpSeconds: Int, emitSeconds: Int) = Flow[CDM17]
-    .statefulMapConcat { () =>
-      
-      // This is the next moment we want to drop in a 'marker'
-      var nextCleanUp: Long = 0
-      var nextEmit: Long = 0
-
-      {
-        case e: Event =>
-
-          // Check if we are due for a cleanup command
-          var cleanups: List[ProcessingCommand] = if (nextCleanUp < e.timestampNanos) {
-            nextCleanUp = e.timestampNanos + cleanUpSeconds * 1000000000
-            List(CleanUp)
-          } else {
-            List.empty
-          }
-
-          // Check if we are due for an emit command
-          var emits: List[ProcessingCommand] = if (nextCleanUp < e.timestampNanos) {
-            nextEmit = e.timestampNanos + emitSeconds * 1000000000
-            List(EmitCmd)
-          } else {
-            List.empty
-          }
-
-          cleanups ++ emits
-
-        case _ => List.empty
-      }
-    }
 
 
   type MilliSeconds = Long
