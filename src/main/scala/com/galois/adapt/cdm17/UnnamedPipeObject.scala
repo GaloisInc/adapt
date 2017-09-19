@@ -15,12 +15,12 @@ case class UnnamedPipeObject(
   sourceFileDescriptor: Int,
   sinkFileDescriptor: Int
 ) extends CDM17 with DBWritable with DBNodeable {
+  override def getLabels: List[String] = List("CDM17", "UnnamedPipeObject")
+
   def asDBKeyValues = List(
-    label, "UnnamedPipeObject",
-    "titanType", "UnnamedPipeObject",
-    "uuid", uuid,
-    "sourceFileDescriptor", sourceFileDescriptor,
-    "sinkFileDescriptor", sinkFileDescriptor
+    ("uuid", uuid),
+    ("sourceFileDescriptor", sourceFileDescriptor),
+    ("sinkFileDescriptor", sinkFileDescriptor)
   ) ++
     baseObject.asDBKeyValues
 

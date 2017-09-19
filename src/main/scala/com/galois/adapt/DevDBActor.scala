@@ -13,8 +13,6 @@ import java.nio.file.{Files, Paths}
 import java.util.UUID
 
 //import com.galois.adapt.ServiceRegistryProtocol.SubscribeToService
-import com.thinkaurelius.titan.core.TitanFactory
-import com.thinkaurelius.titan.core.schema.TitanGraphIndex
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
@@ -54,7 +52,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   // The second map represents:
   //   (UUID that was destination of edge not in `nodeIds` at the time) -> (source Vertex, edge label)
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
-  var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex,String)]]
+  var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex,CDM17.EdgeTypes.EdgeTypes)]]
 
 
   // TODO: TinkerGraph doesn't update the starting IDs when reading data in from a file.

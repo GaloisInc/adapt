@@ -14,7 +14,7 @@ import scala.util.{Failure, Success, Try}
 
 class TitanDBQueryProxy() extends Actor with ActorLogging {
 
-  val graph = TitanFlowComponents.graph
+  val graph = Neo4jFlowComponents.graph
 //  val jsonWriter = TitanFlowComponents.graph.io(IoCore.graphson).writer().create()   // This was the cause of a lot of failed queries
 
   implicit val ec = context.dispatcher

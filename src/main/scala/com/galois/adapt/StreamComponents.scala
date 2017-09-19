@@ -24,9 +24,6 @@ import scala.collection.mutable
 import scala.sys.process._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
-import com.thinkaurelius.titan.core._
-import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
-import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import scala.concurrent.{ExecutionContext, Future}

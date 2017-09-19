@@ -31,32 +31,32 @@ case class Event(
 ) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
+  override def getLabels: List[String] = List("CDM17", "Event")
+
   def asDBKeyValues = List(
-    label, "Event",
-    "titanType", "Event",
-    "uuid", uuid,
-    "sequence", sequence,
-    "eventType", eventType.toString,
-    "threadId", threadId,
-    "subjectUuid", subjectUuid,
-    "timestampNanos", timestampNanos
+    ("uuid", uuid),
+    ("sequence", sequence),
+    ("eventType", eventType.toString),
+    ("threadId", threadId),
+    ("subjectUuid", subjectUuid),
+    ("timestampNanos", timestampNanos)
   ) ++
-    predicateObject.fold[List[Any]](List.empty)(v => List("predicateObjectUuid", v)) ++
-    predicateObjectPath.fold[List[Any]](List.empty)(v => List("predicateObjectPath", v)) ++
-    predicateObject2.fold[List[Any]](List.empty)(v => List("predicateObject2Uuid", v)) ++
-    predicateObject2Path.fold[List[Any]](List.empty)(v => List("predicateObject2Path", v)) ++
-    name.fold[List[Any]](List.empty)(v => List("name", v)) ++
-    parameters.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("parameters", v.map(_.asDBKeyValues).mkString(", "))) ++
-    location.fold[List[Any]](List.empty)(v => List("location", v)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v)) ++
-    programPoint.fold[List[Any]](List.empty)(v => List("programPoint", v)) ++
+    predicateObject.fold[List[(String,Any)]](List.empty)(v => List(("predicateObjectUuid", v))) ++
+    predicateObjectPath.fold[List[(String,Any)]](List.empty)(v => List(("predicateObjectPath", v))) ++
+    predicateObject2.fold[List[(String,Any)]](List.empty)(v => List(("predicateObject2Uuid", v))) ++
+    predicateObject2Path.fold[List[(String,Any)]](List.empty)(v => List(("predicateObject2Path", v))) ++
+    name.fold[List[(String,Any)]](List.empty)(v => List(("name", v))) ++
+    parameters.fold[List[(String,Any)]](List.empty)(v => if (v.isEmpty) List.empty else List(("parameters", v.map(_.asDBKeyValues).mkString(", ")))) ++
+    location.fold[List[(String,Any)]](List.empty)(v => List(("location", v))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v))) ++
+    programPoint.fold[List[(String,Any)]](List.empty)(v => List(("programPoint", v))) ++
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List(("subject",subjectUuid)),
-    predicateObject.map(p => ("predicateObject",p)),
-    predicateObject2.map(p => ("predicateObject2",p)),
-    foldedParameters.flatMap(value => value.tagsFolded.map(tag => ("parameterTagId", tag.tagId)))
+    List((CDM17.EdgeTypes.subject,subjectUuid)),
+    predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p)),
+    predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p)),
+    foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM17.EdgeTypes.parameterTagId, tag.tagId)))
   )
 
   def getUuid = uuid
