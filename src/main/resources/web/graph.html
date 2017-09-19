@@ -20,6 +20,55 @@
         var right_journal =[]
         var default_node_color = "#97c2fc"
 
+        function LabeledNodes(actor, object, action) {
+            this.actor = actor
+            this.object = object
+            this.action = action
+            this.nodes = []
+
+            if (this.actor === "" && this.object === "" && this.action === "") {
+                this.empty = true
+            } else {
+                this.empty = false
+            }
+
+            this.getLabel = function() {
+                if (this.empty) {
+                    return ""
+                } else {
+                    return this.actor + "," + this.object + "," + this.action
+                }
+            }
+
+            //expects an object in the form {subject: uuid, object: uuid, predicate: [uuid]}
+            this.addNodes = function(labeled) {
+                var found = false
+                var count = 0
+                var instance = this
+                this.nodes.forEach(function(node){
+                    if (node.subject === labeled.subject && node.object === labeled.object) {
+                        found = true
+                        instance.nodes[count].predicates.push(labeled.predicates[0])
+                    }
+                    count++
+                })
+
+                if (!found) {
+                    this.nodes.push(labeled)
+                }
+            }  
+
+            this.getRows = function() {
+                var ground_truth_label = this.getLabel().replace(/\r?\n|\r/g, "")
+                var rows = []
+                this.nodes.forEach(function(node) {
+                    var predicates = node.predicates.join(";")
+                    var row = ground_truth_label + "," + node.subject + "," + predicates + "," + node.object + "\n"
+                    rows.push(row)
+                })
+                return rows
+            }
+        }
 
         function execQuery(query_object, success_function, query_color) {
             right_journal = []
@@ -925,6 +974,18 @@
                 "positions": pinned_positions
             }]
 
+            _.map(nodes, function(n) {
+                node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
+                default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
+                if (typeof node_spec === "object") {
+                    n['icon'] = {
+                        color : getOrElse(n.icon.color, getOrElse(node_spec.color, UI.selectedColor())),
+                        code : getOrElse(n.icon.code, getOrElse(node_spec.icon_unicode, default_spec.icon_unicode)),
+                        size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
+                    }
+                }
+            })
+
             var blob = new Blob([JSON.stringify(snapshot)], {type: "application/json"})
             var a = document.createElement('a')
             a.download = "snapshot.json"
@@ -946,12 +1007,70 @@
                         UI.updateButtonStates()
                     }
                     reader.readAsText(f)
+                } else if (f.type === "text/csv") {
+                    default_label = new LabeledNodes("", "", "")
+                    labels = [default_label]
+                    var reader = new FileReader()
+                    reader.onload = function(e) {
+                        var data = e.target.result.split('\n')
+                        data.forEach(function(line) {
+                            var values = line.split(',')
+                            label = new LabeledNodes(values[0], values[1], values[2])                             
+                            labels.push(label)
+                        })
+                        label_count = 0
+                        labels.forEach(function(label) {
+                            add = "<i class='ion-android-add add-label' title='Add label to selected nodes' label_id=" + label_count + "></i>"
+                            html = "<span>" + label.getLabel() + add + "</span>"
+                            $div = $("<div class='labelRow'>").html(html)
+                            $("#node_labels").append($div)            
+                            label_count++
+                        })
+                        $("i.add-label").bind("click", addLabel)       
+                        $("#node_labels").show()
+                    }
+                    reader.readAsText(f)
                 } else {
                     UI.failHandler()
                 }
             })
         }
 
+
+        function addLabel(event) {
+            var id = $(this).attr("label_id")
+            var label = labels[id]
+            var nodes = network.getSelectedNodes()
+            nodes.forEach(function(node) {
+                node_data_set._data[node].attack = label.getLabel()
+                old_label = node_data_set._data[node].label.split('\n')
+                new_label = old_label[0] + "\n" + old_label[1] + "\n" + label.getLabel()
+                node_data_set.update({id: node, label: new_label})
+
+                var type = node_data_set._data[node].db_label
+                if (type === "Event") {
+                    var subject = node_data_set._data[node].properties.subjectUuid[0]['value']
+                    var object = node_data_set._data[node].properties.predicateObjectUuid[0]['value']
+                    var predicates = node_data_set._data[node].properties.uuid[0]['value']
+                    label.addNodes({subject: subject, object: object, predicates: [predicates]})
+                }
+            })
+        }
+
+        function labeledNodesToCSV() {
+            var content = []
+            labels.forEach(function(label){
+                label.getRows().forEach(function(row) {
+                    content.push(row)
+                })
+            })
+            var blob = new Blob(content, {type: "text/csv"})
+            var a = document.createElement('a')
+            a.download = "labels.csv"
+            a.href = URL.createObjectURL(blob)
+            a.target = "_blank"
+            a.click()
+        }
 
         function createSavedQueries() {
             var arg_idx = 0
@@ -1134,6 +1253,21 @@
             font-size: small;
         }
 
+        div.labelRow {
+            display: block;
+        }
+
+        div.labelRow span {
+            display: inline-block;
+            font-size: 12px;
+        }
+
+        i.add-label {
+            float: left;
+            display: inline;
+            margin-right: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -1155,6 +1289,7 @@
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" onclick="$('#query-string, #query-color').blur()" oncontextmenu="event.preventDefault()"></div>
+    <div id="node_labels" style="position: absolute; top: 50px; left: 10px; display: none;"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
     <div id="node-selection-box" style="display: none;"></div>
     <a id="download-anchor" style="display:none"></a>
