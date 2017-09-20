@@ -18,26 +18,15 @@ lazy val adapt = (project in file(".")).settings(
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "org.apache.avro" % "avro" % "1.8.1",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
-    "com.thinkaurelius.titan" % "titan-core" % "1.0.0",
-    //  "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
-    //  "org.slf4j" % "slf4j-api" % "1.7.25",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
-//    "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
-//    "com.typesafe.akka" %% "akka-persistence" % akkaV,
-//    "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
-    // "com.typesafe.akka" %% "akka-testkit" % akkaV % "test"
-    // "com.github.scopt" %% "scopt" % "3.5.0",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
-//    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.18",
     "org.mapdb" % "mapdb" % "3.0.5",
-    // Titan related
-    "com.thinkaurelius.titan" % "titan-core" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
-    "com.thinkaurelius.titan" % "titan-cassandra" % "1.0.0" excludeAll ExclusionRule(organization = "org.slf4j"),
-    "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j")
+    "org.neo4j" % "neo4j-community" % "3.2.5",
+    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3"
   ),
 
 //  fork in run := true,

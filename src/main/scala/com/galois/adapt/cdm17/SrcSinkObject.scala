@@ -15,14 +15,14 @@ case class SrcSinkObject(
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
 ) extends CDM17 with DBWritable with DBNodeable {
+  override def getLabels: List[String] = List("CDM17", "SrcSinkObject")
+
   def asDBKeyValues = List(
-    label, "SrcSinkObject",
-    "titanType", "SrcSinkObject",
-    "uuid", uuid,
-    "srcSinkType", srcSinkType.toString
+    ("uuid", uuid),
+    ("srcSinkType", srcSinkType.toString)
   ) ++
     baseObject.asDBKeyValues ++
-    fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
+    fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v)))
 
   def asDBEdges = Nil
 

@@ -13,14 +13,14 @@ case class UnitDependency(
   unit: UUID,
   dependentUnit: UUID
 ) extends CDM17 with DBWritable with DBNodeable {
+  override def getLabels: List[String] = List("CDM17", "UnitDependency")
+
   def asDBKeyValues = List(
-    label, "UnitDependency",
-    "titanType", "UnitDependency",
-    "unitUuid", unit,
-    "dependentUnitUuid", dependentUnit
+    ("unitUuid", unit),
+    ("dependentUnitUuid", dependentUnit)
   )
 
-  def asDBEdges = List(("dependentUnit",dependentUnit),("unit",unit))
+  def asDBEdges = List((CDM17.EdgeTypes.dependentUnit,dependentUnit),(CDM17.EdgeTypes.unit,unit))
 
   val thisUUID = UUID.randomUUID()
 

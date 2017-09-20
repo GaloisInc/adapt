@@ -22,22 +22,22 @@ case class Value(
   val tagsFolded = tagRunLengthTuples.fold[List[TagRunLengthTuple]](List.empty)(_.toList)
 
   def asDBKeyValues = List(
-    label, "Value",
-    "titanType", "Value",
-    "size", size,
-    "valueType", valueType.toString,
-    "valueDataType", valueDataType.toString,
-    "isNull", isNull
+    ("size", size),
+    ("valueType", valueType.toString),
+    ("valueDataType", valueDataType.toString),
+    ("isNull", isNull)
   ) ++
-    name.fold[List[Any]](List.empty)(v => List("name", v)) ++
-    runtimeDataType.fold[List[Any]](List.empty)(v => List("runtimeDataType", v)) ++
-    valueBytes.fold[List[Any]](List.empty)(v => List("valueBytes", new String(v))) ++
-    tagRunLengthTuples.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("tagRunLengthTuples", v.map(_.asDBKeyValues).mkString(", "))) ++
-    components.fold[List[Any]](List.empty)(v => List("components", v.map(_.asDBKeyValues).mkString(", ")))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
+    name.fold[List[(String,Any)]](List.empty)(v => List(("name", v))) ++
+    runtimeDataType.fold[List[(String,Any)]](List.empty)(v => List(("runtimeDataType", v))) ++
+    valueBytes.fold[List[(String,Any)]](List.empty)(v => List(("valueBytes", new String(v)))) ++
+    tagRunLengthTuples.fold[List[(String,Any)]](List.empty)(v => if (v.isEmpty) List.empty else List(("tagRunLengthTuples", v.map(_.asDBKeyValues).mkString(", ")))) ++
+    components.fold[List[(String,Any)]](List.empty)(v => List(("components", v.map(_.asDBKeyValues).mkString(", "))))   // TODO: This should probably be made into a more meaningful data structure instead of dumping a Seq[Value] to the DB.
 
   val getUuid = UUID.randomUUID()
 
-  val asDBEdges: List[(String,UUID)] = tagsFolded.map(t => ("tag",t.getUuid))
+  def getLabels = List("CDM17", "Value")
+
+  val asDBEdges: List[(CDM17.EdgeTypes.EdgeTypes,UUID)] = tagsFolded.map(t => (CDM17.EdgeTypes.tag,t.getUuid))
 
   override val supportNodes =
     tagsFolded.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)

@@ -16,15 +16,15 @@ case class RegistryKeyObject(
   value: Option[Value] = None,
   size: Option[Long] = None
 ) extends CDM17 with DBWritable with DBNodeable {
+  override def getLabels: List[String] = List("CDM17", "RegistryKeyObject")
+
   def asDBKeyValues = List(
-    label, "RegistryKeyObject",
-    "titanType", "RegistryKeyObject",
-    "uuid", uuid,
-    "registryKeyOrPath", key
+    ("uuid", uuid),
+    ("registryKeyOrPath", key)
   ) ++
     baseObject.asDBKeyValues ++
-    value.fold[List[Any]](List.empty)(v => List("value", v.asDBKeyValues)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v))
+    value.fold[List[(String,Any)]](List.empty)(v => List(("value", v.asDBKeyValues))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v)))
 
   def asDBEdges = Nil
 
