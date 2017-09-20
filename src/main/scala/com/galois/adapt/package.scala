@@ -24,7 +24,7 @@ package object adapt {
     def asDBEdges: List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)]
 
     // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
-    def supportNodes: List[(UUID, List[Any], List[(String,UUID)])] = List()
+    def supportNodes: List[(UUID, List[Any], List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)])] = List()
   }
 
   type ProcessUUID = UUID

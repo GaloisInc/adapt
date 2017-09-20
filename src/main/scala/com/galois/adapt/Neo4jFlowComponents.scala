@@ -56,8 +56,10 @@ object Neo4jFlowComponents {
         schema.indexFor(eventLabel).on("predicateObjectPath").create()
 
         tx.success()
+        tx.close()
+        tx.success()
 
-        schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
+        //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
       case Failure(err) => ()
     }
 
@@ -93,7 +95,8 @@ object Neo4jFlowComponents {
           newNeo4jVertex.addLabel(Label.label(label))
         }
         for ((k,v) <- cdm.asDBKeyValues) {
-          newNeo4jVertex.setProperty(k, v)
+          if(classOf[java.util.UUID] != v.getClass)
+            newNeo4jVertex.setProperty(k, v)
         }
         newVertices += (cdm.getUuid -> newNeo4jVertex)
 
@@ -209,7 +212,7 @@ object Neo4jFlowComponents {
   def neo4jWrites(graph: GraphDatabaseService = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
-    .mapAsyncUnordered(threadPool)(x => Future {neo4jLoop(x)}) // TODO or check mapasync unordered
+    .mapAsyncUnordered(threadPool)(x => Future {neo4jLoop(x)})
     .toMat(
       Sink.foreach{ sOrF =>
         sOrF match {

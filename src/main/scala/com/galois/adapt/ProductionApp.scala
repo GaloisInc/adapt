@@ -71,7 +71,7 @@ object ProductionApp {
     config.getString("adapt.runflow").toLowerCase match {
       case "database" | "db" =>
         println("Running database-only flow")
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), Neo4jFlowComponents.neo4jWrites())
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
@@ -119,7 +119,7 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites()
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jWrites()
 
           ClosedShape
         }).run()

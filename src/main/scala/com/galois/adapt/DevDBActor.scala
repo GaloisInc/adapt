@@ -92,7 +92,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
         // Create the missing edge
         edgeCreatedCounter += 1
-        fromVertex.addEdge(label, toVertex)
+        //fromVertex.addEdge(label, toVertex)
       }
 
       // Empty out the map
@@ -117,18 +117,18 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         // Add this vertex to the map of vertices we know about and see if it is the destination of
         // any previous nodes (see next comment for more on this).
         nodeIds += (uuid -> newVertex)
-        for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
-          fromVertex.addEdge(label, newVertex)
+        //for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
+          //fromVertex.addEdge(label, newVertex)
         missingToUuid -= uuid
 
         // Recall all edges are treated as outgoing. In general, we expect that the 'toUuid' has
         // already been found. However, if it hasn't, we add it to a map of edges keyed by the UUID
         // they point to (for which no corresponding vertex exists, as of yet). 
-        for ((label,toUuid) <- edges)
-          nodeIds.get(toUuid) match {
-            case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil) 
-            case Some(toVertex) => newVertex.addEdge(label, toVertex)
-          }
+//        for ((label,toUuid) <- edges)
+//          nodeIds.get(toUuid) match {
+//            case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil)
+//            case Some(toVertex) => newVertex.addEdge(label, toVertex)
+//          }
       }
 
     case NodeQuery(q,_) =>

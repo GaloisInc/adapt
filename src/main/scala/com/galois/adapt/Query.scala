@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import com.thinkaurelius.titan.core.attribute.Text
+//import com.thinkaurelius.titan.core.attribute.Text
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -483,7 +483,8 @@ object QueryLanguage {
   }
   case class HasRegex[S,T](traversal: Traversal[S,T], k: QueryValue[String], regex: Regex) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
+      //traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
+      traversal.buildTraversal(graph,context).has(k.eval(context))
   }
   case class HasTraversal[S,T](traversal: Traversal[S,T], k: QueryValue[String], v: Traversal[_,_]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
