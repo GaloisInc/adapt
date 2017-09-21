@@ -40,6 +40,7 @@ object Neo4jFlowComponents {
 
         // CDM17 label (for indexes across all node types)
         val cdm17Label = Label.label("CDM17")
+        // TODO check for index before creation
         schema.constraintFor(cdm17Label).assertPropertyIsUnique("uuid").create()
 
         val subjectLabel = Label.label("Subject")
@@ -57,7 +58,6 @@ object Neo4jFlowComponents {
 
         tx.success()
         tx.close()
-        tx.success()
 
         //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
       case Failure(err) => ()
@@ -123,18 +123,22 @@ object Neo4jFlowComponents {
       }
     }
 
-    // Try to complete missing edges. If the node pointed to is _still_ not found, we
+    println("here!")
+
+    /*// Try to complete missing edges. If the node pointed to is _still_ not found, we
     // synthetically create it.
     var nodeCreatedCounter = 0
     var edgeCreatedCounter = 0
 
-    for ((uuid, edges) <- missingToUuid; (fromNeo4jVertex, label) <- edges) {
+    for ((uuid, edges) <- missingToUuid) {
+
+    for ((fromNeo4jVertex, label) <- edges) {
       if (uuid != skipEdgesToThisUuid) {
         // Find or create the missing vertex (it may have been created earlier in this loop)
-        val toNeo4jVertex = findNode(uuid) getOrElse {
+        val toNeo4jVertex = /*findNode(uuid) getOrElse*/ {
           nodeCreatedCounter += 1
           val newNode = graph.createNode(Label.label("CDM17"))
-          newNode.setProperty("uuid", UUID.randomUUID()) // uuid)
+          //newNode.setProperty("uuid", UUID.randomUUID()) // uuid)
           newVertices += (uuid -> newNode)
           newNode
         }
@@ -153,11 +157,22 @@ object Neo4jFlowComponents {
           case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
         }
       }
-    }
+    }}*/
 
-    Try(
-      transaction.success()
-    ) match {
+    Try {
+          transaction.success()
+          transaction.close()
+//      transaction.close()
+//      val nodes = graph.findNodes(Label.label("CDM17"))
+//      var count = 0
+//      while(nodes.hasNext ) {
+//        count = count + 1
+//        nodes.next()
+//      }
+//      println(count)
+//      println("here")
+//      Success()
+        } match {
       case Success(_) => Success(())
       case Failure(e) => Failure(e)
     }
