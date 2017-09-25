@@ -13,8 +13,10 @@ class MapActor[K,V] extends Actor with ActorLogging {
   }
 }
 
+// Types of messages that should be sent to/from a 'MapActor'
 sealed trait MapMessage[K,V]
-case class Put[K,V](key: K, value: V) extends MapMessage[K,V]
-case class Get[K,V](key: K)           extends MapMessage[K,V]
-case class Val[K,V](value: Option[V]) extends MapMessage[K,V]
+final case class Put[K,V](key: K, value: V) extends MapMessage[K,V]
+final case class Get[K,V](key: K)           extends MapMessage[K,V]
+final case class Val[K,V](value: Option[V]) extends MapMessage[K,V]
+
 

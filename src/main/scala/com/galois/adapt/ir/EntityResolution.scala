@@ -26,7 +26,7 @@ object EntityResolution {
    *  @param renameRetryDelay amont of time to wait before retrying to convert an objects UUIDs to
    *  point to IR instead of CDM
    */
-  def apply(tickTimeout: Long, renameRetryLimit: Long, renameRetryDelay: Long)(implicit system: ActorSystem): Flow[CDM, IR, _] = {
+  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 5, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, IR, _] = {
     type CdmUUID = java.util.UUID
     type IrUUID = java.util.UUID
 

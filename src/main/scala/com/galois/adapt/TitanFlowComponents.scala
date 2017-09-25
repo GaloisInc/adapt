@@ -100,6 +100,7 @@ object TitanFlowComponents {
       ("exportedLibraries", classOf[String]),
       //      ("eventType", classOf[EventType]),
       ("eventType", classOf[String]),
+      ("exec", classOf[String]),
       ("fileDescriptor", classOf[Integer]),
       //      ("fileObjectType", classOf[FileObjectType]),
       ("fileObjectType", classOf[String]),
@@ -486,7 +487,7 @@ object TitanFlowComponents {
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWritesFlow(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
+  def titanWritesFlow(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[AnyRef]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .mapAsyncUnordered(threadPool)(x => Future {titanLoop(x)}) // TODO or check mapasync unordered

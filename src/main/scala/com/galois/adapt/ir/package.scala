@@ -25,26 +25,7 @@ package object ir {
     def remapUuids(renameActor: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[SelfType]
   }
 
-  def remapUuid(renameActor: ActorRef, uuid: UUID)(implicit ec: ExecutionContext, t: Timeout): Future[UUID] = {
-    (renameActor ? Get(uuid))
-      .mapTo[Val[UUID,UUID]]
-      .flatMap {
-        case Val(None) => Future { throw new Exception(s"UUID $uuid wasn't there (yet)") }
-        case Val(Some(newUuid)) => Future(newUuid)
-      }
-  }
-
-  // TODO: merge this into remapSeqUuid (the signature will be ugly)
-  def remapOptUuid(renameActor: ActorRef, uuidOpt: Option[UUID])(implicit ec: ExecutionContext, t: Timeout): Future[Option[UUID]] = {
-    uuidOpt match {
-      case None => Future(None)
-      case Some(uuid) => remapUuid(renameActor, uuid) map { Some(_) }
-    }
-  }
-  
-  def remapSeqUuid(renameActor: ActorRef, uuidSeq: Seq[UUID])(implicit ec: ExecutionContext, t: Timeout): Future[Seq[UUID]] = {
-    Future.sequence(uuidSeq map { uuid => remapUuid(renameActor, uuid) })
-  }
+  import RemapUtils._
 
 
   /* Compared to 'cdm.Event':
@@ -94,13 +75,11 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrEvent] = {
-      for {
-        s <- remapUuid(ra, subject)
-        po1 <- remapOptUuid(ra, predicateObject)
-        po2 <- remapOptUuid(ra, predicateObject2)
-      } yield this.copy(subject = s, predicateObject = po1, predicateObject2 = po2)
-    }
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrEvent] = for {
+      s <- remapUuid(ra, subject)
+      po1 <- remapOptUuid(ra, predicateObject)
+      po2 <- remapOptUuid(ra, predicateObject2)
+    } yield this.copy(subject = s, predicateObject = po1, predicateObject2 = po2)
 
   }
 
@@ -144,12 +123,10 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrSubject] = {
-      for {
-        p <- remapUuid(ra, localPrincipal)
-        ps <- remapOptUuid(ra, parentSubject)
-      } yield this.copy(localPrincipal = p, parentSubject = ps)
-    }
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrSubject] = for {
+      p <- remapUuid(ra, localPrincipal)
+      ps <- remapOptUuid(ra, parentSubject)
+    } yield this.copy(localPrincipal = p, parentSubject = ps)
 
   }
 
@@ -187,11 +164,9 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrFileObject] = {
-      for {
-        p <- remapOptUuid(ra, localPrincipal)
-      } yield this.copy(localPrincipal = p)
-    }
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrFileObject] = for {
+      p <- remapOptUuid(ra, localPrincipal)
+    } yield this.copy(localPrincipal = p)
   
   }
 
@@ -227,9 +202,8 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrNetFlowObject] = {
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrNetFlowObject] =
       Future(this)
-    }
   
   }
 
@@ -259,9 +233,8 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrSrcSinkObject] = {
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrSrcSinkObject] =
       Future(this)
-    }
 
   }
 
@@ -298,9 +271,8 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrPrincipal] = {
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrPrincipal] =
       Future(this)
-    }
     
   }
 
@@ -346,19 +318,42 @@ package object ir {
 
     def getUuid = uuid
 
-    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrProvenanceTagNode] = {
-      for {
-        s <- remapUuid(ra, subjectUuid)
-        fo <- remapOptUuid(ra, flowObject)
-        pt <- remapOptUuid(ra, prevTagId)
-        ts <- remapSeqUuid(ra, tagIds)
-      } yield this.copy(
-        subjectUuid = s,
-        flowObject = fo,
-        prevTagId = pt,
-        tagIds = ts
-      )
-    } 
+    def remapUuids(ra: ActorRef)(implicit ec: ExecutionContext, t: Timeout): Future[IrProvenanceTagNode] = for {
+      s <- remapUuid(ra, subjectUuid)
+      fo <- remapOptUuid(ra, flowObject)
+      pt <- remapOptUuid(ra, prevTagId)
+      ts <- remapSeqUuid(ra, tagIds)
+    } yield this.copy(
+      subjectUuid = s,
+      flowObject = fo,
+      prevTagId = pt,
+      tagIds = ts
+    ) 
 
   }
+
+  // Utilities for remapping UUIDs. Used in the IR's implementation of 'remapUuids'
+  private object RemapUtils {
+    def remapUuid(renameActor: ActorRef, uuid: UUID)(implicit ec: ExecutionContext, t: Timeout): Future[UUID] = {
+      (renameActor ? Get(uuid))
+        .mapTo[Val[UUID,UUID]]
+        .flatMap {
+          case Val(None) => Future { throw new Exception(s"UUID $uuid wasn't there (yet)") }
+          case Val(Some(newUuid)) => Future(newUuid)
+        }
+    }
+
+    // TODO: merge this into remapSeqUuid (the signature will be ugly)
+    def remapOptUuid(renameActor: ActorRef, uuidOpt: Option[UUID])(implicit ec: ExecutionContext, t: Timeout): Future[Option[UUID]] = {
+      uuidOpt match {
+        case None => Future(None)
+        case Some(uuid) => remapUuid(renameActor, uuid) map { Some(_) }
+      }
+    }
+    
+    def remapSeqUuid(renameActor: ActorRef, uuidSeq: Seq[UUID])(implicit ec: ExecutionContext, t: Timeout): Future[Seq[UUID]] = {
+      Future.sequence(uuidSeq map { uuid => remapUuid(renameActor, uuid) })
+    }
+  }
+
 }

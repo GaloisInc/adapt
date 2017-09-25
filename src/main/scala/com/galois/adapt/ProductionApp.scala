@@ -8,6 +8,7 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.galois.adapt.ir._
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
@@ -82,6 +83,25 @@ object ProductionApp {
             case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
           }
         } else Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+
+      case "ir" =>
+        println("Running (IR) database-only flow")
+        Flow[IR].runWith(CDMSource(ta1).via(EntityResolution()).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+
+
+      case "ir-database" | "ir" =>
+        println("running a database flow where CDM and IR are both written in")
+        
+        RunnableGraph.fromGraph(GraphDSL.create() { implicit graph => 
+          import GraphDSL.Implicits._
+          val bcast = graph.add(Broadcast[CDM17](2))
+
+          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+          bcast.out(0).via(EntityResolution()).via(FlowComponents.printCounter("DB (IR)  Writer", 1000)) ~> TitanFlowComponents.titanWrites()
+          bcast.out(1)                        .via(FlowComponents.printCounter("DB (CDM) Writer", 1000)) ~> TitanFlowComponents.titanWrites()
+
+          ClosedShape
+        }).run()
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
