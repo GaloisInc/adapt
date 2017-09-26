@@ -87,6 +87,7 @@ object TitanFlowComponents {
       if ( ! management.containsEdgeLabel(edgeLabel)) management.makeEdgeLabel(edgeLabel).make()
 
     val propertyKeys = List(
+      ("uuid", classOf[String]),
       ("cid", classOf[Integer]),
       ("cmdLine", classOf[String]),
       ("count", classOf[Integer]),

@@ -36,7 +36,7 @@ object ERStreamComponents {
     .merge(Source.tick(tickTimeout.seconds, tickTimeout.seconds, Tick))
     
     // Identify sequences of events
-    .statefulMapConcat( () => { 
+    .statefulMapConcat( () => {
       var ticked: Boolean = false
       
       var state: EventMergeDFA = EventUninitialized
@@ -168,10 +168,13 @@ object ERStreamComponents {
     // Group subjects with events that are possibly interesting to the subject. As soon as the file
     // object has a path attached to it, we pass the file object downstream. We wait at most one
     // 'Tick' to find the path before giving up.
+    .collect({
+      case file: FileObject => file
+      case event: Event if !event.predicateObject.isEmpty => event
+    })
     .groupBy(Int.MaxValue, {
-      case file: FileObject => Some(file.uuid)
-      case event: Event if !event.predicateObject.isEmpty => Some(event.predicateObject)
-      case other: CDM => None
+      case file: FileObject => file.uuid
+      case event: Event => event.predicateObject.get
     })
     .merge(Source.tick(tickTimeout.seconds, tickTimeout.seconds, Tick))
     .statefulMapConcat( () => {
@@ -216,7 +219,7 @@ object ERStreamComponents {
         }
 
         // Receiving a relevant event
-        case e: Event if !e.properties.get("predicateObjectPath").isEmpty => {
+        case e: Event if !e.properties.isEmpty => {
           pathOpt = e.properties.flatMap(_.get("predicateObjectPath"))
           makeFile().toList
         }

@@ -112,7 +112,7 @@ package object ir {
         "titanType", "IrSubject",
         "uuid", uuid,
         "subjectType", subjectType,
-        "localPrincipal", localPrincipal,
+        "localPrincipalUuid", localPrincipal,
         "startTimestampNanos", startTimestampNanos,
         "cmdLine", cmdLine
       ) ++

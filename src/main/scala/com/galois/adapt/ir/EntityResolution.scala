@@ -5,12 +5,13 @@ import com.galois.adapt.cdm17._
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
 import scala.concurrent.{ExecutionContext, Await, Future}
+import com.galois.adapt.FlowComponents
 
 import akka.actor.Props
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.dispatch.ExecutionContexts
 import akka.util.Timeout
-import akka.stream.{FlowShape, DelayOverflowStrategy}
+import akka.stream.{FlowShape, DelayOverflowStrategy, Attributes}
 import akka.stream.scaladsl.{Flow, Source, GraphDSL, Broadcast, Merge, Partition}
 
 object EntityResolution {
@@ -26,16 +27,18 @@ object EntityResolution {
    *  @param renameRetryDelay amont of time to wait before retrying to convert an objects UUIDs to
    *  point to IR instead of CDM
    */
-  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 5, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, IR, _] = {
+  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 10, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, IR, _] = {
     type CdmUUID = java.util.UUID
     type IrUUID = java.util.UUID
 
     implicit val ec: ExecutionContext = system.dispatcher
     val renameActor: ActorRef = system.actorOf(Props[MapActor[CdmUUID, IrUUID]])
-    
-    erWithoutRenamesFlow(renameActor, tickTimeout) via renameFlow(renameActor, renameRetryLimit, renameRetryDelay)
+   
+    erWithoutRenamesFlow(renameActor, tickTimeout)
+      .via(renameFlow(renameActor, renameRetryLimit, renameRetryDelay))
   }
- 
+
+
   // Perform entity resolution on stream of CDMs to convert them into IRs
   private def erWithoutRenamesFlow(renameActor: ActorRef, tickTimeout: Long): Flow[CDM, IR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
     import GraphDSL.Implicits._
@@ -82,6 +85,7 @@ object EntityResolution {
     FlowShape(broadcast.in, merge.out)
   })
 
+
   // Remap UUIDs in IR from CDMs to other IRs
   private def renameFlow(renameActor: ActorRef, retryLimit: Long, retryTime: Long)
                         (implicit ec: ExecutionContext): Flow[IR, IR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
@@ -101,12 +105,16 @@ object EntityResolution {
 
       // Failure to get a result within 2 seconds is hard (the rename actor is not supposed to be
       // blocking)
+
+      // TODO: get rid of Await
       Await.result(renamed, 2 second) match {
-        case None => Left((ir, retries + 1))
+        case None if retries < retryLimit => Left((ir, retries + 1))
+        case None => Right(ir) // TODO: in this case, make a new UUID
         case Some(renamedIr) => Right(renamedIr)
       }
     }
 
+    // TODO: add type alias for resolved/unresolved IR
 
     /* This takes in IR where the consituent UUIDs still point to old CDM and outputs IR where the
      * constituent UUIDs point to new IR.
@@ -141,19 +149,19 @@ object EntityResolution {
     val merge = b.add(Merge[(IR, Int)](2))
     
     // split the stream into the successes and the retries
-    val partition = b.add(Partition[Either[(IR,Int), IR]](2, { case Left(_) => 0; case Right(_) => 1 }))
+    val partition = b.add(Partition[Either[(IR,Int), IR]](2, { case Right(_) => 0; case Left(_) => 1 }))
 
     // unpack unsuccessfully renamed IR elements and filter out the ones that have too many retries
     val retries = b.add(Flow[Either[(IR,Int), IR] /* Left[(IR,Int)] */ ]
       .collect {
         case Left((ir, retries)) => 
-          if (retries < retryLimit) {
-            (ir, retries)
-          } else {
-            throw new Exception("Too many rename attempts (" + retries.toString + "): " + ir.toString)
-          }
+        if (retries >= retryLimit) {
+            println(s"Too many rename attempts ($retries): $ir")
+        }
+        (ir, retries)
       }
       .delay(retryTime seconds, DelayOverflowStrategy.emitEarly)
+      .withAttributes(Attributes.inputBuffer(initial = 10000, max = 10000))
     )
 
     // unpack successfully renamed IR elements

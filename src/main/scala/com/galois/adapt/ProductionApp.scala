@@ -89,7 +89,7 @@ object ProductionApp {
         Flow[IR].runWith(CDMSource(ta1).via(EntityResolution()).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
 
 
-      case "ir-database" | "ir" =>
+      case "ir-database" =>
         println("running a database flow where CDM and IR are both written in")
         
         RunnableGraph.fromGraph(GraphDSL.create() { implicit graph => 
