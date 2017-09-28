@@ -27,7 +27,7 @@ object EntityResolution {
    *  @param renameRetryDelay amont of time to wait before retrying to convert an objects UUIDs to
    *  point to IR instead of CDM
    */
-  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 10, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, IR, _] = {
+  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 10, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, RenamedIR, _] = {
     type CdmUUID = java.util.UUID
     type IrUUID = java.util.UUID
 
@@ -39,8 +39,13 @@ object EntityResolution {
   }
 
 
+  // IR is renamed if its fields which represent edges to other nodes contain UUIDs point to other
+  // IR nodes (instead of CDM nodes)
+  type RenamedIR = IR
+  type UnrenamedIR = IR
+
   // Perform entity resolution on stream of CDMs to convert them into IRs
-  private def erWithoutRenamesFlow(renameActor: ActorRef, tickTimeout: Long): Flow[CDM, IR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
+  private def erWithoutRenamesFlow(renameActor: ActorRef, tickTimeout: Long): Flow[CDM, UnrenamedIR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
     import GraphDSL.Implicits._
 
     /* The original CDM stream gets split into one stream per resolved CDM type. At each of the
@@ -69,7 +74,7 @@ object EntityResolution {
     val broadcast = b.add(Broadcast[CDM](7))
     
     // merge those components back together
-    val merge = b.add(Merge[IR](7))
+    val merge = b.add(Merge[UnrenamedIR](7))
 
 
     // Connect the graph
@@ -88,26 +93,25 @@ object EntityResolution {
 
   // Remap UUIDs in IR from CDMs to other IRs
   private def renameFlow(renameActor: ActorRef, retryLimit: Long, retryTime: Long)
-                        (implicit ec: ExecutionContext): Flow[IR, IR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
+                        (implicit ec: ExecutionContext): Flow[UnrenamedIR, RenamedIR, _] = Flow.fromGraph(GraphDSL.create() { implicit b =>
     import GraphDSL.Implicits._
     
     // Function that does the actual renaming - either produces a 'Right' or a 'Left' with retries
     // incremented
-    val rename: ((IR,Int)) => Either[(/* unrenamed */ IR, Int), /* renamed */ IR] = { case (ir, retries) =>
+    val rename: ((UnrenamedIR,Int)) => Future[Either[(UnrenamedIR, Int), RenamedIR]] = { case (ir, retries) =>
 
       // The 1 second timeout should never happen: the renameActor is supposed to be non-blocking
       implicit val timeout = Timeout(1 second)
 
       // Failure within the future is soft (failure to find a UUID should result in a retry)
-      val renamed: Future[Option[IR]] = ir.remapUuids(renameActor)
+      val renamed: Future[Option[RenamedIR]] = ir.remapUuids(renameActor)
         .map(Some(_))                  // Wrap all successful futures with 'Some'
         .recover({ case _ => None })   // Convert all failed futures into 'None'
 
       // Failure to get a result within 2 seconds is hard (the rename actor is not supposed to be
       // blocking)
 
-      // TODO: get rid of Await
-      Await.result(renamed, 2 second) match {
+      renamed.map {
         case None if retries < retryLimit => Left((ir, retries + 1))
         case None => Right(ir) // TODO: in this case, make a new UUID
         case Some(renamedIr) => Right(renamedIr)
@@ -142,17 +146,17 @@ object EntityResolution {
      */
 
     // Zip incoming IR with 0 retries
-    val preProcess = b.add(Flow.fromFunction[IR,(IR,Int)](ir => (ir, 0)))
+    val preProcess = b.add(Flow.fromFunction[UnrenamedIR,(UnrenamedIR,Int)](ir => (ir, 0)))
 
     // merge the loop-back and initial components back together. The second element in the tuple is
     // the number of retries so far.
-    val merge = b.add(Merge[(IR, Int)](2))
+    val merge = b.add(Merge[(UnrenamedIR, Int)](2))
     
     // split the stream into the successes and the retries
-    val partition = b.add(Partition[Either[(IR,Int), IR]](2, { case Right(_) => 0; case Left(_) => 1 }))
+    val partition = b.add(Partition[Either[(UnrenamedIR,Int), RenamedIR]](2, { case Right(_) => 0; case Left(_) => 1 }))
 
     // unpack unsuccessfully renamed IR elements and filter out the ones that have too many retries
-    val retries = b.add(Flow[Either[(IR,Int), IR] /* Left[(IR,Int)] */ ]
+    val retries = b.add(Flow[Either[(UnrenamedIR,Int), RenamedIR] /* Left[(UnrenamedIR,Int)] */ ]
       .collect {
         case Left((ir, retries)) => 
         if (retries >= retryLimit) {
@@ -165,12 +169,12 @@ object EntityResolution {
     )
 
     // unpack successfully renamed IR elements
-    val postProcess = b.add(Flow[Either[(IR,Int), IR] /* Right[IR] */ ].collect { case Right(ir) => ir })
+    val postProcess = b.add(Flow[Either[(UnrenamedIR,Int), RenamedIR] /* Right[RenamedIR] */ ].collect { case Right(ir) => ir })
 
 
     // Connect the graph
-    preProcess.out ~> merge.in(0);  merge.out.map(rename) ~> partition.in;  partition.out(0) ~> postProcess.in;
-    retries.out    ~> merge.in(1);                                          partition.out(1) ~> retries.in;
+    preProcess.out ~> merge.in(0);  merge.out.mapAsync(4)(rename) ~> partition.in;  partition.out(0) ~> postProcess.in;
+    retries.out    ~> merge.in(1);                                                  partition.out(1) ~> retries.in;
 
     // Expose ports
     FlowShape(preProcess.in, postProcess.out)
