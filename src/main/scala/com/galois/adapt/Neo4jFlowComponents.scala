@@ -12,11 +12,13 @@ import org.neo4j.graphdb
 import org.neo4j.graphdb.{GraphDatabaseService, Label}
 import org.neo4j.graphdb.factory.GraphDatabaseFactory
 import org.neo4j.kernel.api.proc.Neo4jTypes.RelationshipType
+import org.neo4j.graphdb.schema.Schema
 
 import scala.concurrent.duration._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import scala.collection.JavaConverters._
 
 
 object Neo4jFlowComponents {
@@ -36,34 +38,82 @@ object Neo4jFlowComponents {
       case Success(tx) =>
         val schema = graph.schema()
 
-        // TODO: Check for existances of indices first?
+        createIfNeededUniqueConstraint(schema, "CDM17", "uuid")
 
-        // CDM17 label (for indexes across all node types)
-        val cdm17Label = Label.label("CDM17")
-        // TODO check for index before creation
-        schema.constraintFor(cdm17Label).assertPropertyIsUnique("uuid").create()
-
-        val subjectLabel = Label.label("Subject")
-        schema.indexFor(subjectLabel).on("timestampNanos").create()
-        schema.indexFor(subjectLabel).on("cid").create()
-        schema.indexFor(subjectLabel).on("cmdLine").create()
-        val regKeyLabel = Label.label("RegistryKeyObject")
-        schema.indexFor(regKeyLabel).on("registryKeyOrPath").create()
-        val netflowLabel = Label.label("NetFlowObject")
-        schema.indexFor(netflowLabel).on("remoteAddress").create()
-        val eventLabel = Label.label("Event")
-        schema.indexFor(eventLabel).on("timestampnanos").create()
-        schema.indexFor(eventLabel).on("name").create()
-        schema.indexFor(eventLabel).on("predicateObjectPath").create()
+        createIfNeededIndex(schema, "Subject", "timestampNanos")
+        createIfNeededIndex(schema, "Subject", "cid")
+        createIfNeededIndex(schema, "Subject", "cmdLine")
+        createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
+        createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
+        createIfNeededIndex(schema, "Event", "timestampnanos")
+        createIfNeededIndex(schema, "Event", "name")
+        createIfNeededIndex(schema, "Event", "predicateObjectPath")
 
         tx.success()
         tx.close()
+
+        awaitSchemaCreation(graph)
 
         //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
       case Failure(err) => ()
     }
 
     graph
+  }
+
+  def awaitSchemaCreation(graph: GraphDatabaseService) = {
+    Try (
+      graph.beginTx()
+    ) match {
+      case Success(tx) =>
+        val schema = graph.schema()
+
+        for(i <- schema.getIndexes.asScala) {
+          println(i + " is " + schema.getIndexState(i))
+          while(schema.getIndexState(i) != Schema.IndexState.ONLINE) {
+            Thread.sleep(100)
+            println(i + " is " + schema.getIndexState(i))
+          }
+        }
+
+        tx.success()
+        tx.close()
+    }
+  }
+
+  def findConstraint(schema: Schema, label: Label, prop: String): Boolean = {
+    val constraints = schema.getConstraints(label).asScala
+    for(c <- constraints) {
+      val constrainedProps = c.getPropertyKeys.asScala
+      if(constrainedProps.size == 1 && constrainedProps.count(_.equals(prop)) == 1) {
+        return true
+      }
+    }
+    false
+  }
+
+  def createIfNeededUniqueConstraint(schema: Schema, slabel: String, prop: String) = {
+    val label = Label.label(slabel)
+    if(! findConstraint(schema, label, prop)) {
+      schema.constraintFor(label).assertPropertyIsUnique(prop).create()
+    }
+  }
+
+  def findIndex(schema: Schema, label: Label, prop: String): Boolean = {
+    val indices = schema.getIndexes(label).asScala
+    for(i <- indices) {
+      val indexedProps = i.getPropertyKeys.asScala
+      if(indexedProps.size == 1 && indexedProps.count(_.equals(prop)) == 1)
+        return true
+    }
+    return false
+  }
+
+  def createIfNeededIndex(schema: Schema, slabel: String, prop: String) = {
+    val label = Label.label(slabel)
+    if(! findIndex(schema, label, prop)) {
+      schema.indexFor(label).on(prop).create()
+    }
   }
 
   // Create a neo4j transaction to insert a batch of objects
@@ -113,8 +163,8 @@ object Neo4jFlowComponents {
         }
       } match {
         case Success(_) =>
-        case Failure(e: java.lang.IllegalArgumentException) =>
-          if (!e.getMessage.contains("byUuidUnique")) {
+        case Failure(e: org.neo4j.graphdb.ConstraintViolationException) =>
+          if (!e.getMessage.contains("uuid")) {
             println("Failed CDM statement: " + cdm)
             println(e.getMessage) // Bad query
             e.printStackTrace()
