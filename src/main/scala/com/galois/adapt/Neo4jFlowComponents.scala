@@ -87,8 +87,6 @@ object Neo4jFlowComponents {
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     for (cdm <- cdms) {
-      // Note to Ryan: I'm sticking with the try block here instead of .recover since that seems to cancel out all following cdm statements.
-      // iIf we have a failure on one CDM statement my thought is we want to log the failure but continue execution.
       Try {
         val newNeo4jVertex = graph.createNode()
         for(label <- cdm.getLabels) {
@@ -97,6 +95,8 @@ object Neo4jFlowComponents {
         for ((k,v) <- cdm.asDBKeyValues) {
           if(classOf[java.util.UUID] != v.getClass)
             newNeo4jVertex.setProperty(k, v)
+          else
+            newNeo4jVertex.setProperty(k, v.toString)
         }
         newVertices += (cdm.getUuid -> newNeo4jVertex)
 
@@ -162,16 +162,6 @@ object Neo4jFlowComponents {
     Try {
           transaction.success()
           transaction.close()
-//      transaction.close()
-//      val nodes = graph.findNodes(Label.label("CDM17"))
-//      var count = 0
-//      while(nodes.hasNext ) {
-//        count = count + 1
-//        nodes.next()
-//      }
-//      println(count)
-//      println("here")
-//      Success()
         } match {
       case Success(_) => Success(())
       case Failure(e) => Failure(e)
