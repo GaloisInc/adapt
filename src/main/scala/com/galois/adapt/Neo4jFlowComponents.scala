@@ -78,6 +78,7 @@ object Neo4jFlowComponents {
 
         tx.success()
         tx.close()
+      case Failure(error) => ()
     }
   }
 
@@ -173,41 +174,39 @@ object Neo4jFlowComponents {
       }
     }
 
-    println("here!")
-
-    /*// Try to complete missing edges. If the node pointed to is _still_ not found, we
+    // Try to complete missing edges. If the node pointed to is _still_ not found, we
     // synthetically create it.
     var nodeCreatedCounter = 0
     var edgeCreatedCounter = 0
 
     for ((uuid, edges) <- missingToUuid) {
+      for ((fromNeo4jVertex, label) <- edges) {
+        if (uuid != skipEdgesToThisUuid) {
+          // Find or create the missing vertex (it may have been created earlier in this loop)
+          val toNeo4jVertex = findNode(uuid) getOrElse {
+            nodeCreatedCounter += 1
+            val newNode = graph.createNode(Label.label("CDM17"))
+            newNode.setProperty("uuid", UUID.randomUUID().toString) // uuid
+            newVertices += (uuid -> newNode)
+            newNode
+          }
 
-    for ((fromNeo4jVertex, label) <- edges) {
-      if (uuid != skipEdgesToThisUuid) {
-        // Find or create the missing vertex (it may have been created earlier in this loop)
-        val toNeo4jVertex = /*findNode(uuid) getOrElse*/ {
-          nodeCreatedCounter += 1
-          val newNode = graph.createNode(Label.label("CDM17"))
-          //newNode.setProperty("uuid", UUID.randomUUID()) // uuid)
-          newVertices += (uuid -> newNode)
-          newNode
-        }
-
-        // Create the missing edge
-        Try {
-          fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, label)
-          edgeCreatedCounter += 1
-        } match {
-          case Success(_) =>
-          case Failure(e: java.lang.IllegalArgumentException) =>
-            if (!e.getMessage.contains("byUuidUnique")) {
-              println(e.getMessage) // Bad query
-              e.printStackTrace()
-            }
-          case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+          // Create the missing edge
+          Try {
+            fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, label)
+            edgeCreatedCounter += 1
+          } match {
+            case Success(_) =>
+            case Failure(e: java.lang.IllegalArgumentException) =>
+              if (!e.getMessage.contains("byUuidUnique")) {
+                println(e.getMessage) // Bad query
+                e.printStackTrace()
+              }
+            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
+          }
         }
       }
-    }}*/
+    }
 
     Try {
           transaction.success()
