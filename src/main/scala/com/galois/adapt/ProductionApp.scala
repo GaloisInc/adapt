@@ -88,7 +88,7 @@ object ProductionApp {
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
       case "ui" =>
-        println("Staring only the UI and doing nothing else.")
+        println("Starting only the UI and doing nothing else.")
 
       case "csvmaker" | "csv" =>
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -164,6 +164,7 @@ object CDMSource {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+      case Success(0) => None
       case Success(i) => Some(i)
       case _ => None
     }

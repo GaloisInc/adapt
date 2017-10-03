@@ -260,7 +260,6 @@ object TitanFlowComponents {
     for (edge <- allEdges) {
       val titanEdge = management.getEdgeLabel(edge)
       if(! management.containsRelationIndex(titanEdge, "titanTypeEdgeIndex")) {
-        println("Making edge index")
         management.buildEdgeIndex(titanEdge, "titanTypeEdgeIndex", Direction.BOTH, Order.incr, typeKey)
       }
     }
