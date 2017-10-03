@@ -4,15 +4,14 @@ import java.io.{ByteArrayInputStream, File}
 import java.nio.file.Paths
 import java.util.UUID
 
-import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
-//import akka.util.{ByteString, Timeout}
+import scala.util.{Failure, Success}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -71,7 +70,18 @@ object ProductionApp {
     config.getString("adapt.runflow").toLowerCase match {
       case "database" | "db" =>
         println("Running database-only flow")
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+        if (ta1 == "file") {
+          // Terminate after ingesting file sources.
+          val ta1Source = CDMSource(ta1)
+          println("Will shut down after ingesting files.")
+          ta1Source.via(FlowComponents.printCounter("DB Writer", 1000)).via(TitanFlowComponents.titanWritesFlow()).runForeach(_.foreach {
+            case Success(()) => ()
+            case fails => println(s"Insertion errors in batch: $fails")
+          }).onComplete {
+            case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
+            case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
+          }
+        } else Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
@@ -153,6 +163,10 @@ object CDMSource {
   def apply(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+      case Success(i) => Some(i)
+      case _ => None
+    }
     ta1.toLowerCase match {
       case "cadets"         => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
       case "clearscope"     => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
@@ -165,9 +179,9 @@ object CDMSource {
       case _ =>
         val paths = config.getStringList("adapt.ingest.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
-        paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
+        val startStream = paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
           .drop(start)
-          .take(Application.loadLimitOpt.getOrElse(Long.MaxValue))
+        shouldLimit.map(l => startStream.take(l)).getOrElse(startStream)
           .statefulMapConcat { () =>
             var counter = 0
             cdmTry => {

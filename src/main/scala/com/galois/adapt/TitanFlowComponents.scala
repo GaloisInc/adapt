@@ -486,17 +486,17 @@ object TitanFlowComponents {
 
   /* Given a 'TitanGraph', make a 'Flow' that writes CDM data into that graph in a buffered manner
    */
-  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
+  def titanWritesFlow(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 seconds)
     .mapAsyncUnordered(threadPool)(x => Future {titanLoop(x)}) // TODO or check mapasync unordered
-    .toMat(
-      Sink.foreach{ sOrF =>
-        sOrF match {
+
+  def titanWrites(graph: TitanGraph = graph)(implicit ec: ExecutionContext) = titanWritesFlow(graph)
+      .toMat(
+        Sink.foreach{
           case Seq(Success(())) => ()
           case fails => println(s"${fails.length} insertion errors in batch")
         }
-      }
-    )(Keep.right)
+      )(Keep.right)
 }
 
