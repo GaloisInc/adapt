@@ -8,6 +8,9 @@ import akka.actor.ActorRef
 import com.galois.adapt.cdm17._
 import scala.collection.mutable
 
+// TODO: There should be no calls to randomUUID here, only 'Get(<cdmUUID>, true)' requests to the
+// RenameActor
+
 /* This object contains all of the logic for resolving individual CDM types into their corresponding
  * IR ones.
  */

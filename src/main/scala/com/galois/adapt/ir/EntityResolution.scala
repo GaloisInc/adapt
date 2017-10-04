@@ -16,6 +16,9 @@ import akka.stream.scaladsl.{Flow, Source, GraphDSL, Broadcast, Merge, Partition
 
 object EntityResolution {
 
+  type CdmUUID = java.util.UUID
+  type IrUUID = java.util.UUID
+  
   /* Creates an ER flow converting CDM to IR.
    *
    *  @param tickTimeout time interval to wait for other entities to use in ER (ex: waiting for
@@ -27,12 +30,10 @@ object EntityResolution {
    *  @param renameRetryDelay amont of time to wait before retrying to convert an objects UUIDs to
    *  point to IR instead of CDM
    */
-  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 10, renameRetryDelay: Long = 5)(implicit system: ActorSystem): Flow[CDM, RenamedIR, _] = {
-    type CdmUUID = java.util.UUID
-    type IrUUID = java.util.UUID
+  def apply(tickTimeout: Long = 10, renameRetryLimit: Long = 5, renameRetryDelay: Long = 3)(implicit system: ActorSystem): Flow[CDM, RenamedIR, _] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
-    val renameActor: ActorRef = system.actorOf(Props[MapActor[CdmUUID, IrUUID]])
+    val renameActor: ActorRef = system.actorOf(Props[RenameActor])
    
     erWithoutRenamesFlow(renameActor, tickTimeout)
       .via(renameFlow(renameActor, renameRetryLimit, renameRetryDelay))
@@ -98,23 +99,29 @@ object EntityResolution {
     
     // Function that does the actual renaming - either produces a 'Right' or a 'Left' with retries
     // incremented
-    val rename: ((UnrenamedIR,Int)) => Future[Either[(UnrenamedIR, Int), RenamedIR]] = { case (ir, retries) =>
+    val rename: ((UnrenamedIR,Int)) => Future[Either[(UnrenamedIR, Int), Seq[RenamedIR]]] = { case (ir, retries) =>
 
       // The 1 second timeout should never happen: the renameActor is supposed to be non-blocking
       implicit val timeout = Timeout(1 second)
 
-      // Failure within the future is soft (failure to find a UUID should result in a retry)
-      val renamed: Future[Option[RenamedIR]] = ir.remapUuids(renameActor)
-        .map(Some(_))                  // Wrap all successful futures with 'Some'
-        .recover({ case _ => None })   // Convert all failed futures into 'None'
+      // We force creation of filler nodes if we have reached the retryLimit
+      val createIfNotFound: Boolean = retries >= retryLimit
 
-      // Failure to get a result within 2 seconds is hard (the rename actor is not supposed to be
-      // blocking)
+      // Failure within the future is soft (failure to find a UUID should result in a retry)
+      val renamed: Future[Option[(RenamedIR, Seq[IrUUID])]] = ir.remapUuids(renameActor, createIfNotFound)
+        .map(Some(_))                            // Wrap all successful futures with 'Some'
+        .recover({
+          case _ if !createIfNotFound => None    // Convert all failed futures into 'None'
+          case _ =>                              // ...unless 'createIfNotFound = true'
+            println("renameFlow: node was not created")
+            throw new Exception("Node should always be created when 'createIfNotFound = true'")
+        })
 
       renamed.map {
-        case None if retries < retryLimit => Left((ir, retries + 1))
-        case None => Right(ir) // TODO: in this case, make a new UUID
-        case Some(renamedIr) => Right(renamedIr)
+        case None => Left((ir, retries + 1))
+        case Some((renamedIr, synthesizedUuids)) => 
+          val synthesized = synthesizedUuids.map(IrSynthesized(_))
+          Right(renamedIr +: synthesized)
       }
     }
 
@@ -128,6 +135,10 @@ object EntityResolution {
      *
      *  - if so, the resolved IR is just emitted downstream.
      *  - otherwise, the IR is fed back into the rename flow (with a rety time delay and a retry limit)
+     *
+     * If it there have been too many retries, we remap, but with 'createIfNotFound = true'. This
+     * means that we end up emitting every IR node downstream, even if we also have to emit other
+     * garbage (empty) IR nodes along the way.
      *
      * We expect that _most_ of the time, there will be no need for retries (since something pointed
      * to should be before something doing the pointing in the CDM data, and our entity resolution
@@ -153,24 +164,19 @@ object EntityResolution {
     val merge = b.add(Merge[(UnrenamedIR, Int)](2))
     
     // split the stream into the successes and the retries
-    val partition = b.add(Partition[Either[(UnrenamedIR,Int), RenamedIR]](2, { case Right(_) => 0; case Left(_) => 1 }))
+    val partition = b.add(Partition[Either[(UnrenamedIR,Int), Seq[RenamedIR]]](2, { case Right(_) => 0; case Left(_) => 1 }))
 
-    // unpack unsuccessfully renamed IR elements and filter out the ones that have too many retries
-    val retries = b.add(Flow[Either[(UnrenamedIR,Int), RenamedIR] /* Left[(UnrenamedIR,Int)] */ ]
-      .collect {
-        case Left((ir, retries)) => 
-        if (retries >= retryLimit) {
-            println(s"Too many rename attempts ($retries): $ir")
-        }
-        (ir, retries)
-      }
+    // unpack unsuccessfully renamed IR elements and delay
+    val retries = b.add(Flow[Either[(UnrenamedIR,Int), Seq[RenamedIR]] /* Left[(UnrenamedIR,Int)] */ ]
+      .collect { case Left((ir, retries)) => (ir, retries) }
       .delay(retryTime seconds, DelayOverflowStrategy.emitEarly)
       .withAttributes(Attributes.inputBuffer(initial = 10000, max = 10000))
     )
 
     // unpack successfully renamed IR elements
-    val postProcess = b.add(Flow[Either[(UnrenamedIR,Int), RenamedIR] /* Right[RenamedIR] */ ].collect { case Right(ir) => ir })
-
+    val postProcess = b.add(Flow[Either[(UnrenamedIR,Int), Seq[RenamedIR]] /* Right[Seq[RenamedIR]] */ ]
+      .collect { case Right(irs) => irs }
+      .mapConcat[RenamedIR](_.toList))
 
     // Connect the graph
     preProcess.out ~> merge.in(0);  merge.out.mapAsync(4)(rename) ~> partition.in;  partition.out(0) ~> postProcess.in;
