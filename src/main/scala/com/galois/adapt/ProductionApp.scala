@@ -63,7 +63,7 @@ object ProductionApp {
     val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-    val dbActor = system.actorOf(Props[TitanDBQueryProxy])
+    val dbActor = system.actorOf(Props[Neo4jDBQueryProxy])
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 

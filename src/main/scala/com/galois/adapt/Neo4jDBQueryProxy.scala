@@ -1,5 +1,8 @@
 package com.galois.adapt
 
+import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
+import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
+
 import java.io.ByteArrayOutputStream
 
 import akka.actor._
@@ -12,9 +15,9 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 
-class TitanDBQueryProxy() extends Actor with ActorLogging {
+class Neo4jDBQueryProxy() extends Actor with ActorLogging {
 
-  val graph = Neo4jFlowComponents.graph
+  val graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(Neo4jFlowComponents.graph))
 //  val jsonWriter = TitanFlowComponents.graph.io(IoCore.graphson).writer().create()   // This was the cause of a lot of failed queries
 
   implicit val ec = context.dispatcher
@@ -24,38 +27,38 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
     case NodeQuery(q, shouldParse) =>
       println(s"Received node query: $q")
       sender() ! Future(
-//        Query.run[Vertex](q, graph).map { vertices =>
-//          println(s"Found nodes: ${vertices.length}")
-////          println(s"Nodes = $vertices")
-//          val x = if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
-//                  else vertices
-////          println(s"Returning: ${vertices.size} nodes")
-//          x
-//        }
+        Query.run[Vertex](q, graph).map { vertices =>
+          println(s"Found nodes: ${vertices.length}")
+//          println(s"Nodes = $vertices")
+          val x = if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
+                  else vertices
+//          println(s"Returning: ${vertices.size} nodes")
+          x
+        }
       )
 
     case EdgeQuery(q, shouldParse) =>
       println(s"Received new edge query: $q")
       sender() ! Future(
-//        Query.run[Edge](q, graph).map { edges =>
-//          println(s"Found edges: ${edges.length}")
-//          val x = if (shouldParse) JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
-//          else edges
-////          println(s"Returning edges: $x\n\n")
-//          x
-//        }
+        Query.run[Edge](q, graph).map { edges =>
+          println(s"Found edges: ${edges.length}")
+          val x = if (shouldParse) JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
+          else edges
+//          println(s"Returning edges: $x\n\n")
+          x
+        }
       )
 
     case StringQuery(q, shouldParse) =>
       println(s"Received string query: $q")
       sender() ! Future(
-//        Query.run[java.lang.Object](q, graph).map { results =>
-//          println(s"Found: ${results.length} items")
-//          val x = JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
-////            .mkString("[", ",", "]")
-////          println(s"Returning: ${results.size} items")
-//          x
-//        }
+        Query.run[java.lang.Object](q, graph).map { results =>
+          println(s"Found: ${results.length} items")
+          val x = JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
+//            .mkString("[", ",", "]")
+//          println(s"Returning: ${results.size} items")
+          x
+        }
       )
 
     case EdgesForNodes(nodeIdList) =>
@@ -63,7 +66,7 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
         //graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
       }
 
-//    case GiveMeTheGraph => sender() ! graph
+    case GiveMeTheGraph => sender() ! graph
   }
 }
 
@@ -74,5 +77,5 @@ case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends Re
 case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
-//case object GiveMeTheGraph
+case object GiveMeTheGraph
 

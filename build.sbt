@@ -26,6 +26,9 @@ lazy val adapt = (project in file(".")).settings(
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
     "org.mapdb" % "mapdb" % "3.0.5",
     "org.neo4j" % "neo4j-community" % "3.2.5",
+    "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
+    "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3",
+    "org.apache.tinkerpop" % "neo4j-gremlin" % "3.3.0",
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3"
   ),
 
