@@ -1,6 +1,13 @@
 #! /usr/bin/env python3
 
-import requests, readline, atexit, os, sys, json
+import requests, readline, atexit, os, sys, json, subprocess, tempfile
+
+def pager(text):
+    tf = open(tempfile.mkstemp()[1], "w")
+    tf.write(text)
+    tf.flush()
+    subprocess.call(["less", "-FX", tf.name])
+    tf.close()
 
 if __name__ == '__main__':
     url = "http://localhost:8080"
@@ -20,11 +27,13 @@ if __name__ == '__main__':
                                     data={"query": query}).json()
                 if isinstance(req,list):
                     count = len(list)
+                    text = ""
                     for item, line in enumerate(req):
-                        print("Result {} of {}".format(item+1, count))
-                        print(json.dumps(json.loads(line), indent=4))
+                        text += "Result {} of {}\n".format(item+1, count)
+                        text += json.dumps(json.loads(line), indent=4)
+                    pager(text)
                 else:
-                    print(json.dumps(json.loads(req), indent=4))
+                    pager(json.dumps(json.loads(req), indent=4))
             except Exception as e:
                 print("There was an error processing your query:\n"
                       "{}".format(e))
