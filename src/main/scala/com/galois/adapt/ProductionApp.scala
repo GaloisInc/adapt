@@ -169,14 +169,28 @@ object CDMSource {
       case _ => None
     }
     ta1.toLowerCase match {
-      case "cadets"         => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "clearscope"     => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "faros"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "fivedirections" => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "theia"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "cadets"         =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "clearscope"     =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "faros"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "fivedirections" =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "theia"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
         .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
-      case "trace"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "kafkaTest"      => kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+      case "trace"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "kafkaTest"      =>
+        val src = kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        shouldLimit.fold(src)(l => src.take(l))
       case _ =>
         val paths = config.getStringList("adapt.ingest.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
