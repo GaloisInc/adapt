@@ -19,7 +19,7 @@ package object adapt {
 
     def getLabels: List[String]
 
-    // Outgoing edges coming off the node. The string is the label on the edge, the UUID the node
+    // Outgoing edges coming off the node. The key is the label on the edge, the UUID the node
     // (which should be 'DBNodeable' too) the edge goes to.
     def asDBEdges: List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)]
 
