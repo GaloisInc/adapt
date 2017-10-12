@@ -23,9 +23,9 @@ object ERStreamComponents {
    *
    * The following patterns are supported:
    *   
-   *    - OPEN   -> (WRITE | LSEEK)*      -> CLOSE    is transformed into    WRITE
-   *    - ACCEPT -> (RECVFROM | RECVMSG)* -> CLOSE    is transformed into    RECVMSG
-   *    - ACCEPT -> (SENDFROM | SENDMSG)* -> CLOSE    is transformed into    SENDMSG
+   *    - (WRITE | LSEEK)*         is transformed into    WRITE
+   *    - (RECVFROM | RECVMSG)*    is transformed into    RECVMSG
+   *    - SENDMSG*                 is transformed into    SENDMSG
    *
    * Other EVENT_OPEN and EVENT_CLOSE are simply discarded.
    */
@@ -41,21 +41,22 @@ object ERStreamComponents {
     // Identify sequences of events
     .statefulMapConcat( () => {
       var ticked: Boolean = false
-      
-      var state: EventMergeDFA = EventUninitialized
       var wipEvent: Option[IrEvent] = None
 
       // Reset to the initial state
       def dumpState(): Option[IrEvent] = {
-        ticked = false
-        state = EventUninitialized
-        
         val toReturn = wipEvent
+        
+        ticked = false
         wipEvent = None
-
         toReturn
       }
       
+      // Set wip event
+      def setWip(wip: IrEvent) = {
+        wipEvent = Some(wip)
+      }
+
       // Handler
       {
         // Release all state
@@ -67,29 +68,37 @@ object ERStreamComponents {
           Nil
         }
 
-        // Try to follow the patterns 
+        // Try to follow the patterns
+        case e: Event if e.eventType == EVENT_OPEN || e.eventType == EVENT_CLOSE => dumpState().toList
         case e: Event => {
           ticked = false
-          e.eventType match {
-            case EVENT_OPEN => Nil
-            case EVENT_CLOSE => dumpState().toList
-            
-            case EVENT_WRITE if state == EventWritten => Nil
-            case EVENT_WRITE if state == EventUninitialized => {
-              wipEvent = Some(resolveEvent(e))
-              state = EventWritten
-              Nil
-            }
-            case EVENT_WRITE => {
-              val toReturn = dumpState()
-              wipEvent = Some(resolveEvent(e))
-              state = EventWritten
-              toReturn.toList
-            }
+          wipEvent match {
+            case None => setWip(resolveEvent(e)); Nil
+            case Some(wip) => 
+              (e.eventType, wip.eventType) match {
+                // merging WRITE and LSEEK
+                case (EVENT_WRITE, EVENT_WRITE) => setWip(resolveEvent(e)); Nil
+                case (EVENT_WRITE, EVENT_LSEEK) => setWip(resolveEvent(e)); Nil
+                case (EVENT_LSEEK, EVENT_WRITE) => setWip(wip);             Nil
+                case (EVENT_LSEEK, EVENT_LSEEK) => setWip(resolveEvent(e)); Nil
 
-            // TODO other cases
+                // merging RECVFROM and RECVMSG
+                case (EVENT_RECVMSG,  EVENT_RECVMSG)  => setWip(resolveEvent(e)); Nil
+                case (EVENT_RECVMSG,  EVENT_RECVFROM) => setWip(resolveEvent(e)); Nil
+                case (EVENT_RECVFROM, EVENT_RECVMSG)  => setWip(wip);             Nil
+                case (EVENT_RECVFROM, EVENT_RECVFROM) => setWip(resolveEvent(e)); Nil
 
-            case _ => dumpState().toList ++ Seq(resolveEvent(e))
+                // merge SENDMSG
+                case (EVENT_SENDMSG,  EVENT_SENDMSG)  => setWip(resolveEvent(e)); Nil
+
+                // everything else causes the previous event to be flushed out and replaced with the
+                // new event received
+                case _ => {
+                  val toReturn = dumpState()
+                  setWip(resolveEvent(e))
+                  toReturn.toList
+                }
+            }
           }
         }
       }
@@ -97,14 +106,7 @@ object ERStreamComponents {
     })
 
     // Un-group events
-    .mergeSubstreams
-
-  sealed trait EventMergeDFA
-  case object EventUninitialized extends EventMergeDFA
-  case object EventWritten extends EventMergeDFA
-  case object EventReceived extends EventMergeDFA
-  case object EventSent extends EventMergeDFA
-
+    .mergeSubstreams 
 
   // Make a resolved event from an event by throwing away the fields that arent used.
   def resolveEvent(e: Event): IrEvent = IrEvent(
@@ -349,6 +351,12 @@ object ERStreamComponents {
 }
 
 
-//
+// Object passed around as (time-based) indicator to flush state
 object Tick
 
+
+// 
+object EventDFA {
+
+
+}
