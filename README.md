@@ -3,18 +3,15 @@
 ### Prerequistites
 
 You will need to have:
-  - a recent version of the Oracle [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
+  - a recent version of the Oracle [JDK] version 8 (http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
     - IMPORTANT: DO NOT use JDK 9. Cassandra 2.1 depends upon an obscure thread library bug that's incompatible with JDK 9. Use JDK 8!
-  - the latest version of [SBT](http://www.scala-sbt.org/)
-    - Maybe not latest: try 0.13...
+  - the latest version of [SBT](http://www.scala-sbt.org/) installed and on your path
   - a specific version of the Cassandra database installed: `cassandra 2.1`
 
 Then, you will need to run
 
-    # working directory: cassandra/bin
-    $ cassandra -f           # keep this running in a different tab, or background the process.
-    # working directory: sbt
-    $ bin/sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
+    $ cassandra -f     # keep this running in a different tab, or background the process.
+    $ sbt run          # choose how much RAM to use with the -mem flag, specified in megabytes. e.g.: `sbt -mem 6000 run`
 
 
 At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
