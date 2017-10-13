@@ -41,8 +41,6 @@ import scala.language.existentials
  *   stringArray ::= variable | '[' string ',' ... ']'
  *   uuidArray   ::= variable | '[' uuid ',' ... ']'
  *
- *   regex       ::= 'regex(' string ')'
- *
  *   literal     ::= int | long | string | uuid | intArray | longArray | stringArray | uuidArray
  *
  *   predicate   ::= 'eq(' literal ')'
@@ -60,7 +58,6 @@ import scala.language.existentials
  *                 | '_(' long ',' ... ')'                                 TODO: What is this?
  *                 | traversal '.has(' string ')'
  *                 | traversal '.has(' string ',' literal ')'
- *                 | traversal '.has(' string ',' regex ')'
  *                 | traversal '.has(' string ',' traversal ')'
  *                 | traversal '.has(' string ',' predicate ')'
  *                 | traversal '.hasLabel(' string ')'
@@ -224,14 +221,6 @@ object Query {
         ( "[" ~ repsep(elem,",") ~ "]" ~ ".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
         ).withFailureMessage(s"array of ${ev.runtimeClass.getSimpleName()} expected")
 
-      // Parse a regex
-      def regex[T]: Parser[Regex] = {
-         val r = ("regex(" ~! stringLiteral ~ ")" | "newP(REGEX," ~! stringLiteral ~ ")") ^^ {
-           case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
-         }
-         r.withFailureMessage("regex expected (ex: 'regex(\"hel{2}o\")'")
-      }
-
       def predicate[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
@@ -251,7 +240,6 @@ object Query {
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
-        | ".has(" ~ str ~ "," ~ regex~ ")" ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
@@ -480,11 +468,6 @@ object QueryLanguage {
   case class HasValue[S,T,V](traversal: Traversal[S,T], k: QueryValue[String], v: QueryValue[V]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context),v.eval(context))
-  }
-  case class HasRegex[S,T](traversal: Traversal[S,T], k: QueryValue[String], regex: Regex) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      //traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
-      traversal.buildTraversal(graph,context).has(k.eval(context))
   }
   case class HasTraversal[S,T](traversal: Traversal[S,T], k: QueryValue[String], v: Traversal[_,_]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
@@ -727,6 +710,4 @@ object QueryLanguage {
       )
     }
   }
-  
-  case class Regex(raw: String)
 }
