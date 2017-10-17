@@ -28,6 +28,8 @@ object ERStreamComponents {
    *    - SENDMSG*                 is transformed into    SENDMSG
    *
    * Other EVENT_OPEN and EVENT_CLOSE are simply discarded.
+   *
+   * TODO: fill earliest/latest timestamps
    */
   def eventResolution(tickTimeout: Long): Flow[Event, IrEvent, _] = Flow[Event]
     
@@ -115,6 +117,7 @@ object ERStreamComponents {
     e.eventType,
     e.subjectUuid,
     e.timestampNanos,
+    e.timestampNanos,
     e.properties.flatMap(_.get("exec")),
     e.predicateObject,
     e.predicateObject2
@@ -125,9 +128,12 @@ object ERStreamComponents {
    * see an event close for that subject.
    *
    * TODO: drop state once we see a CLOSE(?) event on the subject
+   * TODO: collect fork events and look for an 'exec'
    */
   def subjectResolution(tickTimeout: Long, erRenameActor: ActorRef): Flow[CDM, IrSubject, _] = Flow[CDM]
-    .statefulMapConcat( () => {
+    
+    // Merge units with their closest subject ancestor
+    .statefulMapConcat[Either[IrSubject,Event]]( () => {
 
       // Given the (CDM) UUID of a subject, find its closest non-unit ancestor subject
       var ancestorSubject: mutable.Map[UUID,UUID] = mutable.Map[UUID,UUID]();
@@ -150,13 +156,79 @@ object ERStreamComponents {
           val newUuid = UUID.randomUUID()
           erRenameActor ! Put(uuid, newUuid)
 
-          List(IrSubject(newUuid, Seq(uuid), ty, principal, timestamp, cmd, parent))
+          List(Left(IrSubject(newUuid, Seq(uuid), ty, principal, timestamp, cmd, parent)))
         }
+
+        // Event that will may be interesting
+        case e: Event if e.eventType == EVENT_FORK && !e.predicateObject.isEmpty => List(Right(e))
 
         case _ => Nil
       }
     })
- 
+
+    // Attach event from FORK onto the subject
+    .groupBy(Int.MaxValue, {
+      case Left(subj: IrSubject) => subj.originalEntities(0)
+      case Right(evnt: Event) => evnt.predicateObject.get
+    })
+    .merge(Source.tick(tickTimeout.seconds, tickTimeout.seconds, Tick))
+    .statefulMapConcat[IrSubject]( () => {
+      var subject: Option[IrSubject] = None
+      var execOpt: Option[String] = None
+      var subjectSent: Boolean = false
+      var tickReceived: Boolean = false
+
+      // Tries to make a subject (if it succeeds, the subject is returned and subjectsent/subject are updated)
+      def makeSubject(): Option[IrSubject] = {
+        (subject, execOpt) match {
+          case (Some(s), _) if !s.cmdLine.isEmpty => {
+            subjectSent = true
+            subject
+          }
+          case (Some(s), Some(e)) => {
+            subject = Some(s.copy(cmdLine = Some(e)))
+            subjectSent = true
+            subject
+          }
+          case _ => None
+        }
+      }
+
+      {
+        // Don't do anything if we have already sent along the subject
+        case _ if subjectSent => Nil
+
+        // When receiving a Tick, only send off the file if there is a partial subject and we have
+        // already received one tick before
+        case Tick => {
+          val toReturn = if (!subject.isEmpty && tickReceived) {
+            subjectSent = true
+            subject.toList
+          } else { 
+            Nil
+          }
+          tickReceived = true
+          toReturn
+        }
+
+        // Receiving the subject
+        case s: IrSubject => {
+          subject = Some(s)
+          makeSubject().toList
+        }
+
+        // Receiving a relevant event
+        case e: Event => {
+          execOpt = e.properties.flatMap(_.get("exec"))
+          makeSubject().toList
+        }
+
+        // Anything else
+        case _ => Nil 
+      }
+    })
+    .mergeSubstreams
+
 
 
   /* Transform a stream of CDM into resolved file objects or other CDM

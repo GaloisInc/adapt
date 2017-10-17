@@ -170,6 +170,8 @@ object TitanFlowComponents {
       ("tagIds", classOf[UUID], Cardinality.LIST),
       ("threadId", classOf[Integer]),
       ("timestampNanos", classOf[java.lang.Long]),
+      ("earliestTimestampNanos", classOf[java.lang.Long]),
+      ("latestTimestampNanos", classOf[java.lang.Long]),
       //      ("type", classOf[CryptoHashType]),
       ("titanType", classOf[String]),
       ("type", classOf[String]),

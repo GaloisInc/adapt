@@ -46,7 +46,8 @@ package object ir {
 
     eventType: EventType,
     subject: UUID,
-    timestampNanos: Long,
+    earliestTimestampNanos: Long,
+    latestTimestampNanos: Long,
     exec: Option[String] = None,    // On cadets - tells you what command (if any) led to this event (eg: 'sh')
 
     predicateObject: Option[UUID] = None,
@@ -62,7 +63,8 @@ package object ir {
         "uuid", uuid,
         "eventType", eventType,
         "subjectUuid", subject,
-        "timestampNanos", timestampNanos,
+        "earliestTimestampNanos", earliestTimestampNanos,
+        "latestTimestampNanos", latestTimestampNanos,
         "exec", exec
       ) ++
       exec.fold[List[Any]](Nil)(v => List("exec", v)) ++

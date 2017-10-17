@@ -28,6 +28,8 @@ information.
 The following entity resolution occurs
 
   * `UnitDependency` records are merged into their closest non-unit subject ancestor
+  * `Subject` process records get their `cmdLine` field from fork events if they don't have that
+    information already
   * `Netflow` records are deduplicated based on the local IP, global IP, and port
   * `FileObject` records are merged by their path, type, and local principal. Filepath information
     found on some `Event` records is moved onto the `FileObject`.
