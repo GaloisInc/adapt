@@ -60,6 +60,7 @@ object TitanFlowComponents {
         .set("storage.hostname","localhost")
         .set("storage.read-time",120000)
         .set("storage.cassandra.keyspace", config.getString("adapt.runtime.titankeyspace"))
+        .set("storage.cassandra.frame-size-mb", config.getInt("adapt.runtime.titanthriftframesize"))    // FYI: there is also `storage.cassandra.astyanax.frame-size`which does NOT appear to be what we need (untested)
         .open
     ) match {
       case Success(g) => g
