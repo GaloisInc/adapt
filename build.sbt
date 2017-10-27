@@ -29,7 +29,9 @@ lazy val adapt = (project in file(".")).settings(
     "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
     "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3",
     "org.apache.tinkerpop" % "neo4j-gremlin" % "3.3.0",
-    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3"
+    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
+    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
+//    "org.neo4j" % "neo4j-bolt" % "3.3.0"
   ),
 
 //  fork in run := true,

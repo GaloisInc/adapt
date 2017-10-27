@@ -17,7 +17,6 @@ case class NetFlowObject(
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "NetFlowObject")
 
   def asDBKeyValues =
     baseObject.asDBKeyValues ++

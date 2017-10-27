@@ -16,7 +16,6 @@ case class MemoryObject(
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "MemoryObject")
 
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     ("uuid", uuid),

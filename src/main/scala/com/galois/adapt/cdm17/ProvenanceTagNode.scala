@@ -22,8 +22,7 @@ case class ProvenanceTagNode(
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "ProvenanceTagNode")
-  
+
   def asDBKeyValues = List(
     ("uuid", tagIdUuid),
     ("subjectUuid", subjectUuid)

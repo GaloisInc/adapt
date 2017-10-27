@@ -8,7 +8,6 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.T.label
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 
@@ -80,7 +79,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       
       // If at the end of an epoch there are still elements in `missingToUuid`, empty those out and
       // create placeholder vertices/edges for them.
-      for ((uuid,edges) <- missingToUuid; (fromVertex,label) <- edges) {
+      for ((uuid,edges) <- missingToUuid; (fromVertex,edgeName) <- edges) {
        
         // Find or create the missing vertex (it may have been created earlier in this loop)
         val toVertex = findNode("uuid",uuid) getOrElse {
@@ -92,7 +91,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
         // Create the missing edge
         edgeCreatedCounter += 1
-        //fromVertex.addEdge(label, toVertex)
+        //fromVertex.addEdge(edgeName, toVertex)
       }
 
       // Empty out the map

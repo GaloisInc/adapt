@@ -21,8 +21,6 @@ case class TagRunLengthTuple(
   )
 
   def asDBEdges = List((CDM17.EdgeTypes.tagId, tagId))
-
-  def getLabels = List("CDM17", "TagRunLengthTuple")
 }
 
 

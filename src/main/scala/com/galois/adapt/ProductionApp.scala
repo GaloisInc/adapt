@@ -12,6 +12,9 @@ import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principa
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
+import akka.util.Timeout
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 //import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -63,15 +66,26 @@ object ProductionApp {
     val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-    val dbActor = system.actorOf(Props[Neo4jDBQueryProxy])
+    val neoGraph = Neo4jFlowComponents.graph
+    val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy], neoGraph))
+
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
     val ta1 = config.getString("adapt.env.ta1")
+
     config.getString("adapt.runflow").toLowerCase match {
       case "database" | "db" =>
         println("Running database-only flow")
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), Neo4jFlowComponents.neo4jWrites())
+        val writeTimeout = Timeout(30 seconds)
+//        CDMSource(ta1).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout)) //Neo4jFlowComponents.neo4jWrites(neoGraph))
+//        sinkMat.onComplete {
+//          case Success(done) => println(done)
+//          case Failure(e)    => e.printStackTrace()
+//        }
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
@@ -79,6 +93,7 @@ object ProductionApp {
 
       case "ui" =>
         println("Staring only the UI and doing nothing else.")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       case "csvmaker" | "csv" =>
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -112,6 +127,7 @@ object ProductionApp {
 
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 	
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
@@ -119,19 +135,11 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> Neo4jFlowComponents.neo4jWrites()
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()
     }
-
-//    val source = Source
-//      .actorRef[Int](0, OverflowStrategy.fail)
-//      .mapMaterializedValue( ref =>
-//        Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, ref), interface, port), 10 seconds)
-//      )
-
-    val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
   }
 }
 
@@ -178,7 +186,8 @@ object CDMSource {
                 List.empty
               }
             }
-          }.via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+          }
+//          .via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 

@@ -31,8 +31,6 @@ case class Event(
 ) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
-  override def getLabels: List[String] = List("CDM17", "Event")
-
   def asDBKeyValues = List(
     ("uuid", uuid),
     ("sequence", sequence),

@@ -19,7 +19,6 @@ case class FileObject(
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "FileObject")
 
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(

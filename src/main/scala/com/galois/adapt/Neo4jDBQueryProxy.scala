@@ -2,22 +2,22 @@ package com.galois.adapt
 
 import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
-
-import java.io.ByteArrayOutputStream
-
 import akka.actor._
-import org.apache.tinkerpop.gremlin.structure.{Graph, Edge, Vertex}
-import org.apache.tinkerpop.gremlin.structure.io.IoCore
+import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
+import org.neo4j.graphdb.{GraphDatabaseService, Label, Node => NeoNode}
 import spray.json.{JsArray, JsString}
 
+import collection.mutable.{Map => MutableMap}
 import collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-class Neo4jDBQueryProxy() extends Actor with ActorLogging {
+class Neo4jDBQueryProxy(neoGraph: GraphDatabaseService) extends Actor with ActorLogging {
 
-  val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(Neo4jFlowComponents.graph))
+  val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
   implicit val ec = context.dispatcher
+
+  var counter = 0L
 
   def receive = {
 
@@ -69,6 +69,21 @@ class Neo4jDBQueryProxy() extends Actor with ActorLogging {
     // Use with care! Unless you have a really good reason (like running acceptance tests), you
     // probably shouldn't be asking for the whole graph.
     case GiveMeTheGraph => sender() ! graph
+
+
+    case WriteToNeo4jDB(cdms) =>
+      counter = counter + cdms.size
+      log.info(s"DBActor received: $counter")
+      sender() ! Neo4jFlowComponents.neo4jTx(cdms, neoGraph)
+
+    case FailureMsg(e: Throwable) =>
+      log.error(s"FAILED: {}", e)
+    case CompleteMsg =>
+      log.info(s"GOT complete message")
+      sender() ! Success(())
+    case InitMsg =>
+      log.info(s"GOT init message")
+      sender() ! Success(())
   }
 }
 
@@ -81,3 +96,4 @@ case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object GiveMeTheGraph
 
+case class WriteToNeo4jDB(cdms: Seq[DBNodeable])

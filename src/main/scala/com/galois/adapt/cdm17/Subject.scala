@@ -25,8 +25,7 @@ case class Subject(
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "Subject")
-  
+
   def asDBKeyValues = List(
     ("uuid", uuid),
     ("subjectType", subjectType.toString),

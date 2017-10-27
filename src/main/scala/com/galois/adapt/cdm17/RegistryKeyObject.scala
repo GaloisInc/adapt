@@ -16,7 +16,6 @@ case class RegistryKeyObject(
   value: Option[Value] = None,
   size: Option[Long] = None
 ) extends CDM17 with DBWritable with DBNodeable {
-  override def getLabels: List[String] = List("CDM17", "RegistryKeyObject")
 
   def asDBKeyValues = List(
     ("uuid", uuid),
