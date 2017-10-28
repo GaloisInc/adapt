@@ -102,6 +102,13 @@ object ProdRoutes {
               queryResult(StringQuery(queryString.toString), dbActor)
             )
           }
+        } ~
+        pathPrefix("json") {
+          path(RemainingPath) { queryString =>
+            complete(
+              queryResult(StringQuery(queryString.toString, true), dbActor)
+            )
+          }
         }
       } ~
       serveStaticFilesRoute
@@ -211,7 +218,15 @@ object ProdRoutes {
               queryResult(StringQuery(queryString), dbActor)
             )
           }
+        } ~
+        path("json") {
+          formField('query) { queryString =>
+            complete(
+              queryResult(StringQuery(queryString, true), dbActor)
+            )
+          }
         }
+
       }
     }
 

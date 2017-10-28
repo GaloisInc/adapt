@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream
 import akka.actor._
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
-import spray.json.{JsArray, JsString}
+import spray.json._
 
 import collection.JavaConverters._
 import scala.concurrent.Future
@@ -51,10 +51,11 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
       sender() ! Future(
         Query.run[java.lang.Object](q, graph).map { results =>
           println(s"Found: ${results.length} items")
-          val x = JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
-//            .mkString("[", ",", "]")
-//          println(s"Returning: ${results.size} items")
-          x
+          if (shouldParse) {
+            toJson(results.toList) 
+          } else {
+            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
+          }
         }
       )
 
@@ -64,6 +65,39 @@ class TitanDBQueryProxy() extends Actor with ActorLogging {
       }
 
 //    case GiveMeTheGraph => sender() ! graph
+  }
+
+  import scala.collection.JavaConversions._
+
+  def toJson: Any => JsValue = {
+  
+    // Numbers
+    case n: Int => JsNumber(n)
+    case n: Long => JsNumber(n)
+    case n: Double => JsNumber(n)
+    case n: java.lang.Long => JsNumber(n)
+    case n: java.lang.Double => JsNumber(n)
+    
+    // Strings 
+    case s: String => JsString(s) 
+    
+    // Lists
+    case l: java.util.List[_] => toJson(l.toList)
+    case l: List[_] => JsArray(l map toJson)
+  
+    // Maps
+    case m: java.util.Map[_,_] => toJson(m.toMap)
+    case m: Map[_,_] => JsObject(m map { case (k,v) => (k.toString, toJson(v)) })
+  
+    // Special cases (commented out because they are pretty verbose)
+    // case v: Vertex => ApiJsonProtocol.vertexToJson(v)
+    // case e: Edge => ApiJsonProtocol.edgeToJson(e)
+  
+    // Other
+    //
+    // Any custom 'toString' that is longer than 250 characters is probably not a good idea...
+    case o => JsString(o.toString.take(250))
+  
   }
 }
 
@@ -75,4 +109,6 @@ case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 //case object GiveMeTheGraph
+
+
 

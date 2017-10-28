@@ -14,7 +14,7 @@ if __name__ == '__main__':
     if len(sys.argv) >= 2:
     	url = sys.argv[1]
     print("Welcome to the query shell.\n"
-          "Queries are sent to '{}/query/generic'.".format(url))
+          "Queries are sent to '{}/query/json'.".format(url))
     histfile = "cmdline_query.history"
     if os.access(histfile, os.R_OK):
         readline.read_history_file(histfile)
@@ -23,14 +23,14 @@ if __name__ == '__main__':
         try:
             query = input("==> ")
             try:
-                req = requests.post(url + "/query/generic",
+                req = requests.post(url + "/query/json",
                                     data={"query": query}).json()
                 if isinstance(req,list):
-                    count = len(list)
+                    count = len(req)
                     text = ""
                     for item, line in enumerate(req):
                         text += "Result {} of {}\n".format(item+1, count)
-                        text += json.dumps(json.loads(line), indent=4)
+                        text += json.dumps(line, indent=4)
                     pager(text)
                 else:
                     pager(json.dumps(json.loads(req), indent=4))
