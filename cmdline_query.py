@@ -25,15 +25,7 @@ if __name__ == '__main__':
             try:
                 req = requests.post(url + "/query/json",
                                     data={"query": query}).json()
-                if isinstance(req,list):
-                    count = len(req)
-                    text = ""
-                    for item, line in enumerate(req):
-                        text += "Result {} of {}\n".format(item+1, count)
-                        text += json.dumps(line, indent=4)
-                    pager(text)
-                else:
-                    pager(json.dumps(json.loads(req), indent=4))
+                pager(json.dumps(req, indent=4))
             except Exception as e:
                 print("There was an error processing your query:\n"
                       "{}".format(e))
