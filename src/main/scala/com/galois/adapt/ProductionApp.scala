@@ -4,8 +4,7 @@ import java.io.{ByteArrayInputStream, File}
 import java.nio.file.Paths
 import java.util.UUID
 
-import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
@@ -15,7 +14,6 @@ import akka.stream.scaladsl._
 import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-//import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -78,14 +76,18 @@ object ProductionApp {
       case "database" | "db" =>
         println("Running database-only flow")
         val writeTimeout = Timeout(30 seconds)
-//        CDMSource(ta1).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout)) //Neo4jFlowComponents.neo4jWrites(neoGraph))
-//        sinkMat.onComplete {
-//          case Success(done) => println(done)
-//          case Failure(e)    => e.printStackTrace()
-//        }
-        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
-
+        if (ta1 == "file") {
+          // Terminate after ingesting file sources.
+          println("Will shut down after ingesting all files.")
+          CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
+            case Success(_) => ()
+            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n$e")
+          } onComplete {
+            case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
+            case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
+          }
+        } else CDMSource(ta1).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+//      val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
@@ -161,21 +163,40 @@ object CDMSource {
   def apply(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+      case Success(0) => None
+      case Success(i) => Some(i)
+      case _ => None
+    }
     ta1.toLowerCase match {
-      case "cadets"         => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "clearscope"     => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "faros"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "fivedirections" => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "theia"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+      case "cadets"         =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "clearscope"     =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "faros"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "fivedirections" =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "theia"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
         .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
-      case "trace"          => kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
-      case "kafkaTest"      => kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+      case "trace"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "kafkaTest"      =>
+        val src = kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        shouldLimit.fold(src)(l => src.take(l))
       case _ =>
         val paths = config.getStringList("adapt.ingest.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
-        paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
+        val startStream = paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
           .drop(start)
-          .take(Application.loadLimitOpt.getOrElse(Long.MaxValue))
+        shouldLimit.map(l => startStream.take(l)).getOrElse(startStream)
           .statefulMapConcat { () =>
             var counter = 0
             cdmTry => {

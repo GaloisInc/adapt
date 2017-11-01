@@ -207,7 +207,6 @@ object Neo4jFlowComponents {
       transaction.success()
       transaction.close()
       cdmToNodeResults.foreach(_.get)
-      ()
     }
   }
 
@@ -289,6 +288,14 @@ object Neo4jFlowComponents {
 //        case fails => println(s"$fails. insertion errors in batch")
 //      }
 //    )(Keep.right)
+
+  def neo4jActorWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
+    .collect { case cdm: DBNodeable => cdm }
+    .groupedWithin(1000, 1 second)
+    .map(WriteToNeo4jDB.apply)
+    .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
+//    .map(cdm => WriteToNeo4jDB(Seq(cdm)))
+//    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
 }
 
 case class FailureMsg(e: Throwable)

@@ -27,3 +27,5 @@ target
 out
 
 *.o
+
+cmdline_query.history

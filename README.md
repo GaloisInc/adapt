@@ -3,19 +3,23 @@
 ### Prerequistites
 
 You will need to have:
-  - a recent version of the Oracle [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
-  - the latest version of [SBT](http://www.scala-sbt.org/)
+  - a recent version of the Oracle [JDK] version 8 (http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
+    - IMPORTANT: DO NOT use JDK 9. Cassandra 2.1 depends upon an obscure thread library bug that's incompatible with JDK 9. Use JDK 8!
+  - the latest version of [SBT](http://www.scala-sbt.org/) installed and on your path
   - a specific version of the Cassandra database installed: `cassandra 2.1`
 
 Then, you will need to run
 
-    $ cassandra -f           # keep this running in a different tab, or background the process.
-    $ sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
+    $ cassandra -f     # keep this running in a different tab, or background the process.
+    $ sbt run          # run from the top level of the project directory
 
 
 At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
 
 ### Command Line Options
+SBT will allow you to choose the maximum ram to allocate (default is 1 GB). 
+Specify how much RAM to use with the `-mem` flag followed by a number in megabytes. e.g.: `sbt -mem 6000 run`
+
 The adapt system is configurable at runtime by using the following command-line flags. Each flag should be preceded 
 with `-D` and followed by a equals sign, then value; no spaces. For example: `-Dadapt.runflow=db`
 

@@ -2,7 +2,6 @@ package com.galois.adapt
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json._
-
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 
@@ -42,12 +41,7 @@ object ProdRoutes {
   implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
 
   def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = (dbActor ? query)
-    .mapTo[Future[Try[JsValue]]].flatMap(identity).map {
-      case Success(json) => json
-      case Failure(e) =>
-        println(e.getMessage)
-        JsString("\"" + e.getMessage + "\"")
-    }
+    .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
