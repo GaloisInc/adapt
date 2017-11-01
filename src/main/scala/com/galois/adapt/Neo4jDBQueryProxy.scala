@@ -73,7 +73,7 @@ class Neo4jDBQueryProxy(neoGraph: GraphDatabaseService) extends Actor with Actor
 
     case WriteToNeo4jDB(cdms) =>
       counter = counter + cdms.size
-      log.info(s"DBActor received: $counter")
+//      log.info(s"DBActor received: $counter")
       sender() ! Neo4jFlowComponents.neo4jTx(cdms, neoGraph)
 
     case FailureMsg(e: Throwable) =>

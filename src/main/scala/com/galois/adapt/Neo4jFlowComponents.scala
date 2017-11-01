@@ -91,12 +91,12 @@ object Neo4jFlowComponents {
     }
   }
 
-  def createIfNeededUniqueConstraint(schema: Schema, slabel: String, prop: String) = {
-    val label = Label.label(slabel)
+  def createIfNeededUniqueConstraint(schema: Schema, labelString: String, prop: String) = {
+    val label = Label.label(labelString)
     if(! findConstraint(schema, label, prop)) {
       Try(schema.constraintFor(label).assertPropertyIsUnique(prop).create()) match {
         case Success(_) => ()
-        case Failure(e) if e.getCause.isInstanceOf[AlreadyConstrainedException] => println("Already ")
+        case Failure(e) if e.getCause.isInstanceOf[AlreadyConstrainedException] => println(s"Ignoring an already constrained label: ${label.name}")
         case Failure(e) => throw e
       }
     }
