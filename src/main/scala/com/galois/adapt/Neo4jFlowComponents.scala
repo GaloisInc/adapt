@@ -28,95 +28,6 @@ object Neo4jFlowComponents {
   val config = ConfigFactory.load()
   val parallelismSize = config.getInt("adapt.ingest.parallelism")
 
-//  /* Open a Neo4j graph database and create indices */
-//  val graph: GraphDatabaseService = {
-//    val neo4jFile: java.io.File = new java.io.File(config.getString("adapt.runtime.neo4jfile"))
-//    val graph = new GraphDatabaseFactory().newEmbeddedDatabase(neo4jFile)
-//
-//    Try (
-//      graph.beginTx()
-//    ) match {
-//      case Success(tx) =>
-//        val schema = graph.schema()
-//
-//        createIfNeededUniqueConstraint(schema, "CDM17", "uuid")
-//
-//        createIfNeededIndex(schema, "Subject", "timestampNanos")
-//        createIfNeededIndex(schema, "Subject", "cid")
-//        createIfNeededIndex(schema, "Subject", "cmdLine")
-//        createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
-//        createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
-//        createIfNeededIndex(schema, "Event", "timestampnanos")
-//        createIfNeededIndex(schema, "Event", "name")
-//        createIfNeededIndex(schema, "Event", "predicateObjectPath")
-//
-//        tx.success()
-//        tx.close()
-//
-//        awaitSchemaCreation(graph)
-//
-//        //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
-//      case Failure(err) => err.printStackTrace()
-//    }
-//    graph
-//  }
-
-//  def awaitSchemaCreation(g: GraphDatabaseService) = {
-//    Try (
-//      g.beginTx()
-//    ) match {
-//      case Success(tx) =>
-//        val schema = g.schema()
-//        for(i <- schema.getIndexes.asScala) {
-//          var status = schema.getIndexState(i)
-//          while(status != Schema.IndexState.ONLINE) {
-//            println(i + " is " + status)
-//            Thread.sleep(100)
-//            status = schema.getIndexState(i)
-//          }
-//          println(i + " is " + status)
-//        }
-//
-//        tx.success()
-//        tx.close()
-//      case Failure(error) => ()
-//    }
-//  }
-//
-//  def findConstraint(schema: Schema, label: Label, prop: String): Boolean = {
-//    val constraints = schema.getConstraints(label).asScala
-//    constraints.exists { c =>
-//      val constrainedProps = c.getPropertyKeys.asScala
-//      constrainedProps.size == 1 && constrainedProps.exists(_.equals(prop))
-//    }
-//  }
-//
-//  def createIfNeededUniqueConstraint(schema: Schema, labelString: String, prop: String) = {
-//    val label = Label.label(labelString)
-//    if(! findConstraint(schema, label, prop)) {
-//      Try(schema.constraintFor(label).assertPropertyIsUnique(prop).create()) match {
-//        case Success(_) => ()
-//        case Failure(e) if e.getCause.isInstanceOf[AlreadyConstrainedException] => println(s"Ignoring an already constrained label: ${label.name}")
-//        case Failure(e) => throw e
-//      }
-//    }
-//  }
-//
-//  def findIndex(schema: Schema, label: Label, prop: String): Boolean = {
-//    val indices = schema.getIndexes(label).asScala
-//    indices.exists { i =>
-//      val indexedProps = i.getPropertyKeys.asScala
-//      indexedProps.size == 1 && indexedProps.exists(_.equals(prop))
-//    }
-//  }
-//
-//  def createIfNeededIndex(schema: Schema, slabel: String, prop: String) = {
-//    val label = Label.label(slabel)
-//    if(! findIndex(schema, label, prop)) {
-//      schema.indexFor(label).on(prop).create()
-//    }
-//  }
-
   // Create a neo4j transaction to insert a batch of objects
   def neo4jTx(cdms: Seq[DBNodeable], g: GraphDatabaseService): Try[Unit] = {
     val transaction = g.beginTx()
@@ -137,13 +48,15 @@ object Neo4jFlowComponents {
 
         val cdmTypeName = cdm.getClass.getSimpleName
         newNeo4jVertex.addLabel(Label.label(cdmTypeName))  // Creating labels are like creating indices. An index for all Events requires a lot of memory.
-//        newNeo4jVertex.addLabel(Label.label("CDM17"))  // TODO: Why is the presence of this label changing how the UI renders the nodes?
+        newNeo4jVertex.addLabel(Label.label("CDM"))
+        // NOTE: The UI expects a specific format and collection of labels on each node.
+        // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
 
-        cdm.asDBKeyValues.foreach { case (k,v) =>
-          newNeo4jVertex.setProperty(k, v.toString)
+        cdm.asDBKeyValues.foreach {
+          case (k, v: UUID) => newNeo4jVertex.setProperty(k, v.toString)
+          case (k,v) => newNeo4jVertex.setProperty(k, v)
         }
-        newNeo4jVertex.setProperty("db_label", cdmTypeName)   // ui_language.js in the UI depends on this property being set to the CDM type.
 
         newVertices += (cdm.getUuid -> newNeo4jVertex)
 

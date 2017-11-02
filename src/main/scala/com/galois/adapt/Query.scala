@@ -181,13 +181,13 @@ object Query {
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
-      def uid: Parser[QueryValue[java.util.UUID]] = ( variable(uids) |
+      def uuid: Parser[QueryValue[String /*java.util.UUID*/ ]] = ( variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
-          s => Raw(java.util.UUID.fromString(s))
+          s => Raw(s) //java.util.UUID.fromString(s))
         }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
 
-      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] =
-        ( variable(arrs) | arr(uid) ).withFailureMessage("UUID array expected")
+      def uuidArr: Parser[QueryValue[Seq[String /*java.util.UUID*/ ]]] =
+        ( variable(arrs) | arr(uuid) ).withFailureMessage("UUID array expected")
 
       def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] =
         ( variable(arrs) | arr(lng) ).withFailureMessage("long array expected")
@@ -199,12 +199,12 @@ object Query {
         ( variable(arrs) | arr(str) ).withFailureMessage("string array expected")
 
       def lit: Parser[QueryValue[_]] =
-        ( uid ||| int ||| lng ||| str
-        ||| intArr ||| lngArr ||| uidArr ||| strArr
+        ( uuid ||| int ||| lng ||| str
+        ||| intArr ||| lngArr ||| uuidArr ||| strArr
         ).withFailureMessage("literal expected (ex: 9, 12I, \"hello\", [1,2,3])")
 
       def pred: Parser[QueryValue[P[Any]]] =
-        (   predicate(uid)
+        (   predicate(uuid)
         ||| predicate(int)
         ||| predicate(lng)
         ||| predicate(str)

@@ -87,15 +87,19 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       case Success(tx) =>
         val schema = graphService.schema()
 
-        createIfNeededUniqueConstraint(schema, "CDM17", "uuid")
+        createIfNeededUniqueConstraint(schema, "CDM", "uuid")
+
+        // NOTE: The UI expects a specific format and collection of labels on each node.
+        // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
         createIfNeededIndex(schema, "Subject", "timestampNanos")
         createIfNeededIndex(schema, "Subject", "cid")
         createIfNeededIndex(schema, "Subject", "cmdLine")
         createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
         createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
-        createIfNeededIndex(schema, "Event", "timestampnanos")
+        createIfNeededIndex(schema, "Event", "timestampNanos")
         createIfNeededIndex(schema, "Event", "name")
+        createIfNeededIndex(schema, "Event", "eventType")
         createIfNeededIndex(schema, "Event", "predicateObjectPath")
 
         tx.success()
@@ -108,8 +112,6 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     }
     graphService
   }
-
-
   val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
   var counter = 0L
@@ -176,9 +178,9 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       log.error(s"FAILED: {}", e)
     case CompleteMsg =>
       log.info(s"DBActor received a completion message")
-      log.warning("shutting down...")
       sender() ! Success(())
-      Runtime.getRuntime.halt(0)
+//      log.warning("shutting down...")
+//      Runtime.getRuntime.halt(0)
     case InitMsg =>
       log.info(s"DBActor received an initialization message")
       sender() ! Success(())

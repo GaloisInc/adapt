@@ -66,7 +66,7 @@ object ProductionApp {
 
 //    val neoGraph = Neo4jFlowComponents.graph
     val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy])) //, neoGraph))
-    implicit val timeout = Timeout(300 seconds)
+    implicit val timeout = Timeout(600 seconds)
     println(s"Waiting for DB indices to become active: $timeout")
     Await.result(dbActor ? Ready, timeout.duration)
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
