@@ -64,9 +64,11 @@ object ProductionApp {
     val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-    val neoGraph = Neo4jFlowComponents.graph
-    val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy], neoGraph))
-
+//    val neoGraph = Neo4jFlowComponents.graph
+    val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy])) //, neoGraph))
+    implicit val timeout = Timeout(300 seconds)
+    println(s"Waiting for DB indices to become active: $timeout")
+    Await.result(dbActor ? Ready, timeout.duration)
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
@@ -137,7 +139,7 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> Neo4jFlowComponents.neo4jWrites(neoGraph)
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()

@@ -1,6 +1,7 @@
 val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.3"
-val akkaHttpV = "10.0.9"
+val akkaV = "2.5.6"
+val akkaHttpV = "10.0.10"
+val neoV = "3.3.0"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
@@ -25,13 +26,17 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
     "org.mapdb" % "mapdb" % "3.0.5",
-    "org.neo4j" % "neo4j-community" % "3.2.5",
+    "org.neo4j" % "neo4j-community" % neoV,
     "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
-    "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3",
-    "org.apache.tinkerpop" % "neo4j-gremlin" % "3.3.0",
-    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.2.3",
-    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
-//    "org.neo4j" % "neo4j-bolt" % "3.3.0"
+    "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
+    "org.neo4j" % "neo4j-lucene-index" % neoV,
+//    "org.neo4j" % "neo4j-lucene-upgrade" % neoV,
+    "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
+    "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV
+//    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
+//    "org.neo4j" % "neo4j-bolt" % neoV
+
+//    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
   ),
 
 //  fork in run := true,
@@ -57,7 +62,12 @@ lazy val adapt = (project in file(".")).settings(
 
   assemblyMergeStrategy in assembly := {
     case PathList("reference.conf") => MergeStrategy.concat
-    case PathList("META-INF", xs@_*) => MergeStrategy.discard
+//    case PathList("META-INF", "services" /*, "org.neo4j.kernel.extension.KernelExtensionFactory"*/) => MergeStrategy.first
+    case PathList("META-INF", xs @ _*) => xs.map(_.toLowerCase) match {
+      case "services" :: rfqdn :: Nil => MergeStrategy.first
+      case list if list.exists(_.contains("neo4j")) => MergeStrategy.first
+      case _ => MergeStrategy.discard
+    }
     case x => MergeStrategy.first
   }
 )
