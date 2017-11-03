@@ -3,7 +3,8 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -15,7 +16,10 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[RegistryKeyObject] with CDM17 with DBWritable with DBNodeable {
+
+  val companion = RegistryKeyObject
+
   def asDBKeyValues = List(
     label, "RegistryKeyObject",
     "uuid", uuid,
@@ -39,7 +43,10 @@ case class RegistryKeyObject(
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
-case object RegistryKeyObject extends CDM17Constructor[RegistryKeyObject] {
+case object RegistryKeyObject extends FreeNodeConstructor with CDM17Constructor[RegistryKeyObject] {
+
+  type ClassType = RegistryKeyObject
+
   type RawCDMType = cdm17.RegistryKeyObject
 
   def from(cdm: RawCDM17Type): Try[RegistryKeyObject] = Try(

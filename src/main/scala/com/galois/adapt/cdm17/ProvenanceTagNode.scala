@@ -3,7 +3,8 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -17,11 +18,14 @@ case class ProvenanceTagNode(
   programPoint: Option[String] = None,
   prevTagId: Option[UUID] = None,
   opcode: Option[TagOpCode] = None,
-  tagIds: Option[Seq[UUID]] = None,
+  tagIds: Option[List[UUID]] = None,
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[ProvenanceTagNode] with CDM17 with DBWritable with DBNodeable {
+
+  val companion = ProvenanceTagNode
+
   def asDBKeyValues = List(
     label, "ProvenanceTagNode",
     "uuid", tagIdUuid,
@@ -42,7 +46,7 @@ case class ProvenanceTagNode(
     prevTagId.fold[List[(String,UUID)]](Nil)(p => List(("prevTagId", p))) ++
     tagIds.fold[List[(String,UUID)]](Nil)(ts => ts.toList.map(t => ("tagId", t)))
 
-  def getUuid = tagIdUuid
+  def getUuid = UUID.randomUUID()
 
   def toMap: Map[String, Any] = Map(
     "uuid" -> tagIdUuid,
@@ -59,7 +63,10 @@ case class ProvenanceTagNode(
   )
 }
 
-case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
+case object ProvenanceTagNode extends FreeNodeConstructor with CDM17Constructor[ProvenanceTagNode] {
+
+  type ClassType = ProvenanceTagNode
+
   type RawCDMType = cdm17.ProvenanceTagNode
 
   def from(cdm: RawCDM17Type): Try[ProvenanceTagNode] = Try(
@@ -71,7 +78,7 @@ case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
       AvroOpt.str(cdm.getProgramPoint),
       AvroOpt.uuid(cdm.getPrevTagId),
       AvroOpt.tagOpCode(cdm.getOpcode),
-      AvroOpt.listUuid(cdm.getTagIds),
+      AvroOpt.listUuid(cdm.getTagIds).map(_.toList),
       AvroOpt.integrityTag(cdm.getItag),
       AvroOpt.confidentialityTag(cdm.getCtag),
       AvroOpt.map(cdm.getProperties)

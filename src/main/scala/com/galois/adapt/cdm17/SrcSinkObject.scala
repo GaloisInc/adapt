@@ -3,7 +3,8 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -14,7 +15,10 @@ case class SrcSinkObject(
   baseObject: AbstractObject,
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
-) extends CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[SrcSinkObject] with CDM17 with DBWritable with DBNodeable {
+
+  val companion = SrcSinkObject
+
   def asDBKeyValues = List(
     label, "SrcSinkObject",
     "uuid", uuid,
@@ -35,7 +39,10 @@ case class SrcSinkObject(
   )
 }
 
-case object SrcSinkObject extends CDM17Constructor[SrcSinkObject] {
+case object SrcSinkObject extends FreeNodeConstructor with CDM17Constructor[SrcSinkObject] {
+
+  type ClassType = SrcSinkObject
+
   type RawCDMType = cdm17.SrcSinkObject
 
   def from(cdm: RawCDM17Type): Try[SrcSinkObject] = Try(
