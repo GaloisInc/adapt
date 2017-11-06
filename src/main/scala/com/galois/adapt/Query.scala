@@ -1,6 +1,8 @@
 package com.galois.adapt
 
 //import com.thinkaurelius.titan.core.attribute.Text
+import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP;
+
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -48,7 +50,8 @@ import scala.language.existentials
  *                 | 'within([' literal ',' ... '])'
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
- *                 | 'between(' literal ',' literal ')'   
+ *                 | 'between(' literal ',' literal ')'
+ *                 | 'of(' string ')'
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -479,7 +482,7 @@ object QueryLanguage {
   }
   case class HasLabel[S,T](traversal: Traversal[S,T], label: QueryValue[String]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).hasLabel(label.eval(context))
+      traversal.buildTraversal(graph,context).has(Token.label, LabelP.of(label.eval(context)))
   }
   case class HasId[S,T](traversal: Traversal[S,T], id: QueryValue[java.lang.Long]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
