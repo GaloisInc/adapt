@@ -31,7 +31,15 @@ The following entity resolution occurs
 
   * `Subject`
       - Subjects of type `SUBJECT_UNIT` are merged into their closest non-unit subject ancestor
-      - Subjects without a `cmdLine` look for an `EVENT_FORK` to try to fill their `cmdLine` field
+      - Subjects collect a set of `cmdLines` from
+          + the `cmdLine` field on the subject
+          + an event which has this subject and with a `cmdLine` field
+          + an event which has this subject and with a `exec` field
+          + in the `name` field which can exist on the subjects property map
+      - Synthesize parent subject edge (suggestion coming from Daniel)
+      - If a subject has a `cmdLine` that indicates it corresponds to one of several common
+        interpreters (Python, Ruby, ...), for every `EVENT_READ` attached to this subject
+        an `EVENT_EXECUTE` is synthesized
 
   * `Event`
       - Sequences of events with the same subject and predicate objects are merged into groups of
@@ -42,11 +50,14 @@ The following entity resolution occurs
 
   * `FileObject`
       - File objects look for path information on the `predicateFileObjectPath` field of events
-        that reference them as their `predicateObject`
+        that reference them as their `predicateObject` and collect all such information into a set
       - File objects are deduplicated based on their path (if they have one), type, and local
         principal
 
   * `Netflow`
       - Netflows are deduplicated based on the local/global IP and local/global port
+      
+  * `RegistryKeyObject`
+      - Converted into files (discard the `value`, use the `key` as the path)
 
   [0]: package.scala
