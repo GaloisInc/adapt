@@ -27,6 +27,7 @@ object Neo4jFlowComponents {
 
   val config = ConfigFactory.load()
   val parallelismSize = config.getInt("adapt.ingest.parallelism")
+  val shouldLogDuplicates = config.getBoolean("adapt.ingest.logduplicates")
 
   // Create a neo4j transaction to insert a batch of objects
   def neo4jTx(cdms: Seq[DBNodeable], g: GraphDatabaseService): Try[Unit] = {
@@ -52,7 +53,6 @@ object Neo4jFlowComponents {
         // NOTE: The UI expects a specific format and collection of labels on each node.
         // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
-
         cdm.asDBKeyValues.foreach {
           case (k, v: UUID) => newNeo4jVertex.setProperty(k, v.toString)
           case (k,v) => newNeo4jVertex.setProperty(k, v)
@@ -60,25 +60,31 @@ object Neo4jFlowComponents {
 
         newVertices += (cdm.getUuid -> newNeo4jVertex)
 
-        cdm.asDBEdges.foreach {
-          case (edgeName, toUuid) =>
-            if (toUuid != skipEdgesToThisUuid) newVertices.get(toUuid) match {
-              case Some(toNeo4jVertex) =>
-                newNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
-              case None =>
-                missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set.empty[(NeoNode, EdgeTypes)]) + (newNeo4jVertex -> edgeName)
-            }
+        cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
+          if (toUuid != skipEdgesToThisUuid) newVertices.get(toUuid) match {
+            case Some(toNeo4jVertex) =>
+              newNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
+            case None =>
+              missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set.empty[(NeoNode, EdgeTypes)]) + (newNeo4jVertex -> edgeName)
+          }
         }
+        Some(cdm.getUuid)
+      }.recoverWith{
+        case e: ConstraintViolationException =>
+          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${cdm.getUuid}")
+          Success(None)
+        case e =>
+          e.printStackTrace()
+          Failure(e)
 //      } match {
-//        case Success(_) =>
+//        case Success(_) => Success(cdm.getUuid)
 //        case Failure(e: ConstraintViolationException) =>
 //          if (!e.getMessage.contains("uuid")) {
 //            println("Failed CDM statement: " + cdm)
-//            println(e.getMessage) // Bad query
+////            println(e.getMessage) // Bad query
 //            e.printStackTrace()
 //          }
 //        case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
-        cdm.getUuid
       }
     }
 
@@ -87,43 +93,53 @@ object Neo4jFlowComponents {
     var nodeCreatedCounter = 0
     var edgeCreatedCounter = 0
 
-    for ((uuid, edges) <- missingToUuid) {
-      for ((fromNeo4jVertex, label) <- edges) {
-        if (uuid != skipEdgesToThisUuid) {
-          // Find or create the missing vertex (it may have been created earlier in this loop)
-          val toNeo4jVertex = newVertices.getOrElse(uuid, {
-            nodeCreatedCounter += 1
-            val newNode = g.createNode() //Label.label("CDM17"))
-            newNode.setProperty("uuid", UUID.randomUUID().toString) // uuid
-            newVertices += (uuid -> newNode)
-            newNode
-          })
+    val missingEdgeCreationResults = for {
+      (uuid, edges) <- missingToUuid.toSeq
+      (fromNeo4jVertex, edgeType) <- edges.toSeq
+    } yield {
+      if (uuid != skipEdgesToThisUuid) Success(Some(skipEdgesToThisUuid))
+      else {
+        // Find or create the missing vertex (it may have been created earlier in this loop)
+        lazy val toNeo4jVertex = newVertices.getOrElse(uuid, { // Lazy because it might throw an exception.
+          nodeCreatedCounter += 1
+          val newNode = g.createNode()
+          newNode.addLabel(Label.label("CDM"))
+          newNode.setProperty("uuid", UUID.randomUUID.toString)  // UUID must be unique, so this might throw a constraint violation exception.
+          newVertices += (uuid -> newNode)
+          newNode
+        })
 
-          // Create the missing edge
-          Try {
-            fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, label)
-            edgeCreatedCounter += 1
-          } match {
-            case Success(_) =>
-            case Failure(e: java.lang.IllegalArgumentException) =>
-              if (!e.getMessage.contains("byUuidUnique")) {
-                println(e.getMessage) // Bad query
-                e.printStackTrace()
-              }
-            case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
-          }
+        // Create the missing edge
+        Try {
+          fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeType)
+          edgeCreatedCounter += 1
+//          Some(UUID.fromString(toNeo4jVertex.getProperty("uuid").asInstanceOf[String]))
+          None
+        }.recoverWith {
+          case e: ConstraintViolationException =>
+            if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${toNeo4jVertex.getProperty("uuid")}")
+            Success(None)
+          case e =>
+            e.printStackTrace()
+            Failure(e)
         }
       }
     }
 
+    val results = cdmToNodeResults ++ missingEdgeCreationResults
+
     Try {
-      transaction.success()
+      if (results.forall(_.isSuccess))
+        transaction.success()
+      else {
+        println(s"TRANSACTION FAILURE! CDMs:\n$cdms")
+        transaction.failure()
+      }
       transaction.close()
-      cdmToNodeResults.foreach(_.get)
     }
   }
 
-  // Loop indefinetly over locking failures
+  // Loop indefinitely over locking failures
   def retryFinalLoop(cdms: Seq[DBNodeable], g: GraphDatabaseService): Boolean = {
     neo4jTx(cdms, g) match {
       case Success(_) => false
@@ -185,30 +201,17 @@ object Neo4jFlowComponents {
       }
     )(Keep.right)
 
-  implicit
-
   def neo4jActorWrite(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteToNeo4jDB.apply)
-//    .map(cdm => WriteToNeo4jDB(Seq(cdm)))
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
-//    .mapAsync(1)(cdms => (neoActor ? WriteToNeo4jDB(cdms)).mapTo[Try[Unit]])
-//    .toMat(
-//      Sink.foreach {
-//        case Success(_) => ()
-//        case Seq(Success(())) => ()
-//        case fails => println(s"$fails. insertion errors in batch")
-//      }
-//    )(Keep.right)
 
   def neo4jActorWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteToNeo4jDB.apply)
     .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
-//    .map(cdm => WriteToNeo4jDB(Seq(cdm)))
-//    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
 }
 
 case class FailureMsg(e: Throwable)

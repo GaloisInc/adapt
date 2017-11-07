@@ -26,25 +26,20 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     val graphService = new GraphDatabaseFactory().newEmbeddedDatabase(neo4jFile)
 
     def awaitSchemaCreation(g: GraphDatabaseService) = {
-      Try (
-        g.beginTx()
-      ) match {
-        case Success(tx) =>
-          val schema = g.schema()
-          for(i <- schema.getIndexes.asScala) {
-            var status = schema.getIndexState(i)
-            while(status != Schema.IndexState.ONLINE) {
-              println(i + " is " + status)
-              Thread.sleep(100)
-              status = schema.getIndexState(i)
-            }
-            println(i + " is " + status)
-          }
-
-          tx.success()
-          tx.close()
-        case Failure(error) => ()
+      val tx = g.beginTx()
+      val schema = g.schema()
+      for(i <- schema.getIndexes.asScala) {
+        var status = schema.getIndexState(i)
+        while(status != Schema.IndexState.ONLINE) {
+          println(i + " is " + status)
+          Thread.sleep(100)
+          status = schema.getIndexState(i)
+        }
+        println(i + " is " + status)
       }
+
+      tx.success()
+      tx.close()
     }
 
     def findConstraint(schema: Schema, label: Label, prop: String): Boolean = {
@@ -74,8 +69,8 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       }
     }
 
-    def createIfNeededIndex(schema: Schema, slabel: String, prop: String) = {
-      val label = Label.label(slabel)
+    def createIfNeededIndex(schema: Schema, labelString: String, prop: String) = {
+      val label = Label.label(labelString)
       if(! findIndex(schema, label, prop)) {
         schema.indexFor(label).on(prop).create()
       }

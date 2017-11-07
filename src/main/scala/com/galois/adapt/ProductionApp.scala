@@ -81,9 +81,9 @@ object ProductionApp {
         if (ta1 == "file") {
           // Terminate after ingesting file sources.
           println("Will shut down after ingesting all files.")
-          CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
+          CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 10000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
             case Success(_) => ()
-            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n$e")
+            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
           } onComplete {
             case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
             case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
