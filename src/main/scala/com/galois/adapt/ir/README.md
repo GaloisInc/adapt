@@ -25,15 +25,28 @@ more entity resolution, but it also means we are must hold onto more state and a
 between when we receive records and when we start doing any sort of APT detection on that
 information.
 
+# Details
+
 The following entity resolution occurs
 
-  * `UnitDependency` records are merged into their closest non-unit subject ancestor
-  * `Subject` process records get their `cmdLine` field from fork events if they don't have that
-    information already
-  * `Netflow` records are deduplicated based on the local IP, global IP, and port
-  * `FileObject` records are merged by their path, type, and local principal. Filepath information
-    found on some `Event` records is moved onto the `FileObject`.
-  * `Event` records that come one after another, apply to the same object, and are the same, are
-    merged.
+  * `Subject`
+      - Subjects of type `SUBJECT_UNIT` are merged into their closest non-unit subject ancestor
+      - Subjects without a `cmdLine` look for an `EVENT_FORK` to try to fill their `cmdLine` field
+
+  * `Event`
+      - Sequences of events with the same subject and predicate objects are merged into groups of
+          + `EVENT_WRITE` and `EVENT_LSEEK`
+          + `EVENT_RECVFROM` and `EVENT_RECVMSG`
+          + `EVENT_SENDMSG`
+      - `EVENT_OPEN` and `EVENT_CLOSE` are ignored, except as boundaries between groups of events
+
+  * `FileObject`
+      - File objects look for path information on the `predicateFileObjectPath` field of events
+        that reference them as their `predicateObject`
+      - File objects are deduplicated based on their path (if they have one), type, and local
+        principal
+
+  * `Netflow`
+      - Netflows are deduplicated based on the local/global IP and local/global port
 
   [0]: package.scala
