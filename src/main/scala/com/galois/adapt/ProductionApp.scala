@@ -5,13 +5,15 @@ import java.nio.file.Paths
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.galois.adapt.cdm17.{AbstractObject, CDM17, CryptographicHash, Event, FileObject, FileObjectType, NetFlowObject, Principal, PrincipalType, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
+import akka.util.Timeout
+import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
 //import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -37,10 +39,6 @@ import scala.pickling.FastTypeTag
 
 
 object ProductionApp {
-//  println(s"Running the production system.")
-
-//  println(ConfigFactory.load())
-
   def run() {
 
     // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
@@ -71,13 +69,19 @@ object ProductionApp {
 
     val ta1 = config.getString("adapt.env.ta1")
     config.getString("adapt.runflow").toLowerCase match {
-      case "quine" =>
-        val quineActor = system.actorOf(Props[QuineDBActor])
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 100))/*.throttle(1000, 1 second, 100, ThrottleMode.shaping)*/, Sink.actorRef(quineActor, None))
-
       case "database" | "db" =>
-        println("Running database-only flow")
-        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+//        println("Running database-only flow")
+        println("running Quine flow")
+        val graph = GraphService(system, uiPort = 9090)(EmptyPersistor)
+        implicit val timeout = Timeout(10 seconds)
+        val parallelism = 16
+//        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
+//        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
+        val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+        CDMSource(ta1)
+          .via(FlowComponents.printCounter("Quine", 1000))
+          .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
+          .runWith(Sink.ignore)
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
@@ -119,16 +123,16 @@ object ProductionApp {
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow")
 	
-        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-          import GraphDSL.Implicits._
-          val bcast = graph.add(Broadcast[CDM17](2))
-
-          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-          bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites()
-
-          ClosedShape
-        }).run()
+//        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+//          import GraphDSL.Implicits._
+//          val bcast = graph.add(Broadcast[CDM17](2))
+//
+//          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+//          bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
+//          bcast.out(1) ~> TitanFlowComponents.titanWrites()
+//
+//          ClosedShape
+//        }).run()
     }
 
 //    val source = Source
@@ -140,6 +144,32 @@ object ProductionApp {
     val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
   }
 }
+
+
+
+import akka.routing.{ ActorRefRoutee, RoundRobinRoutingLogic, Router }
+
+class QuineRouter(count: Int, graph: GraphService) extends Actor {
+  var router = {
+    val routees = Vector.fill(count) {
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph))
+      context watch r
+      ActorRefRoutee(r)
+    }
+    Router(RoundRobinRoutingLogic(), routees)
+  }
+
+  def receive = {
+    case w: CDM17 =>
+      router.route(w, sender())
+    case Terminated(a) =>
+      router = router.removeRoutee(a)
+      val r = context.actorOf(Props[QuineDBActor])
+      context watch r
+      router = router.addRoutee(r)
+  }
+}
+
 
 
 class StatusActor extends Actor with ActorLogging {
