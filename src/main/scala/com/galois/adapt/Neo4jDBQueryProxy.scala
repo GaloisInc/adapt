@@ -24,6 +24,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
   val neoGraph = {
     val neo4jFile: java.io.File = new java.io.File(config.getString("adapt.runtime.neo4jfile"))
     val graphService = new GraphDatabaseFactory().newEmbeddedDatabase(neo4jFile)
+    context.system.registerOnTermination(graphService.shutdown())
 
     def awaitSchemaCreation(g: GraphDatabaseService) = {
       val tx = g.beginTx()

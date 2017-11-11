@@ -8,7 +8,7 @@ import com.galois.adapt.cdm17.CDM17.EdgeTypes.EdgeTypes
 import com.typesafe.config.ConfigFactory
 import org.apache.tinkerpop.gremlin.process.traversal.Order
 import org.apache.tinkerpop.gremlin.structure.Direction
-import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, Label, Node => NeoNode}
+import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, Label, MultipleFoundException, Node => NeoNode}
 import org.neo4j.graphdb.factory.GraphDatabaseFactory
 import org.neo4j.kernel.api.proc.Neo4jTypes.RelationshipType
 import org.neo4j.graphdb.schema.Schema
@@ -69,22 +69,13 @@ object Neo4jFlowComponents {
           }
         }
         Some(cdm.getUuid)
-      }.recoverWith{
+      }.recoverWith {
         case e: ConstraintViolationException =>
           if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${cdm.getUuid}")
           Success(None)
         case e =>
           e.printStackTrace()
           Failure(e)
-//      } match {
-//        case Success(_) => Success(cdm.getUuid)
-//        case Failure(e: ConstraintViolationException) =>
-//          if (!e.getMessage.contains("uuid")) {
-//            println("Failed CDM statement: " + cdm)
-////            println(e.getMessage) // Bad query
-//            e.printStackTrace()
-//          }
-//        case Failure(e) => println(s"Continuing after unknown exception:\n${e.printStackTrace()}")
       }
     }
 
@@ -94,28 +85,31 @@ object Neo4jFlowComponents {
     var edgeCreatedCounter = 0
 
     val missingEdgeCreationResults = for {
-      (uuid, edges) <- missingToUuid.toSeq
+      (destinationUuid, edges) <- missingToUuid.toSeq
       (fromNeo4jVertex, edgeType) <- edges.toSeq
     } yield {
-      if (uuid != skipEdgesToThisUuid) Success(Some(skipEdgesToThisUuid))
+      if (destinationUuid != skipEdgesToThisUuid) Success(Some(skipEdgesToThisUuid))
       else {
         // Find or create the missing vertex (it may have been created earlier in this loop)
-        lazy val toNeo4jVertex = newVertices.getOrElse(uuid, { // Lazy because it might throw an exception.
-          nodeCreatedCounter += 1
-          val newNode = g.createNode()
-          newNode.addLabel(Label.label("CDM"))
-          newNode.setProperty("uuid", UUID.randomUUID.toString)  // UUID must be unique, so this might throw a constraint violation exception.
-          newVertices += (uuid -> newNode)
-          newNode
+        lazy val toNeo4jVertex = newVertices.getOrElse(destinationUuid, { // Lazy because it might throw an exception.
+          val existingNodeInDBOpt = Option(g.findNode(Label.label("CDM"), "uuid", destinationUuid.toString)) // possibly return `null` or throws MultipleFoundException
+          existingNodeInDBOpt.getOrElse {
+            nodeCreatedCounter += 1
+            val newNode = g.createNode()
+            newNode.addLabel(Label.label("CDM"))
+            newNode.setProperty("uuid", destinationUuid) // UUID.randomUUID.toString)  // UUID must be unique, so this might throw a constraint violation exception.
+            newVertices += (destinationUuid -> newNode)
+            newNode
+          }
         })
 
         // Create the missing edge
         Try {
           fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeType)
           edgeCreatedCounter += 1
-//          Some(UUID.fromString(toNeo4jVertex.getProperty("uuid").asInstanceOf[String]))
           None
         }.recoverWith {
+          //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
           case e: ConstraintViolationException =>
             if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${toNeo4jVertex.getProperty("uuid")}")
             Success(None)
