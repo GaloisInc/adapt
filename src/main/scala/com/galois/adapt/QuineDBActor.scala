@@ -9,6 +9,7 @@ import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
 
 import scala.concurrent.duration._
+import scala.pickling.Unpickler
 import scala.util.{Failure, Success}
 
 
@@ -29,6 +30,7 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
   implicit val t = Pickler.generate[Option[String]]
   implicit val y = Pickler.generate[AbstractObject]
 
+  var counter = 0
 
   override def receive = {
 
@@ -60,6 +62,21 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
       implicit val j = Pickler.generate[EventType]
       implicit val i = Pickler.generate[Option[Long]]
       implicit val fp = Pickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
+      counter += 1
+//      cdm.predicateObjectPath.map(s => println(s"##$counter: $s"))
+//      if (cdm.predicateObjectPath == Some("/etc/libmap.conf")) println(cdm.toBranch)
+      if (counter == 1000) {
+        implicit val t = Timeout(10 seconds)
+
+//        println(EventLookup(UUID.randomUUID(), Some("test_string")).toBranch)
+        implicit val uu = Unpickler.generate[Option[String]]
+
+
+        lookup[EventLookup]( 'predicateObjectPath := Some("/etc/libmap.conf") ).onComplete{
+          case Success(list) => println(s"\nSUCCESS: $list\n")
+          case Failure(e) => println(s"\nFAILED: $e\n")
+        }
+      }
       cdm.create(Some(cdm.getUuid))
         .onComplete{
           case Success(_) => s ! Ack
@@ -103,7 +120,7 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
       implicit val b = Pickler.generate[Option[TagOpCode]]
       implicit val c = Pickler.generate[Option[List[UUID]]]
       implicit val d = Pickler.generate[Option[IntegrityTag]]
-      implicit val e = Pickler.generate[Option[ConfidentialityTag]]
+      implicit val f = Pickler.generate[Option[ConfidentialityTag]]
       implicit val z = Pickler.generate[Option[Map[String,String]]]  // This needs to be here for some reason. WTF?!?
       cdm.create(Some(cdm.getUuid))
         .onComplete{
@@ -145,3 +162,29 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 case object Init
 case object Ack
 case object Complete
+
+
+case class EventLookup(
+  uuid: UUID,
+//  sequence: Long = 0,
+//  eventType: EventType,
+//  threadId: Int,
+//  subjectUuid: -->[UUID],
+//  timestampNanos: Long,
+//  predicateObject: Option[-->[UUID]] = None,
+  predicateObjectPath: Option[String]
+//  predicateObject2: Option[-->[UUID]] = None,
+//  predicateObject2Path: Option[String] = None,
+//  name: Option[String] = None,
+//  parameters: Option[List[Value]] = None,
+//  location: Option[Long] = None,
+//  size: Option[Long] = None,
+//  programPoint: Option[String] = None,
+//  properties: Option[Map[String,String]] = None
+) extends FreeDomainNode[EventLookup] {
+  val companion = EventLookup
+}
+
+case object EventLookup extends FreeNodeConstructor {
+  type ClassType = EventLookup
+}

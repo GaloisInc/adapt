@@ -13,7 +13,8 @@ import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
+import com.rrwright.quine.runtime
+import com.rrwright.quine.runtime.{EmptyPersistor, GraphService, MapDbEventJsonPersistor, MapDbJournalJsonPersistor, ParallelBlockingJsonFilePersistor, SingleActorJsonFilePersistor}
 //import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -72,9 +73,15 @@ object ProductionApp {
       case "database" | "db" =>
 //        println("Running database-only flow")
         println("running Quine flow")
-        val graph = GraphService(system, uiPort = 9090)(EmptyPersistor)
+        val graph = GraphService(system, inMemoryNodeLimit = None /*Some(10000)*/, uiPort = 9090)(
+          EmptyPersistor
+//          SingleActorJsonFilePersistor(system)
+//          ParallelBlockingJsonFilePersistor()
+//          MapDbEventJsonPersistor()
+//          MapDbJournalJsonPersistor()
+        )
         implicit val timeout = Timeout(10 seconds)
-        val parallelism = 16
+        val parallelism = 1
 //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
         val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
