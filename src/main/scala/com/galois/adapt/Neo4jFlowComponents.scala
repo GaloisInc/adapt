@@ -35,37 +35,36 @@ object Neo4jFlowComponents {
 
     // For the duration of the transaction, we keep a 'Map[UUID -> NeoNode]' of vertices created
     // during this transaction (since we don't look those up in the existing database).
-    val newVertices = MutableMap.empty[UUID, NeoNode]
-
-    // We also need to keep track of edges that point to nodes we haven't found yet (this lets us
-    // handle cases where nodes are out of order).
-    val missingToUuid = MutableMap.empty[UUID, Set[(NeoNode, EdgeTypes)]]
+    val newVerticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val cdmToNodeResults = cdms map { cdm =>
       Try {
-        val newNeo4jVertex = g.createNode()
-
         val cdmTypeName = cdm.getClass.getSimpleName
-        newNeo4jVertex.addLabel(Label.label(cdmTypeName))  // Creating labels are like creating indices. An index for all Events requires a lot of memory.
-        newNeo4jVertex.addLabel(Label.label("CDM"))
+        val thisNeo4jVertex = newVerticesInThisTX.getOrElse(cdm.getUuid,
+          g.createNode(Label.label("CDM"), Label.label(cdmTypeName))
+        )
         // NOTE: The UI expects a specific format and collection of labels on each node.
         // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
         cdm.asDBKeyValues.foreach {
-          case (k, v: UUID) => newNeo4jVertex.setProperty(k, v.toString)
-          case (k,v) => newNeo4jVertex.setProperty(k, v)
+          case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
+          case (k,v) => thisNeo4jVertex.setProperty(k, v)
         }
 
-        newVertices += (cdm.getUuid -> newNeo4jVertex)
+        newVerticesInThisTX += (cdm.getUuid -> thisNeo4jVertex)
 
         cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
-          if (toUuid != skipEdgesToThisUuid) newVertices.get(toUuid) match {
+          if (toUuid != skipEdgesToThisUuid) newVerticesInThisTX.get(toUuid) match {
             case Some(toNeo4jVertex) =>
-              newNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
+              thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
             case None =>
-              missingToUuid(toUuid) = missingToUuid.getOrElse(toUuid, Set.empty[(NeoNode, EdgeTypes)]) + (newNeo4jVertex -> edgeName)
+              val destinationNode = Option(g.findNode(Label.label("CDM"), "uuid", toUuid.toString)).getOrElse {
+                newVerticesInThisTX(toUuid) = g.createNode(Label.label("CDM"))
+                newVerticesInThisTX(toUuid)
+              }
+              thisNeo4jVertex.createRelationshipTo(destinationNode, edgeName)
           }
         }
         Some(cdm.getUuid)
@@ -73,54 +72,15 @@ object Neo4jFlowComponents {
         case e: ConstraintViolationException =>
           if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${cdm.getUuid}")
           Success(None)
+    //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
         case e =>
           e.printStackTrace()
           Failure(e)
       }
     }
 
-    // Try to complete missing edges. If the node pointed to is _still_ not found, we
-    // synthetically create it.
-    var nodeCreatedCounter = 0
-    var edgeCreatedCounter = 0
 
-    val missingEdgeCreationResults = for {
-      (destinationUuid, edges) <- missingToUuid.toSeq
-      (fromNeo4jVertex, edgeType) <- edges.toSeq
-    } yield {
-      if (destinationUuid != skipEdgesToThisUuid) Success(Some(skipEdgesToThisUuid))
-      else {
-        // Find or create the missing vertex (it may have been created earlier in this loop)
-        lazy val toNeo4jVertex = newVertices.getOrElse(destinationUuid, { // Lazy because it might throw an exception.
-          val existingNodeInDBOpt = Option(g.findNode(Label.label("CDM"), "uuid", destinationUuid.toString)) // possibly return `null` or throws MultipleFoundException
-          existingNodeInDBOpt.getOrElse {
-            nodeCreatedCounter += 1
-            val newNode = g.createNode()
-            newNode.addLabel(Label.label("CDM"))
-            newNode.setProperty("uuid", destinationUuid) // UUID.randomUUID.toString)  // UUID must be unique, so this might throw a constraint violation exception.
-            newVertices += (destinationUuid -> newNode)
-            newNode
-          }
-        })
-
-        // Create the missing edge
-        Try {
-          fromNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeType)
-          edgeCreatedCounter += 1
-          None
-        }.recoverWith {
-          //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
-          case e: ConstraintViolationException =>
-            if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${toNeo4jVertex.getProperty("uuid")}")
-            Success(None)
-          case e =>
-            e.printStackTrace()
-            Failure(e)
-        }
-      }
-    }
-
-    val results = cdmToNodeResults ++ missingEdgeCreationResults
+    val results = cdmToNodeResults //++ missingEdgeCreationResults
 
     Try {
       if (results.forall(_.isSuccess))
