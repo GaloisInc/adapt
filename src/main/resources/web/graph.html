@@ -133,7 +133,7 @@
 
         function execTextQuery(query_string) {
             UI.loadingUIStart()
-            $.post("/query", {"query": query_string}, function(results) {
+            $.post("/query/generic", {"query": query_string}, function(results) {
                 UI.queryInputColor("lightgreen")
                 console.log(results)
                 setTimeout(function(){ UI.queryInputColor() }, 750)
