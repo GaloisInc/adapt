@@ -73,7 +73,7 @@ object ProductionApp {
       case "database" | "db" =>
 //        println("Running database-only flow")
         println("running Quine flow")
-        val graph = GraphService(system, inMemoryNodeLimit = None /*Some(10000)*/, uiPort = 9090)(
+        val graph = GraphService(system, inMemoryNodeLimit = Some(10000), uiPort = 9090)(
           EmptyPersistor
 //          SingleActorJsonFilePersistor(system)
 //          ParallelBlockingJsonFilePersistor()
