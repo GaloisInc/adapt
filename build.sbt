@@ -5,6 +5,8 @@ val neoV = "3.3.0"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
+resolvers += Resolver.mavenLocal  // for BBN repositories built locally
+
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
   version := "0.5",
@@ -37,6 +39,8 @@ lazy val adapt = (project in file(".")).settings(
 //    "org.neo4j" % "neo4j-bolt" % neoV
 
 //    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
+
+//  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
   ),
 
 //  fork in run := true,
