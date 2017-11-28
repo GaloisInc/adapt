@@ -1,6 +1,6 @@
 val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.3"
-val akkaHttpV = "10.0.9"
+val akkaV = "2.4.19" //"2.5.6"
+val akkaHttpV = "10.0.10"
 
 //resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 resolvers += Resolver.sonatypeRepo("snapshots")  // for scala-pickling 0.10.2-SNAPSHOT  // for Quine

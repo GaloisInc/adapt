@@ -13,8 +13,7 @@ import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.rrwright.quine.runtime
-import com.rrwright.quine.runtime.{EmptyPersistor, GraphService, MapDbEventJsonPersistor, MapDbJournalJsonPersistor, ParallelBlockingJsonFilePersistor, SingleActorJsonFilePersistor}
+import com.rrwright.quine.runtime._
 //import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -70,24 +69,29 @@ object ProductionApp {
 
     val ta1 = config.getString("adapt.env.ta1")
     config.getString("adapt.runflow").toLowerCase match {
-      case "database" | "db" =>
+      case "database" | "db" | "quine" =>
 //        println("Running database-only flow")
         println("running Quine flow")
-        val graph = GraphService(system, inMemoryNodeLimit = Some(10000), uiPort = 9090)(
+        val graph = GraphService(system,
+          inMemoryNodeLimit = Some(1000)
+        , uiPort = 9090)(
           EmptyPersistor
-//          SingleActorJsonFilePersistor(system)
+//          MapDBMultimap()
 //          ParallelBlockingJsonFilePersistor()
+
+//          SingleActorJsonFilePersistor(system)
 //          MapDbEventJsonPersistor()
 //          MapDbJournalJsonPersistor()
         )
-        implicit val timeout = Timeout(10 seconds)
-        val parallelism = 1
+        implicit val timeout = Timeout(30.4 seconds)
+        val parallelism = 16
 //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
         val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
         CDMSource(ta1)
-          .via(FlowComponents.printCounter("Quine", 1000))
+          .via(FlowComponents.printCounter("Quine", 100))
           .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
+            .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
           .runWith(Sink.ignore)
 
       case "anomalies" | "anomaly" =>

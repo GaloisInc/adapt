@@ -32,6 +32,10 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 
   var counter = 0
 
+
+  implicit val timeout = Timeout(21 seconds)
+
+
   override def receive = {
 
     case cdm: Principal =>
@@ -62,21 +66,21 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
       implicit val j = Pickler.generate[EventType]
       implicit val i = Pickler.generate[Option[Long]]
       implicit val fp = Pickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
-      counter += 1
+//      counter += 1
 //      cdm.predicateObjectPath.map(s => println(s"##$counter: $s"))
 //      if (cdm.predicateObjectPath == Some("/etc/libmap.conf")) println(cdm.toBranch)
-      if (counter == 1000) {
-        implicit val t = Timeout(10 seconds)
-
-//        println(EventLookup(UUID.randomUUID(), Some("test_string")).toBranch)
-        implicit val uu = Unpickler.generate[Option[String]]
-
-
-        lookup[EventLookup]( 'predicateObjectPath := Some("/etc/libmap.conf") ).onComplete{
-          case Success(list) => println(s"\nSUCCESS: $list\n")
-          case Failure(e) => println(s"\nFAILED: $e\n")
-        }
-      }
+//      if (counter == 1000) {
+//        implicit val t = Timeout(10 seconds)
+//
+////        println(EventLookup(UUID.randomUUID(), Some("test_string")).toBranch)
+//        implicit val uu = Unpickler.generate[Option[String]]
+//
+//
+//        lookup[EventLookup]( 'predicateObjectPath := Some("/etc/libmap.conf") ).onComplete{
+//          case Success(list) => println(s"\nSUCCESS: $list\n")
+//          case Failure(e) => println(s"\nFAILED: $e\n")
+//        }
+//      }
       cdm.create(Some(cdm.getUuid))
         .onComplete{
           case Success(_) => s ! Ack
