@@ -75,8 +75,8 @@ object ProductionApp {
         val graph = GraphService(system,
           inMemoryNodeLimit = Some(1000)
         , uiPort = 9090)(
-          EmptyPersistor
-//          MapDBMultimap()
+//          EmptyPersistor
+          MapDBMultimap()
 //          ParallelBlockingJsonFilePersistor()
 
 //          SingleActorJsonFilePersistor(system)
