@@ -89,7 +89,7 @@ object ProductionApp {
           }
         } else {
           println("Will continuing running the DB and UI after ingesting all files.")
-          CDMSource(ta1).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
         }
       val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
