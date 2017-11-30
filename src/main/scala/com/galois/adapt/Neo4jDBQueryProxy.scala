@@ -77,39 +77,35 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       }
     }
 
-    Try (
-      graphService.beginTx()
-    ) match {
-      case Success(tx) =>
-        val schema = graphService.schema()
 
-        createIfNeededUniqueConstraint(schema, "CDM", "uuid")
+    val tx = graphService.beginTx()
+    val schema = graphService.schema()
 
-        // NOTE: The UI expects a specific format and collection of labels on each node.
-        // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
+    createIfNeededUniqueConstraint(schema, "CDM", "uuid")
 
-        createIfNeededIndex(schema, "Subject", "timestampNanos")
-        createIfNeededIndex(schema, "Subject", "cid")
-        createIfNeededIndex(schema, "Subject", "cmdLine")
-        createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
-        createIfNeededIndex(schema, "NetFlowObject", "localAddress")
-        createIfNeededIndex(schema, "NetFlowObject", "localPort")
-        createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
-        createIfNeededIndex(schema, "NetFlowObject", "remotePort")
-        createIfNeededIndex(schema, "FileObject", "peInfo")
-        createIfNeededIndex(schema, "Event", "timestampNanos")
-        createIfNeededIndex(schema, "Event", "name")
-        createIfNeededIndex(schema, "Event", "eventType")
-        createIfNeededIndex(schema, "Event", "predicateObjectPath")
+    // NOTE: The UI expects a specific format and collection of labels on each node.
+    // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
-        tx.success()
-        tx.close()
+    createIfNeededIndex(schema, "Subject", "timestampNanos")
+    createIfNeededIndex(schema, "Subject", "cid")
+    createIfNeededIndex(schema, "Subject", "cmdLine")
+    createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
+    createIfNeededIndex(schema, "NetFlowObject", "localAddress")
+    createIfNeededIndex(schema, "NetFlowObject", "localPort")
+    createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
+    createIfNeededIndex(schema, "NetFlowObject", "remotePort")
+    createIfNeededIndex(schema, "FileObject", "peInfo")
+    createIfNeededIndex(schema, "Event", "timestampNanos")
+    createIfNeededIndex(schema, "Event", "name")
+    createIfNeededIndex(schema, "Event", "eventType")
+    createIfNeededIndex(schema, "Event", "predicateObjectPath")
 
-        awaitSchemaCreation(graphService)
+    tx.success()
+    tx.close()
 
-        //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
-      case Failure(err) => err.printStackTrace()
-    }
+    awaitSchemaCreation(graphService)
+    //schema.awaitIndexesOnline(10, TimeUnit.MINUTES)
+
     graphService
   }
   val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
@@ -123,49 +119,64 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     // the resulting list into JSON
     case NodeQuery(q, shouldParse) =>
       println(s"Received node query: $q")
-      sender() ! Future(
-        Query.run[Vertex](q, graph).map { vertices =>
+      sender() ! Future {
+        val tx = neoGraph.beginTx()
+        val jsResults = Query.run[Vertex](q, graph).map { vertices =>
           println(s"Found: ${vertices.length} nodes")
           if (shouldParse)
             JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
           else
             vertices
         }
-      )
+        tx.success()
+        tx.close()
+        jsResults
+      }
 
     // Run the given query with the expectation that the output type be edges. Optionally encode
     // the resulting list into JSON
     case EdgeQuery(q, shouldParse) =>
       println(s"Received new edge query: $q")
-      sender() ! Future(
-        Query.run[Edge](q, graph).map { edges =>
+      sender() ! Future {
+        val tx = neoGraph.beginTx()
+        val jsResults = Query.run[Edge](q, graph).map { edges =>
           println(s"Found: ${edges.length} edges")
           if (shouldParse)
             JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
           else
             edges
         }
-      )
+        tx.success()
+        tx.close()
+        jsResults
+      }
 
     // Run the given query without specifying what the output type will be. This is the variant used
     // by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
       println(s"Received string query: $q")
-      sender() ! Future(
-        Query.run[java.lang.Object](q, graph).map { results =>
+      sender() ! Future {
+        val tx = neoGraph.beginTx()
+        val jsResults = Query.run[java.lang.Object](q, graph).map { results =>
           println(s"Found: ${results.length} items")
           if (shouldParse) {
-            toJson(results.toList) 
+            toJson(results.toList)
           } else {
-            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[",",","]"))
+            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
           }
         }
-      )
+        tx.success()
+        tx.close()
+        jsResults
+      }
 
     // Get all the edges that touch the given nodes (either incoming or outgoing) 
     case EdgesForNodes(nodeIdList) =>
       sender() ! Try {
+        val tx = neoGraph.beginTx()
         graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
+        tx.success()
+        tx.close()
       }
 
     // Use with care! Unless you have a really good reason (like running acceptance tests), you
@@ -217,10 +228,8 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
  //   case v: Vertex => ApiJsonProtocol.vertexToJson(v)
  //   case e: Edge => ApiJsonProtocol.edgeToJson(e)
                           
-    // Other
-                                    
-    // Any custom 'toString' that is longer than 250 characters is probably not a good idea...
-    case o => JsString(o.toString.take(250))
+    // Other: Any custom 'toString'
+    case o => JsString(o.toString)
                                               
   }
 }
