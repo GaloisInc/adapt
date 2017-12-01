@@ -1,6 +1,8 @@
 package com.galois.adapt
 
-import com.thinkaurelius.titan.core.attribute.Text
+//import com.thinkaurelius.titan.core.attribute.Text
+import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP;
+
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -41,8 +43,6 @@ import scala.language.existentials
  *   stringArray ::= variable | '[' string ',' ... ']'
  *   uuidArray   ::= variable | '[' uuid ',' ... ']'
  *
- *   regex       ::= 'regex(' string ')'
- *
  *   literal     ::= int | long | string | uuid | intArray | longArray | stringArray | uuidArray
  *
  *   predicate   ::= 'eq(' literal ')'
@@ -50,7 +50,8 @@ import scala.language.existentials
  *                 | 'within([' literal ',' ... '])'
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
- *                 | 'between(' literal ',' literal ')'   
+ *                 | 'between(' literal ',' literal ')'
+ *                 | 'of(' string ')'
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -60,7 +61,6 @@ import scala.language.existentials
  *                 | '_(' long ',' ... ')'                                 TODO: What is this?
  *                 | traversal '.has(' string ')'
  *                 | traversal '.has(' string ',' literal ')'
- *                 | traversal '.has(' string ',' regex ')'
  *                 | traversal '.has(' string ',' traversal ')'
  *                 | traversal '.has(' string ',' predicate ')'
  *                 | traversal '.hasLabel(' string ')'
@@ -184,13 +184,13 @@ object Query {
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
-      def uid: Parser[QueryValue[java.util.UUID]] = ( variable(uids) |
+      def uuid: Parser[QueryValue[String /*java.util.UUID*/ ]] = ( variable(uids) |
         """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
-          s => Raw(java.util.UUID.fromString(s))
+          s => Raw(s) //java.util.UUID.fromString(s))
         }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
 
-      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] =
-        ( variable(arrs) | arr(uid) ).withFailureMessage("UUID array expected")
+      def uuidArr: Parser[QueryValue[Seq[String /*java.util.UUID*/ ]]] =
+        ( variable(arrs) | arr(uuid) ).withFailureMessage("UUID array expected")
 
       def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] =
         ( variable(arrs) | arr(lng) ).withFailureMessage("long array expected")
@@ -202,12 +202,12 @@ object Query {
         ( variable(arrs) | arr(str) ).withFailureMessage("string array expected")
 
       def lit: Parser[QueryValue[_]] =
-        ( uid ||| int ||| lng ||| str
-        ||| intArr ||| lngArr ||| uidArr ||| strArr
+        ( uuid ||| int ||| lng ||| str
+        ||| intArr ||| lngArr ||| uuidArr ||| strArr
         ).withFailureMessage("literal expected (ex: 9, 12I, \"hello\", [1,2,3])")
 
       def pred: Parser[QueryValue[P[Any]]] =
-        (   predicate(uid)
+        (   predicate(uuid)
         ||| predicate(int)
         ||| predicate(lng)
         ||| predicate(str)
@@ -223,14 +223,6 @@ object Query {
       def arr[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[Seq[T]]] =
         ( "[" ~ repsep(elem,",") ~ "]" ~ ".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
         ).withFailureMessage(s"array of ${ev.runtimeClass.getSimpleName()} expected")
-
-      // Parse a regex
-      def regex[T]: Parser[Regex] = {
-         val r = ("regex(" ~! stringLiteral ~ ")" | "newP(REGEX," ~! stringLiteral ~ ")") ^^ {
-           case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
-         }
-         r.withFailureMessage("regex expected (ex: 'regex(\"hel{2}o\")'")
-      }
 
       def predicate[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
@@ -251,7 +243,6 @@ object Query {
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
-        | ".has(" ~ str ~ "," ~ regex~ ")" ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
@@ -481,10 +472,6 @@ object QueryLanguage {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context),v.eval(context))
   }
-  case class HasRegex[S,T](traversal: Traversal[S,T], k: QueryValue[String], regex: Regex) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
-  }
   case class HasTraversal[S,T](traversal: Traversal[S,T], k: QueryValue[String], v: Traversal[_,_]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context), v.buildTraversal(graph, context))
@@ -495,7 +482,7 @@ object QueryLanguage {
   }
   case class HasLabel[S,T](traversal: Traversal[S,T], label: QueryValue[String]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).hasLabel(label.eval(context))
+      traversal.buildTraversal(graph,context).has(Token.label, LabelP.of(label.eval(context)))
   }
   case class HasId[S,T](traversal: Traversal[S,T], id: QueryValue[java.lang.Long]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
@@ -726,6 +713,4 @@ object QueryLanguage {
       )
     }
   }
-  
-  case class Regex(raw: String)
 }

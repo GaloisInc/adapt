@@ -8,13 +8,10 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.T.label
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 
 //import com.galois.adapt.ServiceRegistryProtocol.SubscribeToService
-import com.thinkaurelius.titan.core.TitanFactory
-import com.thinkaurelius.titan.core.schema.TitanGraphIndex
 import org.apache.tinkerpop.gremlin.structure.io.graphson._
 
 import collection.JavaConverters._
@@ -54,7 +51,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
   // The second map represents:
   //   (UUID that was destination of edge not in `nodeIds` at the time) -> (source Vertex, edge label)
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]
-  var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex,String)]]
+  var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex,CDM17.EdgeTypes.EdgeTypes)]]
 
 
   // TODO: TinkerGraph doesn't update the starting IDs when reading data in from a file.
@@ -82,7 +79,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       
       // If at the end of an epoch there are still elements in `missingToUuid`, empty those out and
       // create placeholder vertices/edges for them.
-      for ((uuid,edges) <- missingToUuid; (fromVertex,label) <- edges) {
+      for ((uuid,edges) <- missingToUuid; (fromVertex,edgeName) <- edges) {
        
         // Find or create the missing vertex (it may have been created earlier in this loop)
         val toVertex = findNode("uuid",uuid) getOrElse {
@@ -94,7 +91,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
         // Create the missing edge
         edgeCreatedCounter += 1
-        fromVertex.addEdge(label, toVertex)
+        //fromVertex.addEdge(edgeName, toVertex)
       }
 
       // Empty out the map
@@ -119,18 +116,18 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         // Add this vertex to the map of vertices we know about and see if it is the destination of
         // any previous nodes (see next comment for more on this).
         nodeIds += (uuid -> newVertex)
-        for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
-          fromVertex.addEdge(label, newVertex)
+        //for ((fromVertex,label) <- missingToUuid.getOrElse(uuid,Nil))
+          //fromVertex.addEdge(label, newVertex)
         missingToUuid -= uuid
 
         // Recall all edges are treated as outgoing. In general, we expect that the 'toUuid' has
         // already been found. However, if it hasn't, we add it to a map of edges keyed by the UUID
         // they point to (for which no corresponding vertex exists, as of yet). 
-        for ((label,toUuid) <- edges)
-          nodeIds.get(toUuid) match {
-            case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil) 
-            case Some(toVertex) => newVertex.addEdge(label, toVertex)
-          }
+//        for ((label,toUuid) <- edges)
+//          nodeIds.get(toUuid) match {
+//            case None => missingToUuid(toUuid) = (newVertex, label) :: missingToUuid.getOrElse(toUuid,Nil)
+//            case Some(toVertex) => newVertex.addEdge(label, toVertex)
+//          }
       }
 
     case NodeQuery(q,_) =>
@@ -174,10 +171,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
                .mkString("[",",","]")
       }
    
-    case EdgesForNodes(nodeIdList) =>
-      sender() ! Try {
-        graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
-      }
+//    case EdgesForNodes(nodeIdList) =>
+//      sender() ! Try {
+//        graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
+//      }
 
 //    case GiveMeTheGraph => sender() ! graph
 

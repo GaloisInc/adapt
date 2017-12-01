@@ -11,6 +11,8 @@ import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principa
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
+import akka.util.Timeout
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -62,33 +64,41 @@ object ProductionApp {
     val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-    val dbActor = system.actorOf(Props[TitanDBQueryProxy])
+    val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
+    implicit val timeout = Timeout(600 seconds)
+    println(s"Waiting for DB indices to become active: $timeout")
+    Await.result(dbActor ? Ready, timeout.duration)
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
     val ta1 = config.getString("adapt.env.ta1")
+
     config.getString("adapt.runflow").toLowerCase match {
-      case "database" | "db" =>
-        println("Running database-only flow")
-        if (ta1 == "file") {
-          // Terminate after ingesting file sources.
-          val ta1Source = CDMSource(ta1)
-          println("Will shut down after ingesting files.")
-          ta1Source.via(FlowComponents.printCounter("DB Writer", 1000)).via(TitanFlowComponents.titanWritesFlow()).runForeach(_.foreach {
-            case Success(()) => ()
-            case fails => println(s"Insertion errors in batch: $fails")
-          }).onComplete {
+      case "database" | "db" | "ingest" =>
+        println("Running database flow with UI")
+        val writeTimeout = Timeout(30.1 seconds)
+        if (config.getBoolean("adapt.ingest.quitafteringest")) {
+          println("Will shut down after ingesting all files.")
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
+            case Success(_) => ()
+            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
+          } onComplete {
             case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
             case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
           }
-        } else Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+        } else {
+          println("Will continuing running the DB and UI after ingesting all files.")
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+        }
+      val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       case "anomalies" | "anomaly" =>
         println("Running anomaly-only flow")
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
-      case "ui" =>
-        println("Starting only the UI and doing nothing else.")
+      case "ui" | "uionly" =>
+        println("Staring only the UI and doing nothing else.")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       case "csvmaker" | "csv" =>
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -121,7 +131,8 @@ object ProductionApp {
           .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
 
       case _ =>
-        println("Running the combined database ingest + anomaly calculation flow")
+        println("Running the combined database ingest + anomaly calculation flow + UI")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 	
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
@@ -129,19 +140,11 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites()
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()
     }
-
-//    val source = Source
-//      .actorRef[Int](0, OverflowStrategy.fail)
-//      .mapMaterializedValue( ref =>
-//        Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, ref), interface, port), 10 seconds)
-//      )
-
-    val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
   }
 }
 
@@ -207,7 +210,8 @@ object CDMSource {
                 List.empty
               }
             }
-          }.via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+          }
+//          .via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 

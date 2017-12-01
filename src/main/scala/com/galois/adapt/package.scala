@@ -8,7 +8,7 @@ package object adapt {
   trait DBWritable {
     // Returns an (even-length) list alternating between the string label of the property and its
     // value.
-    def asDBKeyValues: List[Any]
+    def asDBKeyValues: List[(String, Any)]
   }
 
   // Anything that corresponds to a node in the graph
@@ -17,12 +17,12 @@ package object adapt {
     // as the internal ID.
     def getUuid: UUID
 
-    // Outgoing edges coming off the node. The string is the label on the edge, the UUID the node
+    // Outgoing edges coming off the node. The key is the label on the edge, the UUID the node
     // (which should be 'DBNodeable' too) the edge goes to.
-    def asDBEdges: List[(String,UUID)]
+    def asDBEdges: List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)]
 
     // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
-    def supportNodes: List[(UUID, List[Any], List[(String,UUID)])] = List()
+    def supportNodes: List[(UUID, List[Any], List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)])] = List()
   }
 
   type ProcessUUID = UUID
