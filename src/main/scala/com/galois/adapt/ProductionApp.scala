@@ -84,22 +84,28 @@ object ProductionApp {
           }
         } else Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
 
-      case "ir" =>
-        println("Running (IR) database-only flow")
-        Flow[IR].runWith(CDMSource(ta1).via(EntityResolution()).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
-
-
-      case "ir-database" =>
-        println("running a database flow where CDM and IR are both written in")
-        
-        RunnableGraph.fromGraph(GraphDSL.create() { implicit graph => 
+      case "ir-csvmaker" | "ir-csv" =>
+        RunnableGraph.fromGraph(GraphDSL.create() { implicit graph =>
           import GraphDSL.Implicits._
-          val bcast = graph.add(Broadcast[CDM17](2))
+          val bcast = graph.add(Broadcast[Any](9))
+          val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
 
-          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-          bcast.out(0).via(EntityResolution()).via(FlowComponents.printCounter("DB (IR)  Writer", 1000)) ~> TitanFlowComponents.titanWrites()
-          bcast.out(1)                        .via(FlowComponents.printCounter("DB (CDM) Writer", 1000)) ~> TitanFlowComponents.titanWrites()
+          CDMSource(ta1).via(EntityResolution())
+            .via(FlowComponents.printCounter("DB Writer", 1000))
+            .via(Flow.fromFunction {
+              case Left(e) => e
+              case Right(ir) => ir
+            }) ~> bcast.in
 
+          bcast.out(0).collect{ case Edge(src, lbl, tgt) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
+          bcast.out(0).collect{ case c: IrNetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
+          bcast.out(1).collect{ case c: IrEvent => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
+          bcast.out(2).collect{ case c: IrFileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
+          bcast.out(4).collect{ case c: IrProvenanceTagNode => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
+          bcast.out(5).collect{ case c: IrSubject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
+          bcast.out(6).collect{ case c: IrPrincipal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
+          bcast.out(7).collect{ case c: IrSrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
+          bcast.out(8).collect{ case c: IrPathNode => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
           ClosedShape
         }).run()
 
