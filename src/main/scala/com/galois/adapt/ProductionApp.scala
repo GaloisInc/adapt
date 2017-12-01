@@ -74,7 +74,7 @@ object ProductionApp {
     val ta1 = config.getString("adapt.env.ta1")
 
     config.getString("adapt.runflow").toLowerCase match {
-      case "database" | "db" =>
+      case "database" | "db" | "ingest" =>
         println("Running database flow with UI")
         val writeTimeout = Timeout(30.1 seconds)
         if (config.getBoolean("adapt.ingest.quitafteringest")) {
