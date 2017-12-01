@@ -1,32 +1,37 @@
 package com.galois.adapt
 
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 import scala.concurrent._
-
 import org.apache.tinkerpop.gremlin.structure.T.label
 import com.galois.adapt.cdm17._
 import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
 
-// TODO: put the remap functions in the IR trait
+import scala.reflect.ClassTag
+
+// TODO: do this with shapeless. It is _begging_ to be done with shapeless
+
 
 package object ir {
-  
-  sealed trait IR { self => 
-    // F-bound modelled as type member. We need this type to give a more precise type to 'remapUuids' 
-    type SelfType >: self.type <: IR
 
-    val uuid: UUID;
-    val originalEntities: Seq[UUID]  // TODO: is this really a Seq?
-   
-    // Defines how to remap UUIDs from CDM to IR
-    def remapUuids(renameActor: ActorRef, createIfNotFound: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(SelfType, Seq[UUID])]
+  type IR_UUID = UUID
+  type CDM_UUID = UUID
+
+  /* Edges are now first class values in the stream.
+   */
+  case class Edge[From: ClassTag, To: ClassTag](src: UUID, label: String, tgt: UUID)
+
+  sealed trait IR { self: DBWritable =>
+    val uuid: IR_UUID                     // The current UUID
+    val originalEntities: Seq[CDM_UUID]   // The UUIDs of all the CDM nodes that were merged to produce this node
+
+    def toMap: Map[String, Any]
+
+    def getUuid: IR_UUID = uuid
   }
-
-  import RemapUtils._
 
 
   /* Compared to 'cdm.Event':
@@ -45,16 +50,9 @@ package object ir {
     originalEntities: Seq[UUID],
 
     eventType: EventType,
-    subject: UUID,
     earliestTimestampNanos: Long,
-    latestTimestampNanos: Long,
-    exec: Option[String] = None,    // On cadets - tells you what command (if any) led to this event (eg: 'sh')
-
-    predicateObject: Option[UUID] = None,
-    predicateObject2: Option[UUID] = None
-  ) extends IR with DBWritable with DBNodeable {
-
-    type SelfType = IrEvent
+    latestTimestampNanos: Long
+  ) extends IR with DBWritable {
 
     def asDBKeyValues =
       List(
@@ -62,29 +60,17 @@ package object ir {
         "titanType", "IrEvent",
         "uuid", uuid,
         "eventType", eventType,
-        "subjectUuid", subject,
         "earliestTimestampNanos", earliestTimestampNanos,
-        "latestTimestampNanos", latestTimestampNanos,
-        "exec", exec
-      ) ++
-      exec.fold[List[Any]](Nil)(v => List("exec", v)) ++
-      predicateObject.fold[List[Any]](Nil)(v => List("predicateObjectUuid", v)) ++
-      predicateObject2.fold[List[Any]](Nil)(v => List("predicateObject2Uuid", v))
+        "latestTimestampNanos", latestTimestampNanos
+      )
 
-    def asDBEdges = List(("subject", subject)) ++ List.concat(
-      predicateObject.map(p => ("predicateObject", p)),
-      predicateObject2.map(p => ("predicateObject2", p))
-    )
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrEvent,Seq[UUID])] = for {
-      (s, n1) <- remapUuid(ra, subject, c)
-      (po1, n2) <- remapOptUuid(ra, predicateObject, c)
-      (po2, n3) <- remapOptUuid(ra, predicateObject2, c)
-    } yield (this.copy(subject = s, predicateObject = po1, predicateObject2 = po2), n1 ++ n2 ++ n3)
-
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "eventType" -> eventType,
+        "earliestTimestampNanos" -> earliestTimestampNanos,
+        "latestTimestampNanos" -> latestTimestampNanos
+      )
   }
 
 
@@ -101,38 +87,46 @@ package object ir {
     uuid: UUID,
     originalEntities: Seq[UUID],
 
-    subjectType: SubjectType,
-    localPrincipal: UUID,
-    startTimestampNanos: Long,
-    cmdLine: Option[String],
-    parentSubject: Option[UUID] = None
-  ) extends IR with DBWritable with DBNodeable {
-    
-    type SelfType = IrSubject
-  
+    subjectTypes: Set[SubjectType],
+    startTimestampNanos: Long
+  ) extends IR with DBWritable {
+
     def asDBKeyValues =
       List(
         label, "IrSubject",
         "titanType", "IrSubject",
         "uuid", uuid,
-        "subjectType", subjectType,
-        "localPrincipalUuid", localPrincipal,
-        "startTimestampNanos", startTimestampNanos,
-        "cmdLine", cmdLine
-      ) ++
-      parentSubject.fold[List[Any]](Nil)(v => List("parentSubjectUuid", v))
+        "subjectType", subjectTypes.toString,
+        "startTimestampNanos", startTimestampNanos
+      )
 
-    def asDBEdges = List(("localPrincipal",localPrincipal)) ++ 
-      parentSubject.fold[List[(String,UUID)]](Nil)(v => List(("parentSubject", v)))
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "subjectType" -> subjectTypes.toString,
+        "startTimestampNanos" -> startTimestampNanos
+      )
+  }
 
-    def getUuid = uuid
+  case class IrPathNode(
+     path: String
+   ) extends IR with DBWritable {
+    val uuid: UUID = DeterministicUUID(this)
+    val originalEntities = Nil
 
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrSubject, Seq[UUID])] = for {
-      (p, n1) <- remapUuid(ra, localPrincipal, c)
-      (ps, n2) <- remapOptUuid(ra, parentSubject, c)
-    } yield (this.copy(localPrincipal = p, parentSubject = ps), n1 ++ n2)
+    def asDBKeyValues =
+      List(
+        label, "IrPathNode",
+        "titanType", "IrPathNode",
+        "uuid", uuid,
+        "path", path
+      )
 
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "path"-> path
+      )
   }
 
   /* Compared to 'cdm.FileObject', this leaves out
@@ -146,12 +140,8 @@ package object ir {
     uuid: UUID,
     originalEntities: Seq[UUID],
 
-    path: Option[String],
-    fileObjectType: FileObjectType,
-    localPrincipal: Option[UUID] = None
-  ) extends IR with DBWritable with DBNodeable {
-     
-    type SelfType = IrFileObject
+    fileObjectType: FileObjectType
+  ) extends IR with DBWritable {
 
     def asDBKeyValues =
       List(
@@ -159,21 +149,13 @@ package object ir {
         "titanType", "IrFileObject",
         "uuid", uuid,
         "fileObjectType", fileObjectType
-      ) ++
-      path.fold[List[Any]](Nil)(v => List("path", path)) ++
-      localPrincipal.fold[List[Any]](Nil)(v => List("localPrincipalUuid", v))
+      )
 
-    def asDBEdges = List.concat(
-      localPrincipal.map(p => ("localPrincipal", p))
-    )
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrFileObject, Seq[UUID])] = for {
-      (p, n) <- remapOptUuid(ra, localPrincipal, c)
-    } yield (this.copy(localPrincipal = p), n)
-  
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "fileObjectType" -> fileObjectType
+      )
   }
 
   /* Compared to 'cdm.NetFlowObject' this leaves out
@@ -182,18 +164,17 @@ package object ir {
    *  - fileDescriptor
    */
   final case class IrNetFlowObject(
-    uuid: UUID,
     originalEntities: Seq[UUID],
 
     localAddress: String,
     localPort: Int,
     remoteAddress: String,
     remotePort: Int
-  ) extends IR with DBNodeable with DBWritable {
-     
-    type SelfType = IrNetFlowObject
-    
-    def asDBKeyValues = 
+  ) extends IR with DBWritable {
+
+    val uuid: UUID = DeterministicUUID(this)
+
+    def asDBKeyValues =
       List(
         label, "IrNetFlowObject",
         "titanType", "IrNetflowObject",
@@ -204,17 +185,17 @@ package object ir {
         "remotePort", remotePort
       )
 
-    def asDBEdges = Nil
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrNetFlowObject, Seq[UUID])] =
-      Future { (this, Nil) }
-  
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "localAddress" -> localAddress,
+        "localPort" -> localPort,
+        "remoteAddress" -> remoteAddress,
+        "remotePort" -> remotePort
+      )
   }
 
-  
+
   /* Compared to 'cdm.SrcSinkObject' this leaves out
    *
    *  - fileDescriptor
@@ -222,13 +203,11 @@ package object ir {
   final case class IrSrcSinkObject(
     uuid: UUID,
     originalEntities: Seq[UUID],
-    
-    srcSinkType: SrcSinkType
-  ) extends IR with DBNodeable with DBWritable {
-     
-    type SelfType = IrSrcSinkObject
 
-    def asDBKeyValues = 
+    srcSinkType: SrcSinkType
+  ) extends IR with DBWritable {
+
+    def asDBKeyValues =
       List(
         label, "IrSrcSinkObject",
         "titanType", "IrSrcSinkObject",
@@ -236,14 +215,11 @@ package object ir {
         "srcSinkType", srcSinkType
       )
 
-    def asDBEdges = Nil
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrSrcSinkObject, Seq[UUID])] =
-      Future { (this, Nil) }
-
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "srcSinkType" -> srcSinkType
+      )
   }
 
   /* These don't occur very much, so we are likely to do lots of analysis on them. Still worth
@@ -253,17 +229,16 @@ package object ir {
    * TODO: get rid of this in favor of an enumeration (this is a lot of edges for not much)
    */
   final case class IrPrincipal(
-    uuid: UUID,
     originalEntities: Seq[UUID],
 
     userId: String,
     groupIds: Seq[String],
     principalType: PrincipalType = PRINCIPAL_LOCAL,
     username: Option[String] = None
-  ) extends IR with DBNodeable with DBWritable {
-     
-    type SelfType = IrPrincipal
-    
+  ) extends IR with DBWritable {
+
+    val uuid: UUID = DeterministicUUID(this)
+
     def asDBKeyValues =
       List(
         label, "IrPrincipal",
@@ -272,17 +247,17 @@ package object ir {
         "userId", userId,
         "principalType", principalType
       ) ++
-      (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else Nil) ++
-      username.fold[List[Any]](Nil)(v => List("username", v))
+        (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else Nil) ++
+        username.fold[List[Any]](Nil)(v => List("username", v))
 
-    def asDBEdges = Nil
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrPrincipal, Seq[UUID])] =
-      Future { (this, Nil) }
-    
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "userId" -> userId,
+        "principalType" -> principalType,
+        "groupIds" -> groupIds.mkString(", "),
+        "username" -> username.getOrElse("")
+      )
   }
 
   /* Compared to 'cdm.ProvenanceTagNode', this leaves out
@@ -297,62 +272,31 @@ package object ir {
   final case class IrProvenanceTagNode(
     uuid: UUID,
     originalEntities: Seq[UUID],
-    
-    subjectUuid: UUID,
-    flowObject: Option[UUID] = None,
-    programPoint: Option[String] = None,
-    prevTagId: Option[UUID] = None,
-    tagIds: Seq[UUID] = Seq()
-  ) extends IR with DBNodeable with DBWritable {
-  
+
+    programPoint: Option[String] = None
+  ) extends IR with DBWritable {
+
     type SelfType = IrProvenanceTagNode
-    
+
     def asDBKeyValues =
       List(
         label, "IrProvenanceTagNode",
         "titanType", "IrProvenanceTagNode",
-        "uuid", uuid,
-        "subjectUuid", subjectUuid
+        "uuid", uuid
       ) ++
-      flowObject.fold[List[Any]](Nil)(f => List("flowObjectUuid", f)) ++
-      programPoint.fold[List[Any]](Nil)(p => List("programPoint", p)) ++
-      prevTagId.fold[List[Any]](Nil)(p => List("prevTagIdUuid", p)) ++
-      tagIds.flatMap(t => List("tagIdUuid", t))
+        programPoint.fold[List[Any]](Nil)(p => List("programPoint", p))
 
-      
-    def asDBEdges = List(("subject",subjectUuid)) ++
-      flowObject.fold[List[(String,UUID)]](Nil)(f => List(("flowObject", f))) ++
-      prevTagId.fold[List[(String,UUID)]](Nil)(p => List(("prevTagId", p))) ++
-      tagIds.map(t => ("tagId", t))
-
-    def getUuid = uuid
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrProvenanceTagNode, Seq[UUID])] = for {
-      (s, n1) <- remapUuid(ra, subjectUuid, c)
-      (fo, n2) <- remapOptUuid(ra, flowObject, c)
-      (pt, n3) <- remapOptUuid(ra, prevTagId, c)
-      (ts, n4) <- remapSeqUuid(ra, tagIds, c)
-    } yield (this.copy(
-      subjectUuid = s,
-      flowObject = fo,
-      prevTagId = pt,
-      tagIds = ts
-    ),
-      n1 ++ n2 ++ n3 ++ n4
-    )
-
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", "),
+        "programPoint" -> programPoint.getOrElse("")
+      )
   }
 
   final case class IrSynthesized(
-    uuid: UUID
-  ) extends IR with DBNodeable with DBWritable {
-    
-    val originalEntities = Nil
-    
-    type SelfType = IrSynthesized
-    
-    def getUuid = uuid
+    uuid: UUID,
+    originalEntities: Seq[UUID]
+  ) extends IR with DBWritable {
 
     def asDBKeyValues =
       List(
@@ -361,46 +305,22 @@ package object ir {
         "uuid", uuid
       )
 
-    def asDBEdges = Nil
-
-    def remapUuids(ra: ActorRef, c: Boolean)
-                  (implicit ec: ExecutionContext, t: Timeout): Future[(IrSynthesized, Seq[UUID])] = 
-      throw new Exception("IrSynthesized nodes cannot be remapped")
+    def toMap =
+      Map(
+        "originalEntities" -> originalEntities.mkString(", ")
+      )
   }
 
-  // Utilities for remapping UUIDs. Used in the IR's implementation of 'remapUuids'
-  private object RemapUtils {
-    def remapUuid(renameActor: ActorRef, uuid: UUID, createIfNotFound: Boolean)
-                 (implicit ec: ExecutionContext, t: Timeout): Future[(UUID, Seq[UUID])] = {
-      (renameActor ? Get(uuid))
-        .mapTo[MapMessage[UUID,UUID]]
-        .flatMap {
-          case Val(None) => Future { throw new Exception(s"UUID $uuid wasn't there (yet)") }
-          case Val(Some(newUuid)) => Future { (newUuid, Nil) }
-          case SynVal(newUuid) => Future { (newUuid, Seq(newUuid)) }
-        }
-    }
+}
 
-    // TODO: merge this into remapSeqUuid (the signature will be ugly)
-    def remapOptUuid(renameActor: ActorRef, uuidOpt: Option[UUID], createIfNotFound: Boolean)
-                    (implicit ec: ExecutionContext, t: Timeout): Future[(Option[UUID], Seq[UUID])] = {
-      uuidOpt match {
-        case None => Future { (None, Nil) }
-        case Some(uuid) => remapUuid(renameActor, uuid, createIfNotFound) map {
-          case (newUuid, syn) => (Some(newUuid),syn)
-        }
-      }
+object DeterministicUUID {
+
+  def apply[T <: Product](product: T): UUID = {
+    val byteOutputStream: ByteArrayOutputStream = new ByteArrayOutputStream()
+    for (value <- product.productIterator) {
+      byteOutputStream.write(value.hashCode())
     }
-    
-    def remapSeqUuid(renameActor: ActorRef, uuidSeq: Seq[UUID], createIfNotFound: Boolean)
-                    (implicit ec: ExecutionContext, t: Timeout): Future[(Seq[UUID], Seq[UUID])] = {
-      Future
-        .sequence(uuidSeq map { uuid => remapUuid(renameActor, uuid, createIfNotFound) })
-        .map { case seq: Seq[(UUID, Seq[UUID])] => 
-          val (uuids, synUuids): (Seq[UUID], Seq[Seq[UUID]]) = seq.unzip
-          (uuids, synUuids.flatten)
-        }
-    }
+    UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)
   }
 
 }
