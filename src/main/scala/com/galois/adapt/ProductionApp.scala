@@ -78,7 +78,6 @@ object ProductionApp {
         println("Running database flow with UI")
         val writeTimeout = Timeout(30.1 seconds)
         if (config.getBoolean("adapt.ingest.quitafteringest")) {
-          // Terminate after ingesting file sources.
           println("Will shut down after ingesting all files.")
           CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
             case Success(_) => ()

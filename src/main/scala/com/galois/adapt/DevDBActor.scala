@@ -171,10 +171,10 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
                .mkString("[",",","]")
       }
    
-    case EdgesForNodes(nodeIdList) =>
-      sender() ! Try {
-        graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
-      }
+//    case EdgesForNodes(nodeIdList) =>
+//      sender() ! Try {
+//        graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
+//      }
 
 //    case GiveMeTheGraph => sender() ! graph
 

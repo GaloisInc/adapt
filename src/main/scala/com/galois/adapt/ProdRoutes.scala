@@ -202,14 +202,14 @@ object ProdRoutes {
             complete(
               queryResult(EdgeQuery(queryString), dbActor)
             )
-          } ~
-          formField('nodes) { nodeListString =>
-            println(s"getting edges for nodes: $nodeListString")
-            val idList = nodeListString.split(",").map(_.toInt)
-            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
-              HttpEntity(ContentTypes.`application/json`, s.get)
-            }
-            complete(futureResponse)
+//          } ~
+//          formField('nodes) { nodeListString =>
+//            println(s"getting edges for nodes: $nodeListString")
+//            val idList = nodeListString.split(",").map(_.toInt)
+//            val futureResponse = (dbActor ? EdgesForNodes(idList)).mapTo[Try[String]].map { s =>
+//              HttpEntity(ContentTypes.`application/json`, s.get)
+//            }
+//            complete(futureResponse)
           }
         } ~
         path("generic") {
