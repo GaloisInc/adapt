@@ -1,5 +1,6 @@
 package com.galois.adapt.ir
 
+import java.io.{File, FileOutputStream, FileWriter, OutputStreamWriter}
 import java.util.UUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
@@ -21,31 +22,31 @@ class UuidRemapper extends Actor with ActorLogging {
 //  var cdmIterate: mutable.Map[CDM_UUID, Destination] = mutable.Map.empty
 
   // We keep track of two large Maps containing UUID remap information
-  var cdm2cdm: mutable.Map[CDM_UUID, CDM_UUID] = mutable.Map.empty
-  var cdm2ir:  mutable.Map[CDM_UUID, IR_UUID]  = mutable.Map.empty
+  var cdm2cdm: mutable.Map[CdmUUID, CdmUUID] = mutable.Map.empty
+  var cdm2ir:  mutable.Map[CdmUUID, IrUUID]  = mutable.Map.empty
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
-  var blocking: mutable.Map[CDM_UUID, List[ActorRef]] = mutable.Map.empty
+  var blocking: mutable.Map[CdmUUID, List[ActorRef]] = mutable.Map.empty
 
   // Apply as many CDM remaps as possible
-  def advanceCdm(cdmUuid: CDM_UUID): CDM_UUID = {
+  def advanceCdm(cdmUuid: CdmUUID): CdmUUID = {
     if (cdm2cdm contains cdmUuid)
       advanceCdm(cdm2cdm(cdmUuid))
     else
       cdmUuid
   }
 
-  def removeFromBlocking(cdmUuid: CDM_UUID): List[ActorRef] = {
+  def removeFromBlocking(cdmUuid: CdmUUID): List[ActorRef] = {
     blocking.remove(cdmUuid).getOrElse(Nil)
   }
 
-  def addToBlocking(cdmUuid: CDM_UUID, blocked: List[ActorRef]): Unit = {
+  def addToBlocking(cdmUuid: CdmUUID, blocked: List[ActorRef]): Unit = {
     blocking(cdmUuid) = blocked ++ blocking.getOrElse(cdmUuid, Nil)
   }
 
-  def advanceAndNotify(keyCdm: CDM_UUID, interested: List[ActorRef]): Unit = {
+  def advanceAndNotify(keyCdm: CdmUUID, interested: List[ActorRef]): Unit = {
     // Apply as many CDM remaps as possible
-    val advancedCdm: CDM_UUID = advanceCdm(keyCdm)
+    val advancedCdm: CdmUUID = advanceCdm(keyCdm)
 
     // Try to apply an IR remap
     cdm2ir.get(advancedCdm) match {
@@ -59,9 +60,10 @@ class UuidRemapper extends Actor with ActorLogging {
 
     // Put IR information
     case PutCdm2Ir(source, target) =>
+
       cdm2ir(source) = target
 
-      advanceAndNotify(target, removeFromBlocking(source))
+      advanceAndNotify(source, removeFromBlocking(source))
 
       sender() ! PutConfirm
 
@@ -76,7 +78,22 @@ class UuidRemapper extends Actor with ActorLogging {
 
 
     // Retrieve information
-    case GetCdm2Ir(keyCdm) => advanceAndNotify(keyCdm, List(sender()))
+    case GetCdm2Ir(keyCdm) =>
+      advanceAndNotify(keyCdm, List(sender()))
+
+
+    // Debug information
+    case GetStillBlocked =>
+      val out = new FileWriter(new File("blocked.csv"))
+
+      out.write("blockCdm,blockingActors\n")
+      for ((k,v) <- blocking) {
+        out.write(k.uuid.toString ++ "," ++ v.map(_.toString()).mkString(";") ++ "\n")
+      }
+
+      out.close()
+
+    //  sender() ! ()
 
 
     case msg => log.error("UuidRemapper: received an unexpected message: ", msg)
@@ -86,15 +103,15 @@ class UuidRemapper extends Actor with ActorLogging {
 
 object UuidRemapper {
 
-  type CDM_UUID = UUID
-  type IR_UUID = UUID
-
   // UuidRemapper recieves "PutCdm2Cdm" or "PutCdm2Ir" and returns "PutConfirm"
-  case class PutCdm2Cdm(source: CDM_UUID, target: CDM_UUID)
-  case class PutCdm2Ir (source: CDM_UUID, target: IR_UUID)
+  case class PutCdm2Cdm(source: CdmUUID, target: CdmUUID)
+  case class PutCdm2Ir (source: CdmUUID, target: IrUUID)
   case object PutConfirm
 
   // UuidRemapper recieves "GetCdm2Ir" returns "GetResult"
-  case class GetCdm2Ir(source: CDM_UUID)
-  case class ResultOfGetCdm2Ir(target: IR_UUID)
+  case class GetCdm2Ir(source: CdmUUID)
+  case class ResultOfGetCdm2Ir(target: IrUUID)
+
+  // For debugging: tell me about nodes that are still blocked
+  case object GetStillBlocked
 }

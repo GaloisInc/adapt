@@ -24,14 +24,14 @@ object ERRules {
       ProvenanceTagNodeEdges.PrevTagID,
       ProvenanceTagNodeEdges.TagIdEdges
     ) = {
-        val newUuid = UUID.randomUUID()
-        (
-          IrProvenanceTagNode(newUuid, Seq(p.getUuid), p.programPoint),
-          UuidRemapper.PutCdm2Ir(p.getUuid, newUuid),
-          p.flowObject.map(flow => Edge[IR, CDM17](newUuid, "flowObject", flow)),
-          Edge[IR, CDM17](newUuid, "subject", p.subjectUuid),
-          p.prevTagId.map(tagId => Edge[IR, CDM17](newUuid, "prevTagId", tagId)),
-          p.tagIds.getOrElse(Nil).map(tagId => Edge[IR, CDM17](newUuid, "tagId", tagId))
+      val newUuid = IrUUID(UUID.randomUUID())
+      (
+        IrProvenanceTagNode(newUuid, Seq(CdmUUID(p.getUuid)), p.programPoint),
+        UuidRemapper.PutCdm2Ir(CdmUUID(p.getUuid), newUuid),
+        p.flowObject.map(flow => EdgeIr2Cdm(newUuid, "flowObject", CdmUUID(flow))),
+        EdgeIr2Cdm(newUuid, "subject", CdmUUID(p.subjectUuid)),
+        p.prevTagId.map(tagId => EdgeIr2Cdm(newUuid, "prevTagId", CdmUUID(tagId))),
+        p.tagIds.getOrElse(Nil).map(tagId => EdgeIr2Cdm(newUuid, "tagId", CdmUUID(tagId)))
       )
     }
 
@@ -41,10 +41,10 @@ object ERRules {
       IrPrincipal,
       UuidRemapper.PutCdm2Ir
     ) = {
-      val newP = IrPrincipal(Seq(p.getUuid), p.userId, p.groupIds, p.principalType, p.username)
+      val newP = IrPrincipal(Seq(CdmUUID(p.getUuid)), p.userId, p.groupIds, p.principalType, p.username)
       (
         newP,
-        UuidRemapper.PutCdm2Ir(p.getUuid, newP.uuid)
+        UuidRemapper.PutCdm2Ir(CdmUUID(p.getUuid), newP.uuid)
       )
     }
 
@@ -54,10 +54,10 @@ object ERRules {
       IrSrcSinkObject,
       UuidRemapper.PutCdm2Ir
     ) = {
-      val newUuid = UUID.randomUUID()
+      val newUuid = IrUUID(UUID.randomUUID())
       (
-        IrSrcSinkObject(newUuid, Seq(s.getUuid), s.srcSinkType),
-        UuidRemapper.PutCdm2Ir(s.getUuid, newUuid)
+        IrSrcSinkObject(newUuid, Seq(CdmUUID(s.getUuid)), s.srcSinkType),
+        UuidRemapper.PutCdm2Ir(CdmUUID(s.getUuid), newUuid)
       )
     }
 
@@ -67,10 +67,10 @@ object ERRules {
       IrNetFlowObject,
       UuidRemapper.PutCdm2Ir
     ) = {
-      val newN = IrNetFlowObject(Seq(n.getUuid), n.localAddress, n.localPort, n.remoteAddress, n.remotePort)
+      val newN = IrNetFlowObject(Seq(CdmUUID(n.getUuid)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort)
       (
         newN,
-        UuidRemapper.PutCdm2Ir(n.getUuid, newN.getUuid)
+        UuidRemapper.PutCdm2Ir(CdmUUID(n.getUuid), newN.getUuid)
       )
     }
 
@@ -89,14 +89,14 @@ object ERRules {
     FileObjectEdges.LocalPrincipalEdge,
     FileObjectEdges.FilePathEdgeNode
   ) = {
-    val newUuid = UUID.randomUUID()
+    val newUuid = IrUUID(UUID.randomUUID())
     (
-      IrFileObject(newUuid, Seq(f.getUuid), f.fileObjectType),
-      UuidRemapper.PutCdm2Ir(f.getUuid, newUuid),
-      f.localPrincipal.map(prinicpal => Edge[IR, CDM17](newUuid, "principal", prinicpal)),
+      IrFileObject(newUuid, Seq(CdmUUID(f.getUuid)),  f.fileObjectType),
+      UuidRemapper.PutCdm2Ir(CdmUUID(f.getUuid), newUuid),
+      f.localPrincipal.map(prinicpal => EdgeIr2Cdm(newUuid, "principal", CdmUUID(prinicpal))),
       f.peInfo.map(path => {
         val pathNode = IrPathNode(path)
-        (Edge[IR,IR](newUuid, "path", pathNode.getUuid), pathNode)
+        (EdgeIr2Ir(newUuid, "path", pathNode.getUuid), pathNode)
       })
     )
   }
@@ -111,13 +111,13 @@ object ERRules {
       UuidRemapper.PutCdm2Ir,
       RegistryKeyObjectEdges.FilePathEdgeNode
     ) = {
-      val newUuid = UUID.randomUUID()
+      val newUuid = IrUUID(UUID.randomUUID())
       (
-        IrFileObject(newUuid, Seq(r.getUuid), FILE_OBJECT_FILE),
-        UuidRemapper.PutCdm2Ir(r.getUuid, newUuid),
+        IrFileObject(newUuid, Seq(CdmUUID(r.getUuid)), FILE_OBJECT_FILE),
+        UuidRemapper.PutCdm2Ir(CdmUUID(r.getUuid), newUuid),
         {
           val pathNode = IrPathNode(r.key)
-          (Edge[IR,IR](newUuid, "path", pathNode.getUuid), pathNode)
+          (EdgeIr2Ir(newUuid, "path", pathNode.getUuid), pathNode)
         }
       )
     }
@@ -144,28 +144,28 @@ object ERRules {
       EventEdges.Predicate2PathEdgeNode,
       EventEdges.ExecCommandPathEdgeNode
     ) = {
-      val newUuid = UUID.randomUUID()
+      val newUuid = IrUUID(UUID.randomUUID())
 
       (
-        IrEvent(newUuid, Seq(e.getUuid), e.eventType, e.timestampNanos, e.timestampNanos),
-        UuidRemapper.PutCdm2Ir(e.getUuid, newUuid),
-        Edge[IR, CDM17](newUuid, "subject", e.subjectUuid),
-        e.predicateObject.map(obj => Edge[IR, CDM17](newUuid, "predicateObject", obj)),
-        e.predicateObject2.map(obj => Edge[IR, CDM17](newUuid, "predicateObject2", obj)),
+        IrEvent(newUuid, Seq(CdmUUID(e.getUuid)), e.eventType, e.timestampNanos, e.timestampNanos),
+        UuidRemapper.PutCdm2Ir(CdmUUID(e.getUuid), newUuid),
+        EdgeIr2Cdm(newUuid, "subject", CdmUUID(e.subjectUuid)),
+        e.predicateObject.map(obj => EdgeIr2Cdm(newUuid, "predicateObject", CdmUUID(obj))),
+        e.predicateObject2.map(obj => EdgeIr2Cdm(newUuid, "predicateObject2", CdmUUID(obj))),
 
         e.predicateObjectPath.map(path => {
           val pathNode = IrPathNode(path)
           val label = "eventSynthesized_" ++ e.eventType.toString // if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "cmdLine" } else { "path" }
-          (Edge[IR,IR](newUuid, label, pathNode.getUuid), pathNode)
+          (EdgeIr2Ir(newUuid, label, pathNode.getUuid), pathNode)
         }),
         e.predicateObject2Path.map(path => {
           val pathNode = IrPathNode(path)
           val label = "eventSynthesized_" ++ e.eventType.toString // if (e.eventType == EVENT_FORK) { "cmdLine" } else { "path" }
-          (Edge[IR,IR](newUuid, label, pathNode.getUuid), pathNode)
+          (EdgeIr2Ir(newUuid, label, pathNode.getUuid), pathNode)
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = IrPathNode(cmdLine)
-          (Edge[IR,IR](newUuid, "cmdLine", pathNode.getUuid), pathNode)
+          (EdgeIr2Ir(newUuid, "cmdLine", pathNode.getUuid), pathNode)
         })
       )
     }
@@ -195,21 +195,21 @@ object ERRules {
       Right((
         s.cmdLine.map(cmd => {
           val pathNode = IrPathNode(cmd)
-          (Edge[CDM17,IR](s.parentSubject.get, "cmdLine", pathNode.getUuid), pathNode)
+          (EdgeCdm2Ir(CdmUUID(s.parentSubject.get), "cmdLine", pathNode.getUuid), pathNode)
         }),
-        UuidRemapper.PutCdm2Cdm(s.getUuid, s.parentSubject.get)
+        UuidRemapper.PutCdm2Cdm(CdmUUID(s.getUuid), CdmUUID(s.parentSubject.get))
       ))
     } else {
-      val newUuid = UUID.randomUUID()
+      val newUuid = IrUUID(UUID.randomUUID())
 
       Left((
-        IrSubject(newUuid, Seq(s.getUuid), Set(s.subjectType), s.startTimestampNanos),
-        UuidRemapper.PutCdm2Ir(s.getUuid, newUuid),
-        Edge[IR, CDM17](newUuid, "localPrincipal", s.localPrincipal),
-        s.parentSubject.map(parent => Edge[IR, CDM17](newUuid, "parentSubject", parent)),
+        IrSubject(newUuid, Seq(CdmUUID(s.getUuid)), Set(s.subjectType), s.startTimestampNanos),
+        UuidRemapper.PutCdm2Ir(CdmUUID(s.getUuid), newUuid),
+        EdgeIr2Cdm(newUuid, "localPrincipal", CdmUUID(s.localPrincipal)),
+        s.parentSubject.map(parent => EdgeIr2Cdm(newUuid, "parentSubject", CdmUUID(parent))),
         s.cmdLine.map(cmd => {
           val pathNode = IrPathNode(cmd)
-          (Edge[IR,IR](newUuid, "cmdLine", pathNode.getUuid), pathNode)
+          (EdgeIr2Ir(newUuid, "cmdLine", pathNode.getUuid), pathNode)
         })
       ))
     }
@@ -222,9 +222,9 @@ object ERRules {
         val e2Updated = e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),
-          originalEntities = e1.getUuid +: e2.originalEntities
+          originalCdmUuids = CdmUUID(e1.getUuid) +: e2.originalCdmUuids
         )
-        Left((UuidRemapper.PutCdm2Ir(e1.getUuid, e2.getUuid), e2Updated))
+        Left((UuidRemapper.PutCdm2Ir(CdmUUID(e1.getUuid), e2.getUuid), e2Updated))
       } else {
         Right((e1, e2))
       }

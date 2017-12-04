@@ -10,27 +10,31 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
 
-import scala.reflect.ClassTag
-
 // TODO: do this with shapeless. It is _begging_ to be done with shapeless
 
 
 package object ir {
 
-  type IR_UUID = UUID
-  type CDM_UUID = UUID
+  case class CdmUUID(uuid: UUID) extends AnyVal
+  case class IrUUID(uuid: UUID) extends AnyVal
+
+  implicit def unwrapIR_UUID(irUUID: IrUUID): UUID = irUUID.uuid
 
   /* Edges are now first class values in the stream.
    */
-  case class Edge[From: ClassTag, To: ClassTag](src: UUID, label: String, tgt: UUID)
+  sealed trait Edge[From, To]
+  final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge[CDM17, CDM17]
+  final case class EdgeCdm2Ir (src: CdmUUID, label: String, tgt: IrUUID) extends Edge[CDM17, IR]
+  final case class EdgeIr2Cdm (src: IrUUID, label: String, tgt: CdmUUID) extends Edge[IR, CDM17]
+  final case class EdgeIr2Ir  (src: IrUUID, label: String, tgt: IrUUID) extends Edge[IR, IR]
 
   sealed trait IR { self: DBWritable =>
-    val uuid: IR_UUID                     // The current UUID
-    val originalEntities: Seq[CDM_UUID]   // The UUIDs of all the CDM nodes that were merged to produce this node
+    val uuid: IrUUID                     // The current UUID
+    val originalCdmUuids: Seq[CdmUUID]   // The UUIDs of all the CDM nodes that were merged to produce this node
 
     def toMap: Map[String, Any]
 
-    def getUuid: IR_UUID = uuid
+    def getUuid: IrUUID = uuid
   }
 
 
@@ -46,8 +50,8 @@ package object ir {
    *   - 'programPoint' is too much information
    */
   final case class IrEvent(
-    uuid: UUID,
-    originalEntities: Seq[UUID],
+    uuid: IrUUID,
+    originalCdmUuids: Seq[CdmUUID],
 
     eventType: EventType,
     earliestTimestampNanos: Long,
@@ -66,7 +70,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "eventType" -> eventType,
         "earliestTimestampNanos" -> earliestTimestampNanos,
         "latestTimestampNanos" -> latestTimestampNanos
@@ -84,8 +88,8 @@ package object ir {
    *  - 'importedLibraries' and 'exportedLibraries' aren't used
    */
   final case class IrSubject(
-    uuid: UUID,
-    originalEntities: Seq[UUID],
+    uuid: IrUUID,
+    originalCdmUuids: Seq[CdmUUID],
 
     subjectTypes: Set[SubjectType],
     startTimestampNanos: Long
@@ -102,8 +106,8 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
-        "subjectType" -> subjectTypes.toString,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "subjectType" -> subjectTypes.map(_.toString).toList.sorted.mkString(";"),
         "startTimestampNanos" -> startTimestampNanos
       )
   }
@@ -111,8 +115,8 @@ package object ir {
   case class IrPathNode(
      path: String
    ) extends IR with DBWritable {
-    val uuid: UUID = DeterministicUUID(this)
-    val originalEntities = Nil
+    val uuid = IrUUID(DeterministicUUID(this))
+    val originalCdmUuids: Seq[CdmUUID] = Nil
 
     def asDBKeyValues =
       List(
@@ -124,7 +128,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "path"-> path
       )
   }
@@ -137,10 +141,10 @@ package object ir {
    *  - hashes
    */
   final case class IrFileObject(
-    uuid: UUID,
-    originalEntities: Seq[UUID],
+     uuid: IrUUID,
+     originalCdmUuids: Seq[CdmUUID],
 
-    fileObjectType: FileObjectType
+     fileObjectType: FileObjectType
   ) extends IR with DBWritable {
 
     def asDBKeyValues =
@@ -153,7 +157,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "fileObjectType" -> fileObjectType
       )
   }
@@ -164,7 +168,7 @@ package object ir {
    *  - fileDescriptor
    */
   final case class IrNetFlowObject(
-    originalEntities: Seq[UUID],
+    originalCdmUuids: Seq[CdmUUID],
 
     localAddress: String,
     localPort: Int,
@@ -172,7 +176,7 @@ package object ir {
     remotePort: Int
   ) extends IR with DBWritable {
 
-    val uuid: UUID = DeterministicUUID(this)
+    val uuid = IrUUID(DeterministicUUID(this))
 
     def asDBKeyValues =
       List(
@@ -187,7 +191,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "localAddress" -> localAddress,
         "localPort" -> localPort,
         "remoteAddress" -> remoteAddress,
@@ -201,8 +205,8 @@ package object ir {
    *  - fileDescriptor
    */
   final case class IrSrcSinkObject(
-    uuid: UUID,
-    originalEntities: Seq[UUID],
+    uuid: IrUUID,
+    originalCdmUuids: Seq[CdmUUID],
 
     srcSinkType: SrcSinkType
   ) extends IR with DBWritable {
@@ -217,7 +221,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "srcSinkType" -> srcSinkType
       )
   }
@@ -229,7 +233,7 @@ package object ir {
    * TODO: get rid of this in favor of an enumeration (this is a lot of edges for not much)
    */
   final case class IrPrincipal(
-    originalEntities: Seq[UUID],
+    originalCdmUuids: Seq[CdmUUID],
 
     userId: String,
     groupIds: Seq[String],
@@ -237,7 +241,7 @@ package object ir {
     username: Option[String] = None
   ) extends IR with DBWritable {
 
-    val uuid: UUID = DeterministicUUID(this)
+    val uuid = IrUUID(DeterministicUUID(this))
 
     def asDBKeyValues =
       List(
@@ -252,10 +256,10 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "userId" -> userId,
         "principalType" -> principalType,
-        "groupIds" -> groupIds.mkString(", "),
+        "groupIds" -> groupIds.toList.sorted.mkString(";"),
         "username" -> username.getOrElse("")
       )
   }
@@ -270,8 +274,8 @@ package object ir {
    * TODO: should tagIds just have type 'Seq[UUID]'?
    */
   final case class IrProvenanceTagNode(
-    uuid: UUID,
-    originalEntities: Seq[UUID],
+    uuid: IrUUID,
+    originalCdmUuids: Seq[CdmUUID],
 
     programPoint: Option[String] = None
   ) extends IR with DBWritable {
@@ -288,14 +292,14 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", "),
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "programPoint" -> programPoint.getOrElse("")
       )
   }
 
   final case class IrSynthesized(
-    uuid: UUID,
-    originalEntities: Seq[UUID]
+    uuid: IrUUID,
+    originalCdmUuids: Seq[CdmUUID]
   ) extends IR with DBWritable {
 
     def asDBKeyValues =
@@ -307,7 +311,7 @@ package object ir {
 
     def toMap =
       Map(
-        "originalEntities" -> originalEntities.mkString(", ")
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
       )
   }
 
