@@ -60,12 +60,12 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrEvent",
-        "titanType", "IrEvent",
-        "uuid", uuid,
-        "eventType", eventType,
-        "earliestTimestampNanos", earliestTimestampNanos,
-        "latestTimestampNanos", latestTimestampNanos
+//        label, "IrEvent",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "eventType" -> eventType,
+        "earliestTimestampNanos" -> earliestTimestampNanos,
+        "latestTimestampNanos" -> latestTimestampNanos
       )
 
     def toMap =
@@ -97,11 +97,11 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrSubject",
-        "titanType", "IrSubject",
-        "uuid", uuid,
-        "subjectType", subjectTypes.toString,
-        "startTimestampNanos", startTimestampNanos
+//        label, "IrSubject",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "subjectType" -> subjectTypes.toString,
+        "startTimestampNanos" -> startTimestampNanos
       )
 
     def toMap =
@@ -120,10 +120,10 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrPathNode",
-        "titanType", "IrPathNode",
-        "uuid", uuid,
-        "path", path
+//        label, "IrPathNode",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "path" -> path
       )
 
     def toMap =
@@ -149,10 +149,10 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrFileObject",
-        "titanType", "IrFileObject",
-        "uuid", uuid,
-        "fileObjectType", fileObjectType
+//        label, "IrFileObject",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "fileObjectType" -> fileObjectType
       )
 
     def toMap =
@@ -180,13 +180,13 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrNetFlowObject",
-        "titanType", "IrNetflowObject",
-        "uuid", uuid,
-        "localAddress", localAddress,
-        "localPort", localPort,
-        "remoteAddress", remoteAddress,
-        "remotePort", remotePort
+//        label, "IrNetFlowObject",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "localAddress" -> localAddress,
+        "localPort" -> localPort,
+        "remoteAddress" -> remoteAddress,
+        "remotePort" -> remotePort
       )
 
     def toMap =
@@ -213,10 +213,10 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrSrcSinkObject",
-        "titanType", "IrSrcSinkObject",
-        "uuid", uuid,
-        "srcSinkType", srcSinkType
+//        label, "IrSrcSinkObject",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "srcSinkType" -> srcSinkType
       )
 
     def toMap =
@@ -245,14 +245,14 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrPrincipal",
-        "titanType", "IrPrincipal",
-        "uuid", uuid,
-        "userId", userId,
-        "principalType", principalType
+//        label, "IrPrincipal",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+        "userId" -> userId,
+        "principalType" -> principalType
       ) ++
-        (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else Nil) ++
-        username.fold[List[Any]](Nil)(v => List("username", v))
+        (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(", ")) else Nil) ++
+        username.fold[List[(String,Any)]](Nil)(v => List("username" -> v))
 
     def toMap =
       Map(
@@ -284,11 +284,11 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrProvenanceTagNode",
-        "titanType", "IrProvenanceTagNode",
-        "uuid", uuid
+//        label, "IrProvenanceTagNode",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
       ) ++
-        programPoint.fold[List[Any]](Nil)(p => List("programPoint", p))
+        programPoint.fold[List[(String,Any)]](Nil)(p => List("programPoint" -> p))
 
     def toMap =
       Map(
@@ -304,9 +304,9 @@ package object ir {
 
     def asDBKeyValues =
       List(
-        label, "IrSynthesized",
-        "titanType", "IrSynthesized",
-        "uuid", uuid
+//        label, "IrSynthesized",
+        "uuid" -> uuid,
+        "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
       )
 
     def toMap =
