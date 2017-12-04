@@ -133,7 +133,7 @@
 
         function execTextQuery(query_string) {
             UI.loadingUIStart()
-            $.post("/query", {"query": query_string}, function(results) {
+            $.post("/query/generic", {"query": query_string}, function(results) {
                 UI.queryInputColor("lightgreen")
                 console.log(results)
                 setTimeout(function(){ UI.queryInputColor() }, 750)
@@ -445,6 +445,7 @@
         function formatNodes(raw_results) {
             var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
+                n["label"] = n["label"].replace("::CDM","").replace("CDM::","")  // Neo4j specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the CDM class name and the "CDM" label.
                 n["db_label"] = n["label"]
                 n['queries'] = getRelevantQueries(n)  
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
@@ -458,9 +459,8 @@
                 }
 
                 // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+                // translateAllEnums(n)
 
-
-                translateAllEnums(n)
                 n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}

@@ -24,9 +24,6 @@ import scala.collection.mutable
 import scala.sys.process._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
-import com.thinkaurelius.titan.core._
-import com.thinkaurelius.titan.graphdb.database.management.ManagementSystem
-import com.thinkaurelius.titan.core.schema.{SchemaAction, SchemaStatus}
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import scala.concurrent.{ExecutionContext, Future}
@@ -125,18 +122,18 @@ object FlowComponents {
     var lastTimestampNanos = 0L
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
-        if (lastTimestampNanos == 0L) {
-          originalStartTime = System.nanoTime()
-          lastTimestampNanos = System.nanoTime()
-        }
-        counter = counter + 1
-        if (counter % every == 0) {
-          val nowNanos = System.nanoTime()
-          val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
-          println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second")
-          lastTimestampNanos = System.nanoTime()
-        }
-        List(item)
+      if (lastTimestampNanos == 0L) {
+        originalStartTime = System.nanoTime()
+        lastTimestampNanos = System.nanoTime()
+      }
+      counter = counter + 1
+      if (counter % every == 0) {
+        val nowNanos = System.nanoTime()
+        val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
+        println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second")
+        lastTimestampNanos = System.nanoTime()
+      }
+      List(item)
     }
   }
 

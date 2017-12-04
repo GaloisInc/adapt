@@ -16,13 +16,11 @@ case class TagRunLengthTuple(
   lazy val getUuid = UUID.randomUUID()
 
   def asDBKeyValues = List(
-    label, "TagRunLengthTuple",
-    "titanType", "TagRunLengthTuple",
-    "numValueElements", numValueElements,
-    "uuid", tagId
+    ("numValueElements", numValueElements),
+    ("uuid", tagId)
   )
 
-  def asDBEdges = List(("tagId", tagId))
+  def asDBEdges = List((CDM17.EdgeTypes.tagId, tagId))
 }
 
 
