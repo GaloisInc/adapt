@@ -1,11 +1,8 @@
 package com.galois.adapt.cdm17
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 
 
@@ -15,14 +12,13 @@ case class SrcSinkObject(
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
 ) extends CDM17 with DBWritable with DBNodeable {
+
   def asDBKeyValues = List(
-    label, "SrcSinkObject",
-    "titanType", "SrcSinkObject",
-    "uuid", uuid,
-    "srcSinkType", srcSinkType.toString
+    ("uuid", uuid),
+    ("srcSinkType", srcSinkType.toString)
   ) ++
     baseObject.asDBKeyValues ++
-    fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
+    fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v)))
 
   def asDBEdges = Nil
 

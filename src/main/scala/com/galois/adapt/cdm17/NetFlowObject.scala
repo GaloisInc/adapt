@@ -17,19 +17,18 @@ case class NetFlowObject(
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
 ) extends CDM17 with DBWritable with DBNodeable {
+
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
       List(
-        label, "NetFlowObject",
-        "titanType", "NetFlowObject",
-        "uuid", uuid,
-        "localAddress", localAddress,
-        "localPort", localPort,
-        "remoteAddress", remoteAddress,
-        "remotePort", remotePort
+        ("uuid", uuid),
+        ("localAddress", localAddress),
+        ("localPort", localPort),
+        ("remoteAddress", remoteAddress),
+        ("remotePort", remotePort)
       ) ++
-      ipProtocol.fold[List[Any]](List.empty)(v => List("ipProtocol", v)) ++
-      fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
+      ipProtocol.fold[List[(String,Any)]](List.empty)(v => List(("ipProtocol", v))) ++
+      fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v)))
 
   def asDBEdges = Nil
 

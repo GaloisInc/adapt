@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, File}
 import java.nio.file.Paths
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
@@ -12,6 +12,9 @@ import com.galois.adapt.ir._
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
+
+import akka.util.Timeout
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -22,13 +25,14 @@ import ApiJsonProtocol._
 import akka.http.scaladsl.server.RouteResult._
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
+import com.galois.adapt.ir.UuidRemapper.GetStillBlocked
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
 
 import collection.JavaConverters._
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.{Random, Try}
 import scala.concurrent.duration._
@@ -63,49 +67,89 @@ object ProductionApp {
     val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
     new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-    val dbActor = system.actorOf(Props[TitanDBQueryProxy])
+    val dbActor = system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
+    implicit val timeout = Timeout(600 seconds)
+    println(s"Waiting for DB indices to become active: $timeout")
+    Await.result(dbActor ? Ready, timeout.duration)
     val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
     val statusActor = system.actorOf(Props[StatusActor])
 
     val ta1 = config.getString("adapt.env.ta1")
+
     config.getString("adapt.runflow").toLowerCase match {
-      case "database" | "db" =>
-        println("Running database-only flow")
-        if (ta1 == "file") {
-          // Terminate after ingesting file sources.
-          val ta1Source = CDMSource(ta1)
-          println("Will shut down after ingesting files.")
-          ta1Source.via(FlowComponents.printCounter("DB Writer", 1000)).via(TitanFlowComponents.titanWritesFlow()).runForeach(_.foreach {
-            case Success(()) => ()
-            case fails => println(s"Insertion errors in batch: $fails")
-          }).onComplete {
+      case "database" | "db" | "ingest" =>
+        println("Running database flow with UI")
+        val writeTimeout = Timeout(30.1 seconds)
+        if (config.getBoolean("adapt.ingest.quitafteringest")) {
+          println("Will shut down after ingesting all files.")
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)).runForeach {
+            case Success(_) => ()
+            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
+          } onComplete {
             case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
             case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
           }
-        } else Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("DB Writer", 1000)), TitanFlowComponents.titanWrites())
+        } else {
+          println("Will continuing running the DB and UI after ingesting all files.")
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(writeTimeout))
+        }
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
+      // TODO CLEAN THIS UP
+      case "ir-database" | "ir-db" | "ir-ingest" =>
+        println("Running database flow with UI")
+        val writeTimeout = Timeout(30.1 seconds)
+
+        val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
+//        system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+
+        println("Will shut down after ingesting all files.")
+        val l = CDMSource(ta1)
+          .via(FlowComponents.printCounter("Neo4j Writer", 10000))
+          .via(EntityResolution(uuidRemapper))
+          .via(Neo4jFlowComponents.neo4jActorIrWriteFlow(dbActor)(writeTimeout))
+          .runForeach {
+          case Success(_) => ()
+          case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
+        } onComplete {
+          case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
+          case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
+        }
+
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+
+      // TODO CLEAN THIS UP
       case "ir-csvmaker" | "ir-csv" =>
         RunnableGraph.fromGraph(GraphDSL.create() { implicit graph =>
           import GraphDSL.Implicits._
           val bcast = graph.add(Broadcast[Any](9))
           val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
 
-          CDMSource(ta1).via(EntityResolution())
+          val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
+          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+
+
+          CDMSource(ta1).via(EntityResolution(uuidRemapper))
             .via(FlowComponents.printCounter("DB Writer", 1000))
             .via(Flow.fromFunction {
               case Left(e) => e
               case Right(ir) => ir
-            }) ~> bcast.in
+            })
+            .concat(Source.apply(List(GetStillBlocked))) ~> bcast.in
 
-          bcast.out(0).collect{ case Edge(src, lbl, tgt) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
-          bcast.out(0).collect{ case c: IrNetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
-          bcast.out(1).collect{ case c: IrEvent => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
-          bcast.out(2).collect{ case c: IrFileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
-          bcast.out(4).collect{ case c: IrProvenanceTagNode => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
-          bcast.out(5).collect{ case c: IrSubject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
-          bcast.out(6).collect{ case c: IrPrincipal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
-          bcast.out(7).collect{ case c: IrSrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
-          bcast.out(8).collect{ case c: IrPathNode => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
+          bcast.out(0).collect{ case EdgeIr2Ir(IrUUID(src), lbl, IrUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
+          bcast.out(1).collect{ case c: IrNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
+          bcast.out(2).collect{ case c: IrEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
+          bcast.out(3).collect{ case c: IrFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
+          bcast.out(4).collect{ case c: IrProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
+          bcast.out(5).collect{ case c: IrSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
+          bcast.out(6).collect{ case c: IrPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
+          bcast.out(7).collect{ case c: IrSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
+          bcast.out(8).collect{ case c: IrPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPathNodes.csv")
+        //  bcast.out(9).collect{ case GetStillBlocked => {
+        //    implicit val timeout = akka.util.Timeout(5 seconds)
+        //    Await.result(uuidRemapper ? GetStillBlocked, timeout.duration)
+        //  } } ~> Sink.ignore
           ClosedShape
         }).run()
 
@@ -113,8 +157,9 @@ object ProductionApp {
         println("Running anomaly-only flow")
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
-      case "ui" =>
-        println("Starting only the UI and doing nothing else.")
+      case "ui" | "uionly" =>
+        println("Staring only the UI and doing nothing else.")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       case "csvmaker" | "csv" =>
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -147,7 +192,8 @@ object ProductionApp {
           .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
 
       case _ =>
-        println("Running the combined database ingest + anomaly calculation flow")
+        println("Running the combined database ingest + anomaly calculation flow + UI")
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 	
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
@@ -155,19 +201,11 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> TitanFlowComponents.titanWrites()
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()
     }
-
-//    val source = Source
-//      .actorRef[Int](0, OverflowStrategy.fail)
-//      .mapMaterializedValue( ref =>
-//        Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, ref), interface, port), 10 seconds)
-//      )
-
-    val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
   }
 }
 
@@ -233,7 +271,8 @@ object CDMSource {
                 List.empty
               }
             }
-          }.via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
+          }
+//          .via(FlowComponents.printCounter("File Source", 1e6.toInt)) //.throttle(1000, 1 seconds, 1500, ThrottleMode.shaping)
     }
   }
 

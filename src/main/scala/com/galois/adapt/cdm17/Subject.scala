@@ -25,27 +25,26 @@ case class Subject(
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable with DBNodeable {
+
   def asDBKeyValues = List(
-    label, "Subject",
-    "titanType", "Subject",
-    "uuid", uuid,
-    "subjectType", subjectType.toString,
-    "cid", cid,
-    "localPrincipalUuid", localPrincipal,
-    "startTimestampNanos", startTimestampNanos
+    ("uuid", uuid),
+    ("subjectType", subjectType.toString),
+    ("cid", cid),
+    ("localPrincipalUuid", localPrincipal),
+    ("startTimestampNanos", startTimestampNanos)
   ) ++
-    parentSubject.fold[List[Any]](List.empty)(v => List("parentSubjectUuid", v)) ++
-    unitId.fold[List[Any]](List.empty)(v => List("unitId", v)) ++
-    iteration.fold[List[Any]](List.empty)(v => List("iteration", v)) ++
-    count.fold[List[Any]](List.empty)(v => List("count", v)) ++
-    cmdLine.fold[List[Any]](List.empty)(v => List("cmdLine", v)) ++
-    privilegeLevel.fold[List[Any]](List.empty)(v => List("privilegeLevel", v.toString)) ++
-    importedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("importedLibraries", v.mkString(", "))) ++
-    exportedLibraries.fold[List[Any]](List.empty)(v => if (v.isEmpty) List.empty else List("exportedLibraries", v.mkString(", "))) ++
+    parentSubject.fold[List[(String,Any)]](List.empty)(v => List(("parentSubjectUuid", v))) ++
+    unitId.fold[List[(String,Any)]](List.empty)(v => List(("unitId", v))) ++
+    iteration.fold[List[(String,Any)]](List.empty)(v => List(("iteration", v))) ++
+    count.fold[List[(String,Any)]](List.empty)(v => List(("count", v))) ++
+    cmdLine.fold[List[(String,Any)]](List.empty)(v => List(("cmdLine", v))) ++
+    privilegeLevel.fold[List[(String,Any)]](List.empty)(v => List(("privilegeLevel", v.toString))) ++
+    importedLibraries.fold[List[(String,Any)]](List.empty)(v => if (v.isEmpty) List.empty else List(("importedLibraries", v.mkString(", ")))) ++
+    exportedLibraries.fold[List[(String,Any)]](List.empty)(v => if (v.isEmpty) List.empty else List(("exportedLibraries", v.mkString(", ")))) ++
     DBOpt.fromKeyValMap(properties)
 
-  def asDBEdges = List(("localPrincipal",localPrincipal)) ++
-    parentSubject.fold[List[(String,UUID)]](Nil)(v => List(("parentSubject", v)))
+  def asDBEdges = List((CDM17.EdgeTypes.localPrincipal,localPrincipal)) ++
+    parentSubject.fold[List[(CDM17.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM17.EdgeTypes.parentSubject, v)))
 
   def getUuid = uuid
 

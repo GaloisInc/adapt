@@ -16,15 +16,14 @@ case class MemoryObject(
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
 ) extends CDM17 with DBWritable with DBNodeable {
+
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
-    label, "MemoryObject",
-    "titanType", "MemoryObject",
-    "uuid", uuid,
-    "memoryAddress", memoryAddress
+    ("uuid", uuid),
+    ("memoryAddress", memoryAddress)
   )  ++
-    pageNumber.fold[List[Any]](List.empty)(v => List("pageNumber", v)) ++
-    pageOffset.fold[List[Any]](List.empty)(v => List("pageOffset", v)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v))
+    pageNumber.fold[List[(String,Any)]](List.empty)(v => List(("pageNumber", v))) ++
+    pageOffset.fold[List[(String,Any)]](List.empty)(v => List(("pageOffset", v))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v)))
 
   def asDBEdges = Nil
 

@@ -16,25 +16,18 @@ import akka.dispatch.ExecutionContexts
 import akka.util.Timeout
 import akka.stream.{Attributes, DelayOverflowStrategy, FlowShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Partition, Source}
-import com.galois.adapt.ir.UuidRemapper.GetCdm2Ir
-import scala.reflect._
+import com.galois.adapt.ir.UuidRemapper.{GetCdm2Ir, ResultOfGetCdm2Ir}
 
-import scala.reflect.ClassTag
+import scala.reflect._
 
 object EntityResolution {
 
-  type CdmUUID = java.util.UUID
-  type IrUUID = java.util.UUID
-  
-
-  def apply()(implicit system: ActorSystem): Flow[CDM, Either[Edge[IR, IR], IR], _] = {
+  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeIr2Ir, IR], _] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
-    implicit val timout: Timeout = Timeout(30 seconds)
+    implicit val timout: Timeout = Timeout.durationToTimeout(21474830 seconds) // Timeout(30 seconds)
     val parallelism = 10000
 
-    val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper])
-   
     erWithoutRemapsFlow(uuidRemapper)
       .via(remapEdgeUuids(uuidRemapper))
         .via(awaitAndDeduplicate(parallelism))
@@ -88,23 +81,24 @@ object EntityResolution {
 
 
   // Remap UUIDs in Edges from CDMs to other IRs
-  private def remapEdgeUuids(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Future[Either[Edge[_, _], IR]], Future[Either[Edge[IR, IR], IR]], _] = {
+  private def remapEdgeUuids(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Future[Either[Edge[_, _], IR]], Future[Either[EdgeIr2Ir, IR]], _] = {
 
-    def remapEdge[From: ClassTag, To: ClassTag](edge: Edge[From, To]): Future[Edge[IR,IR]] = for {
-      // Remap source
-      newSrc <- if (classTag[From] != classTag[IR]) {
-        (uuidRemapper ? GetCdm2Ir(edge.src)).mapTo[UUID]
-      } else {
-        Future.successful(edge.src)
-      }
+    def remapEdge[From, To](edge: Edge[From, To]): Future[EdgeIr2Ir] = edge match {
+      case EdgeIr2Ir(src, lbl, tgt) => Future.successful(EdgeIr2Ir(src, lbl, tgt))
 
-      // Remap destination
-      newTgt <- if (classTag[To] != classTag[IR]) {
-        (uuidRemapper ? GetCdm2Ir(edge.src)).mapTo[UUID]
-      } else {
-        Future.successful(edge.tgt)
-      }
-    } yield Edge[IR, IR](newSrc, edge.label, newTgt)
+      case EdgeCdm2Ir(src, lbl, tgt) => for {
+        src_new <- (uuidRemapper ? GetCdm2Ir(src)).mapTo[ResultOfGetCdm2Ir]
+      } yield EdgeIr2Ir(src_new.target, lbl, tgt)
+
+      case EdgeIr2Cdm(src, lbl, tgt) => for {
+        tgt_new <- (uuidRemapper ? GetCdm2Ir(tgt)).mapTo[ResultOfGetCdm2Ir]
+      } yield EdgeIr2Ir(src, lbl, tgt_new.target)
+
+      case EdgeCdm2Cdm(src, lbl, tgt) => for {
+        src_new <- (uuidRemapper ? GetCdm2Ir(src)).mapTo[ResultOfGetCdm2Ir]
+        tgt_new <- (uuidRemapper ? GetCdm2Ir(tgt)).mapTo[ResultOfGetCdm2Ir]
+      } yield EdgeIr2Ir(src_new.target, lbl, tgt_new.target)
+    }
 
     Flow[Future[Either[Edge[_, _], IR]]].map(_.flatMap {
       case Left(edge) => remapEdge(edge).map(Left(_))
@@ -112,20 +106,42 @@ object EntityResolution {
     })
   }
 
-  private def awaitAndDeduplicate(parallelism: Int)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Future[Either[Edge[IR, IR], IR]], Either[Edge[IR, IR], IR], _] =
-    Flow[Future[Either[Edge[IR, IR], IR]]]
-      .mapAsyncUnordered[Either[Edge[IR, IR], IR]](parallelism)(identity)
-      .statefulMapConcat[Either[Edge[IR, IR], IR]](() => {
+  // This does three things:
+  //
+  //   * await the Futures (processing first the Futures that finish first)
+  //   * prevent nodes with the same UUID from being re-emitted
+  //   * prevent Edges from being emitted before both of their endpoints have been emitted
+  //
+  private def awaitAndDeduplicate(parallelism: Int)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Future[Either[EdgeIr2Ir, IR]], Either[EdgeIr2Ir, IR], _] =
+    Flow[Future[Either[EdgeIr2Ir, IR]]]
+      .mapAsyncUnordered[Either[EdgeIr2Ir, IR]](parallelism)(identity)
+      .statefulMapConcat[Either[EdgeIr2Ir, IR]](() => {
+        // UUIDs of nodes seen so far
         val seen: collection.mutable.Set[UUID] = collection.mutable.Set.empty[UUID]
 
+        // Edges blocked by UUIDsthat haven't arrived yet
+        val blockedEdges: collection.mutable.Map[UUID, List[EdgeIr2Ir]] = collection.mutable.Map.empty[UUID, List[EdgeIr2Ir]]
+
+        // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
+        def emitEdge(edge: EdgeIr2Ir): List[Either[EdgeIr2Ir, IR]] = {
+          if (!seen.contains(edge.src)) {
+            blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
+            Nil
+          } else if (!seen.contains(edge.tgt)) {
+            blockedEdges(edge.tgt) = edge :: blockedEdges.getOrElse(edge.tgt, Nil)
+            Nil
+          } else {
+            List(Left(edge))
+          }
+        }
+
         {
-          case Left(e) => List(Left(e))
+          case Left(edge) => emitEdge(edge)
           case Right(ir) if seen.contains(ir.uuid) => Nil
           case Right(ir) =>
             seen.add(ir.uuid)
-            List(Right(ir))
+            val emit = blockedEdges.remove(ir.uuid).getOrElse(Nil).flatMap(emitEdge)
+            Right(ir) :: emit
         }
       })
-
-
-  }
+}

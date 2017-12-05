@@ -12,7 +12,7 @@ import org.apache.avro.util.Utf8
 
 import scala.util.Try
 import scala.collection.JavaConverters._
-
+import org.neo4j.graphdb.RelationshipType
 
 package object cdm17 {
 
@@ -20,6 +20,15 @@ package object cdm17 {
 
   object CDM17 {
     val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
+
+    object EdgeTypes extends Enumeration {
+      type EdgeTypes = Value
+      val localPrincipal, subject, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId = Value
+
+      implicit def conv(rt: EdgeTypes) = new RelationshipType() {
+        def name = rt.toString
+      }
+    }
 
     def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM17]])] = {
       val fileContents = readAvroFile(filePath)
@@ -140,12 +149,12 @@ package object cdm17 {
 
   object DBOpt {
     // Flattens out nested "properties":
-    def fromKeyValMap(mapOpt: Option[Map[String,String]]): List[Any] = mapOpt.fold[List[Any]](List.empty)(aMap =>
+    def fromKeyValMap(mapOpt: Option[Map[String,String]]): List[(String, Any)] = mapOpt.fold[List[(String, Any)]](List.empty)(aMap =>
       if (aMap.isEmpty) List.empty
       else aMap.toList.flatMap {
-        case ("key", value) => List("keyFromProperties", Try(value.toLong).getOrElse(value))
-        case ("size", value) => List("sizeFromProperties", Try(value.toLong).getOrElse(value))
-        case (k,value) => List(k.toString, Try(value.toLong).getOrElse(value))
+        case ("key", value) => List(("keyFromProperties", Try(value.toLong).getOrElse(value)))
+        case ("size", value) => List(("sizeFromProperties", Try(value.toLong).getOrElse(value)))
+        case (k,value) => List((k.toString, Try(value.toLong).getOrElse(value)))
       }
     )
   }
