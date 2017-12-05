@@ -28,7 +28,7 @@ package object ir {
   final case class EdgeIr2Cdm (src: IrUUID, label: String, tgt: CdmUUID) extends Edge[IR, CDM17]
   final case class EdgeIr2Ir  (src: IrUUID, label: String, tgt: IrUUID) extends Edge[IR, IR]
 
-  sealed trait IR { self: DBWritable =>
+  sealed trait IR extends DBWritable { self =>
     val uuid: IrUUID                     // The current UUID
     val originalCdmUuids: Seq[CdmUUID]   // The UUIDs of all the CDM nodes that were merged to produce this node
 
@@ -61,9 +61,9 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrEvent",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "eventType" -> eventType,
+        "eventType" -> eventType.toString,
         "earliestTimestampNanos" -> earliestTimestampNanos,
         "latestTimestampNanos" -> latestTimestampNanos
       )
@@ -98,7 +98,7 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrSubject",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "subjectType" -> subjectTypes.toString,
         "startTimestampNanos" -> startTimestampNanos
@@ -121,7 +121,7 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrPathNode",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "path" -> path
       )
@@ -150,9 +150,9 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrFileObject",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "fileObjectType" -> fileObjectType
+        "fileObjectType" -> fileObjectType.toString
       )
 
     def toMap =
@@ -181,7 +181,7 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrNetFlowObject",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "localAddress" -> localAddress,
         "localPort" -> localPort,
@@ -214,9 +214,9 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrSrcSinkObject",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "srcSinkType" -> srcSinkType
+        "srcSinkType" -> srcSinkType.toString
       )
 
     def toMap =
@@ -246,10 +246,10 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrPrincipal",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "userId" -> userId,
-        "principalType" -> principalType
+        "principalType" -> principalType.toString
       ) ++
         (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(", ")) else Nil) ++
         username.fold[List[(String,Any)]](Nil)(v => List("username" -> v))
@@ -285,7 +285,7 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrProvenanceTagNode",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
       ) ++
         programPoint.fold[List[(String,Any)]](Nil)(p => List("programPoint" -> p))
@@ -305,7 +305,7 @@ package object ir {
     def asDBKeyValues =
       List(
 //        label, "IrSynthesized",
-        "uuid" -> uuid,
+        "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
       )
 

@@ -84,14 +84,32 @@ class UuidRemapper extends Actor with ActorLogging {
 
     // Debug information
     case GetStillBlocked =>
-      val out = new FileWriter(new File("blocked.csv"))
+      val blockedCsv = new FileWriter(new File("blocked.csv"))
 
-      out.write("blockCdm,blockingActors\n")
+      blockedCsv.write("blockCdm,blockingActors\n")
       for ((k,v) <- blocking) {
-        out.write(k.uuid.toString ++ "," ++ v.map(_.toString()).mkString(";") ++ "\n")
+        blockedCsv.write(k.uuid.toString ++ "," ++ v.map(_.toString()).mkString(";") ++ "\n")
       }
 
-      out.close()
+      blockedCsv.close()
+
+      val cdm2cdmCsv = new FileWriter(new File("cdm2cdmCsv.csv"))
+
+      cdm2cdmCsv.write("remappedCdmUuid,cdmUuid\n")
+      for ((k,v) <- cdm2cdm) {
+        cdm2cdmCsv.write(k.uuid.toString ++ "," ++ v.toString() ++ "\n")
+      }
+
+      cdm2cdmCsv.close()
+
+      val cdm2irCsv = new FileWriter(new File("cdm2irCsv.csv"))
+
+      cdm2irCsv.write("remappedCdmUuid,irUuid\n")
+      for ((k,v) <- cdm2ir) {
+        cdm2irCsv.write(k.uuid.toString ++ "," ++ v.toString() ++ "\n")
+      }
+
+      cdm2irCsv.close()
 
     //  sender() ! ()
 

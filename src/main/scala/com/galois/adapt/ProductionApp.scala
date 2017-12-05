@@ -82,7 +82,7 @@ object ProductionApp {
         val writeTimeout = Timeout(30.1 seconds)
         if (config.getBoolean("adapt.ingest.quitafteringest")) {
           println("Will shut down after ingesting all files.")
-          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)).runForeach {
             case Success(_) => ()
             case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
           } onComplete {
@@ -91,10 +91,34 @@ object ProductionApp {
           }
         } else {
           println("Will continuing running the DB and UI after ingesting all files.")
-          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(writeTimeout))
         }
-      val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
+      // TODO CLEAN THIS UP
+      case "ir-database" | "ir-db" | "ir-ingest" =>
+        println("Running database flow with UI")
+        val writeTimeout = Timeout(30.1 seconds)
+
+        val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
+//        system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+
+        println("Will shut down after ingesting all files.")
+        val l = CDMSource(ta1)
+          .via(FlowComponents.printCounter("Neo4j Writer", 10000))
+          .via(EntityResolution(uuidRemapper))
+          .via(Neo4jFlowComponents.neo4jActorIrWriteFlow(dbActor)(writeTimeout))
+          .runForeach {
+          case Success(_) => ()
+          case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
+        } onComplete {
+          case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
+          case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
+        }
+
+        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+
+      // TODO CLEAN THIS UP
       case "ir-csvmaker" | "ir-csv" =>
         RunnableGraph.fromGraph(GraphDSL.create() { implicit graph =>
           import GraphDSL.Implicits._
@@ -177,7 +201,7 @@ object ProductionApp {
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()

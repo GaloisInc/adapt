@@ -22,7 +22,7 @@ import scala.reflect._
 
 object EntityResolution {
 
-  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[Edge[IR, IR], IR], _] = {
+  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeIr2Ir, IR], _] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timout: Timeout = Timeout.durationToTimeout(21474830 seconds) // Timeout(30 seconds)
@@ -106,20 +106,42 @@ object EntityResolution {
     })
   }
 
+  // This does three things:
+  //
+  //   * await the Futures (processing first the Futures that finish first)
+  //   * prevent nodes with the same UUID from being re-emitted
+  //   * prevent Edges from being emitted before both of their endpoints have been emitted
+  //
   private def awaitAndDeduplicate(parallelism: Int)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Future[Either[EdgeIr2Ir, IR]], Either[EdgeIr2Ir, IR], _] =
     Flow[Future[Either[EdgeIr2Ir, IR]]]
       .mapAsyncUnordered[Either[EdgeIr2Ir, IR]](parallelism)(identity)
       .statefulMapConcat[Either[EdgeIr2Ir, IR]](() => {
+        // UUIDs of nodes seen so far
         val seen: collection.mutable.Set[UUID] = collection.mutable.Set.empty[UUID]
 
+        // Edges blocked by UUIDsthat haven't arrived yet
+        val blockedEdges: collection.mutable.Map[UUID, List[EdgeIr2Ir]] = collection.mutable.Map.empty[UUID, List[EdgeIr2Ir]]
+
+        // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
+        def emitEdge(edge: EdgeIr2Ir): List[Either[EdgeIr2Ir, IR]] = {
+          if (!seen.contains(edge.src)) {
+            blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
+            Nil
+          } else if (!seen.contains(edge.tgt)) {
+            blockedEdges(edge.tgt) = edge :: blockedEdges.getOrElse(edge.tgt, Nil)
+            Nil
+          } else {
+            List(Left(edge))
+          }
+        }
+
         {
-          case Left(e) => List(Left(e))
+          case Left(edge) => emitEdge(edge)
           case Right(ir) if seen.contains(ir.uuid) => Nil
           case Right(ir) =>
             seen.add(ir.uuid)
-            List(Right(ir))
+            val emit = blockedEdges.remove(ir.uuid).getOrElse(Nil).flatMap(emitEdge)
+            Right(ir) :: emit
         }
       })
-
-
-  }
+}
