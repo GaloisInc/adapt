@@ -1,4 +1,4 @@
-IR is intended as an internal format of CDM. Compared to CDM, it has several advantages: 
+IR (intermediate representation) is intended as an internal format of CDM. Compared to CDM, 
 
   * there are fewer the extraneous fields (CDM is verbose)
   * we perform entity resolution
@@ -19,10 +19,10 @@ are currently only a handful of types
        - we can emit extra path/command-line information after we've emitted the object it refers to
        - we can do reverse lookups to see which files/processes share a path/command-line
        
-Entity resolution occurs still in a streaming fashion. Since related records can be received with
-arbitrarily large time-delays between them, ER is pessimistic.
+Entity resolution occurs in a streaming fashion. Since related records can be received with
+arbitrarily large time-delays between them, ER is somewhat pessimistic.
 
-Since just about the whole pipeline is processed asynchronously, our control dial to regulate memory
+Since just about the whole pipeline is processed asynchronously, our pressure-value to regulate memory
 usage and time-guarantees is the timeout for these computations. 
 
 # Details
