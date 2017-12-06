@@ -91,7 +91,7 @@ object ERRules {
   ) = {
     val newUuid = IrUUID(UUID.randomUUID())
     (
-      IrFileObject(newUuid, Seq(CdmUUID(f.getUuid)),  f.fileObjectType),
+      IrFileObject(newUuid, Seq(CdmUUID(f.getUuid)), f.fileObjectType, f.size),
       UuidRemapper.PutCdm2Ir(CdmUUID(f.getUuid), newUuid),
       f.localPrincipal.map(prinicpal => EdgeIr2Cdm(newUuid, "principal", CdmUUID(prinicpal))),
       f.peInfo.map(path => {
@@ -113,7 +113,7 @@ object ERRules {
     ) = {
       val newUuid = IrUUID(UUID.randomUUID())
       (
-        IrFileObject(newUuid, Seq(CdmUUID(r.getUuid)), FILE_OBJECT_FILE),
+        IrFileObject(newUuid, Seq(CdmUUID(r.getUuid)), FILE_OBJECT_FILE, None),
         UuidRemapper.PutCdm2Ir(CdmUUID(r.getUuid), newUuid),
         {
           val pathNode = IrPathNode(r.key)

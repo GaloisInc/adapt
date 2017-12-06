@@ -88,7 +88,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     val tx = graphService.beginTx()
     val schema = graphService.schema()
 
-    createIfNeededUniqueConstraint(schema, "CDM", "uuid")
+    createIfNeededUniqueConstraint(schema, "Node", "uuid")
 
     // NOTE: The UI expects a specific format and collection of labels on each node.
     // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
@@ -106,6 +106,17 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     createIfNeededIndex(schema, "Event", "name")
     createIfNeededIndex(schema, "Event", "eventType")
     createIfNeededIndex(schema, "Event", "predicateObjectPath")
+
+    createIfNeededIndex(schema, "IR", "originalCdmUuids")
+    createIfNeededIndex(schema, "IrEvent", "eventType")
+    createIfNeededIndex(schema, "IrEvent", "earliestTimestampNanos")
+    createIfNeededIndex(schema, "IrEvent", "latestTimestampNanos")
+    createIfNeededIndex(schema, "IrSubject", "startTimestampNanos")
+////    createIfNeededIndex(schema, "IrPathNode", "path")            // TODO: Neo4j doesn't want to index properties longer than 32766 bytes
+    createIfNeededIndex(schema, "IrNetFlowObject", "localAddress")
+    createIfNeededIndex(schema, "IrNetFlowObject", "localPort")
+    createIfNeededIndex(schema, "IrNetFlowObject", "remoteAddress")
+    createIfNeededIndex(schema, "IrNetFlowObject", "remotePort")
 
     tx.success()
     tx.close()
@@ -132,7 +143,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(cdm.getUuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("CDM"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = g.createNode(Label.label("Node"), Label.label("CDM"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (cdm.getUuid -> newVertex)
           newVertex
         })
@@ -147,8 +158,8 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
             case Some(toNeo4jVertex) =>
               thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
             case None =>
-              val destinationNode = Option(g.findNode(Label.label("CDM"), "uuid", toUuid.toString)).getOrElse {
-                verticesInThisTX(toUuid) = g.createNode(Label.label("CDM"))  // Create empty node
+              val destinationNode = Option(g.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
+                verticesInThisTX(toUuid) = g.createNode(Label.label("Node"), Label.label("CDM"))  // Create empty node
                 verticesInThisTX(toUuid)
               }
               thisNeo4jVertex.createRelationshipTo(destinationNode, edgeName)
@@ -189,12 +200,12 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX.get(edge.src) match {
             case Some(fromNeo4jVertex) => fromNeo4jVertex
-            case None => Option(g.findNode(Label.label("CDM"), "uuid", edge.src.uuid.toString)).get // TODO error handling
+            case None => Option(g.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)).get // TODO error handling
           }
 
           val target = verticesInThisTX.get(edge.tgt) match {
             case Some(toNeo4jVertex) => toNeo4jVertex
-            case None => Option(g.findNode(Label.label("CDM"), "uuid", edge.tgt.uuid.toString)).get // TODO error handling
+            case None => Option(g.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)).get // TODO error handling
           }
 
           source.createRelationshipTo(target, new RelationshipType() {
@@ -204,11 +215,11 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       }
 
       case Right(ir) => Try {
-        val cdmTypeName = ir.getClass.getSimpleName
+        val irTypeName = ir.getClass.getSimpleName
         val thisNeo4jVertex = verticesInThisTX.getOrElse(ir.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("CDM"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = g.createNode(Label.label("Node"), Label.label("IR"), Label.label(irTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (ir.uuid.uuid -> newVertex)
           newVertex
         })
