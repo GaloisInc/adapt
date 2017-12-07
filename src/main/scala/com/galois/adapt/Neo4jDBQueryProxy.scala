@@ -107,7 +107,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     createIfNeededIndex(schema, "Event", "eventType")
     createIfNeededIndex(schema, "Event", "predicateObjectPath")
 
-    createIfNeededIndex(schema, "IR", "originalCdmUuids")
+//    createIfNeededIndex(schema, "IR", "originalCdmUuids")
     createIfNeededIndex(schema, "IrEvent", "eventType")
     createIfNeededIndex(schema, "IrEvent", "earliestTimestampNanos")
     createIfNeededIndex(schema, "IrEvent", "latestTimestampNanos")
@@ -226,7 +226,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
         ir.asDBKeyValues.foreach {
           case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
-          case (k, v) => Try( thisNeo4jVertex.setProperty(k, v) ) match { case Failure(e) => println(s"Cannot set property: $k -> $v"); Failure(e); case x => x }
+          case (k, v) => thisNeo4jVertex.setProperty(k, v)
         }
 
         Some(ir.uuid)
