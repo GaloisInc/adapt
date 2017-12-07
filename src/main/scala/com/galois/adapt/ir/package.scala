@@ -71,7 +71,7 @@ package object ir {
     def toMap =
       Map(
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "eventType" -> eventType,
+        "eventType" -> eventType.toString,
         "earliestTimestampNanos" -> earliestTimestampNanos,
         "latestTimestampNanos" -> latestTimestampNanos
       )
@@ -100,7 +100,7 @@ package object ir {
 //        label, "IrSubject",
         "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "subjectType" -> subjectTypes.toString,
+        "subjectType" -> subjectTypes.map(_.toString).toList.sorted.mkString(";"),
         "startTimestampNanos" -> startTimestampNanos
       )
 
@@ -144,7 +144,8 @@ package object ir {
      uuid: IrUUID,
      originalCdmUuids: Seq[CdmUUID],
 
-     fileObjectType: FileObjectType
+     fileObjectType: FileObjectType,
+     size: Option[Long]
   ) extends IR with DBWritable {
 
     def asDBKeyValues =
@@ -153,12 +154,14 @@ package object ir {
         "uuid" -> uuid.uuid,
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
         "fileObjectType" -> fileObjectType.toString
-      )
+      ) ++
+        size.fold[List[(String,Any)]](Nil)(v => List("size" -> v))
 
     def toMap =
       Map(
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "fileObjectType" -> fileObjectType
+        "fileObjectType" -> fileObjectType.toString,
+        "size" -> size.getOrElse("")
       )
   }
 
@@ -222,7 +225,7 @@ package object ir {
     def toMap =
       Map(
         "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-        "srcSinkType" -> srcSinkType
+        "srcSinkType" -> srcSinkType.toString
       )
   }
 

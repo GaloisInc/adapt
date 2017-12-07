@@ -1,4 +1,4 @@
-IR is intended as an internal format of CDM. Compared to CDM, it has several advantages: 
+IR (intermediate representation) is intended as an internal format of CDM. Compared to CDM, 
 
   * there are fewer the extraneous fields (CDM is verbose)
   * we perform entity resolution
@@ -10,26 +10,27 @@ are currently only a handful of types
   * `IrEvent`
   * `IrSubject`
   * `IrPrincipal`
-  * `IrFileObject`
+  * `IrFileObject` - `RegistryKeyObject`s are merged into this
   * `IrProvenanceTagNode`
   * `IrNetflowObject`
   * `IrSrcSinkObject`
+  * `IrPathNode` - This node type represents both file paths and command lines. The motivation for
+     breaking paths/command-line into separate nodes is two-fold:
+       - we can emit extra path/command-line information after we've emitted the object it refers to
+       - we can do reverse lookups to see which files/processes share a path/command-line
+       
+Entity resolution occurs in a streaming fashion. Since related records can be received with
+arbitrarily large time-delays between them, ER is somewhat pessimistic.
 
-Entity resolution occurs still in a streaming fashion. Since related records can be recieved with
-arbitrarily large time-delays between them, ER is pessimistic. The measure of when to "give up"
-holding onto information is usually in the form of `Tick`'s, which are emitted at regular time
-intervals.
-
-Holding onto records for longer (by increasing the `Tick` delay) means we can potentially perform
-more entity resolution, but it also means we are must hold onto more state and a greate delay
-between when we receive records and when we start doing any sort of APT detection on that
-information.
+Since just about the whole pipeline is processed asynchronously, our pressure-value to regulate memory
+usage and time-guarantees is the timeout for these computations. 
 
 # Details
 
 The following entity resolution occurs
 
   * `Subject`
+<<<<<<< HEAD
       - Subjects of type `SUBJECT_UNIT` are merged into their closest non-unit subject ancestor
       - Subjects collect a set of `cmdLines` from
           + the `cmdLine` field on the subject
@@ -40,24 +41,41 @@ The following entity resolution occurs
       - If a subject has a `cmdLine` that indicates it corresponds to one of several common
         interpreters (Python, Ruby, ...), for every `EVENT_READ` attached to this subject
         an `EVENT_EXECUTE` is synthesized
+=======
+      - Subjects that are _not_ processes are merged into their closest process ancestor
+      - The `exec` field on some subject processes is moved onto an `IrPathNode`
+>>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   * `Event`
-      - Sequences of events with the same subject and predicate objects are merged into groups of
-          + `EVENT_WRITE` and `EVENT_LSEEK`
-          + `EVENT_RECVFROM` and `EVENT_RECVMSG`
-          + `EVENT_SENDMSG`
-      - `EVENT_OPEN` and `EVENT_CLOSE` are ignored, except as boundaries between groups of events
+      - Successive events having the same type and with the same subject and predicate objects are merged
+      - <s>`EVENT_OPEN` and `EVENT_CLOSE` are ignored</s> (not yet implemented)
+      - An `EVENT_FORK` with a `cmdLine` field produces an `IrPathNode` with an edge between the path and process
+      - Events with a `predicateObject` and `predicateObjectPath` produce an `IrPathNode` with an edge
+        to the predicate object. Ditto for `predicateObject2` / `predicateObject2Path`.
 
   * `FileObject`
+<<<<<<< HEAD
       - File objects look for path information on the `predicateFileObjectPath` field of events
         that reference them as their `predicateObject` and collect all such information into a set
       - File objects are deduplicated based on their path (if they have one), type, and local
         principal
+=======
+      - The path information on some file objects is moved onto an `IrPathNode`
+>>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   * `Netflow`
       - Netflows are deduplicated based on the local/global IP and local/global port
       
+<<<<<<< HEAD
   * `RegistryKeyObject`
       - Converted into files (discard the `value`, use the `key` as the path)
+=======
+      
+# Future
+
+Building off of the current system here are some things that are now possible, and may be useful:
+
+  * adding edges to link nodes to other nodes that are temporally close to them  
+>>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   [0]: package.scala
