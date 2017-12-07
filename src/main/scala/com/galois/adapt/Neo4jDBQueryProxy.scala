@@ -215,7 +215,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
         ir.asDBKeyValues.foreach {
           case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
-          case (k, v) => thisNeo4jVertex.setProperty(k, v)
+          case (k, v) => Try( thisNeo4jVertex.setProperty(k, v) ) match { case Failure(e) => println(s"Cannot set property: $k -> $v"); Failure(e); case x => x }
         }
 
         Some(ir.uuid)
@@ -224,9 +224,10 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
           if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${ir.getUuid}")
           Success(None)
         //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
-        case e =>
-          e.printStackTrace()
-          Failure(e)
+//        case e: IllegalArgumentException =>  // When a property can't be set (e.g. is too long)
+//          e.printStackTrace()
+//          Failure(e)
+        case e: Throwable => Failure(e)
       }
     }
 
