@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import java.util.UUID
 
 import com.galois.adapt.cdm17._
@@ -66,7 +67,7 @@ package object adm {
     latestTimestampNanos: Long
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -101,7 +102,7 @@ package object adm {
     startTimestampNanos: Long
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -151,7 +152,7 @@ package object adm {
      size: Option[Long]
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -212,7 +213,7 @@ package object adm {
     srcSinkType: SrcSinkType
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -274,7 +275,7 @@ package object adm {
     programPoint: Option[String] = None
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -317,12 +318,13 @@ object DeterministicUUID {
     UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)
   }
 
-  def apply(fields: Seq[Any]): UUID = {
-    val byteOutputStream: ByteArrayOutputStream = new ByteArrayOutputStream()
+  def apply(fields: Seq[UUID]): UUID = {
+    val byteBuffer: ByteBuffer = ByteBuffer.allocate(8 * 2)
     for (value <- fields) {
-      byteOutputStream.write(value.hashCode())
+      byteBuffer.putLong(value.getLeastSignificantBits)
+      byteBuffer.putLong(value.getMostSignificantBits)
     }
-    UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)
+    UUID.nameUUIDFromBytes(byteBuffer.array())
   }
 
 }
