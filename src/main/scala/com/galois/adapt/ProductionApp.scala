@@ -98,8 +98,8 @@ object ProductionApp {
         println("Running database flow with UI")
         val writeTimeout = Timeout(30.1 seconds)
 
-        val ingestCdm = config.getBoolean("adapt.ingest.cdm")
-        val ingestAdm = config.getBoolean("adapt.ingest.adm")
+        val ingestCdm = config.getBoolean("adapt.ingest.produceadm")
+        val ingestAdm = config.getBoolean("adapt.ingest.producecdm")
 
         // Ingestion pipeline
         val flow: Source[Try[Unit], _] = CDMSource(ta1)
@@ -117,6 +117,7 @@ object ProductionApp {
               println("Ingesting neither CDM not ADM - so just passing elements through!")
               Flow.fromFunction(_ => Success(()))
 
+            // TODO: Add edges between CDM and ADM
             case (true, true) =>
               Flow.fromGraph(GraphDSL.create() { implicit b =>
                 import GraphDSL.Implicits._
@@ -155,8 +156,8 @@ object ProductionApp {
 
       case "csvmaker" | "csv" =>
 
-        val forCdm = config.getBoolean("adapt.ingest.cdm")
-        val forAdm = config.getBoolean("adapt.ingest.adm")
+        val forCdm = config.getBoolean("adapt.ingest.producecdm")
+        val forAdm = config.getBoolean("adapt.ingest.produceadm")
 
         val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
 
@@ -201,15 +202,15 @@ object ProductionApp {
                   case Right(ir) => ir
                 }) ~> broadcast.in
 
-              broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src), lbl, AdmUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
-              broadcast.out(1).collect{ case c: ADMNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
-              broadcast.out(2).collect{ case c: ADMEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
-              broadcast.out(3).collect{ case c: ADMFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
-              broadcast.out(4).collect{ case c: ADMProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
-              broadcast.out(5).collect{ case c: ADMSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
-              broadcast.out(6).collect{ case c: ADMPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
-              broadcast.out(7).collect{ case c: ADMSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
-              broadcast.out(8).collect{ case c: ADMPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPathNodes.csv")
+              broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src), lbl, AdmUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
+              broadcast.out(1).collect{ case c: ADMNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
+              broadcast.out(2).collect{ case c: ADMEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
+              broadcast.out(3).collect{ case c: ADMFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
+              broadcast.out(4).collect{ case c: ADMProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
+              broadcast.out(5).collect{ case c: ADMSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
+              broadcast.out(6).collect{ case c: ADMPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
+              broadcast.out(7).collect{ case c: ADMSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
+              broadcast.out(8).collect{ case c: ADMPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
 
               ClosedShape
             }).run()

@@ -13,6 +13,18 @@ package object adm {
   case class CdmUUID(uuid: UUID) extends AnyVal
   case class AdmUUID(uuid: UUID) extends AnyVal
 
+  implicit def orderingCdm: Ordering[CdmUUID] = new Ordering[CdmUUID] {
+    override def compare(x: CdmUUID, y: CdmUUID) = {
+      x.uuid.compareTo(y.uuid)
+    }
+  }
+
+  implicit def orderingAdm: Ordering[AdmUUID] = new Ordering[AdmUUID] {
+    override def compare(x: AdmUUID, y: AdmUUID) = {
+      x.uuid.compareTo(y.uuid)
+    }
+  }
+
   implicit def unwrapAdmUUID(admUuid: AdmUUID): UUID = admUuid.uuid
 
   // Edges are now first class values in the stream.
@@ -47,13 +59,14 @@ package object adm {
    *   - 'programPoint' is too much information
    */
   final case class ADMEvent(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID],
 
     eventType: EventType,
     earliestTimestampNanos: Long,
     latestTimestampNanos: Long
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -81,13 +94,14 @@ package object adm {
    *  - 'importedLibraries' and 'exportedLibraries' aren't used
    */
   final case class ADMSubject(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID],
 
     subjectTypes: Set[SubjectType],
     cid: Int,
     startTimestampNanos: Long
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -131,12 +145,13 @@ package object adm {
    *  - hashes
    */
   final case class ADMFileObject(
-     uuid: AdmUUID,
      originalCdmUuids: Seq[CdmUUID],
 
      fileObjectType: FileObjectType,
      size: Option[Long]
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -192,11 +207,12 @@ package object adm {
    *  - fileDescriptor
    */
   final case class ADMSrcSinkObject(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID],
 
     srcSinkType: SrcSinkType
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -253,13 +269,12 @@ package object adm {
    *  - 'ctag'
    */
   final case class ADMProvenanceTagNode(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID],
 
     programPoint: Option[String] = None
   ) extends ADM with DBWritable {
 
-    type SelfType = ADMProvenanceTagNode
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -297,6 +312,14 @@ object DeterministicUUID {
   def apply[T <: Product](product: T): UUID = {
     val byteOutputStream: ByteArrayOutputStream = new ByteArrayOutputStream()
     for (value <- product.productIterator) {
+      byteOutputStream.write(value.hashCode())
+    }
+    UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)
+  }
+
+  def apply(fields: Seq[Any]): UUID = {
+    val byteOutputStream: ByteArrayOutputStream = new ByteArrayOutputStream()
+    for (value <- fields) {
       byteOutputStream.write(value.hashCode())
     }
     UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)

@@ -7,14 +7,14 @@ ADM (adapt data model) is intended as an internal format of CDM. Compared to CDM
 To the effect of the first point, the entire definition of the ADM type [lives in one file][0]. There
 are currently only a handful of types 
 
-  * `IrEvent`
-  * `IrSubject`
-  * `IrPrincipal`
-  * `IrFileObject` - `RegistryKeyObject`s are merged into this
-  * `IrProvenanceTagNode`
-  * `IrNetflowObject`
-  * `IrSrcSinkObject`
-  * `IrPathNode` - This node type represents both file paths and command lines. The motivation for
+  * `AdmEvent`
+  * `AdmSubject`
+  * `AdmPrincipal`
+  * `AdmFileObject` - `RegistryKeyObject`s are merged into this
+  * `AdmProvenanceTagNode`
+  * `AdmNetflowObject`
+  * `AdmSrcSinkObject`
+  * `AdmPathNode` - This node type represents both file paths and command lines. The motivation for
      breaking paths/command-line into separate nodes is two-fold:
        - we can emit extra path/command-line information after we've emitted the object it refers to
        - we can do reverse lookups to see which files/processes share a path/command-line
@@ -31,17 +31,17 @@ The following entity resolution occurs
 
   * `Subject`
       - Subjects that are _not_ processes are merged into their closest process ancestor
-      - The `exec` field on some subject processes is moved onto an `IrPathNode`
+      - The `exec` field on some subject processes is moved onto an `AdmPathNode`
 
   * `Event`
       - Successive events having the same type and with the same subject and predicate objects are merged
       - <s>`EVENT_OPEN` and `EVENT_CLOSE` are ignored</s> (not yet implemented)
-      - An `EVENT_FORK` with a `cmdLine` field produces an `IrPathNode` with an edge between the path and process
-      - Events with a `predicateObject` and `predicateObjectPath` produce an `IrPathNode` with an edge
+      - An `EVENT_FORK` with a `cmdLine` field produces an `AdmPathNode` with an edge between the path and process
+      - Events with a `predicateObject` and `predicateObjectPath` produce an `AdmPathNode` with an edge
         to the predicate object. Ditto for `predicateObject2` / `predicateObject2Path`.
 
   * `FileObject`
-      - The path information on some file objects is moved onto an `IrPathNode`
+      - The path information on some file objects is moved onto an `AdmPathNode`
 
   * `Netflow`
       - Netflows are deduplicated based on the local/global IP and local/global port

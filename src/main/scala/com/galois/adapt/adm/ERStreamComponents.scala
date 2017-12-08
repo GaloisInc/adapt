@@ -22,35 +22,35 @@ object ERStreamComponents {
 
     // Identify sequences of events
     .statefulMapConcat( () => {
-      var wipIrEventOpt: Option[ADMEvent] = None
+      var wipAdmEventOpt: Option[ADMEvent] = None
       var remaps: List[UuidRemapper.PutCdm2Adm] = Nil
       var dependent: Stream[Either[Edge[_, _], ADM]] = Stream.empty
 
       (e: Event) => {
 
-        wipIrEventOpt match {
-          case Some(wipIrEvent) => collapseEvents(e, wipIrEvent) match {
+        wipAdmEventOpt match {
+          case Some(wipAdmEvent) => collapseEvents(e, wipAdmEvent) match {
 
             // Merged event in
             case Left((remap, newWipEvent)) =>
               // Update the new WIP
-              wipIrEventOpt = Some(newWipEvent)
+              wipAdmEventOpt = Some(newWipEvent)
               remaps = remap :: remaps
               Stream.empty
 
             // Didn't merge event in
-            case Right((e, wipIrEvent)) =>
+            case Right((e, wipAdmEvent)) =>
 
               // Create a new WIP from e
 
-              val (newWipIrEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
+              val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
 
               val toReturn = Stream.concat(                            // Emit the old WIP
-                Some(Right(wipIrEvent)),
+                Some(Right(wipAdmEvent)),
                 dependent
               ).map(elem => Future.sequence(remaps.map(r => uuidRemapper ? r)).map(_ => elem))
 
-              wipIrEventOpt = Some(newWipIrEvent)
+              wipAdmEventOpt = Some(newWipAdmEvent)
               remaps = List(remap)
               dependent = extractPathsAndEdges(path1) ++ extractPathsAndEdges(path2) ++ extractPathsAndEdges(path3) ++ Stream.concat(
                   Some(Left(subject)),
@@ -63,9 +63,9 @@ object ERStreamComponents {
           }
           case None =>
             // Create a new WIP from e
-            val (newWipIrEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
+            val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
 
-            wipIrEventOpt = Some(newWipIrEvent)
+            wipAdmEventOpt = Some(newWipAdmEvent)
             remaps = List(remap)
             dependent = extractPathsAndEdges(path1) ++ extractPathsAndEdges(path2) ++ extractPathsAndEdges(path3) ++ Stream.concat(
               Some(Left(subject)),

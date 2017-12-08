@@ -242,8 +242,12 @@ object Query {
       // inference is stupidly asymmetric.
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
+        | ".has('uuid'," ~ lit ~ ")"       ^^ { case _~v~_      => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v) }
+        | ".has(\"uuid\"," ~ lit ~ ")"     ^^ { case _~v~_      => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v) }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
+        | ".has('uuid'," ~ pred ~ ")"      ^^ { case _~p~_      => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p) }
+        | ".has(\"uuid\"," ~ pred ~ ")"    ^^ { case _~p~_      => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p) }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~! str ~ ")"       ^^ { case _~l~_      => HasLabel(_: Tr, l) }

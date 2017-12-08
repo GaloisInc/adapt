@@ -92,7 +92,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     // NOTE: The UI expects a specific format and collection of labels on each node.
     // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
-    if (config.getBoolean("adapt.ingest.cdm")) {
+    if (config.getBoolean("adapt.ingest.producecdm")) {
 
       createIfNeededIndex(schema, "Subject", "timestampNanos")
       createIfNeededIndex(schema, "Subject", "cid")
@@ -110,22 +110,22 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
     }
 
-    if (config.getBoolean("adapt.ingest.adm")) {
+    if (config.getBoolean("adapt.ingest.produceadm")) {
 
-      createIfNeededIndex(schema, "IrEvent", "eventType")
-      createIfNeededIndex(schema, "IrEvent", "earliestTimestampNanos")
-      createIfNeededIndex(schema, "IrEvent", "latestTimestampNanos")
-      createIfNeededIndex(schema, "IrSubject", "startTimestampNanos")
-      createIfNeededIndex(schema, "IrNetFlowObject", "localAddress")
-      createIfNeededIndex(schema, "IrNetFlowObject", "localPort")
-      createIfNeededIndex(schema, "IrNetFlowObject", "remoteAddress")
-      createIfNeededIndex(schema, "IrNetFlowObject", "remotePort")
+      createIfNeededIndex(schema, "AdmEvent", "eventType")
+      createIfNeededIndex(schema, "AdmEvent", "earliestTimestampNanos")
+      createIfNeededIndex(schema, "AdmEvent", "latestTimestampNanos")
+      createIfNeededIndex(schema, "AdmSubject", "startTimestampNanos")
+      createIfNeededIndex(schema, "AdmNetFlowObject", "localAddress")
+      createIfNeededIndex(schema, "AdmNetFlowObject", "localPort")
+      createIfNeededIndex(schema, "AdmNetFlowObject", "remoteAddress")
+      createIfNeededIndex(schema, "AdmNetFlowObject", "remotePort")
 
     }
 
     // TODO: Neo4j doesn't want to index properties longer than 32766 bytes:
-    //    createIfNeededIndex(schema, "IrPathNode", "path")
-    //    createIfNeededIndex(schema, "IR", "originalCdmUuids")
+    //    createIfNeededIndex(schema, "AdmPathNode", "path")
+    //    createIfNeededIndex(schema, "ADM", "originalCdmUuids")
 
     tx.success()
     tx.close()
@@ -152,7 +152,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(cdm.getUuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("Node"), Label.label("CDM"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = g.createNode(Label.label("Node"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (cdm.getUuid -> newVertex)
           newVertex
         })
@@ -168,7 +168,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
               thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
             case None =>
               val destinationNode = Option(g.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
-                verticesInThisTX(toUuid) = g.createNode(Label.label("Node"), Label.label("CDM"))  // Create empty node
+                verticesInThisTX(toUuid) = g.createNode(Label.label("Node"))  // Create empty node
                 verticesInThisTX(toUuid)
               }
               thisNeo4jVertex.createRelationshipTo(destinationNode, edgeName)
@@ -207,15 +207,15 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       case Left(edge) => Try {
 
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
-          val source = verticesInThisTX.get(edge.src) match {
-            case Some(fromNeo4jVertex) => fromNeo4jVertex
-            case None => Option(g.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)).get // TODO error handling
-          }
+          val source = verticesInThisTX
+            .get(edge.src)
+            .orElse(Option(g.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
+            .getOrElse(throw AdmInvariantViolation(edge))
 
-          val target = verticesInThisTX.get(edge.tgt) match {
-            case Some(toNeo4jVertex) => toNeo4jVertex
-            case None => Option(g.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)).get // TODO error handling
-          }
+          val target = verticesInThisTX
+            .get(edge.tgt)
+            .orElse(Option(g.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
+            .getOrElse(throw AdmInvariantViolation(edge))
 
           source.createRelationshipTo(target, new RelationshipType() {
             def name: String = edge.label
@@ -228,7 +228,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("Node"), Label.label("IR"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = g.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (adm.uuid.uuid -> newVertex)
           newVertex
         })
@@ -243,10 +243,6 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         case e: ConstraintViolationException =>
           if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${adm.uuid}")
           Success(None)
-        //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
-//        case e: IllegalArgumentException =>  // When a property can't be set (e.g. is too long)
-//          e.printStackTrace()
-//          Failure(e)
         case e: Throwable => Failure(e)
       }
     }
@@ -255,7 +251,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       if (admToNodeResults.forall(_.isSuccess))
         transaction.success()
       else {
-        println(s"TRANSACTION FAILURE! IRs:\n") // $adms") // The IRS is coming after you!
+        println(s"TRANSACTION FAILURE! ADMs:\n")
         admToNodeResults.find(_.isFailure) match {
           case Some(Failure(e)) => e.printStackTrace()
         }
@@ -410,3 +406,5 @@ object Neo4jFlowComponents {
 case class FailureMsg(e: Throwable)
 case object CompleteMsg
 case object InitMsg
+
+case class AdmInvariantViolation(edge: EdgeAdm2Adm) extends RuntimeException(s"Didn't find source ${edge.src} of $edge")
