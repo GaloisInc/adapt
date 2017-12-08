@@ -1,10 +1,10 @@
-IR (intermediate representation) is intended as an internal format of CDM. Compared to CDM, 
+ADM (adapt data model) is intended as an internal format of CDM. Compared to CDM, 
 
   * there are fewer the extraneous fields (CDM is verbose)
   * we perform entity resolution
   * we can apply provider specific rules to normalize the data
 
-To the effect of the first point, the entire definition of the IR type [lives in one file][0]. There
+To the effect of the first point, the entire definition of the ADM type [lives in one file][0]. There
 are currently only a handful of types 
 
   * `IrEvent`
@@ -30,21 +30,8 @@ usage and time-guarantees is the timeout for these computations.
 The following entity resolution occurs
 
   * `Subject`
-<<<<<<< HEAD
-      - Subjects of type `SUBJECT_UNIT` are merged into their closest non-unit subject ancestor
-      - Subjects collect a set of `cmdLines` from
-          + the `cmdLine` field on the subject
-          + an event which has this subject and with a `cmdLine` field
-          + an event which has this subject and with a `exec` field
-          + in the `name` field which can exist on the subjects property map
-      - Synthesize parent subject edge (suggestion coming from Daniel)
-      - If a subject has a `cmdLine` that indicates it corresponds to one of several common
-        interpreters (Python, Ruby, ...), for every `EVENT_READ` attached to this subject
-        an `EVENT_EXECUTE` is synthesized
-=======
       - Subjects that are _not_ processes are merged into their closest process ancestor
       - The `exec` field on some subject processes is moved onto an `IrPathNode`
->>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   * `Event`
       - Successive events having the same type and with the same subject and predicate objects are merged
@@ -54,28 +41,18 @@ The following entity resolution occurs
         to the predicate object. Ditto for `predicateObject2` / `predicateObject2Path`.
 
   * `FileObject`
-<<<<<<< HEAD
-      - File objects look for path information on the `predicateFileObjectPath` field of events
-        that reference them as their `predicateObject` and collect all such information into a set
-      - File objects are deduplicated based on their path (if they have one), type, and local
-        principal
-=======
       - The path information on some file objects is moved onto an `IrPathNode`
->>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   * `Netflow`
       - Netflows are deduplicated based on the local/global IP and local/global port
       
-<<<<<<< HEAD
   * `RegistryKeyObject`
       - Converted into files (discard the `value`, use the `key` as the path)
-=======
       
 # Future
 
 Building off of the current system here are some things that are now possible, and may be useful:
 
   * adding edges to link nodes to other nodes that are temporally close to them  
->>>>>>> 121fe0b2bf49b1abe99dd2ebda524a5ecc63eb4d
 
   [0]: package.scala

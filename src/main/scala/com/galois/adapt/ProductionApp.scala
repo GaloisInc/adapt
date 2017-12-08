@@ -6,36 +6,29 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
-import com.galois.adapt.ir._
-import com.typesafe.config.ConfigFactory
-import akka.stream._
-import akka.stream.scaladsl._
-
-import akka.util.Timeout
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import org.mapdb.{DB, DBMaker}
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.pattern.ask
-import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import ApiJsonProtocol._
 import akka.http.scaladsl.server.RouteResult._
 import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
-import com.galois.adapt.ir.UuidRemapper.GetStillBlocked
+import akka.kafka.{ConsumerSettings, Subscriptions}
+import akka.pattern.ask
+import akka.stream.{ActorMaterializer, _}
+import akka.stream.scaladsl._
+import akka.util.Timeout
+import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
+import com.galois.adapt.adm._
+import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.apache.kafka.common.serialization.ByteArrayDeserializer
+import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+import org.mapdb.{DB, DBMaker}
 
-import collection.JavaConverters._
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.language.postfixOps
-import scala.util.{Random, Try}
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
+import scala.language.postfixOps
+import scala.util.{Failure, Random, Success, Try}
 
 
 object ProductionApp {
@@ -96,7 +89,7 @@ object ProductionApp {
         val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       // TODO CLEAN THIS UP
-      case "ir-database" | "ir-db" | "ir-ingest" =>
+      case "adm-database" | "adm-db" | "adm-ingest" =>
         println("Running database flow with UI")
         val writeTimeout = Timeout(30.1 seconds)
 
@@ -107,7 +100,7 @@ object ProductionApp {
         val l = CDMSource(ta1)
           .via(FlowComponents.printCounter("Neo4j Writer", 10000))
           .via(EntityResolution(uuidRemapper))
-          .via(Neo4jFlowComponents.neo4jActorIrWriteFlow(dbActor)(writeTimeout))
+          .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout))
           .runForeach {
           case Success(_) => ()
           case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
@@ -119,7 +112,7 @@ object ProductionApp {
         val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
       // TODO CLEAN THIS UP
-      case "ir-csvmaker" | "ir-csv" =>
+      case "adm-csvmaker" | "adm-csv" =>
         RunnableGraph.fromGraph(GraphDSL.create() { implicit graph =>
           import GraphDSL.Implicits._
           val bcast = graph.add(Broadcast[Any](9))
@@ -137,15 +130,15 @@ object ProductionApp {
             })
             .concat(Source.apply(List(GetStillBlocked))) ~> bcast.in
 
-          bcast.out(0).collect{ case EdgeIr2Ir(IrUUID(src), lbl, IrUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
-          bcast.out(1).collect{ case c: IrNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
-          bcast.out(2).collect{ case c: IrEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
-          bcast.out(3).collect{ case c: IrFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
-          bcast.out(4).collect{ case c: IrProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
-          bcast.out(5).collect{ case c: IrSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
-          bcast.out(6).collect{ case c: IrPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
-          bcast.out(7).collect{ case c: IrSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
-          bcast.out(8).collect{ case c: IrPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPathNodes.csv")
+          bcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src), lbl, AdmUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEdges.csv")
+          bcast.out(1).collect{ case c: ADMNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrNetFlowObjects.csv")
+          bcast.out(2).collect{ case c: ADMEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrEvents.csv")
+          bcast.out(3).collect{ case c: ADMFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrFileObjects.csv")
+          bcast.out(4).collect{ case c: ADMProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrProvenanceTagNodes.csv")
+          bcast.out(5).collect{ case c: ADMSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSubjects.csv")
+          bcast.out(6).collect{ case c: ADMPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPrincipals.csv")
+          bcast.out(7).collect{ case c: ADMSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrSrcSinkObjects.csv")
+          bcast.out(8).collect{ case c: ADMPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "IrPathNodes.csv")
         //  bcast.out(9).collect{ case GetStillBlocked => {
         //    implicit val timeout = akka.util.Timeout(5 seconds)
         //    Await.result(uuidRemapper ? GetStillBlocked, timeout.duration)

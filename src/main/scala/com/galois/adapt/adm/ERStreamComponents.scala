@@ -1,36 +1,30 @@
-package com.galois.adapt.ir
+package com.galois.adapt.adm
 
-import java.util.UUID
-
-import scala.concurrent.duration._
-import akka.stream.scaladsl.{Flow, Source}
 import akka.actor.ActorRef
 import akka.pattern.ask
+import akka.stream.scaladsl.Flow
 import akka.util.Timeout
 import com.galois.adapt.cdm17._
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
-/* This object contains all of the logic for resolving individual CDM types into their corresponding
- * IR ones.
- */
+// This object contains all of the logic for resolving individual CDM types into their corresponding ADM ones.
 object ERStreamComponents {
 
   import ERRules._
 
   type CDM = CDM17
 
-  def eventResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Event, Future[Either[Edge[_, _], IR]], _] = Flow[Event]
+  def eventResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Event, Future[Either[Edge[_, _], ADM]], _] = Flow[Event]
 
     // Group events that have the same subject and predicate objects
     .groupBy(Int.MaxValue, e => (e.subjectUuid, e.predicateObject, e.predicateObject2))
 
     // Identify sequences of events
     .statefulMapConcat( () => {
-      var wipIrEventOpt: Option[IrEvent] = None
-      var remaps: List[UuidRemapper.PutCdm2Ir] = Nil
-      var dependent: Stream[Either[Edge[_, _], IR]] = Stream.empty
+      var wipIrEventOpt: Option[ADMEvent] = None
+      var remaps: List[UuidRemapper.PutCdm2Adm] = Nil
+      var dependent: Stream[Either[Edge[_, _], ADM]] = Stream.empty
 
       (e: Event) => {
 
@@ -87,13 +81,13 @@ object ERStreamComponents {
     // Un-group events
     .mergeSubstreams
 
-  def extractPathsAndEdges(path: Option[(Edge[_, _], IrPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], IR]] = path match {
+  def extractPathsAndEdges(path: Option[(Edge[_, _], ADMPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
     case Some((edge, path)) => Stream(Right(path), Left(edge))
     case None => Stream()
   }
 
-  def subjectResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Subject, Future[Either[Edge[_, _], IR]], _] = Flow[Subject]
-    .mapConcat[Future[Either[Edge[_, _], IR]]] { s =>
+  def subjectResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Subject, Future[Either[Edge[_, _], ADM]], _] = Flow[Subject]
+    .mapConcat[Future[Either[Edge[_, _], ADM]]] { s =>
       ERRules.resolveSubject(s) match {
 
         // Don't merge the Subject (it isn't a UNIT)
@@ -113,9 +107,9 @@ object ERStreamComponents {
       }
     }
 
-  def otherResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[CDM, Future[Either[Edge[_, _], IR]], _] = {
+  def otherResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[CDM, Future[Either[Edge[_, _], ADM]], _] = {
 
-    Flow[CDM].mapConcat[Future[Either[Edge[_, _], IR]]] {
+    Flow[CDM].mapConcat[Future[Either[Edge[_, _], ADM]]] {
       case ptn: ProvenanceTagNode =>
 
         val (irPtn, remap, flowObjectEdge, subjectEdge, prevTagIdEdge, tagIdsEgdes) = ERRules.resolveProvenanceTagNode(ptn)

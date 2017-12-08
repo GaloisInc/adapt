@@ -2,34 +2,33 @@ package com.galois.adapt
 
 import java.util.UUID
 
-import com.typesafe.config.ConfigFactory
-import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
-import org.neo4j.graphdb.factory.GraphDatabaseFactory
-import org.neo4j.graphdb.schema.Schema
-import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException
-import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
 import akka.actor._
+import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
+import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.CDM17
+import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
+import org.neo4j.graphdb.factory.GraphDatabaseFactory
+import org.neo4j.graphdb.schema.Schema
 import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, Label, RelationshipType, Node => NeoNode}
+import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException
+import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
 import spray.json._
-import akka.pattern.ask
-import com.galois.adapt.cdm17.CDM17.EdgeTypes
-import com.galois.adapt.ir._
 
+import scala.collection.JavaConverters._
+import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
-import collection.mutable.{Map => MutableMap}
-import collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 class Neo4jDBQueryProxy extends Actor with ActorLogging {
-  implicit val ec = context.dispatcher
-  val config = ConfigFactory.load()
+  implicit val ec: ExecutionContext = context.dispatcher
+  val config: Config = ConfigFactory.load()
 
-  val neoGraph = {
+  val neoGraph: GraphDatabaseService = {
     val neo4jFile: java.io.File = new java.io.File(config.getString("adapt.runtime.neo4jfile"))
     val graphService = new GraphDatabaseFactory().newEmbeddedDatabase(neo4jFile)
     context.system.registerOnTermination(graphService.shutdown())
@@ -93,30 +92,40 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     // NOTE: The UI expects a specific format and collection of labels on each node.
     // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
-    createIfNeededIndex(schema, "Subject", "timestampNanos")
-    createIfNeededIndex(schema, "Subject", "cid")
-    createIfNeededIndex(schema, "Subject", "cmdLine")
-    createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
-    createIfNeededIndex(schema, "NetFlowObject", "localAddress")
-    createIfNeededIndex(schema, "NetFlowObject", "localPort")
-    createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
-    createIfNeededIndex(schema, "NetFlowObject", "remotePort")
-    createIfNeededIndex(schema, "FileObject", "peInfo")
-    createIfNeededIndex(schema, "Event", "timestampNanos")
-    createIfNeededIndex(schema, "Event", "name")
-    createIfNeededIndex(schema, "Event", "eventType")
-    createIfNeededIndex(schema, "Event", "predicateObjectPath")
+    if (config.getBoolean("adapt.ingest.cdm")) {
 
-//    createIfNeededIndex(schema, "IR", "originalCdmUuids")
-    createIfNeededIndex(schema, "IrEvent", "eventType")
-    createIfNeededIndex(schema, "IrEvent", "earliestTimestampNanos")
-    createIfNeededIndex(schema, "IrEvent", "latestTimestampNanos")
-    createIfNeededIndex(schema, "IrSubject", "startTimestampNanos")
-////    createIfNeededIndex(schema, "IrPathNode", "path")            // TODO: Neo4j doesn't want to index properties longer than 32766 bytes
-    createIfNeededIndex(schema, "IrNetFlowObject", "localAddress")
-    createIfNeededIndex(schema, "IrNetFlowObject", "localPort")
-    createIfNeededIndex(schema, "IrNetFlowObject", "remoteAddress")
-    createIfNeededIndex(schema, "IrNetFlowObject", "remotePort")
+      createIfNeededIndex(schema, "Subject", "timestampNanos")
+      createIfNeededIndex(schema, "Subject", "cid")
+      createIfNeededIndex(schema, "Subject", "cmdLine")
+      createIfNeededIndex(schema, "RegistryKeyObject", "registryKeyOrPath")
+      createIfNeededIndex(schema, "NetFlowObject", "localAddress")
+      createIfNeededIndex(schema, "NetFlowObject", "localPort")
+      createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
+      createIfNeededIndex(schema, "NetFlowObject", "remotePort")
+      createIfNeededIndex(schema, "FileObject", "peInfo")
+      createIfNeededIndex(schema, "Event", "timestampNanos")
+      createIfNeededIndex(schema, "Event", "name")
+      createIfNeededIndex(schema, "Event", "eventType")
+      createIfNeededIndex(schema, "Event", "predicateObjectPath")
+
+    }
+
+    if (config.getBoolean("adapt.ingest.adm")) {
+
+      createIfNeededIndex(schema, "IrEvent", "eventType")
+      createIfNeededIndex(schema, "IrEvent", "earliestTimestampNanos")
+      createIfNeededIndex(schema, "IrEvent", "latestTimestampNanos")
+      createIfNeededIndex(schema, "IrSubject", "startTimestampNanos")
+      createIfNeededIndex(schema, "IrNetFlowObject", "localAddress")
+      createIfNeededIndex(schema, "IrNetFlowObject", "localPort")
+      createIfNeededIndex(schema, "IrNetFlowObject", "remoteAddress")
+      createIfNeededIndex(schema, "IrNetFlowObject", "remotePort")
+
+    }
+
+    // TODO: Neo4j doesn't want to index properties longer than 32766 bytes:
+    //    createIfNeededIndex(schema, "IrPathNode", "path")
+    //    createIfNeededIndex(schema, "IR", "originalCdmUuids")
 
     tx.success()
     tx.close()
@@ -129,7 +138,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
   val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
 
-  val shouldLogDuplicates = config.getBoolean("adapt.ingest.logduplicates")
+  val shouldLogDuplicates: Boolean = config.getBoolean("adapt.ingest.logduplicates")
 
   def neo4jDBNodeableTx(cdms: Seq[DBNodeable], g: GraphDatabaseService): Try[Unit] = {
     val transaction = g.beginTx()
@@ -188,13 +197,13 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     }
   }
 
-  def neo4jIrTx(irs: Seq[Either[EdgeIr2Ir, IR]], g: GraphDatabaseService): Try[Unit] = {
+  def neo4jAdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]], g: GraphDatabaseService): Try[Unit] = {
     val transaction = g.beginTx()
     val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
-    val irToNodeResults = irs map {
+    val admToNodeResults = adms map {
       case Left(edge) => Try {
 
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
@@ -209,30 +218,30 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
           }
 
           source.createRelationshipTo(target, new RelationshipType() {
-            def name = edge.label
+            def name: String = edge.label
           })
         }
       }
 
-      case Right(ir) => Try {
-        val irTypeName = ir.getClass.getSimpleName
-        val thisNeo4jVertex = verticesInThisTX.getOrElse(ir.uuid, {
+      case Right(adm) => Try {
+        val admTypeName = adm.getClass.getSimpleName
+        val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("Node"), Label.label("IR"), Label.label(irTypeName)) // Throws an exception instead of creating duplicate UUIDs.
-          verticesInThisTX += (ir.uuid.uuid -> newVertex)
+          val newVertex = g.createNode(Label.label("Node"), Label.label("IR"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          verticesInThisTX += (adm.uuid.uuid -> newVertex)
           newVertex
         })
 
-        ir.asDBKeyValues.foreach {
+        adm.asDBKeyValues.foreach {
           case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
           case (k, v) => thisNeo4jVertex.setProperty(k, v)
         }
 
-        Some(ir.uuid)
+        Some(adm.uuid)
       }.recoverWith {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${ir.getUuid}")
+          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${adm.uuid}")
           Success(None)
         //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
 //        case e: IllegalArgumentException =>  // When a property can't be set (e.g. is too long)
@@ -243,11 +252,11 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     }
 
     Try {
-      if (irToNodeResults.forall(_.isSuccess))
+      if (admToNodeResults.forall(_.isSuccess))
         transaction.success()
       else {
-        println(s"TRANSACTION FAILURE! IRs:\n") // $irs") // The IRS is coming after you!
-        irToNodeResults.find(_.isFailure) match {
+        println(s"TRANSACTION FAILURE! IRs:\n") // $adms") // The IRS is coming after you!
+        admToNodeResults.find(_.isFailure) match {
           case Some(Failure(e)) => e.printStackTrace()
         }
         transaction.failure()
@@ -309,7 +318,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       }
 
     case WriteCdmToNeo4jDB(cdms) => sender() ! neo4jDBNodeableTx(cdms, neoGraph)
-    case WriteIrToNeo4jDB(irs) => sender() ! neo4jIrTx(irs, neoGraph)
+    case WriteAdmToNeo4jDB(adms) => sender() ! neo4jAdmTx(adms, neoGraph)
 
 //      counter = counter + cdms.size
 //      log.info(s"DBActor received: $counter")
@@ -369,7 +378,7 @@ case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
 
 case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable])
-case class WriteIrToNeo4jDB(irs: Seq[Either[EdgeIr2Ir, IR]])
+case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 
 
 
@@ -387,14 +396,14 @@ object Neo4jFlowComponents {
     .map(WriteCdmToNeo4jDB.apply)
     .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
 
-  def neo4jActorIrWrite(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeIr2Ir, IR]]
+  def neo4jActorAdmWrite(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
-    .map(WriteIrToNeo4jDB.apply)
+    .map(WriteAdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
 
-  def neo4jActorIrWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeIr2Ir, IR]]
+  def neo4jActorAdmWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
-    .map(WriteIrToNeo4jDB.apply)
+    .map(WriteAdmToNeo4jDB.apply)
     .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
 }
 
