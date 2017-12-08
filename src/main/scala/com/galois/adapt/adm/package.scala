@@ -319,7 +319,7 @@ object DeterministicUUID {
   }
 
   def apply(fields: Seq[UUID]): UUID = {
-    val byteBuffer: ByteBuffer = ByteBuffer.allocate(8 * 2)
+    val byteBuffer: ByteBuffer = ByteBuffer.allocate(8 * 2 * fields.length)
     for (value <- fields) {
       byteBuffer.putLong(value.getLeastSignificantBits)
       byteBuffer.putLong(value.getMostSignificantBits)
