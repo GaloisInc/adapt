@@ -203,7 +203,7 @@ object ERRules {
       val newUuid = AdmUUID(UUID.randomUUID())
 
       Left((
-        ADMSubject(newUuid, Seq(CdmUUID(s.getUuid)), Set(s.subjectType), s.startTimestampNanos),
+        ADMSubject(newUuid, Seq(CdmUUID(s.getUuid)), Set(s.subjectType), s.cid, s.startTimestampNanos),
         UuidRemapper.PutCdm2Adm(CdmUUID(s.getUuid), newUuid),
         EdgeAdm2Cdm(newUuid, "localPrincipal", CdmUUID(s.localPrincipal)),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newUuid, "parentSubject", CdmUUID(parent))),

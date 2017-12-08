@@ -74,9 +74,6 @@ package object adm {
 
   /* Compared to 'cdm.Subject', the following are omitted
    *
-   * TODO: add back 'cid'
-   *
-   *  - 'cid'
    *  - 'unitId'
    *  - 'iteration'
    *  - 'count'
@@ -88,6 +85,7 @@ package object adm {
     originalCdmUuids: Seq[CdmUUID],
 
     subjectTypes: Set[SubjectType],
+    cid: Int,
     startTimestampNanos: Long
   ) extends ADM with DBWritable {
 
@@ -95,12 +93,14 @@ package object adm {
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "subjectType" -> subjectTypes.map(_.toString).toList.sorted.mkString(";"),
+      "cid" -> cid,
       "startTimestampNanos" -> startTimestampNanos
     )
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "subjectType" -> subjectTypes.map(_.toString).toList.sorted.mkString(";"),
+      "cid" -> cid,
       "startTimestampNanos" -> startTimestampNanos
     )
   }
