@@ -22,7 +22,7 @@ object ERStreamComponents {
 
     // Identify sequences of events
     .statefulMapConcat( () => {
-      var wipAdmEventOpt: Option[ADMEvent] = None
+      var wipAdmEventOpt: Option[AdmEvent] = None
       var remaps: List[UuidRemapper.PutCdm2Adm] = Nil
       var dependent: Stream[Either[Edge[_, _], ADM]] = Stream.empty
 
@@ -81,7 +81,7 @@ object ERStreamComponents {
     // Un-group events
     .mergeSubstreams
 
-  def extractPathsAndEdges(path: Option[(Edge[_, _], ADMPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
+  def extractPathsAndEdges(path: Option[(Edge[_, _], AdmPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
     case Some((edge, path)) => Stream(Right(path), Left(edge))
     case None => Stream()
   }

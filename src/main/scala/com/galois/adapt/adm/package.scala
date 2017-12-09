@@ -59,7 +59,7 @@ package object adm {
    *   - 'location' is too much information
    *   - 'programPoint' is too much information
    */
-  final case class ADMEvent(
+  final case class AdmEvent(
     originalCdmUuids: Seq[CdmUUID],
 
     eventType: EventType,
@@ -94,7 +94,7 @@ package object adm {
    *  - 'privilegeLevel'
    *  - 'importedLibraries' and 'exportedLibraries' aren't used
    */
-  final case class ADMSubject(
+  final case class AdmSubject(
     originalCdmUuids: Seq[CdmUUID],
 
     subjectTypes: Set[SubjectType],
@@ -120,10 +120,10 @@ package object adm {
     )
   }
 
-  case class ADMPathNode(
+  case class AdmPathNode(
      path: String
    ) extends ADM with DBWritable {
-    val uuid = AdmUUID(DeterministicUUID(this))
+    val uuid = AdmUUID(DeterministicUUID(path))
     val originalCdmUuids: Seq[CdmUUID] = Nil
 
     def asDBKeyValues = List(
@@ -145,7 +145,7 @@ package object adm {
    *  - peInfo
    *  - hashes
    */
-  final case class ADMFileObject(
+  final case class AdmFileObject(
      originalCdmUuids: Seq[CdmUUID],
 
      fileObjectType: FileObjectType,
@@ -173,7 +173,7 @@ package object adm {
    *  - ipProtocol
    *  - fileDescriptor
    */
-  final case class ADMNetFlowObject(
+  final case class AdmNetFlowObject(
     originalCdmUuids: Seq[CdmUUID],
 
     localAddress: String,
@@ -182,7 +182,7 @@ package object adm {
     remotePort: Int
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(this))
+    val uuid = AdmUUID(DeterministicUUID(localAddress + localPort + remoteAddress + remotePort))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -207,7 +207,7 @@ package object adm {
    *
    *  - fileDescriptor
    */
-  final case class ADMSrcSinkObject(
+  final case class AdmSrcSinkObject(
     originalCdmUuids: Seq[CdmUUID],
 
     srcSinkType: SrcSinkType
@@ -233,7 +233,7 @@ package object adm {
    *
    * TODO: get rid of this in favor of an enumeration (this is a lot of edges for not much)
    */
-  final case class ADMPrincipal(
+  final case class AdmPrincipal(
     originalCdmUuids: Seq[CdmUUID],
 
     userId: String,
@@ -242,7 +242,7 @@ package object adm {
     username: Option[String] = None
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(this))
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -269,7 +269,7 @@ package object adm {
    *  - 'itag'
    *  - 'ctag'
    */
-  final case class ADMProvenanceTagNode(
+  final case class AdmProvenanceTagNode(
     originalCdmUuids: Seq[CdmUUID],
 
     programPoint: Option[String] = None
@@ -290,7 +290,7 @@ package object adm {
   }
 
   // TODO: consider emitting this on timeout
-  final case class ADMSynthesized(
+  final case class AdmSynthesized(
     uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
@@ -309,13 +309,8 @@ package object adm {
 
 object DeterministicUUID {
 
-  // Utility function for generating deterministic UUIDs from case classes.
-  def apply[T <: Product](product: T): UUID = {
-    val byteOutputStream: ByteArrayOutputStream = new ByteArrayOutputStream()
-    for (value <- product.productIterator) {
-      byteOutputStream.write(value.hashCode())
-    }
-    UUID.nameUUIDFromBytes(byteOutputStream.toByteArray)
+  def apply(str: String): UUID = {
+    UUID.nameUUIDFromBytes(str.getBytes)
   }
 
   def apply(fields: Seq[UUID]): UUID = {
