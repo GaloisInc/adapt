@@ -4,35 +4,33 @@ import java.io.{ByteArrayInputStream, File}
 import java.nio.file.Paths
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.Done
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
-import com.typesafe.config.ConfigFactory
-import akka.stream._
-import akka.stream.scaladsl._
-import akka.util.Timeout
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import org.mapdb.{DB, DBMaker}
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.pattern.ask
-import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import ApiJsonProtocol._
 import akka.http.scaladsl.server.RouteResult._
 import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
+import akka.kafka.{ConsumerSettings, Subscriptions}
+import akka.pattern.ask
+import akka.stream.{ActorMaterializer, _}
+import akka.stream.scaladsl._
+import akka.util.Timeout
+import com.galois.adapt.adm.ERStreamComponents.{CDM, eventResolution, otherResolution, subjectResolution}
+import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
+import com.galois.adapt.adm._
+import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer}
+import org.apache.kafka.common.serialization.ByteArrayDeserializer
+import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+import org.mapdb.{DB, DBMaker}
 
-import collection.JavaConverters._
-import scala.concurrent.{Await, ExecutionContext}
-import scala.language.postfixOps
-import scala.util.{Random, Try}
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.language.postfixOps
+import scala.util.{Failure, Random, Success, Try}
 
 
 object ProductionApp {
@@ -68,56 +66,180 @@ object ProductionApp {
     implicit val timeout = Timeout(600 seconds)
     println(s"Waiting for DB indices to become active: $timeout")
     Await.result(dbActor ? Ready, timeout.duration)
-    val anomalyActor = system.actorOf(Props( classOf[AnomalyManager], dbActor, config))
-    val statusActor = system.actorOf(Props[StatusActor])
+    val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
+    val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+    val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
 
     val ta1 = config.getString("adapt.env.ta1")
 
+
+    def onStreamEnd(failed: Throwable => Unit, done: => Unit)
+                   (source: Source[_, _])
+                   (implicit materializer: Materializer): Unit = {
+      source.runForeach {
+        case Success(_) => ()
+        case Failure(e) => failed(e)
+      } onComplete {
+        case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
+        case Success(_) => done
+      }
+    }
+
+    // Starts the web server
+    def httpService(): Http.ServerBinding = {
+      val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
+      val httpServer = Http().bindAndHandle(route, interface, port)
+      Await.result(httpServer, 10 seconds)
+    }
+
     config.getString("adapt.runflow").toLowerCase match {
+
       case "database" | "db" | "ingest" =>
         println("Running database flow with UI")
         val writeTimeout = Timeout(30.1 seconds)
+
+        val ingestCdm = config.getBoolean("adapt.ingest.produceadm")
+        val ingestAdm = config.getBoolean("adapt.ingest.producecdm")
+
+        // Ingestion pipeline
+        val flow: Source[Try[Unit], _] = CDMSource(ta1)
+          .via(FlowComponents.printCounter("Neo4j Writer", 10000))
+          .via((ingestCdm, ingestAdm) match {
+
+            case (true, false) =>
+              Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)
+
+            case (false, true) =>
+              EntityResolution(uuidRemapper)
+                .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout))
+
+            case (false, false) =>
+              println("Ingesting neither CDM not ADM - so just passing elements through!")
+              Flow.fromFunction(_ => Success(()))
+
+            // TODO: Add edges between CDM and ADM
+            case (true, true) =>
+              Flow.fromGraph(GraphDSL.create() { implicit b =>
+                import GraphDSL.Implicits._
+
+                val broadcast = b.add(Broadcast[CDM17](2))
+                val merge = b.add(Merge[Try[Unit]](2))
+
+                // CDM
+                broadcast.out(0)
+                  .via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout))  ~> merge.in(0)
+
+                // ADM
+                broadcast.out(1)
+                  .via(EntityResolution(uuidRemapper))
+                  .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout))  ~> merge.in(1)
+
+                FlowShape(broadcast.in, merge.out)
+              })
+          })
+
+        // What to do when ingestion completes
         if (config.getBoolean("adapt.ingest.quitafteringest")) {
           println("Will shut down after ingesting all files.")
-          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).via(Neo4jFlowComponents.neo4jActorWriteFlow(dbActor)(writeTimeout)).runForeach {
-            case Success(_) => ()
-            case msg @ Failure(e) => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}")
-          } onComplete {
-            case Failure(e) => e.printStackTrace(); Runtime.getRuntime.halt(1)
-            case Success(v) => println("shutting down..."); Runtime.getRuntime.halt(0)
-          }
+          onStreamEnd(
+            e => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}"),
+            () => {
+              println("shutting down..."); Runtime.getRuntime.halt(0)
+            }
+          )(flow)
         } else {
           println("Will continuing running the DB and UI after ingesting all files.")
-          CDMSource(ta1).via(FlowComponents.printCounter("Neo4j Writer", 10000)).runWith(Neo4jFlowComponents.neo4jActorWrite(dbActor)(writeTimeout))
+          flow
         }
-      val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
+
+        httpService();
+
+      case "csvmaker" | "csv" =>
+
+        val forCdm = config.getBoolean("adapt.ingest.producecdm")
+        val forAdm = config.getBoolean("adapt.ingest.produceadm")
+
+        val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
+
+        // CSV generation
+        //
+        // TODO: Alec find a way to have this exit on completion
+        (forCdm, forAdm) match {
+          case (true, false) =>
+            RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+              import GraphDSL.Implicits._
+
+              val broadcast = graph.add(Broadcast[CDM17](8))
+
+              CDMSource(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
+
+              broadcast.out(0).collect{ case c: NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
+              broadcast.out(1).collect{ case c: Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
+              broadcast.out(2).collect{ case c: FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
+              broadcast.out(3).collect{ case c: RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
+              broadcast.out(4).collect{ case c: ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
+              broadcast.out(5).collect{ case c: Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
+              broadcast.out(6).collect{ case c: Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
+              broadcast.out(7).collect{ case c: SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
+
+              ClosedShape
+            }).run()
+
+          case (false, true) =>
+
+            // TODO: Alec find a better way to get the "blocked" CSV information
+            system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+
+            RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+              import GraphDSL.Implicits._
+
+              val broadcast = graph.add(Broadcast[Any](9))
+
+              CDMSource(ta1).via(EntityResolution(uuidRemapper))
+                .via(FlowComponents.printCounter("DB Writer", 1000))
+                .via(Flow.fromFunction {
+                  case Left(e) => e
+                  case Right(ir) => ir
+                }) ~> broadcast.in
+
+              broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src), lbl, AdmUUID(tgt)) =>  src -> Map("label" -> lbl, "target" -> tgt) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
+              broadcast.out(1).collect{ case c: AdmNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
+              broadcast.out(2).collect{ case c: AdmEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
+              broadcast.out(3).collect{ case c: AdmFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
+              broadcast.out(4).collect{ case c: AdmProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
+              broadcast.out(5).collect{ case c: AdmSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
+              broadcast.out(6).collect{ case c: AdmPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
+              broadcast.out(7).collect{ case c: AdmSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
+              broadcast.out(8).collect{ case c: AdmPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
+
+              ClosedShape
+            }).run()
+
+
+          case (false, false) =>
+            println("Generting CSVs for neither CDM not ADM - so generating nothing!")
+            Source.empty
+
+          case (true, true) =>
+            println("This isn't implemented yet. TODO: Alec")
+
+        }
 
       case "anomalies" | "anomaly" =>
+
         println("Running anomaly-only flow")
+        println("NOTE: this will run using CDM")
+
         Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
       case "ui" | "uionly" =>
         println("Staring only the UI and doing nothing else.")
-        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
 
-      case "csvmaker" | "csv" =>
-        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-          import GraphDSL.Implicits._
-          val bcast = graph.add(Broadcast[CDM17](8))
-          val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
-          CDMSource(ta1).via(FlowComponents.printCounter("File Input")) ~> bcast.in
-          bcast.out(0).collect{ case c: NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
-          bcast.out(1).collect{ case c: Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
-          bcast.out(2).collect{ case c: FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
-          bcast.out(3).collect{ case c: RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
-          bcast.out(4).collect{ case c: ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
-          bcast.out(5).collect{ case c: Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
-          bcast.out(6).collect{ case c: Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
-          bcast.out(7).collect{ case c: SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
-          ClosedShape
-        }).run()
+        httpService();
 
       case "valuebytes" =>
+        println("NOTE: this will run using CDM")
+
         CDMSource(ta1)
           .collect{ case e: Event if e.parameters.nonEmpty => e}
           .flatMapConcat(
@@ -126,24 +248,27 @@ object ProductionApp {
                 v.valueBytes.map(b =>
                   List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
                 ).getOrElse(List.empty)).toIterator
-              )
             )
+          )
           .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
 
       case _ =>
         println("Running the combined database ingest + anomaly calculation flow + UI")
-        val httpService = Await.result(Http().bindAndHandle(ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor), interface, port), 10 seconds)
-	
+        println("NOTE: this will run using CDM")
+
+        httpService()
+
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
           val bcast = graph.add(Broadcast[CDM17](2))
 
           CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
+          bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
           ClosedShape
         }).run()
+
     }
   }
 }

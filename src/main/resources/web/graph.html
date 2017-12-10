@@ -445,7 +445,7 @@
         function formatNodes(raw_results) {
             var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
-                n["label"] = n["label"].replace("::CDM","").replace("CDM::","")  // Neo4j specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the CDM class name and the "CDM" label.
+                n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
                 n["db_label"] = n["label"]
                 n['queries'] = getRelevantQueries(n)  
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
