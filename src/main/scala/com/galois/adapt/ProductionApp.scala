@@ -101,15 +101,23 @@ object ProductionApp {
         val ingestCdm = config.getBoolean("adapt.ingest.produceadm")
         val ingestAdm = config.getBoolean("adapt.ingest.producecdm")
 
+//        CDMSource(ta1).runWith(Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(writeTimeout))
+//        CDMSource(ta1).via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout))
+
         // Ingestion pipeline
         val flow: Source[Try[Unit], _] = CDMSource(ta1)
           .via(FlowComponents.printCounter("Neo4j Writer", 10000))
           .via((ingestCdm, ingestAdm) match {
 
             case (true, false) =>
-              Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)
+              println("Ingesting data and transforming into ADM before writing to the database")
+//              if (config.getBoolean("adapt.ingest.quitafteringest"))
+//                Neo4jFlowComponents.neo4jActorCdmWrite(dbActor)(writeTimeout).runWith(Sink.ignore)
+//              else
+                Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)
 
             case (false, true) =>
+              println("Ingesting CDM into database")
               EntityResolution(uuidRemapper)
                 .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout))
 
@@ -119,6 +127,7 @@ object ProductionApp {
 
             // TODO: Add edges between CDM and ADM
             case (true, true) =>
+              println("Ingesting both CDM and ADM into the same database.")
               Flow.fromGraph(GraphDSL.create() { implicit b =>
                 import GraphDSL.Implicits._
 
@@ -127,30 +136,33 @@ object ProductionApp {
 
                 // CDM
                 broadcast.out(0)
-                  .via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout))  ~> merge.in(0)
+                  .via(Neo4jFlowComponents.neo4jActorCdmWriteFlow(dbActor)(writeTimeout)) ~> merge.in(0)
 
                 // ADM
                 broadcast.out(1)
                   .via(EntityResolution(uuidRemapper))
-                  .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout))  ~> merge.in(1)
+                  .via(Neo4jFlowComponents.neo4jActorAdmWriteFlow(dbActor)(writeTimeout)) ~> merge.in(1)
 
                 FlowShape(broadcast.in, merge.out)
               })
           })
 
         // What to do when ingestion completes
-        if (config.getBoolean("adapt.ingest.quitafteringest")) {
-          println("Will shut down after ingesting all files.")
+//        if (config.getBoolean("adapt.ingest.quitafteringest")) {
+//          println("Will shut down after ingesting all files.")
           onStreamEnd(
             e => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}"),
             () => {
               println("shutting down..."); Runtime.getRuntime.halt(0)
             }
           )(flow)
-        } else {
-          println("Will continuing running the DB and UI after ingesting all files.")
-          flow
-        }
+//        } else {
+//          println("Will continuing running the DB and UI after ingesting all files.")
+//          onStreamEnd(
+//            e => println(s"Insertion errors in batch. Continuing after exception:\n${e.printStackTrace()}"),
+//            ()
+//          )(flow)
+//        }
 
         httpService();
 

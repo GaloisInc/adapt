@@ -253,6 +253,9 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       else {
         println(s"TRANSACTION FAILURE! ADMs:\n")
         admToNodeResults.find(_.isFailure) match {
+
+            // TODO: handle all cases!
+
           case Some(Failure(e)) => e.printStackTrace()
         }
         transaction.failure()
