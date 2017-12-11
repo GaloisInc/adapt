@@ -41,6 +41,8 @@ High-level commands about the primary operations of the system
 | adapt.ingest.startatoffset   | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
 | adapt.ingest.loadlimit       | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
 | adapt.ingest.quitafteringest | `yes` `no`                  | `yes`                                                             | The program will exit after ingesting all the data specified. Only applicable when ingesting from a file. |
+| adapt.ingest.produceadm      | `yes` `no`                  | `yes`                                                             | Ingested CDM data will be tranformed in ADM ("Adapt data model") and the ADM data written into the database. Note: This CAN be used together with `producecdm` |
+| adapt.ingest.producecdm      | `yes` `no`                  | `no`                                                              | Ingested CDM data will be written directly into the database structured as it is in the incoming CDM data; entity resolution will not be applied to this data. Note: This CAN be used together with `produceadm` |
 
 
 #### `-Dadapt.runtime.X` Flags
