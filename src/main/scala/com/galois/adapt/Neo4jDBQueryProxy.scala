@@ -2,6 +2,7 @@ package com.galois.adapt
 
 import java.util.UUID
 
+import akka.NotUsed
 import akka.actor._
 import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink}
@@ -252,12 +253,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         transaction.success()
       else {
         println(s"TRANSACTION FAILURE! ADMs:\n")
-        admToNodeResults.find(_.isFailure) match {
-
-            // TODO: handle all cases!
-
-          case Some(Failure(e)) => e.printStackTrace()
-        }
+        admToNodeResults foreach { case t if t.isFailure => t.failed.get.printStackTrace() }
         transaction.failure()
       }
       transaction.close()
@@ -316,21 +312,44 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         }
       }
 
-    case WriteCdmToNeo4jDB(cdms) => sender() ! neo4jDBNodeableTx(cdms, neoGraph)
-    case WriteAdmToNeo4jDB(adms) => sender() ! neo4jAdmTx(adms, neoGraph)
+    case WriteCdmToNeo4jDB(cdms) =>
+//      log.info(s"Received CDM batch of ${cdms.length}")
+      neo4jDBNodeableTx(cdms, neoGraph).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
+      sender() ! Ack
 
+    case WriteAdmToNeo4jDB(adms) =>
+//      log.info(s"Received ADM batch of ${adms.length}")
+      neo4jAdmTx(adms, neoGraph).getOrElse(log.error(s"Failure writing to DB with ADMs: $adms"))
+      sender() ! Ack
 //      counter = counter + cdms.size
 //      log.info(s"DBActor received: $counter")
 
-    case FailureMsg(e: Throwable) =>  log.error(s"FAILED: {}", e)
+    case Failure(e: Throwable) =>
+      log.error(s"FAILED in DBActor: {}", e)
+//      sender() ! Ack   // TODO: Should this ACK?
+
     case CompleteMsg =>
-      log.info(s"DBActor received a completion message")
-      sender() ! Success(())
+      streamsFlowingInToThisActor -= 1
+      log.info(s"DBActor received a completion message. Remaining streams: $streamsFlowingInToThisActor")
+//      sender() ! Ack
+
+    case KillJVM =>
+      streamsFlowingInToThisActor -= 1
+      log.warning(s"DBActor received a termination message. Remaining streams: $streamsFlowingInToThisActor")
+      if (streamsFlowingInToThisActor == 0) {
+        log.warning(s"Shutting down the JVM.")
+        graph.close()
+        Runtime.getRuntime.halt(0)
+      }
+//      sender() ! Ack
 
     case InitMsg =>
       log.info(s"DBActor received an initialization message")
-      sender() ! Success(())
+      streamsFlowingInToThisActor += 1
+      sender() ! Ack
   }
+
+  var streamsFlowingInToThisActor = 0
 
   import scala.collection.JavaConversions._
 
@@ -383,31 +402,36 @@ case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 
 object Neo4jFlowComponents {
 
-  def neo4jActorCdmWrite(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
+  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM17, NotUsed] = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
-    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
+    .recover{ case e: Throwable => e.printStackTrace }
+    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
+  @deprecated
   def neo4jActorCdmWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
     .collect { case cdm: DBNodeable => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
     .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
 
-  def neo4jActorAdmWrite(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeAdm2Adm, ADM]]
+  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
-    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Success(()), CompleteMsg, FailureMsg.apply))(Keep.right)
+    .recover{ case e: Throwable => e.printStackTrace }
+    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
+  @deprecated
   def neo4jActorAdmWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
 }
 
-case class FailureMsg(e: Throwable)
+case object Ack
 case object CompleteMsg
+case object KillJVM
 case object InitMsg
 
 case class AdmInvariantViolation(edge: EdgeAdm2Adm) extends RuntimeException(s"Didn't find source ${edge.src} of $edge")

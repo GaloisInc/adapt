@@ -117,7 +117,7 @@ object FlowComponents {
 
 
   def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    var counter = 0L
+    var counter = config.getLong("adapt.ingest.startatoffset")
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
 

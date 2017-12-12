@@ -2,6 +2,7 @@ package com.galois.adapt.adm
 
 import java.util.UUID
 
+import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.stream.FlowShape
