@@ -128,8 +128,8 @@ object ERRules {
     type PredicateObject = Option[Edge[ADM, CDM17]]
     type PredicateObject2 = Option[Edge[ADM, CDM17]]
 
-    type PredicatePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
-    type Predicate2PathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
+    type PredicatePathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
+    type Predicate2PathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
     type ExecCommandPathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
   }
   def resolveEventAndPaths(e: Event):
@@ -152,19 +152,23 @@ object ERRules {
         e.predicateObject.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject", CdmUUID(obj))),
         e.predicateObject2.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject2", CdmUUID(obj))),
 
-        e.predicateObjectPath.map(path => {
-          val pathNode = AdmPathNode(path)
-          val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-          (EdgeAdm2Adm(newEvent.uuid, label, pathNode.uuid), pathNode)
+        e.predicateObjectPath.flatMap(path => {
+          e.predicateObject.map(predicateObject => {
+            val pathNode = AdmPathNode(path)
+            val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
+            (EdgeCdm2Adm(CdmUUID(predicateObject), label, pathNode.uuid), pathNode)
+          })
         }),
-        e.predicateObject2Path.map(path => {
-          val pathNode = AdmPathNode(path)
-          val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-          (EdgeAdm2Adm(newEvent.uuid, label, pathNode.uuid), pathNode)
+        e.predicateObject2Path.flatMap(path => {
+          e.predicateObject2.map(predicateObject2 => {
+            val pathNode = AdmPathNode(path)
+            val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
+            (EdgeCdm2Adm(CdmUUID(predicateObject2), label, pathNode.uuid), pathNode)
+          })
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = AdmPathNode(cmdLine)
-          (EdgeAdm2Adm(newEvent.uuid, "cmdLine", pathNode.uuid), pathNode)
+          (EdgeAdm2Adm(newEvent.uuid, "(cmdLine)", pathNode.uuid), pathNode)
         })
       )
     }
