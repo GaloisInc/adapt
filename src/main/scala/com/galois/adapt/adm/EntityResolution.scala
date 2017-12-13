@@ -106,10 +106,11 @@ object EntityResolution {
 
   type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], _]
 
-  // This does three things:
+  // This does several things:
   //
   //   - await the Futures (processing first the Futures that finish first)
   //   - prevent nodes with the same UUID from being re-emitted
+  //   - prevent duplicate edges from being re-emitted
   //   - prevent Edges from being emitted before both of their endpoints have been emitted
   //
   private def awaitAndDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
@@ -117,15 +118,16 @@ object EntityResolution {
       .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
-        val seen = MutableSet.empty[UUID]                            // UUIDs of nodes seen (and emitted) so far
+        val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
+        val seenEdges = MutableSet.empty[EdgeAdm2Adm]                // edges seen (not necessarily emitted)
         val blockedEdges = MutableMap.empty[UUID, List[EdgeAdm2Adm]] // Edges blocked by UUIDs that haven't arrived yet
 
         // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
         def emitEdge(edge: EdgeAdm2Adm): List[Either[EdgeAdm2Adm, ADM]] = {
-          if (!seen.contains(edge.src)) {
+          if (!seenNodes.contains(edge.src)) {
             blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
             Nil
-          } else if (!seen.contains(edge.tgt)) {
+          } else if (!seenNodes.contains(edge.tgt)) {
             blockedEdges(edge.tgt) = edge :: blockedEdges.getOrElse(edge.tgt, Nil)
             Nil
           } else {
@@ -134,10 +136,13 @@ object EntityResolution {
         }
 
         {
-          case Left(edge) => emitEdge(edge)                  // Edge - check if we can emit
-          case Right(adm) if seen.contains(adm.uuid) => Nil  // Duplicate ADM - ignore
+          case Left(edge) if seenEdges.contains(edge) => Nil      // Duplicate edge - ignore
+          case Right(adm) if seenNodes.contains(adm.uuid) => Nil  // Duplicate ADM - ignore
+          case Left(edge) =>
+            seenEdges.add(edge)
+            emitEdge(edge)                                   // Edge - check if we can emit
           case Right(adm) =>                                 // New ADM - record and emit
-            seen.add(adm.uuid)
+            seenNodes.add(adm.uuid)
             val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(emitEdge)
             Right(adm) :: emit
         }
