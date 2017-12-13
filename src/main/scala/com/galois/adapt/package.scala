@@ -19,10 +19,10 @@ package object adapt {
 
     // Outgoing edges coming off the node. The key is the label on the edge, the UUID the node
     // (which should be 'DBNodeable' too) the edge goes to.
-    def asDBEdges: List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)]
+    def asDBEdges: List[(cdm17.CDM17.EdgeTypes.EdgeTypes, UUID)]
 
     // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
-    def supportNodes: List[(UUID, List[Any], List[(cdm17.CDM17.EdgeTypes.EdgeTypes,UUID)])] = List()
+    def supportNodes: List[(UUID, List[Any], List[(cdm17.CDM17.EdgeTypes.EdgeTypes, UUID)])] = List()
   }
 
   type ProcessUUID = UUID

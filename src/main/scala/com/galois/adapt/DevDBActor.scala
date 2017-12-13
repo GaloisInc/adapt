@@ -36,12 +36,9 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
 
 
   val graph = TinkerGraph.open()   // TODO: maybe don't hold this state inside the actor...?
-//  val graph = TitanFactory.build.set("storage.backend", "inmemory").open
-
 
   graph.createIndex("uuid", classOf[Vertex])
   graph.createIndex("pid", classOf[Vertex])
-//  graph.createIndex("url", classOf[Vertex])
 
   // Optionally load in existing data:
   localStorage.foreach( path =>
@@ -170,18 +167,6 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
         results.map(r => s""""${r.toString.replace("\\","\\\\").replace("\"","\\\"")}"""")
                .mkString("[",",","]")
       }
-   
-//    case EdgesForNodes(nodeIdList) =>
-//      sender() ! Try {
-//        graph.traversal().V(nodeIdList.asJava.toArray).bothE().toList.asScala.mkString("[",",","]")
-//      }
-
-//    case GiveMeTheGraph => sender() ! graph
-
-//    case Shutdown =>
-//      log.info(s"Incomplete Edge count: ${missingToUuid.size}")
-//      localStorage.foreach(path => graph.io(IoCore.graphson()).writeGraph(path))
-//      sender() !  missingToUuid.size
   }
 }
 

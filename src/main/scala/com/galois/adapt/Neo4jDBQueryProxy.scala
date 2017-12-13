@@ -409,24 +409,11 @@ object Neo4jFlowComponents {
     .recover{ case e: Throwable => e.printStackTrace }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
-  @deprecated
-  def neo4jActorCdmWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[CDM17]
-    .collect { case cdm: DBNodeable => cdm }
-    .groupedWithin(1000, 1 second)
-    .map(WriteCdmToNeo4jDB.apply)
-    .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
-
   def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .recover{ case e: Throwable => e.printStackTrace }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
-
-  @deprecated
-  def neo4jActorAdmWriteFlow(neoActor: ActorRef)(implicit timeout: Timeout) = Flow[Either[EdgeAdm2Adm, ADM]]
-    .groupedWithin(1000, 1 second)
-    .map(WriteAdmToNeo4jDB.apply)
-    .mapAsync(1)(msg => (neoActor ? msg).mapTo[Try[Unit]])
 }
 
 case object Ack

@@ -23,7 +23,7 @@ object EntityResolution {
 
   val config: Config = ConfigFactory.load()
 
-  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], _] = {
+  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
@@ -34,8 +34,11 @@ object EntityResolution {
         .via(awaitAndDeduplicate(parallelism))
   }
 
+
+  type ErFlow = Flow[CDM, Future[Either[Edge[_, _], ADM]], NotUsed]
+
   // Perform entity resolution on stream of CDMs to convert them into ADMs
-  private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[CDM, Future[Either[Edge[_, _], ADM]], _] =
+  private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
 
@@ -104,7 +107,7 @@ object EntityResolution {
   }
 
 
-  type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], _]
+  type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], NotUsed]
 
   // This does several things:
   //
