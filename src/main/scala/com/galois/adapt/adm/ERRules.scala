@@ -130,7 +130,8 @@ object ERRules {
 
     type PredicatePathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
     type Predicate2PathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
-    type ExecCommandPathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
+    type ExecSubjectPathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
+    type ExecPathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
   }
   def resolveEventAndPaths(e: Event):
     (
@@ -142,7 +143,8 @@ object ERRules {
 
       EventEdges.PredicatePathEdgeNode,
       EventEdges.Predicate2PathEdgeNode,
-      EventEdges.ExecCommandPathEdgeNode
+      EventEdges.ExecSubjectPathEdgeNode,
+      EventEdges.ExecPathEdgeNode
     ) = {
       val newEvent = AdmEvent(Seq(CdmUUID(e.getUuid)), e.eventType, e.timestampNanos, e.timestampNanos)
       (
@@ -168,7 +170,11 @@ object ERRules {
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = AdmPathNode(cmdLine)
-          (EdgeAdm2Adm(newEvent.uuid, "(cmdLine)", pathNode.uuid), pathNode)
+          (EdgeCdm2Adm(CdmUUID(e.subjectUuid), "exec", pathNode.uuid), pathNode)
+        }),
+        e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
+          val pathNode = AdmPathNode(cmdLine)
+          (EdgeAdm2Adm(newEvent.uuid, "exec", pathNode.uuid), pathNode)
         })
       )
     }

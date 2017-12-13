@@ -43,7 +43,7 @@ object ERStreamComponents {
 
               // Create a new WIP from e
 
-              val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
+              val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
 
               val toReturn = Stream.concat(                            // Emit the old WIP
                 Some(Right(wipAdmEvent)),
@@ -52,7 +52,12 @@ object ERStreamComponents {
 
               wipAdmEventOpt = Some(newWipAdmEvent)
               remaps = List(remap)
-              dependent = extractPathsAndEdges(path1) ++ extractPathsAndEdges(path2) ++ extractPathsAndEdges(path3) ++ Stream.concat(
+              dependent =
+                extractPathsAndEdges(path1) ++
+                extractPathsAndEdges(path2) ++
+                extractPathsAndEdges(path3) ++
+                extractPathsAndEdges(path4) ++
+                Stream.concat(
                   Some(Left(subject)),
                   predicateObject.map(Left(_)),
                   predicateObject2.map(Left(_))
@@ -63,15 +68,20 @@ object ERStreamComponents {
           }
           case None =>
             // Create a new WIP from e
-            val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3) = resolveEventAndPaths(e)
+            val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
 
             wipAdmEventOpt = Some(newWipAdmEvent)
             remaps = List(remap)
-            dependent = extractPathsAndEdges(path1) ++ extractPathsAndEdges(path2) ++ extractPathsAndEdges(path3) ++ Stream.concat(
-              Some(Left(subject)),
-              predicateObject.map(Left(_)),
-              predicateObject2.map(Left(_))
-            )
+            dependent =
+              extractPathsAndEdges(path1) ++
+              extractPathsAndEdges(path2) ++
+              extractPathsAndEdges(path3) ++
+              extractPathsAndEdges(path4) ++
+              Stream.concat(
+                Some(Left(subject)),
+                predicateObject.map(Left(_)),
+                predicateObject2.map(Left(_))
+              )
 
             Stream.empty
         }
