@@ -1,8 +1,6 @@
 package com.galois.adapt.adm
 
-import java.util.UUID
-
-import com.galois.adapt.cdm17._
+import com.galois.adapt.cdm18._
 
 object ERRules {
 
@@ -10,10 +8,10 @@ object ERRules {
 
   // Resolve a 'ProvenanceTagNode'
   object ProvenanceTagNodeEdges {
-    type TagIdEdges = Seq[Edge[ADM, CDM17]]
-    type Subject = Edge[ADM, CDM17]
-    type FlowObject = Option[Edge[ADM, CDM17]]
-    type PrevTagID = Option[Edge[ADM, CDM17]]
+    type TagIdEdges = Seq[Edge[ADM, CDM18]]
+    type Subject = Edge[ADM, CDM18]
+    type FlowObject = Option[Edge[ADM, CDM18]]
+    type PrevTagID = Option[Edge[ADM, CDM18]]
   }
   def resolveProvenanceTagNode(p: ProvenanceTagNode):
     (
@@ -78,7 +76,7 @@ object ERRules {
   //
   // Resolve a 'FileObject'
   object FileObjectEdges {
-    type LocalPrincipalEdge = Option[Edge[ADM, CDM17]]
+    type LocalPrincipalEdge = Option[Edge[ADM, CDM18]]
 
     type FilePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
   }
@@ -124,13 +122,13 @@ object ERRules {
 
   // Resolve an 'Event'
   object EventEdges {
-    type Subject = Edge[ADM, CDM17]
-    type PredicateObject = Option[Edge[ADM, CDM17]]
-    type PredicateObject2 = Option[Edge[ADM, CDM17]]
+    type Subject = Option[Edge[ADM, CDM18]]
+    type PredicateObject = Option[Edge[ADM, CDM18]]
+    type PredicateObject2 = Option[Edge[ADM, CDM18]]
 
-    type PredicatePathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
-    type Predicate2PathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
-    type ExecSubjectPathEdgeNode = Option[(Edge[CDM17,ADM], AdmPathNode)]
+    type PredicatePathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
+    type Predicate2PathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
+    type ExecSubjectPathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
     type ExecPathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
   }
   def resolveEventAndPaths(e: Event):
@@ -150,7 +148,7 @@ object ERRules {
       (
         newEvent,
         UuidRemapper.PutCdm2Adm(CdmUUID(e.getUuid), newEvent.uuid),
-        EdgeAdm2Cdm(newEvent.uuid, "subject", CdmUUID(e.subjectUuid)),
+        e.subjectUuid.map(subj => EdgeAdm2Cdm(newEvent.uuid, "subject", CdmUUID(subj))),
         e.predicateObject.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject", CdmUUID(obj))),
         e.predicateObject2.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject2", CdmUUID(obj))),
 
@@ -168,9 +166,11 @@ object ERRules {
             (EdgeCdm2Adm(CdmUUID(predicateObject2), label, pathNode.uuid), pathNode)
           })
         }),
-        e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
+        e.properties.getOrElse(Map()).get("exec").flatMap(cmdLine => {
           val pathNode = AdmPathNode(cmdLine)
-          (EdgeCdm2Adm(CdmUUID(e.subjectUuid), "exec", pathNode.uuid), pathNode)
+          e.subjectUuid.map(subj =>
+            (EdgeCdm2Adm(CdmUUID(subj), "exec", pathNode.uuid), pathNode)
+          )
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = AdmPathNode(cmdLine)
@@ -181,11 +181,11 @@ object ERRules {
 
   // Resolve a 'Subject'
   object SubjectEdges {
-    type LocalPrincipalEdge = Edge[ADM, CDM17]
-    type ParentSubject = Option[Edge[ADM, CDM17]]
+    type LocalPrincipalEdge = Edge[ADM, CDM18]
+    type ParentSubject = Option[Edge[ADM, CDM18]]
 
     type CmdLinePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
-    type CmdLineIndirectPathEdgeNode = Option[(Edge[CDM17, ADM], AdmPathNode)]
+    type CmdLineIndirectPathEdgeNode = Option[(Edge[CDM18, ADM], AdmPathNode)]
   }
   def resolveSubject(s: Subject): Either[
     (

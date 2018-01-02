@@ -95,7 +95,7 @@ object ProductionApp {
           case (false, true) => "ADM" -> EntityResolution(uuidRemapper).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
           case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
             import GraphDSL.Implicits._
-            val broadcast = b.add(Broadcast[CDM17](2))
+            val broadcast = b.add(Broadcast[CDM18](2))
             broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
             broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
             SinkShape(broadcast.in)
@@ -106,7 +106,7 @@ object ProductionApp {
         if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
 
         startWebServer()
-        CDMSource.cdm17(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
+        CDMSource.cdm18(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
 
       case "csvmaker" | "csv" =>
 
@@ -123,9 +123,9 @@ object ProductionApp {
             RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
               import GraphDSL.Implicits._
 
-              val broadcast = graph.add(Broadcast[CDM17](8))
+              val broadcast = graph.add(Broadcast[CDM18](8))
 
-              CDMSource.cdm17(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
+              CDMSource.cdm18(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
 
               broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
               broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
@@ -149,7 +149,7 @@ object ProductionApp {
 
               val broadcast = graph.add(Broadcast[Any](9))
 
-              CDMSource.cdm17(ta1).via(EntityResolution(uuidRemapper))
+              CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper))
                 .via(FlowComponents.printCounter("DB Writer", 1000))
                 .via(Flow.fromFunction {
                   case Left(e) => e
@@ -184,7 +184,7 @@ object ProductionApp {
         println("Running anomaly-only flow")
         println("NOTE: this will run using CDM")
 
-        Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource.cdm17(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
+        Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
       case "ui" | "uionly" =>
         println("Staring only the UI and doing nothing else.")
@@ -214,9 +214,9 @@ object ProductionApp {
 
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
           import GraphDSL.Implicits._
-          val bcast = graph.add(Broadcast[CDM17](2))
+          val bcast = graph.add(Broadcast[CDM18](2))
 
-          CDMSource.cdm17(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+          CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
           bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
@@ -294,7 +294,7 @@ object CDMSource {
     }
   }
 
-  // Make a CDM18 source
+  // Make a CDM18 source, possibly falling back on CDM17 for files with that version
   def cdm18(ta1: String): Source[CDM18, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
@@ -328,8 +328,21 @@ object CDMSource {
       case _ =>
         val paths = config.getStringList("adapt.ingest.loadfiles").asScala
         println(s"Setting file sources to: ${paths.mkString(", ")}")
-        val startStream = paths.foldLeft(Source.empty[Try[CDM18]])((a,b) => a.concat(Source.fromIterator[Try[CDM18]](() => CDM18.readData(b, None).get._2)))
-          .drop(start)
+        val startStream = paths.foldLeft(Source.empty[Try[CDM18]])((a,b) => a.concat({
+
+          // Try to read CDM18 data. If we fail, fall back on reading CDM17 data, then convert that to CDM18
+          var cdm18: Iterator[Try[CDM18]] = CDM18.readData(b, None).map(_._2).getOrElse({
+            println("Failed to read file as CDM18, trying to read it as CDM17...")
+
+            val dummyHost: UUID = new java.util.UUID(0L,1L)
+
+            CDM17.readData(b, None).map(_._2).get.flatMap {
+              case Failure(e) => List(Failure[CDM18](e))
+              case Success(cdm17) => cdm17ascdm18(cdm17, dummyHost).toList.map(Success(_))
+            }
+          })
+          Source.fromIterator[Try[CDM18]](() => cdm18)
+        })).drop(start)
         shouldLimit.fold(startStream)(l => startStream.take(l))
           .statefulMapConcat { () =>
             var counter = 0
@@ -346,25 +359,25 @@ object CDMSource {
   }
 
   // Make a CDM18 source from a CDM17 one
-  def cdm17ascdm18(s: Source[CDM17,_], dummyHost: UUID): Source[CDM18,_] = {
+  def cdm17ascdm18(c: CDM17, dummyHost: UUID): Option[CDM18] = {
     implicit val _: UUID = dummyHost
-    s.mapConcat[CDM18]({
-      case e: cdm17types.Event => List(Cdm17to18.event(e))
-      case f: cdm17types.FileObject => List(Cdm17to18.fileObject(f))
-      case m: cdm17types.MemoryObject => List(Cdm17to18.memoryObject(m))
-      case n: cdm17types.NetFlowObject => List(Cdm17to18.netFlowObject(n))
-      case p: cdm17types.Principal => List(Cdm17to18.principal(p))
-      case p: cdm17types.ProvenanceTagNode => List(Cdm17to18.provenanceTagNode(p))
-      case r: cdm17types.RegistryKeyObject => List(Cdm17to18.registryKeyObject(r))
-      case s: cdm17types.SrcSinkObject => List(Cdm17to18.srcSinkObject(s))
-      case s: cdm17types.Subject => List(Cdm17to18.subject(s))
-      case t: cdm17types.TimeMarker => List(Cdm17to18.timeMarker(t))
-      case u: cdm17types.UnitDependency => List(Cdm17to18.unitDependency(u))
-      case u: cdm17types.UnnamedPipeObject => List(Cdm17to18.unnamedPipeObject(u))
+    c match {
+      case e: cdm17types.Event => Some(Cdm17to18.event(e))
+      case f: cdm17types.FileObject => Some(Cdm17to18.fileObject(f))
+      case m: cdm17types.MemoryObject => Some(Cdm17to18.memoryObject(m))
+      case n: cdm17types.NetFlowObject => Some(Cdm17to18.netFlowObject(n))
+      case p: cdm17types.Principal => Some(Cdm17to18.principal(p))
+      case p: cdm17types.ProvenanceTagNode => Some(Cdm17to18.provenanceTagNode(p))
+      case r: cdm17types.RegistryKeyObject => Some(Cdm17to18.registryKeyObject(r))
+      case s: cdm17types.SrcSinkObject => Some(Cdm17to18.srcSinkObject(s))
+      case s: cdm17types.Subject => Some(Cdm17to18.subject(s))
+      case t: cdm17types.TimeMarker => Some(Cdm17to18.timeMarker(t))
+      case u: cdm17types.UnitDependency => Some(Cdm17to18.unitDependency(u))
+      case u: cdm17types.UnnamedPipeObject => Some(Cdm17to18.unnamedPipeObject(u))
       case other =>
         println(s"couldn't find a way to convert $other")
-        List.empty
-    })
+        None
+    }
   }
 
   // Make a CDM source from a kafka topic

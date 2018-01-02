@@ -20,7 +20,7 @@ import FileStream._
 import ProcessStream._
 import MemoryStream._
 import FlowComponents._
-import com.galois.adapt.cdm17.{CDM17, Event}
+import com.galois.adapt.cdm18.{CDM18, Event}
 import com.typesafe.config.ConfigFactory
 
 
@@ -168,9 +168,9 @@ object AnomalyStream {
 
   def anomalyScores(db: DB, fastClean: Int = 6, fastEmit: Int = 20, slowClean: Int = 30, slowEmit: Int = 50)(implicit ec: ExecutionContext) = Flow.fromGraph(
     GraphDSL.create(){ implicit graph =>
-      val bcast = graph.add(Broadcast[(String, UUID, Event, CDM17)](4))
+      val bcast = graph.add(Broadcast[(String, UUID, Event, CDM18)](4))
       val merge = graph.add(Merge[(String,UUID,Double, Set[UUID])](4))
-      val start = graph.add(Flow[CDM17])
+      val start = graph.add(Flow[CDM18])
 
       val fastCommandSource = commandSource(fastClean, fastEmit)   // TODO
       val slowCommandSource = commandSource(slowClean, slowEmit)   // TODO

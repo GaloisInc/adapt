@@ -19,8 +19,7 @@ case class UnnamedPipeObject(
 ) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
-      ("uuid", uuid),
-      ("sourceFileDescriptor", sourceFileDescriptor)
+      ("uuid", uuid)
     ) ++
     sourceFileDescriptor.fold[List[(String, Any)]](Nil)(v => List(("sourceFileDescriptor", v))) ++
     sinkFileDescriptor.fold[List[(String, Any)]](Nil)(v => List(("sinkFileDescriptor", v))) ++

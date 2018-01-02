@@ -8,7 +8,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm17.CDM17
+import com.galois.adapt.cdm18.CDM18
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
@@ -160,7 +160,13 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
         cdm.asDBKeyValues.foreach {
           case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
-          case (k,v) => thisNeo4jVertex.setProperty(k, v)
+          case (k,v) => try {
+            thisNeo4jVertex.setProperty(k, v)
+          } catch {
+            case e: Exception =>
+              println(s"Tried (and failed) to set the key $k to the value $v on a Neo4j node")
+              e.printStackTrace()
+          }
         }
 
         cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
@@ -404,7 +410,7 @@ case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 
 object Neo4jFlowComponents {
 
-  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM17, NotUsed] = Flow[CDM17]
+  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM18, NotUsed] = Flow[CDM18]
     .collect { case cdm: DBNodeable[_] => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)

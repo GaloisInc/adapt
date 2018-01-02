@@ -10,7 +10,7 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.Timeout
 import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{GetCdm2Adm, ResultOfGetCdm2Adm}
-import com.galois.adapt.cdm17._
+import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
