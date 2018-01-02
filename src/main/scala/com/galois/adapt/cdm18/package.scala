@@ -18,26 +18,6 @@ package object cdm18 {
 
   trait CDM18
 
-  object cdm17to18 {
-
-    // Enumerations
-    implicit def subjectType(st: com.galois.adapt.cdm17.SubjectType): cdm18.SubjectType = cdm18.SubjectType.from(st.toString).get
-    implicit def privilegeLevel(pl: com.galois.adapt.cdm17.PrivilegeLevel): cdm18.PrivilegeLevel = cdm18.PrivilegeLevel.from(pl.toString).get
-    implicit def srcSinkType(pl: com.galois.adapt.cdm17.SrcSinkType): cdm18.SrcSinkType = cdm18.SrcSinkType.from(pl.toString).get
-    // TODO instrumentation source
-    implicit def principalType(pt: com.galois.adapt.cdm17.PrincipalType): cdm18.PrincipalType = cdm18.PrincipalType.from(pt.toString).get
-    implicit def eventType(e: com.galois.adapt.cdm17.EventType): cdm18.EventType = cdm18.EventType.from(e.toString).get
-    implicit def FileObjectType(fo: com.galois.adapt.cdm17.FileObjectType): com.galois.adapt.cdm18.FileObjectType = cdm18.FileObjectType.from(fo.toString).get
-    implicit def ValueType(v: com.galois.adapt.cdm17.ValueType): com.galois.adapt.cdm18.ValueType = cdm18.ValueType.from(v.toString).get
-    implicit def ValueDataType(v: com.galois.adapt.cdm17.ValueDataType): com.galois.adapt.cdm18.ValueDataType = cdm18.ValueDataType.from(v.toString).get
-    implicit def tagOpCode(t: com.galois.adapt.cdm17.TagOpCode): com.galois.adapt.cdm18.TagOpCode = cdm18.TagOpCode.from(t.toString).get
-    implicit def integrityTag(i: com.galois.adapt.cdm17.IntegrityTag): com.galois.adapt.cdm18.IntegrityTag = cdm18.IntegrityTag.from(i.toString).get
-    implicit def confidentialityTag(c: com.galois.adapt.cdm17.ConfidentialityTag): com.galois.adapt.cdm18.ConfidentialityTag = cdm18.ConfidentialityTag.from(c.toString).get
-    implicit def cryptoHashType(c: com.galois.adapt.cdm17.CryptoHashType): com.galois.adapt.cdm18.CryptoHashType = cdm18.CryptoHashType.from(c.toString).get
-
-
-  }
-
   object CDM18 {
     val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
 

@@ -7,7 +7,7 @@ import com.galois.adapt.{DBNodeable, DBWritable}
 
 import scala.util.Try
 
-// No changed
+// No change
 case class TagRunLengthTuple(
   numValueElements: Int,
   tagId: UUID

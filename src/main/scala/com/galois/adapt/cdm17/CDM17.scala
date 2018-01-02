@@ -5,7 +5,7 @@ trait CustomEnum[T] extends CDM17 {
   def from(s: String): Option[T] = values.find(_.toString == s)  // TODO: strings will be slow. Use ordinals.
 }
 
-class FixedShort(val bytes: Array[Byte]) extends AnyVal
+case class FixedShort(val bytes: Array[Byte]) extends AnyVal
 
 sealed trait SubjectType extends CDM17
 case object SubjectType extends CustomEnum[SubjectType] { val values = Seq(SUBJECT_PROCESS, SUBJECT_THREAD, SUBJECT_UNIT, SUBJECT_BASIC_BLOCK) }

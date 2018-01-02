@@ -6,10 +6,10 @@ trait CustomEnum[T] extends CDM18 {
 }
 
 // New
-class FixedByte(val bytes: Array[Byte]) extends AnyVal
+case class FixedByte(val bytes: Array[Byte]) extends AnyVal
 
 // No change
-class FixedShort(val bytes: Array[Byte]) extends AnyVal
+case class FixedShort(val bytes: Array[Byte]) extends AnyVal
 
 // No changes
 sealed trait SubjectType extends CDM18
