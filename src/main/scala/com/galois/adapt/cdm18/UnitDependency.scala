@@ -9,15 +9,14 @@ import scala.util.Try
 case class UnitDependency(
   unit: UUID,
   dependentUnit: UUID
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] = List(
     ("unitUuid", unit),
     ("dependentUnitUuid", dependentUnit)
   )
 
-  // TODO cdm18 edges
-  def asDBEdges = Nil //. List((CDM17.EdgeTypes.dependentUnit,dependentUnit),(CDM17.EdgeTypes.unit,unit))
+  def asDBEdges = List((CDM18.EdgeTypes.dependentUnit,dependentUnit),(CDM18.EdgeTypes.unit,unit))
 
   val thisUUID: UUID = UUID.randomUUID()
 

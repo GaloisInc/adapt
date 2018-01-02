@@ -17,7 +17,7 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
@@ -30,11 +30,9 @@ case class FileObject(
     peInfo.fold[List[(String,Any)]](List.empty)(v => List(("peInfo", v))) ++
     hashes.fold[List[(String,Any)]](List.empty)(v => List(("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", "))))  // TODO: Revisit how we should represent this in the DB
 
-  // TODO CDM18 edges
-  def asDBEdges = Nil
-  /* List.concat(
-    localPrincipal.map(p => (CDM17.EdgeTypes.localPrincipal,p))
-  ) */
+  def asDBEdges =List.concat(
+    localPrincipal.map(p => (CDM18.EdgeTypes.localPrincipal,p))
+  )
 
   def getUuid = uuid
 

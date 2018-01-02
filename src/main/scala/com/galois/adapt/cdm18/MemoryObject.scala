@@ -15,7 +15,7 @@ case class MemoryObject(
   pageNumber: Option[Long] = None,
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] = baseObject.asDBKeyValues ++ List(
     ("uuid", uuid),

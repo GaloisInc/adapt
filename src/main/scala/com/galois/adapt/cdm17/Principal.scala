@@ -16,7 +16,7 @@ case class Principal(
   principalType: PrincipalType = PRINCIPAL_LOCAL,
   username: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", uuid),

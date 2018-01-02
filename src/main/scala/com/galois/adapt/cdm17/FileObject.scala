@@ -18,7 +18,7 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(

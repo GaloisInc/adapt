@@ -16,7 +16,7 @@ case class Principal(
   host: UUID, // Host where principal exists
   username: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", uuid),
@@ -26,11 +26,9 @@ case class Principal(
     (if (groupIds.nonEmpty) List(("groupIds", groupIds.mkString(", "))) else List.empty) ++
     username.fold[List[(String,Any)]](List.empty)(v => List(("username", v))) ++
     DBOpt.fromKeyValMap(properties)
+  
+  def asDBEdges = List((CDM18.EdgeTypes.host,host))
 
-  // TODO CDM18 edges
-  def asDBEdges = Nil /*
-    List((CDM18.EdgeTypes.host,host))
-*/
   def getUuid = uuid
 
   def toMap: Map[String, Any] = Map(

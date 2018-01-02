@@ -27,7 +27,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM18 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
+) extends CDM18 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
   def asDBKeyValues: List[(String, Any)] = List(
@@ -49,13 +49,12 @@ case class Event(
     programPoint.fold[List[(String,Any)]](List.empty)(v => List(("programPoint", v))) ++
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
-  // TODO CDM18 edges (host)
-  def asDBEdges = Nil /* List.concat(
-    List((CDM17.EdgeTypes.subject,subjectUuid)),
-    predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p)),
-    predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p)),
-    foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM17.EdgeTypes.parameterTagId, tag.tagId)))
-  ) */
+  def asDBEdges = List.concat(
+    subjectUuid.map(s => (CDM18.EdgeTypes.subject,s)),
+    predicateObject.map(p => (CDM18.EdgeTypes.predicateObject,p)),
+    predicateObject2.map(p => (CDM18.EdgeTypes.predicateObject2,p)),
+    foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM18.EdgeTypes.parameterTagId, tag.tagId)))
+  )
 
   def getUuid: UUID = uuid
 

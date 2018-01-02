@@ -11,7 +11,7 @@ case class UnnamedPipeObject(
   baseObject: AbstractObject,
   sourceFileDescriptor: Int,
   sinkFileDescriptor: Int
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", uuid),

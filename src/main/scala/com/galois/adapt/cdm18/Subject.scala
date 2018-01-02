@@ -24,7 +24,7 @@ case class Subject(
   importedLibraries: Option[Seq[String]] = None,
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] = List(
     ("uuid", uuid),
@@ -43,11 +43,11 @@ case class Subject(
     exportedLibraries.fold[List[(String,Any)]](List.empty)(v => if (v.isEmpty) List.empty else List(("exportedLibraries", v.mkString(", ")))) ++
     DBOpt.fromKeyValMap(properties)
 
-  // TODO CDM18 edges (host)
-  def asDBEdges = Nil
-  /* List((CDM17.EdgeTypes.localPrincipal,localPrincipal)) ++
-    parentSubject.fold[List[(CDM17.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM17.EdgeTypes.parentSubject, v)))
-  */
+  def asDBEdges =
+    List((CDM18.EdgeTypes.localPrincipal,localPrincipal)) ++
+    List((CDM18.EdgeTypes.host,host)) ++
+    parentSubject.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM18.EdgeTypes.parentSubject, v)))
+
 
   def getUuid: UUID = uuid
 

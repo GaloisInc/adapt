@@ -14,13 +14,15 @@ import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.galois.adapt.adm.ERStreamComponents.{CDM, eventResolution, otherResolution, subjectResolution}
 import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm17.{CDM17, Event, FileObject, NetFlowObject, Principal, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
+import com.galois.adapt.{cdm17 => cdm17types}
+import com.galois.adapt.cdm18.{CDM18, Cdm17to18, RawCDM18Type}
 import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
@@ -104,7 +106,7 @@ object ProductionApp {
         if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
 
         startWebServer()
-        CDMSource(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
+        CDMSource.cdm17(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
 
       case "csvmaker" | "csv" =>
 
@@ -123,16 +125,16 @@ object ProductionApp {
 
               val broadcast = graph.add(Broadcast[CDM17](8))
 
-              CDMSource(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
+              CDMSource.cdm17(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
 
-              broadcast.out(0).collect{ case c: NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
-              broadcast.out(1).collect{ case c: Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
-              broadcast.out(2).collect{ case c: FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
-              broadcast.out(3).collect{ case c: RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
-              broadcast.out(4).collect{ case c: ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
-              broadcast.out(5).collect{ case c: Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
-              broadcast.out(6).collect{ case c: Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
-              broadcast.out(7).collect{ case c: SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
+              broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
+              broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
+              broadcast.out(2).collect{ case c: cdm17.FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
+              broadcast.out(3).collect{ case c: cdm17.RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
+              broadcast.out(4).collect{ case c: cdm17.ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
+              broadcast.out(5).collect{ case c: cdm17.Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
+              broadcast.out(6).collect{ case c: cdm17.Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
+              broadcast.out(7).collect{ case c: cdm17.SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
 
               ClosedShape
             }).run()
@@ -147,7 +149,7 @@ object ProductionApp {
 
               val broadcast = graph.add(Broadcast[Any](9))
 
-              CDMSource(ta1).via(EntityResolution(uuidRemapper))
+              CDMSource.cdm17(ta1).via(EntityResolution(uuidRemapper))
                 .via(FlowComponents.printCounter("DB Writer", 1000))
                 .via(Flow.fromFunction {
                   case Left(e) => e
@@ -182,7 +184,7 @@ object ProductionApp {
         println("Running anomaly-only flow")
         println("NOTE: this will run using CDM")
 
-        Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
+        Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource.cdm17(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
 
       case "ui" | "uionly" =>
         println("Staring only the UI and doing nothing else.")
@@ -192,10 +194,10 @@ object ProductionApp {
       case "valuebytes" =>
         println("NOTE: this will run using CDM")
 
-        CDMSource(ta1)
-          .collect{ case e: Event if e.parameters.nonEmpty => e}
+        CDMSource.cdm17(ta1)
+          .collect{ case e: cdm17.Event if e.parameters.nonEmpty => e}
           .flatMapConcat(
-            (e: Event) => Source.fromIterator(
+            (e: cdm17.Event) => Source.fromIterator(
               () => e.parameters.get.flatMap( v =>
                 v.valueBytes.map(b =>
                   List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
@@ -214,7 +216,7 @@ object ProductionApp {
           import GraphDSL.Implicits._
           val bcast = graph.add(Broadcast[CDM17](2))
 
-          CDMSource(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
+          CDMSource.cdm17(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
           bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
           bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
@@ -240,7 +242,8 @@ object CDMSource {
   private val config = ConfigFactory.load()
   val scenario = config.getString("adapt.env.scenario")
 
-  def apply(ta1: String): Source[CDM17, _] = {
+  //  Make a CDM17 source
+  def cdm17(ta1: String): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
@@ -250,26 +253,26 @@ object CDMSource {
     }
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
-        .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic")).via(FlowComponents.printCounter("Theia Query Response", 1)))
+          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(FlowComponents.printCounter("Theia Query Response", 1)))
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic")).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         shouldLimit.fold(src)(l => src.take(l))
       case "kafkaTest"      =>
-        val src = kafkaSource("kafkaTest").drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        val src = kafkaSource("kafkaTest", kafkaCdm17Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l))
       case _ =>
         val paths = config.getStringList("adapt.ingest.loadfiles").asScala
@@ -291,29 +294,116 @@ object CDMSource {
     }
   }
 
+  // Make a CDM18 source
+  def cdm18(ta1: String): Source[CDM18, _] = {
+    println(s"Setting source for: $ta1")
+    val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+      case Success(0) => None
+      case Success(i) => Some(i)
+      case _ => None
+    }
+    ta1.toLowerCase match {
+      case "cadets"         =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "clearscope"     =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "faros"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "fivedirections" =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "theia"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "trace"          =>
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        shouldLimit.fold(src)(l => src.take(l))
+      case "kafkaTest"      =>
+        val src = kafkaSource("kafkaTest", kafkaCdm18Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        shouldLimit.fold(src)(l => src.take(l))
+      case _ =>
+        val paths = config.getStringList("adapt.ingest.loadfiles").asScala
+        println(s"Setting file sources to: ${paths.mkString(", ")}")
+        val startStream = paths.foldLeft(Source.empty[Try[CDM18]])((a,b) => a.concat(Source.fromIterator[Try[CDM18]](() => CDM18.readData(b, None).get._2)))
+          .drop(start)
+        shouldLimit.fold(startStream)(l => startStream.take(l))
+          .statefulMapConcat { () =>
+            var counter = 0
+            cdmTry => {
+              counter = counter + 1
+              if (cdmTry.isSuccess) List(cdmTry.get)
+              else {
+                println(s"Couldn't read binary data at offset: $counter")
+                List.empty
+              }
+            }
+          }
+    }
+  }
 
-  def kafkaSource(ta1Topic: String): Source[CDM17, _] = Consumer.plainSource(  // commitableSource
-    ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-    Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))
-  ).map { msg =>
-    Try {
-      val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
-      val offset = msg.offset()   // msg.record.offset()
-      val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
-      val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-      val t = Try {
-        val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
-        elem
-      }
-      if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
-//      msg.committableOffset.commitScaladsl()
-      val cdm = new RawCDM17Type(t.get.getDatum)
-      CDM17.parse(cdm)
-    }.flatten
-  }.mapConcat(c =>
-    if (c.isSuccess) List(c.get)
-    else List.empty
-  ) //.asInstanceOf[Source[CDM17, NotUsed]]
+  // Make a CDM18 source from a CDM17 one
+  def cdm17ascdm18(s: Source[CDM17,_], dummyHost: UUID): Source[CDM18,_] = {
+    implicit val _: UUID = dummyHost
+    s.mapConcat[CDM18]({
+      case e: cdm17types.Event => List(Cdm17to18.event(e))
+      case f: cdm17types.FileObject => List(Cdm17to18.fileObject(f))
+      case m: cdm17types.MemoryObject => List(Cdm17to18.memoryObject(m))
+      case n: cdm17types.NetFlowObject => List(Cdm17to18.netFlowObject(n))
+      case p: cdm17types.Principal => List(Cdm17to18.principal(p))
+      case p: cdm17types.ProvenanceTagNode => List(Cdm17to18.provenanceTagNode(p))
+      case r: cdm17types.RegistryKeyObject => List(Cdm17to18.registryKeyObject(r))
+      case s: cdm17types.SrcSinkObject => List(Cdm17to18.srcSinkObject(s))
+      case s: cdm17types.Subject => List(Cdm17to18.subject(s))
+      case t: cdm17types.TimeMarker => List(Cdm17to18.timeMarker(t))
+      case u: cdm17types.UnitDependency => List(Cdm17to18.unitDependency(u))
+      case u: cdm17types.UnnamedPipeObject => List(Cdm17to18.unnamedPipeObject(u))
+      case other =>
+        println(s"couldn't find a way to convert $other")
+        List.empty
+    })
+  }
+
+  // Make a CDM source from a kafka topic
+  def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C]): Source[C, _] =
+    Consumer.plainSource(
+      ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
+      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))
+    ) .map(parser)
+      .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
+
+  // Parse a `CDM17` from a kafka record
+  def kafkaCdm17Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM17] = Try {
+    val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
+    val offset = msg.offset()   // msg.record.offset()
+    val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+    val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+    val t = Try {
+      val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+      elem
+    }
+    if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
+    val cdm = new RawCDM17Type(t.get.getDatum)
+    CDM17.parse(cdm)
+  }.flatten
+
+  // Parse a `CDM18` from a kafka record
+  def kafkaCdm18Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM18] = Try {
+    val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
+    val offset = msg.offset()   // msg.record.offset()
+    val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm18.TCCDMDatum])
+    val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+    val t = Try {
+      val elem: com.bbn.tc.schema.avro.cdm18.TCCDMDatum = reader.read(null, decoder)
+      elem
+    }
+    if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
+    val cdm = new RawCDM18Type(t.get.getDatum)
+    CDM18.parse(cdm)
+  }.flatten
 }
 
 

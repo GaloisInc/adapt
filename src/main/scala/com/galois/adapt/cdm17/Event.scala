@@ -28,7 +28,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable {
+) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
   def asDBKeyValues = List(

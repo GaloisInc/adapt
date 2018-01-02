@@ -11,7 +11,7 @@ case class SrcSinkObject(
   baseObject: AbstractObject,
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", uuid),

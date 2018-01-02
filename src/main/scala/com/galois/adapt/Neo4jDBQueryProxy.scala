@@ -141,7 +141,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
   val shouldLogDuplicates: Boolean = config.getBoolean("adapt.ingest.logduplicates")
 
-  def neo4jDBNodeableTx(cdms: Seq[DBNodeable], g: GraphDatabaseService): Try[Unit] = {
+  def neo4jDBNodeableTx(cdms: Seq[DBNodeable[_]], g: GraphDatabaseService): Try[Unit] = {
     val transaction = g.beginTx()
     val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
@@ -166,13 +166,15 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
           if (toUuid != skipEdgesToThisUuid) verticesInThisTX.get(toUuid) match {
             case Some(toNeo4jVertex) =>
-              thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, edgeName)
+              val relationship = new RelationshipType() { def name: String = edgeName.toString }
+              thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, relationship)
             case None =>
               val destinationNode = Option(g.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
                 verticesInThisTX(toUuid) = g.createNode(Label.label("Node"))  // Create empty node
                 verticesInThisTX(toUuid)
               }
-              thisNeo4jVertex.createRelationshipTo(destinationNode, edgeName)
+              val relationship = new RelationshipType() { def name: String = edgeName.toString }
+              thisNeo4jVertex.createRelationshipTo(destinationNode, relationship)
           }
         }
         Some(cdm.getUuid)
@@ -395,7 +397,7 @@ case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
 
-case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable])
+case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable[_]])
 case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 
 
@@ -403,7 +405,7 @@ case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 object Neo4jFlowComponents {
 
   def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM17, NotUsed] = Flow[CDM17]
-    .collect { case cdm: DBNodeable => cdm }
+    .collect { case cdm: DBNodeable[_] => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
     .recover{ case e: Throwable => e.printStackTrace }

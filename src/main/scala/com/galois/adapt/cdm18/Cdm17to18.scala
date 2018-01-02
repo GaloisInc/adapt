@@ -4,13 +4,14 @@ import com.galois.adapt.cdm17
 import com.galois.adapt.cdm18
 import java.util.UUID
 
+// This object provides implicit conversions from CDM17 to CDM18 Scala case classes
 object Cdm17to18 {
 
   // Enumerations
   implicit def subjectType(st: cdm17.SubjectType): cdm18.SubjectType = cdm18.SubjectType.from(st.toString).get
   implicit def privilegeLevel(pl: cdm17.PrivilegeLevel): cdm18.PrivilegeLevel = cdm18.PrivilegeLevel.from(pl.toString).get
   implicit def srcSinkType(pl: cdm17.SrcSinkType): cdm18.SrcSinkType = cdm18.SrcSinkType.from(pl.toString).get
-  // TODO instrumentation source
+  // TODO instrumentation sources
   implicit def principalType(pt: cdm17.PrincipalType): cdm18.PrincipalType = cdm18.PrincipalType.from(pt.toString).get
   implicit def eventType(e: cdm17.EventType): cdm18.EventType = cdm18.EventType.from(e.toString).get
   implicit def FileObjectType(fo: cdm17.FileObjectType): cdm18.FileObjectType = cdm18.FileObjectType.from(fo.toString).get

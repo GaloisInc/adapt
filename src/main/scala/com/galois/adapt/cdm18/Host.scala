@@ -16,7 +16,7 @@ case class Host (
   osDetails: String, // OS level details revealed by tools such as uname -a
   hostType: HostType, // host's role or device type, such as mobile, server, desktop
   interfaces: Seq[Interface] // names and addresses of network interfaces
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
   def asDBKeyValues: List[(String, Any)] = List(
     ("uuid", uuid.toString),
     ("hostName", hostName),

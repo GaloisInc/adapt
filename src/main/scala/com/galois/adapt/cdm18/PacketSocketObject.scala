@@ -17,7 +17,7 @@ case class PacketSocketObject(
   haType: FixedShort, // ARP hardware type
   pktType: FixedByte, // Packet type
   addr: Seq[Byte] // Physical-layer address
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
   override def asDBKeyValues: List[(String, Any)] = List(
     ("proto", proto.toString),
     ("ifIndex", ifIndex),

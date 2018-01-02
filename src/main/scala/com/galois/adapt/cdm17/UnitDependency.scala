@@ -9,7 +9,7 @@ import scala.util.Try
 case class UnitDependency(
   unit: UUID,
   dependentUnit: UUID
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("unitUuid", unit),

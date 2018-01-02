@@ -13,7 +13,7 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] = List(
     ("uuid", uuid),

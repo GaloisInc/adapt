@@ -21,7 +21,7 @@ case class ProvenanceTagNode(
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", tagIdUuid),
@@ -37,14 +37,13 @@ case class ProvenanceTagNode(
     ctag.fold[List[(String,Any)]](List.empty)((v => List(("ctag", v.toString)))) ++
     DBOpt.fromKeyValMap(properties)
 
-  // TODO CDM18 edges (host)
-  def asDBEdges = Nil /*
+  def asDBEdges = Nil
     List((CDM18.EdgeTypes.subject,subjectUuid)) ++
     List((CDM18.EdgeTypes.host,host)) ++
     flowObject.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(f => List((CDM18.EdgeTypes.flowObject, f))) ++
     prevTagId.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(p => List((CDM18.EdgeTypes.prevTagId, p))) ++
     tagIds.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(ts => ts.toList.map(t => (CDM18.EdgeTypes.tagId, t)))
-*/
+
   def getUuid = tagIdUuid
 
   def toMap: Map[String, Any] = Map(

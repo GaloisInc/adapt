@@ -24,7 +24,7 @@ case class Subject(
   importedLibraries: Option[Seq[String]] = None,
   exportedLibraries: Option[Seq[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", uuid),

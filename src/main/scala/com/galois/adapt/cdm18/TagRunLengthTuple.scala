@@ -11,7 +11,7 @@ import scala.util.Try
 case class TagRunLengthTuple(
   numValueElements: Int,
   tagId: UUID
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
   lazy val getUuid: UUID = UUID.randomUUID()
 
   def asDBKeyValues: List[(String, Any)] = List(
@@ -20,7 +20,7 @@ case class TagRunLengthTuple(
   )
 
   // TODO CDM18 edges
-  def asDBEdges = Nil // List((CDM18.EdgeTypes.tagId, tagId))
+  def asDBEdges = List((CDM18.EdgeTypes.tagId, tagId))
 }
 
 

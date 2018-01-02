@@ -16,7 +16,7 @@ case class Value(
   valueBytes: Option[Array[Byte]] = None,
   tagRunLengthTuples: Option[Seq[TagRunLengthTuple]] = None,
   components: Option[Seq[Value]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
   val tagsFolded = tagRunLengthTuples.fold[List[TagRunLengthTuple]](List.empty)(_.toList)
 
   def asDBKeyValues = List(

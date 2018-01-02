@@ -23,7 +23,7 @@ package object cdm18 {
 
     object EdgeTypes extends Enumeration {
       type EdgeTypes = Value
-      val localPrincipal, subject, host, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId = Value
+      val localPrincipal, subject, host, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId, source, sink = Value
 
       implicit def conv(rt: EdgeTypes) = new RelationshipType() {
         def name = rt.toString

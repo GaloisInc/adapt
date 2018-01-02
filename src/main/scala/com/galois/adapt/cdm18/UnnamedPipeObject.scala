@@ -16,7 +16,7 @@ case class UnnamedPipeObject(
   source: Option[UUID] = None,
   sinkFileDescriptor: Option[Int] = None,
   sink: Option[UUID] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
       ("uuid", uuid),
@@ -26,8 +26,10 @@ case class UnnamedPipeObject(
     sinkFileDescriptor.fold[List[(String, Any)]](Nil)(v => List(("sinkFileDescriptor", v))) ++
     baseObject.asDBKeyValues
 
-  // TODO CDM18 edges (source, sink)
-  def asDBEdges = Nil
+  def asDBEdges = List.concat(
+    source.map(s => (CDM18.EdgeTypes.source, s)),
+    sink.map(s => (CDM18.EdgeTypes.sink, s))
+  )
 
   def getUuid = uuid
 }

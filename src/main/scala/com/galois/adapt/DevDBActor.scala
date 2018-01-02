@@ -99,7 +99,7 @@ class DevDBActor(val registry: ActorRef, localStorage: Option[String] = None)
       println(s"Edges created at epoch close: $edgeCreatedCounter")
       println("Done creating all missing nodes.")
 
-    case cdm15: DBNodeable =>
+    case cdm15: DBNodeable[_] =>
       nodesReceived += 1
 
       val nodes = (cdm15.getUuid, cdm15.asDBKeyValues, cdm15.asDBEdges) :: cdm15.supportNodes

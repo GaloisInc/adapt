@@ -16,7 +16,7 @@ case class NetFlowObject(
   remotePort: Int,
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] =
     baseObject.asDBKeyValues ++

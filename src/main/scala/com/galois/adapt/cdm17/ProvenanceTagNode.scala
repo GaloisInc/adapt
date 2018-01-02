@@ -21,7 +21,7 @@ case class ProvenanceTagNode(
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
     ("uuid", tagIdUuid),

@@ -24,7 +24,7 @@ case class Value(
   provenance: Option[Seq[ProvenanceAssertion]] = None,
   tagRunLengthTuples: Option[Seq[TagRunLengthTuple]] = None,
   components: Option[Seq[Value]] = None
-) extends CDM18 with DBWritable with DBNodeable {
+) extends CDM18 with DBWritable with DBNodeable[CDM18.EdgeTypes.EdgeTypes] {
   val tagsFolded = tagRunLengthTuples.fold[List[TagRunLengthTuple]](List.empty)(_.toList)
 
   def asDBKeyValues: List[(String, Any)] = List(
@@ -41,12 +41,9 @@ case class Value(
 
   val getUuid: UUID = UUID.randomUUID()
 
-  // TODO CDM18 edges
-  val asDBEdges = Nil // : List[(CDM17.EdgeTypes.EdgeTypes,UUID)] = tagsFolded.map(t => (CDM17.EdgeTypes.tag,t.getUuid))
+  val asDBEdges: List[(CDM18.EdgeTypes.EdgeTypes,UUID)] = tagsFolded.map(t => (CDM18.EdgeTypes.tag,t.getUuid))
 
-  // TODO CDM18 edges
-  override val supportNodes = Nil
-   // tagsFolded.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
+  override val supportNodes = tagsFolded.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
   
 }
 
