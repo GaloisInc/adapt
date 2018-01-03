@@ -14,7 +14,7 @@ import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import org.neo4j.graphdb.factory.GraphDatabaseFactory
 import org.neo4j.graphdb.schema.Schema
-import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, Label, RelationshipType, Node => NeoNode}
+import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, Label, RelationshipType, Result, Node => NeoNode}
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException
 import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
 import spray.json._
@@ -320,6 +320,20 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         }
       }
 
+    case CypherQuery(q, shouldParse) =>
+      println(s"Received Cypher query: $q")
+      sender() ! Future {
+        Try {
+          val results = neoGraph.execute(q)
+          if (shouldParse) {
+            toJson(results.asScala.toList)
+          } else {
+            val stringResult = results.resultAsString()
+            JsString(stringResult.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
+          }
+        }
+      }
+
     case WriteCdmToNeo4jDB(cdms) =>
 //      log.info(s"Received CDM batch of ${cdms.length}")
       neo4jDBNodeableTx(cdms, neoGraph).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
@@ -399,6 +413,7 @@ sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
+case class CypherQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
