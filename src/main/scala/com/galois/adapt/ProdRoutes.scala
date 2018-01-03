@@ -109,6 +109,13 @@ object ProdRoutes {
               queryResult(StringQuery(queryString.toString, true), dbActor)
             )
           }
+        } ~
+        pathPrefix("cypher") {
+          path(RemainingPath) { queryString =>
+            complete(
+              queryResult(CypherQuery(queryString.toString), dbActor)
+            )
+          }
         }
       } ~
       serveStaticFilesRoute
@@ -223,6 +230,13 @@ object ProdRoutes {
           formField('query) { queryString =>
             complete(
               queryResult(StringQuery(queryString, true), dbActor)
+            )
+          }
+        } ~
+        path("cypher") {
+          formField('query) { queryString =>
+            complete(
+              queryResult(CypherQuery(queryString), dbActor)
             )
           }
         }
