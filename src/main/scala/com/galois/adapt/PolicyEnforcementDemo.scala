@@ -7,7 +7,7 @@ import spray.json.DefaultJsonProtocol
 
 
 object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
-  
+
   case class SimpleResponse(name: String)
   implicit val simpleResponseFormat = jsonFormat1(SimpleResponse)
 
@@ -47,22 +47,4 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         }
       }
     }
-
 }
-
-
-//policy : Integer
-//Index to a list of policies [1 | 2 | 3 | 4]
-//clientIp : IP Address string
-//IP address of the client sending the request to check
-//clientPort : Integer
-//port on the client to receive the response from the server
-//serverIp: IP Address string
-//IP address of the server
-//serverPort : Integer
-//port on the server the client sent to
-//timestamp : long
-//time the server received the request
-//requestId : Integer
-//unique identifier for this policy request, responses should reference it
-//responseUri
