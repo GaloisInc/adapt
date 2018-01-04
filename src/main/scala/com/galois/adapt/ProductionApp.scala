@@ -89,7 +89,7 @@ object ProductionApp {
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
         val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
         CDMSource(ta1)
-          .via(FlowComponents.printCounter("Quine", 100))
+          .via(FlowComponents.printCounter("Quine", 10000))
           .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
           .runWith(Sink.ignore)

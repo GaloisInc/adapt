@@ -9,8 +9,9 @@ import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
 
 import scala.concurrent.duration._
-import scala.pickling.Unpickler
 import scala.util.{Failure, Success}
+import scala.pickling.shareNothing._
+//import scala.pickling.static._        // Avoid run-time reflection
 
 
 class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
@@ -23,7 +24,7 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 
   import scala.pickling.Pickler
   import scala.pickling.Defaults._
-  import scala.pickling.json.pickleFormat
+  import com.rrwright.quine.runtime.runtimePickleFormat
 
   implicit val b = Pickler.generate[Option[Map[String,String]]]
 //  implicit val l = Pickler.generate[Option[UUID]]
