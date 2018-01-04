@@ -45,6 +45,7 @@ object ProdRoutes {
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
+    PolicyEnforcementDemo.route ~
     get {
       pathPrefix("ranked") {
         path(RemainingPath) { count =>
