@@ -104,6 +104,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
       createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
       createIfNeededIndex(schema, "NetFlowObject", "remotePort")
       createIfNeededIndex(schema, "FileObject", "peInfo")
+      createIfNeededIndex(schema, "FileObject", "path")
       createIfNeededIndex(schema, "Event", "timestampNanos")
       createIfNeededIndex(schema, "Event", "name")
       createIfNeededIndex(schema, "Event", "eventType")
