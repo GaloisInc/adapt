@@ -8,12 +8,15 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
-import com.galois.adapt.cdm17.{AbstractObject, CDM17, CryptographicHash, Event, FileObject, FileObjectType, NetFlowObject, Principal, PrincipalType, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject}
+import com.galois.adapt.cdm17.{AbstractObject, CDM17, CryptographicHash, Event, FileObject, FileObjectType, NetFlowObject, Principal, PrincipalType, PrivilegeLevel, ProvenanceTagNode, RawCDM17Type, RegistryKeyObject, SrcSinkObject, Subject, SubjectType}
 import com.typesafe.config.ConfigFactory
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.Timeout
+import com.rrwright.quine.language.refinedBranchOf
 import com.rrwright.quine.runtime._
+
+import scala.pickling.PicklerUnpickler
 //import akka.util.{ByteString, Timeout}
 import org.mapdb.{DB, DBMaker}
 import akka.http.scaladsl.model._
@@ -73,7 +76,7 @@ object ProductionApp {
 //        println("Running database-only flow")
         println("running Quine flow")
         val graph = GraphService(system,
-          inMemoryNodeLimit = Some(1000)
+          inMemoryNodeLimit = None //Some(1000)
         , uiPort = 9090)(
 //          EmptyPersistor
           MapDBMultimap()
@@ -88,6 +91,24 @@ object ProductionApp {
 //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
         val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+
+        {
+          import scala.pickling.Pickler
+          import scala.pickling.Defaults._
+          import com.rrwright.quine.runtime.runtimePickleFormat
+          implicit val gr = graph
+          implicit val b = PicklerUnpickler.generate[Option[Map[String,String]]]
+          //  implicit val l = PicklerUnpickler.generate[Option[UUID]]
+          implicit val t = PicklerUnpickler.generate[Option[String]]
+          implicit val y = PicklerUnpickler.generate[AbstractObject]
+          implicit val j = PicklerUnpickler.generate[SubjectType]
+          implicit val k = PicklerUnpickler.generate[Option[PrivilegeLevel]]
+          implicit val l = PicklerUnpickler.generate[Option[Seq[String]]]
+          implicit val m = PicklerUnpickler.generate[Option[Int]]
+          implicit val n = PicklerUnpickler.generate[Option[UUID]]
+          refinedBranchOf[Subject]().standingFind(println)
+        }
+
         CDMSource(ta1)
           .via(FlowComponents.printCounter("Quine", 10000))
           .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)

@@ -9,6 +9,7 @@ import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
 
 import scala.concurrent.duration._
+import scala.pickling.PicklerUnpickler
 import scala.util.{Failure, Success}
 import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
@@ -26,10 +27,13 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
   import scala.pickling.Defaults._
   import com.rrwright.quine.runtime.runtimePickleFormat
 
-  implicit val b = Pickler.generate[Option[Map[String,String]]]
-//  implicit val l = Pickler.generate[Option[UUID]]
-  implicit val t = Pickler.generate[Option[String]]
-  implicit val y = Pickler.generate[AbstractObject]
+  implicit val b = PicklerUnpickler.generate[Option[Map[String,String]]]
+//  implicit val l = PicklerUnpickler.generate[Option[UUID]]
+  implicit val t = PicklerUnpickler.generate[Option[String]]
+  implicit val y = PicklerUnpickler.generate[AbstractObject]
+
+
+  var isSet = false
 
   var counter = 0
 
@@ -90,11 +94,17 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 
     case cdm: Subject =>
       val s = sender()
-      implicit val j = Pickler.generate[SubjectType]
-      implicit val k = Pickler.generate[Option[PrivilegeLevel]]
-      implicit val l = Pickler.generate[Option[Seq[String]]]
-      implicit val m = Pickler.generate[Option[Int]]
-      implicit val n = Pickler.generate[Option[UUID]]
+      implicit val j = PicklerUnpickler.generate[SubjectType]
+      implicit val k = PicklerUnpickler.generate[Option[PrivilegeLevel]]
+      implicit val l = PicklerUnpickler.generate[Option[Seq[String]]]
+      implicit val m = PicklerUnpickler.generate[Option[Int]]
+      implicit val n = PicklerUnpickler.generate[Option[UUID]]
+
+      if (! isSet) {
+        isSet = true
+//        refinedBranchOf[Subject]().standingFind(println)
+      }
+
       cdm.create(Some(cdm.getUuid))
         .onComplete{
           case Success(_) => s ! Ack
