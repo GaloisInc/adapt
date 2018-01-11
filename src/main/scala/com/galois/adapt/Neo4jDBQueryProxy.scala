@@ -25,8 +25,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-class Neo4jDBQueryProxy extends Actor with ActorLogging {
-  implicit val ec: ExecutionContext = context.dispatcher
+class Neo4jDBQueryProxy extends DBQueryProxyActor {
+
   val config: Config = ConfigFactory.load()
 
   val neoGraph: GraphDatabaseService = {
@@ -136,13 +136,13 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
 
     graphService
   }
-  val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
+  val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
   val shouldLogDuplicates: Boolean = config.getBoolean("adapt.ingest.logduplicates")
 
-  def neo4jDBNodeableTx(cdms: Seq[DBNodeable[_]], g: GraphDatabaseService): Try[Unit] = {
-    val transaction = g.beginTx()
+  def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = {
+    val transaction = neoGraph.beginTx()
     val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
@@ -153,7 +153,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(cdm.getUuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("Node"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (cdm.getUuid -> newVertex)
           newVertex
         })
@@ -175,8 +175,8 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
               val relationship = new RelationshipType() { def name: String = edgeName.toString }
               thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, relationship)
             case None =>
-              val destinationNode = Option(g.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
-                verticesInThisTX(toUuid) = g.createNode(Label.label("Node"))  // Create empty node
+              val destinationNode = Option(neoGraph.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
+                verticesInThisTX(toUuid) = neoGraph.createNode(Label.label("Node"))  // Create empty node
                 verticesInThisTX(toUuid)
               }
               val relationship = new RelationshipType() { def name: String = edgeName.toString }
@@ -206,8 +206,8 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     }
   }
 
-  def neo4jAdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]], g: GraphDatabaseService): Try[Unit] = {
-    val transaction = g.beginTx()
+  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
+    val transaction = neoGraph.beginTx()
     val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
@@ -218,12 +218,12 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
-            .orElse(Option(g.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
           val target = verticesInThisTX
             .get(edge.tgt)
-            .orElse(Option(g.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
           source.createRelationshipTo(target, new RelationshipType() {
@@ -237,7 +237,7 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = g.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
           verticesInThisTX += (adm.uuid.uuid -> newVertex)
           newVertex
         })
@@ -268,158 +268,38 @@ class Neo4jDBQueryProxy extends Actor with ActorLogging {
     }
   }
 
-  var writeToDbCounter = 0L
-
   def FutureTx[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = Future {
-      val tx = neoGraph.beginTx()
-      val result: T = body
-      tx.success()
-      tx.close()
-      result
-    }
+    val tx = neoGraph.beginTx()
+    val result: T = body
+    tx.success()
+    tx.close()
+    result
+  }
 
+  override def receive: PartialFunction[Any,Unit] = super.receive orElse {
 
-
-  def receive = {
-
-    case Ready => sender() ! Ready
-
-    case NodeQuery(q, shouldParse) =>
-      println(s"Received node query: $q")
-      sender() ! FutureTx {
-        Query.run[Vertex](q, graph).map { vertices =>
-          println(s"Found: ${vertices.length} nodes")
-          if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
-          else vertices
-        }
-      }
-
-    case EdgeQuery(q, shouldParse) =>
-      println(s"Received new edge query: $q")
-      sender() ! FutureTx {
-        Query.run[Edge](q, graph).map { edges =>
-          println(s"Found: ${edges.length} edges")
-          if (shouldParse)
-            JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
-          else
-            edges
-        }
-      }
-
-    // Run the given query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
-    case StringQuery(q, shouldParse) =>
-      println(s"Received string query: $q")
-      sender() ! FutureTx {
-        Query.run[java.lang.Object](q, graph).map { results =>
-          println(s"Found: ${results.length} items")
-          if (shouldParse) {
-            toJson(results.toList)
-          } else {
-            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
-          }
-        }
-      }
-
+    // Cypher queries are only supported by Neo4j
     case CypherQuery(q, shouldParse) =>
       println(s"Received Cypher query: $q")
       sender() ! Future {
         Try {
           val results = neoGraph.execute(q)
           if (shouldParse) {
-            toJson(results.asScala.toList)
+            DBQueryProxyActor.toJson(results.asScala.toList)
           } else {
             val stringResult = results.resultAsString()
-            JsString(stringResult.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
+            JsString(
+              stringResult
+                .map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""")
+                .mkString("[", ",", "]")
+            )
           }
         }
       }
-
-    case WriteCdmToNeo4jDB(cdms) =>
-//      log.info(s"Received CDM batch of ${cdms.length}")
-      neo4jDBNodeableTx(cdms, neoGraph).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
-      sender() ! Ack
-
-    case WriteAdmToNeo4jDB(adms) =>
-//      log.info(s"Received ADM batch of ${adms.length}")
-      neo4jAdmTx(adms, neoGraph).getOrElse(log.error(s"Failure writing to DB with ADMs: $adms"))
-      sender() ! Ack
-//      counter = counter + cdms.size
-//      log.info(s"DBActor received: $counter")
-
-    case Failure(e: Throwable) =>
-      log.error(s"FAILED in DBActor: {}", e)
-//      sender() ! Ack   // TODO: Should this ACK?
-
-    case CompleteMsg =>
-      streamsFlowingInToThisActor -= 1
-      log.info(s"DBActor received a completion message. Remaining streams: $streamsFlowingInToThisActor")
-//      sender() ! Ack
-
-    case KillJVM =>
-      streamsFlowingInToThisActor -= 1
-      log.warning(s"DBActor received a termination message. Remaining streams: $streamsFlowingInToThisActor")
-      if (streamsFlowingInToThisActor == 0) {
-        log.warning(s"Shutting down the JVM.")
-        graph.close()
-        Runtime.getRuntime.halt(0)
-      }
-//      sender() ! Ack
-
-    case InitMsg =>
-      log.info(s"DBActor received an initialization message")
-      streamsFlowingInToThisActor += 1
-      sender() ! Ack
-  }
-
-  var streamsFlowingInToThisActor = 0
-
-  import scala.collection.JavaConversions._
-
-  def toJson: Any => JsValue = {
-
-    // Numbers
-    case n: Int => JsNumber(n)
-    case n: Long => JsNumber(n)
-    case n: Double => JsNumber(n)
-    case n: java.lang.Long => JsNumber(n)
-    case n: java.lang.Double => JsNumber(n)
-
-    // Strings
-    case s: String => JsString(s)
-
-    // Lists
-    case l: java.util.List[_] => toJson(l.toList)
-    case l: List[_] => JsArray(l map toJson)
-
-    // Maps
-    case m: java.util.Map[_,_] => toJson(m.toMap)
-    case m: Map[_,_] => JsObject(m map { case (k,v) => (k.toString, toJson(v)) })
-
-    // Special cases (commented out because they are pretty verbose) and functionality is
-    // anyways accessible via the "vertex" and "edges" endpoints
- //   case v: Vertex => ApiJsonProtocol.vertexToJson(v)
- //   case e: Edge => ApiJsonProtocol.edgeToJson(e)
-
-    // Other: Any custom 'toString'
-    case o => JsString(o.toString)
-
   }
 }
 
 
-
-
-sealed trait RestQuery { val query: String }
-case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
-case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
-case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
-case class CypherQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
-
-case class EdgesForNodes(nodeIdList: Seq[Int])
-case object Ready
-
-case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable[_]])
-case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
 
 
 
@@ -438,10 +318,3 @@ object Neo4jFlowComponents {
     .recover{ case e: Throwable => e.printStackTrace }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }
-
-case object Ack
-case object CompleteMsg
-case object KillJVM
-case object InitMsg
-
-case class AdmInvariantViolation(edge: EdgeAdm2Adm) extends RuntimeException(s"Didn't find source ${edge.src} of $edge")

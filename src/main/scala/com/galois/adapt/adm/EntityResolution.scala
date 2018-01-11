@@ -8,8 +8,9 @@ import akka.pattern.ask
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.Timeout
+import com.galois.adapt.FlowComponents
 import com.galois.adapt.adm.ERStreamComponents._
-import com.galois.adapt.adm.UuidRemapper.{GetCdm2Adm, ResultOfGetCdm2Adm}
+import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -28,10 +29,32 @@ object EntityResolution {
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
     val parallelism: Int = config.getInt("adapt.adm.parallelism")
+    val delay: FiniteDuration = 5 seconds
 
-    erWithoutRemapsFlow(uuidRemapper)
-      .via(remapEdgeUuids(uuidRemapper))
-        .via(awaitAndDeduplicate(parallelism))
+    // TODO: this is a hack
+    def endHack(cdm: CDM): CDM = {
+      cdm match {
+        case EndMarker(session, counts) =>
+
+          println(s"Reached end of session $session: ")
+          for ((k,v) <- counts) {
+            println(s"  $k: $v")
+          }
+
+          println(s"Waiting for $delay seconds...")
+          Thread.sleep(delay.toMillis)
+          uuidRemapper ! ExpireEverything
+
+        case _ => /* do nothing */
+      }
+
+      cdm
+    }
+
+    Flow.fromFunction[CDM,CDM](endHack)
+      .via(erWithoutRemapsFlow(uuidRemapper))
+        .via(remapEdgeUuids(uuidRemapper))
+          .via(awaitAndDeduplicate(parallelism))
   }
 
 
@@ -118,7 +141,9 @@ object EntityResolution {
   //
   private def awaitAndDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
+//      .via(FlowComponents.printCounter("Before map async", 1000))
       .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
+//      .via(FlowComponents.printCounter("Through map async", 1000))
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far

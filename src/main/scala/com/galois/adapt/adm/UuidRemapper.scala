@@ -30,6 +30,9 @@ object UuidRemapper {
   // TODO: do this nicely
   // For debugging: tell me about nodes that are still blocked
   case object GetStillBlocked
+
+  // TODO: need finer grain control of this
+  case object ExpireEverything
 }
 
 class UuidRemapper extends Actor with ActorLogging {
@@ -114,6 +117,15 @@ class UuidRemapper extends Actor with ActorLogging {
 
     //  sender() ! ()
 
+
+    // TODO: do this better
+    case ExpireEverything =>
+
+      // Just send ourself messages with synthesized UUIDs
+      for ((cdmUuid, waiting) <- blocking) {
+        val synthesizedAdmUuid = AdmUUID(java.util.UUID.randomUUID())
+        self ! PutCdm2Adm(cdmUuid, synthesizedAdmUuid)
+      }
 
     case msg => log.error("UuidRemapper: received an unexpected message: ", msg)
   }

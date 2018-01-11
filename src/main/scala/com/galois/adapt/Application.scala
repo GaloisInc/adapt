@@ -18,7 +18,7 @@ object Application extends App {
   }
   
   appMode.toLowerCase match {
-    case "accept"  => AcceptanceApp.run()
+  //  case "accept"  => AcceptanceApp.run()
     case "prod"    => ProductionApp.run()
 //    case "dev"     => DevelopmentApp.run()
 //    case "cluster" => ClusterDevApp.run(config)

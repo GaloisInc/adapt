@@ -23,8 +23,8 @@ class AcceptanceTestsActor(val registry: ActorRef) extends Actor with ActorLoggi
     
   import context.dispatcher
  
-//  val dependencies = "DevDBActor" :: "UIActor" :: Nil
-//  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("DevDBActor").get, x => true))
+//  val dependencies = "TinkerGraphDBQueryProxy" :: "UIActor" :: Nil
+//  lazy val subscriptions = Set[Subscription](Subscription(dependencyMap("TinkerGraphDBQueryProxy").get, x => true))
 
   //implicit val ec = system.dispatcher
   implicit val askTimeout = Timeout(100 seconds)
