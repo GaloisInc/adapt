@@ -50,9 +50,9 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
   override def FutureTx[T](body: => T)(implicit ec: ExecutionContext) = Future { body }
 
 
-  override def DBNodeableTx(cdms: Seq[DBNodeable[_]]) = ???
+  override def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ???
 
-  override def AdmTx(adms: Seq[Either[adm.EdgeAdm2Adm, adm.ADM]]) = {
+  override def AdmTx(adms: Seq[Either[adm.EdgeAdm2Adm, adm.ADM]]): Try[Unit] = {
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
@@ -74,21 +74,20 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       case Right(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
 
-        val props: List[Object] = List(org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) ++ adm.asDBKeyValues.flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
-        if (props.length % 2 != 0) {
-          println(s"Size of props: ${props.length}")
-        } else {
-          val newNode = graph.addVertex(props: _*)
-          nodeIds += (adm.uuid.uuid -> newNode)
-        }
+        val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) +: adm.asDBKeyValues)
+          .flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
+
+        assert(props.length % 2 == 0, s"Properties should have even size: $props")
+        val newNode = graph.addVertex(props: _*)
+        nodeIds += (adm.uuid.uuid -> newNode)
 
         ()
       }
     }
 
     admToNodeResults
-      .find(_.isFailure)
-      .map { case f@Failure(e) => e.printStackTrace(); f }
+      .collect { case f@Failure(_) => f }
+      .headOption
       .getOrElse(Success(()))
   }
 

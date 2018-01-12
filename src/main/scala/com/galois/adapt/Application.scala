@@ -60,12 +60,10 @@ object Application extends App {
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
-
   // Start up the database
-  val appMode = config.getString("adapt.app")
-  val dbActor: ActorRef = appMode.toLowerCase match {
-    case "prod" => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
-    case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
+  val dbActor: ActorRef = config.getString("adapt.db").toLowerCase match {
+    case "neo4j" => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
+    case "tinkergraph" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
   println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
@@ -87,16 +85,17 @@ object Application extends App {
 
   config.getString("adapt.runflow").toLowerCase match {
 
-    case _ if appMode == "accept" =>
+    case "accept" =>
       println("Running acceptance tests")
 
       val completionMsg = CompleteMsg
       val writeTimeout = Timeout(30.1 seconds)
 
-      val sink = EntityResolution(uuidRemapper).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))
-
       startWebServer()
-      CDMSource.cdm18(ta1).via(FlowComponents.printCounter("ADM events")).runWith(sink)
+      CDMSource.cdm18(ta1)
+        .via(FlowComponents.printCounter("CDM events"))
+        .via(EntityResolution(uuidRemapper))
+        .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))
 
 
     case "database" | "db" | "ingest" =>
