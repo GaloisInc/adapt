@@ -88,7 +88,7 @@ object Application extends App {
     case "accept" =>
       println("Running acceptance tests")
 
-      val completionMsg = CompleteMsg
+      val completionMsg = StartTests
       val writeTimeout = Timeout(30.1 seconds)
 
       startWebServer()

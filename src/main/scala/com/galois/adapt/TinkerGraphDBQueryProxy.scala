@@ -10,8 +10,11 @@ import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 
+import com.galois.adapt.scepter.General_TA1_Tests
+
 import scala.concurrent.{ExecutionContext, Future}
 import collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
 class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
@@ -93,11 +96,16 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
 
   override def receive: PartialFunction[Any,Unit] = super.receive orElse {
-    case GiveMeTheGraph => sender() ! graph
+
+    case StartTests =>
+      log.info(s"DBActor received a message to start the tests. Remaining streams.")
+
+      org.scalatest.run(new General_TA1_Tests(0, Nil, Map(), graph, None, ListBuffer.empty))
+
   }
 
 }
 
-case object GiveMeTheGraph
+case object StartTests
 case class DoneDevDB(graph: Option[TinkerGraph], incompleteEdgeCount: Map[UUID, List[(Vertex,String)]])
 
