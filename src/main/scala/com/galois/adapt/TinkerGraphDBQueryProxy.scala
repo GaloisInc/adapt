@@ -14,7 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class TinkerGraphDBQueryProxy(localStorage: Option[String] = None) extends DBQueryProxyActor {
+class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
   // In memory DB
   val graph: TinkerGraph = {
@@ -24,9 +24,9 @@ class TinkerGraphDBQueryProxy(localStorage: Option[String] = None) extends DBQue
     g.createIndex("pid", classOf[Vertex])
 
     // Optionally load in existing data:
-    localStorage.foreach( path =>
-      if (Files.exists(Paths.get(path))) g.io(IoCore.graphson()).readGraph(path)
-    )
+//    localStorage.foreach( path =>
+//      if (Files.exists(Paths.get(path))) g.io(IoCore.graphson()).readGraph(path)
+//    )
 
     g
   }
@@ -74,9 +74,13 @@ class TinkerGraphDBQueryProxy(localStorage: Option[String] = None) extends DBQue
       case Right(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
 
-        val props = List(org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) ++ adm.asDBKeyValues.flatMap { case (k, v) => List(k, v) }
-        val newNode = graph.addVertex(props)
-        nodeIds += (adm.uuid.uuid -> newNode)
+        val props: List[Object] = List(org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) ++ adm.asDBKeyValues.flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
+        if (props.length % 2 != 0) {
+          println(s"Size of props: ${props.length}")
+        } else {
+          val newNode = graph.addVertex(props: _*)
+          nodeIds += (adm.uuid.uuid -> newNode)
+        }
 
         ()
       }
@@ -84,6 +88,7 @@ class TinkerGraphDBQueryProxy(localStorage: Option[String] = None) extends DBQue
 
     admToNodeResults
       .find(_.isFailure)
+      .map { case f@Failure(e) => e.printStackTrace(); f }
       .getOrElse(Success(()))
   }
 

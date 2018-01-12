@@ -74,7 +74,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Write a batch of ADM to the DB
     case WriteAdmToNeo4jDB(adms) =>
-      AdmTx(adms).getOrElse(log.error(s"Failure writing to DB with ADMs: $adms"))
+      AdmTx(adms).getOrElse(log.error(s"Failure writing to DB with ADMs: ")) //$adms"))
       sender() ! Ack
 
     case Failure(e: Throwable) =>
