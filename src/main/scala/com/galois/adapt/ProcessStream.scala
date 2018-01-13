@@ -4,11 +4,10 @@ import java.util.UUID
 
 import akka.stream.scaladsl.{Flow, Source}
 import com.galois.adapt.FlowComponents.predicateTypeLabeler
-import com.galois.adapt.cdm17.{CDM17, EVENT_ACCEPT, EVENT_CONNECT, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, Event, EventType, NetFlowObject}
+import cdm18._
 import org.mapdb.{DB, HTreeMap}
 import FlowComponents._
 import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
-import cdm17._
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.immutable.SortedSet
@@ -23,7 +22,7 @@ object ProcessStream {
   def processFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
 //    val dbMap = db.hashMap("fileFeatureGenerator_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID, MutableSet[Event]]]
 
-    Flow[(String, UUID, Event, CDM17)]
+    Flow[(String, UUID, Event, CDM18)]
       .filter(x => List("NetFlowObject", "FileObject", "Subject", "MemoryObject").contains(x._1))
       .groupBy(Int.MaxValue, _._3.subjectUuid)
 //      .merge(commandSource)
@@ -42,7 +41,7 @@ object ProcessStream {
 
 
         {
-          case Tuple4("Subject", uuid: ProcessUUID, event: Event, _: CDM17) =>
+          case Tuple4("Subject", uuid: ProcessUUID, event: Event, _: CDM18) =>
             if (processUuidOpt.isEmpty) processUuidOpt = Some(uuid)
 //            if (event.subject == processUuidOpt.get) allEventsByThisProcess += event
             if (shouldStore) {
@@ -57,8 +56,8 @@ object ProcessStream {
 //            List.empty
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
-          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+          case Tuple4("NetFlowObject", uuid: NetFlowUUID, event: Event, cdm: CDM18) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = event.subjectUuid
 //            netFlowEvents(uuid) = netFlowEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,NetFlowObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[NetFlowObject])
             if (shouldStore) {
@@ -73,8 +72,8 @@ object ProcessStream {
 //            List.empty
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
-          case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+          case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, cdm: CDM18) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = event.subjectUuid
 //            memoryEvents(uuid) = memoryEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,MemoryObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[MemoryObject])
             if (shouldStore) {
@@ -89,8 +88,8 @@ object ProcessStream {
 //            List.empty
             List(((processUuidOpt.get, eventsToThisProcess), netFlowEvents, fileEvents, memoryEvents))
 
-          case Tuple4("FileObject", uuid: FileUUID, event: Event, cdm: CDM17) =>
-            if (processUuidOpt.isEmpty) processUuidOpt = Some(event.subjectUuid)
+          case Tuple4("FileObject", uuid: FileUUID, event: Event, cdm: CDM18) =>
+            if (processUuidOpt.isEmpty) processUuidOpt = event.subjectUuid
 //            fileEvents(uuid) = fileEvents.getOrElse(uuid, MutableSortedSet.empty[(Event,FileObject)](Ordering.by(_._1.timestampNanos))) +
 //              (event -> cdm.asInstanceOf[FileObject])
             if (shouldStore) {
@@ -173,7 +172,7 @@ object ProcessStream {
     val allProcessEventSet: MutableSortedSet[Event] = eventsDoneToThisProcessSet ++ netFlowEventSets.flatMap(_._2.map(_._1)) ++= fileEventSets.flatMap(_._2.map(_._1)) ++= memoryEventSets.flatMap(_._2.map(_._1))
     val allProcessEventList: List[Event] = allProcessEventSet.toList
 
-    var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+    var allRelatedUUIDs = eventsDoneToThisProcessSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, e.subjectUuid).flatten)
 
 
     val m = MutableMap.empty[String, Any]
@@ -196,7 +195,7 @@ object ProcessStream {
 
 //      m("touchesAPasswordFile") = "TODO"                                                  // TODO: needs pairing with Files. Or does it? Path is probably on events.
     m("readsFromNetFlowThenWritesAFileThenExecutesTheFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-      _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+      _._2.collect{ case e if e.subjectUuid == Some(processUuid) && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
     ).toList.sorted.headOption.exists(netFlowReadTime =>
       fileEventSets.exists(
         _._2.map(_._1).dropWhile(write =>
@@ -208,7 +207,7 @@ object ProcessStream {
     m("changesFilePermissionsThenExecutesIt") = allProcessEventList.dropWhile(_.eventType != EVENT_MODIFY_FILE_ATTRIBUTES).exists(_.eventType == EVENT_EXECUTE): Boolean
     m("executedThenImmediatelyDeletedAFile") = allProcessEventList.groupBy(_.predicateObject).-(None).values.exists(l => l.sortBy(_.timestampNanos).dropWhile(_.eventType != EVENT_EXECUTE).drop(1).headOption.exists(_.eventType == EVENT_UNLINK)): Boolean
     m("readFromNetFlowThenDeletedFile") = netFlowEventSets.map(i => i._1 -> i._2.map(_._1)).flatMap(
-      _._2.collect{ case e if e.subjectUuid == processUuid && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
+      _._2.collect{ case e if e.subjectUuid == Some(processUuid) && List(EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG).contains(e.eventType) => e.timestampNanos }   // TODO: revisit these event types
     ).toList.sorted.headOption.exists(netFlowReadTime =>
       fileEventSets.exists(
         _._2.map(_._1).exists(delete =>

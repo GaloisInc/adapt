@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Source}
 import com.galois.adapt.FlowComponents.predicateTypeLabeler
-import com.galois.adapt.cdm17._
+import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, HTreeMap}
 
@@ -22,7 +22,7 @@ object MemoryStream {
 //    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
 
 //    predicateTypeLabeler(commandSource, db)
-    Flow[(String, UUID, Event, CDM17)]
+    Flow[(String, UUID, Event, CDM18)]
       .filter(x => x._1 == "MemoryObject")
       .groupBy(Int.MaxValue, _._2)
 //      .merge(commandSource)
@@ -33,7 +33,7 @@ object MemoryStream {
         var cleanupCounts = 0
 
         {
-          case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, _: CDM17) =>
+          case Tuple4("MemoryObject", uuid: MemoryUUID, event: Event, _: CDM18) =>
             if (shouldStore) {
               memoryEvents += event
               cleanupCounts = 0
@@ -96,7 +96,7 @@ object MemoryStream {
   val memoryFeatures = Flow[(MemoryUUID, MutableSortedSet[Event])]
     .mapConcat[(String, MemoryUUID, MutableMap[String,Any], Set[UUID])] { case (memoryUUID, memoryEventSet) =>
     val memoryEventList = memoryEventSet.toList
-    var allRelatedUUIDs = memoryEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+    var allRelatedUUIDs = memoryEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, e.subjectUuid).flatten)
     val m = MutableMap.empty[String,Any]
     m("writeAndMProtectToTheSameMemoryObject") = memoryEventSet.exists(_.eventType == EVENT_WRITE) && memoryEventSet.exists(_.eventType == EVENT_MPROTECT)
     m("mmapAndMProtectToTheSameMemoryObject") = memoryEventSet.exists(_.eventType == EVENT_MMAP) && memoryEventSet.exists(_.eventType == EVENT_MPROTECT)

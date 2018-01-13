@@ -1,10 +1,9 @@
 package com.galois.adapt
 
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import com.galois.adapt.cdm17._
+import com.galois.adapt.cdm18._
 
 import scala.language.implicitConversions
 
@@ -30,9 +29,9 @@ package object adm {
 
   // Edges are now first class values in the stream.
   sealed trait Edge[From, To]
-  final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge[CDM17, CDM17]
-  final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge[CDM17, ADM]
-  final case class EdgeAdm2Cdm(src: AdmUUID, label: String, tgt: CdmUUID) extends Edge[ADM, CDM17]
+  final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge[CDM18, CDM18]
+  final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge[CDM18, ADM]
+  final case class EdgeAdm2Cdm(src: AdmUUID, label: String, tgt: CdmUUID) extends Edge[ADM, CDM18]
   final case class EdgeAdm2Adm(src: AdmUUID, label: String, tgt: AdmUUID) extends Edge[ADM, ADM]
 
   /* Stands for Adapt Data Model. This is generated from CDM by

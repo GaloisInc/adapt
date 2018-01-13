@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.stream.scaladsl.Flow
 import akka.util.Timeout
-import com.galois.adapt.cdm17._
+import com.galois.adapt.cdm18._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -13,7 +13,7 @@ object ERStreamComponents {
 
   import ERRules._
 
-  type CDM = CDM17
+  type CDM = CDM18
 
   def eventResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Event, Future[Either[Edge[_, _], ADM]], _] = Flow[Event]
 
@@ -58,7 +58,7 @@ object ERStreamComponents {
                 extractPathsAndEdges(path3) ++
                 extractPathsAndEdges(path4) ++
                 Stream.concat(
-                  Some(Left(subject)),
+                  subject.map(Left(_)),
                   predicateObject.map(Left(_)),
                   predicateObject2.map(Left(_))
                 )
@@ -78,7 +78,7 @@ object ERStreamComponents {
               extractPathsAndEdges(path3) ++
               extractPathsAndEdges(path4) ++
               Stream.concat(
-                Some(Left(subject)),
+                subject.map(Left(_)),
                 predicateObject.map(Left(_)),
                 predicateObject2.map(Left(_))
               )

@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.util.UUID
 
 import akka.stream.scaladsl.{Flow, Source}
-import com.galois.adapt.cdm17.{CDM17, EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LOADLIBRARY, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_RENAME, EVENT_SENDMSG, EVENT_SENDTO, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE, Event, FileObject}
+import com.galois.adapt.cdm18.{CDM18, EVENT_CHECK_FILE_ATTRIBUTES, EVENT_CLOSE, EVENT_CREATE_OBJECT, EVENT_DUP, EVENT_EXECUTE, EVENT_FNCTL, EVENT_LINK, EVENT_LOADLIBRARY, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_OPEN, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_RENAME, EVENT_SENDMSG, EVENT_SENDTO, EVENT_TRUNCATE, EVENT_UNLINK, EVENT_UPDATE, EVENT_WRITE, Event, FileObject}
 import org.mapdb.{DB, HTreeMap}
 import FlowComponents._
 import akka.stream.{DelayOverflowStrategy, OverflowStrategy}
@@ -20,7 +20,7 @@ object FileStream {
   def fileFeatureGenerator(commandSource: Source[ProcessingCommand,_], db: DB) = {
 //    val dbMap = db.hashMap("fileFeatureGenerator" + Random.nextInt()).createOrOpen().asInstanceOf[HTreeMap[UUID,MutableSet[Event]]]
 
-    Flow[(String, UUID, Event, CDM17)]
+    Flow[(String, UUID, Event, CDM18)]
       .filter(x => x._1 == "FileObject")
       .groupBy(Int.MaxValue, _._2)
 //      .merge(commandSource)
@@ -33,7 +33,7 @@ object FileStream {
         var cleanupCounts = 0
 
         {
-          case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM17) =>
+          case Tuple4("FileObject", uuid: FileUUID, event: Event, _: CDM18) =>
             if (fileUuidOpt.isEmpty) fileUuidOpt = Some(uuid)
 
             if (shouldStore) {
@@ -99,7 +99,7 @@ object FileStream {
   val fileFeatures = Flow[(FileUUID, MutableSortedSet[Event])]
     .mapConcat[(String, FileUUID, MutableMap[String,Any], Set[EventUUID])] { case (fileUuid, fileEventSet) =>
       val fileEventList = fileEventSet.toList
-      var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, Some(e.subjectUuid)).flatten)
+      var allRelatedUUIDs = fileEventSet.flatMap(e => List(Some(e.uuid), e.predicateObject, e.predicateObject2, e.subjectUuid).flatten)
       val m = MutableMap.empty[String,Any]
 
   //    m("execAfterWriteByNetFlowReadingProcess") = {
@@ -169,7 +169,7 @@ object FileStream {
       m("attribChangeEventThenExecuteGapNanos") = fileEventList.timeBetween(Some(EVENT_MODIFY_FILE_ATTRIBUTES), Some(EVENT_EXECUTE))
       m("writeExecutionGapNanos") = fileEventList.timeBetween(Some(EVENT_WRITE), Some(EVENT_EXECUTE))
       m("readDeletionGapNanos") = fileEventList.timeBetween(Some(EVENT_READ), Some(EVENT_UNLINK))
-      m("countDistinctProcessesHaveEventToFile") = fileEventSet.map(_.subjectUuid).size
+      m("countDistinctProcessesHaveEventToFile") = fileEventSet.flatMap(_.subjectUuid).size
       m("totalBytesRead") = fileEventList.filter(_.eventType == EVENT_READ).flatMap(_.size).sum
       m("totalBytesWritten") = fileEventList.filter(_.eventType == EVENT_WRITE).flatMap(_.size).sum
 

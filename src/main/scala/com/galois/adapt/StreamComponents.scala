@@ -4,21 +4,23 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.file.Paths
 import java.util.UUID
 import java.io._
+
 import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
-import com.galois.adapt.cdm17._
 import akka.kafka.{ConsumerSettings, ProducerSettings, Subscriptions}
 import akka.kafka.scaladsl.Producer
 import akka.kafka.scaladsl.Consumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.avro.io.{DecoderFactory, EncoderFactory}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import GraphDSL.Implicits._
 import akka.util.ByteString
 import org.mapdb.{DB, DBMaker, HTreeMap}
+
 import collection.JavaConverters._
 import scala.collection.mutable
 import scala.sys.process._
@@ -26,12 +28,14 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.tinkerpop.gremlin.structure.Vertex
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.{Source => FileSource}
 import NetFlowStream._
 import FileStream._
 import ProcessStream._
 import MemoryStream._
+import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 
 
@@ -40,10 +44,10 @@ object FlowComponents {
   val config = ConfigFactory.load()
 
 
-  def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB): Flow[CDM17, (String, UUID, Event, CDM17), _] = {
+  def predicateTypeLabeler(commandSource: Source[ProcessingCommand,_], db: DB): Flow[CDM18, (String, UUID, Event, CDM18), _] = {
 //    val dbMap = db.hashMap("typeSorter_" + Random.nextLong()).createOrOpen().asInstanceOf[HTreeMap[UUID,mutable.SortedSet[Event]]]
-    Flow[CDM17]
-      .mapConcat[(UUID, String, CDM17)] {
+    Flow[CDM18]
+      .mapConcat[(UUID, String, CDM18)] {
         case e: Event if e.predicateObject.isDefined && e.eventType != EVENT_OTHER && e.eventType != EVENT_CHECK_FILE_ATTRIBUTES =>    // Throw away all EVENT_OTHERs
           if (e.predicateObject2.isDefined) List((e.predicateObject.get, "Event", e), (e.predicateObject2.get, "Event", e))
           else List((e.predicateObject.get, "Event", e))
@@ -59,9 +63,9 @@ object FlowComponents {
     }
       .groupBy(Int.MaxValue, _._1)
       .merge(commandSource)
-      .statefulMapConcat[(String, UUID, Event, CDM17)] { () =>
+      .statefulMapConcat[(String, UUID, Event, CDM18)] { () =>
         var targetUuid: Option[UUID] = None
-        var idOpt: Option[(UUID,String,CDM17)] = None
+        var idOpt: Option[(UUID,String,CDM18)] = None
         val events = mutable.SortedSet.empty[Event](Ordering.by(_.timestampNanos))
         var cleanupCount = 0
         var shouldStore = true
@@ -76,7 +80,7 @@ object FlowComponents {
               List.empty
             }
 
-          case Tuple3(objectUuid: UUID, labelName: String, cdm: CDM17) =>
+          case Tuple3(objectUuid: UUID, labelName: String, cdm: CDM18) =>
             cleanupCount = 0
             if (targetUuid.isEmpty) targetUuid = Some(objectUuid)
             if (idOpt.isEmpty) {
@@ -113,7 +117,7 @@ object FlowComponents {
       }.mergeSubstreams
   }
 
-//case class LabeledPredicateType(labelName: String, predicateObjectUuid: UUID, event: Event, cdm: CDM17)
+//case class LabeledPredicateType(labelName: String, predicateObjectUuid: UUID, event: Event, cdm: CDM18)
 
 
   def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
@@ -186,7 +190,7 @@ object FlowComponents {
 }
 
 
-trait ProcessingCommand extends CDM17
+trait ProcessingCommand extends CDM18
 case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
 case object EmitCmd extends ProcessingCommand
 case object CleanUp extends ProcessingCommand
