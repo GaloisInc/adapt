@@ -28,10 +28,9 @@ Example:
 
 High-level commands about the primary operations of the system
 
-| Command Line Flag | Possible Values                      | Default Value | Description |
-| ----------------- |:------------------------------------:|:-------------:|:------------|
-| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
-| adapt.app         | `prod` `accept`                      | `prod`        | previous multiple versions have been combined into `prod`. `accept` is for the acceptance testing app. |
+| Command Line Flag | Possible Values                               | Default Value | Description |
+| ----------------- |:---------------------------------------------:|:-------------:|:------------|
+| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` `accept` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
 
 
 #### `-Dadapt.ingest.X` Flags

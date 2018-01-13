@@ -61,9 +61,9 @@ object Application extends App {
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
   // Start up the database
-  val dbActor: ActorRef = config.getString("adapt.db").toLowerCase match {
-    case "neo4j" => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
-    case "tinkergraph" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
+  val dbActor: ActorRef = config.getString("adapt.runflow").toLowerCase match {
+    case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
+    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
   println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
