@@ -106,6 +106,7 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
       createIfNeededIndex(schema, "NetFlowObject", "remoteAddress")
       createIfNeededIndex(schema, "NetFlowObject", "remotePort")
       createIfNeededIndex(schema, "FileObject", "peInfo")
+      createIfNeededIndex(schema, "FileObject", "path")
       createIfNeededIndex(schema, "Event", "timestampNanos")
       createIfNeededIndex(schema, "Event", "name")
       createIfNeededIndex(schema, "Event", "eventType")
@@ -300,9 +301,6 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
       }
   }
 }
-
-
-
 
 
 object Neo4jFlowComponents {

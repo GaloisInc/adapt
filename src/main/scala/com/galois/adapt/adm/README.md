@@ -1,3 +1,5 @@
+Link to the [ADM schema][1].
+
 ADM (adapt data model) is intended as an internal format of CDM. Compared to CDM, 
 
   * there are fewer the extraneous fields (CDM is verbose)
@@ -56,3 +58,4 @@ Building off of the current system here are some things that are now possible, a
   * adding edges to link nodes to other nodes that are temporally close to them  
 
   [0]: package.scala
+  [1]: https://owncloud-tng.galois.com/index.php/s/I3tOvpXsnKjopce#pdfviewer
