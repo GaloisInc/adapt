@@ -104,19 +104,19 @@ import scala.language.existentials
  *                 | traversal '.groupCount()'
  *                 | traversal '.match(' traversal ',' ... ')'
  *                 | traversal '.both(' string ',' ... ')'
- *                 | traversal '.bothV()'
  *                 | traversal '.out(' string ',' ... ')'
- *                 | traversal '.outV()'
  *                 | traversal '.in(' string ',' ... ')'
+ *                 | traversal '.bothV()'
+ *                 | traversal '.outV()'
  *                 | traversal '.inV()'
- *                 | traversal '.bothE()'
+ *                 | traversal '.bothE(' string ',' ... ')'
  *                 | traversal '.outE(' string ',' ... ')'
- *                 | traversal '.inE()'
+ *                 | traversal '.inE(' string ',' ... ')'
  *                 | traversal '.repeat(' traversal ')'
  *                 | traversal '.union(' traversal ',' ... ')'
  *                 | traversal '.local(' traversal ')'
  *                 | traversal '.property(' string ',' literal ',' ... ')'
- *                 | traversal '.properties()'
+ *                 | traversal '.properties(' string ',' ... ')'
  *                 | traversal '.path()'
  *                 | traversal '.unrollPath()'
  *
@@ -273,8 +273,8 @@ object Query {
         | ".by(" ~ trav ~ ",decr)"         ^^ { case _~t~_      => ByTraversal(_: Tr, t, false) }
         | ".as(" ~! rep1sep(str,",") ~ ")" ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
         | ".until(" ~! trav ~ ")"          ^^ { case _~t~_      => Until(_: Tr, t) }
-        | ".values(" ~! rep1sep(str,",")~")"    ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
-        | ".valueMap(" ~! repsep(str,",")~")"   ^^ { case _~s~_      => ValueMap(_: Tr, RawArr(s)) }
+        | ".values(" ~! rep1sep(str,",")~")"    ^^ { case _~s~_     => Values(_: Tr, RawArr(s)) }
+        | ".valueMap(" ~! repsep(str,",")~")"   ^^ { case _~s~_     => ValueMap(_: Tr, RawArr(s)) }
         | ".properties(" ~! repsep(str,",")~")" ^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
         | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
@@ -295,9 +295,9 @@ object Query {
         | ".outV()"                        ^^ { case _          => OutV(_: Traversal[_,Edge]) }
         | ".in(" ~! repsep(str,",")~ ")"   ^^ { case _~s~_      => In(_: Traversal[_,Vertex], RawArr(s)) }
         | ".inV()"                         ^^ { case _          => InV(_: Traversal[_,Edge]) }
-        | ".bothE()"                       ^^ { case _          => BothE(_: Traversal[_,Vertex]) }
+        | ".bothE("~! repsep(str,",")~ ")" ^^ { case _~s~_      => BothE(_: Traversal[_,Vertex], RawArr(s)) }
         | ".outE(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => OutE(_: Traversal[_,Vertex], RawArr(s)) }
-        | ".inE()"                         ^^ { case _          => InE(_: Traversal[_,Vertex]) }
+        | ".inE(" ~! repsep(str,",")~ ")"  ^^ { case _~s~_      => InE(_: Traversal[_,Vertex], RawArr(s)) }
         | ".repeat(" ~! trav ~ ")"         ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
         | ".union(" ~!repsep(trav,",")~")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
         | ".local(" ~! trav ~ ")"          ^^ { case _~t~_      => Local(_: Tr, t) }
@@ -663,15 +663,17 @@ object QueryLanguage {
   case class InV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inV()
   }
-  case class BothE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).bothE()
+  case class BothE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).bothE(edgeLabels.eval(context): _*)
   }
   case class OutE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).outE(edgeLabels.eval(context): _*)
   }
-  case class InE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inE()
+  case class InE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).inE(edgeLabels.eval(context): _*)
   }
   case class Repeat[S](traversal: Traversal[S,Edge], rep: Traversal[_,Edge]) extends Traversal[S,Edge]{
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
