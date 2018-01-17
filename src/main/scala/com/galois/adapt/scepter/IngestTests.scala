@@ -57,6 +57,29 @@ class General_TA1_Tests(
     }
   }
 
+  // Test that all subjects have a "parentSubject" edge
+  "Subjects" should "have a 'parentSubject'" in {
+    val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
+        .hasLabel("Subject")
+        .hasNot("parentSubjectUuid")
+        .toList
+
+    if (subjectsWithoutParents.isEmpty) {
+      assert(subjectsWithoutParents.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        subjectsWithoutParents.length == 0,
+        s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
+      )
+    }
+  }
+
+
+
   // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them
   if ( ! ta1Source.contains(SOURCE_WINDOWS_FIVEDIRECTIONS)) {
     it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {

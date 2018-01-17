@@ -141,15 +141,17 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
     case CdmDone =>
       storedCdmDone = true
-      if (storedAdmDone) {
-        self ! StartTests
-      }
+      self ! StartTests
+      // TODO Alec: once tests start using ADM, fix this
+   //   if (storedAdmDone) {
+   //     self ! StartTests
+   //   }
 
     case AdmDone =>
-      storedAdmDone = true
-      if (storedCdmDone) {
-        self ! StartTests
-      }
+   //   storedAdmDone = true
+   //   if (storedCdmDone) {
+   //     self ! StartTests
+   //   }
 
     case StartTests  =>
       log.info(s"DBActor received a message to start the tests. Remaining streams.")

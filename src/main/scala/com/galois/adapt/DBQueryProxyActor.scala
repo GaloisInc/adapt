@@ -31,10 +31,10 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run a query that returns vertices
     case NodeQuery(q, shouldParse) =>
-      println(s"Received node query: $q")
+      log.info(s"Received node query: $q")
       sender() ! FutureTx {
         Query.run[Vertex](q, graph).map { vertices =>
-          println(s"Found: ${vertices.length} nodes")
+          log.info(s"Found: ${vertices.length} nodes")
           if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
           else vertices
         }
@@ -42,10 +42,10 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run a query that returns edges
     case EdgeQuery(q, shouldParse) =>
-      println(s"Received new edge query: $q")
+      log.info(s"Received new edge query: $q")
       sender() ! FutureTx {
         Query.run[Edge](q, graph).map { edges =>
-          println(s"Found: ${edges.length} edges")
+          log.info(s"Found: ${edges.length} edges")
           if (shouldParse)
             JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
           else
@@ -55,10 +55,10 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
-      println(s"Received string query: $q")
+      log.info(s"Received string query: $q")
       sender() ! FutureTx {
         Query.run[java.lang.Object](q, graph).map { results =>
-          println(s"Found: ${results.length} items")
+          log.info(s"Found: ${results.length} items")
           if (shouldParse) {
             DBQueryProxyActor.toJson(results.toList)
           } else {
