@@ -2,7 +2,7 @@
 
 ## Brief description of the files (to be found in the explore directory)
 
-The current implementation the FCA analysis is contained in fcbo_core.py (port of the original FCbO C implementation) and FCAscript.py (script to launch the concepts generation with FCbO and analyze the generated concepts to find anomalies).  
+The current implementation the FCA analysis is contained in fcbo.py (port of the original FCbO C implementation) and fcascript.py (script to launch the concepts generation with FCbO and analyze the generated concepts to find anomalies).  
 
 Example input files are provided in the directory: context files (one in CXT and one in FIMI format obtained by using the event query on ta1-theia-bovia-cdm17.bin) as well as json specification files 
 (event query in spec_context_event.py, netflow query in spec_context_netflow.py and file execution query in spec_context_execute.py and information for context generation (pid vs event context) from CSV files in csv/csvspec.json)
@@ -15,7 +15,7 @@ The concept/rule generation and rule violation analysis software can take variou
 
 - context files in FIMI or CXT format
 
-- query results from the Titan database
+- query results from the Neo4j database
 
 - CSV files generated from the original CDM files
 
@@ -51,8 +51,7 @@ queries can timeout or produce obscure Cassandra errors.)
 The second type of files gives the information necessary to extract an FCA/FCA analysis input context from a set of CSV files. In the case where the specification file passed as argument to the ```--specfile/-s``` option
 corresponds to the second type of file, the ```--csv``` flag must be used.
 
-In the case where ```--workflow/-w``` is set to ```'analysis'```, the ```--concept_file/-cf``` option must be used and it specifies the absolute path to the file that contains the concepts to analyze. An example of concept
-file is stored in the explore directory (cadets_csvspec_concepts_supp0_05.txt in explore/csv/cadets  generated from the CADETS Bovia file).
+In the case where ```--workflow/-w``` is set to ```'analysis'```, the ```--concept_file/-cf``` option must be used and it specifies the absolute path to the file that contains the concepts to analyze. 
 
 The ```--disable-naming/-dn``` flag cannot be invoked with in the case where only ```--inputfile/-i``` is specified and is passed a FIMI file as argument.
 It can be only invoked when json query specification files are passed as argument to ```--specfile/-s```or a file in CXT format is passed as argument to ```--inputfile/-i```.
@@ -103,16 +102,7 @@ All results of the rule generation and rule violation analysis are saved in the 
 In the case where ```--workflow/-w``` is set to ```'analysis'```, the ```--concept_file/-cf``` option must be used and it specifies the absolute path to the file that contains the concepts to analyze. An example of concept
 file is stored in the explore directory.
 
-The ```--min_rule_conf/-rc``` option specifies the minimum confidence of the implication rules generated. By default, this value is set to 0.95.
-
-The ```--max_rule_conf/-mrc``` option specifies the maximum confidence of the anti-implication rules generated. This value is set to 0.05 by default.
-
-```--num_rules/-nr``` specifies the number of rules to display. By default, this value is set to 10.  
-
-It is possible to choose the type of rules you want to generate with the ```--analysis_type/-a``` option. By default, the value of this option is set to 'all', which means that implication rules, anti-implication rules and disjointness rules are all generated. It is possible to generate a subset of the rules. 
-If you only want to generate implication rules, the value of ```--analysis_type/-a``` should be set to ```'imp'``` (the values for anti-implication rules and disjointness rules are ```'anti'``` and ```'dis'``` respectively). If you want to generate more than a type of rule than you pass the values associated with each type of rule you want to compute separated by a comma as an argument to ```--analysis_type/-a```. For example, if you want to compute implication rules and disjointness rules, you can pass ```'imp,dis'``` or ```'dis,imp'``` as argument to ```--analysis_type/-a```. 
-Similarly, if you want to compute implication rules and anti-implication rules, you can pass ```'imp,anti'``` or ```'anti,imp'``` as argument to ```--analysis_type/-a```. The full set of possible values for the ```--analysis_type/-a``` option is given in the next section.
-
+It is possible to choose the type of rules you want to generate with the ```--rules_spec/-rs``` option. The argument passed to the ```--rules_spec/-rs``` is a JSON file that specifies the types of rules to generate as the rule generation parameters (e.g for implication rules, minimum confidence threshold and number of rules to generate). An example of such specification file is the file explore/rulesCurrentSpec.json.
 
 
 ## Launching the concept generation and analysis
@@ -120,22 +110,20 @@ Similarly, if you want to compute implication rules and anti-implication rules, 
 
 The concept generation and analysis can be launched after an avro file has been ingested or CSV files generated from an avro file by invoking the following command:
 ```
-python3 fcascript.py [-h] --workflow {'context','fca','analysis','both'}
+python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
                     [--fca_algo {python,C}] [--fcbo_path FCBO_PATH]
                     [--inputfile INPUTFILE] [--specfile SPECFILE] [--csv]
                     [--parallel PARALLEL] [--min_support MIN_SUPPORT]
                     [--disable_naming] [--outputfile OUTPUTFILE]
-                    [--analysis_type {'all', 'imp', 'anti', 'dis', 'imp,anti', 'imp,dis', 'anti,imp', 'anti,dis', 'dis,imp', 'dis,anti', 'imp,anti,dis', 'imp,dis,anti', 'anti,imp,dis', 'anti,dis,imp', 'dis,imp,anti', 'dis,anti,imp'}]
                     [--analysis_outputfile ANALYSIS_OUTPUTFILE]
-                    [--concept_file CONCEPT_FILE]
-                    [--min_rule_conf MIN_RULE_CONF]
-                    [--max_rule_conf MAX_RULE_CONF] [--num_rules NUM_RULES]
+                    [--concept_file CONCEPT_FILE] [--rules_spec RULES_SPEC]
+
 ```
 
 
 To perform an analysis equivalent to the one obtained with ```python3 analyze.py --event```, one could launch:
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -m 0.05 -w both --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3
+python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
@@ -143,14 +131,14 @@ python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -m 0.05 -
 or 
 
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -m 0.05 -w both --fca_algo C --fcbo_path explore/fcbo-ins/fcbo 
+python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both --fca_algo C --fcbo_path explore/fcbo-ins/fcbo 
 ```
 (if you want to run the C version of FCbO)
 
 or 
 
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -m 0.05 -w both
+python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both
 ```
 (if you want to run the Python version of FCbO)
 

@@ -389,7 +389,7 @@ parser.add_argument('--outputfile','-o',help='Full path to output file (saving c
 #specifies where to save the FCbO concepts. By default, the concepts are just printed out on the screen
 
 vals=['imp','anti','dis']
-parser.add_argument('--analysis_type','-a',help='specifies which type of analysis to perform',action='store',default='all',choices=['all']+list(','.join(s) for s in list(itertools.permutations(vals,1))+list(itertools.permutations(vals,2))+list(itertools.permutations(vals,3))))
+#parser.add_argument('--analysis_type','-a',help='specifies which type of analysis to perform',action='store',default='all',choices=['all']+list(','.join(s) for s in list(itertools.permutations(vals,1))+list(itertools.permutations(vals,2))+list(itertools.permutations(vals,3))))
 parser.add_argument('--analysis_outputfile','-oa',help='Full path to output file (saving analysis). If not specified, the analysis results are printed on the screen.',default=sys.stdout)
 #specifies where to save the analysis results. By default, the analysis results are just printed out on the screen
 
@@ -475,7 +475,7 @@ if __name__ == '__main__':
 		#min_conf=args.min_rule_conf
 		#max_conf=args.max_rule_conf
 		#num_rules=args.num_rules
-		type_analysis=args.analysis_type
+		rules_spec=args.rules_spec
 		if inputfile!='':
 			fca_context=fcbo.Context(inputfile)
 		else:
