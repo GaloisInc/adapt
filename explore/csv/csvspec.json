@@ -1,0 +1,11 @@
+{"csv params":{
+"csv1":"./Subjects.csv",
+"csv2":"./Events.csv",
+"csv1_key":"uuid",
+"csv2_key":"subjectUuid",
+"join":"inner",
+"objects":"cid",
+"attributes":"eventType"
+
+}
+}

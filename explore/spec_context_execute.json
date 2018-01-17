@@ -1,0 +1,7 @@
+{"context specification":{
+"query":"g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().has('eventType','EVENT_EXECUTE').out().values('cmdLine').as('cmd').select('pid','cmd').dedup()",
+"objects":"pid",
+"attributes":"cmd"
+
+}
+}

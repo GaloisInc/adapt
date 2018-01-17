@@ -1,0 +1,11 @@
+{"csv params":{
+"csv1":"./csv/theia/Events.csv",
+"csv2":"./csv/theia/Events.csv",
+"csv1_key":"uuid",
+"csv2_key":"uuid",
+"join":"none",
+"objects":"subjectUuid",
+"attributes":"eventType"
+
+}
+}
