@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.util.Timeout
 import com.galois.adapt.cdm17._
 import org.apache.tinkerpop.gremlin.process.traversal.P
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.scalatest.FlatSpec
@@ -56,29 +57,6 @@ class General_TA1_Tests(
       assert(incompleteCount == 0, message)
     }
   }
-
-  // Test that all subjects have a "parentSubject" edge
-  "Subjects" should "have a 'parentSubject'" in {
-    val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
-        .hasLabel("Subject")
-        .hasNot("parentSubjectUuid")
-        .toList
-
-    if (subjectsWithoutParents.isEmpty) {
-      assert(subjectsWithoutParents.length == 0)
-    } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).mkString(",")}):$code"
-      val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-
-      assert(
-        subjectsWithoutParents.length == 0,
-        s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
-      )
-    }
-  }
-
-
 
   // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them
   if ( ! ta1Source.contains(SOURCE_WINDOWS_FIVEDIRECTIONS)) {
@@ -153,6 +131,97 @@ class General_TA1_Tests(
         toDisplay += s"g.V(${offendingUnits.take(20).map(_._1).mkString(",")}):$code"
         assert(onlyValidUnitDependencies, s"\nNot all UnitDependencies connect SUBJECT_UNIT types with a common parent:\n$depsToPrint\n${Console.RED}")
       }
+    }
+  }
+
+  // Test that all subjects have a "parentSubject" edge
+  "Subjects" should "have a 'parentSubject'" in {
+    val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Subject")
+      .hasNot("parentSubjectUuid")
+      .toList
+
+    if (subjectsWithoutParents.isEmpty) {
+      assert(subjectsWithoutParents.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        subjectsWithoutParents.length == 0,
+        s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that events have a "subjectUuid" field (unless they are EVENT_ADD_OBJECT_ATTRIBUTE)
+  "Events" should "have a 'subjectUuid' (unless they have type 'EVENT_ADD_OBJECT_ATTRIBUTE')" in {
+    val eventsWithoutSubjectUuid: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .hasNot("subjectUuid")
+      .has("eventType", P.neq("EVENT_ADD_OBJECT_ATTRIBUTE"))
+      .toList
+
+    if (eventsWithoutSubjectUuid.isEmpty) {
+      assert(eventsWithoutSubjectUuid.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${eventsWithoutSubjectUuid.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfEventsWithoutSubjectUuid = eventsWithoutSubjectUuid.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        eventsWithoutSubjectUuid.length == 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutSubjectUuid${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that events have a "threadId" field (unless they are EVENT_ADD_OBJECT_ATTRIBUTE or EVENT_FLOWS_TO)
+  it should "have a 'threadId' (unless they have type 'EVENT_ADD_OBJECT_ATTRIBUTE' or 'EVENT_FLOWS_TO')" in {
+    val eventsWithoutThreadId: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .hasNot("threadId")
+      .has("eventType", P.not(P.within("EVENT_ADD_OBJECT_ATTRIBUTE", "EVENT_FLOWS_TO")))
+      .toList
+
+    if (eventsWithoutThreadId.isEmpty) {
+      assert(eventsWithoutThreadId.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${eventsWithoutThreadId.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfEventsWithoutThreadId = eventsWithoutThreadId.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        eventsWithoutThreadId.length == 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that EVENT_ADD_OBJECT_ATTRIBUTE events have two predicate objects
+  // I (Alec) have been assuming the semantics of this event is that predicateObject is an updated variant of predicateObject2
+  it should "have two predicate objects that are 'NetFlowObject's when they are 'EVENT_ADD_OBJECT_ATTRIBUTE's" in {
+    val malformedAddObjectEvents: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE")
+      .and(
+        __.has("predicateObjectUuid"), __.out("predicateObject").hasLabel("NetFlowObject"),
+        __.has("predicateObject2Uuid"), __.out("predicateObject2").hasLabel("NetFlowObject")
+      )
+      .toList
+
+    if (malformedAddObjectEvents.isEmpty) {
+      assert(malformedAddObjectEvents.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${malformedAddObjectEvents.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfMalformedAddObjectEvents = malformedAddObjectEvents.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        malformedAddObjectEvents.length == 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
+      )
     }
   }
 } 
