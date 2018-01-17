@@ -140,6 +140,22 @@ class Context():
 		vals_split2=vals_split[-1].split('\n',self.num_attributes)
 		self.objects,self.attributes,self.context=vals_split[:-1],vals_split2[:-1],vals_split2[-1].translate({ord("X"):'1',ord("."):'0'}).split()
 		return self
+		
+	def parseContextCSV(self,cxtcsvfile):#build context object from input csv file
+		with open(cxtcsvfile,'r') as f:
+			csv=f.read()
+		r=re.compile('(?P<attributes>.*)\s(?P<vals>(.*\s*)*)',re.M)
+		m=re.match(r,csv)
+		self.attributes,content=m.group('attributes').split(',')[1:],m.group('vals').split('\n')
+		r2=re.compile('(?P<object>\d*),(?P<context>([01],*)*)',re.M)
+		self.objects=[]
+		self.context=[]
+		for v in content:
+			m2=re.match(r2,v)
+			self.objects.append(m2.group('object'))
+			self.context.append(m2.group('context').replace(',',''))
+		self.num_attributes,self.num_objects=len(attributes),len(objects)
+		
 	
 	def parseFimifile(self,fimifile): #build context object from input fimi file
 		with open(fimifile,'r') as f:

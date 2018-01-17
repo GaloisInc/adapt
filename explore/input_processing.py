@@ -242,6 +242,22 @@ def convertCxtFileToFimi(cxtfile,fimifile):
 	context=[[i for i in range(len(e)) if e[i].lower()=='x'] for e in cxt_context]
 	writeFimiFileV2(context,fimifile)
 	
+	
+def convertCxtFileToContextCSV(cxtfile,csvfile):
+	with open(cxtfile,'r') as f:
+		cxt=f.read()
+	r=re.compile('B\s{2}(?P<num_obj>\d*)\s(?P<num_att>\d*)\s{2}(?P<vals>(.*\s*)*)',re.M)
+	m=re.match(r,cxt)
+	num_objects,num_attributes,vals=int(m.group('num_obj')),int(m.group('num_att')),m.group('vals')
+	vals_split=vals.split('\n',num_objects)
+	vals_split2=vals_split[-1].split('\n',num_attributes)
+	objects,attributes,cxt_context=vals_split[:-1],vals_split2[:-1],vals_split2[-1].split()
+	context=[e.translate({ord('.'):'0,',ord('X'):'1,'})[:-1] for e in cxt_context]
+	filecontent=','.join([' ']+attributes)+'\n'+'\n'.join([objects[i]+','+context[i] for i in range(num_objects)])
+	with open(csvfile,'w') as f:
+		f.write(filecontent)
+	
+	
 def num2roman(num):
 	num_map = [(10000,'|M|'),(1000, 'M'), (900, 'CM'), (500, 'D'), (400, 'CD'), (100, 'C'), (90, 'XC'),(50, 'L'), (40, 'XL'), (10, 'X'), (9, 'IX'), (5, 'V'), (4, 'IV'), (1, 'I')]
 	roman = ''
