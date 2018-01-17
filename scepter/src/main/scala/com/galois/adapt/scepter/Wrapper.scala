@@ -155,7 +155,6 @@ object Wrapper extends App {
                    |     -Dadapt.runflow=accept
                    |     -Dadapt.ingest.loadlimit=0
                    |     -Dakka.loglevel=ERROR
-                   |     -Dadapt.webserver=${opts.webUi.toString}
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $adaptJarPath
                    |""".stripMargin
