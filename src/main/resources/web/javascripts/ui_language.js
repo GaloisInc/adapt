@@ -1,33 +1,24 @@
 
 var starting_queries = [
-
-     {
-        name : "find file by predicateObject file path",
-        base_query : "g.V().hasLabel('FileObject').as('file').in('predicateObject').hasLabel('Event').has('predicateObjectPath','{_}').select('file')",
-        default_values : ["<filename>"]
+    {
+        name : "Get a few nodes",
+        base_query : "g.V().limit({_})",
+        default_values : [10]
     }, {
-        name : "find file by predicateObject2 file path",
-        base_query : "g.V().hasLabel('FileObject').as('file').in('predicateObject2').hasLabel('Event').has('predicateObjectPath2','{_}').select('file')",
-        default_values : ["<filename>"]
+        name : "Get a few nodes by label",
+        base_query : "g.V().hasLabel({_}).limit({_})",
+        default_values : ["AdmPathNode",10]
     }, {
-        name : "find file by file descriptor",
-        base_query : "g.V().hasLabel('FileObject').has('fileDescriptor',{_}).dedup()",
-        default_values : ["1"]
+        name : "Get a Path Node by its path",
+        base_query : "g.V().hasLabel('AdmPathNode').has('path','{_}')",
+        default_values : ["/etc/passwd"]
     }, {
         name : "find process by pid",
-        base_query : "g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').has('cid',{_})",
+        base_query : "g.V().hasLabel('Subject').has('cid',{_})",
         default_values : ["1001"]
     }, {
-        name : "find up to n processes of an owner",
-        base_query : "g.V().hasLabel('Principal').has('userId','{_}').in('localPrincipal').hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').limit({_})",
-        default_values : ["10004",10]
-    }, {
-        name : "find NetFlow by local address & port",
-        base_query : "g.V().hasLabel('NetFlowObject').has('localAddress','{_}').has('localPort',{_}).dedup()",
-        default_values : ["127.0.0.1",80]
-    }, {
         name : "find NetFlow by remote address & port",
-        base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_}).dedup()",
+        base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_})",
         default_values : ["127.0.0.1",80]
     }
 
@@ -35,7 +26,7 @@ var starting_queries = [
 
 var node_appearance = [
     {   // Icon codes:  http://ionicons.com/cheatsheet.html
-        // NOTE: the insertion of 'u' to make code prefixes of '\uf...' as below; because javascript.
+        // NOTE: the insertion of 'u' is required to make code prefixes of '\uf...' as below; because javascript.
         name : "Cluster",
         is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
         icon_unicode : "\uf413",
@@ -125,7 +116,7 @@ var node_appearance = [
    }, {
         name : "PTN",
         is_relevant : function(n) { return n.db_label === "ProvenanceTagNode" },
-        icon_unicode : "\uf277",
+        icon_unicode : "\uf48e",
         make_node_label : function(node) {
             // var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
             var opcode = (node['properties'].hasOwnProperty('opcode') ? node['properties']['opcode'][0]['value'] : "None")
@@ -141,7 +132,7 @@ var node_appearance = [
             var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
             var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
             var cmd = (node['properties'].hasOwnProperty('cmdLine') ? node['properties']['cmdLine'][0]['value'] : "no cmd line")
-            var timestamp = (node['properties'].hasOwnProperty('startedTimestampNanos') ? new Date(node['properties']['startTimestampNanos'][0]['value']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos'][0]['value']%1000 : "no timestamp")
+            // var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? new Date(node['properties']['startTimestampNanos'][0]['value']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos'][0]['value']%1000 : "no timestamp")
             switch(t) {
                 case "SUBJECT_PROCESS":
                     return "Process: " + cid
@@ -153,7 +144,51 @@ var node_appearance = [
                     return t + ": " + cid
             }
         }
+    }, 
+
+// ADM:
+    {
+        name : "ADM Path Node",
+        is_relevant : function(n) { return n.db_label === "AdmPathNode" },
+        icon_unicode : "\uf3fb",
+        size: 40,
+        make_node_label : function(node) {
+            return (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "???")
+        }
     }, {
+       name : "ADM Subject",
+        is_relevant : function(n) { return n.db_label === "AdmSubject" },
+        icon_unicode : "\uf375",
+        make_node_label : function(node) {
+            var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
+            var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString()) : "")
+            return "Process: " + cid + timestamp
+        }
+    }, {
+        name : "ADM File",
+        is_relevant : function(n) { return n.db_label === "AdmFileObject" },
+        icon_unicode : "\uf41b",
+        size: 40,
+        make_node_label : function(node) {
+            return (node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'][0]['value'] : "UNKNOWN TYPE")
+        }
+    }, {
+        name : "ADM Event",
+        is_relevant : function(n) { return n.db_label === "AdmEvent" },
+        icon_unicode : "\uf29a",
+        make_node_label : function(node) {
+            var firstTime = (node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos'][0]['value']/1000000).toGMTString() : "???")
+            // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos'][0]['value']/1000000).toGMTString() : "???")
+            var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+            return type + "\n" + firstTime //+ " - " + lastTime
+        }
+    },
+
+
+
+
+// DEFAULT:
+    {
         name : "Default",   // This default will override anything that comes below it!
         is_relevant : function(n) { return true },
         icon_unicode : "\uf3a6",
@@ -161,7 +196,6 @@ var node_appearance = [
         make_node_label : function(n) {
             return n['label'].replace(/^(EDGE_)/,"").replace(/^(EVENT_)/,"")
         }
-    
      // color : do not set a color for default values, or it will always override query-time color choice.
     }
 ]
@@ -486,8 +520,57 @@ var predicates = [
        {
         name : "Processes Owned",
         is_relevant : function(n) { return n.db_label === "Principal"},
-        floating_query: ".in('localPrincipal').hasLabel('Subject')",
+        floating_query : ".in('localPrincipal').hasLabel('Subject')",
         is_default : true
+    },
+
+// ADM:
+
+// AdmSubject
+    {
+        name : "Path Names",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".outE('cmdLine','exec','(cmdLine)').inV().hasLabel('AdmPathNode')",
+        is_default : true
+    }, {
+        name : "Parent Process",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".outE('parentSubject').inV().hasLabel('AdmSubject')",
+        is_default : false
+    }, {
+        name : "Child Processes",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".inE('parentSubject').outV()",
+        is_default : false
+    },
+// AdmPathNode
+    {
+        name : "Processes",
+        is_relevant : function(n) {return n.db_label === "AdmPathNode"},
+        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')",
+        is_default : false
+    }, {
+        name : "Files",
+        is_relevant : function(n) {return n.db_label === "AdmPathNode"},
+        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')",
+        is_default : false
+    },
+// AdmFileObject
+    {
+        name : "Path Names",
+        is_relevant : function(n) {return n.db_label === "AdmFileObject"},
+        floating_query : ".outE('path','(path)').inV().hasLabel('AdmPathNode')",
+        is_default : true
+    }, {
+        name : "Reading Processes",
+        is_relevant : function(n) {return n.db_label === "AdmFileObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject')",
+        is_default : false
+    }, {
+        name : "Writing Processes",
+        is_relevant : function(n) {return n.db_label === "AdmFileObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')",
+        is_default : false
     }
 ]
 
