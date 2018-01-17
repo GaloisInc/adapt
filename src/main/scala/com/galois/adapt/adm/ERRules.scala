@@ -174,7 +174,7 @@ object ERRules {
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = AdmPathNode(cmdLine)
-          (EdgeAdm2Adm(newEvent.uuid, "exec", pathNode.uuid), pathNode)
+          (EdgeAdm2Adm(newEvent.uuid, "eventExec", pathNode.uuid), pathNode)
         })
       )
     }

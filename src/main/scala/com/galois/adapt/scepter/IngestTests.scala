@@ -2,27 +2,23 @@ package com.galois.adapt.scepter
 
 import java.util.UUID
 
-import com.galois.adapt._
-import com.galois.adapt.cdm17._
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
-import org.apache.tinkerpop.gremlin.process.traversal.P
-import akka.pattern.ask
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.util.Timeout
+import com.galois.adapt.cdm17._
+import org.apache.tinkerpop.gremlin.process.traversal.P
+import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.scalatest.FlatSpec
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
 import scala.language.postfixOps
-import org.scalatest.FlatSpec
+import scala.util.{Success, Try}
 
 
 class General_TA1_Tests(
   failedStatements: Int,                    // Number of failed events
-  failedStatementsMsgs: List[String],       // First 5 failed messages TODO: use this?
+  failedStatementsMsgs: List[String],       // First 5 failed messages
   incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
   ta1Source: Option[InstrumentationSource],
@@ -102,77 +98,6 @@ class General_TA1_Tests(
       )
     }
   }
-
-  // Test deduplication of PIDs
-  // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
-  it should "not have duplicate PID's in process Subjects" in {
-    val pids = graph.traversal().V().hasLabel("Subject")
-      .has("subjectType","SUBJECT_PROCESS")
-      .dedup()
-      .values("pid")
-
-    while (pids.hasNext) {
-      val pid: Int = pids.next()
-
-      val processesWithPID: java.util.List[Vertex] = graph.traversal().V()
-        .has("pid", pid)
-        .hasLabel("Subject")
-        .has("subjectType","SUBJECT_PROCESS")
-        .dedup()
-        .toList
-      
-      if (processesWithPID.length <= 1) {
-        assert(processesWithPID.length <= 1)
-      } else {
-        val (code,color) = colors.next()
-        toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")}):$code"
-        val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-      
-        assert(
-          processesWithPID.length <= 1,
-          s"\nMultiple process subjects share the PID$pid:\n$color$uuidsOfProcessesWithPID${Console.RED}\n"
-        )
-      }
-    }
-  }
-
-//  // Test deduplication of Files
-//  // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
-//  it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
-//    val files = graph.traversal().V().hasLabel("FileObject").dedup()
-//
-//    while (files.hasNext) {
-//      val file: Vertex = files.next()
-//
-//      val urls = file.properties("url").toList
-//      if (urls.nonEmpty) {
-//        val url: String = urls.head.value()
-//        val version: Int = file.property("version").value()
-//        val filesWithUrl: java.util.List[Vertex] =
-//          graph.traversal().V().hasLabel("FileObject")
-//           .has("url",url)
-//           .has("version",version)
-//           .dedup()
-//           .by("uuid")
-//           .toList
-//
-//
-//        if (filesWithUrl.length <= 1) {
-//          assert(filesWithUrl.length <= 1)
-//        } else {
-//          val (code,color) = colors.next()
-//          toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
-//          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-//
-//          assert(
-//            filesWithUrl.length <= 1,
-//            s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
-//          )
-//        }
-//      }
-//    }
-//  }
-
 
   if (graph.traversal().V().hasLabel("UnitDependency").count().next() > 0L) {
     it should "contain UnitDependency statements which connect only SUBJECT_UNITs that have a common parent, and not as general edges" in {

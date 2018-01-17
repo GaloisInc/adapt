@@ -152,8 +152,9 @@ object Wrapper extends App {
       // Run the tests
       val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.loadfiles.$i=$t" }
       val cmd = s"""java -Xmx${opts.heapSize}
-                   |     -Dadapt.app=accept
+                   |     -Dadapt.runflow=accept
                    |     -Dadapt.ingest.loadlimit=0
+                   |     -Dakka.loglevel=ERROR
                    |     -Dadapt.webserver=${opts.webUi.toString}
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $adaptJarPath

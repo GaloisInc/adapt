@@ -88,14 +88,20 @@ object Application extends App {
     case "accept" =>
       println("Running acceptance tests")
 
-      val completionMsg = StartTests
       val writeTimeout = Timeout(30.1 seconds)
+
+      val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+        val broadcast = b.add(Broadcast[CDM18](2))
+        broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+        broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
+        SinkShape(broadcast.in)
+      })
 
       startWebServer()
       CDMSource.cdm18(ta1)
         .via(FlowComponents.printCounter("CDM events"))
-        .via(EntityResolution(uuidRemapper))
-        .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))
+        .runWith(sink)
 
 
     case "database" | "db" | "ingest" =>
