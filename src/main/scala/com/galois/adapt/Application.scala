@@ -92,9 +92,9 @@ object Application extends App {
 
       val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
-        val broadcast = b.add(Broadcast[CDM18](2))
+        val broadcast = b.add(Broadcast[CDM18](1))
         broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
-        broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
+     //   broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
         SinkShape(broadcast.in)
       })
 

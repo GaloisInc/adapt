@@ -14,7 +14,7 @@ are currently only a handful of types
   * `AdmPrincipal`
   * `AdmFileObject` - `RegistryKeyObject`s are merged into this
   * `AdmProvenanceTagNode`
-  * `AdmNetflowObject`
+  * `AdmNetFlowObject`
   * `AdmSrcSinkObject`
   * `AdmPathNode` - This node type represents both file paths and command lines. The motivation for
      breaking paths/command-line into separate nodes is two-fold:

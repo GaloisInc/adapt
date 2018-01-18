@@ -135,6 +135,7 @@ class General_TA1_Tests(
   }
 
   // Test that all subjects have a "parentSubject" edge
+  // TODO Alec: check that parent subject uuid != uuid
   "Subjects" should "have a 'parentSubject'" in {
     val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
       .hasLabel("Subject")
@@ -205,10 +206,10 @@ class General_TA1_Tests(
     val malformedAddObjectEvents: java.util.List[Vertex] = graph.traversal().V()
       .hasLabel("Event")
       .has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE")
-      .and(
+      .where(__.not(__.and(
         __.has("predicateObjectUuid"), __.out("predicateObject").hasLabel("NetFlowObject"),
         __.has("predicateObject2Uuid"), __.out("predicateObject2").hasLabel("NetFlowObject")
-      )
+      )))
       .toList
 
     if (malformedAddObjectEvents.isEmpty) {
@@ -224,6 +225,37 @@ class General_TA1_Tests(
       )
     }
   }
+
+  // Test that EVENT_WRITE and EVENT_READ have predicate objects that are 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'
+  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'" in {
+    val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+      .as("e")
+      .out("predicateObject","predicateObject2")
+      .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+      .select[Vertex]("e")
+      .toList
+
+    if (malformedReadWriteEvents.isEmpty) {
+      assert(malformedReadWriteEvents.length == 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${malformedReadWriteEvents.map(_.id().toString).mkString(",")}):$code"
+      val uuidsOfMalformedReadWriteEvents = malformedReadWriteEvents.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+
+      assert(
+        malformedReadWriteEvents.length == 0,
+        s"\nSome 'EVENT_WRITE' or 'EVENT_READ' have unexpected predicate objects':\n$color$uuidsOfMalformedReadWriteEvents${Console.RED}\n"
+      )
+    }
+  }
+
+//  // Test that EVENT_MODIFY_FILE_ATTRIBUTES events have files as predicate objects
+//  it should "have 'FileObject' predicates when the event type is 'EVENT_MODIFY_FILE_ATTRIBUTES'" in {
+//    val
+//  }
+
 } 
 
 // Provider specific test classes:

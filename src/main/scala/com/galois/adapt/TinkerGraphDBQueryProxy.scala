@@ -147,7 +147,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
    //     self ! StartTests
    //   }
 
-    case AdmDone =>
+//    case AdmDone =>
    //   storedAdmDone = true
    //   if (storedCdmDone) {
    //     self ! StartTests
