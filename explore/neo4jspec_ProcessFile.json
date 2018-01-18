@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().has('subjectType','SUBJECT_PROCESS').as('x').values('uuid').as('id').select('x').out().has('path').as('y').values('path').as('filepath').select('id','filepath').dedup()",
+"objects":"id",
+"attributes":"cid,type"
+ }
+}

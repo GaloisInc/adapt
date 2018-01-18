@@ -108,7 +108,7 @@ It is possible to choose the type of rules you want to generate with the ```--ru
 ## Launching the concept generation and analysis
 
 
-The concept generation and analysis can be launched after an avro file has been ingested or CSV files generated from an avro file by invoking the following command:
+The concept generation and analysis can be launched after an avro file has been ingested (or CSV files generated from an avro file) by invoking the following command:
 ```
 python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
                     [--fca_algo {python,C}] [--fcbo_path FCBO_PATH]
@@ -121,9 +121,9 @@ python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
 ```
 
 
-To perform an analysis equivalent to the one obtained with ```python3 analyze.py --event```, one could launch:
+To perform an analysis equivalent to the one obtained with ```python3 analyze.py --event```, one could launch (after ADM ingestion):
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3
+python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3 -rs explore/rulesCurrentSpec.json
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
@@ -131,14 +131,14 @@ python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explo
 or 
 
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both --fca_algo C --fcbo_path explore/fcbo-ins/fcbo 
+python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/fcbo-ins/fcbo -rs explore/rulesCurrentSpec.json
 ```
 (if you want to run the C version of FCbO)
 
 or 
 
 ```
-python3 explore/fcascript.py -s explore/csv/csvspec_updated.json --csv -rs explore/rulesCurrentSpec.json -w both
+python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 -rs explore/rulesCurrentSpec.json
 ```
 (if you want to run the Python version of FCbO)
 
