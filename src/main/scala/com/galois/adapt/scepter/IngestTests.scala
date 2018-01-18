@@ -231,8 +231,10 @@ class General_TA1_Tests(
     val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
       .hasLabel("Event")
       .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+      .as("e")
       .out("predicateObject","predicateObject2")
       .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+      .select[Vertex]("e")
       .toList
 
     if (malformedReadWriteEvents.isEmpty) {
