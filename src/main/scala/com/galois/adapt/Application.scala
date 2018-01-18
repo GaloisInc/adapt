@@ -19,7 +19,7 @@ import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
-import com.galois.adapt.cdm18.{CDM18, Cdm17to18, RawCDM18Type}
+import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
@@ -75,6 +75,8 @@ object Application extends App {
   val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
 
   val ta1 = config.getString("adapt.env.ta1")
+
+  var instrumentationSource: String = "(not detected)"
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
@@ -274,22 +276,28 @@ object CDMSource {
     ta1.toLowerCase match {
       case "cadets"         =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "cadets"
         shouldLimit.fold(src)(l => src.take(l))
       case "clearscope"     =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "clearscope"
         shouldLimit.fold(src)(l => src.take(l))
       case "faros"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "faros"
         shouldLimit.fold(src)(l => src.take(l))
       case "fivedirections" =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "fivedirections"
         shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "theia"
         shouldLimit.fold(src)(l => src.take(l))
           .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(FlowComponents.printCounter("Theia Query Response", 1)))
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        Application.instrumentationSource = "trace"
         shouldLimit.fold(src)(l => src.take(l))
       case "kafkaTest"      =>
         val src = kafkaSource("kafkaTest", kafkaCdm17Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
@@ -301,8 +309,19 @@ object CDMSource {
           path.replaceFirst("^~",System.getProperty("user.home"));
         }
         println(s"Setting file sources to: ${paths.mkString(", ")}")
-        val startStream = paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat(Source.fromIterator[Try[CDM17]](() => CDM17.readData(b, None).get._2)))
-          .drop(start)
+
+        val startStream = paths.foldLeft(Source.empty[Try[CDM17]])((a,b) => a.concat{
+          Source.fromIterator[Try[CDM17]](() => {
+            val read = CDM17.readData(b, None)
+
+            read.map(_._1) match {
+              case Failure(_) => None
+              case Success(s) => Application.instrumentationSource = Ta1Flows.getSourceName(s)
+            }
+
+            read.get._2
+          })
+        }).drop(start)
         shouldLimit.fold(startStream)(l => startStream.take(l))
           .statefulMapConcat { () =>
             var counter = 0
@@ -330,21 +349,27 @@ object CDMSource {
     ta1.toLowerCase match {
       case "cadets"         =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "cadets"
         shouldLimit.fold(src)(l => src.take(l))
       case "clearscope"     =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "clearscope"
         shouldLimit.fold(src)(l => src.take(l))
       case "faros"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "faros"
         shouldLimit.fold(src)(l => src.take(l))
       case "fivedirections" =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "fivedirections"
         shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "theia"
         shouldLimit.fold(src)(l => src.take(l))
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        Application.instrumentationSource = "trace"
         shouldLimit.fold(src)(l => src.take(l))
       case "kafkaTest"      =>
         val src = kafkaSource("kafkaTest", kafkaCdm18Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
@@ -357,13 +382,25 @@ object CDMSource {
         println(s"Setting file sources to: ${paths.mkString(", ")}")
         val startStream = paths.foldLeft(Source.empty[Try[CDM18]])((a,b) => a.concat({
 
+          val read = CDM18.readData(b, None)
+          read.map(_._1) match {
+            case Failure(_) => None
+            case Success(s) => Application.instrumentationSource = Ta1Flows.getSourceName(s)
+          }
+
           // Try to read CDM18 data. If we fail, fall back on reading CDM17 data, then convert that to CDM18
-          var cdm18: Iterator[Try[CDM18]] = CDM18.readData(b, None).map(_._2).getOrElse({
+          val cdm18: Iterator[Try[CDM18]] = read.map(_._2).getOrElse({
             println("Failed to read file as CDM18, trying to read it as CDM17...")
 
             val dummyHost: UUID = new java.util.UUID(0L,1L)
 
-            CDM17.readData(b, None).map(_._2).get.flatMap {
+            val read = CDM17.readData(b, None)
+            read.map(_._1) match {
+              case Failure(_) => None
+              case Success(s) => Application.instrumentationSource = Ta1Flows.getSourceName(s)
+            }
+
+            read.map(_._2).get.flatMap {
               case Failure(e) => List(Failure[CDM18](e))
               case Success(cdm17) => cdm17ascdm18(cdm17, dummyHost).toList.map(Success(_))
             }
@@ -470,4 +507,7 @@ object Ta1Flows {
       slowEmit
     ).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
   }
+
+  // Get the name of the instrumentation source
+  def getSourceName(a: AnyRef): String = a.toString.split("_").last.toLowerCase
 }
