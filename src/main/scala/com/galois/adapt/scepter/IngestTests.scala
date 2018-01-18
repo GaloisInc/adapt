@@ -18,8 +18,7 @@ import scala.util.{Success, Try}
 
 
 class General_TA1_Tests(
-  failedStatements: Int,                    // Number of failed events
-  failedStatementsMsgs: List[String],       // First 5 failed messages
+  failedStatements: List[(Int,String)],     // position, failed event
   incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
   ta1Source: String,
@@ -40,9 +39,15 @@ class General_TA1_Tests(
 
   // Test that all data gets parsed
   "Parsing data in the file..." should "parse successfully" in {
-    assert(failedStatements == 0)
-    if (failedStatements != 0)
-      println(failedStatementsMsgs.mkString("\n"))
+    if (failedStatements.isEmpty)
+      assert(failedStatements.length == 0)
+    else {
+      val toShow: String = failedStatements
+        .map { case (i, msg) => s"  offset: $i, message: $msg" }
+        .mkString("\n")
+      val msg = s"The following CDM messages failed to parse:\n$toShow"
+      assert(failedStatements.length == 0, msg)
+    }
   }
 
   // Test to assert that there are no dangling edges
@@ -67,14 +72,13 @@ class General_TA1_Tests(
         .hasNot("size")
         .dedup()
         .toList
-        .take(20)
 
       if (eventsShouldHaveSize.length <= 1) {
         assert(eventsShouldHaveSize.length <= 1)
       } else {
         val (code, color) = colors.next()
-        toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
-        val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.map(_.value("uuid").toString).mkString("\n" + color)
+        toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).take(20).mkString(",")}):$code"
+        val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
         assert(
           eventsShouldHaveSize.length <= 1,
