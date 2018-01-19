@@ -33,9 +33,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]                        // All nodes in the graph
   var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex, String)]]  // CDM edges with a missing endpoint
-  var failedStatements: Int = 0                                                   // Number of failed events
   var maxFailedMsgs = 5                                                           // Limit on the length of `failedStatementsMsgs`
-  var failedStatementsMsgs: List[String] = Nil                                    // First messages on failed CDM
 
   def findNode(key: String, value: Any): Option[Vertex] = {
     if (key == "uuid" && value.isInstanceOf[UUID]) nodeIds.get(value.asInstanceOf[UUID])
@@ -53,15 +51,11 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         val cdmTypeName = cdm.getClass.getSimpleName
 
         // Create the node
-        val thisVertex = nodeIds.getOrElse(cdm.getUuid, {
-          val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, cdmTypeName) +: cdm.asDBKeyValues)
-            .flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
-          assert(props.length % 2 == 0, s"Properties should have even size: $props")
-
-          val newNode = graph.addVertex(props: _*)
-          nodeIds += (cdm.getUuid -> newNode)
-          newNode
-        })
+        val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, cdmTypeName) +: cdm.asDBKeyValues)
+          .flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
+        assert(props.length % 2 == 0, s"Properties should have even size: $props")
+        val thisVertex = graph.addVertex(props: _*)
+        nodeIds += (cdm.getUuid -> thisVertex)
 
         // Add all edges that we can
         cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
@@ -79,14 +73,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         }
 
         ()
-      }.recoverWith {
-        case e =>
-          failedStatements += 1
-          if (failedStatementsMsgs.length < maxFailedMsgs) {
-            failedStatementsMsgs = failedStatementsMsgs :+ e.getMessage
-          }
-          Failure(e)
-      }
+      } recoverWith { case e => Failure(e) }
     }
 
     cdmToNodeResults
@@ -157,27 +144,24 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       log.info(s"DBActor received a message to start the tests. Remaining streams.")
 
       var toDisplay = scala.collection.mutable.ListBuffer.empty[String]
-      var instrumentationSource: Option[InstrumentationSource] = None
 
       org.scalatest.run(new General_TA1_Tests(
-        failedStatements,
-        failedStatementsMsgs,
+        Application.failedStatements,
         missingToUuid.toMap,
         graph,
-        instrumentationSource,
+        Application.instrumentationSource,
         toDisplay
       ))
 
       // Provider specific tests
-      val providerSpecificTests = instrumentationSource match {
-        case Some(SOURCE_ANDROID_JAVA_CLEARSCOPE) => Some(new CLEARSCOPE_Specific_Tests(graph))
-        case Some(SOURCE_LINUX_AUDIT_TRACE) => Some(new TRACE_Specific_Tests(graph))
-        case Some(SOURCE_FREEBSD_DTRACE_CADETS) => Some(new CADETS_Specific_Tests(graph))
-        case Some(SOURCE_WINDOWS_DIFT_FAROS) => Some(new FAROS_Specific_Tests(graph))
-        case Some(SOURCE_LINUX_THEIA) => Some(new THEIA_Specific_Tests(graph))
-        case Some(SOURCE_WINDOWS_FIVEDIRECTIONS) => Some(new FIVEDIRECTIONS_Specific_Tests(graph))
-        case Some(s) => { println(s"No tests for: $s"); None }
-        case None => { println("Failed to detect provider"); None }
+      val providerSpecificTests = Application.instrumentationSource match {
+        case "clearscope" => Some(new CLEARSCOPE_Specific_Tests(graph))
+        case "trace" => Some(new TRACE_Specific_Tests(graph))
+        case "cadets" => Some(new CADETS_Specific_Tests(graph))
+        case "faros" => Some(new FAROS_Specific_Tests(graph))
+        case "theia" => Some(new THEIA_Specific_Tests(graph))
+        case "fivedirections" => Some(new FIVEDIRECTIONS_Specific_Tests(graph))
+        case s => { println(s"No tests for: $s"); None }
       }
       providerSpecificTests.foreach(org.scalatest.run(_))
 

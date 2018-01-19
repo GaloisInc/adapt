@@ -1,19 +1,19 @@
 package com.galois.adapt
 
 //import com.thinkaurelius.titan.core.attribute.Text
-import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP;
-
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
+import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
+import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
-
 import java.util.{Collections, Comparator, Iterator}
+
+import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Stream
 import scala.util.parsing.combinator._
-import scala.util.{Try, Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.language.existentials
 
 /*
@@ -147,6 +147,9 @@ object Query {
   def run[T](query: String, graph: Graph): Try[Stream[T]] =
     Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
 
+  // Is this Neo4j or not
+  val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
+
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {
 
@@ -242,12 +245,16 @@ object Query {
       // inference is stupidly asymmetric.
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
-        | ".has('uuid'," ~ lit ~ ")"       ^^ { case _~v~_      => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v) }
-        | ".has(\"uuid\"," ~ lit ~ ")"     ^^ { case _~v~_      => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v) }
+        | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
+            case _~_~_~v~_ if isNeo4j => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v)
+            case _~_~_~v~_ => (t: Tr) => HasValue(t, Raw("uuid"), v)
+          }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
-        | ".has('uuid'," ~ pred ~ ")"      ^^ { case _~p~_      => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p) }
-        | ".has(\"uuid\"," ~ pred ~ ")"    ^^ { case _~p~_      => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p) }
+        | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ pred ~ ")" ^^ {
+            case _~_~_~p~_ if isNeo4j => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p)
+            case _~_~_~p~_ => (t: Tr) => HasPredicate(t, Raw("uuid"), p)
+          }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~! str ~ ")"       ^^ { case _~l~_      => HasLabel(_: Tr, l) }
