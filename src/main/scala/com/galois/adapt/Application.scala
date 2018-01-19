@@ -229,6 +229,27 @@ object Application extends App {
         )
         .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
 
+
+    case "uniqueuuids" =>
+      println("Running unique UUID test")
+      CDMSource.cdm17(ta1)
+        .statefulMapConcat[(UUID,Boolean)] { () =>
+        import scala.collection.mutable.{Map => MutableMap}
+        val firstObservation = MutableMap.empty[UUID, CDM17]
+        val ignoreUuid = new UUID(0L,0L);
+      {
+        case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
+        case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
+          val comparison = firstObservation(c.getUuid) == c
+          if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
+          List()
+        case c: CDM17 with DBNodeable[_] =>
+          firstObservation += (c.getUuid -> c)
+          List()
+      }
+      }.runWith(Sink.ignore)
+
+
     case _ =>
       println("Running the combined database ingest + anomaly calculation flow + UI")
       println("NOTE: this will run using CDM")

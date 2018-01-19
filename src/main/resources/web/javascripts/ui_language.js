@@ -6,7 +6,7 @@ var starting_queries = [
         default_values : [10]
     }, {
         name : "Get a few nodes by label",
-        base_query : "g.V().hasLabel({_}).limit({_})",
+        base_query : "g.V().hasLabel('{_}'').limit({_})",
         default_values : ["AdmPathNode",10]
     }, {
         name : "Get a Path Node by its path",
@@ -16,6 +16,10 @@ var starting_queries = [
         name : "find process by pid",
         base_query : "g.V().hasLabel('Subject').has('cid',{_})",
         default_values : ["1001"]
+    }, {
+        name : "Find a file by its path",
+        base_query : "g.V().hasLabel('AdmFileObject').has('path','{_}')",
+        default_values : ["/etc/passwd"]
     }, {
         name : "find NetFlow by remote address & port",
         base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_})",
@@ -161,7 +165,7 @@ var node_appearance = [
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
-            var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString()) : "")
+            var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString().replace(" GMT","")) : "")
             return "Process: " + cid + timestamp
         }
     }, {
