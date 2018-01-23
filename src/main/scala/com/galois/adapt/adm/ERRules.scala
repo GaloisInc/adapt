@@ -1,5 +1,6 @@
 package com.galois.adapt.adm
 
+import com.galois.adapt.Application
 import com.galois.adapt.cdm18._
 
 object ERRules {
@@ -226,8 +227,9 @@ object ERRules {
     // Collapse event
     //
     // TODO: better logic than just merge same successive events
-    def collapseEvents(e1: Event, e2: AdmEvent): Either[(UuidRemapper.PutCdm2Adm, AdmEvent), (Event, AdmEvent)] = {
-      if (e1.eventType == e2.eventType) {
+    val maxEventsMerged: Int = Application.config.getInt("adapt.adm.maxeventsmerged")
+    def collapseEvents(e1: Event, e2: AdmEvent, merged: Int): Either[(UuidRemapper.PutCdm2Adm, AdmEvent), (Event, AdmEvent)] = {
+      if (e1.eventType == e2.eventType && merged < maxEventsMerged) {
         val e2Updated = e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),
