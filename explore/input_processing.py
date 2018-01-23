@@ -130,7 +130,7 @@ def getQueryResFromSpecFile(specfile):
 	query=spec['query']
 	obj_name=spec['objects']
 	att_name=spec['attributes']
-	port=int(spec['port'])
+	port=(int(spec['port']) if 'port' in spec.keys() else 8080)
 	query_res=getQuery(query,port)
 	return query_res,obj_name,att_name
 	
