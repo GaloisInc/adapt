@@ -323,7 +323,7 @@ def getItemsetScaledSupport(context,concept_intent,namedentities=False):
 		
 def getConceptSupport(context,concept_intent,namedentities=False):
 	support=0
-	print('concept_intent',concept_intent)
+	#print('concept_intent',concept_intent)
 	for row in context.context:
 		if namedentities==True:
 			indices=[context.attributes.index(e) for e in concept_intent]
@@ -375,14 +375,14 @@ def doImpRules(context,concepts,min_conf,num_rules,namedentities=False):
     supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
     rules = findImpRules(concepts,supports,min_conf)
     vios = allViolations(context,rules,namedentities)
-    violations=sorted(vios.items(),key=snd,reverse=True)[0:num_rules]
+    violations=(sorted(vios.items(),key=snd,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=snd,reverse=True))
     return {'type_rule':'implication','rules':rules,'violations':violations,'namedentities':namedentities,'confidence':min_conf}
 
 def doAntiImpRules(context,concepts,max_conf,num_rules,namedentities=False):
     supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
     rules = findAntiImpRules(concepts,supports,max_conf)
     vios = allAntiImpViolations(context,rules,namedentities)
-    violations=sorted(vios.items(),key=snd,reverse=True)[0:num_rules]
+    violations=(sorted(vios.items(),key=snd,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=snd,reverse=True))
     return {'type_rule':'anti-implication','rules':rules,'violations':violations,'namedentities':namedentities,'confidence':max_conf}
 
 #def doDisjRules(context,concepts,num_rules,namedentities=False):
@@ -396,7 +396,7 @@ def doDisjRules(context,concepts,num_rules,namedentities=False):
     drules = disjointRules(context,concepts,namedentities)
     drulesSupp = getDisjRuleScaledSupports(context,drules,namedentities)
     dvios = druleViolationsCtxt(context,drules,namedentities)
-    violations=sorted(dvios.items(),key=snd,reverse=True)[0:num_rules]
+    violations=(sorted(dvios.items(),key=snd,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(dvios.items(),key=snd,reverse=True))
     return {'type_rule':'disjointness','rules':drulesSupp,'violations':violations,'namedentities':namedentities,'confidence':0.05}
     
     
@@ -517,7 +517,7 @@ def printComputedRules(rule_gen_results,context,output=sys.stdout):
 	sep_line2="========================================"
 	preamble=[sep_line,type_rule[:1].upper()+type_rule[1:]+' rules',sep_line,'Found '+type_rule+' rules with '+measurePerRule[type_rule]+' '+str(confidence),sep_line2,]
 	ruleprint=printRules2(rules,type_rule,print_flag=False)
-	middle=[sep_line2,"The top 10 "+type_rule+" rule violators are:"]
+	middle=[sep_line2,"The top "+str(len(violations))+" "+type_rule+" rule violators are:"]
 	vios_print=printRuleViolations(violations,context,rules,type_rule,printing_flag=False,namedentities=named_entities)
 	toprint='\n'.join(preamble+[ruleprint]+middle+[vios_print])
 	print(toprint,file=out)
