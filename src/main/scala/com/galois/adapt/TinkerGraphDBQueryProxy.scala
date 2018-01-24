@@ -33,9 +33,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
   var nodeIds = collection.mutable.Map.empty[UUID, Vertex]                        // All nodes in the graph
   var missingToUuid = collection.mutable.Map.empty[UUID, List[(Vertex, String)]]  // CDM edges with a missing endpoint
-  var failedStatements: Int = 0                                                   // Number of failed events
   var maxFailedMsgs = 5                                                           // Limit on the length of `failedStatementsMsgs`
-  var failedStatementsMsgs: List[String] = Nil                                    // First messages on failed CDM
 
   def findNode(key: String, value: Any): Option[Vertex] = {
     if (key == "uuid" && value.isInstanceOf[UUID]) nodeIds.get(value.asInstanceOf[UUID])
@@ -75,14 +73,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         }
 
         ()
-      }.recoverWith {
-        case e =>
-          failedStatements += 1
-          if (failedStatementsMsgs.length < maxFailedMsgs) {
-            failedStatementsMsgs = failedStatementsMsgs :+ e.getMessage
-          }
-          Failure(e)
-      }
+      } recoverWith { case e => Failure(e) }
     }
 
     cdmToNodeResults
@@ -155,8 +146,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       var toDisplay = scala.collection.mutable.ListBuffer.empty[String]
 
       org.scalatest.run(new General_TA1_Tests(
-        failedStatements,
-        failedStatementsMsgs,
+        Application.failedStatements,
         missingToUuid.toMap,
         graph,
         Application.instrumentationSource,

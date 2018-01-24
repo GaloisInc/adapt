@@ -76,7 +76,9 @@ object Application extends App {
 
   val ta1 = config.getString("adapt.env.ta1")
 
+  // Mutable state that gets updated during ingestion
   var instrumentationSource: String = "(not detected)"
+  var failedStatements: List[(Int, String)] = Nil
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
@@ -101,7 +103,7 @@ object Application extends App {
       })
 
       startWebServer()
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
         .via(FlowComponents.printCounter("CDM events"))
         .runWith(sink)
 
@@ -286,7 +288,7 @@ object CDMSource {
   val scenario = config.getString("adapt.env.scenario")
 
   //  Make a CDM17 source
-  def cdm17(ta1: String): Source[CDM17, _] = {
+  def cdm17(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[CDM17, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
@@ -348,10 +350,12 @@ object CDMSource {
             var counter = 0
             cdmTry => {
               counter = counter + 1
-              if (cdmTry.isSuccess) List(cdmTry.get)
-              else {
-                println(s"Couldn't read binary data at offset: $counter")
-                List.empty
+              cdmTry match {
+                case Success(cdm) => List(cdm)
+                case Failure(err) =>
+                  println(s"Couldn't read binary data at offset: $counter")
+                  handleError(counter, err)
+                  List.empty
               }
             }
           }
@@ -359,7 +363,7 @@ object CDMSource {
   }
 
   // Make a CDM18 source, possibly falling back on CDM17 for files with that version
-  def cdm18(ta1: String): Source[CDM18, _] = {
+  def cdm18(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[CDM18, _] = {
     println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
@@ -433,10 +437,12 @@ object CDMSource {
             var counter = 0
             cdmTry => {
               counter = counter + 1
-              if (cdmTry.isSuccess) List(cdmTry.get)
-              else {
-                println(s"Couldn't read binary data at offset: $counter")
-                List.empty
+              cdmTry match {
+                case Success(cdm) => List(cdm)
+                case Failure(err) =>
+                  println(s"Couldn't read binary data at offset: $counter")
+                  handleError(counter, err)
+                  List.empty
               }
             }
           }

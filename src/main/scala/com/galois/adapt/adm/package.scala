@@ -137,6 +137,17 @@ package object adm {
     )
   }
 
+  case object AdmPathNode {
+    def normalized(path: String): AdmPathNode = {
+      val segments = path.trim.split("/",-1)
+      segments.last match {
+        case "." | "" => new AdmPathNode(segments.init.mkString("/"))
+        case ".." if segments.length > 2 => new AdmPathNode(segments.init.init.mkString("/"))
+        case _ => new AdmPathNode(segments.mkString("/"))
+      }
+    }
+  }
+
   /* Compared to 'cdm.FileObject', this leaves out
    *
    *  - fileDescriptor

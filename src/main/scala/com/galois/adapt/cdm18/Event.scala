@@ -1,8 +1,8 @@
 package com.galois.adapt.cdm18
 
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm18

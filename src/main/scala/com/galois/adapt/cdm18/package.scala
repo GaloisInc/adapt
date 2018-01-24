@@ -12,7 +12,7 @@ import org.neo4j.graphdb.RelationshipType
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 package object cdm18 {
 
@@ -115,37 +115,37 @@ package object cdm18 {
     def fixedShort(x: => bbnCdm18.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
     def listValue(x: java.util.List[bbnCdm18.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => Value.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => Value.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listValue: None.getOrElse"))))
     def listProvTagNode(x: java.util.List[bbnCdm18.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listProvTagNode: None.getOrElse"))))
     def listCryptographicHash(x: java.util.List[bbnCdm18.CryptographicHash]): Option[Seq[CryptographicHash]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => CryptographicHash.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => CryptographicHash.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listCryptographicHash: None.getOrElse"))))
     def listUuid(x: java.util.List[bbnCdm18.UUID]): Option[Seq[UUID]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(makeJavaUUID(_)))
     def listTagRunLengthTuple(x: java.util.List[bbnCdm18.TagRunLengthTuple]): Option[Seq[TagRunLengthTuple]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => TagRunLengthTuple.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listTagRunLengthTuple: None.getOrElse"))))
     def listHostIdentifier(x: java.util.List[bbnCdm18.HostIdentifier]): Option[Seq[HostIdentifier]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => HostIdentifier.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => HostIdentifier.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listHostIdentifier: None.getOrElse"))))
     def listInterfaces(x: java.util.List[bbnCdm18.Interface]): Option[Seq[Interface]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => Interface.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => Interface.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listInterfaces: None.getOrElse"))))
     def listProvenanceAssertion(x: java.util.List[bbnCdm18.ProvenanceAssertion]): Option[Seq[ProvenanceAssertion]] = Try(Option(x)).toOption.flatten.map(
-      _.asScala.toList.map(x => ProvenanceAssertion.from(new RawCDM18Type(x)).get))
+      _.asScala.toList.map(x => ProvenanceAssertion.from(new RawCDM18Type(x)).getOrElse(throw new RuntimeException("listProvenanceAssertion: None.getOrElse"))))
   }
 
-  implicit def makeHostType(s: bbnCdm18.HostType): HostType = HostType.from(s.toString).get
-  implicit def makeSubjectType(s: bbnCdm18.SubjectType): SubjectType = SubjectType.from(s.toString).get
-  implicit def makePrivilegeLevel(s: bbnCdm18.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).get
-  implicit def makeSrcSinkType(s: bbnCdm18.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).get
-  implicit def makeSource(s: bbnCdm18.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).get  // TODO: Use ordinals for faster performance!
-  implicit def makePrincipalType(t: bbnCdm18.PrincipalType): PrincipalType = PrincipalType.from(t.toString).get
-  implicit def makeEventType(e: bbnCdm18.EventType): EventType = EventType.from(e.toString).get
-  implicit def makeFileObjectTime(s: bbnCdm18.FileObjectType): FileObjectType = FileObjectType.from(s.toString).get
-  implicit def makeValueType(v: bbnCdm18.ValueType): ValueType = ValueType.from(v.toString).get
-  implicit def makeValDataType(d: bbnCdm18.ValueDataType): ValueDataType = ValueDataType.from(d.toString).get
-  implicit def makeTagOpCode(t: bbnCdm18.TagOpCode): TagOpCode = TagOpCode.from(t.toString).get
-  implicit def makeIntegrityTag(i: bbnCdm18.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).get
-  implicit def makeConfidentialityTag(c: bbnCdm18.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).get
-  implicit def makeCryptoHashType(c: bbnCdm18.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).get
+  implicit def makeHostType(s: bbnCdm18.HostType): HostType = HostType.from(s.toString).getOrElse(throw new RuntimeException("makeHostType: None.getOrElse"))
+  implicit def makeSubjectType(s: bbnCdm18.SubjectType): SubjectType = SubjectType.from(s.toString).getOrElse(throw new RuntimeException("makeSubjectType: None.getOrElse"))
+  implicit def makePrivilegeLevel(s: bbnCdm18.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).getOrElse(throw new RuntimeException("makePrivilegeLevel: None.getOrElse"))
+  implicit def makeSrcSinkType(s: bbnCdm18.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).getOrElse(throw new RuntimeException("makeSrcSinkType: None.getOrElse"))
+  implicit def makeSource(s: bbnCdm18.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).getOrElse(throw new RuntimeException("makeSource: None.getOrElse"))  // TODO: Use ordinals for faster performance!
+  implicit def makePrincipalType(t: bbnCdm18.PrincipalType): PrincipalType = PrincipalType.from(t.toString).getOrElse(throw new RuntimeException("makePrincipalType: None.getOrElse"))
+  implicit def makeEventType(e: bbnCdm18.EventType): EventType = EventType.from(e.toString).getOrElse(throw new RuntimeException("makeEventType: None.getOrElse"))
+  implicit def makeFileObjectTime(s: bbnCdm18.FileObjectType): FileObjectType = FileObjectType.from(s.toString).getOrElse(throw new RuntimeException("makeFileObjectTime: None.getOrElse"))
+  implicit def makeValueType(v: bbnCdm18.ValueType): ValueType = ValueType.from(v.toString).getOrElse(throw new RuntimeException("makeValueType: None.getOrElse"))
+  implicit def makeValDataType(d: bbnCdm18.ValueDataType): ValueDataType = ValueDataType.from(d.toString).getOrElse(throw new RuntimeException("makeValDataType: None.getOrElse"))
+  implicit def makeTagOpCode(t: bbnCdm18.TagOpCode): TagOpCode = TagOpCode.from(t.toString).getOrElse(throw new RuntimeException("makeTagOpCode: None.getOrElse"))
+  implicit def makeIntegrityTag(i: bbnCdm18.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).getOrElse(throw new RuntimeException("makeIntegrityTag: None.getOrElse"))
+  implicit def makeConfidentialityTag(c: bbnCdm18.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).getOrElse(throw new RuntimeException("makeConfidentialityTag: None.getOrElse"))
+  implicit def makeCryptoHashType(c: bbnCdm18.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).getOrElse(throw new RuntimeException("makeCryptoHashType: None.getOrElse"))
 
   implicit def makeJavaUUID(u: bbnCdm18.UUID): UUID = {
     val bb = ByteBuffer.wrap(u.bytes)

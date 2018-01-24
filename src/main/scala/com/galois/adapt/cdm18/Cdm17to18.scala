@@ -13,7 +13,10 @@ object Cdm17to18 {
   implicit def srcSinkType(pl: cdm17.SrcSinkType): cdm18.SrcSinkType = cdm18.SrcSinkType.from(pl.toString).get
   // TODO instrumentation sources
   implicit def principalType(pt: cdm17.PrincipalType): cdm18.PrincipalType = cdm18.PrincipalType.from(pt.toString).get
-  implicit def eventType(e: cdm17.EventType): cdm18.EventType = cdm18.EventType.from(e.toString).get
+  implicit def eventType(e: cdm17.EventType): cdm18.EventType = e match {
+    case cdm17.EVENT_FNCTL => cdm18.EVENT_FCNTL
+    case _ => cdm18.EventType.from(e.toString).get
+  }
   implicit def FileObjectType(fo: cdm17.FileObjectType): cdm18.FileObjectType = cdm18.FileObjectType.from(fo.toString).get
   implicit def ValueType(v: cdm17.ValueType): cdm18.ValueType = cdm18.ValueType.from(v.toString).get
   implicit def ValueDataType(v: cdm17.ValueDataType): cdm18.ValueDataType = cdm18.ValueDataType.from(v.toString).get
