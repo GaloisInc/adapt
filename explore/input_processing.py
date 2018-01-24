@@ -134,6 +134,18 @@ def getQueryResFromSpecFile(specfile):
 	query_res=getQuery(query,port)
 	return query_res,obj_name,att_name
 	
+	
+def getQueryResFromJsons(specfile,resfile):
+	#loads a json specification file (defining a query) and returns the results (in json format) of the query definined in the specification file 
+	#as well as the types of objects and attributes
+	spec=loadSpec(specfile,csv_flag=False)
+	query=spec['query']
+	obj_name=spec['objects']
+	att_name=spec['attributes']
+	port=(int(spec['port']) if 'port' in spec.keys() else 8080)
+	query_res=json.load(open(resfile,'r'))
+	return query_res,obj_name,att_name
+	
 
 
 

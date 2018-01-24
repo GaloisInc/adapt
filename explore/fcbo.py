@@ -20,7 +20,7 @@ def detectTypeFile(filepath,type_json='context'): #type_json specifies which typ
 	#the specification file gives query/context details or 'csv' when details are given about csv to be used to generate the context
 	ext=os.path.splitext(filepath)[1]
 	if ext=='.json':
-		return (-1 if type_json=='context' else (-2 if type_json=='csv' else 2))
+		return (-1 if type_json=='context' or type_json=='query' else (-2 if type_json=='csv' else 2))
 	elif ext=='.cxt':
 		return 0
 	elif ext=='.fimi':
@@ -82,11 +82,16 @@ class ConceptsList(): #currently not used. Will be used in later version of code
 
 class Context():
 	
-	def __init__(self,filepath,type_json='context'):
+	def __init__(self,filepath,query_res='',type_json='context'):
 		#print('json type (Context)',type_json)
 		self.typefile=detectTypeFile(filepath,type_json) #type of input file (cxt,fimi or json specification file)
 		print('Parsing input')
-		self.read_file(filepath,type_json) #generation of context object
+		if type_json!='query':
+			print('Parsing json', type_json)
+			self.read_file(filepath,type_json) #generation of context object
+		else:
+			print('Parsing json', type_json)
+			self.parseQueryRes(filepath,query_res)
 		# A context always has the following attributes: 
 		#- num_objects (i.e number of objects in the context)
 	    #- num_attributes (i.e number of attributes in the context)
@@ -128,6 +133,34 @@ class Context():
 		precontext=[(k,[self.attributes.index(e) for e in v]) for k,v in dic.items()]
 		self.objects,self.context=zip(*[(c[0],''.join(['1' if i in c[1] else '0' for i in range(self.num_attributes)])) for c in precontext])
 		self.num_objects=len(self.objects)
+		return self
+		
+	def parseQueryRes(self,filepath,query_res): #generates context object from json output of a query
+		print('----------------------------------------')
+		print('parsing query result json',filepath,query_res)
+		spec=ip.loadSpec(filepath,csv_flag=False)
+		query=spec['query']
+		obj_name=spec['objects']
+		att_name=(spec['attributes'].strip() if ',' not in spec['attributes'] else [s.strip() for s in spec['attributes'].split(',')])
+		query_content=json.load(open(query_res,'r'))
+		dic = collections.defaultdict(list)
+		self.attributes=list({e[att_name] for e in query_content})
+		self.num_attributes=len(self.attributes)
+		attributes_index=dict((self.attributes[i],i) for i in range(self.num_attributes))
+		for e in query_content:
+			dic[e[obj_name]].append(attributes_index[e[att_name]])
+		#for e in query_content:
+			#dic[e[obj_name]].append(self.e[att_name])
+		print('parseQueryRes dic formed')
+		#self.attributes=list({e for val in dic.values() for e in val})
+		#print('parseQueryRes preparing context')
+		#precontext=[(k,[self.attributes.index(e) for e in v]) for k,v in dic.items()]
+		print('parseQueryRes forming objects and context')
+		self.objects,self.context=zip(*[(k,''.join(['1' if i in v else '0' for i in range(self.num_attributes)])) for k,v in dic.items()])
+		#self.objects,self.context=zip(*[(c[0],''.join(['1' if i in c[1] else '0' for i in range(self.num_attributes)])) for c in precontext])
+		self.num_objects=len(self.objects)
+		print('parseQueryRes done')
+		print('----------------------------------------')
 		return self
 		
 	def parseCxtfile(self,cxtfile): #build context object from input cxt file
