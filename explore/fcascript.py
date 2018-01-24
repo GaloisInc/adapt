@@ -40,7 +40,7 @@ def naming(*disable_naming):
 		else:
 			named=False
 	return named
-	
+
 def fca(fca_context,min_support,named,file_out,proceed_flag=True): #run FCbO on context fca_context
 	if min_support==0:
 		concepts=fca_context.generateAllIntents() #generate all concepts if the minimal support is set to 0
@@ -70,20 +70,20 @@ def copyCfcaOutput2File(concept_file,names,outputfile=sys.stdout,namedentities=F
 	print(filecontent,file=output)
 	if output!=sys.stdout:
 		output.close()
-			
 
-		
-						
+
+
+
 def fcaCReturn(fca_context,itemsets,proceed_flag,named,attributes):
 	if proceed_flag==True:
 		if named==True:
 			trans_itemsets={frozenset(ip.indicesToNames(tup,attributes)) for tup in itemsets}
 		else:
-			trans_itemsets={frozenset(c) for c in itemsets}	
+			trans_itemsets={frozenset(c) for c in itemsets}
 		return FCAoutput(concepts=set(),context=fca_context,naming=named,itemsets=trans_itemsets)
 	else:
 		return "FCA done. Stopping."
-		
+
 def produceConceptfileName(sourcefile,outputfile):
 	if outputfile!=sys.stdout:
 		concepts_file=outputfile
@@ -104,12 +104,12 @@ def fcaC(fcbo_path,fca_context,min_support,sourcefile,fimifile,named,output,proc
 	itemsets=parseFimiConceptFile(concepts_file)
 	attributes=(fca_context.attributes if fimi_flag==False else [])
 	copyCfcaOutput2File(concepts_file,attributes,outputfile=output,namedentities=named)
-	if fimi_flag==False:	
+	if fimi_flag==False:
 		result=fcaCReturn(fca_context,itemsets,proceed_flag,named,fca_context.attributes)
 	else:
-		result=fcaCReturn(fca_context,itemsets,proceed_flag,False,[])	
+		result=fcaCReturn(fca_context,itemsets,proceed_flag,False,[])
 	return result
-	
+
 def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1):
 	print('runFCA queryres',queryres)
 	#add code_flag switch to allow bypass of my python code+add naming of c fimi results
@@ -139,14 +139,14 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
-			if type_json=='context' or type_json=='query': 
-				print('case where the specification describes a query')#if no input file is specified (which means a specification has been specified),			
+			if type_json=='context' or type_json=='query':
+				print('case where the specification describes a query')#if no input file is specified (which means a specification has been specified),
 				fimifile=os.path.splitext(specfile)[0]+'.fimi'
 			elif type_json=='csv':
 				print('case where the specification describes csv files')
 				fimifile=ip.getFimiFromCSVSpec(specfile)
 			result=fcaC(fcbo_path,fca_context,min_support,specfile,fimifile,named,outputfile,proceed_flag,False,csv,parallel,ncpus)
-	elif specfile=='': #if no specification file is supplied 		
+	elif specfile=='': #if no specification file is supplied
 		print('case where only input file supplied')
 		fca_context=fcbo.Context(inputfile,queryres,type_json)#a context input file has to be specified (in cxt or fimi format)
 		if flag=='python':
@@ -157,7 +157,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 				result=fcaC(fcbo_path,fca_context,min_support,inputfile,inputfile,named,outputfile,proceed_flag,True,parallel,ncpus)
 			else:
 				fimifile=os.path.splitext(inputfile)[0]+'.fimi'
-				result=fcaC(fcbo_path,fca_context,min_support,inputfile,fimifile,named,outputfile,proceed_flag,False,parallel,ncpus)		
+				result=fcaC(fcbo_path,fca_context,min_support,inputfile,fimifile,named,outputfile,proceed_flag,False,parallel,ncpus)
 	else: #case where both a query specification file and a context input file are specified
 		print('case where both specification and input file supplied')
 		fca_context=fcbo.Context(specfile,queryres,type_json) # a context is generated using the query specification file
@@ -178,12 +178,12 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 				fimifile=inputfile
 			else:
 				fimifile=os.path.splitext(specfile)[0]+'.fimi'
-			result=fcaC(fcbo_path,fca_context,min_support,inputfile,fimifile,named,outputfile,proceed_flag,False,csv,parallel,ncpus)	
+			result=fcaC(fcbo_path,fca_context,min_support,inputfile,fimifile,named,outputfile,proceed_flag,False,csv,parallel,ncpus)
 			if os.path.splitext(inputfile)[1].replace('.','')=='cxt':
 				fca_context.writeContext2Cxt(inputfile)
 	return result
-	
-	
+
+
 def runAnalysis_old(fca_context,trans_concepts,min_rule_conf,max_rule_conf,num_rules,rule_type=['implication','antiimplication','disjointness'],namedentities=False,c_flag=False,output=sys.stdout):
 	min_conf=min_rule_conf
 	max_conf=max_rule_conf
@@ -199,7 +199,7 @@ def runAnalysis_old(fca_context,trans_concepts,min_rule_conf,max_rule_conf,num_r
 	if 'disjointness' in rule_type:
 		analysis.doDisjRules(fca_context,itemsets,num_rules,namedentities,output)
 
-	
+
 def runAnalysisParallel_old(fca_context,trans_concepts,min_rule_conf,max_rule_conf,num_rules,rule_type=['implication','anti-implication','disjointness'],namedentities=False,c_flag=False,output=sys.stdout):
 	min_conf=min_rule_conf
 	max_conf=max_rule_conf
@@ -217,9 +217,9 @@ def runAnalysisParallel_old(fca_context,trans_concepts,min_rule_conf,max_rule_co
 		if 'disjointness' in rule_type:
 			executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
 	for x in executors_list:
-		analysis.printComputedRules(x.result(),fca_context,output)
-		
-		
+		analysis.printComputedRules(x.result(),fca_context,output,json_flag=True)
+
+
 
 ruleFunction={'implication':analysis.doImpRules,'anti-implication':analysis.doAntiImpRules,'disjointness':analysis.doDisjRules}
 supported_rules=['implication','anti-implication','disjointness','kulczynski','lift','leverage','imbalance']
@@ -244,11 +244,11 @@ def runAnalysis(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_
 	if measureRules!={}:
 		measure_res=analysis.doMeasureRules(measureRules,fca_context,itemsets,namedentities)
 	analysis_res=measure_res+imp_res+dis_res
-	analysis.printComputedRules(analysis_res,fca_context,output)
-	
-			
+	analysis.printComputedRules(analysis_res,fca_context,output,json_flag=True)
 
-			
+
+
+
 def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
 	rule_spec=unpackRules(rule_spec_file)
 	print('rule_spec',rule_spec)
@@ -268,15 +268,15 @@ def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=
 		   executors_list+=[executor.submit(ruleFunction[rule],fca_context,itemsets,imp_rules[rule]['min_threshold'],imp_rules[rule]['num_rules'],namedentities) for rule in imp_rules.keys()]
 		if disjointness!={}:
 		   executors_list+=[executor.submit(analysis.doDisjRules,fca_context,itemsets,disjointness[rule]['num_rules'],namedentities,output) for rule in disjointness]
-			
+
 		#for rule in rule_type:
 			#if rule in ruleFunction and 'disjointness' not in rule:
 				#executors_list.append(executor.submit(ruleFunction[rule],fca_context,itemsets,rule_thresholds[rule],num_rules,namedentities))
 			#else:
 				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
 	for x in executors_list:
-		analysis.printComputedRules(x.result(),fca_context,output)
-	
+		analysis.printComputedRules(x.result(),fca_context,output,json_flag=True)
+
 def parseConceptFile(concept_file):
 	with open(concept_file,'r') as f:
 		content=f.read().translate({ord('\n'):'#'})
@@ -306,7 +306,7 @@ def parseConceptFile(concept_file):
 					value=()
 			trans_concepts.add((key,value))
 	return {'transconcepts':trans_concepts,'named':named}
-	
+
 def parseFimiConceptFile(concept_file):
 	itemsets=set()
 	with open(concept_file,'r') as f:
@@ -336,8 +336,8 @@ def parseCfcaOutput(cfca_output):
 			else:
 				itemsets.add(tuple(i for i in split_l))
 	return {'itemsets':itemsets,'named':named}
-	
-	
+
+
 def generateContextFiles(inputfile,outputfile=sys.stdout,csv_flag=False):
 	ext_input=os.path.splitext(inputfile)[1][1:]
 	ext_output=(os.path.splitext(outputfile)[1][1:] if outputfile==sys.stdout else ' ')
@@ -365,11 +365,11 @@ def generateContextFiles(inputfile,outputfile=sys.stdout,csv_flag=False):
 					shutil.copyfileobj(f, sys.stdout)
 		else:
 			print('Cannot convert ',inputfile,' to ',outputfile,'. Inputfile format not supported.')
-				
-	
 
-	
-	
+
+
+
+
 
 #-------------------------------------------------------------------------------------------------------
 #definition of command line arguments
@@ -377,7 +377,7 @@ def generateContextFiles(inputfile,outputfile=sys.stdout,csv_flag=False):
 
 parser=argparse.ArgumentParser(description='FCbO concept generation and analysis input arguments')
 parser.add_argument('--workflow','-w',help='Specify whether to run only FCA, only the concept analysis or both', required=True, action='store', choices=['context','fca','analysis','both'])
-#specifies whether to analyze the concepts after they have been computed. Doesn't make use of the saved concepts files for now. 
+#specifies whether to analyze the concepts after they have been computed. Doesn't make use of the saved concepts files for now.
 #In an upcoming version, it will be possible to do the concepts computation and the analysis separately.
 parser.add_argument('--fca_algo','-f',help='Specifies whether to run FCA from the python (FCbO) or the C (FCbO or PCbO) code ',action='store',choices=['python','C'],default='python')
 parser.add_argument('--fcbo_path','-p',help='Specifies the location of the FCbO/PCbO C code',action='store',default='')
@@ -386,7 +386,7 @@ parser.add_argument('--specfile','-s',help="Context specification file (json for
 parser.add_argument('--queryres','-q',help="JSON file containing results of a query",default='')
 #either an context input file (in cxt or fimi format) or a query specification file or both have to be provided. If only a context input file is provided, the context in the file is used as
 #input to FCbO. If only a query specification file is provided, a query is sent to the database to generate a temporary context that is used as input to FCbO. If both a context input file
-# and a query specification file are provided, a query is sent to the database to generate a context that is saved to the input file. The input file is then used as input to FCbO. 
+# and a query specification file are provided, a query is sent to the database to generate a context that is saved to the input file. The input file is then used as input to FCbO.
 #Either an context input file (in fimi or cxt format) or a query specification file (in json format+contains 'spec' in filename) is required. Otherwise, an error is thrown.
 parser.add_argument('--csv',help='Specifies whether the specification file gives details about the csv files to use to construct a context',action='store_true')
 parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbo should be used instead of FCbO',type=int,default=1)
@@ -425,7 +425,7 @@ parser.add_argument('--rules_spec','-rs',help='JSON file that specifies which ru
 #launches concept generation with FCbO then analysis
 #this part will need to be factorized in a subsequent version
 
-if __name__ == '__main__':	
+if __name__ == '__main__':
 	#retrieving the arguments from the command line
 	args=parser.parse_args()
 	workflow=args.workflow
@@ -439,11 +439,11 @@ if __name__ == '__main__':
 	parallel=(True if ncpus>1 else False)
 	queryres=args.queryres
 	if inputfile=='' and specfile=='':#at least a specification file or an input (context file) must be supplied)
-		parser.error('Either --specfile/-s or --inputfile/-i is required.')# if not an error is thrown	
+		parser.error('Either --specfile/-s or --inputfile/-i is required.')# if not an error is thrown
 	min_support=args.min_support
 	fca_algo=args.fca_algo
 	if workflow=='context': #generate context files. By default, if no outputfile is specified, the input is formatted like a cxt file and printed on the screen.
-		#Otherwise the output format is the format corresponding to the extension of the provided outputfile 
+		#Otherwise the output format is the format corresponding to the extension of the provided outputfile
 		if inputfile!='' and specfile!='':
 			parser.error('--specfile/-s and --inputfile/-i cannot both be specified.')
 		to_convert=(inputfile if inputfile!='' else specfile)
@@ -451,14 +451,14 @@ if __name__ == '__main__':
 		generateContextFiles(to_convert,outputfile,csv_flag=csv)
 	elif workflow!='analysis':
 		print('Workflow',workflow)
-		print('Starting FCA. Generating concepts...\n')	
+		print('Starting FCA. Generating concepts...\n')
 		output_file=args.outputfile
 		proceed_flag=(True if workflow=='both' else False)
 		if args.disable_naming:
 			naming=args.disable_naming
 		else:
 			naming=False
-		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus)	
+		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus)
 		print('FCA finished. Concepts generated')
 		if workflow=='both':
 			output_file_analysis=args.analysis_outputfile
@@ -508,7 +508,7 @@ if __name__ == '__main__':
 		runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output=output_file_analysis)
 
 
-	
-			
-			
-				
+
+
+
+
