@@ -1,6 +1,0 @@
-{"context specification":{
-"query":"g.V().hasLabel('AdmFileObject').as('file').out('path','(path)').hasLabel('AdmPathNode').as('p').values('path').as('filepath').select('file').in('predicateObject','predicateObject2').hasLabel('AdmEvent').limit(1).as('y').values('eventType').as('type').select('y').out().hasLabel('AdmSubject').has('subjectType','SUBJECT_PROCESS').as('x').values('uuid').as('id').select('id','filepath').dedup()",
-"objects":"id",
-"attributes":"filepath"
- }
-}
