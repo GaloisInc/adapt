@@ -498,7 +498,7 @@ def printRuleViolations(vios,context,rules,type_rule,printing_flag=True,namedent
 			setAtts=frozenset(context.getAttributeFromObject(v[0],namedentities))
 			violated_rules=dict((e,rules[e]) for e in rules.keys() if e[0] <= setAtts and not(e[1] <= setAtts))
 			printlist+=[printRules2(violated_rules,type_rule,print_flag=False,output=out)]
-			out_json = { 'score': v[0], 'rules': [ [ list(l), list(r) ] for l,r in violated_rules ] }
+			out_json[v[0]] = { 'score': v[1], 'rules': [ [ list(l), list(r) ] for l,r in violated_rules ] }
 	printlist='\n'.join(printlist)
 	if json_flag:
 		return out_json
