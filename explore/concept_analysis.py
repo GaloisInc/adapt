@@ -84,12 +84,11 @@ def getRulesWithConfidence(concepts,supports,minconf):
 
 # a rule X1 -> Y2 subsumes another X2 -> Y2 if X1 subseteq X2 and Y2 subseteq Y1
 # this is naive, it would be better to filter out rules that are implied
-# by combinations of other rules also
-#def impRuleSubsumes(rule1,rule2):
-	#return rule1[0] <= rule2[0] and rule2[1] <= rule1[1]
+# by combinations of other rules also.
 
+# Note that this is not equivalent to "rule1<=rule2"
 def impRuleSubsumes(rule1,rule2):
-	return rule1<=rule2
+	return rule1[0] <= rule2[0] and rule2[1] <= rule1[1]
 
 #def impRuleRedundant(rules,rule):
 	#for exrule in rules:
