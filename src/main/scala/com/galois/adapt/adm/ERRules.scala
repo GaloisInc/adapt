@@ -1,5 +1,6 @@
 package com.galois.adapt.adm
 
+import com.galois.adapt.Application
 import com.galois.adapt.cdm18._
 
 object ERRules {
@@ -93,7 +94,7 @@ object ERRules {
       UuidRemapper.PutCdm2Adm(CdmUUID(f.getUuid), newFo.uuid),
       f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal))),
       f.peInfo.map(path => {
-        val pathNode = AdmPathNode(path)
+        val pathNode = AdmPathNode.normalized(path)
         (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
       })
     )
@@ -114,7 +115,7 @@ object ERRules {
         newFo,
         UuidRemapper.PutCdm2Adm(CdmUUID(r.getUuid), newFo.uuid),
         {
-          val pathNode = AdmPathNode(r.key)
+          val pathNode = AdmPathNode.normalized(r.key)
           (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
         }
       )
@@ -154,26 +155,26 @@ object ERRules {
 
         e.predicateObjectPath.flatMap(path => {
           e.predicateObject.map(predicateObject => {
-            val pathNode = AdmPathNode(path)
+            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject), label, pathNode.uuid), pathNode)
           })
         }),
         e.predicateObject2Path.flatMap(path => {
           e.predicateObject2.map(predicateObject2 => {
-            val pathNode = AdmPathNode(path)
+            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject2), label, pathNode.uuid), pathNode)
           })
         }),
         e.properties.getOrElse(Map()).get("exec").flatMap(cmdLine => {
-          val pathNode = AdmPathNode(cmdLine)
+          val pathNode = AdmPathNode.normalized(cmdLine)
           e.subjectUuid.map(subj =>
             (EdgeCdm2Adm(CdmUUID(subj), "exec", pathNode.uuid), pathNode)
           )
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
-          val pathNode = AdmPathNode(cmdLine)
+          val pathNode = AdmPathNode.normalized(cmdLine)
           (EdgeAdm2Adm(newEvent.uuid, "eventExec", pathNode.uuid), pathNode)
         })
       )
@@ -202,8 +203,8 @@ object ERRules {
     )] =
     if (s.subjectType != SUBJECT_PROCESS && s.parentSubject.isDefined) {
       Right((
-        s.cmdLine.map(cmd => {
-          val pathNode = AdmPathNode(cmd)
+        s.cmdLine.map(cdm => {
+          val pathNode = AdmPathNode.normalized(cdm)
           (EdgeCdm2Adm(CdmUUID(s.parentSubject.get), "cmdLine", pathNode.uuid), pathNode)
         }),
         UuidRemapper.PutCdm2Cdm(CdmUUID(s.getUuid), CdmUUID(s.parentSubject.get))
@@ -216,8 +217,8 @@ object ERRules {
         UuidRemapper.PutCdm2Adm(CdmUUID(s.getUuid), newSubj.uuid),
         EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(s.localPrincipal)),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent))),
-        s.cmdLine.map(cmd => {
-          val pathNode = AdmPathNode(cmd)
+        s.cmdLine.map(cdm => {
+          val pathNode = AdmPathNode.normalized(cdm)
           (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)
         })
       ))
@@ -226,8 +227,9 @@ object ERRules {
     // Collapse event
     //
     // TODO: better logic than just merge same successive events
-    def collapseEvents(e1: Event, e2: AdmEvent): Either[(UuidRemapper.PutCdm2Adm, AdmEvent), (Event, AdmEvent)] = {
-      if (e1.eventType == e2.eventType) {
+    val maxEventsMerged: Int = Application.config.getInt("adapt.adm.maxeventsmerged")
+    def collapseEvents(e1: Event, e2: AdmEvent, merged: Int): Either[(UuidRemapper.PutCdm2Adm, AdmEvent), (Event, AdmEvent)] = {
+      if (e1.eventType == e2.eventType && merged < maxEventsMerged) {
         val e2Updated = e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),

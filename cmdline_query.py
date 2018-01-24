@@ -17,12 +17,23 @@ if __name__ == '__main__':
                         default='http://localhost:8080')
     parser.add_argument('--endpoint', metavar='ENDPOINT', type=str, nargs='?',
                         default='json')
+    parser.add_argument('--query', metavar='QUERY', type=str, nargs='?')
     args = parser.parse_args()
 
     # Compute post url
     post_url = args.url + "/query/" + args.endpoint
-    print("Welcome to the query shell.\n"
-          "Queries are sent to '{}'.".format(post_url))
+    sys.stderr.write("Queries are sent to '{}'.\n".format(post_url))
+
+    # Check for the single query case
+    if args.query:
+        try:
+            req = requests.post(post_url, data={"query": args.query}).json()
+            json.dump(req, sys.stdout, indent=4)
+            sys.exit(0)
+        except Exception as e:
+            sys.stderr.write("There was an error processing your query:\n"
+                             "{}\n".format(e))
+            sys.exit(1)
 
     # Load history file
     histfile = "cmdline_query.history"
@@ -38,10 +49,10 @@ if __name__ == '__main__':
                 req = requests.post(post_url, data={"query": query}).json()
                 pager(json.dumps(req, indent=4))
             except Exception as e:
-                print("There was an error processing your query:\n"
-                      "{}".format(e))
+                sys.stderr.write("There was an error processing your query:\n"
+                                 "{}\n".format(e))
         except KeyboardInterrupt:
-            print("\ninterrupt: input discarded")
+            sys.stderr.write("\ninterrupt: input discarded\n")
         except EOFError:
-            print("\nexit")
+            sys.stderr.write("\nexit\n")
             sys.exit(0)

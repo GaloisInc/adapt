@@ -26,15 +26,20 @@ object ERStreamComponents {
       var remaps: List[UuidRemapper.PutCdm2Adm] = Nil
       var dependent: Stream[Either[Edge[_, _], ADM]] = Stream.empty
 
+      // NOTE: we keep track here of how many events have contributed to the 'wipAdmEventOpt'. This allows us to cap the
+      //       number of CDM events that get ER'd into an ADM event. Not doing this slows everything to a crawl.
+      var merged: Int = 0
+
       (e: Event) => {
 
         wipAdmEventOpt match {
-          case Some(wipAdmEvent) => collapseEvents(e, wipAdmEvent) match {
+          case Some(wipAdmEvent) => collapseEvents(e, wipAdmEvent, merged) match {
 
             // Merged event in
             case Left((remap, newWipEvent)) =>
               // Update the new WIP
               wipAdmEventOpt = Some(newWipEvent)
+              merged += 1
               remaps = remap :: remaps
               Stream.empty
 
@@ -44,11 +49,13 @@ object ERStreamComponents {
               // Create a new WIP from e
 
               val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
+              merged = 1
 
+              val r1 = Future.sequence(remaps.map(r => uuidRemapper ? r))
               val toReturn = Stream.concat(                            // Emit the old WIP
                 Some(Right(wipAdmEvent)),
                 dependent
-              ).map(elem => Future.sequence(remaps.map(r => uuidRemapper ? r)).map(_ => elem))
+              ).map(elem => r1.map(_ => elem))
 
               wipAdmEventOpt = Some(newWipAdmEvent)
               remaps = List(remap)
@@ -69,6 +76,7 @@ object ERStreamComponents {
           case None =>
             // Create a new WIP from e
             val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
+            merged = 1
 
             wipAdmEventOpt = Some(newWipAdmEvent)
             remaps = List(remap)
