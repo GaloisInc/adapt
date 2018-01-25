@@ -20,6 +20,10 @@ def getQuery(query,port=8080):
     except Exception as e:
         print("There was an error processing your query:")
         print(e)
+
+def generateQueryResultFile(resfile,query,port=8080):
+	with open(resfile,'w') as f:
+		f.write(getQuery(query,port))
         
         
 def printResp(resp):  

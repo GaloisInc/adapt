@@ -141,11 +141,15 @@ class Context():
 		att_name=(spec['attributes'].strip() if ',' not in spec['attributes'] else [s.strip() for s in spec['attributes'].split(',')])
 		query_content=json.load(open(query_res,'r'))
 		dic = collections.defaultdict(list)
-		self.attributes=list({e[att_name] for e in query_content})
+		self.attributes=(list({e[att_name] for e in query_content}) if type(att_name)==str else list({str(a)+'#'+str(e[a]) for a in att_name for e in query_content}))
 		self.num_attributes=len(self.attributes)
 		attributes_index=dict((self.attributes[i],i) for i in range(self.num_attributes))
-		for e in query_content:
-			dic[e[obj_name]].append(attributes_index[e[att_name]])
+		if type(att_name)==str:
+			for e in query_content:
+				dic[e[obj_name]].append(attributes_index[e[att_name]])
+		elif type(att_name)==list:
+			for e in query_content:
+				dic[e[obj_name]].extend([attributes_index[str(a)+'#'+str(e[a])] for a in att_name])
 		self.objects,self.context=zip(*[(k,''.join(['1' if i in v else '0' for i in range(self.num_attributes)])) for k,v in dic.items()])
 		self.num_objects=len(self.objects)
 		#print('parseQueryRes done')
