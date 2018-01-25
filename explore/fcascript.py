@@ -111,7 +111,7 @@ def fcaC(fcbo_path,fca_context,min_support,sourcefile,fimifile,named,output,proc
 	return result
 
 def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1):
-	print('runFCA queryres',queryres)
+	#print('runFCA queryres',queryres)
 	#add code_flag switch to allow bypass of my python code+add naming of c fimi results
 	if code_flag not in code_flag_options:
 		flag='python' #if the user specifies an algorithm that doesn't exist, the FCA code that will be used is the python one
@@ -126,16 +126,16 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 	ncpus=cpus
 	named=namingByFileExtension(fileext,disable_naming)
 	type_json=('csv' if csv_flag==True else ('query' if queryres!='' else 'context'))
-	print('runFCA type_json',type_json)
+	#print('runFCA type_json',type_json)
 	if inputfile=='':
-		print('runFCA constructing context')
+		#print('runFCA constructing context')
 		fca_context=fcbo.Context(specfile,queryres,type_json)#we query localhost based on the specification file), parse it to a context
-		print('runFCA context constructed')
+		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		print('case where only specification supplied')#if no input file is specified (which means a specification has been specified),
 		if flag=='python':
-			print('fca_context context', type(fca_context.context), len(fca_context.context))
-			print('fca_context attributes', type(fca_context.attributes), len(fca_context.attributes))
-			print('fca_context objects', type(fca_context.objects), len(fca_context.objects))
+			#print('fca_context context', type(fca_context.context), len(fca_context.context))
+			#print('fca_context attributes', type(fca_context.attributes), len(fca_context.attributes))
+			#print('fca_context objects', type(fca_context.objects), len(fca_context.objects))
 			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
@@ -149,6 +149,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 	elif specfile=='': #if no specification file is supplied
 		print('case where only input file supplied')
 		fca_context=fcbo.Context(inputfile,queryres,type_json)#a context input file has to be specified (in cxt or fimi format)
+		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		if flag=='python':
 			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
 		elif flag=='C':
