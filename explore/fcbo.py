@@ -117,21 +117,35 @@ class Context():
 			port=spec['port']
 		else:
 			port=8080
-		query_res=ast.literal_eval(ip.getQuery(query,port))
-		query_res=[ast.literal_eval(v.replace('{ ','{').replace(', ',',').replace(' }','}').translate({ord('='):'":"',ord(','):'","',ord('{'):'{"',ord('}'):'"}'})) for v in query_res]
+		#print(type(ip.getQuery(query,port)))
+		#print(ip.getQuery(query,port),file=open('debug_parsing.txt','w'))
+		#query_res=ast.literal_eval(ip.getQuery(query,port))
+		#print('first evaluation of query string DONE')
+		#print(type(query_res))
+		#if type(query_res)==list:
+		#	print(query_res[0])
+		#for i in range(len(query_res)):
+		#	print(i,' ',query_res[i])
+		#	ast.literal_eval(query_res[i].replace('{ ','{').replace(', ',',').replace(' }','}').translate({ord('='):'":"',ord(','):'","',ord('{'):'{"',ord('}'):'"}'}))
+		#query_res=[ast.literal_eval(v.replace('{ ','{').replace(', ',',').replace(' }','}').translate({ord('='):'":"',ord(','):'","',ord('{'):'{"',ord('}'):'"}'})) for v in query_res]
+		#print('second evaluation of query string DONE')
+		query_res=ip.getQuery(query,port)
+		#print(type(query_res))
+		#if type(query_res)==list:
+		#	print(query_res[0])
+		print('forming dictionary')
 		dic = collections.defaultdict(list)
-		if type(att_name)==str:
-			for e in query_res:
-				dic[e[obj_name]].append(e[att_name])
-		elif type(att_name)==list:
-			for e in query_res:
-				dic[e[obj_name]].extend([att+'='+str(e[att]) for att in att_name])
-		else:
-			raise TypeError('The attributes should either be a string or a list of strings')
-		self.attributes=list({e for val in dic.values() for e in val})
+		self.attributes=list({e[att_name] for e in query_res})
 		self.num_attributes=len(self.attributes)
-		precontext=[(k,[self.attributes.index(e) for e in v]) for k,v in dic.items()]
-		self.objects,self.context=zip(*[(c[0],''.join(['1' if i in c[1] else '0' for i in range(self.num_attributes)])) for c in precontext])
+		attributes_index=dict((self.attributes[i],i) for i in range(self.num_attributes))
+		for e in query_res:
+			dic[e[obj_name]].append(attributes_index[e[att_name]])
+		print('dictionary formation DONE')
+		#self.attributes=list({e for val in dic.values() for e in val})
+		#self.num_attributes=len(self.attributes)
+		#precontext=[(k,[self.attributes.index(e) for e in v]) for k,v in dic.items()]
+		self.objects,self.context=zip(*[(k,''.join(['1' if i in v else '0' for i in range(self.num_attributes)])) for k,v in dic.items()])
+		#self.objects,self.context=zip(*[(c[0],''.join(['1' if i in c[1] else '0' for i in range(self.num_attributes)])) for c in precontext])
 		self.num_objects=len(self.objects)
 		return self
 		

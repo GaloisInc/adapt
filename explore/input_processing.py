@@ -14,7 +14,7 @@ def indicesToNames(indices_tup,names_list):
 def getQuery(query,port=8080):
 	#gets query result as json
     try:
-        resp = requests.post("http://localhost:"+str(port)+"/query/generic", data={"query": query},timeout=300)
+        resp = requests.post("http://localhost:"+str(port)+"/query/json", data={"query": query},timeout=300)
         print('Response: '+ str(resp.status_code))
         return (resp.json())
     except Exception as e:
