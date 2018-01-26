@@ -8,8 +8,8 @@ from pprint import pprint
 
 # Usage:
 # Edit these constants:
-cdm2admCsv_path = "/Users/ryan/Desktop/cdm2admCsv.csv"  # Alec made this. It's a constant mapping of UUIDs from CDM (for ground truth labels) to their corresponding ADM uuid. Can download from here: https://owncloud.galois.com/index.php/s/SYOYTzuH8fXFzOv
-implication_file_path = "/Users/ryan/Code/adapt/explore/implication.json"  # this is the "implication.json" file produced by Ghita's script.
+cdm2admCsv_path = "/home/gberrada/adaptNew/adapt/explore/cdm2admCsv.csv"  # Alec made this. It's a constant mapping of UUIDs from CDM (for ground truth labels) to their corresponding ADM uuid. Can download from here: https://owncloud-tng.galois.com/index.php/s/RzqNzscSCcnGvDn
+implication_file_path = "/home/gberrada/adaptNew/adapt/explore/implication.json"  # this is the "implication.json" file produced by Ghita's script.
 
 # Then use this script at the command line with something like:
 # `context_evaluation_with_ground_truth.py ~/cadets/labeled_ground_truth/bovia_webshell.csv`
