@@ -193,6 +193,24 @@ class General_TA1_Tests(
     }
   }
 
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
+    }
+  }
+
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
+    }
+  }
+
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
+    }
+  }
+
   // Test that events have a "threadId" field (unless they are EVENT_ADD_OBJECT_ATTRIBUTE or EVENT_FLOWS_TO)
   it should "have a 'threadId' (unless they have type 'EVENT_ADD_OBJECT_ATTRIBUTE' or 'EVENT_FLOWS_TO')" in {
     val eventsWithoutThreadId: java.util.List[Vertex] = graph.traversal().V()
@@ -305,7 +323,7 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "TRACE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -323,7 +341,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CADETS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -340,7 +358,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker)
   val minimum = 50000
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FAROS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -359,7 +377,7 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "THEIA data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -377,7 +395,7 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FIVE DIRECTIONS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -395,7 +413,7 @@ class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CLEARSCOPE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
