@@ -1,6 +1,8 @@
 package com.galois.adapt
 
 //import com.thinkaurelius.titan.core.attribute.Text
+import java.util
+
 import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
@@ -295,6 +297,7 @@ object Query {
         | ".fold()"                        ^^ { case _          => Fold(_: Tr) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
+        | ".group()"                       ^^ { case _          => Group(_: Tr) }
         | ".groupCount()"                  ^^ { case _          => GroupCount(_: Tr) }
         | ".both(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], RawArr(s)) }
         | ".bothV()"                       ^^ { case _          => BothV(_: Traversal[_,Edge]) }
@@ -633,6 +636,10 @@ object QueryLanguage {
   case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Long] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).count()
   }
+  case class Group[S,K,V](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[K,V]] {
+    override def buildTraversal(graph: Graph, context: Map[String, QueryValue[_]]) = traversal.buildTraversal(graph, context).group()
+  }
+
   case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).groupCount()
   }
