@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import requests, readline, atexit, os, sys, json, subprocess, tempfile, argparse
+import requests, readline, atexit, os, sys, json, subprocess, tempfile, argparse, webbrowser
 
 def pager(text):
     tf = open(tempfile.mkstemp()[1], "w")
@@ -45,11 +45,14 @@ if __name__ == '__main__':
     while True:
         try:
             query = input("==> ")
-            try:
-                req = requests.post(post_url, data={"query": query}).json()
-                pager(json.dumps(req, indent=4))
-            except Exception as e:
-                sys.stderr.write("There was an error processing your query:\n"
+            if query[-1] == '?':
+                webbrowser.open_new_tab(args.url + "/#" + query[0:-1] + ":F00")
+            else:
+                try:
+                    req = requests.post(post_url, data={"query": query}).json()
+                    pager(json.dumps(req, indent=4))
+                except Exception as e:
+                    sys.stderr.write("There was an error processing your query:\n"
                                  "{}\n".format(e))
         except KeyboardInterrupt:
             sys.stderr.write("\ninterrupt: input discarded\n")

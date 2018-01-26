@@ -149,23 +149,25 @@ class General_TA1_Tests(
 
   // Test that all subjects have a "parentSubject" edge
   // TODO Alec: check that parent subject uuid != uuid
-  "Subjects" should "have a 'parentSubject'" in {
-    val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
-      .hasLabel("Subject")
-      .hasNot("parentSubjectUuid")
-      .toList
+  if (ta1Source != "cadets") {
+    "Subjects" should "have a 'parentSubject'" in {
+      val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
+        .hasLabel("Subject")
+        .hasNot("parentSubjectUuid")
+        .toList
 
-    if (subjectsWithoutParents.isEmpty) {
-      assert(subjectsWithoutParents.length == 0)
-    } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
-      val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+      if (subjectsWithoutParents.isEmpty) {
+        assert(subjectsWithoutParents.length == 0)
+      } else {
+        val (code, color) = colors.next()
+        toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
+        val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
-      assert(
-        subjectsWithoutParents.length == 0,
-        s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
-      )
+        assert(
+          subjectsWithoutParents.length == 0,
+          s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
+        )
+      }
     }
   }
 
