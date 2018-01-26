@@ -6,9 +6,8 @@ import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.stream.FlowShape
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import akka.util.Timeout
-import com.galois.adapt.FlowComponents
 import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
@@ -52,10 +51,11 @@ object EntityResolution {
     }
 
     Flow.fromFunction[CDM,CDM](endHack)
+      .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue))))
       .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
       .via(remapEdgeUuids(uuidRemapper))
-      .via(awaitAndDeduplicate(parallelism))
+      .via(asyncDeduplicate(parallelism))
   }
 
 
@@ -94,13 +94,13 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[Timed[CDM]](3))
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
-      broadcast.out(0).collect({ case e@Timed(_, i) if i.isInstanceOf[Event] => e.asInstanceOf[Timed[Event]] })
+      broadcast.out(0)
         .via(EventResolution(uuidRemapper, (10 seconds).toNanos)) ~> merge.in(0)
 
-      broadcast.out(1).collect({ case s@Timed(_, i) if i.isInstanceOf[Subject] => i.asInstanceOf[Subject] })
+      broadcast.out(1).collect({ case s@Timed(_, i: Subject) => i })
         .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
 
-      broadcast.out(2).collect({ case o: Timed[CDM] => o.unwrap })
+      broadcast.out(2).collect({ case o@Timed(_, i: CDM) => i })
         .via(otherResolution(uuidRemapper))    ~> merge.in(2)
 
       FlowShape(broadcast.in, merge.out)
@@ -140,31 +140,21 @@ object EntityResolution {
 
   // This does several things:
   //
-  //   - await the Futures (processing first the Futures that finish first)
   //   - prevent nodes with the same UUID from being re-emitted
   //   - prevent duplicate edges from being re-emitted
   //   - prevent Edges from being emitted before both of their endpoints have been emitted
   //
-  private def awaitAndDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
+  private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
-//      .via(FlowComponents.printCounter("Before map async", 1000))
       .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
-//      .via(FlowComponents.printCounter("Through map async", 1000))
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
         val seenEdges = MutableSet.empty[EdgeAdm2Adm]                // edges seen (not necessarily emitted)
         val blockedEdges = MutableMap.empty[UUID, List[EdgeAdm2Adm]] // Edges blocked by UUIDs that haven't arrived yet
-        var counter = 0
 
         // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
         def emitEdge(edge: EdgeAdm2Adm): List[Either[EdgeAdm2Adm, ADM]] = {
-          counter += 1
-         // assert(seenNodes.intersect(blockedEdges.keySet).isEmpty)
-          if (counter % 10000 == 0) {
-            println(s"seenNodes: ${seenNodes.size}, seenEdges: ${seenEdges.size}, blockedEdges: ${blockedEdges.size}, sample blockedEdges: ${blockedEdges.take(10)}")
-          }
-
           if (!seenNodes.contains(edge.src)) {
             blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
             Nil
@@ -185,10 +175,6 @@ object EntityResolution {
           case Right(adm) =>                                 // New ADM - record and emit
             seenNodes.add(adm.uuid)
             val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(emitEdge)
-//            if (blockedEdges.flatMap(_._2).size > 1000) {
-//              println("blockedEdges: " + blockedEdges.flatMap(_._2).size.toString + " " + blockedEdges.keys.size.toString)
-//              println("Sample from blockedEdges: " + blockedEdges.head.toString)
-//            }
             Right(adm) :: emit
         }
       })

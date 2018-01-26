@@ -36,7 +36,8 @@ object ERStreamComponents {
       merged: Int                                  // The number of CDM events that have been folded in so far
     )
 
-    def apply(uuidRemapper: ActorRef, expireInNanos: Long)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Timed[Event], Future[Either[Edge[_, _], ADM]], _] = Flow[Timed[Event]]
+    def apply(uuidRemapper: ActorRef, expireInNanos: Long)
+             (implicit timeout: Timeout, ec: ExecutionContext): Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], _] = Flow[Timed[CDM]]
 
       .statefulMapConcat { () =>
 
@@ -44,16 +45,31 @@ object ERStreamComponents {
         val activeChains: mutable.Map[EventKey, EventMergeState] = mutable.Map.empty
         var expiryTimes: Fridge[EventKey] = Fridge.empty
 
-        {
-          case Timed(currentTime, e) =>
+        // Expire old events based on the current time
+        def expireOldChains(currentTime: Long): Stream[Future[Either[Edge[_, _], ADM]]] = {
+          var toReturnExpired = Stream[Future[Either[Edge[_, _], ADM]]]()
+          while (expiryTimes.peekFirstToExpire.exists { case (_,t) => t <= currentTime }) {
+            val (keysToExpire, _) = expiryTimes.popFirstToExpire().get
 
-//            assert(activeChains.keySet == expiryTimes.keySet, "keysets are different")
+            for (keyToExpire <- keysToExpire) {
+              val EventMergeState(wipAdmEvent, lastCdmUuid, remaps, dependent, _) = activeChains.remove(keyToExpire).get
+              val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid)
+              val rs = Future.sequence((final_remap :: remaps).map(r => uuidRemapper ? r))
+              val toReturn = Stream.concat(
+                Some(Right(wipAdmEvent)),
+                dependent
+              ).map(elem => rs.map(_ => elem))
+
+              toReturnExpired = toReturn ++ toReturnExpired
+            }
+          }
+          toReturnExpired
+        }
+
+        {
+          case Timed(currentTime, e: Event) =>
 
             val eKey = key(e)
-
-//            println("The current time is " + currentTime.toString)
-
-//            println("Map size: " + activeChains.size.toString)
 
             // Write in the new information
             val toReturnChain = activeChains.get(eKey) match {
@@ -135,119 +151,16 @@ object ERStreamComponents {
                 Stream.empty
             }
 
-//            assert(activeChains.keySet == expiryTimes.keySet, "keysets are different 2")
+            toReturnChain ++ expireOldChains(currentTime)
 
-            // Expire old events
-            var toReturnExpired = Stream[Future[Either[Edge[_, _], ADM]]]()
-            while (expiryTimes.peekFirstToExpire.exists { case (_,t) => t <= currentTime }) {
-//              assert(activeChains.keySet == expiryTimes.keySet, "keysets are different 3")
-              val (keysToExpire, _) = expiryTimes.popFirstToExpire().get
-//              println("keys to expire: " + keysToExpire.toString)
+          case Timed(currentTime, TimeMarker(t)) => expireOldChains(t)
 
-              for (keyToExpire <- keysToExpire) {
-//                println("expiring: " + keyToExpire.toString)
-//                println("activeChains: " + activeChains.toString)
-                val EventMergeState(wipAdmEvent, lastCdmUuid, remaps, dependent, _) = activeChains.remove(keyToExpire).get
-                val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid)
-                val rs = Future.sequence((final_remap :: remaps).map(r => uuidRemapper ? r))
-                val toReturn = Stream.concat(
-                  Some(Right(wipAdmEvent)),
-                  dependent
-                ).map(elem => rs.map(_ => elem))
+          case _ => Stream.empty
 
-                toReturnExpired = toReturn ++ toReturnExpired
-              }
-
-//              println("Expired ADM (uuid: " + wipAdmEvent.uuid.toString + ", originalUuids: " + wipAdmEvent.originalCdmUuids.toString + ")")
-            }
-
-            toReturnChain ++ toReturnExpired
         }
       }
-
   }
-/*
-    // Group events that have the same subject and predicate objects
-    .groupBy(Int.MaxValue, e => (e.subjectUuid, e.predicateObject, e.predicateObject2))
 
-    // Identify sequences of events
-    .statefulMapConcat( () => {
-      var wipAdmEventOpt: Option[AdmEvent] = None
-      var remaps: List[UuidRemapper.PutCdm2Adm] = Nil
-      var dependent: Stream[Either[Edge[_, _], ADM]] = Stream.empty
-
-      // NOTE: we keep track here of how many events have contributed to the 'wipAdmEventOpt'. This allows us to cap the
-      //       number of CDM events that get ER'd into an ADM event. Not doing this slows everything to a crawl.
-      var merged: Int = 0
-
-      (e: Event) => {
-
-        wipAdmEventOpt match {
-          case Some(wipAdmEvent) => collapseEvents(e, wipAdmEvent, merged) match {
-
-            // Merged event in
-            case Left((remap, newWipEvent)) =>
-              // Update the new WIP
-              wipAdmEventOpt = Some(newWipEvent)
-              merged += 1
-              remaps = remap :: remaps
-              Stream.empty
-
-            // Didn't merge event in
-            case Right((e, wipAdmEvent)) =>
-
-              // Create a new WIP from e
-
-              val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
-              merged = 1
-
-              val r1 = Future.sequence(remaps.map(r => uuidRemapper ? r))
-              val toReturn = Stream.concat(                            // Emit the old WIP
-                Some(Right(wipAdmEvent)),
-                dependent
-              ).map(elem => r1.map(_ => elem))
-
-              wipAdmEventOpt = Some(newWipAdmEvent)
-              remaps = List(remap)
-              dependent =
-                extractPathsAndEdges(path1) ++
-                extractPathsAndEdges(path2) ++
-                extractPathsAndEdges(path3) ++
-                extractPathsAndEdges(path4) ++
-                Stream.concat(
-                  subject.map(Left(_)),
-                  predicateObject.map(Left(_)),
-                  predicateObject2.map(Left(_))
-                )
-
-              toReturn
-
-          }
-          case None =>
-            // Create a new WIP from e
-            val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
-            merged = 1
-
-            wipAdmEventOpt = Some(newWipAdmEvent)
-            remaps = List(remap)
-            dependent =
-              extractPathsAndEdges(path1) ++
-              extractPathsAndEdges(path2) ++
-              extractPathsAndEdges(path3) ++
-              extractPathsAndEdges(path4) ++
-              Stream.concat(
-                subject.map(Left(_)),
-                predicateObject.map(Left(_)),
-                predicateObject2.map(Left(_))
-              )
-
-            Stream.empty
-        }
-      }
-    })
-
-    // Un-group events
-    .mergeSubstreams */
 
   def extractPathsAndEdges(path: Option[(Edge[_, _], AdmPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
     case Some((edge, path)) => Stream(Right(path), Left(edge))

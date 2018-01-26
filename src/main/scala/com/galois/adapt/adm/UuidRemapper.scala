@@ -83,8 +83,6 @@ class UuidRemapper extends Actor with ActorLogging {
 
     // Retrieve information
     case GetCdm2Adm(keyCdm) =>
-//      if (blocking.values.flatten.size > 1000)
-//        println(s"blocking: ${blocking.size}, ${blocking.values.flatten.size}, ${blocking.toList.sortBy(t => t._2.size).map(_._1)}")
       advanceAndNotify(keyCdm, List(sender()))
 
 

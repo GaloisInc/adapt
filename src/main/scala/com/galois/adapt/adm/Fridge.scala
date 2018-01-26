@@ -11,11 +11,14 @@ class Fridge[K] {
   private var expiry2key: SortedMap[TimeNanos, List[K]] = SortedMap()
   var counter = 0
 
+  // Check that the same keys and times are in the two maps
+  def checkInvariants(): Unit = {
+    assert(key2expiry.keySet == expiry2key.values.flatten.toSet)
+    assert(key2expiry.values.toSet == expiry2key.keySet)
+  }
+
   // Introduce or update an expiry time associated with a key
   def updateExpiryTime(key: K, newTime: TimeNanos): Unit = {
-//    println("updateExpiryTime")
-//    assert(key2expiry.keySet == expiry2key.values.flatten.toSet, "updateExpiryTime 1")
-//    assert(key2expiry.values.toSet == expiry2key.keySet, "updateExpiryTime 2")
     for (oldTime <- key2expiry.get(key)) {
       expiry2key.get(oldTime) match {
         case Some(List(key1)) if key == key1 => expiry2key = expiry2key - oldTime
@@ -30,17 +33,11 @@ class Fridge[K] {
 
   // See what keys are next in line to be expired (have the smallest expiry time)
   def peekFirstToExpire: Option[(List[K], TimeNanos)] = {
-//    println("peekFirstToExpire")
-//    assert(key2expiry.keySet == expiry2key.values.flatten.toSet, "peekFirstToExpire 1")
-//    assert(key2expiry.values.toSet == expiry2key.keySet, "peekFirstToExpire 2")
     expiry2key.headOption.map { case (t,k) => (k,t) }
   }
 
   // Remove the keys that are next in line to be expired (have the smallest expiry time)
   def popFirstToExpire(): Option[(List[K], TimeNanos)] = {
-//    println("popFirstToExpire")
-//    assert(key2expiry.keySet == expiry2key.values.flatten.toSet, "popFirstToExpire 1")
-//    assert(key2expiry.values.toSet == expiry2key.keySet, "popFirstToExpire 2")
     peekFirstToExpire match {
       case None => None
       case toReturn@Some((keys, time)) =>
