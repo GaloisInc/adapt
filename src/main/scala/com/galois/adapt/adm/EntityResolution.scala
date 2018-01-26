@@ -6,9 +6,8 @@ import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.stream.FlowShape
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import akka.util.Timeout
-import com.galois.adapt.FlowComponents
 import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
@@ -52,13 +51,15 @@ object EntityResolution {
     }
 
     Flow.fromFunction[CDM,CDM](endHack)
+      .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue))))
+      .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
-        .via(remapEdgeUuids(uuidRemapper))
-          .via(awaitAndDeduplicate(parallelism))
+      .via(remapEdgeUuids(uuidRemapper))
+      .via(asyncDeduplicate(parallelism))
   }
 
 
-  type ErFlow = Flow[CDM, Future[Either[Edge[_, _], ADM]], NotUsed]
+  type ErFlow = Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], NotUsed]
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs
   private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
@@ -90,12 +91,17 @@ object EntityResolution {
        *                                      `-__________-'
        */
 
-      val broadcast = b.add(Broadcast[CDM](3))
+      val broadcast = b.add(Broadcast[Timed[CDM]](3))
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
-      broadcast.out(0).collect({ case e: Event => e })    .via(eventResolution(uuidRemapper))    ~> merge.in(0)
-      broadcast.out(1).collect({ case s: Subject => s })  .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
-      broadcast.out(2)                                    .via(otherResolution(uuidRemapper))    ~> merge.in(2)
+      broadcast.out(0)
+        .via(EventResolution(uuidRemapper, (10 seconds).toNanos)) ~> merge.in(0)
+
+      broadcast.out(1).collect({ case s@Timed(_, i: Subject) => i })
+        .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
+
+      broadcast.out(2).collect({ case o@Timed(_, i: CDM) => i })
+        .via(otherResolution(uuidRemapper))    ~> merge.in(2)
 
       FlowShape(broadcast.in, merge.out)
     })
@@ -134,16 +140,13 @@ object EntityResolution {
 
   // This does several things:
   //
-  //   - await the Futures (processing first the Futures that finish first)
   //   - prevent nodes with the same UUID from being re-emitted
   //   - prevent duplicate edges from being re-emitted
   //   - prevent Edges from being emitted before both of their endpoints have been emitted
   //
-  private def awaitAndDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
+  private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
-//      .via(FlowComponents.printCounter("Before map async", 1000))
       .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
-//      .via(FlowComponents.printCounter("Through map async", 1000))
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
@@ -175,4 +178,29 @@ object EntityResolution {
             Right(adm) :: emit
         }
       })
+
+
+  // Map a CDM onto a possible timestamp
+  def timestampOf: CDM => Option[Long] = {
+    case s: Subject => Some(s.startTimestampNanos)
+    case e: Event => Some(e.timestampNanos)
+    case t: TimeMarker => Some(t.timestampNanos)
+    case _ => None
+  }
+
+  case class Timed[+T](time: Long, unwrap: T) {
+    def map[U](f: T => U): Timed[U] = Timed(time, f(unwrap))
+  }
+
+  def annotateTime: Flow[CDM, Timed[CDM], _] = Flow[CDM].statefulMapConcat{ () =>
+    var currentTime: Long = 0
+
+    (cdm: CDM) => {
+      for (time <- timestampOf(cdm); if time > currentTime) {
+        currentTime = time
+      }
+      List(Timed(currentTime, cdm))
+    }
+  }
+
 }
