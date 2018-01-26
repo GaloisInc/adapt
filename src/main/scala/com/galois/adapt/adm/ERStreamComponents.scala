@@ -19,7 +19,7 @@ object ERStreamComponents {
   import ERRules._
 
   type CDM = CDM18
-
+  
   object EventResolution {
 
     // In order to consider merging two events, we need them to have the same key, which consists of the subject UUID,
@@ -156,11 +156,9 @@ object ERStreamComponents {
           case Timed(currentTime, TimeMarker(t)) => expireOldChains(t)
 
           case _ => Stream.empty
-
         }
       }
   }
-
 
   def extractPathsAndEdges(path: Option[(Edge[_, _], AdmPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
     case Some((edge, path)) => Stream(Right(path), Left(edge))

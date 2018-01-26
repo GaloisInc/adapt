@@ -149,23 +149,25 @@ class General_TA1_Tests(
 
   // Test that all subjects have a "parentSubject" edge
   // TODO Alec: check that parent subject uuid != uuid
-  "Subjects" should "have a 'parentSubject'" in {
-    val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
-      .hasLabel("Subject")
-      .hasNot("parentSubjectUuid")
-      .toList
+  if (ta1Source != "cadets") {
+    "Subjects" should "have a 'parentSubject'" in {
+      val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
+        .hasLabel("Subject")
+        .hasNot("parentSubjectUuid")
+        .toList
 
-    if (subjectsWithoutParents.isEmpty) {
-      assert(subjectsWithoutParents.length == 0)
-    } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
-      val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+      if (subjectsWithoutParents.isEmpty) {
+        assert(subjectsWithoutParents.length == 0)
+      } else {
+        val (code, color) = colors.next()
+        toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
+        val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
-      assert(
-        subjectsWithoutParents.length == 0,
-        s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
-      )
+        assert(
+          subjectsWithoutParents.length == 0,
+          s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
+        )
+      }
     }
   }
 
@@ -188,6 +190,24 @@ class General_TA1_Tests(
         eventsWithoutSubjectUuid.length == 0,
         s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutSubjectUuid${Console.RED}\n"
       )
+    }
+  }
+
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
+    }
+  }
+
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
+    }
+  }
+
+  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
     }
   }
 
@@ -303,7 +323,7 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "TRACE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -321,7 +341,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CADETS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -338,7 +358,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker)
   val minimum = 50000
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FAROS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -357,7 +377,7 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "THEIA data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -375,7 +395,7 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FIVE DIRECTIONS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -393,7 +413,7 @@ class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CLEARSCOPE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
