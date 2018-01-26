@@ -40,11 +40,11 @@ class UuidRemapper extends Actor with ActorLogging {
   import UuidRemapper._
 
   // We keep track of two large Maps containing UUID remap information
-  private var cdm2cdm: mutable.Map[CdmUUID, CdmUUID] = mutable.Map.empty
-  private var cdm2adm: mutable.Map[CdmUUID, AdmUUID]  = mutable.Map.empty
+  private val cdm2cdm: mutable.Map[CdmUUID, CdmUUID] = mutable.Map.empty
+  private val cdm2adm: mutable.Map[CdmUUID, AdmUUID]  = mutable.Map.empty
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
-  private var blocking: mutable.Map[CdmUUID, List[ActorRef]] = mutable.Map.empty
+  private val blocking: mutable.Map[CdmUUID, List[ActorRef]] = mutable.Map.empty
 
   // Apply as many CDM remaps as possible
   @tailrec
@@ -83,6 +83,8 @@ class UuidRemapper extends Actor with ActorLogging {
 
     // Retrieve information
     case GetCdm2Adm(keyCdm) =>
+//      if (blocking.values.flatten.size > 1000)
+//        println(s"blocking: ${blocking.size}, ${blocking.values.flatten.size}, ${blocking.toList.sortBy(t => t._2.size).map(_._1)}")
       advanceAndNotify(keyCdm, List(sender()))
 
 

@@ -52,13 +52,14 @@ object EntityResolution {
     }
 
     Flow.fromFunction[CDM,CDM](endHack)
+      .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
-        .via(remapEdgeUuids(uuidRemapper))
-          .via(awaitAndDeduplicate(parallelism))
+      .via(remapEdgeUuids(uuidRemapper))
+      .via(awaitAndDeduplicate(parallelism))
   }
 
 
-  type ErFlow = Flow[CDM, Future[Either[Edge[_, _], ADM]], NotUsed]
+  type ErFlow = Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], NotUsed]
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs
   private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
@@ -90,12 +91,17 @@ object EntityResolution {
        *                                      `-__________-'
        */
 
-      val broadcast = b.add(Broadcast[CDM](3))
+      val broadcast = b.add(Broadcast[Timed[CDM]](3))
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
-      broadcast.out(0).collect({ case e: Event => e })    .via(eventResolution(uuidRemapper))    ~> merge.in(0)
-      broadcast.out(1).collect({ case s: Subject => s })  .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
-      broadcast.out(2)                                    .via(otherResolution(uuidRemapper))    ~> merge.in(2)
+      broadcast.out(0).collect({ case e@Timed(_, i) if i.isInstanceOf[Event] => e.asInstanceOf[Timed[Event]] })
+        .via(EventResolution(uuidRemapper, (10 seconds).toNanos)) ~> merge.in(0)
+
+      broadcast.out(1).collect({ case s@Timed(_, i) if i.isInstanceOf[Subject] => i.asInstanceOf[Subject] })
+        .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
+
+      broadcast.out(2).collect({ case o: Timed[CDM] => o.unwrap })
+        .via(otherResolution(uuidRemapper))    ~> merge.in(2)
 
       FlowShape(broadcast.in, merge.out)
     })
@@ -149,9 +155,16 @@ object EntityResolution {
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
         val seenEdges = MutableSet.empty[EdgeAdm2Adm]                // edges seen (not necessarily emitted)
         val blockedEdges = MutableMap.empty[UUID, List[EdgeAdm2Adm]] // Edges blocked by UUIDs that haven't arrived yet
+        var counter = 0
 
         // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
         def emitEdge(edge: EdgeAdm2Adm): List[Either[EdgeAdm2Adm, ADM]] = {
+          counter += 1
+         // assert(seenNodes.intersect(blockedEdges.keySet).isEmpty)
+          if (counter % 10000 == 0) {
+            println(s"seenNodes: ${seenNodes.size}, seenEdges: ${seenEdges.size}, blockedEdges: ${blockedEdges.size}, sample blockedEdges: ${blockedEdges.take(10)}")
+          }
+
           if (!seenNodes.contains(edge.src)) {
             blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
             Nil
@@ -172,7 +185,36 @@ object EntityResolution {
           case Right(adm) =>                                 // New ADM - record and emit
             seenNodes.add(adm.uuid)
             val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(emitEdge)
+//            if (blockedEdges.flatMap(_._2).size > 1000) {
+//              println("blockedEdges: " + blockedEdges.flatMap(_._2).size.toString + " " + blockedEdges.keys.size.toString)
+//              println("Sample from blockedEdges: " + blockedEdges.head.toString)
+//            }
             Right(adm) :: emit
         }
       })
+
+
+  // Map a CDM onto a possible timestamp
+  def timestampOf: CDM => Option[Long] = {
+    case s: Subject => Some(s.startTimestampNanos)
+    case e: Event => Some(e.timestampNanos)
+    case t: TimeMarker => Some(t.timestampNanos)
+    case _ => None
+  }
+
+  case class Timed[+T](time: Long, unwrap: T) {
+    def map[U](f: T => U): Timed[U] = Timed(time, f(unwrap))
+  }
+
+  def annotateTime: Flow[CDM, Timed[CDM], _] = Flow[CDM].statefulMapConcat{ () =>
+    var currentTime: Long = 0
+
+    (cdm: CDM) => {
+      for (time <- timestampOf(cdm); if time > currentTime) {
+        currentTime = time
+      }
+      List(Timed(currentTime, cdm))
+    }
+  }
+
 }
