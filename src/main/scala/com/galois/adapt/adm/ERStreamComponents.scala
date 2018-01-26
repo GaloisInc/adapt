@@ -32,7 +32,7 @@ object ERStreamComponents {
 
       (e: Event) => {
 
-        wipAdmEventOpt match {
+     /*   wipAdmEventOpt match {
           case Some(wipAdmEvent) => collapseEvents(e, wipAdmEvent, merged) match {
 
             // Merged event in
@@ -73,12 +73,12 @@ object ERStreamComponents {
               toReturn
 
           }
-          case None =>
+          case None => */
             // Create a new WIP from e
             val (newWipAdmEvent, remap, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
             merged = 1
 
-            wipAdmEventOpt = Some(newWipAdmEvent)
+          //  wipAdmEventOpt = Some(newWipAdmEvent)
             remaps = List(remap)
             dependent =
               extractPathsAndEdges(path1) ++
@@ -91,9 +91,16 @@ object ERStreamComponents {
                 predicateObject2.map(Left(_))
               )
 
-            Stream.empty
+        val r1 = Future.sequence(remaps.map(r => uuidRemapper ? r))
+        val toReturn = Stream.concat(                            // Emit the old WIP
+          Some(Right(newWipAdmEvent)),
+          dependent
+        ).map(elem => r1.map(_ => elem))
+
+//            Stream.empty
+            toReturn
         }
-      }
+//      }
     })
 
     // Un-group events
