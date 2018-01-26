@@ -96,9 +96,14 @@
                 $.post("/query/nodes", {"query": query_string}, function(node_results) {
                     var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
                     if ( ! all_are_nodes) { UI.failHandler(); return false }
-                    
-                    UI.foundNodes(node_results.length)
-                    if ( ! _.isEmpty(node_results)) {
+
+                    var node_results_count = node_results.length
+                    UI.foundNodes(node_results_count)
+
+                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to proceed?"
+                    var displayNodes = node_results_count > 0 && (node_results_count < 500 || confirm(confirm_msg))
+
+                    if (displayNodes) {
                         var result_node_ids = _.map(node_results, function(n) { return n['id'] })
                         var edge_query;
                         // if (node_data_set.getIds().length == 0) {
