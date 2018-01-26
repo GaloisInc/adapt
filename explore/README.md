@@ -46,8 +46,7 @@ The FIMI file format is described in: http://fcalgs.sourceforge.net/format.html 
 It is currently recommended to use files CXT format as they are faster to parse than FIMI files.
 
 ```--specfile/-s``` can take two types of json files as argument.
-The first type of files describes all the parameters (e.g query to run, data fields to extract as objects or attributes) needed to run a query on the database and generate an input context to concept generation and/or rule generation and analysis (it's not advised to use this functionality at the moment as the 
-queries can timeout or produce obscure Cassandra errors.)
+The first type of files describes all the parameters (e.g query to run, data fields to extract as objects or attributes) needed to run a query on the database and generate an input context to concept generation and/or rule generation and analysis (one could also run the query specified by this type of file, save its results to a JSON file and pass this result file as parameter to the ```--queryres/-q```).
 The second type of files gives the information necessary to extract an FCA/FCA analysis input context from a set of CSV files. In the case where the specification file passed as argument to the ```--specfile/-s``` option
 corresponds to the second type of file, the ```--csv``` flag must be used.
 
@@ -112,9 +111,10 @@ The concept generation and analysis can be launched after an avro file has been 
 ```
 python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
                     [--fca_algo {python,C}] [--fcbo_path FCBO_PATH]
-                    [--inputfile INPUTFILE] [--specfile SPECFILE] [--csv]
-                    [--parallel PARALLEL] [--min_support MIN_SUPPORT]
-                    [--disable_naming] [--outputfile OUTPUTFILE]
+                    [--inputfile INPUTFILE] [--specfile SPECFILE]
+                    [--queryres QUERYRES] [--csv] [--parallel PARALLEL]
+                    [--min_support MIN_SUPPORT] [--disable_naming]
+                    [--outputfile OUTPUTFILE]
                     [--analysis_outputfile ANALYSIS_OUTPUTFILE]
                     [--concept_file CONCEPT_FILE] [--rules_spec RULES_SPEC]
 
@@ -123,7 +123,7 @@ python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
 
 To perform an analysis equivalent to the one obtained with ```python3 analyze.py --event```, one could launch (after ADM ingestion):
 ```
-python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3 -rs explore/rulesCurrentSpec.json
+python3 explore/fcascript.py -s explore/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3 -rs explore/rulesCurrentSpec.json
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
