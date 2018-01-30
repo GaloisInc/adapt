@@ -65,11 +65,11 @@ fi
 if [ ! $TEST_FILE ]
 then
   echo "Are you SURE you want to skip testing?"
-  echo "Type in 'yes' or enter the path to testing data"
+  echo "Type in the path to the test data file... or else swear to, and type: 'I_know_that_skipping_tests_is_a_very_bad_idea_but_I_have_a_good_reason_for_skipping_tests_which_I_will_explain_after_I_break_the_testing_tool_for_everyone_on_the_program'"
   echo -n "> "
   read INPUT
   case $INPUT in
-    yes) ;;
+    I_know_that_skipping_tests_is_a_very_bad_idea_but_I_have_a_good_reason_for_skipping_tests_which_I_will_explain_after_I_break_the_testing_tool_for_everyone_on_the_program) ;;
     *)   TEST_FILE=$INPUT ;; 
   esac
 fi

@@ -123,19 +123,18 @@ object ERRules {
 
   // Resolve an 'Event'
   object EventEdges {
-    type Subject = Option[Edge[ADM, CDM18]]
-    type PredicateObject = Option[Edge[ADM, CDM18]]
-    type PredicateObject2 = Option[Edge[ADM, CDM18]]
+    type Subject = Option[Edge[CDM18, CDM18]]
+    type PredicateObject = Option[Edge[CDM18, CDM18]]
+    type PredicateObject2 = Option[Edge[CDM18, CDM18]]
 
     type PredicatePathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
     type Predicate2PathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
     type ExecSubjectPathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
-    type ExecPathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
+    type ExecPathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
   }
   def resolveEventAndPaths(e: Event):
     (
       AdmEvent,
-      UuidRemapper.PutCdm2Adm,
       EventEdges.Subject,
       EventEdges.PredicateObject,
       EventEdges.PredicateObject2,
@@ -148,10 +147,9 @@ object ERRules {
       val newEvent = AdmEvent(Seq(CdmUUID(e.getUuid)), e.eventType, e.timestampNanos, e.timestampNanos)
       (
         newEvent,
-        UuidRemapper.PutCdm2Adm(CdmUUID(e.getUuid), newEvent.uuid),
-        e.subjectUuid.map(subj => EdgeAdm2Cdm(newEvent.uuid, "subject", CdmUUID(subj))),
-        e.predicateObject.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject", CdmUUID(obj))),
-        e.predicateObject2.map(obj => EdgeAdm2Cdm(newEvent.uuid, "predicateObject2", CdmUUID(obj))),
+        e.subjectUuid.map(subj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "subject", CdmUUID(subj))),
+        e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject", CdmUUID(obj))),
+        e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject2", CdmUUID(obj))),
 
         e.predicateObjectPath.flatMap(path => {
           e.predicateObject.map(predicateObject => {
@@ -175,7 +173,7 @@ object ERRules {
         }),
         e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
           val pathNode = AdmPathNode.normalized(cmdLine)
-          (EdgeAdm2Adm(newEvent.uuid, "eventExec", pathNode.uuid), pathNode)
+          (EdgeCdm2Adm(CdmUUID(e.getUuid), "eventExec", pathNode.uuid), pathNode)
         })
       )
     }
@@ -228,14 +226,15 @@ object ERRules {
     //
     // TODO: better logic than just merge same successive events
     val maxEventsMerged: Int = Application.config.getInt("adapt.adm.maxeventsmerged")
-    def collapseEvents(e1: Event, e2: AdmEvent, merged: Int): Either[(UuidRemapper.PutCdm2Adm, AdmEvent), (Event, AdmEvent)] = {
+    def collapseEvents(e1: Event, e2: AdmEvent, lastCdmUuid: CdmUUID, merged: Int): Either[(UuidRemapper.PutCdm2Cdm, CdmUUID, AdmEvent), (Event, AdmEvent)] = {
       if (e1.eventType == e2.eventType && merged < maxEventsMerged) {
         val e2Updated = e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),
           originalCdmUuids = CdmUUID(e1.getUuid) +: e2.originalCdmUuids
         )
-        Left((UuidRemapper.PutCdm2Adm(CdmUUID(e1.getUuid), e2.uuid), e2Updated))
+        val newCdmUuid = CdmUUID(e1.getUuid)
+        Left((UuidRemapper.PutCdm2Cdm(lastCdmUuid, newCdmUuid), newCdmUuid, e2Updated))
       } else {
         Right((e1, e2))
       }
