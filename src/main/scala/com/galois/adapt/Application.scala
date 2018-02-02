@@ -41,7 +41,7 @@ object Application extends App {
   // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
   org.slf4j.LoggerFactory.getILoggerFactory
   val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("production"))
-
+  val runFlow = config.getString("adapt.runflow").toLowerCase
 
   val interface = config.getString("akka.http.server.interface")
   val port = config.getInt("akka.http.server.port")
@@ -61,7 +61,7 @@ object Application extends App {
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
   // Start up the database
-  val dbActor: ActorRef = config.getString("adapt.runflow").toLowerCase match {
+  val dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
     case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
   }
@@ -87,7 +87,7 @@ object Application extends App {
     Await.result(httpServer, 10 seconds)
   }
 
-  config.getString("adapt.runflow").toLowerCase match {
+  runFlow match {
 
     case "accept" =>
       println("Running acceptance tests")

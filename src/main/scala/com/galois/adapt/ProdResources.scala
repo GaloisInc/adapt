@@ -40,7 +40,7 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
     } match {
       case Success(parsedNotes) => parsedNotes
       case Failure(e) =>
-        println("Could not load saved notes file: " + e.getMessage + " It will be created on first write.")
+//        println("Could not load saved notes file: " + e.getMessage + " It will be created on first write.")
         List.empty[SavedNotes]
     }
 
