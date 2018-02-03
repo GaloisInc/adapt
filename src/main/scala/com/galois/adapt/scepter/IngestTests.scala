@@ -236,7 +236,7 @@ class General_TA1_Tests(
 
   // Test that EVENT_ADD_OBJECT_ATTRIBUTE events have two predicate objects
   // I (Alec) have been assuming the semantics of this event is that predicateObject is an updated variant of predicateObject2
-  it should "have two predicate objects that are 'NetFlowObject's when they are 'EVENT_ADD_OBJECT_ATTRIBUTE's" in {
+  it should "have two predicate objects that are 'NetFlowObject's for all events of type: 'EVENT_ADD_OBJECT_ATTRIBUTE'" in {
     val malformedAddObjectEvents: java.util.List[Vertex] = graph.traversal().V()
       .hasLabel("Event")
       .has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE")

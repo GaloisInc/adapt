@@ -73,6 +73,7 @@ object Application extends App {
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
   val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
+  val tagPropActor = system.actorOf(Props[TagPropagationActor], name = "tagPropagation")
 
   val ta1 = config.getString("adapt.env.ta1")
 
@@ -82,7 +83,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
+    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor, tagPropActor)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }
@@ -117,18 +118,18 @@ object Application extends App {
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
         case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> EntityResolution(uuidRemapper).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
+        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, tagPropActor).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[CDM18](2))
           broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast.out(1) ~> EntityResolution(uuidRemapper, tagPropActor) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
           SinkShape(broadcast.in)
         })
       }
 
       println(s"Running database flow for $name with UI.")
-      if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
+      if (config.getBoolean("adapt.ingest.quitafteringest")) println("Should terminate after ingest.")
 
       startWebServer()
       CDMSource.cdm18(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
@@ -174,7 +175,7 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[Any](9))
 
-            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper))
+            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, tagPropActor))
               .via(FlowComponents.printCounter("DB Writer", 1000))
               .via(Flow.fromFunction {
                 case Left(e) => e
@@ -239,16 +240,16 @@ object Application extends App {
         import scala.collection.mutable.{Map => MutableMap}
         val firstObservation = MutableMap.empty[UUID, CDM17]
         val ignoreUuid = new UUID(0L,0L);
-      {
-        case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
-        case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
-          val comparison = firstObservation(c.getUuid) == c
-          if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
-          List()
-        case c: CDM17 with DBNodeable[_] =>
-          firstObservation += (c.getUuid -> c)
-          List()
-      }
+        {
+          case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
+          case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
+            val comparison = firstObservation(c.getUuid) == c
+            if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
+            List()
+          case c: CDM17 with DBNodeable[_] =>
+            firstObservation += (c.getUuid -> c)
+            List()
+        }
       }.runWith(Sink.ignore)
 
 

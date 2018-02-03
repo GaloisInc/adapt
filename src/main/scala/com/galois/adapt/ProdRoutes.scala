@@ -44,7 +44,7 @@ object ProdRoutes {
     .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
+  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef, tagPropActor: ActorRef)(implicit ec: ExecutionContext) =
     PolicyEnforcementDemo.route ~
     get {
       pathPrefix("ranked") {
@@ -201,7 +201,22 @@ object ProdRoutes {
         path("nodes") {
           formField('query) { queryString =>
             complete(
-              queryResult(NodeQuery(queryString), dbActor)
+              queryResult(NodeQuery(queryString), dbActor).flatMap {
+                case a: JsArray =>
+                  val resolvedTagFutures = a.elements.map { o =>
+                    val nodeFields = o.asJsObject.fields
+                    val props = nodeFields("properties").asJsObject.fields
+                    val uuidString = props("uuid").asInstanceOf[JsArray].elements.head.asJsObject.fields("value").toString.replaceAll("\"","")
+                    val nodeUuid = UUID.fromString(uuidString)
+                    def getTags(u: UUID): Future[TagStatusResults] = (tagPropActor ? GetTagStatus(u)).mapTo[TagStatusResults]
+                    getTags(nodeUuid).map { tags =>
+                      val newProps = props + ("cTag" -> JsArray(JsObject("value" -> JsString(tags.confidentiality.getOrElse("None").toString)))) + ("tTag" -> JsArray(JsObject("value" -> JsString(tags.trust.getOrElse("None").toString))))
+                      JsObject(nodeFields + ("properties" -> JsObject(newProps)))
+                    }
+                  }
+                  Future.sequence(resolvedTagFutures).map(JsArray.apply)
+                case jsVal => Future.successful(jsVal)
+              }
             )
           }
         } ~

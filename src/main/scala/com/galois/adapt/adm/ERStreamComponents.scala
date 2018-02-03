@@ -6,7 +6,9 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.stream.scaladsl.Flow
 import akka.util.Timeout
+import com.galois.adapt.TagPropStreamComponents
 import com.galois.adapt.adm.EntityResolution.Timed
+import com.galois.adapt.adm.UuidRemapper.GetCdm2Adm
 import com.galois.adapt.cdm18._
 
 import scala.collection.immutable.SortedMap
@@ -36,8 +38,10 @@ object ERStreamComponents {
       merged: Int                                  // The number of CDM events that have been folded in so far
     )
 
-    def apply(uuidRemapper: ActorRef, expireInNanos: Long)
+    def apply(uuidRemapper: ActorRef, expireInNanos: Long, tagPropActor: ActorRef)
              (implicit timeout: Timeout, ec: ExecutionContext): Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], _] = Flow[Timed[CDM]]
+
+      .via(TagPropStreamComponents.tagPropByEventFlow(uuidRemapper, tagPropActor))
 
       .statefulMapConcat { () =>
 

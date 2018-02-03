@@ -23,7 +23,7 @@ object EntityResolution {
 
   val config: Config = ConfigFactory.load()
 
-  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
+  def apply(uuidRemapper: ActorRef, tagPropActor: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
@@ -53,7 +53,7 @@ object EntityResolution {
     Flow.fromFunction[CDM,CDM](endHack)
       .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue))))
       .via(annotateTime)
-      .via(erWithoutRemapsFlow(uuidRemapper))
+      .via(erWithoutRemapsFlow(uuidRemapper, tagPropActor))
       .via(remapEdgeUuids(uuidRemapper))
       .via(asyncDeduplicate(parallelism))
   }
@@ -62,7 +62,7 @@ object EntityResolution {
   type ErFlow = Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], NotUsed]
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs
-  private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
+  private def erWithoutRemapsFlow(uuidRemapper: ActorRef, tagPropActor: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
 
@@ -95,7 +95,7 @@ object EntityResolution {
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
       broadcast.out(0)
-        .via(EventResolution(uuidRemapper, (10 seconds).toNanos)) ~> merge.in(0)
+        .via(EventResolution(uuidRemapper, (10 seconds).toNanos, tagPropActor)) ~> merge.in(0)
 
       broadcast.out(1).collect({ case s@Timed(_, i: Subject) => i })
         .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
