@@ -50,8 +50,9 @@ object EntityResolution {
       cdm
     }
 
-    Flow.fromFunction[CDM,CDM](endHack)
-      .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue))))
+    Flow[CDM]
+      .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue), EndMarker(-1,Map()))))
+      .map(endHack(_))
       .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
       .via(remapEdgeUuids(uuidRemapper))
@@ -95,7 +96,7 @@ object EntityResolution {
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
       broadcast.out(0)
-        .via(EventResolution(uuidRemapper, (10 seconds).toNanos)) ~> merge.in(0)
+        .via(EventResolution(uuidRemapper, (config.getInt("adapt.adm.eventexpirysecs") seconds).toNanos)) ~> merge.in(0)
 
       broadcast.out(1).collect({ case s@Timed(_, i: Subject) => i })
         .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
@@ -194,10 +195,16 @@ object EntityResolution {
 
   def annotateTime: Flow[CDM, Timed[CDM], _] = Flow[CDM].statefulMapConcat{ () =>
     var currentTime: Long = 0
+    val maxTimeJump: Long = (config.getInt("adapt.adm.maxtimejumpsecs") seconds).toNanos
 
     (cdm: CDM) => {
       for (time <- timestampOf(cdm); if time > currentTime) {
-        currentTime = time
+        cdm match {
+          case _: TimeMarker if time > currentTime => currentTime = time
+          case _ if time > currentTime && time - currentTime < maxTimeJump => currentTime = time
+          case _ => { }
+        }
+
       }
       List(Timed(currentTime, cdm))
     }

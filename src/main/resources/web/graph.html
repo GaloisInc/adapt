@@ -7,7 +7,6 @@
     <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
     <script type="text/javascript" src="javascripts/ui_language.js"></script>
     <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
-    <!--<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>-->
 
     <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
     <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
@@ -105,20 +104,11 @@
 
                     if (displayNodes) {
                         var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                        var edge_query;
-                        // if (node_data_set.getIds().length == 0) {
-                          //  edge_query = "x = [" + result_node_ids.join(",") + "].toArray(); g.V(x).bothE().dedup()"
-                            edge_query = "new = [" + result_node_ids.join(",") + "];" +
+                        var edge_query = "new = [" + result_node_ids.join(",") + "];" +
                                          "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
                                          "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
-                        // } else {
-                        //     // Limit edges returned to only those which connect nodes which will be rendered (existing and additional nodes):
-                        //     var existing_rendered_nodes = "'" + node_data_set.getIds().join("','") + "'"
-                        //     edge_query = "results = [" + result_node_ids.join(",") + "].toArray(); existing = ["+existing_rendered_nodes+",'"+result_node_ids.join("','")+"'].toArray(); g.V(results).bothE().as('e').and(inV().hasId(existing),outV().hasId(existing)).select('e').dedup()"
-                        // }
                         $.post("/query/edges", {"query": edge_query}, function(edge_results) {
                             UI.foundEdges(edge_results.length)
-                            // var query_color = document.getElementById("query-color").jscolor.value
                             var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                             var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
                             var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
@@ -1010,6 +1000,10 @@
                         var data = JSON.parse(e.target.result)
                         right_journal = right_journal.concat(data)
                         UI.updateButtonStates()
+                    }
+                    reader.onloadend = function(e) {
+                        do { $("#redo-button").click() }
+                        while ( ! $("#redo-button").hasClass("disabled"))
                     }
                     reader.readAsText(f)
                 } else if (f.type === "text/csv") {

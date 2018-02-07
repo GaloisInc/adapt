@@ -34,13 +34,15 @@ lazy val adapt = (project in file(".")).settings(
     "org.neo4j" % "neo4j-lucene-index" % neoV,
 //    "org.neo4j" % "neo4j-lucene-upgrade" % neoV,
     "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
-    "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV
+    "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
 //    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
 //    "org.neo4j" % "neo4j-bolt" % neoV
 
 //    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
+
+    "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
   ),
 
 //  fork in run := true,

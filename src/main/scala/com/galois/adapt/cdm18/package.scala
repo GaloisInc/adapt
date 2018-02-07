@@ -78,7 +78,7 @@ package object cdm18 {
       case _: UnitDependency.RawCDMType => UnitDependency.from(cdm)
       case _: TimeMarker.RawCDMType => TimeMarker.from(cdm)
       case _: StartMarker.RawCDMType => StartMarker.from(cdm)
-      case _: EndMarker.RawCDMType => StartMarker.from(cdm)
+      case _: EndMarker.RawCDMType => EndMarker.from(cdm)
       case x => throw new RuntimeException(s"No deserializer for: $x")
     }
   }

@@ -52,19 +52,20 @@ class General_TA1_Tests(
 
   // Test to assert that there are no dangling edges
   "Data in this data set" should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
-    val incompleteCount = incompleteEdges.size
+    val incompleteEdgesExcludingZeros = incompleteEdges.filterNot(_._1 == new UUID(0L,0L))
+    val incompleteCount = incompleteEdgesExcludingZeros.size
     if (incompleteCount == 0) assert(incompleteCount == 0)
     else {
       val (code, color) = colors.next()
-      val edgesToPrint = incompleteEdges.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
-      toDisplay += s"g.V(${incompleteEdges.take(20).flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
+      val edgesToPrint = incompleteEdgesExcludingZeros.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
+      toDisplay += s"g.V(${incompleteEdgesExcludingZeros.take(20).flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
       val message = s"\nThe following edges (ExistingUUID --> MissingUUID) are all referenced in this data set, but nodes with these MissingUUIDs do not exist in this dataset:\n$color$edgesToPrint${Console.RED}\n"
       assert(incompleteCount == 0, message)
     }
   }
 
   // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them
-  if (ta1Source != "fivedirections") {
+  if ( ! List("fivedirections", "faros").contains(ta1Source)) {
     it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
       val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
         .hasLabel("Event")
@@ -199,7 +200,7 @@ class General_TA1_Tests(
     }
   }
 
-  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("faros").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
     }
@@ -355,7 +356,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker)
+  val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker, SrcSinkObject)
   val minimum = 50000
   // Test that we have a minimum number of nodes
   "FAROS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {

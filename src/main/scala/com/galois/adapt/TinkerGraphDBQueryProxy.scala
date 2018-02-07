@@ -165,7 +165,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       }
       providerSpecificTests.foreach(org.scalatest.run(_))
 
-      println(s"Total (CDM and ADM) vertices: ${graph.traversal().V().count().next()}")
+      println(s"Total CDM vertices: ${graph.traversal().V().count().next()}")
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
 
