@@ -260,7 +260,7 @@ package object adm {
       "userId" -> userId,
       "principalType" -> principalType.toString
     ) ++
-      (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(", ")) else Nil) ++
+      (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(",")) else Nil) ++
       username.fold[List[(String,Any)]](Nil)(v => List("username" -> v))
 
     def toMap = Map(

@@ -186,6 +186,27 @@ var node_appearance = [
             var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
             return type + "\n" + firstTime //+ " - " + lastTime
         }
+    }, {
+       name : "ADM Principal",
+        is_relevant : function(n) { return n.db_label === "AdmPrincipal" },
+        icon_unicode : "\uf419",
+        size : 50,
+        make_node_label : function(node) {
+            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'][0]['value'] : "")
+            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'][0]['value'] : "")
+            return username + userId
+        }
+    }, {
+        name : "Adm NetFlowObject",
+        is_relevant : function(n) { return n.db_label === "AdmNetFlowObject" },
+        icon_unicode : "\uf262",
+        make_node_label : function(node) {
+            var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None")
+            var localP = (node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None")
+            var remoteA = (node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None")
+            var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None")
+            return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
+        }
     },
 
 
@@ -539,25 +560,21 @@ var predicates = [
     }, {
         name : "Parent Process",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".outE('parentSubject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".outE('parentSubject').inV().hasLabel('AdmSubject')"
     }, {
         name : "Child Processes",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".inE('parentSubject').outV()",
-        is_default : false
+        floating_query : ".inE('parentSubject').outV()"
     },
 // AdmPathNode
     {
         name : "Processes",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')"
     }, {
         name : "Files",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')",
-        is_default : false
+        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')"
     },
 // AdmFileObject
     {
@@ -568,13 +585,18 @@ var predicates = [
     }, {
         name : "Reading Processes",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject')"
     }, {
         name : "Writing Processes",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')"
+    },
+
+ // AdmNetFlowObject
+    {
+        name : "NetFlow Principal",
+        is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
     }
 ]
 
