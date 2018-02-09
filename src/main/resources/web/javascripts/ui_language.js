@@ -36,7 +36,7 @@ var node_appearance = [
         icon_unicode : "\uf413",
        // color : "gray",  // setting color here will always override query-specific colors.
         size: 54
-        // make_node_label : SPECIAL CASE!!! Don't put anything here right now.
+        // make_node_label : SPECIAL CASE!!! Don't put anything here for Clusters right now.
     }, {
         name : "File",
         is_relevant : function(n) { return n.db_label === "FileObject" },
@@ -47,8 +47,7 @@ var node_appearance = [
             var fp = (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "none")
             return fp + " fd " + fd
         }
-    },
-    {
+    }, {
         name : "MemoryObject",
         is_relevant : function(n) { return n.db_label === "MemoryObject" },
         icon_unicode : "\uf376",
@@ -77,7 +76,7 @@ var node_appearance = [
             var at = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'][0]['value'] : "None")
             return "userId: " + at
         }
-   }, {
+    }, {
         name : "NetFlow",
         is_relevant : function(n) { return n.db_label === "NetFlowObject" },
         icon_unicode : "\uf262",
@@ -88,7 +87,7 @@ var node_appearance = [
             var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None")
             return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
         }
-   }, {
+    }, {
         name : "RegistryKey",
         is_relevant : function(n) { return n.db_label === "RegistryKeyObject" },
         icon_unicode : "\uf296",
@@ -97,7 +96,7 @@ var node_appearance = [
             var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
             return key + " : " + value
         }
-   }, {
+    }, {
         name : "Event",
         is_relevant : function(n) { return n.db_label === "Event" },
         icon_unicode : "\uf375",
@@ -108,7 +107,7 @@ var node_appearance = [
             // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
             return type + "\n# " + sequence
         }
-   }, {
+    }, {
         name : "SrcSink",
         is_relevant : function(n) { return n.db_label === "SrcSinkObject" },
         icon_unicode : "\uf313",
@@ -117,7 +116,7 @@ var node_appearance = [
             var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "None")
             return type
         }
-   }, {
+    }, {
         name : "PTN",
         is_relevant : function(n) { return n.db_label === "ProvenanceTagNode" },
         icon_unicode : "\uf48e",
@@ -157,15 +156,15 @@ var node_appearance = [
         icon_unicode : "\uf3fb",
         size: 40,
         make_node_label : function(node) {
-            return (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "???")
+            return node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "???"
         }
     }, {
        name : "ADM Subject",
         is_relevant : function(n) { return n.db_label === "AdmSubject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-            var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
-            var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString().replace(" GMT","")) : "")
+            var cid = node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None"
+            var timestamp = node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString().replace(" GMT","")) : ""
             return "Process: " + cid + timestamp
         }
     }, {
@@ -174,17 +173,52 @@ var node_appearance = [
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
-            return (node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'][0]['value'] : "UNKNOWN TYPE")
+            return node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'][0]['value'] : "UNKNOWN TYPE"
         }
     }, {
         name : "ADM Event",
         is_relevant : function(n) { return n.db_label === "AdmEvent" },
         icon_unicode : "\uf29a",
         make_node_label : function(node) {
-            var firstTime = (node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos'][0]['value']/1000000).toGMTString() : "???")
+            var firstTime = node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos'][0]['value']/1000000).toGMTString() : "???"
             // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos'][0]['value']/1000000).toGMTString() : "???")
-            var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
+            var type = node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None"
             return type + "\n" + firstTime //+ " - " + lastTime
+        }
+    }, {
+       name : "ADM Principal",
+        is_relevant : function(n) { return n.db_label === "AdmPrincipal" },
+        icon_unicode : "\uf419",
+        size : 50,
+        make_node_label : function(node) {
+            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'][0]['value'] : "")
+            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'][0]['value'] : "")
+            return username + userId
+        }
+    }, {
+        name : "ADM NetFlowObject",
+        is_relevant : function(n) { return n.db_label === "AdmNetFlowObject" },
+        icon_unicode : "\uf262",
+        make_node_label : function(node) {
+            var localA = node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None"
+            var localP = node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None"
+            var remoteA = node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None"
+            var remoteP = node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None"
+            return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
+        }
+    }, {
+        name : "ADM SrcSink",
+        is_relevant : function(n) { return n.db_label === "AdmSrcSinkObject" },
+        icon_unicode : "\uf313",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "??"
+        }
+    }, {
+        name : "ADM Provenance Tag Node",
+        is_relevant : function(n) { return n.db_label === "AdmProvenanceTagNode" },
+        icon_unicode : "\uf48e",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "??"
         }
     },
 
@@ -539,25 +573,29 @@ var predicates = [
     }, {
         name : "Parent Process",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".outE('parentSubject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".outE('parentSubject').inV().hasLabel('AdmSubject')"
     }, {
         name : "Child Processes",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".inE('parentSubject').outV()",
-        is_default : false
+        floating_query : ".inE('parentSubject').outV()"
+    }, {
+        name : "NetFlows",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')"
+    }, {
+        name : "Affected Objects",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2')"
     },
 // AdmPathNode
     {
         name : "Processes",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')"
     }, {
         name : "Files",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')",
-        is_default : false
+        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')"
     },
 // AdmFileObject
     {
@@ -568,13 +606,18 @@ var predicates = [
     }, {
         name : "Reading Processes",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject')"
     }, {
         name : "Writing Processes",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')",
-        is_default : false
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')"
+    },
+
+ // AdmNetFlowObject
+    {
+        name : "NetFlow Principal",
+        is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
     }
 ]
 

@@ -1,14 +1,17 @@
 package com.galois.adapt
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json._
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import akka.stream.Materializer
 import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
 import spray.json.{JsString, JsValue}
@@ -43,7 +46,7 @@ object ProdRoutes {
     .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext) =
+  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     PolicyEnforcementDemo.route(dbActor) ~
     get {
       pathPrefix("status") {
