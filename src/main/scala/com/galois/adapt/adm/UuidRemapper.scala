@@ -127,7 +127,7 @@ class UuidRemapper extends Actor with ActorLogging {
         self ! PutCdm2Adm(cdmUuid, synthesizedAdmUuid)
       }
 
-    case msg => log.error("UuidRemapper: received an unexpected message: ", msg)
+    case msg => log.error("UuidRemapper: received an unexpected message: {}", msg)
   }
 
 }
