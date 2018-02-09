@@ -25,9 +25,14 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   case class ValueName(name: String)
   implicit val simpleResponseFormat = jsonFormat1(ValueName)
 
+  def testIpAddress(ip: String): Option[String] = ip.split("\\.") match {
+    case l if l.length == 4 && Try(require(l.map(_.toInt).forall(i => i >= 0 && i <= 255))).isSuccess => Some(ip)
+    case _ => None
+  }
+
   val validIpAddress = Unmarshaller.strict[String, String] { string =>
-    string.split("\\.") match {
-      case l if l.length == 4 && Try(require(l.map(_.toInt).forall(i => i >= 0 && i <= 255))).isSuccess => string
+    testIpAddress(string) match {
+      case Some(s) => s
       case _ => throw new IllegalArgumentException(s"'$string' is not a valid IPv4 address.")
     }
   }
@@ -58,6 +63,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
+//  def go(query: String, f: (List[String]) => (Int, Option[String]))
+
 
   def route(dbActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer, timeout: Timeout) = {
     get {
@@ -67,7 +74,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         )
       } ~
         path("checkPolicy") {
-          parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri/*.as(validUri)*/) {
+          parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
             (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
               parameters('policy ! 1, 'permissionType.as(validPermissionType) ? "USER", 'permissionList.as(CsvSeq[String]) ? collection.immutable.Seq[String]("darpa")) { (permissionType, permissionList) =>
                 // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_User
@@ -80,10 +87,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                        |.outE('subject').inV()
                        |.outE('localPrincipal').inV()
                        |.dedup().values('$desiredProperty')
-                 """.stripMargin.replaceAll("\n","")   // .has('eventType','EVENT_WRITE')
+                     """.stripMargin.replaceAll("\n","")   // .has('eventType','EVENT_WRITE')
 
-                  val queryResult = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList)
-                  val resultFuture = queryResult.map {
+                  val resultFuture = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
                     case value :: Nil => permissionType.toLowerCase match {
                       case "user" =>
                         val result = permissionList.map(_.toLowerCase) contains value
@@ -108,12 +114,37 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                   StatusCodes.Accepted -> "Started the policy check process, will respond later"
                 }
               } ~
-                parameters('policy ! 2, 'restrictedHost.as[String]) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
+                parameters('policy ! 2, 'restrictedHost.as(validIpAddress)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
                   // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_Communication
-                  val cidrRange = if (restrictedHost.contains("/")) new CIDRUtils(restrictedHost) else new CIDRUtils(s"$restrictedHost/32")
-                  // TODO: single IPv4? single IPv6?
                   complete {
-                    // TODO
+                    val disallowedRange = if (restrictedHost.contains("/")) new CIDRUtils(restrictedHost) else new CIDRUtils(s"$restrictedHost/32")
+
+                    val query =  // Get all netflows associated with the process of the netflow in question.
+                      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+                         |.in('predicateObject','predicateObject2')
+                         |.out('subject')
+                         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')
+                         |.dedup().values('remoteAddress')
+                       """.stripMargin.replaceAll("\n","")
+
+                    val doesViolateF = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
+                      case Nil => List.empty[(String,Boolean)] // No matching netflows. ——Note: this should never be possible, because you should always get the originating netflow.
+                      case l => l.flatMap { string =>
+                        val validIpOpt = testIpAddress(string)
+                        val doesViolateOpt = validIpOpt.flatMap(ip => Try(disallowedRange.isInRange(ip)).toOption)
+                        doesViolateOpt.map(r => string -> r)
+                      }
+                    }
+                    doesViolateF.map{ results =>
+                      if (results.forall(t => ! t._2))
+                        returnPolicyResult(200, None, responseUri) // should allow
+                      else
+                        returnPolicyResult(400, Some(s"The following violating addresses were also contacted by this process: ${results.collect{case t if t._2 => t._1}.mkString(", ")}"), responseUri)
+                    }.recover {
+                      case e: Throwable =>
+                        returnPolicyResult(500, Some(s"An error occurred during the processing of the request: ${e.getMessage}"), responseUri)
+                        throw e
+                    }
                     StatusCodes.Accepted -> "Started the policy check process, will respond later"
                   }
                 } ~
