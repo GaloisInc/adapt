@@ -152,14 +152,14 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                   // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
                   complete {
                     // TODO
-                    StatusCodes.Accepted -> "Started the policy check process, will respond later"
+                    StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
                   }
                 } ~
                 parameters('policy ! 4) {
                   // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
                   complete {
                     // TODO
-                    StatusCodes.Accepted -> "Started the policy check process, will respond later"
+                    StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
                   }
                 }
           }

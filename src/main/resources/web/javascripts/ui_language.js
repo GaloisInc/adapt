@@ -586,7 +586,7 @@ var predicates = [
         name : "Affected Objects",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2')"
-    }
+    },
 // AdmPathNode
     {
         name : "Processes",
