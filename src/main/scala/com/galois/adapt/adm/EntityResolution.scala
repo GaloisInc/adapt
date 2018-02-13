@@ -23,7 +23,7 @@ object EntityResolution {
 
   val config: Config = ConfigFactory.load()
 
-  def apply(uuidRemapper: ActorRef)(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
+  def apply(uuidRemapper: ActorRef, synthesizedSource: Source[ADM, _])(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
@@ -56,6 +56,7 @@ object EntityResolution {
       .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
       .via(remapEdgeUuids(uuidRemapper))
+      .merge(synthesizedSource.map(adm => Future.successful(Right(adm))))
       .via(asyncDeduplicate(parallelism))
   }
 

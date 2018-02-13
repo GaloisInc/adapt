@@ -299,7 +299,7 @@ package object adm {
     )
   }
 
-  // TODO: consider emitting this on timeout
+  // TODO: make this deterministic
   final case class AdmSynthesized(
     uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID]

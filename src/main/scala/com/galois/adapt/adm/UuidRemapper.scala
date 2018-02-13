@@ -3,9 +3,11 @@ package com.galois.adapt.adm
 import java.io.{File, FileWriter}
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import com.galois.adapt.Application.synActor
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.concurrent.Future
 
 // This object contains all of the types of messages the 'UuidRemapper' actor is ever expected to encounter/send.
 object UuidRemapper {
@@ -35,7 +37,7 @@ object UuidRemapper {
   case object ExpireEverything
 }
 
-class UuidRemapper extends Actor with ActorLogging {
+class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
 
   import UuidRemapper._
 
@@ -123,9 +125,12 @@ class UuidRemapper extends Actor with ActorLogging {
 
       // Just send ourself messages with synthesized UUIDs
       for ((cdmUuid, waiting) <- blocking) {
-        val synthesizedAdmUuid = AdmUUID(java.util.UUID.randomUUID())
+        val synthesizedAdmUuid = AdmUUID(java.util.UUID.randomUUID()) // TODO: track CdmUuids remapping to this, then make this deterministic
+        synActor ! AdmSynthesized(synthesizedAdmUuid, Nil)
         self ! PutCdm2Adm(cdmUuid, synthesizedAdmUuid)
+        println(s"Expired ${synthesizedAdmUuid}")
       }
+      synActor ! akka.actor.Status.Success(()) // Terminate synthesizing stream
 
     case msg => log.error("UuidRemapper: received an unexpected message: {}", msg)
   }
