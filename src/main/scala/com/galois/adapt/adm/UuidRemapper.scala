@@ -17,8 +17,8 @@ object UuidRemapper {
    * The "PutConfirm" response is only sent after (1) the remap has been registered and (2) the actors that had been
    * waiting for this information have been notified.
    */
-  case class PutCdm2Cdm(source: CdmUUID, target: CdmUUID)
-  case class PutCdm2Adm(source: CdmUUID, target: AdmUUID)
+  case class PutCdm2Cdm(source: CdmUUID, target: CdmUUID, time: Option[Long] = None)
+  case class PutCdm2Adm(source: CdmUUID, target: AdmUUID, time: Option[Long] = None)
   case object PutConfirm
 
   /* UuidRemapper recieves "GetCdm2Adm" returns "GetResult"
@@ -26,7 +26,7 @@ object UuidRemapper {
    * The "ResultOfGetCdm2Adm" response is sent only once the 'UuidRemapper' has information about the source CDM UUID.
    * That means that the "ResultOfGetCdm2Adm" reponse may come a while after the initial "GetCdm2Adm" message.
    */
-  case class GetCdm2Adm(source: CdmUUID)
+  case class GetCdm2Adm(source: CdmUUID, time: Option[Long] = None)
   case class ResultOfGetCdm2Adm(target: AdmUUID)
 
   // TODO: do this nicely
@@ -46,24 +46,26 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
   private val cdm2adm: mutable.Map[CdmUUID, AdmUUID]  = mutable.Map.empty
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
-  private val blocking: mutable.Map[CdmUUID, List[ActorRef]] = mutable.Map.empty
+  private val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
 
   // Apply as many CDM remaps as possible
   @tailrec
-  private def advanceCdm(cdmUuid: CdmUUID): CdmUUID = {
+  private def advanceCdm(cdmUuid: CdmUUID, visited: Set[CdmUUID]): (CdmUUID, Set[CdmUUID]) = {
     if (cdm2cdm contains cdmUuid)
-      advanceCdm(cdm2cdm(cdmUuid))
+      advanceCdm(cdm2cdm(cdmUuid), visited | Set(cdmUuid))
     else
-      cdmUuid
+      (cdmUuid, visited)
   }
 
   // Apply as many CDM remaps as possible, then try to apply an ADM remap. If that succeeds, notify all the 'interested'
   // actors. Otherwise, add the 'interested' actors back into the blocked map under the final CDM we had advanced to.
-  private def advanceAndNotify(keyCdm: CdmUUID, interested: List[ActorRef]): Unit = {
-    val advancedCdm: CdmUUID = advanceCdm(keyCdm)
+  private def advanceAndNotify(keyCdm: CdmUUID, interested: List[ActorRef], prevOriginals: Set[CdmUUID]): Unit = {
+    val (advancedCdm: CdmUUID, originals: Set[CdmUUID]) = advanceCdm(keyCdm, prevOriginals)
 
     cdm2adm.get(advancedCdm) match {
-      case None => blocking(advancedCdm) = interested ++ blocking.getOrElse(advancedCdm, Nil)
+      case None =>
+        val (prevInterested, prevOriginals1: Set[CdmUUID]) = blocking.getOrElse(advancedCdm, (Nil, Set.empty[CdmUUID]))
+        blocking(advancedCdm) = (interested ++ prevInterested, originals | prevOriginals1 | Set(advancedCdm))
       case Some(adm) => interested.foreach(actor => actor ! ResultOfGetCdm2Adm(adm))
     }
   }
@@ -72,20 +74,22 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
   override def receive: Receive = {
 
     // Put ADM information
-    case PutCdm2Adm(source, target) =>
+    case PutCdm2Adm(source, target, _) =>
       cdm2adm(source) = target
-      advanceAndNotify(source, blocking.remove(source).getOrElse(Nil))
+      val (interested, original) = blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID]))
+      advanceAndNotify(source, interested, original)
       sender() ! PutConfirm
 
     // Put CDM information
-    case PutCdm2Cdm(source, target) =>
+    case PutCdm2Cdm(source, target, _) =>
       cdm2cdm(source) = target
-      advanceAndNotify(target, blocking.remove(source).getOrElse(Nil))
+      val (interested, original) = blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID]))
+      advanceAndNotify(source, interested, original)
       sender() ! PutConfirm
 
     // Retrieve information
-    case GetCdm2Adm(keyCdm) =>
-      advanceAndNotify(keyCdm, List(sender()))
+    case GetCdm2Adm(keyCdm, _) =>
+      advanceAndNotify(keyCdm, List(sender()), Set.empty)
 
 
     // Debug information
@@ -94,7 +98,7 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
 
       blockedCsv.write("blockCdm,blockingActors\n")
       for ((k,v) <- blocking) {
-        blockedCsv.write(k.uuid.toString ++ "," ++ v.map(_.toString()).mkString(";") ++ "\n")
+     //   blockedCsv.write(k.uuid.toString ++ "," ++ v.map(_.toString()).mkString(";") ++ "\n")
       }
 
       blockedCsv.close()
@@ -124,11 +128,11 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
     case ExpireEverything =>
 
       // Just send ourself messages with synthesized UUIDs
-      for ((cdmUuid, waiting) <- blocking) {
-        val synthesizedAdmUuid = AdmUUID(java.util.UUID.randomUUID()) // TODO: track CdmUuids remapping to this, then make this deterministic
-        synActor ! AdmSynthesized(synthesizedAdmUuid, Nil)
-        self ! PutCdm2Adm(cdmUuid, synthesizedAdmUuid)
-        println(s"Expired ${synthesizedAdmUuid}")
+      for ((cdmUuid, (waiting, originalCdmUuids)) <- blocking) {
+        val synthesizedAdm = AdmSynthesized(originalCdmUuids.toList) // TODO: track CdmUuids remapping to this, then make this deterministic
+        synActor ! synthesizedAdm
+        self ! PutCdm2Adm(cdmUuid, synthesizedAdm.uuid)
+        println(s"Expired ${synthesizedAdm.uuid}")
       }
       synActor ! akka.actor.Status.Success(()) // Terminate synthesizing stream
 

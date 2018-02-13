@@ -301,9 +301,10 @@ package object adm {
 
   // TODO: make this deterministic
   final case class AdmSynthesized(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
