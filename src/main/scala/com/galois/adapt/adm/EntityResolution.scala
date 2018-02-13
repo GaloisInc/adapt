@@ -95,14 +95,9 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[Timed[CDM]](3))
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
-      broadcast.out(0)
-        .via(EventResolution(uuidRemapper, (config.getInt("adapt.adm.eventexpirysecs") seconds).toNanos)) ~> merge.in(0)
-
-      broadcast.out(1).collect({ case s@Timed(_, i: Subject) => i })
-        .via(subjectResolution(uuidRemapper))  ~> merge.in(1)
-
-      broadcast.out(2).collect({ case o@Timed(_, i: CDM) => i })
-        .via(otherResolution(uuidRemapper))    ~> merge.in(2)
+      broadcast ~> EventResolution(uuidRemapper, (config.getInt("adapt.adm.eventexpirysecs") seconds).toNanos) ~> merge
+      broadcast ~> SubjectResolution(uuidRemapper)                                                             ~> merge
+      broadcast ~> OtherResolution(uuidRemapper)                                                               ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })

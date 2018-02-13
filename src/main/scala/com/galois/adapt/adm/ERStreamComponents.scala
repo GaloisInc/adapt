@@ -9,7 +9,6 @@ import akka.util.Timeout
 import com.galois.adapt.adm.EntityResolution.Timed
 import com.galois.adapt.cdm18._
 
-import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,7 +18,19 @@ object ERStreamComponents {
   import ERRules._
 
   type CDM = CDM18
-  
+
+  // All flows in this object have this type
+  type TimedCdmToFutureAdm = Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], _]
+
+
+  def extractPathsAndEdges(pathEdge: Option[(Edge[_, _], AdmPathNode)])
+                          (implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] =
+    pathEdge match {
+      case Some((edge, path)) => Stream(Right(path), Left(edge))
+      case None => Stream()
+    }
+
+
   object EventResolution {
 
     // In order to consider merging two events, we need them to have the same key, which consists of the subject UUID,
@@ -37,13 +48,13 @@ object ERStreamComponents {
     )
 
     def apply(uuidRemapper: ActorRef, expireInNanos: Long)
-             (implicit timeout: Timeout, ec: ExecutionContext): Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], _] = Flow[Timed[CDM]]
+             (implicit timeout: Timeout, ec: ExecutionContext): TimedCdmToFutureAdm = Flow[Timed[CDM]]
 
       .statefulMapConcat { () =>
 
         // INVARIANT: the keys in the fridge should match the keys of the active chains
         val activeChains: mutable.Map[EventKey, EventMergeState] = mutable.Map.empty
-        var expiryTimes: Fridge[EventKey] = Fridge.empty
+        val expiryTimes: Fridge[EventKey] = Fridge.empty
 
         // Expire old events based on the current time
         def expireOldChains(currentTime: Long): Stream[Future[Either[Edge[_, _], ADM]]] = {
@@ -153,97 +164,104 @@ object ERStreamComponents {
 
             toReturnChain ++ expireOldChains(currentTime)
 
-          case Timed(currentTime, TimeMarker(t)) => expireOldChains(t)
+          case Timed(_, TimeMarker(t)) => expireOldChains(t)
 
           case _ => Stream.empty
         }
       }
   }
 
-  def extractPathsAndEdges(path: Option[(Edge[_, _], AdmPathNode)])(implicit timeout: Timeout, ec: ExecutionContext): Stream[Either[Edge[_, _], ADM]] = path match {
-    case Some((edge, path)) => Stream(Right(path), Left(edge))
-    case None => Stream()
+
+  object SubjectResolution {
+    def apply(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): TimedCdmToFutureAdm =
+      Flow[Timed[CDM]]
+        .mapConcat[Future[Either[Edge[_, _], ADM]]] {
+
+          // We are solely interested in subjects
+          case Timed(t, s: Subject) =>
+            ERRules.resolveSubject(s) match {
+
+              // Don't merge the Subject (it isn't a UNIT)
+              case Left((irSubject, remap, localPrincipal, parentSubjectOpt, path)) =>
+                Stream.concat(
+                  Some(Right(irSubject)),
+                  extractPathsAndEdges(path),
+                  Some(Left(localPrincipal)),
+                  parentSubjectOpt.map(Left(_))
+                ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+              // Merge the Subject (it was a UNIT)
+              case Right((path, remap)) =>
+                Stream.concat(
+                  extractPathsAndEdges(path)
+                ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+            }
+
+          case _ => Stream.empty
+        }
   }
 
-  def subjectResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[Subject, Future[Either[Edge[_, _], ADM]], _] = Flow[Subject]
-    .mapConcat[Future[Either[Edge[_, _], ADM]]] { s =>
-      ERRules.resolveSubject(s) match {
 
-        // Don't merge the Subject (it isn't a UNIT)
-        case Left((irSubject, remap, localPrincipal, parentSubjectOpt, path)) =>
+  object OtherResolution {
+    def apply(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): TimedCdmToFutureAdm = {
+
+      Flow[Timed[CDM]].mapConcat[Future[Either[Edge[_, _], ADM]]] {
+        case Timed(t, ptn: ProvenanceTagNode) =>
+
+          val (irPtn, remap, flowObjectEdge, subjectEdge, prevTagIdEdge, tagIdsEgdes) = ERRules.resolveProvenanceTagNode(ptn)
+
           Stream.concat(
-            Some(Right(irSubject)),
+            Some(Right(irPtn)),
+            flowObjectEdge.map(Left(_)),
+            Some(Left(subjectEdge)),
+            prevTagIdEdge.map(Left(_)),
+            tagIdsEgdes.map(Left(_))
+          ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+
+        case Timed(t, p: Principal) =>
+
+          val (irP, remap) = resolvePrincipal(p)
+
+          Stream(Right(irP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+
+        case Timed(t, s: SrcSinkObject) =>
+
+          val (sP, remap) = resolveSrcSink(s)
+
+          Stream(Right(sP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+
+        case Timed(t, n: NetFlowObject) =>
+
+          val (nP, remap) = resolveNetflow(n)
+
+          Stream(Right(nP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+
+        case Timed(t, fo: FileObject) =>
+
+          val (irFileObject, remap, localPrincipalOpt, path) = resolveFileObject(fo)
+
+          Stream.concat(
+            Some(Right(irFileObject)),
             extractPathsAndEdges(path),
-            Some(Left(localPrincipal)),
-            parentSubjectOpt.map(Left(_))
+            localPrincipalOpt.map(Left(_))
           ).map(elem => (uuidRemapper ? remap).map(_ => elem))
 
-        // Merge the Subject (it was a UNIT)
-        case Right((path, remap)) =>
+
+        case Timed(t, rk: RegistryKeyObject) =>
+          val (irFileObject, remap, path) = resolveRegistryKeyObject(rk)
+
           Stream.concat(
-            extractPathsAndEdges(path)
+            Some(Right(irFileObject)),
+            extractPathsAndEdges(Some(path))
           ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+
+
+        case _ => Nil
       }
-    }
-
-  def otherResolution(uuidRemapper: ActorRef)(implicit timeout: Timeout, ec: ExecutionContext): Flow[CDM, Future[Either[Edge[_, _], ADM]], _] = {
-
-    Flow[CDM].mapConcat[Future[Either[Edge[_, _], ADM]]] {
-      case ptn: ProvenanceTagNode =>
-
-        val (irPtn, remap, flowObjectEdge, subjectEdge, prevTagIdEdge, tagIdsEgdes) = ERRules.resolveProvenanceTagNode(ptn)
-
-        Stream.concat(
-          Some(Right(irPtn)),
-          flowObjectEdge.map(Left(_)),
-          Some(Left(subjectEdge)),
-          prevTagIdEdge.map(Left(_)),
-          tagIdsEgdes.map(Left(_))
-        ).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case p: Principal =>
-
-        val (irP, remap) = resolvePrincipal(p)
-
-        Stream(Right(irP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case s: SrcSinkObject =>
-
-        val (sP, remap) = resolveSrcSink(s)
-
-        Stream(Right(sP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case n: NetFlowObject =>
-
-        val (nP, remap) = resolveNetflow(n)
-
-        Stream(Right(nP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case fo: FileObject =>
-
-        val (irFileObject, remap, localPrincipalOpt, path) = resolveFileObject(fo)
-
-        Stream.concat(
-          Some(Right(irFileObject)),
-          extractPathsAndEdges(path),
-          localPrincipalOpt.map(Left(_))
-        ).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case rk: RegistryKeyObject =>
-        val (irFileObject, remap, path) = resolveRegistryKeyObject(rk)
-
-        Stream.concat(
-          Some(Right(irFileObject)),
-          extractPathsAndEdges(Some(path))
-        ).map(elem => (uuidRemapper ? remap).map(_ => elem))
-
-
-      case _ => Nil
     }
   }
 }
