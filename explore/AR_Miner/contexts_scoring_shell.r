@@ -29,7 +29,6 @@ cat('\n ############### Association Rule Mining ######################## \n')
   ObjectOfAttributes=returns_args$ObjectOfAttributes
    
    ContextFileRCF=rcf_context_file
-
     cat('\n ################## sup \n',MinSup)
     cat('\n ############### conf \n',MinConf)
      ##-----------------------------------------LESS DETAILS OF RULES
