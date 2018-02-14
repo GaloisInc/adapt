@@ -1,0 +1,22 @@
+# Database file name:              /home/terminator2/Documents/R_Projects/AnomalyRulesMining/coron-0.8/../shifted.basenum
+# Database file size:              21,716 bytes
+# Number of lines:                 1,965
+# Total number of attributes:      17
+# Number of non empty attributes:  17
+# Number of attributes in average: 4.58
+# Density:                         26.96%
+# min_supp:                        983, i.e. 50.03%
+# Chosen algorithm:                Charm (v4) [triangular matrix; hash for FCIs]
+
+{1, 6, 7, 13, 14} (1248) +
+{1, 6, 14} (1249) +
+{1, 6, 7, 13} (1254) +
+{1, 6, 13} (1259) +
+{13} (1261) +
+{1, 6, 7} (1280) +
+{6, 7} (1293) +
+{1, 6} (1548) +
+{6} (1584) +
+{1} (1588) +
+
+# FCIs: 10

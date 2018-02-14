@@ -92,6 +92,14 @@ def writeCxtFile(objects,attributes,context,cxtfile):
 	else:
 		with open(cxtfile,'w') as f:
 			f.write(filecontent)
+			
+def writeContextCSVFile(objects,attributes,context,cxtcsvfile):
+	#print(type(objects[0]))
+	#print(type(attributes[0]))
+	#print(type(context[0]))
+	filecontent=','.join([' ']+attributes)+'\n'+'\n'.join([objects[i]+','+','.join(list(context[i])) for i in range(len(objects))])
+	with open(cxtcsvfile,'w') as f:
+		f.write(filecontent)
 		
 def writeFimiFile(context,fimifile):
 	filecontent='\n'.join([' '.join([str(i) for i in v[1]]) for v in context])
@@ -109,8 +117,12 @@ def convertDict2File(dictionary,filename):
 	if extension=='fimi':
 		precontext=[(k,sorted([attributes.index(e) for e in dictionary[k]])) for k in dictionary.keys()]
 		writeFimiFile(precontext,filename)
+	elif extension=='csv':
+		precontext=[(k,[attributes.index(e) for e in v]) for k,v in dictionary.items()]
+		objects,fullcontext=zip(*[(c[0],''.join(['1' if i in c[1] else '0' for i in range(len(attributes))])) for c in precontext])
+		writeContextCSVFile(objects,attributes,fullcontext,filename)
 	else:
-		precontext=[(k,[attributes.index(e) for e in v]) for k,v in dic.items()]
+		precontext=[(k,[attributes.index(e) for e in v]) for k,v in dictionary.items()]
 		objects,fullcontext=zip(*[(c[0],''.join(['X' if i in c[1] else '.' for i in range(len(attributes))])) for c in precontext])
 		writeCxtFile(objects,attributes,fullcontext,filename)
 			
@@ -127,15 +139,18 @@ def getFimiFromCSVSpec(specfile):
 	return fimifile
 		  
         
-def getQueryResFromSpecFile(specfile):
+def getQueryResFromSpecFile(specfile,port=''):
 	#loads a json specification file (defining a query) and returns the results (in json format) of the query definined in the specification file 
 	#as well as the types of objects and attributes
 	spec=loadSpec(specfile,csv_flag=False)
 	query=spec['query']
 	obj_name=spec['objects']
-	att_name=spec['attributes']
-	port=(int(spec['port']) if 'port' in spec.keys() else 8080)
-	query_res=getQuery(query,port)
+	att_name=(spec['attributes'].strip() if ',' not in spec['attributes'] else [s.strip() for s in spec['attributes'].split(',')])
+	if port=='':
+		port_val=(int(spec['port']) if 'port' in spec.keys() else 8080)
+	else:
+		port_val=port
+	query_res=getQuery(query,port_val)
 	return query_res,obj_name,att_name
 	
 	
@@ -155,8 +170,14 @@ def getQueryResFromJsons(specfile,resfile):
 
 def convertQueryRes2Dict(json,obj_name,att_name):
 	dic = collections.defaultdict(list)
-	for e in json:
-		dic[e[obj_name]].append(e[att_name])
+	if type(att_name)==str:
+		for e in json:
+			dic[e[obj_name]].append(e[att_name])
+	elif type(att_name)==list:
+		for e in json:
+			dic[e[obj_name]].extend([str(e[a]) for a in att_name])
+	#for e in json:
+		#dic[e[obj_name]].append(e[att_name])
 	return dic
         
 def convertQueryRes2File(json,obj_name,att_name,filename):
@@ -164,9 +185,9 @@ def convertQueryRes2File(json,obj_name,att_name,filename):
 	dic=convertQueryRes2Dict(json,obj_name,att_name)
 	convertDict2File(dic,filename)
 			
-def convertSpec2File(specfile,outputfile,csv_flag=False):
+def convertSpec2File(specfile,outputfile,csv_flag=False,port=''):
 	if csv_flag==False:
-		query_res,obj_name,att_name=getQueryResFromSpecFile(specfile)
+		query_res,obj_name,att_name=getQueryResFromSpecFile(specfile,port)
 		convertQueryRes2File(query_res,obj_name,att_name,outputfile)
 	else:
 		convertCSVRes(specfile,outputfile)

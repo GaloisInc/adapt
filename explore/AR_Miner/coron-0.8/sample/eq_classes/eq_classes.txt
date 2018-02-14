@@ -1,0 +1,23 @@
+# Database file name:              /home/jabba/eclipse2/releases/coron-v1-20090917/sample/laszlo.rcf
+# Database file size:              208 bytes
+# Number of lines:                 5
+# Total number of attributes:      5
+# Number of non empty attributes:  5
+# Number of attributes in average: 3.4
+# Density:                         68%
+# min_supp:                        1, i.e. 20%
+# Chosen algorithm:                Touch (v1) [Charm + Talky-G + association]
+
+{a, b, d, e} (1) +; [{d}]
+{a, b, c, e} (2) +; [{a, b, c}, {a, c, e}]
+{a, b, e} (3) +; [{a, b}, {a, e}]
+{a, c} (3) +; [{a, c}]
+{a} (4) +; [{a}]
+{b, c, e} (3) +; [{b, c}, {c, e}]
+{b, e} (4) +; [{b}, {e}]
+{c} (4) +; [{c}]
+
+# FGs:  12
+# Frequent equivalence classes (FCIs):  8
+# Simple frequent equivalence classes:  3
+# Complex frequent equivalence classes: 5

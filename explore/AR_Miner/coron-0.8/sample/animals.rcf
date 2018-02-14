@@ -1,0 +1,16 @@
+# animals
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+ostrich | canary | duck | shark | salmon | frog | crocodile
+egg | feather | tooth | fly | swim | air
+1 1 0 0 0 1
+1 1 0 1 0 1
+1 1 0 1 1 1
+1 0 1 0 1 0
+1 0 0 0 1 0
+1 0 0 0 1 1
+1 0 1 0 1 1
+[END Relational Context]

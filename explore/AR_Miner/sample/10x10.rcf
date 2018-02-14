@@ -1,0 +1,24 @@
+# a bit larger test dataset
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+o_1 | o_2 | o_3 | o_4 | o_5 | o_6 | o_7 | o_8 | o_9 | o_10 | o_11 | o_12 | o_13 | o_14 | o_15 | 
+a | b | c | d | e | f | g | h | i | j | 
+1 0 1 0 0 1 1 1 1 1 
+1 0 1 0 1 1 0 1 0 0 
+1 0 0 1 0 0 1 0 0 0 
+1 0 1 0 0 1 1 1 0 1 
+1 1 0 0 1 0 0 1 1 0 
+0 1 1 0 0 1 0 1 0 1 
+0 0 0 1 1 0 1 1 1 0 
+1 0 0 0 1 0 1 0 0 1 
+0 0 1 0 1 0 1 0 1 0 
+0 1 0 0 0 0 1 1 0 0 
+1 0 0 1 0 1 0 1 1 1 
+0 1 1 0 1 0 0 0 0 0 
+0 0 0 1 1 0 0 1 0 0 
+0 0 1 0 0 0 1 1 1 1 
+0 1 0 1 0 1 0 0 0 1 
+[END Relational Context]

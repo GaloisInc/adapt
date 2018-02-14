@@ -1,0 +1,10 @@
+# Input dataset: /home/terminator2/Documents/R_Projects/AnomalyRulesMining/coron-0.8/shiftedContext.basenum
+# Output format: .rcf
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+
+
+[END Relational Context]

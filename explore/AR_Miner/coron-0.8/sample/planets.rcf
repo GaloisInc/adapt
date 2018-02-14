@@ -1,0 +1,22 @@
+# planets of the solar system
+# Attributes:
+#    size - small, medium, large
+#    distance from sun - near, far
+#    moon - yes, no
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+Mercury | Venus | Earth | Mars | Jupiter | Saturn | Uranus | Neptune | Pluto
+size_s | size_m | size_l | dist_n | dist_f | moon_y | moon_n
+1 0 0 1 0 0 1
+1 0 0 1 0 0 1
+1 0 0 1 0 1 0
+1 0 0 1 0 1 0
+0 0 1 0 1 1 0
+0 0 1 0 1 1 0
+0 1 0 0 1 1 0
+0 1 0 0 1 1 0
+1 0 0 0 1 1 0
+[END Relational Context]

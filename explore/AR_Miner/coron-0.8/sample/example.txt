@@ -1,0 +1,7 @@
+{ANP_7ValVal} => {Hypertension}
+{ADRB3_64TrpTrp} => {Hypertension}
+{ANP_8Val, ENaCa_493TrpTrp} => {Hypertension, Something}
+{Hypertension, FCER1B_237GluGlu} => {LPL_9AspAsp}
+{Hypertension, CCR3_39ProPro, LPL-93TT, LPL_291AsnAsn} => {LPL_9AspAsp}
+{Hypertension, LPL-93TT} => {LPL_9AspAsp}
+{Hypertension} => {Something_1, Something_2}

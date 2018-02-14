@@ -1,0 +1,25 @@
+# Number of lines:                 8
+# Number of columns:               8
+# Context size:                    8 x 8 = 64 elements
+# Minimal number of elements/line: 1 (12.50%)
+# Maximal number of elements/line: 8
+# Minimal (current) density:       32 (50.00%)
+# Maximal density:                 100.00%
+# Output format:                   .rcf
+# Output file:                     /tmp/4jen_1.rcf
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+o1 | o2 | o3 | o4 | o5 | o6 | o7 | o8
+a | b | c | d | e | f | g | h
+1 1 1 1 1 1 0 1 
+1 1 1 0 1 1 0 0 
+1 1 0 1 0 0 0 1 
+0 0 0 0 1 1 0 0 
+1 0 1 0 1 1 1 0 
+1 0 0 1 1 0 0 1 
+0 0 0 0 0 1 1 0 
+0 0 1 1 0 0 0 1 
+[END Relational Context]
