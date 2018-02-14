@@ -52,7 +52,7 @@ object EntityResolution {
 
     Flow[CDM]
       .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue), EndMarker(-1,Map()))))
-      .map(endHack(_))
+      .map(endHack)
       .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
       .via(remapEdgeUuids(uuidRemapper))

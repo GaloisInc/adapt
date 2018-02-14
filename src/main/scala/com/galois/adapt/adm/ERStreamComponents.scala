@@ -64,7 +64,7 @@ object ERStreamComponents {
 
             for (keyToExpire <- keysToExpire) {
               val EventMergeState(wipAdmEvent, lastCdmUuid, remaps, dependent, _) = activeChains.remove(keyToExpire).get
-              val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid)
+              val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid, Some(currentTime))
               val rs = Future.sequence((final_remap :: remaps).map(r => uuidRemapper ? r))
               val toReturn = Stream.concat(
                 Some(Right(wipAdmEvent)),
@@ -109,7 +109,7 @@ object ERStreamComponents {
 
                     val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(e)
 
-                    val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid)
+                    val final_remap = UuidRemapper.PutCdm2Adm(lastCdmUuid, wipAdmEvent.uuid, Some(currentTime))
                     val rs = Future.sequence((final_remap :: remaps).map(r => uuidRemapper ? r))
                     val toReturn = Stream.concat(                            // Emit the old WIP
                       Some(Right(wipAdmEvent)),
@@ -183,18 +183,20 @@ object ERStreamComponents {
 
               // Don't merge the Subject (it isn't a UNIT)
               case Left((irSubject, remap, localPrincipal, parentSubjectOpt, path)) =>
+                val remapTimed = remap.copy(time = Some(t))
                 Stream.concat(
                   Some(Right(irSubject)),
                   extractPathsAndEdges(path),
                   Some(Left(localPrincipal)),
                   parentSubjectOpt.map(Left(_))
-                ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+                ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
               // Merge the Subject (it was a UNIT)
               case Right((path, remap)) =>
+                val remapTimed = remap.copy(time = Some(t))
                 Stream.concat(
                   extractPathsAndEdges(path)
-                ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+                ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
             }
 
           case _ => Stream.empty
@@ -209,6 +211,7 @@ object ERStreamComponents {
         case Timed(t, ptn: ProvenanceTagNode) =>
 
           val (irPtn, remap, flowObjectEdge, subjectEdge, prevTagIdEdge, tagIdsEgdes) = ERRules.resolveProvenanceTagNode(ptn)
+          val remapTimed = remap.copy(time = Some(t))
 
           Stream.concat(
             Some(Right(irPtn)),
@@ -216,48 +219,53 @@ object ERStreamComponents {
             Some(Left(subjectEdge)),
             prevTagIdEdge.map(Left(_)),
             tagIdsEgdes.map(Left(_))
-          ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, p: Principal) =>
 
           val (irP, remap) = resolvePrincipal(p)
+          val remapTimed = remap.copy(time = Some(t))
 
-          Stream(Right(irP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          Stream(Right(irP)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, s: SrcSinkObject) =>
 
           val (sP, remap) = resolveSrcSink(s)
+          val remapTimed = remap.copy(time = Some(t))
 
-          Stream(Right(sP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          Stream(Right(sP)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, n: NetFlowObject) =>
 
           val (nP, remap) = resolveNetflow(n)
+          val remapTimed = remap.copy(time = Some(t))
 
-          Stream(Right(nP)).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          Stream(Right(nP)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, fo: FileObject) =>
 
           val (irFileObject, remap, localPrincipalOpt, path) = resolveFileObject(fo)
+          val remapTimed = remap.copy(time = Some(t))
 
           Stream.concat(
             Some(Right(irFileObject)),
             extractPathsAndEdges(path),
             localPrincipalOpt.map(Left(_))
-          ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, rk: RegistryKeyObject) =>
           val (irFileObject, remap, path) = resolveRegistryKeyObject(rk)
+          val remapTimed = remap.copy(time = Some(t))
 
           Stream.concat(
             Some(Right(irFileObject)),
             extractPathsAndEdges(Some(path))
-          ).map(elem => (uuidRemapper ? remap).map(_ => elem))
+          ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case _ => Nil
