@@ -27,7 +27,7 @@ library("tm")
 library("SnowballC")
 library("wordcloud")
 library("RColorBrewer")
-
+   
 
 Listviews=c("ProcessEvent",
             "ProcessEventExec",
@@ -46,9 +46,13 @@ Score_Simple_Processing=FALSE
 CREATE_RCF_WITH_PYTHON=FALSE
 options(max.print=10000000)
 
+cat('\n ############### Association Rule Mining ######################## \n')
 for (k in 1:length(Listviews)){
-  cat('\n ####################################### \n')
-  cat("\n processing view \n", as.character(Listviews[k]))  
+  
+  cat("\n processing view 1: ", as.character(Listviews[k]))  
+                              }  ## for views
+
+
   currentview=as.character(Listviews[k])
   JsonSpecFile =paste0('./contextSpecFiles/neo4jspec_',currentview,'.json',sep="")
   rcf_context_file=paste0(myWorkingDirectory,"/contexts/Context_",currentview,".rcf",sep="")
@@ -553,5 +557,4 @@ for (k in 1:length(Listviews)){
                         keysize = 1.5, margins=c(5, 5)))
   dev.off()
   
-} ## for views
 

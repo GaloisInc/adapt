@@ -13,5 +13,5 @@ if [ $AUTO_MEM = "1" ]; then
       *                      )   JAVA_MAX_HEAP_SIZE=16384m;;
    esac
 else
-   JAVA_MAX_HEAP_SIZE=16384m
+   JAVA_MAX_HEAP_SIZE=8192m
 fi

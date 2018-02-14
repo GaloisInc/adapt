@@ -1,6 +1,6 @@
 
 args <- commandArgs()
-#print(args)
+print(args)
 A <- read.csv(args[6])
 B<- read.csv(args[7])
  
