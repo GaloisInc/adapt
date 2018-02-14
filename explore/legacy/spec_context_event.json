@@ -1,7 +1,0 @@
-{"context specification":{
-"query":"g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').in().hasLabel('Event').as('y').values('eventType').as('type').select('pid','type').dedup()",
-"objects":"pid",
-"attributes":"type"
-
-}
-}
