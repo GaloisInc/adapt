@@ -299,11 +299,12 @@ package object adm {
     )
   }
 
-  // TODO: consider emitting this on timeout
+  // TODO: make this deterministic
   final case class AdmSynthesized(
-    uuid: AdmUUID,
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)))
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,

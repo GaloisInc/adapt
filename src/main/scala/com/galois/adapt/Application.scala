@@ -28,6 +28,7 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker}
+import org.reactivestreams.Publisher
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -72,7 +73,28 @@ object Application extends App {
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-  val uuidRemapper: ActorRef = system.actorOf(Props[UuidRemapper], name = "uuidRemapper")
+
+  // Akka-streams makes this _way_ more difficult than I feel it ought to be, but here it is:
+  //
+  //   * an actor ref to which you send messages of type `ADM`
+  //   * a source where those `ADM` magically appear
+  //
+  // To make the source complete, we have to send the actor a `akka.actor.Status.Success(())`.
+  val (synActor: ActorRef, synSource: Source[ADM, _]) = {
+
+    // If we support fanout, we would have to buffer everything sent to the sink, forever. Thankfully, the odds of
+    // someone making another source from this publisher are low since the publisher's scope is limited to this block.
+    val fanOut: Boolean = false
+    val sink: Sink[ADM, Publisher[ADM]] = Sink.asPublisher[ADM](fanOut)
+
+    val (ref, synPublisher) = Source.actorRef(Int.MaxValue, OverflowStrategy.fail).toMat(sink)(Keep.both).run()
+    val source: Source[ADM, _] = Source.fromPublisher(synPublisher)
+
+    (ref, source)
+  }
+
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor), name = "uuidRemapper")
+
 
   val ta1 = config.getString("adapt.env.ta1")
 
@@ -97,8 +119,9 @@ object Application extends App {
       val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
         val broadcast = b.add(Broadcast[CDM18](1))
-        broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
-     //   broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
+
+        broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+     //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
         SinkShape(broadcast.in)
       })
 
@@ -117,12 +140,14 @@ object Application extends App {
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
         case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> EntityResolution(uuidRemapper).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
+        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[CDM18](2))
-          broadcast.out(0) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast.out(1) ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+
+          broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> EntityResolution(uuidRemapper, synSource) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+
           SinkShape(broadcast.in)
         })
       }
@@ -174,7 +199,7 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[Any](9))
 
-            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper))
+            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource))
               .via(FlowComponents.printCounter("DB Writer", 1000))
               .via(Flow.fromFunction {
                 case Left(e) => e
@@ -262,9 +287,10 @@ object Application extends App {
         import GraphDSL.Implicits._
         val bcast = graph.add(Broadcast[CDM18](2))
 
-        CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Combined", 1000)) ~> bcast.in
-        bcast.out(0) ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-        bcast.out(1) ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
+        CDMSource.cdm18(ta1) ~> FlowComponents.printCounter[CDM18]("Combined", 1000) ~> bcast
+
+        bcast ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
+        bcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
 
         ClosedShape
       }).run()
