@@ -1,7 +1,0 @@
-{"context specification":{
-"query":"g.V().hasLabel('Subject').has('subjectType','SUBJECT_PROCESS').as('x').values('cid').as('pid').select('x').both().hasLabel('Event').both().hasLabel('NetFlowObject').values('remoteAddress').as('dest').select('pid','dest').dedup()",
-"objects":"pid",
-"attributes":"dest"
-
-}
-}
