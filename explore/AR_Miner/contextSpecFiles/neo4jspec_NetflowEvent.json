@@ -1,6 +1,0 @@
-{"context specification":{
-"query":"g.V().hasLabel('AdmNetflowObject').as('ad').values('remoteAddress').as('ip').select('ad').in('predicateObject','predicateObject2').hasLabel('AdmEvent').as('y').values('eventType').as('type').select('ip','type').dedup()",
-"objects":"ip",
-"attributes":"type"
-}
-}

@@ -1,6 +1,0 @@
-{"context specification":{
-"query":"g.V().has('eventType').as('y').values('eventType').as('type').select('y').out().has('subjectType').as('x').values('cid').as('pid').select('x').out().has('path').values('path').as('filepath').select('filepath','pid','type').dedup()",
-"objects":"filepath",
-"attributes":"type"
-}
-}
