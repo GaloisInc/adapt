@@ -1,10 +1,11 @@
 #!/bin/bash
+echo '\n ;;;;;;;;;;;;;;;;;;;;;;; \n'
 
 if [ -d jar ]; then
    PRE='./'    # release version
    DEV=0
 else
-   PRE='../'   # development version
+   PRE='./'   # development version
    DEV=1
 fi
 
@@ -18,8 +19,20 @@ DEBUG=0
 
 # You can add your machine(s) to the script below
 # if you want to allow Java to use more RAM.
-source ${PRE}common/assets/machines.sh
-
+if [ $AUTO_MEM = "1" ]; then
+   case "$HOSTNAME" in
+      "BARRACUDA"            )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "coutures"             )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "debrecen"             )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "hagrid.loria.fr"      )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "hoth"                 )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "kraken"	    	        )   JAVA_MAX_HEAP_SIZE=16384m;;
+      "servbioinfo.loria.fr" )   JAVA_MAX_HEAP_SIZE=16384m;;
+      *                      )   JAVA_MAX_HEAP_SIZE=16384m;;
+   esac
+else
+   JAVA_MAX_HEAP_SIZE=8192m
+fi
 #############################################################################
 ## OK, you can stop here
 #############################################################################

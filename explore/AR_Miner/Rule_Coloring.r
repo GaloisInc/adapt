@@ -1,4 +1,4 @@
-Rule_Coloring=function(RulesFile,List_Attributes,ViolatorObjectList,AVGScoresOfObjectsConfidence){
+ Rule_Coloring=function(RulesFile,List_Attributes,ViolatorObjectList,AVGScoresOfObjectsConfidence){
   Rules_File=file(RulesFile,"r")
     fileColor=file("./sample/coloring/rulz.col","w")
   #cmd="./post02_ruleColoring.sh sample/coloring/rulz.txt sample/coloring/rulz.col >/tmp/rulz.html"
