@@ -281,24 +281,10 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
 
   override def receive: PartialFunction[Any,Unit] = super.receive orElse {
 
-    // Cypher queries are only supported by Neo4j
-    case CypherQuery(q, shouldParse) =>
+    // Cypher queries are only supported by Neo4j, and they are always streaming
+    case CypherQuery(q) =>
       println(s"Received Cypher query: $q")
-      sender() ! Future {
-        Try {
-          val results = neoGraph.execute(q)
-          if (shouldParse) {
-            DBQueryProxyActor.toJson(results.asScala.toList)
-          } else {
-            val stringResult = results.resultAsString()
-            JsString(
-              stringResult
-                .map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""")
-                .mkString("[", ",", "]")
-            )
-          }
-        }
-      }
+      sender() ! Future { Try { neoGraph.execute(q).asScala.map(DBQueryProxyActor.toJson) } }
   }
 }
 
