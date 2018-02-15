@@ -35,8 +35,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
     cat('\n ----> Calculating Rules \n')
      SoftAssRulescmd=paste0("./coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
      cat(SoftAssRulescmd)
-      SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
-     
+    SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
     CoronOutPut=as.list(SoftAssRulesresult)
     CoronOutPut=lapply(CoronOutPut,function(x)x[!is.na(x)])
     CoronOutPut=lapply(CoronOutPut,function(x)x[!x==""])
