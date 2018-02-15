@@ -3,11 +3,10 @@ package com.galois.adapt.adm
 import java.io.{File, FileWriter}
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
-import com.galois.adapt.Application.synActor
+import akka.pattern.ask
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.concurrent.Future
 
 // This object contains all of the types of messages the 'UuidRemapper' actor is ever expected to encounter/send.
 object UuidRemapper {
@@ -37,7 +36,7 @@ object UuidRemapper {
   case object ExpireEverything
 }
 
-class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
+class UuidRemapper(synActor: ActorRef, expiryTime: Long) extends Actor with ActorLogging {
 
   import UuidRemapper._
 
@@ -47,6 +46,32 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
   private val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
+
+  // Keep track of current time art the tip of the stream, along with things that will expire
+  var currentTime: Long = 0
+  var expiryTimes: Fridge[CdmUUID] = Fridge.empty
+
+  // Expire old UUIDs based on the current time
+  private def updateTimeAndExpireOldUuids(time: Long): Unit = {
+
+    // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several "tip
+    // of the streams".
+    if (time <= currentTime) return
+    currentTime = time
+
+    while (expiryTimes.peekFirstToExpire.exists { case (_,t) => t <= currentTime }) {
+      val (keysToExpire, _) = expiryTimes.popFirstToExpire().get
+
+      for (cdmUuid <- keysToExpire) {
+        for ((interested, originalCdmUuids) <- blocking.get(cdmUuid)) {
+          val synthesizedAdm = AdmSynthesized(originalCdmUuids.toList) // TODO: track CdmUuids remapping to this, then make this deterministic
+          synActor ! synthesizedAdm
+          self ! PutCdm2Adm(cdmUuid, synthesizedAdm.uuid)
+          println(s"Expired ${synthesizedAdm.uuid}")
+        }
+      }
+    }
+  }
 
   // Apply as many CDM remaps as possible
   @tailrec
@@ -59,13 +84,19 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
 
   // Apply as many CDM remaps as possible, then try to apply an ADM remap. If that succeeds, notify all the 'interested'
   // actors. Otherwise, add the 'interested' actors back into the blocked map under the final CDM we had advanced to.
-  private def advanceAndNotify(keyCdm: CdmUUID, interested: List[ActorRef], prevOriginals: Set[CdmUUID]): Unit = {
+  private def advanceAndNotify(keyCdm: CdmUUID, previous: (List[ActorRef], Set[CdmUUID])): Unit = {
+    val (interested: List[ActorRef], prevOriginals: Set[CdmUUID]) = previous
     val (advancedCdm: CdmUUID, originals: Set[CdmUUID]) = advanceCdm(keyCdm, prevOriginals)
 
     cdm2adm.get(advancedCdm) match {
       case None =>
         val (prevInterested, prevOriginals1: Set[CdmUUID]) = blocking.getOrElse(advancedCdm, (Nil, Set.empty[CdmUUID]))
         blocking(advancedCdm) = (interested ++ prevInterested, originals | prevOriginals1 | Set(advancedCdm))
+
+        // Set an expiry time, but only if there isn't one already
+        if (!(expiryTimes.keySet contains advancedCdm)) {
+          expiryTimes.updateExpiryTime(advancedCdm, currentTime + expiryTime)
+        }
       case Some(adm) => interested.foreach(actor => actor ! ResultOfGetCdm2Adm(adm))
     }
   }
@@ -74,22 +105,42 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
   override def receive: Receive = {
 
     // Put ADM information
-    case PutCdm2Adm(source, target, _) =>
+    case PutCdm2Adm(source, target, time) =>
+      time.foreach(updateTimeAndExpireOldUuids)
+
+      // Yell loudly if we are about to overwrite something
+      assert(!(cdm2adm contains source) || cdm2adm(source) == target,
+        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}"
+      )
+      assert(!(cdm2cdm contains source),
+        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}"
+      )
+
       cdm2adm(source) = target
-      val (interested, original) = blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID]))
-      advanceAndNotify(source, interested, original)
+      advanceAndNotify(source, blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
       sender() ! PutConfirm
 
     // Put CDM information
-    case PutCdm2Cdm(source, target, _) =>
+    case PutCdm2Cdm(source, target, time) =>
+      time.foreach(updateTimeAndExpireOldUuids)
+
+      // Yell loudly if we are about to overwrite something
+      assert(!(cdm2adm contains source),
+        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}"
+      )
+      assert(!(cdm2cdm contains source) || cdm2cdm(source) == target,
+        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}"
+      )
+
       cdm2cdm(source) = target
-      val (interested, original) = blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID]))
-      advanceAndNotify(source, interested, original)
+      advanceAndNotify(source, blocking.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
       sender() ! PutConfirm
 
     // Retrieve information
-    case GetCdm2Adm(keyCdm, _) =>
-      advanceAndNotify(keyCdm, List(sender()), Set.empty)
+    case GetCdm2Adm(keyCdm, time) =>
+      time.foreach(updateTimeAndExpireOldUuids)
+
+      advanceAndNotify(keyCdm, (List(sender()), Set.empty))
 
 
     // Debug information
@@ -135,6 +186,8 @@ class UuidRemapper(synActor: ActorRef) extends Actor with ActorLogging {
         println(s"Expired ${synthesizedAdm.uuid}")
       }
       synActor ! akka.actor.Status.Success(()) // Terminate synthesizing stream
+
+    case PutConfirm => ;
 
     case msg => log.error("UuidRemapper: received an unexpected message: {}", msg)
   }

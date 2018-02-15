@@ -88,7 +88,6 @@ object Application extends App {
   //
   // To make the source complete, we have to send the actor a `akka.actor.Status.Success(())`.
   val (synActor: ActorRef, synSource: Source[ADM, _]) = {
-
     // If we support fanout, we would have to buffer everything sent to the sink, forever. Thankfully, the odds of
     // someone making another source from this publisher are low since the publisher's scope is limited to this block.
     val fanOut: Boolean = false
@@ -100,7 +99,7 @@ object Application extends App {
     (ref, source)
   }
 
-  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor), name = "uuidRemapper")
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos), name = "uuidRemapper")
 
 
   val ta1 = config.getString("adapt.env.ta1")
