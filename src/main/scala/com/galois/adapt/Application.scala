@@ -51,7 +51,14 @@ object Application extends App {
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
 
-  implicit val materializer = ActorMaterializer()
+  val quitOnError = config.getBoolean("adapt.runtime.quitonerror")
+  val streamErrorStrategy: Supervision.Decider = {
+    case e: Throwable =>
+      e.printStackTrace()
+      if (quitOnError) Runtime.getRuntime.halt(1)
+      Supervision.Resume
+  }
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
   implicit val executionContext = system.dispatcher
 //    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
 //    dbFile.delete()
