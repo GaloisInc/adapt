@@ -1,6 +1,6 @@
 # Adapt Project
 
-## Prerequistites
+## Prerequisites
 We have used R cran version 3.4.3 to write the scripts in the repository. 
 It is necessary to install some packages before executing the scripts. They are detailed in *chek_packages.r*.
 For example, to install a package from R, we do:
