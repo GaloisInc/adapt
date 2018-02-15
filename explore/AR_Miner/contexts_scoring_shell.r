@@ -33,7 +33,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
     cat('\n ############### conf \n',MinConf)
      ##-----------------------------------------LESS DETAILS OF RULES
     cat('\n ----> Calculating Rules \n')
-     SoftAssRulescmd=paste0(getwd(),"/coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
+     SoftAssRulescmd=paste0("./coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
      cat(SoftAssRulescmd)
       SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
      
