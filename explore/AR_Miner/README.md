@@ -20,7 +20,7 @@ We can do the same process under un R environment:
 
 *R prompt> get_query("JsonSpecFile"","rcf_context_file","csv_file"")*
 
-![Exxample of csv context](./tmp/context.jpeg)
+![Exxample of csv context](./img/context.jpeg)
 
 In this first step, many other sub-modules are also available:
 
@@ -49,9 +49,9 @@ Example:
 
 *$> ./Context_scoring_From_CSV.sh*: is actually the second main shell that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* string, a produced *csv context file*, an *rcf file*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
 
-![Exxample of scoring output](./tmp/rank.jpeg)
+![Exxample of scoring output](./img/rank.jpeg)
 
-![Exxample of ranking the scores](./tmp/rank2.jpeg)
+![Exxample of ranking the scores](./img/rank2.jpeg)
 
  
  ### Data Visualisation:
@@ -59,4 +59,4 @@ Example:
  *Rule_coloring.r* (unedr progress): generates an HTML file for coloring the rules, and a word cloud of the objects that violate rules, regarding their score.
  
 
-![Exxample of object scores cloud](./tmp/cloud.jpeg)
+![Exxample of object scores cloud](./img/cloud.jpeg)

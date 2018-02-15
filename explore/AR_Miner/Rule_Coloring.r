@@ -1,6 +1,6 @@
  Rule_Coloring=function(RulesFile,List_Attributes,ViolatorObjectList,AVGScoresOfObjectsConfidence){
   Rules_File=file(RulesFile,"r")
-    fileColor=file("./sample/coloring/rulz.col","w")
+    fileColor=file("./coron-0.8/sample/coloring/rulz.col","w")
   #cmd="./post02_ruleColoring.sh sample/coloring/rulz.txt sample/coloring/rulz.col >/tmp/rulz.html"
   #paste0("./contexts/AssociationRulesOnly_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep="")
    # Rules_File=capture.output(SoftAssRulesresult,file=paste0("./contexts/AssociationRulesOnly_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
@@ -14,9 +14,9 @@
   }
   close(fileColor) 
   
-  cmd= paste0(getwd(),"/coron-0.8/post02_ruleColoring.sh ",RulesFile," ./sample/coloring/rulz.col  > ./tmp/rulz.html")
+  cmd= paste0(getwd(),"/coron-0.8/post02_ruleColoring.sh ",RulesFile," ./coron-0.8/sample/coloring/rulz.col  > ./test/coloring_output/rulz.html")
   try(system(cmd, intern = TRUE,  wait = TRUE))  
-  cat("\n RULES HTML FILE GENERATED, PLEASE OPEN  ./tmp/rulz.html \n")
+  cat("\n RULES HTML FILE GENERATED, PLEASE OPEN  ./test/coloring_output/rulz.html \n")
   
   
   set.seed(1234)
