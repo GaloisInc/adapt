@@ -1,0 +1,79 @@
+Coron Software License Agreement
+
+This legal agreement applies to the "Coron Data Mining Platform"
+(shortly "Coron"), version 0.8 of January 2010 ("the Software").
+
+The Software has been designed and implemented by the following
+persons ("the Authors"):
+   * Laszlo SZATHMARY  (INRIA; University Nancy 1)
+   * Mehdi KAYTOUE     (University Nancy 1)
+   * Florent MARCUOLA  (INRA)
+   * Amedeo NAPOLI     (CNRS)
+
+INRIA, University Nancy 1, and CNRS ("the Owners") hold all the
+ownership rights of the Software. The Software has been registered 
+at the Agence pour la Protection des Programmes (APP), under the
+reference IDDN.FR.001.420045.000.S.P.2007.000.10000 . 
+
+The Software is only available in binary form unless a license for
+the source code is bought. You also agree not to reverse engineer,
+decompile, disassemble or otherwise attempt to discover the source
+code of the Software.
+
+The Software is available for use, free of charge, for educational
+and scientific, non-commercial purposes. If the Software, or any of
+its generated results is used in scientific publications, we request
+that one or more relevant publications of the development team be 
+cited (see http://coron.wikidot.com/ for a complete list). The Coron 
+development team welcomes collaborations.
+
+Integration of the Software in other software products is permitted
+provided that the following conditions are met:
+(1) It should be for non-commercial research purposes.
+(2) A permission is granted from the Authors of the Software.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+In summary, feel free to use this software if it's not for any commercial
+purpose.
+
+The Software includes the following modules:
+   * Core Modules
+     - Coron-base
+     - AssRuleX
+     - LeCo
+   * Pre-Processing
+     - Transformer
+     - Converter
+     - Filter-DB
+     - Filter-Compl
+     - Context-Merger
+     - Negator
+     - PosAndNegContext
+     - Basenum2IBM
+     - Transposer
+   * Post-Processing
+     - Filter-Rules
+     - Rule-Coloring
+   * Tools
+     - VizEq
+     - ContextGen
+     - Leco2Jena
+     - JavaXmxTest
+     - AnalyseEqClasses
+     - ShiftContext
+
+If you have any questions, please consult
+the official home page at http://coron.loria.fr .
+The documentation site with a forum is
+available at http://coron.wikidot.com .
+

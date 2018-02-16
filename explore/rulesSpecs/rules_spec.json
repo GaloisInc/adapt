@@ -1,0 +1,16 @@
+{"rules":
+	{
+		"implication":{
+			"min_threshold":0.95,
+			"num_rules":10
+			},
+		"anti-implication":{
+			"min_threshold":0.05,
+			"num_rules":10
+			},
+		"lift":{
+			"min_threshold":0.95,
+			"num_rules":10
+			}
+	}
+}

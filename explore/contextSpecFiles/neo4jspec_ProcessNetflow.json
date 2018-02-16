@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().has('remoteAddress').as('ad').select('ad').in().out().has('subjectType','SUBJECT_PROCESS').as('y').values('uuid').as('id').select('ad').values('remoteAddress').as('ip').select('ad').values('remotePort').as('po').select('id','ip','po').dedup()",
+"objects":"id",
+"attributes":"ip,po"
+}
+}

@@ -1,0 +1,12 @@
+The Coron Data Mining Platform
+==============================
+
+CORON is a domain and platform independent, multi-purposed 
+data mining toolkit, which incorporates not only a rich collection 
+of data mining algorithms, but also allows a number of auxiliary 
+operations. 
+CORON also provides support for preparing and filtering data, and 
+for interpreting the extracted units of knowledge.
+
+Project home page: http://coron.loria.fr .
+Documentation: http://coron.wikidot.com .

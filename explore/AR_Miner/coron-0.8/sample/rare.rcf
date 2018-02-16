@@ -1,0 +1,16 @@
+# Laszlo's rare example
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+o1 | o2 | o3 | o4 | o5 | o6 | o7
+a | b | c | d | e | f | g
+1 1 1 0 0 1 1
+1 0 0 1 1 0 0
+0 1 0 1 0 1 1
+1 1 1 0 1 1 1
+0 0 1 0 1 1 0
+0 1 1 1 0 1 1
+1 0 1 0 1 1 0
+[END Relational Context]
