@@ -197,7 +197,7 @@ object EntityResolution {
       for (time <- timestampOf(cdm); if time > currentTime) {
         cdm match {
           case _: TimeMarker if time > currentTime => currentTime = time
-          case _ if time > currentTime && time - currentTime < maxTimeJump => currentTime = time
+          case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime == 0) => currentTime = time
           case _ => { }
         }
 
