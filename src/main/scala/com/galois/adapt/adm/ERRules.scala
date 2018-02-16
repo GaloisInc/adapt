@@ -121,6 +121,21 @@ object ERRules {
       )
     }
 
+  // Resolve an 'UnnamedPipeObject'
+  //
+  // TODO: sourceUUID, sinkUUID
+  def resolveUnnamedPipeObject(u: UnnamedPipeObject):
+    (
+      AdmFileObject,
+      UuidRemapper.PutCdm2Adm
+    ) = {
+      val newFo = AdmFileObject(Seq(CdmUUID(u.getUuid)), FILE_OBJECT_NAMED_PIPE, None)
+      (
+        newFo,
+        UuidRemapper.PutCdm2Adm(CdmUUID(u.getUuid), newFo.uuid)
+      )
+    }
+
   // Resolve an 'Event'
   object EventEdges {
     type Subject = Option[Edge[CDM18, CDM18]]
