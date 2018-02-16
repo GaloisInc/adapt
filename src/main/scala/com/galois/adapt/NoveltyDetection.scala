@@ -16,13 +16,15 @@ object NoveltyDetection {
   type F = (Event, Subject, Object) => Boolean
 
   val noveltyThreshold: Float = 0.01F
-  type IsNovel = Option[List[String]]
+  type IsNovel = Option[List[(String, Float)]]
 
   class Tree(filter: F, discriminators: D) {
     var children = Map.empty[ExtractedValue, Tree]
     var counter = 0
 
-    def localNovelty: Float = if (counter == 0) 0F else children.size / counter.toFloat
+    def globalNoveltyRate = ???
+
+    def localNovelty: Float = if (counter == 0) 1F else children.size / counter.toFloat
 //    def getChildCount: Int = counter  // if (children.isEmpty) counter else children.map(_._2.getChildCount).sum
 //    def subtreeNovelty: Float = Try[Float](children.size / getChildCount.toFloat).getOrElse(1F)
 
@@ -35,17 +37,22 @@ object NoveltyDetection {
     }
 
     def update(e: Event, s: Subject, o: Object): IsNovel = if (filter(e, s, o)) {
+      val historicalNoveltyRate = localNovelty
       counter += 1
       discriminators match {
-        case Nil =>
-          if (counter == 1) Some(List.empty) else None
+        case Nil => None
+          
         case discriminator :: remainingDiscriminators =>
           val extracted = discriminator(e, s, o)
+          val childExists = children.contains(extracted)
           val childTree = children.getOrElse(extracted, new Tree(filter, remainingDiscriminators))
           children = children + (extracted -> childTree)
           val childUpdateResult = childTree.update(e, s, o)
-          if (childUpdateResult.isDefined && localNovelty < noveltyThreshold)
-            Some(extracted :: childUpdateResult.getOrElse(List.empty))
+
+          if (childUpdateResult.isDefined)
+            childUpdateResult.map(childPaths => (extracted -> historicalNoveltyRate) :: childPaths)
+          else if ( ! childExists && historicalNoveltyRate < noveltyThreshold)
+            Some(List(extracted -> historicalNoveltyRate))
           else None
       }
     } else None
@@ -58,8 +65,8 @@ class NoveltyActor extends Actor with ActorLogging {
 
   val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ
   val ds = List(
-    (e: Event, s: Subject, o: Object) => math.abs(s.uuid.getLeastSignificantBits % 8).toString,
-    (e: Event, s: Subject, o: Object) => o.toMap.get("fileObjectType").toString
+    (e: Event, s: Subject, o: Object) => o.toMap.get("fileObjectType").toString,
+    (e: Event, s: Subject, o: Object) => math.abs(s.uuid.getLeastSignificantBits % 8).toString
   )
 
   val root = new Tree(f, ds)
