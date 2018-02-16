@@ -267,6 +267,12 @@ object ERStreamComponents {
             extractPathsAndEdges(Some(path))
           ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
+        case Timed(t, u: UnnamedPipeObject) =>
+          val (irFileObject, remap) = resolveUnnamedPipeObject(u)
+          val remapTimed = remap.copy(time = Some(t))
+
+          Stream(Right(irFileObject)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
+
 
         case _ => Nil
       }
