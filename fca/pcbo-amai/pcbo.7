@@ -1,0 +1,115 @@
+.TH PCBO 7 "February 2009" http://fcalgs.sourceforge.net "FCA Algorithms"
+.SH NAME
+.P
+pcbo - computes formal concepts and maximal frequent itemsets
+.SH SYNOPSIS
+.B pcbo
+[\fIOPTION\fR]... [\fIINPUT-FILE\fR] [\fIOUTPUT-FILE\fR]
+.SH DESCRIPTION
+.P
+This program computes intents of all formal concepts in an object-attribute
+data set (a formal context), i.e. the algorithm computes all maximal submatrices
+of a boolean matrix which are full of 1's. The program implements PCbO,
+a parallel algorithm based on Kuznetsov's CbO.
+.PP
+The \fIINPUT-FILE\fR is in the usual FIMI format: each line represents
+a transaction or an object and it contains of a list of
+attributes/features/items. If the \fIINPUT-FILE\fR is omitted or if it equals
+to `\fI-\fR', the program reads the input form the \fIstdin\fR.
+The \fIOUTPUT-FILE\fR has a similar
+format, each line represents one intent (itemset), where numbers indicate
+attributes in the intent (itemset). If the \fIOUTPUT-FILE\fR is omitted or
+if it equals to `\fI-\fR', the program writes the input to the \fIstdout\fR.
+.SS
+Optional arguments
+.TP
+\fB\-\fR\fIindex\fR,
+sets the initial \fIindex\fR of the first attribute. The default value is 0,
+meaning that attributes are numbered from 0 upwards. If a data set uses
+attributes numbered from 1, you should use the `\fB-1\fR' switch, and so on.
+.TP
+\fB\-P\fR\fIcpus\fR,
+sets the number of threads to \fIcpus\fR. The default value is 1, meaning that
+\fIpcbo\fR runs in the single-threaded version. In order to benefit from the
+parallel computation, you have to set \fIcpus\fR to at least 2. The recommended
+values is the number of hardware processors (processor cores) in your system or
+higher (typically, two or three times the number of all CPU cores).
+.TP
+\fB\-L\fR\fIdepth\fR,
+sets the initial stage recursion level to \fIdepth\fR. The value influences the
+number of formal concepts which are computed during the initial sequential
+stage. Namely, the algorithm first computes all concepts which are derivable in
+less than \fIdepth\fR steps. The default value is 3. A reasonable choice of
+the value is 3 or 4. In general, higher values may lead to a more uniform
+distribution of concepts over the separate threads. On the other hand, too
+large values of \fIdepth\fR degrade the parallel computation into the
+serial one. Some experimentation to achieve the best results is necessary.
+Anyway, a good starting value seems to be 3 or 4.
+.TP
+\fB\-S\fR\fImin-support\fR,
+the minimal support considered is set to \fImin-support\fR. The default value
+is 0, meaning that the support is disregarded and all intents (itemsets)
+are written to the output. If \fImin-support\fR is set to a positive value,
+only itemsets having extents with at least \fImin-support\fR are written
+to the output.
+.TP
+\fB\-V\fR\fIlevel\fR,
+sets the verbosity \fIlevel\fR to a specified value. Permitted values are
+numbers from 0 up to 3. The default value is 1. Verbosity level 0 (no output)
+just computes the intents and produces no output. Verbosity level 1 produces
+lists of intents with no auxiliary output. Verbosity levels 2 and higher
+write additional information to \fIstderr\fR.
+.SH EXAMPLES
+.B pcbo -1 mushroom.dat
+
+.fi
+Computes all intents in the file named \fBmushroom.dat\fR where \fB1\fR denotes
+the first attribute in \fBmushroom.dat\fR. The output is
+written to the standard output.
+.P
+.B pcbo -1 -P6 mushroom.dat
+
+.fi
+Computes all intents in \fBmushroom.dat\fR with first attribute \fB1\fR using \fB6\fR
+threads. The output is written to the standard output.
+.P
+.B pcbo -P8 -L4 foo.dat output-intents.dat
+
+.fi
+Computes all intents in \fBmushroom.dat\fR with \fB8\fR threads using the
+initial stage recursion depth \fB4\fR, and writing results to
+\fBoutput-intents.dat\fR.
+.P
+.B pcbo -P4 -L3 -V2 - output.dat
+
+.fi
+Computes all intents in data from the standard input with \fB4\fR threads
+using the initial stage recursion depth \fB3\fR, and verbosity level \fB2\fR,
+writing result to \fBoutput.dat\fR.
+.SH AUTHORS
+.P
+Written by Petr Krajca, Jan Outrata, and Vilem Vychodil.
+.SH REPORTING BUGS
+.P
+Report bugs to <fcalgs-bugs@lists.sourceforge.net>.
+.SH COPYRIGHT
+.P
+GNU GPL 2 (http://www.gnu.org/licenses/gpl-2.0.html).
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.P
+Users in academia are kindly asked to cite the following resources if
+the software is used to pursue any research activities which may result
+in publications:
+.P
+Krajca P., Outrata J., Vychodil V.: Parallel Recursive Algorithm for FCA.
+In: \fIProc. CLA 2008, CEUR WS\fR, \fB433\fR(2008), 71-82.
+.SH SEE ALSO
+.P
+Preliminary version of PCbO is described in the aforementioned
+paper that can be downloaded from
+.P
+http://sunsite.informatik.rwth-aachen.de/Publications/CEUR-WS/Vol-433/paper6.pdf
+.P
+Further information can be found at
+http://fcalgs.sourceforge.net

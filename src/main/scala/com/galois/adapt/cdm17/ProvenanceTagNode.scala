@@ -1,11 +1,8 @@
 package com.galois.adapt.cdm17
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 
 
@@ -34,7 +31,7 @@ case class ProvenanceTagNode(
     opcode.fold[List[(String,Any)]](List.empty)(v => List(("opcode", v.toString))) ++
     tagIds.fold[List[(String,Any)]](List.empty)(v => List(("tagIds", v.toList.mkString(",")))) ++
     itag.fold[List[(String,Any)]](List.empty)(v => List(("itag", v.toString))) ++
-    ctag.fold[List[(String,Any)]](List.empty)((v => List(("ctag", v.toString)))) ++
+    ctag.fold[List[(String,Any)]](List.empty)(v => List(("ctag", v.toString))) ++
     DBOpt.fromKeyValMap(properties)
 
   def asDBEdges =  List((CDM17.EdgeTypes.subject,subjectUuid)) ++

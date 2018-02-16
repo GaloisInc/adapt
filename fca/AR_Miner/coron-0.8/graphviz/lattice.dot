@@ -1,0 +1,43 @@
+digraph lattice
+{
+   // top to bottom
+   rankdir=TB;
+   concentrate=true;
+   edge [dir=back, arrowsize=0.75, color=black];
+
+   // top and bottom concepts
+   node [shape=box, peripheries=2, style=filled];
+   9 10
+
+   // inner concepts
+   node [shape=box, peripheries=1, color=black, style=solid];
+
+   // all concepts
+   9 [label="[o1, o2, o3, o4, o5]\nx\n{}  (5)\n|\n{}"]; // top concept
+   5 [label="[o1, o2, o3, o5]\nx\n{A}  (4)\n|\n{A}"];
+   8 [label="[o2, o3, o4, o5]\nx\n{C}  (4)\n|\n{C}"];
+   4 [label="[o2, o3, o5]\nx\n{A, C}  (3)\n|\n{A, C}"];
+   7 [label="[o1, o3, o4, o5]\nx\n{B, E}  (4)\n|\n{B}  #  {E}"];
+   3 [label="[o1, o3, o5]\nx\n{A, B, E}  (3)\n|\n{A, B}  #  {A, E}"];
+   6 [label="[o3, o4, o5]\nx\n{B, C, E}  (3)\n|\n{B, C}  #  {C, E}"];
+   1 [label="[o1]\nx\n{A, B, D, E}  (1)\n|\n{D}"];
+   2 [label="[o3, o5]\nx\n{A, B, C, E}  (2)\n|\n{A, B, C}  #  {A, C, E}"];
+   10 [label="[]\nx\n{A, B, C, D, E}  (0)"]; // bottom concept
+
+   // links between the concepts
+   9 -> 5;
+   9 -> 7;
+   9 -> 8;
+   5 -> 4;
+   5 -> 3;
+   8 -> 4;
+   8 -> 6;
+   4 -> 2;
+   7 -> 3;
+   7 -> 6;
+   3 -> 2;
+   3 -> 1;
+   6 -> 2;
+   1 -> 10;
+   2 -> 10;
+}

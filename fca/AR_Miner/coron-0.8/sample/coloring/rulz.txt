@@ -1,0 +1,73 @@
+# Database file name:              test/in.rcf
+# Database file size:              247 bytes
+# Number of lines:                 5
+# Largest attribute:               5
+# Number of attributes:            5
+# Number of attributes in average: 3.2
+# min_supp:                        2, i.e. 40%
+# min_conf:                        50%
+# Chosen algorithm:                Zart (v2) [triangular matrix]
+# Rules to extract:                all possible association rules
+
+{b} => {a} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a} => {b} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+
+{c} => {a} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%]) +
+{a} => {c} (supp=3 [60.00%]; conf=1.000 [100.00%]; suppLeft=3 [60.00%]) +
+
+{e} => {a} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a} => {e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+
+{c} => {b} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%])
+{b} => {c} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%])
+
+{e} => {b} (supp=4 [80.00%]; conf=1.000 [100.00%]; suppLeft=4 [80.00%]) +
+{b} => {e} (supp=4 [80.00%]; conf=1.000 [100.00%]; suppLeft=4 [80.00%]) +
+
+{e} => {c} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%])
+{c} => {e} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%])
+
+{b, c} => {a} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+{a, c} => {b} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+{a, b} => {c} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%])
+{c} => {a, b} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{b} => {a, c} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a} => {b, c} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+
+{b, e} => {a} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a, e} => {b} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%])
+{a, b} => {e} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%])
+{e} => {a, b} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{b} => {a, e} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a} => {b, e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+
+{c, e} => {a} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+{a, e} => {c} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%])
+{a, c} => {e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+{e} => {a, c} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{c} => {a, e} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%])
+{a} => {c, e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%])
+
+{c, e} => {b} (supp=3 [60.00%]; conf=1.000 [100.00%]; suppLeft=3 [60.00%]) +
+{b, e} => {c} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%]) +
+{b, c} => {e} (supp=3 [60.00%]; conf=1.000 [100.00%]; suppLeft=3 [60.00%]) +
+{e} => {b, c} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%]) +
+{c} => {b, e} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%]) +
+{b} => {c, e} (supp=3 [60.00%]; conf=0.750 [75.00%]; suppLeft=4 [80.00%]) +
+
+{b, c, e} => {a} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%]) +
+{a, c, e} => {b} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%]) +
+{a, b, e} => {c} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%]) +
+{a, b, c} => {e} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%]) +
+{c, e} => {a, b} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%]) +
+{b, e} => {a, c} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%]) +
+{b, c} => {a, e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%]) +
+{a, e} => {b, c} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%]) +
+{a, c} => {b, e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%]) +
+{a, b} => {c, e} (supp=2 [40.00%]; conf=1.000 [100.00%]; suppLeft=2 [40.00%]) +
+{e} => {a, b, c} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%]) +
+{c} => {a, b, e} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%]) +
+{b} => {a, c, e} (supp=2 [40.00%]; conf=0.500 [50.00%]; suppLeft=4 [80.00%]) +
+{a} => {b, c, e} (supp=2 [40.00%]; conf=0.667 [66.67%]; suppLeft=3 [60.00%]) +
+
+# Number of found rules: 50

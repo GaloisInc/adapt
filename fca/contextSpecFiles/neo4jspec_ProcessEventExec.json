@@ -1,0 +1,7 @@
+{"context specification":{
+"query":"g.V().has('subjectType','SUBJECT_PROCESS').as('x').select('x').in().has('eventType').as('y').values('eventType').as('type').select('x').values('uuid').as('id').select('x').values('cid').as('pid').select('id','pid','type').dedup()",
+"objects":"id",
+"attributes":"pid,type"
+
+}
+}

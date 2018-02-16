@@ -1,0 +1,2170 @@
+[
+    {
+        "filepath": "ulog-helper",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ulog-helper",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ulog-helper",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ulog-helper",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "ulog-helper",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "postgres",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "postgres",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "postgres",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "postgres",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_MPROTECT"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "master",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "master",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_LOGIN"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_LOGIN"
+    },
+    {
+        "filepath": "sysctl",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sysctl",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mv",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "mv",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sleep",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sleep",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sleep",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "dd",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sysctl",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "mv",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mv",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "atrun",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sleep",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "trivial-rewrite",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "master",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sysctl",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "master",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ls",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ls",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ls",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ls",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sleep",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "gzip",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "gzip",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "unlink",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "unlink",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "unlink",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "unlink",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_MPROTECT"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_OTHER"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "rm",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_LOGIN"
+    },
+    {
+        "filepath": "fortune",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "fortune",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "fortune",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "fortune",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "fortune",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "vi",
+        "type": "EVENT_UNLINK"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "ifconfig",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "rm",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "rm",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "rm",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "rm",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "bash",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "w",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "w",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "w",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "w",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "w",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "df",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "df",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "df",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "df",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "df",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "find",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "find",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "find",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "find",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "find",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sort",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sort",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sort",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sort",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sort",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "diff",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "diff",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "diff",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "diff",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "diff",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "ls",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "gzip",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "gzip",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "gzip",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "ps",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ps",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ps",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ps",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "uname",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "uname",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "uname",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "uname",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "uname",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "gunzip",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "gunzip",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "gunzip",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "gunzip",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "gunzip",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "mv",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "dhclient",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "hostname",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "hostname",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "hostname",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "hostname",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "mkdir",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mkdir",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mkdir",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "route",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "local",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "cmp",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "chkgrp",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "syslogd",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "syslogd",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_LINK"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_LINK"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_LINK"
+    },
+    {
+        "filepath": "sh",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "newsyslog",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "cron",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "syslogd",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bzip2",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "adjkerntz",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "tee",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "lockf",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "lockf",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "lockf",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "mktemp",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mktemp",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "mktemp",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mktemp",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cp",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "cp",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "cp",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "cp",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "tee",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "wc",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "wc",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "tee",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "wc",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "msgs",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "awk",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cmp",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "cmp",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "chkgrp",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "chkgrp",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "cat",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "netstat",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "uptime",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "uptime",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "uptime",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "egrep",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "egrep",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "uptime",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "egrep",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "showq",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "awk",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "awk",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "tee",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "qmgr",
+        "type": "EVENT_UNLINK"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "grep",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "grep",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mount",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "mount",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "mount",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sed",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sed",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sed",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "ipfw",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ipfw",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "ipfw",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "ipfw",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ipfstat",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ipfstat",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ipfstat",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "grep",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "touch",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ipfstat",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "touch",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "touch",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "touch",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "pfctl",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "nawk",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "sysctl",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "pfctl",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "pfctl",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "nawk",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "nawk",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "pfctl",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "nawk",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ipfstat",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "stat",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "stat",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "cmp",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "stat",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "stat",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "cleanup",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "bzcat",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_MODIFY_FILE_ATTRIBUTES"
+    },
+    {
+        "filepath": "pkg",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_UNLINK"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "mail",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "date",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "date",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "date",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "bzcat",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "uniq",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "bzcat",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "uniq",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "uniq",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "bzcat",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "pickup",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "jot",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "jot",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "jot",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "sendmail",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "mailwrapper",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "postqueue",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "bounce",
+        "type": "EVENT_UNLINK"
+    },
+    {
+        "filepath": "mkdir",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "php-fpm",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "php-fpm",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "proxymap",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "php-fpm",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "anvil",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "sshd",
+        "type": "EVENT_FORK"
+    },
+    {
+        "filepath": "top",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "top",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "top",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "top",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "top",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "php-fpm",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "ping",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "ping",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "ping",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "ping",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "fcgiwrap",
+        "type": "EVENT_BIND"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_BIND"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_MODIFY_PROCESS"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "nginx",
+        "type": "EVENT_CHANGE_PRINCIPAL"
+    },
+    {
+        "filepath": "sudo",
+        "type": "EVENT_FCNTL"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "python2.7",
+        "type": "EVENT_MPROTECT"
+    },
+    {
+        "filepath": "env",
+        "type": "EVENT_MPROTECT"
+    },
+    {
+        "filepath": "awk",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "expr",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "expr",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "expr",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_CREATE_OBJECT"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "date",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_SENDTO"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_RECVFROM"
+    },
+    {
+        "filepath": "fetch",
+        "type": "EVENT_CONNECT"
+    },
+    {
+        "filepath": "awk",
+        "type": "EVENT_CLOSE"
+    },
+    {
+        "filepath": "expr",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "smtpd",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "syslogd",
+        "type": "EVENT_WRITE"
+    },
+    {
+        "filepath": "lockf",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "chkgrp",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "sed",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "pfctl",
+        "type": "EVENT_MMAP"
+    },
+    {
+        "filepath": "dmesg",
+        "type": "EVENT_OPEN"
+    },
+    {
+        "filepath": "dmesg",
+        "type": "EVENT_READ"
+    },
+    {
+        "filepath": "dmesg",
+        "type": "EVENT_LSEEK"
+    },
+    {
+        "filepath": "postdrop",
+        "type": "EVENT_WRITE"
+    }
+]

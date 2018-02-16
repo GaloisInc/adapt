@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().hasLabel('AdmEvent').as('y').values('eventType').as('type').select('y').out().hasLabel('AdmSubject').as('x').select('x').out().hasLabel('AdmPathNode').values('path').as('filepath').select('filepath','type').dedup()",
+"objects":"filepath",
+"attributes":"type"
+}
+}

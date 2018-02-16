@@ -51,7 +51,14 @@ object Application extends App {
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
 
-  implicit val materializer = ActorMaterializer()
+  val quitOnError = config.getBoolean("adapt.runtime.quitonerror")
+  val streamErrorStrategy: Supervision.Decider = {
+    case e: Throwable =>
+      e.printStackTrace()
+      if (quitOnError) Runtime.getRuntime.halt(1)
+      Supervision.Resume
+  }
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
   implicit val executionContext = system.dispatcher
 //    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
 //    dbFile.delete()
@@ -127,6 +134,7 @@ object Application extends App {
       startWebServer()
       CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
         .via(FlowComponents.printCounter("CDM events"))
+        .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
 
 
@@ -220,11 +228,12 @@ object Application extends App {
 
 
         case (false, false) =>
-          println("Generting CSVs for neither CDM not ADM - so generating nothing!")
+          println("Generting CSVs for neither CDM not ADM - so... generating nothing!")
           Source.empty
 
         case (true, true) =>
           println("This isn't implemented yet. TODO: Alec")
+          ???
 
       }
 
@@ -263,17 +272,110 @@ object Application extends App {
         import scala.collection.mutable.{Map => MutableMap}
         val firstObservation = MutableMap.empty[UUID, CDM17]
         val ignoreUuid = new UUID(0L,0L);
-      {
-        case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
-        case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
-          val comparison = firstObservation(c.getUuid) == c
-          if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
-          List()
-        case c: CDM17 with DBNodeable[_] =>
-          firstObservation += (c.getUuid -> c)
-          List()
-      }
+        {
+          case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
+          case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
+            val comparison = firstObservation(c.getUuid) == c
+            if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
+            List()
+          case c: CDM17 with DBNodeable[_] =>
+            firstObservation += (c.getUuid -> c)
+            List()
+        }
       }.runWith(Sink.ignore)
+
+
+    case "find" =>
+      println("Running TEST flow")
+      CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Test"))
+        .collect{ case cdm: Event if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n${cdm}" }
+        .runWith(Sink.foreach(println))
+
+
+    case "novelty" | "novel" =>
+      println("Running Novelty Detection Flow")
+      val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
+      CDMSource.cdm18(ta1)
+        .via(FlowComponents.printCounter("Novelty"))
+        .via(EntityResolution(uuidRemapper, synSource))
+//        .statefulMapConcat[(NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)]{ () =>  // This is the real goal
+        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Option[ADM])]{ () =>
+          val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
+          val everything = collection.mutable.Map.empty[AdmUUID, ADM]
+
+          val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
+            EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
+
+          {
+            case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { sub =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+                val t = (e._1, Some(sub), e._3)
+                if (t._3.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  List(t)
+                } else {
+                  events += (src -> t)
+                  List.empty
+                }
+              }
+            case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { obj =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+                val t = (e._1, e._2, Some(obj))
+                if (t._2.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  List(t)
+                } else {
+                  events += (src -> t)
+                  List.empty
+                }
+              }
+            case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { obj =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+              val t = (e._1, e._2, Some(obj))
+                if (t._2.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  List(t)
+                } else {
+                  events += (src -> t)
+                  List.empty
+                }
+              }
+
+  //          case Left(edge) =>
+  //              edge.label match { // throw away the referenced UUIDs!
+  //                case "subject" | "flowObject" => everything -= edge.src
+  //                case "eventExec" | "cmdLine" | "(cmdLine)" | "exec" | "localPrincipal" | "principal" | "path" | "(path)" => everything -= edge.tgt
+  //                case "tagIds" | "prevTagId" => everything -= edge.src; everything -= edge.tgt
+  //                case _ => ()  // "parentSubject"
+  //              }
+  //            List()
+            case Right(adm: AdmEvent) =>
+              events += (adm.uuid -> (adm, None, None))
+              List()
+            case Right(adm: AdmSubject) =>
+              everything += (adm.uuid -> adm)
+              List()
+            case Right(adm: AdmFileObject) =>
+              everything += (adm.uuid -> adm)
+              List()
+            case Right(adm: AdmNetFlowObject) =>
+              everything += (adm.uuid -> adm)
+              List()
+            case Right(adm: AdmSrcSinkObject) =>
+              everything += (adm.uuid -> adm)
+              List()
+            case _ => List()
+          }
+        }
+        .recover{ case e: Throwable => e.printStackTrace(); ???}
+        .runWith(
+//          Sink.ignore //foreach(println)
+          Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
+        )
+
 
 
     case _ =>

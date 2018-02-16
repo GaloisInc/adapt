@@ -1,0 +1,24 @@
+# university courses
+# Objects:
+#    course_1, etc.
+# Attributes:
+#    AI - artificial intelligence
+#    IT - information theory
+#    Prog - programming
+#    SD - software design
+#    Mpure - pure mathematics
+#    Mapp - applied mathematics
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+c1 | c2 | c3 | c4 | c5 | c6
+AI | IT | Prog | SD | Mpure | Mapp
+1 1 0 0 0 1
+0 1 1 0 1 0
+1 1 0 0 1 0
+0 0 0 0 1 1
+1 1 0 1 0 0
+0 1 0 1 1 0
+[END Relational Context]

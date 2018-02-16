@@ -1,0 +1,6 @@
+// this is a remark
+body { background-color: #EAF1FD; }
+
+yellow { a }
+//A0FFFF { b }
+red { c }
