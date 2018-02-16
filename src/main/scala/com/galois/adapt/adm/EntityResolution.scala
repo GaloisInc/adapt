@@ -35,7 +35,7 @@ object EntityResolution {
       cdm match {
         case EndMarker(session, counts) =>
 
-          println(s"Reached end of session $session: ")
+          println(s"Reached end of session with session number: $session: ")
           for ((k,v) <- counts) {
             println(s"  $k: $v")
           }

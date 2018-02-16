@@ -11,11 +11,8 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.json.{DefaultJsonProtocol, JsArray}
+import spray.json.DefaultJsonProtocol
 import edazdarevic.commons.net.CIDRUtils
-import org.apache.tinkerpop.gremlin.structure.Vertex
-
-import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -50,7 +47,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
   type RequestId = Int
-  var policyRequests = Map.empty[RequestId,Future[Boolean]]
+  var policyRequests = Map.empty[RequestId,Future[(Int, Option[String])]]
 
   val validRequestId = Unmarshaller.strict[String,Int] { string =>
     Try(string.toInt) match {
@@ -63,8 +60,6 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
-//  def go(query: String, f: (List[String]) => (Int, Option[String]))
-
 
   def route(dbActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer, timeout: Timeout) = {
     get {
@@ -73,106 +68,44 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           ValueName("ADAPT")
         )
       } ~
-        path("checkPolicy") {
-          parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
-            (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
-              parameters('policy ! 1, 'permissionType.as(validPermissionType) ? "USER", 'permissionList.as(CsvSeq[String]) ? collection.immutable.Seq[String]("darpa")) { (permissionType, permissionList) =>
-                // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_User
-                // BLOCK if the user originating the process that sent the HTTP requests is NOT an allowed user or in an allowed user group.
-                complete {
-                  val desiredProperty = if (permissionType.toLowerCase == "user") "username" else "groupId"
-                  val query =
-                    s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
-                       |.inE('predicateObject','predicateObject2').outV()
-                       |.outE('subject').inV()
-                       |.outE('localPrincipal').inV()
-                       |.dedup().values('$desiredProperty')
-                     """.stripMargin.replaceAll("\n","")   // .has('eventType','EVENT_WRITE')
-
-                  val resultFuture = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
-                    case value :: Nil => permissionType.toLowerCase match {
-                      case "user" =>
-                        val result = permissionList.map(_.toLowerCase) contains value
-                        if (result) returnPolicyResult(200, None, responseUri)
-                        else returnPolicyResult(400, Some(s"username used to make the request was: $value  This query was testing for: ${permissionList.mkString(",")}"), responseUri)
-                        result
-                      case "group" | _ =>
-                        val result = value.split(",").toSet[String].intersect(permissionList.toSet[String].map(_.toLowerCase)).nonEmpty
-                        if (result) returnPolicyResult(200, None, responseUri)
-                        else returnPolicyResult(400, Some(s"user's set of groupIds that made this request was: $value  This query was testing for: ${permissionList.mkString(",")}"), responseUri)
-                        result
-                    }
-                    case x =>
-                      returnPolicyResult(500, Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow."), responseUri)
-                      false   // TODO: Should this use a Try[Boolean]?
-                  }.recover {
-                    case e: Throwable =>
-                      returnPolicyResult(500, Some(s"An error occurred during the processing of the request: ${e.getMessage}"), responseUri)
-                      throw e
-                  }
-                  policyRequests = policyRequests + (requestId -> resultFuture)
-                  StatusCodes.Accepted -> "Started the policy check process, will respond later"
-                }
-              } ~
-                parameters('policy ! 2, 'restrictedHost.as(validIpAddress)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
-                  // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_Communication
-                  complete {
-                    val disallowedRange = if (restrictedHost.contains("/")) new CIDRUtils(restrictedHost) else new CIDRUtils(s"$restrictedHost/32")
-
-                    val query =  // Get all netflows associated with the process of the netflow in question.
-                      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
-                         |.in('predicateObject','predicateObject2')
-                         |.out('subject')
-                         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')
-                         |.dedup().values('remoteAddress')
-                       """.stripMargin.replaceAll("\n","")
-
-                    val doesViolateF = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
-                      case Nil => List.empty[(String,Boolean)] // No matching netflows. ——Note: this should never be possible, because you should always get the originating netflow.
-                      case l => l.flatMap { string =>
-                        val validIpOpt = testIpAddress(string)
-                        val doesViolateOpt = validIpOpt.flatMap(ip => Try(disallowedRange.isInRange(ip)).toOption)
-                        doesViolateOpt.map(r => string -> r)
-                      }
-                    }
-                    doesViolateF.map{ results =>
-                      if (results.forall(t => ! t._2))
-                        returnPolicyResult(200, None, responseUri) // should allow
-                      else
-                        returnPolicyResult(400, Some(s"The following violating addresses were also contacted by this process: ${results.collect{case t if t._2 => t._1}.mkString(", ")}"), responseUri)
-                    }.recover {
-                      case e: Throwable =>
-                        returnPolicyResult(500, Some(s"An error occurred during the processing of the request: ${e.getMessage}"), responseUri)
-                        throw e
-                    }
-                    StatusCodes.Accepted -> "Started the policy check process, will respond later"
-                  }
-                } ~
-                parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean]) { (keyboardAction, guiEventAction) =>
-                  // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
-                  complete {
-                    // TODO
-                    StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
-                  }
-                } ~
-                parameters('policy ! 4) {
-                  // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
-                  complete {
-                    // TODO
-                    StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
-                  }
-                }
-          }
-        } ~
-        path("status") {
-          parameter('requestId.as[Int]) { requestId =>
-            complete(
-              if (policyRequests contains requestId) {
-                StatusCodes.Accepted -> (if (policyRequests(requestId).isCompleted) policyRequests(requestId).value.get.toString else s"Request #$requestId is not yet complete.")
-              } else StatusCodes.NotFound -> s"We do not have an active request for that Id: $requestId"
-            )
-          }
+      path("checkPolicy") {
+        parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
+          (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
+            parameters('policy ! 1, 'permissionType.as(validPermissionType) ? "USER", 'permissionList.as(CsvSeq[String]) ? collection.immutable.Seq[String]("darpa")) { (permissionType, permissionList) =>
+              complete {
+                answerPolicy1(permissionType, permissionList, serverIp, serverPort, responseUri, requestId, dbActor)
+                StatusCodes.Accepted -> "Started the policy check process, will respond later"
+              }
+            } ~
+            parameters('policy ! 2, 'restrictedHost.as(validIpAddress)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
+              complete {
+                answerPolicy2(restrictedHost, serverIp, serverPort, responseUri, requestId, dbActor)
+                StatusCodes.Accepted -> "Started the policy check process, will respond later"
+              }
+            } ~
+            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean]) { (keyboardAction, guiEventAction) =>
+              complete {
+                answerPolicy3()
+                StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
+              }
+            } ~
+            parameters('policy ! 4) {
+              complete {
+                answerPolicy4()
+                StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
+              }
+            }
         }
+      } ~
+      path("status") {
+        parameter('requestId.as[Int]) { requestId =>
+          complete(
+            if (policyRequests contains requestId) {
+              StatusCodes.Accepted -> (if (policyRequests(requestId).isCompleted) policyRequests(requestId).value.get.toString else s"Request #$requestId is not yet complete.")
+            } else StatusCodes.NotFound -> s"We do not have an active request for that Id: $requestId"
+          )
+        }
+      }
     } ~
     post {
       path("testResponder") {
@@ -186,6 +119,115 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         }
       }
     }
+  }
+
+
+
+  def answerPolicy1(permissionType: String, permissionList: Seq[String], serverIp: String, serverPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
+    (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_User
+    // BLOCK if the user originating the process that sent the HTTP requests is NOT an allowed user or in an allowed user group.
+    val desiredProperty = if (permissionType.toLowerCase == "user") "username" else "groupId"
+    val query =
+      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+         |.inE('predicateObject','predicateObject2').outV()
+         |.outE('subject').inV()
+         |.outE('localPrincipal').inV()
+         |.dedup().values('$desiredProperty')
+       """.stripMargin.replaceAll("\n","")   // .has('eventType','EVENT_WRITE')
+
+    val resultFuture = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
+      case value :: Nil => permissionType.toLowerCase match {
+        case "user" =>
+          val result = permissionList.map(_.toLowerCase) contains value
+          if (result) {
+            returnPolicyResult(200, None, responseUri)
+            200 -> None
+          } else {
+            val message = Some(s"username used to make the request was: $value  This query was testing for: ${permissionList.mkString(",")}")
+            returnPolicyResult(400, message, responseUri)
+            400 -> message
+          }
+        case "group" | _ =>
+          val result = value.split(",").toSet[String].intersect(permissionList.toSet[String].map(_.toLowerCase)).nonEmpty
+          if (result) {
+            returnPolicyResult(200, None, responseUri)
+            200 -> None
+          }
+          else {
+            val message = Some(s"user's set of groupIds that made this request was: $value  This query was testing for: ${permissionList.mkString(",")}")
+            returnPolicyResult(400, message, responseUri)
+            400 -> message
+          }
+      }
+      case x =>
+        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow.")
+        returnPolicyResult(500, message, responseUri)
+        500 -> message
+    }.recover {
+      case e: Throwable =>
+        val message = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        returnPolicyResult(500, message, responseUri)
+        500 -> message
+    }
+    policyRequests = policyRequests + (requestId -> resultFuture)
+  }
+
+
+  def answerPolicy2(restrictedHost: String, serverIp: String, serverPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
+    (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_Communication
+
+    val disallowedRange = if (restrictedHost.contains("/")) new CIDRUtils(restrictedHost) else new CIDRUtils(s"$restrictedHost/32")
+
+    val query =  // Get all netflows associated with the process of the netflow in question.
+      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+         |.in('predicateObject','predicateObject2')
+         |.out('subject')
+         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')
+         |.dedup().values('remoteAddress')
+       """.stripMargin.replaceAll("\n","")
+
+    val doesViolateF = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map {
+      case Nil => List.empty[(String,Boolean)] // No matching netflows. ——Note: this should never be possible, because you should always get the originating netflow.
+      case l => l.flatMap { string =>
+        val validIpOpt = testIpAddress(string)
+        val doesViolateOpt = validIpOpt.flatMap(ip => Try(disallowedRange.isInRange(ip)).toOption)
+        doesViolateOpt.map(r => string -> r)
+      }
+    }
+    val resultFuture: Future[(Int, Option[String])] = doesViolateF.map { results =>
+      if (results.forall(t => ! t._2)) {
+        val result = 200
+        returnPolicyResult(result, None, responseUri) // should allow
+        result -> None
+      }
+      else {
+        val result = 400
+        val message = Some(s"The following violating addresses were also contacted by this process: ${results.collect{case t if t._2 => t._1}.mkString(", ")}")
+        returnPolicyResult(result, message, responseUri)
+        result -> message
+      }
+    }.recover {
+      case e: Throwable =>
+        val result = 500
+        val message = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        returnPolicyResult(result, message, responseUri)
+        result -> message
+    }
+    policyRequests = policyRequests + (requestId -> resultFuture)
+  }
+
+
+  def answerPolicy3(): Unit = {
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
+    // TODO
+  }
+
+
+  def answerPolicy4(): Unit = {
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
+    // TODO
   }
 
 

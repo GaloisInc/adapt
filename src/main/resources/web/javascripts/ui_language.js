@@ -6,7 +6,7 @@ var starting_queries = [
         default_values : [10]
     }, {
         name : "Get a few nodes by label",
-        base_query : "g.V().hasLabel('{_}'').limit({_})",
+        base_query : "g.V().hasLabel('{_}').limit({_})",
         default_values : ["AdmPathNode",10]
     }, {
         name : "Get a Path Node by its path",

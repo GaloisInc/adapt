@@ -1,13 +1,9 @@
 package com.galois.adapt.cdm17
 
 import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm17
-
 import scala.collection.JavaConverters._
 
 
