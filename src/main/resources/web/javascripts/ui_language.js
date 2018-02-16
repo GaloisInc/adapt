@@ -5,6 +5,10 @@ var starting_queries = [
         base_query : "g.V().limit({_})",
         default_values : [10]
     }, {
+        name : "Get nodes by their UUID(s)",
+        base_query : "g.V().has('uuid',within([{_}]))",
+        default_values : ["271d6c79-ff9a-2b63-297c-bf948375a868"]
+    }, {
         name : "Get a few nodes by label",
         base_query : "g.V().hasLabel('{_}').limit({_})",
         default_values : ["AdmPathNode",10]
