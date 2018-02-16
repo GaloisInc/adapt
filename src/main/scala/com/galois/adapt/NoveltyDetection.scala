@@ -1,7 +1,7 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
-import com.galois.adapt.adm.{ADM, _}
+import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.EVENT_READ
 
 
@@ -41,7 +41,7 @@ object NoveltyDetection {
       counter += 1
       discriminators match {
         case Nil => None
-          
+
         case discriminator :: remainingDiscriminators =>
           val extracted = discriminator(e, s, o)
           val childExists = children.contains(extracted)
@@ -51,7 +51,7 @@ object NoveltyDetection {
 
           if (childUpdateResult.isDefined)
             childUpdateResult.map(childPaths => (extracted -> historicalNoveltyRate) :: childPaths)
-          else if ( ! childExists && historicalNoveltyRate < noveltyThreshold)
+          else if ( ! childExists && historicalNoveltyRate < noveltyThreshold)  // TODO: consider if we should ALSO emit another detection if this still matches here. => List[List[String]]
             Some(List(extracted -> historicalNoveltyRate))
           else None
       }
@@ -65,8 +65,8 @@ class NoveltyActor extends Actor with ActorLogging {
 
   val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ
   val ds = List(
-    (e: Event, s: Subject, o: Object) => o.toMap.get("fileObjectType").toString,
-    (e: Event, s: Subject, o: Object) => math.abs(s.uuid.getLeastSignificantBits % 8).toString
+    (e: Event, s: Subject, o: Object) => math.abs(s.uuid.getLeastSignificantBits % 8).toString,
+    (e: Event, s: Subject, o: Object) => o.toMap.get("fileObjectType").toString
   )
 
   val root = new Tree(f, ds)
