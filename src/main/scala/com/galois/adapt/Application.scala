@@ -298,51 +298,85 @@ object Application extends App {
       CDMSource.cdm18(ta1)
         .via(FlowComponents.printCounter("Novelty"))
         .via(EntityResolution(uuidRemapper, synSource))
-//        .statefulMapConcat[(NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)]{ () =>  // This is the real goal
-        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Option[ADM])]{ () =>
+        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
+
           val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
           val everything = collection.mutable.Map.empty[AdmUUID, ADM]
+
+          type AdmUUIDReferencingPathNodes = AdmUUID
+          val pathNodeUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
+          val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
 
           val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
             EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
 
+
+//        type NodeType = _
+//        type EdgeOpt = _
+//        val l: List[(NodeType, EdgeOpt)] = List.empty
+//        trait Direction
+//        object Forward extends Direction
+//        object Reverse extends Direction
+//
+//        class Aggregated(left: Either[ADM, Aggregated], right: ADM)
+//
+//        val leftThings = Map.empty[AdmUUID, Aggregated]
+//        val rightThings = Map.empty[AdmUUID, ADM]
+//        def foo(edge: EdgeAdm2Adm, labelFilter: String, dir: Direction = Forward) = if (edge.label == labelFilter) {
+//          val (left, right) = if (dir == Forward) edge.src -> edge.tgt else edge.tgt -> edge.src
+//          val t = (rightThings(left), rightThings(right))
+//        }
+
+
           {
             case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { sub =>
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
                 val t = (e._1, Some(sub), e._3)
                 if (t._3.isDefined) {
                   if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  List(t)
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
                   List.empty
                 }
               }
             case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { obj =>
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
                 val t = (e._1, e._2, Some(obj))
                 if (t._2.isDefined) {
                   if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  List(t)
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
                   List.empty
                 }
               }
             case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Option[ADM])]) { obj =>
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
               val t = (e._1, e._2, Some(obj))
                 if (t._2.isDefined) {
                   if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  List(t)
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
                   List.empty
                 }
               }
+            case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
+              // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
+              val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
+              pathNodeUses += (subObj -> newSet)
+
+              Nil
 
   //          case Left(edge) =>
   //              edge.label match { // throw away the referenced UUIDs!
@@ -367,12 +401,13 @@ object Application extends App {
             case Right(adm: AdmSrcSinkObject) =>
               everything += (adm.uuid -> adm)
               List()
+            case Right(adm: AdmPathNode) =>
+              pathNodes += (adm.uuid -> adm)
+              Nil
             case _ => List()
           }
         }
-        .recover{ case e: Throwable => e.printStackTrace(); ???}
         .runWith(
-//          Sink.ignore //foreach(println)
           Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
         )
 

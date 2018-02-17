@@ -2,13 +2,13 @@ package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.EVENT_READ
+import com.galois.adapt.cdm18._
 
 
 object NoveltyDetection {
-  type Event = AdmEvent
-  type Subject = ADM // (AdmSubject, AdmPathNode)
-  type Object = ADM  // (ADM, AdmPathNode)
+  type Event   = AdmEvent
+  type Subject = (AdmSubject, Set[AdmPathNode])
+  type Object  = (ADM, Set[AdmPathNode])
 
   type ExtractedValue = String
   type Discriminator = (Event, Subject, Object) => ExtractedValue
@@ -63,22 +63,21 @@ object NoveltyDetection {
 class NoveltyActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ
+  val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE
   val ds = List(
-    (e: Event, s: Subject, o: Object) => math.abs(s.uuid.getLeastSignificantBits % 8).toString,
-    (e: Event, s: Subject, o: Object) => o.toMap.get("fileObjectType").toString
+    (e: Event, s: Subject, o: Object) => s._2.toList.map(_.path).sorted.mkString("[", ",", "]"),
+    (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", ",", "]")
   )
 
   val root = new Tree(f, ds)
 
   def receive = {
-    case (e: Event, Some(s: ADM), Some(o: ADM)) =>
-      root.update(e, s, o).foreach(println)
+    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+      root.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
     case CompleteMsg => root.print(0, "")
     case x => log.error(s"Received Unknown Message: $x")
-
   }
 }
