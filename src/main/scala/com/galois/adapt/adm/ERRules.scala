@@ -28,7 +28,7 @@ object ERRules {
         newPtn,
         UuidRemapper.PutCdm2Adm(CdmUUID(p.getUuid), newPtn.uuid),
         p.flowObject.map(flow => EdgeAdm2Cdm(newPtn.uuid, "flowObject", CdmUUID(flow))),
-        EdgeAdm2Cdm(newPtn.uuid, "subject", CdmUUID(p.subjectUuid)),
+        EdgeAdm2Cdm(newPtn.uuid, "provSubject", CdmUUID(p.subjectUuid)),
         p.prevTagId.map(tagId => EdgeAdm2Cdm(newPtn.uuid, "prevTagId", CdmUUID(tagId))),
         p.tagIds.getOrElse(Nil).map(tagId => EdgeAdm2Cdm(newPtn.uuid, "tagId", CdmUUID(tagId)))
       )
