@@ -140,6 +140,7 @@ case object SRCSINK_WEB_BROWSER extends SrcSinkType
 case object SRCSINK_WIDGETS extends SrcSinkType
 case object SRCSINK_IPC extends SrcSinkType
 case object SRCSINK_UNKNOWN extends SrcSinkType
+case object MEMORY_SRCSINK extends SrcSinkType // ADDED BY US FOR ADM!
 
 // Updated
 sealed trait InstrumentationSource extends CDM18

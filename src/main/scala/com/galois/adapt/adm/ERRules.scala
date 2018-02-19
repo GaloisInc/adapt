@@ -136,6 +136,18 @@ object ERRules {
       )
     }
 
+  def resolveMemoryObject(m: MemoryObject):
+    (
+      AdmSrcSinkObject,
+      UuidRemapper.PutCdm2Adm
+    ) = {
+      val newSrcSink = AdmSrcSinkObject(Seq(CdmUUID(m.uuid)), MEMORY_SRCSINK)
+      (
+        newSrcSink,
+        UuidRemapper.PutCdm2Adm(CdmUUID(m.uuid), newSrcSink.uuid)
+      )
+    }
+
   // Resolve an 'Event'
   object EventEdges {
     type Subject = Option[Edge[CDM18, CDM18]]

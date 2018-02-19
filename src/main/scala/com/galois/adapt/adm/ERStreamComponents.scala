@@ -273,6 +273,11 @@ object ERStreamComponents {
 
           Stream(Right(irFileObject)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
+        case Timed(t, m: MemoryObject) =>
+          val (irSrcSink, remap) = resolveMemoryObject(m)
+          val remapTimed = remap.copy(time = Some(t))
+
+          Stream(Right(irSrcSink)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
         case _ => Nil
       }
