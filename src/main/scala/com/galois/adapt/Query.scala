@@ -2,6 +2,7 @@ package com.galois.adapt
 
 //import com.thinkaurelius.titan.core.attribute.Text
 import java.util
+import java.util.function.BiPredicate
 
 import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
@@ -10,6 +11,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 import java.util.{Collections, Comparator, Iterator}
 
+import com.carrotsearch.hppc.predicates.BytePredicate
 import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
@@ -17,6 +19,7 @@ import scala.collection.immutable.Stream
 import scala.util.parsing.combinator._
 import scala.util.{Failure, Success, Try}
 import scala.language.existentials
+import scala.util.matching.Regex
 
 /*
  * A 'Traversal' represents roughly the shape of path(s) that can be used to explore a graph. This
@@ -53,7 +56,7 @@ import scala.language.existentials
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
  *                 | 'between(' literal ',' literal ')'
- *                 | 'of(' string ')'
+ *                 | 'regex(' string ')'
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -215,7 +218,7 @@ object Query {
         (   predicate(uuid)
         ||| predicate(int)
         ||| predicate(lng)
-        ||| predicate(str)
+        ||| strPredicate
         ).asInstanceOf[Parser[QueryValue[P[Any]]]]
          .withFailureMessage("predicate expected (ex: within([1,2,3]), eq(x))")
 
@@ -240,6 +243,11 @@ object Query {
         ).asInstanceOf[Parser[QueryValue[P[T]]]]
          .withFailureMessage(s"predicate of type ${ev.runtimeClass.getSimpleName()} expected")
 
+      def strPredicate: Parser[QueryValue[P[String]]] =
+        ( predicate(str)
+        | "regex(" ~ stringLiteral ~ ")"         ^^ { case _~s~_     => RawRegexPred(s) }
+        ).withFailureMessage(s"predicate of type String expected")
+
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
       //
@@ -263,7 +271,7 @@ object Query {
         | ".hasNot(" ~! str ~ ")"          ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".hasId(" ~! lng ~ ")"           ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
-        | ".where(" ~ predicate(str) ~ ")" ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where(" ~ strPredicate ~ ")"  ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
         | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
@@ -452,6 +460,28 @@ object QueryLanguage {
   }
   case class RawWithinPred[T](col: QueryValue[Seq[T]]) extends QueryValue[P[T]] {
     override def eval(context: Map[String,QueryValue[_]]): P[T] = P.within(col.eval(context): _*)
+  }
+  case class RawRegexPred(regex: String) extends QueryValue[P[String]] {
+
+    val matches: BiPredicate[String,String] = new BiPredicate[String,String] {
+
+      // Compile the regex only once...
+      val compiledRegex: Regex = regex.r
+      println(regex)
+
+      // So you noticed that `valueB` never gets used, eh? You are probably thinking: "You don't understand how
+      // `BiPredicate` works! You must want a `Predicate`". Unfortunately, it is tinkerpop that are confused. Check out
+      // their implementation of `OrBiPredicate` (another example of something that ought to be a `Predicate`).
+      @Override
+      override def test(valueA: String, valueB: String): Boolean = {
+        println(valueA)
+        val r = compiledRegex.findFirstMatchIn(valueA).isDefined
+        println(r)
+        r
+      }
+    }
+
+    override def eval(context: Map[String,QueryValue[_]]): P[String] = P.test(matches, "").asInstanceOf[P[String]]
   }
   case class Variable[T](name: String) extends QueryValue[T] {
     override def eval(context: Map[String,QueryValue[_]]): T = context(name).eval(context).asInstanceOf[T]
