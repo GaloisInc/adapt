@@ -1,13 +1,13 @@
 # Generating Concepts with FCbO and analyzing the concepts
 
-## Brief description of the files (to be found in the explore directory)
+## Brief description of the files (to be found in the fca directory)
 
 The current implementation the FCA analysis is contained in fcbo.py (port of the original FCbO C implementation) and fcascript.py (script to launch the concepts generation with FCbO and analyze the generated concepts to find anomalies).  
 
 Example input files are provided in the directory: context files (one in CXT and one in FIMI format obtained by using the event query on ta1-theia-bovia-cdm17.bin) as well as json specification files 
 (event query in spec_context_event.py, netflow query in spec_context_netflow.py and file execution query in spec_context_execute.py and information for context generation (pid vs event context) from CSV files in csv/csvspec.json)
 
-The explore directory also contains the FCbO/PCbO original C source code in directories fcbo-ins and pcbo-amai respectively.
+The fca directory also contains the FCbO/PCbO original C source code in directories fcbo-ins and pcbo-amai respectively.
 
 ## Brief description of the software
 
@@ -42,7 +42,7 @@ If both options are specified, the specification file given as argument to ```--
 option. Whether the file is saved in FIMI or CXT format depends on the extension of the file given as argument to ```--inputfile/-i``` (no other formats than CXT or FIMI are supported at the moment)  
 
 ```--inputfile/-i``` can be specified alone. In this case, the file (in FIMI or CXT format) passed as argument to the option is used to generate the context that will subsequently be passed as input to concept generation and/or rule generation and analysis.  
-The FIMI file format is described in: http://fcalgs.sourceforge.net/format.html . And a few examples of CXT files are provided in the explore directory.
+The FIMI file format is described in: http://fcalgs.sourceforge.net/format.html . And a few examples of CXT files are provided in the fca directory.
 It is currently recommended to use files CXT format as they are faster to parse than FIMI files.
 
 ```--specfile/-s``` can take two types of json files as argument.
@@ -99,9 +99,9 @@ The argument passed to ```--min_support/-m``` is a number between 0 and 1 that c
 All results of the rule generation and rule violation analysis are saved in the file passed as argument to the ```--analysis_outputfile/-oa``` option. If not specified, the analysis results are printed on the screen.
 
 In the case where ```--workflow/-w``` is set to ```'analysis'```, the ```--concept_file/-cf``` option must be used and it specifies the absolute path to the file that contains the concepts to analyze. An example of concept
-file is stored in the explore directory.
+file is stored in the fca directory.
 
-It is possible to choose the type of rules you want to generate with the ```--rules_spec/-rs``` option. The argument passed to the ```--rules_spec/-rs``` is a JSON file that specifies the types of rules to generate as the rule generation parameters (e.g for implication rules, minimum confidence threshold and number of rules to generate). An example of such specification file is the file explore/rulesCurrentSpec.json.
+It is possible to choose the type of rules you want to generate with the ```--rules_spec/-rs``` option. The argument passed to the ```--rules_spec/-rs``` is a JSON file that specifies the types of rules to generate as the rule generation parameters (e.g for implication rules, minimum confidence threshold and number of rules to generate). An example of such specification file is the file fca/rulesCurrentSpec.json.
 
 
 ## Launching the concept generation and analysis
@@ -123,7 +123,7 @@ python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
 
 To perform an analysis equivalent to the one obtained with ```python3 analyze.py --event```, one could launch (after ADM ingestion):
 ```
-python3 explore/fcascript.py -s explore/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/pcbo-amai/pcbo --parallel 3 -rs explore/rulesCurrentSpec.json
+python3 fca/fcascript.py -s fca/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/pcbo-amai/pcbo --parallel 3 -rs fca/rulesCurrentSpec.json
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
@@ -131,21 +131,21 @@ python3 explore/fcascript.py -s explore/neo4jspec_ProcessEvent.json -w both -m 0
 or 
 
 ```
-python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 --fca_algo C --fcbo_path explore/fcbo-ins/fcbo -rs explore/rulesCurrentSpec.json
+python3 fca/fcascript.py -s fca/neo4jspec_FileEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/fcbo-ins/fcbo -rs fca/rulesCurrentSpec.json
 ```
 (if you want to run the C version of FCbO)
 
 or 
 
 ```
-python3 explore/fcascript.py -s explore/neo4jspec_FileEvent.json -w both -m 0.05 -rs explore/rulesCurrentSpec.json
+python3 fca/fcascript.py -s fca/neo4jspec_FileEvent.json -w both -m 0.05 -rs fca/rulesCurrentSpec.json
 ```
 (if you want to run the Python version of FCbO)
 
 ## Script (runFCA.py) for testing the influence of support/confidence variation (not very stable at the moment)
 
 This script currently runs the full pipeline (i.e concept generation followed by rule generation and analysis) on the CSV files generated from several avro files (one directory per avro file) and provides lists of minimum
-support and minimum rule confidence to test. The data it is supposed to run on is the explore/csv directory.
+support and minimum rule confidence to test. The data it is supposed to run on is the fca/csv directory.
 
 
 
