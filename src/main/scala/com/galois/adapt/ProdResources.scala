@@ -3,17 +3,14 @@ package com.galois.adapt
 import java.io.{ByteArrayOutputStream, PrintWriter}
 import java.nio.ByteBuffer
 import java.util.{Properties, UUID}
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
-import org.mapdb.DBMaker
 import akka.pattern.ask
 import com.bbn.tc.schema.avro.{TheiaQuery, TheiaQueryType}
 import com.typesafe.config.Config
 import org.apache.avro.io.EncoderFactory
 import org.apache.avro.specific.SpecificDatumWriter
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-
 import scala.collection.mutable.{MutableList, Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
@@ -21,7 +18,6 @@ import scala.util.{Failure, Random, Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import ApiJsonProtocol._
 import spray.json._
-
 import scala.concurrent.Future
 
 
@@ -30,19 +26,6 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
   var threshold = 0.8D
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
-
-  val notesFilePath = config.getString("adapt.runtime.notesfile")
-
-  var savedNotes = Try(scala.io.Source.fromFile(notesFilePath))
-    .map { notesSource =>
-      val notesString = try notesSource.mkString finally notesSource.close()
-      notesString.parseJson.convertTo[List[SavedNotes]]
-    } match {
-      case Success(parsedNotes) => parsedNotes
-      case Failure(e) =>
-//        println("Could not load saved notes file: " + e.getMessage + " It will be created on first write.")
-        List.empty[SavedNotes]
-    }
 
   var queryQueue = List.empty[UUID]
   val freq = config.getInt("adapt.runtime.expansionqueryfreq")
@@ -218,22 +201,6 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
           k -> weights.getOrElse(k, 1D)
         ).toMap
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
-
-    case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
-      savedNotes = savedNotes :+ msg
-      sender() ! Try {
-        new PrintWriter(notesFilePath) {
-          write(savedNotes.toJson.toString)
-          close()
-        }
-      }.map(_ => ())
-
-    case GetNotes(uuids) =>
-      val revOrderNotes = savedNotes.reverse
-      val toSend =
-        if (uuids.isEmpty) revOrderNotes
-        else uuids.flatMap(u => revOrderNotes.find(_.keyUuid == u))
-      sender() ! toSend
   }
 }
 
@@ -243,9 +210,6 @@ case object GetThreshold
 case object GetWeights
 case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
-case class SavedNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[UUID]) {
-  def toJsonString: String = s"""{"keyUuid": "$keyUuid", "rating": $rating, "notes":"$notes", "subgraph":${subgraph.map(u => s""""$u"""").mkString("[",",","]")}, "ratingTimeMillis": ${System.currentTimeMillis()} }"""
-}
 case class GetNotes(uuid: Seq[UUID])
 
 case object MakeExpansionQueries

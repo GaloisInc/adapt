@@ -237,17 +237,9 @@ object Application extends App {
 
       }
 
-    case "anomalies" | "anomaly" =>
-
-      println("Running anomaly-only flow")
-      println("NOTE: this will run using CDM")
-
-      Ta1Flows(ta1)(system.dispatcher)(db).runWith(CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Anomalies", 10000)), Sink.actorRef[ViewScore](anomalyActor, None))
-
     case "ui" | "uionly" =>
       println("Staring only the UI and doing nothing else.")
-
-      startWebServer();
+      startWebServer()
 
     case "valuebytes" =>
       println("NOTE: this will run using CDM")
@@ -286,9 +278,9 @@ object Application extends App {
 
 
     case "find" =>
-      println("Running TEST flow")
-      CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Test"))
-        .collect{ case cdm: Event if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n${cdm}" }
+      println("Running FIND flow")
+      CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Find"))
+        .collect{ case cdm: Event if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
         .runWith(Sink.foreach(println))
 
 
@@ -340,7 +332,7 @@ object Application extends App {
                   List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
-                  List.empty
+                  Nil
                 }
               }
             case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
@@ -354,7 +346,7 @@ object Application extends App {
                   List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
-                  List.empty
+                  Nil
                 }
               }
             case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
@@ -368,14 +360,13 @@ object Application extends App {
                   List((t._1, t._2, subPathNodes, t._3, objPathNodes))
                 } else {
                   events += (src -> t)
-                  List.empty
+                  Nil
                 }
               }
             case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
               // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
               val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
               pathNodeUses += (subObj -> newSet)
-
               Nil
 
   //          case Left(edge) =>
@@ -388,49 +379,32 @@ object Application extends App {
   //            List()
             case Right(adm: AdmEvent) =>
               events += (adm.uuid -> (adm, None, None))
-              List()
+              Nil
             case Right(adm: AdmSubject) =>
               everything += (adm.uuid -> adm)
-              List()
+              Nil
             case Right(adm: AdmFileObject) =>
               everything += (adm.uuid -> adm)
-              List()
+              Nil
             case Right(adm: AdmNetFlowObject) =>
               everything += (adm.uuid -> adm)
-              List()
+              Nil
             case Right(adm: AdmSrcSinkObject) =>
               everything += (adm.uuid -> adm)
-              List()
+              Nil
             case Right(adm: AdmPathNode) =>
               pathNodes += (adm.uuid -> adm)
               Nil
-            case _ => List()
+            case _ => Nil
           }
         }
         .runWith(
           Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
         )
 
-
-
     case _ =>
-      println("Running the combined database ingest + anomaly calculation flow + UI")
-      println("NOTE: this will run using CDM")
-
-      startWebServer()
-
-      RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-        import GraphDSL.Implicits._
-        val bcast = graph.add(Broadcast[CDM18](2))
-
-        CDMSource.cdm18(ta1) ~> FlowComponents.printCounter[CDM18]("Combined", 1000) ~> bcast
-
-        bcast ~> Ta1Flows(ta1)(system.dispatcher)(db) ~> Sink.actorRef[ViewScore](anomalyActor, None)
-        bcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor)(Timeout(30 seconds)) //Neo4jFlowComponents.neo4jWrites(neoGraph)
-
-        ClosedShape
-      }).run()
-
+      println("Unknown runflow argument. Quitting.")
+      Runtime.getRuntime.halt(1)
   }
 }
 
@@ -674,29 +648,6 @@ object CDMSource {
 
 
 object Ta1Flows {
-  import AnomalyStream._
-
-  private val config = ConfigFactory.load()
-  val base = config.getInt("adapt.runtime.basecleanupseconds")    // 10
-  val fastEmit = base * 2 + base                          // 30
-  val slowClean = fastEmit * 2                            // 60
-  val slowEmit = slowClean * 2 + base                     // 130
-
-  def apply(ta1: String)(implicit ec: ExecutionContext) = ta1.toLowerCase match {
-//    case "cadets" =>
-//    case "clearscope" =>
-//    case "faros" =>
-//    case "fivedirections" =>
-//    case "theia" =>
-//    case "trace" =>
-    case _ => anomalyScores(_: DB,
-      base,
-      fastEmit,
-      slowClean,
-      slowEmit
-    ).map[ViewScore]((ViewScore.apply _).tupled).recover[ViewScore]{ case e: Throwable => e.printStackTrace().asInstanceOf[ViewScore] }
-  }
-
   // Get the name of the instrumentation source
   def getSourceName(a: AnyRef): String = a.toString.split("_").last.toLowerCase
 }

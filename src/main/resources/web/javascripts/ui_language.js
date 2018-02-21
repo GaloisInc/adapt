@@ -29,7 +29,6 @@ var starting_queries = [
         base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_})",
         default_values : ["127.0.0.1",80]
     }
-
 ]
 
 var node_appearance = [
@@ -587,6 +586,10 @@ var predicates = [
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')"
     }, {
+        name : "Affected Files",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')"
+    },{
         name : "Affected Objects",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2')"
@@ -619,6 +622,10 @@ var predicates = [
 
  // AdmNetFlowObject
     {
+        name : "NetFlow Subject",
+        is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+        floating_query : ".in('predicateObject','predicateObject2').out('subject').hasLabel('AdmSubject')"
+    }, {
         name : "NetFlow Principal",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
