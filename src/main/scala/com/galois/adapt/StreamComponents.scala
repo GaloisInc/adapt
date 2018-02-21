@@ -35,6 +35,7 @@ import NetFlowStream._
 import FileStream._
 import ProcessStream._
 import MemoryStream._
+import com.galois.adapt.adm.EntityResolution
 import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 
@@ -134,7 +135,7 @@ object FlowComponents {
       if (counter % every == 0) {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
-        println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second")
+        println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  In ADM buffer: ${EntityResolution.inAsyncBuffer.get()}")
         lastTimestampNanos = System.nanoTime()
       }
       List(item)

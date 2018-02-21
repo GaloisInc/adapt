@@ -1,6 +1,7 @@
 package com.galois.adapt.adm
 
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
@@ -135,6 +136,8 @@ object EntityResolution {
 
   type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], NotUsed]
 
+  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
+
   // This does several things:
   //
   //   - prevent nodes with the same UUID from being re-emitted
@@ -143,7 +146,9 @@ object EntityResolution {
   //
   private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
+      .map(x => { inAsyncBuffer.incrementAndGet(); x })
       .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
+      .map(x => { inAsyncBuffer.decrementAndGet(); x })
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
