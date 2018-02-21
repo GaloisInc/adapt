@@ -20,13 +20,15 @@ def detectTypeFile(filepath,type_json='context'): #type_json specifies which typ
 	#the specification file gives query/context details or 'csv' when details are given about csv to be used to generate the context
 	ext=os.path.splitext(filepath)[1]
 	if ext=='.json':
-		return (-1 if type_json=='context' or type_json=='query' else (-2 if type_json=='csv' else 2))
+		return (-1 if type_json=='context' or type_json=='query' else (-2 if type_json=='csv' else 3))
 	elif ext=='.cxt':
 		return 0
 	elif ext=='.fimi':
 		return 1
-	else:
+	elif ext=='.csv':
 		return 2
+	else:
+		return 3
 	
 			
 
@@ -82,13 +84,15 @@ class ConceptsList(): #currently not used. Will be used in later version of code
 
 class Context():
 	
-	def __init__(self,filepath,query_res='',type_json='context'):
+	def __init__(self,filepath,query_res='',type_json='context',port=8080):
+		self.port=port
 		#print('json type (Context)',type_json)
 		self.typefile=detectTypeFile(filepath,type_json) #type of input file (cxt,fimi or json specification file)
+		print('self.typefile',self.typefile)
 		print('Parsing input')
 		if type_json!='query':
 			print('Parsing json', type_json)
-			self.read_file(filepath,type_json) #generation of context object
+			self.read_file(filepath,type_json,port=self.port) #generation of context object
 		else:
 			print('Parsing json', type_json)
 			self.parseQueryRes(filepath,query_res)
@@ -108,7 +112,8 @@ class Context():
 	def setMinSupport(self,support): #set minimal support
 		self.min_support=support
 		
-	def parseQuery(self,filepath): #generates context object from json query specification file
+	def parseQuery(self,filepath,port=8080): #generates context object from json query specification file
+		port_val=port
 		spec=ip.loadSpec(filepath,csv_flag=False)
 		query=spec['query']
 		obj_name=spec['objects']
@@ -116,7 +121,7 @@ class Context():
 		if 'port' in spec.keys():
 			port=spec['port']
 		else:
-			port=8080
+			port=port_val
 		query_res=ip.getQuery(query,port)
 		dic = collections.defaultdict(list)
 		self.attributes=(list({e[att_name] for e in query_res}) if type(att_name)==str else list({str(a)+'#'+str(e[a]) for a in att_name for e in query_res}))
@@ -173,14 +178,18 @@ class Context():
 		r=re.compile('(?P<attributes>.*)\s(?P<vals>(.*\s*)*)',re.M)
 		m=re.match(r,csv)
 		self.attributes,content=m.group('attributes').split(',')[1:],m.group('vals').split('\n')
-		r2=re.compile('(?P<object>\d*),(?P<context>([01],*)*)',re.M)
-		self.objects=[]
-		self.context=[]
-		for v in content:
-			m2=re.match(r2,v)
-			self.objects.append(m2.group('object'))
-			self.context.append(m2.group('context').replace(',',''))
-		self.num_attributes,self.num_objects=len(attributes),len(objects)
+		print('attributes',len(self.attributes))
+		print('content',type(content),len(content),content[0])
+		self.objects,self.context=zip(*[(s.split(',',1)[0],s.split(',',1)[1].replace(',','')) for s in content])
+		#r2=re.compile('(?P<object>(\W|\w)*),(?P<context>([01],*)*)',re.M)
+		#self.objects=[]
+		#self.context=[]
+		#for v in content:
+			#m2=re.match(r2,v)
+			#self.objects.append(m2.group('object'))
+			#self.context.append(m2.group('context').replace(',',''))
+		self.num_attributes,self.num_objects=len(self.attributes),len(self.objects)
+		#print(self.num_objects,self.num_attributes,self.context[0])
 		
 	
 	def parseFimifile(self,fimifile): #build context object from input fimi file
@@ -208,20 +217,23 @@ class Context():
 		return self
 		
 		
-	def read_file(self,filepath,type_json='context'): #generates context object depending on input (cxt file, fimi file or json query specification file)
+	def read_file(self,filepath,type_json='context',port=8080): #generates context object depending on input (cxt file, fimi file or json query specification file)
 		print('Detecting input type')
 		filetype=detectTypeFile(filepath,type_json)
+		port_val=port
 		print('filetype',filetype)
 		if filetype==-2:
 			self.parseCSV(filepath)
 		elif filetype==-1:
-			self.parseQuery(filepath)
+			self.parseQuery(filepath,port=port_val)
 		elif filetype==0:
 			self.parseCxtfile(filepath)
 		elif filetype==1:
 			self.parseFimifile(filepath)
+		elif filetype==2:
+			self.parseContextCSV(filepath)
 		else:
-			print('Wrong file format. Expecting .cxt or .fimi or context (query)/csv specification file (json format) and not '+os.path.splitext(filepath)[1])
+			print('Wrong file format. Expecting .cxt or .fimi or .csv or context (query)/csv specification file (json format) and not '+os.path.splitext(filepath)[1])
 			
 	def writeContext2Cxt(self,cxtfile):
 		ip.writeCxtFile(self.objects,self.attributes,self.context,cxtfile)
@@ -251,7 +263,7 @@ class Context():
 	#def getAttributeFromObject2
 			
 	def computeClosure(self,extent,intent,new_attribute): #computes closures
-		if self.typefile>1:
+		if self.typefile>2:
 			print('Cannot compute closure. File format not recognized and not supported.\n')
 		else:
 			table=self.context
@@ -280,7 +292,7 @@ class Context():
 			
 			
 	def computeClosureWithSupp(self,extent,intent,new_attribute): #computes closures. Takes into account minimal support conditions
-		if self.typefile>1:
+		if self.typefile>2:
 			print('Cannot compute closure. File format not recognized and not supported.\n')
 		else:
 			table=self.context
@@ -336,6 +348,8 @@ class Context():
 						concept=self.generateFromWithSupp(C,D,j+1)
 						concepts.update(concept)
 		return concepts
+		
+	#write version that keeps frontier concepts
 		
 	def generateFromWithSupp2(self,extent,intent,new_attribute): #main function of FCbO. Generates the concepts whose support is above a certain threshold. Currently is a direct port of the original recursive algorithm
 		#For scalability reasons, an iterative version of this function will be included in a future version of the code

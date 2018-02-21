@@ -110,7 +110,7 @@ def fcaC(fcbo_path,fca_context,min_support,sourcefile,fimifile,named,output,proc
 		result=fcaCReturn(fca_context,itemsets,proceed_flag,False,[])
 	return result
 
-def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1):
+def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1,port=8080):
 	#print('runFCA queryres',queryres)
 	#add code_flag switch to allow bypass of my python code+add naming of c fimi results
 	if code_flag not in code_flag_options:
@@ -125,11 +125,12 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 	parallel=parallel_flag
 	ncpus=cpus
 	named=namingByFileExtension(fileext,disable_naming)
+	port_val=port
 	type_json=('csv' if csv_flag==True else ('query' if queryres!='' else 'context'))
 	#print('runFCA type_json',type_json)
 	if inputfile=='':
 		#print('runFCA constructing context')
-		fca_context=fcbo.Context(specfile,queryres,type_json)#we query localhost based on the specification file), parse it to a context
+		fca_context=fcbo.Context(specfile,queryres,type_json,port=port_val)#we query localhost based on the specification file), parse it to a context
 		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		print('case where only specification supplied')#if no input file is specified (which means a specification has been specified),
 		if flag=='python':
@@ -148,7 +149,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 			result=fcaC(fcbo_path,fca_context,min_support,specfile,fimifile,named,outputfile,proceed_flag,False,csv,parallel,ncpus)
 	elif specfile=='': #if no specification file is supplied
 		print('case where only input file supplied')
-		fca_context=fcbo.Context(inputfile,queryres,type_json)#a context input file has to be specified (in cxt or fimi format)
+		fca_context=fcbo.Context(inputfile,queryres,type_json,port=port_val)#a context input file has to be specified (in cxt or fimi format)
 		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		if flag=='python':
 			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
@@ -161,10 +162,10 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 				result=fcaC(fcbo_path,fca_context,min_support,inputfile,fimifile,named,outputfile,proceed_flag,False,parallel,ncpus)
 	else: #case where both a query specification file and a context input file are specified
 		print('case where both specification and input file supplied')
-		fca_context=fcbo.Context(specfile,queryres,type_json) # a context is generated using the query specification file
+		fca_context=fcbo.Context(specfile,queryres,type_json,port=port_val) # a context is generated using the query specification file
 		if flag=='python':
 			if csv==False:
-				res,obj_name,att_name=(ip.getQueryResFromSpecFile(specfile) if type_json=='context' else ip.getQueryResFromJsons(specfile,queryres))
+				res,obj_name,att_name=(ip.getQueryResFromSpecFile(specfile,port=port_val) if type_json=='context' else ip.getQueryResFromJsons(specfile,queryres))
 				#if type_json=='context':
 					#res,obj_name,att_name=ip.getQueryResFromSpecFile(specfile)
 				#elif type_json=='query':
@@ -382,7 +383,7 @@ parser.add_argument('--workflow','-w',help='Specify whether to run only FCA, onl
 #In an upcoming version, it will be possible to do the concepts computation and the analysis separately.
 parser.add_argument('--fca_algo','-f',help='Specifies whether to run FCA from the python (FCbO) or the C (FCbO or PCbO) code ',action='store',choices=['python','C'],default='python')
 parser.add_argument('--fcbo_path','-p',help='Specifies the location of the FCbO/PCbO C code',action='store',default='')
-parser.add_argument('--inputfile','-i',help='Full path to FCA input file including extension (cxt or fimi). If not given, --specfile/-s is required.',default='')
+parser.add_argument('--inputfile','-i',help='Full path to FCA input file including extension (cxt or fimi or csv). If not given, --specfile/-s is required.',default='')
 parser.add_argument('--specfile','-s',help="Context specification file (json format+contains 'spec' in filename) that generates FCA input context. If not given, --inputfile/-i is required",default='')
 parser.add_argument('--queryres','-q',help="JSON file containing results of a query",default='')
 #either an context input file (in cxt or fimi format) or a query specification file or both have to be provided. If only a context input file is provided, the context in the file is used as
@@ -393,7 +394,7 @@ parser.add_argument('--csv',help='Specifies whether the specification file gives
 parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbo should be used instead of FCbO',type=int,default=1)
 parser.add_argument('--min_support','-m',help="Minimum support of the concepts to be computed (float required). Default:0",type=float,default=0)
 #argument to specify the minimal support of the concepts to be returned by FCbO. A default of 0 is set, which means that all concepts are genrated by default.
-
+parser.add_argument('--port',help="Query port. Default:8080",type=int,default=8080)
 parser.add_argument('--disable_naming','-dn',help='Only applies when context is directly generated from json specification file or when context is a CXT file. Turns off naming of object and attribute entities in concepts. Objects and attributes only referred to by their position (index) in the context.',action='store_true')
 #This argument cannot be invoked with an input FIMI file. It can be invoked with a json query specification file or an input file in CXT format. If invoked, the objects and attributes
 #are identified by their positions in the context matrix (as is the case for FIMI files) and not by name.
@@ -420,7 +421,7 @@ parser.add_argument('--concept_file','-cf',help='Full path to the file that cont
 
 #parser.add_argument('--num_rules','-nr',help='Number of rules to display',type=int, default=10)
 
-parser.add_argument('--rules_spec','-rs',help='JSON file that specifies which rules should be computed along with their computation parameters',action='store',default='./rulesCurrent_spec.json')
+parser.add_argument('--rules_spec','-rs',help='JSON file that specifies which rules should be computed along with their computation parameters',action='store',default='./rulesSpecs/rules_implication_all.json')
 
 
 #launches concept generation with FCbO then analysis
@@ -430,6 +431,7 @@ if __name__ == '__main__':
 	#retrieving the arguments from the command line
 	args=parser.parse_args()
 	workflow=args.workflow
+	port_val=args.port
 	fca_algo=args.fca_algo
 	fcbo_path=args.fcbo_path
 	csv=args.csv
@@ -459,7 +461,7 @@ if __name__ == '__main__':
 			naming=args.disable_naming
 		else:
 			naming=False
-		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus)
+		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus,port=port_val)
 		print('FCA finished. Concepts generated')
 		if workflow=='both':
 			output_file_analysis=args.analysis_outputfile
