@@ -22,7 +22,6 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       case _              => throw new DeserializationException("Expected hexadecimal UUID string")
     }
   }
-  implicit val savedNotesJsonProtocol = jsonFormat4(SavedNotes)
 
   val vertexTypeTuple = "type" -> JsString("vertex")
   val edgeTypeTuple   = "type" -> JsString("edge")

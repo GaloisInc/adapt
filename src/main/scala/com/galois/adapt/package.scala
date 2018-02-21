@@ -2,7 +2,6 @@ package com.galois
 
 import java.util.UUID
 
-import org.neo4j.graphdb.RelationshipType
 
 package object adapt {
 
