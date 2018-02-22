@@ -142,7 +142,10 @@ object EntityResolution {
   type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], NotUsed]
 
 //  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
-  val asyncTime = new ConcurrentHashMap[Long, Either[Long, Long]]()
+  val asyncTime = new ConcurrentHashMap[Long, Long]()
+  var totalHistoricalTimeInAsync: Long = 0
+  var totalHistoricalCountInAsync: Int = 0
+
   val blockedEdgesCount: AtomicInteger = new AtomicInteger(0)
   val blockingNodes: MutableSet[UUID] = MutableSet.empty[UUID]
 
@@ -154,9 +157,18 @@ object EntityResolution {
   //
   private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
-      .map(x => { val id = Random.nextLong(); asyncTime.put(id, Left(System.currentTimeMillis)); x.map(e => id -> e) })
+
+      .map(x => {
+        val id: Long = Random.nextLong()
+        asyncTime.put(id, System.currentTimeMillis)
+        x.map(e => id -> e)
+      })
       .mapAsyncUnordered[(Long, Either[EdgeAdm2Adm, ADM])](parallelism)(identity)
-      .map(x => { asyncTime.put(x._1, Right(System.currentTimeMillis - asyncTime.get(x._1).left.get)); x._2 })
+      .map { case (id, x) =>
+        totalHistoricalCountInAsync += 1
+        totalHistoricalTimeInAsync += asyncTime.remove(id)
+        x
+      }
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far

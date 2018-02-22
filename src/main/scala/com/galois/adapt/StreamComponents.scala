@@ -39,10 +39,10 @@ object FlowComponents {
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
         import collection.JavaConverters._
 
-        val admFuturesCount = EntityResolution.asyncTime.values().asScala.collect{ case Left(l) => l }.size
-        val measuredMillis = EntityResolution.asyncTime.values().asScala.collect{ case Right(l) => l }
-        val countOutOfBuffer = measuredMillis.size
-        val averageMillisInAsyncBuffer = Try(measuredMillis.sum.toFloat / measuredMillis.size).getOrElse(0F)
+        val admFuturesCount = EntityResolution.asyncTime.values().asScala.size
+        val measuredMillis = EntityResolution.totalHistoricalTimeInAsync
+        val countOutOfBuffer = EntityResolution.totalHistoricalCountInAsync
+        val averageMillisInAsyncBuffer = Try(measuredMillis.toFloat / countOutOfBuffer).getOrElse(0F)
 
         val blockEdgesCount = EntityResolution.blockedEdgesCount.get()
         val blockingNodes = EntityResolution.blockingNodes.size
