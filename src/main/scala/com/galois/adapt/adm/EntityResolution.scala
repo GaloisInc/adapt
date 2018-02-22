@@ -1,8 +1,8 @@
 package com.galois.adapt.adm
 
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
@@ -13,11 +13,11 @@ import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
-
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.postfixOps
+import scala.util.Random
 
 
 object EntityResolution {
@@ -127,6 +127,8 @@ object EntityResolution {
       } yield EdgeAdm2Adm(src_new.target, lbl, tgt_new.target)
     }
 
+    val id = Random.nextLong()
+
     Flow[Future[Either[Edge[_, _], ADM]]].map(_.flatMap {
       case Left(edge) => remapEdge(edge).map(Left(_))
       case Right(node) => Future.successful(Right(node))
@@ -136,7 +138,8 @@ object EntityResolution {
 
   type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], NotUsed]
 
-  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
+//  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
+  val asyncTime = new ConcurrentHashMap[Long, Either[Long, Long]]()
 
   // This does several things:
   //
@@ -146,9 +149,9 @@ object EntityResolution {
   //
   private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
-      .map(x => { inAsyncBuffer.incrementAndGet(); x })
-      .mapAsyncUnordered[Either[EdgeAdm2Adm, ADM]](parallelism)(identity)
-      .map(x => { inAsyncBuffer.decrementAndGet(); x })
+      .map(x => { val id = Random.nextLong(); asyncTime.put(id, Left(System.currentTimeMillis)); x.map(e => id -> e) })
+      .mapAsyncUnordered[(Long, Either[EdgeAdm2Adm, ADM])](parallelism)(identity)
+      .map(x => { asyncTime.put(x._1, Right(System.currentTimeMillis - asyncTime.get(x._1).left.get)); x._2 })
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
         val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far

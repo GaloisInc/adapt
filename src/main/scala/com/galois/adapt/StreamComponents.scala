@@ -4,25 +4,14 @@ import java.nio.file.Paths
 import java.util.UUID
 import akka.stream.scaladsl._
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
-import GraphDSL.Implicits._
+import akka.actor.ActorRef
 import akka.util.ByteString
-import collection.JavaConverters._
 import scala.collection.mutable
-import scala.sys.process._
-import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
-import org.apache.kafka.common.serialization.ByteArraySerializer
-import org.apache.tinkerpop.gremlin.structure.Vertex
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.io.{Source => FileSource}
-import NetFlowStream._
-import FileStream._
-import ProcessStream._
-import MemoryStream._
 import com.galois.adapt.adm.EntityResolution
 import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
+import collection.JavaConverters._
+import scala.util.Try
 
 
 object FlowComponents {
@@ -30,10 +19,11 @@ object FlowComponents {
   val config = ConfigFactory.load()
 
 
-  def printCounter[T](name: String, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
+  def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = config.getLong("adapt.ingest.startatoffset")
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
+    val populationCounter = MutableMap.empty[String, Long]
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
       if (lastTimestampNanos == 0L) {
@@ -41,11 +31,34 @@ object FlowComponents {
         lastTimestampNanos = System.nanoTime()
       }
       counter = counter + 1
+      val className = item.getClass.getSimpleName
+      populationCounter += (className -> (populationCounter.getOrElse(className, 0L) + 1))
+
       if (counter % every == 0) {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
-        println(s"$name ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  In ADM buffer: ${EntityResolution.inAsyncBuffer.get()}")
-        lastTimestampNanos = System.nanoTime()
+        import collection.JavaConverters._
+
+        val admFuturesCount = EntityResolution.asyncTime.values().asScala.collect{ case Left(l) => l }.size
+        val measuredMillis = EntityResolution.asyncTime.values().asScala.collect{ case Right(l) => l }
+        val countOutOfBuffer = measuredMillis.size
+        val averageMillisInAsyncBuffer = Try(measuredMillis.sum.toFloat / measuredMillis.size).getOrElse(0F)
+
+        println(s"$counterName ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  In ADM buffer: $admFuturesCount")
+
+        statusActor ! PopulationLog(
+          counterName,
+          counter,
+          every,
+          populationCounter.toMap,
+          admFuturesCount,
+          countOutOfBuffer,
+          averageMillisInAsyncBuffer
+        )
+
+        populationCounter.clear()
+
+        lastTimestampNanos = nowNanos
       }
       List(item)
     }

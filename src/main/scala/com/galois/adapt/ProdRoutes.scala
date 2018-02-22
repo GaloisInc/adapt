@@ -66,14 +66,13 @@ object ProdRoutes {
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     PolicyEnforcementDemo.route(dbActor) ~
     get {
-      pathPrefix("status") {
-        complete(
-          "todo"
-//          Map(
-//            "nodes" -> statusList.map(s => UINode(s.from.toString, s.from.path.elements.last, s.measurements.mapValues(_.toString).toList.map(t => s"${t._1}: ${t._2}").mkString("<br />"))).map(ApiJsonProtocol.c.write),
-//            "edges" -> statusList.flatMap(s => s.subscribers.map(x => UIEdge(s.from.toString, x.toString, ""))).map(ApiJsonProtocol.d.write)
-//          )
-        )
+      pathPrefix("api"){
+        pathPrefix("status") {
+          import ApiJsonProtocol.statusReport
+          complete(
+            (statusActor ? GetStats).mapTo[StatusReport]
+          )
+        }
       } ~
       pathPrefix("query") {
         pathPrefix("nodes") {

@@ -27,7 +27,7 @@ import scala.util.{Failure, Success, Try}
 
 import scala.language.postfixOps
 
-class Neo4jDBQueryProxy extends DBQueryProxyActor {
+class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   val config: Config = ConfigFactory.load()
 
@@ -279,13 +279,21 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
     result
   }
 
-  override def receive: PartialFunction[Any,Unit] = super.receive orElse {
-
+  override def receive: PartialFunction[Any,Unit] = ({
     // Cypher queries are only supported by Neo4j, and they are always streaming
     case CypherQuery(q) =>
       println(s"Received Cypher query: $q")
       sender() ! Future { Try { neoGraph.execute(q).asScala.map(DBQueryProxyActor.toJson) } }
-  }
+
+    case InitMsg =>
+      statusActor ! InitMsg
+      super.receive(InitMsg)
+
+    case CompleteMsg =>
+      statusActor ! CompleteMsg
+      super.receive(CompleteMsg)
+
+  }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
 

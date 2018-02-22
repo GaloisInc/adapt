@@ -90,20 +90,6 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
 
 
   def receive = {
-    case view: ViewScore =>
-      val existing = anomalies.getOrElse(view.keyNode, MutableMap.empty[String, (Double, Set[UUID])])
-
-      if (view.suspicionScore < threshold) existing -= view.viewName
-      else existing += (view.viewName -> (view.suspicionScore, view.subgraph))
-
-      if (existing.isEmpty) {
-        anomalies -= view.keyNode
-        if (queryQueue.contains(view.keyNode)) queryQueue = queryQueue.filterNot(_ == view.keyNode)
-      } else {
-        anomalies += (view.keyNode -> existing)
-        if ( ! queryQueue.contains(view.keyNode)) queryQueue = view.keyNode :: queryQueue
-      }
-
     case MakeExpansionQueries =>
 //          println("Q: " + queryQueue.size)
         queryQueue.lastOption.foreach { startUuid =>

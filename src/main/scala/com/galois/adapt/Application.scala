@@ -14,7 +14,6 @@ import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.galois.adapt.Application.config
 import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
@@ -29,7 +28,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker}
 import org.reactivestreams.Publisher
-
+import FlowComponents._
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -68,10 +67,12 @@ object Application extends App {
   val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
+  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+
   // Start up the database
   val dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
-    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy]))
+    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
   println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
@@ -79,7 +80,6 @@ object Application extends App {
 
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
-  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
 
   // Akka-streams makes this _way_ more difficult than I feel it ought to be, but here it is:
   //
@@ -133,7 +133,7 @@ object Application extends App {
 
       startWebServer()
       CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
-        .via(FlowComponents.printCounter("CDM events"))
+        .via(printCounter("CDM events", statusActor))
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
 
@@ -163,7 +163,7 @@ object Application extends App {
       if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
 
       startWebServer()
-      CDMSource.cdm18(ta1).via(FlowComponents.printCounter(name)).runWith(sink)
+      CDMSource.cdm18(ta1).via(printCounter(name, statusActor)).runWith(sink)
 
     case "csvmaker" | "csv" =>
 
@@ -182,7 +182,7 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[CDM18](8))
 
-            CDMSource.cdm18(ta1).via(FlowComponents.printCounter("File Input")) ~> broadcast.in
+            CDMSource.cdm18(ta1).via(printCounter("File Input", statusActor)) ~> broadcast.in
 
             broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
             broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
@@ -207,7 +207,7 @@ object Application extends App {
             val broadcast = graph.add(Broadcast[Any](9))
 
             CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource))
-              .via(FlowComponents.printCounter("DB Writer", 1000))
+              .via(printCounter("DB Writer", statusActor, 1000))
               .via(Flow.fromFunction {
                 case Left(e) => e
                 case Right(ir) => ir
@@ -279,7 +279,7 @@ object Application extends App {
 
     case "find" =>
       println("Running FIND flow")
-      CDMSource.cdm18(ta1).via(FlowComponents.printCounter("Find"))
+      CDMSource.cdm18(ta1).via(printCounter("Find", statusActor))
         .collect{ case cdm: Event if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
         .runWith(Sink.foreach(println))
 
@@ -288,7 +288,7 @@ object Application extends App {
       println("Running Novelty Detection Flow")
       val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
       CDMSource.cdm18(ta1)
-        .via(FlowComponents.printCounter("Novelty"))
+        .via(printCounter("Novelty", statusActor))
         .via(EntityResolution(uuidRemapper, synSource))
         .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
 
@@ -409,16 +409,6 @@ object Application extends App {
 }
 
 
-class StatusActor extends Actor with ActorLogging {
-  def receive = {
-    case x => println(s"StatusActor received: $x")
-  }
-}
-
-
-case class ViewScore(viewName: String, keyNode: UUID, suspicionScore: Double, subgraph: Set[UUID])
-
-
 object CDMSource {
   private val config = ConfigFactory.load()
   val scenario = config.getString("adapt.env.scenario")
@@ -453,7 +443,7 @@ object CDMSource {
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "theia"
         shouldLimit.fold(src)(l => src.take(l))
-          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(FlowComponents.printCounter("Theia Query Response", 1)))
+          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "trace"
