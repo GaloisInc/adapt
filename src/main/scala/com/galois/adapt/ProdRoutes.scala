@@ -1,28 +1,28 @@
 package com.galois.adapt
 
-import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post, _}
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import com.bbn.tc.schema.avro.TheiaQueryType
-import com.typesafe.config.ConfigFactory
-import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import spray.json.JsValue
-
-import scala.concurrent.{ExecutionContext, Future}
-//import akka.http.scaladsl.marshalling._
-import java.util.UUID
-
-import akka.actor.ActorRef
-import akka.pattern.ask
-import akka.util.Timeout
+import spray.json._
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
+import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
+import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives._
+import akka.stream.Materializer
+import com.bbn.tc.schema.avro.TheiaQueryType
+import com.typesafe.config.ConfigFactory
+import spray.json.{JsString, JsValue}
+//import akka.http.scaladsl.marshalling._
+import java.util.UUID
+import akka.actor.ActorRef
+import akka.util.Timeout
+import akka.pattern.ask
 import scala.language.postfixOps
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 
 object ProdRoutes {
@@ -42,25 +42,8 @@ object ProdRoutes {
 
   implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
 
-  // This lets us stream out JSON values
-  implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
-
-  def queryStreamingResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)
-                                    (implicit ec: ExecutionContext): Future[Source[JsValue, NotUsed]] = {
-    for {
-      futTryIterator <- (dbActor ? query).mapTo[Future[Try[Iterator[JsValue]]]]
-      tryIterator <- futTryIterator
-      i = tryIterator.get
-    } yield Source.fromIterator[JsValue](() => i)
-  }
-
-
-  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)
-                                    (implicit ec: ExecutionContext): Future[JsValue] = for {
-    futTryResult <- (dbActor ? query).mapTo[Future[Try[JsValue]]]
-    tryResult <- futTryResult
-    result: JsValue = tryResult.get
-  } yield result
+  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = (dbActor ? query)
+    .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
@@ -106,7 +89,7 @@ object ProdRoutes {
         pathPrefix("cypher") {
           path(RemainingPath) { queryString =>
             complete(
-              queryStreamingResult(CypherQuery(queryString.toString), dbActor)
+              queryResult(CypherQuery(queryString.toString), dbActor)
             )
           }
         }
@@ -169,7 +152,7 @@ object ProdRoutes {
         path("cypher") {
           formField('query) { queryString =>
             complete(
-              queryStreamingResult(CypherQuery(queryString), dbActor)
+              queryResult(CypherQuery(queryString), dbActor)
             )
           }
         }

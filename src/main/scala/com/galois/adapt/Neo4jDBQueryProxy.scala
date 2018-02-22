@@ -281,9 +281,9 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   override def receive: PartialFunction[Any,Unit] = ({
     // Cypher queries are only supported by Neo4j, and they are always streaming
-    case CypherQuery(q) =>
+    case CypherQuery(q, true) =>
       println(s"Received Cypher query: $q")
-      sender() ! Future { Try { neoGraph.execute(q).asScala.map(DBQueryProxyActor.toJson) } }
+      sender() ! Future { Try { DBQueryProxyActor.toJson(neoGraph.execute(q).asScala.toList)  } }
 
     case InitMsg =>
       statusActor ! InitMsg
