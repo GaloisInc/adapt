@@ -3,6 +3,8 @@ package com.galois.adapt.adm
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.IntUnaryOperator
+
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
@@ -13,6 +15,7 @@ import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -140,6 +143,8 @@ object EntityResolution {
 
 //  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
   val asyncTime = new ConcurrentHashMap[Long, Either[Long, Long]]()
+  val blockedEdgesCount: AtomicInteger = new AtomicInteger(0)
+  val blockingNodes: MutableSet[UUID] = MutableSet.empty[UUID]
 
   // This does several things:
   //
@@ -162,11 +167,14 @@ object EntityResolution {
         def emitEdge(edge: EdgeAdm2Adm): List[Either[EdgeAdm2Adm, ADM]] = {
           if (!seenNodes.contains(edge.src)) {
             blockedEdges(edge.src) = edge :: blockedEdges.getOrElse(edge.src, Nil)
+            blockingNodes += edge.src
             Nil
           } else if (!seenNodes.contains(edge.tgt)) {
             blockedEdges(edge.tgt) = edge :: blockedEdges.getOrElse(edge.tgt, Nil)
+            blockingNodes += edge.tgt
             Nil
           } else {
+            blockedEdgesCount.decrementAndGet()
             List(Left(edge))
           }
         }
@@ -176,9 +184,11 @@ object EntityResolution {
           case Right(adm) if seenNodes.contains(adm.uuid) => Nil  // Duplicate ADM - ignore
           case Left(edge) =>
             seenEdges.add(edge)
+            blockedEdgesCount.incrementAndGet()
             emitEdge(edge)                                   // Edge - check if we can emit
           case Right(adm) =>                                 // New ADM - record and emit
             seenNodes.add(adm.uuid)
+            blockingNodes -= adm.uuid
             val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(emitEdge)
             Right(adm) :: emit
         }
@@ -197,15 +207,17 @@ object EntityResolution {
     def map[U](f: T => U): Timed[U] = Timed(time, f(unwrap))
   }
 
+  var currentTime: Long = 0
+
   def annotateTime: Flow[CDM, Timed[CDM], _] = Flow[CDM].statefulMapConcat{ () =>
-    var currentTime: Long = 0
+//    var currentTime: Long = 0
     val maxTimeJump: Long = (config.getInt("adapt.adm.maxtimejumpsecs") seconds).toNanos
 
     (cdm: CDM) => {
       for (time <- timestampOf(cdm); if time > currentTime) {
         cdm match {
           case _: TimeMarker if time > currentTime => currentTime = time
-          case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime == 0) => currentTime = time
+          case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime < 1400000000000000L) => currentTime = time
           case _ => { }
         }
 

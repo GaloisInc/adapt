@@ -44,7 +44,11 @@ object FlowComponents {
         val countOutOfBuffer = measuredMillis.size
         val averageMillisInAsyncBuffer = Try(measuredMillis.sum.toFloat / measuredMillis.size).getOrElse(0F)
 
-        println(s"$counterName ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  In ADM buffer: $admFuturesCount")
+        val blockEdgesCount = EntityResolution.blockedEdgesCount.get()
+        val blockingNodes = EntityResolution.blockingNodes.size
+        val currentTime = EntityResolution.currentTime
+
+        println(s"$counterName ingested: $counter   Elapsed for this $every: ${f"$durationSeconds%.3f"} seconds.  Rate for this $every: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  In ADM buffer: $admFuturesCount.  Edges waiting for nodes: $blockEdgesCount.  Nodes blocking edges: $blockingNodes. Current time: $currentTime")
 
         statusActor ! PopulationLog(
           counterName,
