@@ -165,8 +165,8 @@ object EntityResolution {
       })
       .mapAsyncUnordered[(Long, Either[EdgeAdm2Adm, ADM])](parallelism)(identity)
       .map { case (id, x) =>
+        totalHistoricalTimeInAsync += (System.currentTimeMillis - asyncTime.remove(id))
         totalHistoricalCountInAsync += 1
-        totalHistoricalTimeInAsync += asyncTime.remove(id)
         x
       }
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
