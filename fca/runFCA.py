@@ -389,7 +389,7 @@ def runParallel(nb_processes,input_files,fcbo_path,disable_naming=False,min_supp
 	
 	
 if __name__=='__main__':
-	Directory='./explore/csv' #root directory that holds the input files (csv)
+	Directory='./fca/csv' #root directory that holds the input files (csv)
 	specfile=[os.path.join(Directory,'csvspec.json')] #path to the json specification file that describes the input CSV files
 	fcbo_path='./fcbo-ins/fcbo' #path to FCbO or PCbO executable (in this case FCbO)
 	#min_supp=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
