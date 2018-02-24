@@ -303,12 +303,10 @@ object Neo4jFlowComponents {
     .collect { case cdm: DBNodeable[_] => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
-    .recover{ case e: Throwable => e.printStackTrace() }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
-    .recover{ case e: Throwable => e.printStackTrace() }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

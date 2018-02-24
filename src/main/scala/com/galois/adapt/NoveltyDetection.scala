@@ -18,8 +18,8 @@ object NoveltyDetection {
   val noveltyThreshold: Float = 0.01F
   type IsNovel = Option[List[(String, Float)]]
 
-  class Tree(filter: F, discriminators: D) {
-    var children = Map.empty[ExtractedValue, Tree]
+  case class NoveltyTree(filter: F, discriminators: D) {
+    var children = Map.empty[ExtractedValue, NoveltyTree]
     var counter = 0
 
     def globalNoveltyRate = ???
@@ -45,7 +45,7 @@ object NoveltyDetection {
         case discriminator :: remainingDiscriminators =>
           val extracted = discriminator(e, s, o)
           val childExists = children.contains(extracted)
-          val childTree = children.getOrElse(extracted, new Tree(filter, remainingDiscriminators))
+          val childTree = children.getOrElse(extracted, new NoveltyTree(filter, remainingDiscriminators))
           children = children + (extracted -> childTree)
           val childUpdateResult = childTree.update(e, s, o)
 
@@ -56,6 +56,67 @@ object NoveltyDetection {
           else None
       }
     } else None
+  }
+
+
+
+  trait PpmTree {
+    def getCount: Int
+    def update(e: Event, s: Subject, o: Object): Option[Boolean]
+    def getTreeReport(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeReport
+  }
+  case object PpmTree {
+    def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
+  }
+
+  class SymbolNode(filter: F, discriminators: D) extends PpmTree {
+    private var counter = 0
+    def getCount: Int = counter
+
+    var children = Map.empty[ExtractedValue, PpmTree]
+    children = children + ("_?_" -> new QNode(() => children.size - 1))
+
+    def totalChildCounts = children.values.map(_.getCount).sum
+
+    def localChildProbability(identifier: ExtractedValue): Float =
+      children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
+
+    def update(e: Event, s: Subject, o: Object): Option[Boolean] = {
+      counter += 1
+      discriminators match {
+        case Nil => Some(false)
+        case discriminator :: remainingDiscriminators =>
+          val extracted = discriminator(e, s, o)
+          val childExists = children.contains(extracted)
+          val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
+          if ( ! childExists) children = children + (extracted -> childNode)
+          childNode.update(e, s, o)
+      }
+    }
+
+    def getTreeReport(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeReport =
+      TreeReport(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
+        if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeReport(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
+      )
+  }
+
+  class QNode(counterFunc: () => Int) extends PpmTree {
+    def getCount = counterFunc()
+    def update(e: Event, s: Subject, o: Object): Option[Boolean] = Some(true)
+    def getTreeReport(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeReport =
+      TreeReport(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
+  }
+}
+
+case class TreeReport(depth: Int, key: String, localProb: Float, globalProb: Float, count: Int, children: Set[TreeReport]) {
+  override def toString = {
+    val indent = (0 until (4 * depth)).map(_ => " ").mkString("")
+    val depthString = if (depth < 10) s" $depth" else depth.toString
+    val localProbString = localProb.toString + (0 until (13 - localProb.toString.length)).map(_ => " ").mkString("")
+    val globalProbString = globalProb.toString + (0 until (13 - globalProb.toString.length)).map(_ => " ").mkString("")
+    val countString = (0 until (9 - count.toString.length)).map(_ => " ").mkString("") + count.toString
+    s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
+      children.toList.sortBy(r => 1F - r.localProb).map(_.toString).mkString("\n", "", "")
   }
 }
 
@@ -69,15 +130,15 @@ class NoveltyActor extends Actor with ActorLogging {
     (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", ",", "]")
   )
 
-  val root = new Tree(f, ds)
+  val root = PpmTree(f, ds)
 
   def receive = {
     case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      root.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
+      root.update(e, s -> subPathNodes, o -> objPathNodes) //.foreach(println)
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => root.print(0, "")
+    case CompleteMsg => println(root.getTreeReport().toString)
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
