@@ -81,7 +81,7 @@ object NoveltyDetection {
     def localChildProbability(identifier: ExtractedValue): Float =
       children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-    def update(e: Event, s: Subject, o: Object): Option[Boolean] = {
+    def update(e: Event, s: Subject, o: Object): Option[Boolean] = if (filter(e,s,o)) {
       counter += 1
       discriminators match {
         case Nil => Some(false)
@@ -92,7 +92,7 @@ object NoveltyDetection {
           if ( ! childExists) children = children + (extracted -> childNode)
           childNode.update(e, s, o)
       }
-    }
+    } else None
 
     def getTreeReport(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeReport =
       TreeReport(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
@@ -116,7 +116,7 @@ case class TreeReport(depth: Int, key: String, localProb: Float, globalProb: Flo
     val globalProbString = globalProb.toString + (0 until (13 - globalProb.toString.length)).map(_ => " ").mkString("")
     val countString = (0 until (9 - count.toString.length)).map(_ => " ").mkString("") + count.toString
     s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
-      children.toList.sortBy(r => 1F - r.localProb).map(_.toString).mkString("\n", "", "")
+      children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString).mkString("\n", "", "")
   }
 }
 
@@ -130,15 +130,19 @@ class NoveltyActor extends Actor with ActorLogging {
     (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", ",", "]")
   )
 
-  val root = PpmTree(f, ds)
+  val processFileTouches = PpmTree(f, ds)
+  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
+  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
 
   def receive = {
     case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      root.update(e, s -> subPathNodes, o -> objPathNodes) //.foreach(println)
+      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes)
+      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
+      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => println(root.getTreeReport().toString)
+    case CompleteMsg => println(processFileTouches.getTreeReport().toString)
     case x => log.error(s"Received Unknown Message: $x")
   }
 }

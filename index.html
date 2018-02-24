@@ -22,7 +22,7 @@
 	<script type="text/javascript" src="javascripts/jquery-3.3.1.min.js"></script>
     <script type="text/javascript" src="javascripts/underscore.js"></script>
 	<script type="text/javascript">
-		$(function() {
+		function updateServerStatus() {
 			$("td.server").has("a").each(function(i, elem){
 				var endpoint = $(elem).children("a")[0].href + "api/status"
 				$.getJSON(endpoint, function(results){
@@ -33,6 +33,10 @@
 					}
 				}).fail(function() { $(elem).css("background-color", "red") })
 			})
+			setTimeout(updateServerStatus,30000)
+		}
+		$(function() {
+			updateServerStatus()
 		})
 	</script>
 </head>
