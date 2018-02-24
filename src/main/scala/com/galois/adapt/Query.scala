@@ -188,7 +188,7 @@ object Query {
 
       def str: Parser[QueryValue[String]] =
         ( variable(strs)
-        | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
+        | stringLiteral             ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
@@ -245,7 +245,7 @@ object Query {
 
       def strPredicate: Parser[QueryValue[P[String]]] =
         ( predicate(str)
-        | "regex(" ~ stringLiteral ~ ")"         ^^ { case _~s~_     => RawRegexPred(s) }
+        | "regex(" ~ str ~ ")"                   ^^ { case _~s~_     => RawRegexPred(s) }
         ).withFailureMessage(s"predicate of type String expected")
 
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
@@ -271,7 +271,8 @@ object Query {
         | ".hasNot(" ~! str ~ ")"          ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".hasId(" ~! lng ~ ")"           ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
-        | ".where(" ~ strPredicate ~ ")"  ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where(" ~ strPredicate ~ ")"   ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where("~str~","~strPredicate~")"^^{ case _~k~_~p~_  => WhereKeyPredicate(_: Tr, k, p) }
         | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
@@ -461,27 +462,16 @@ object QueryLanguage {
   case class RawWithinPred[T](col: QueryValue[Seq[T]]) extends QueryValue[P[T]] {
     override def eval(context: Map[String,QueryValue[_]]): P[T] = P.within(col.eval(context): _*)
   }
-  case class RawRegexPred(regex: String) extends QueryValue[P[String]] {
+  case class RawRegexPred(regex: QueryValue[String]) extends QueryValue[P[String]] {
 
+    // Yep. This is grossly inefficient. This is probably why tinkerpop doesn't offer this by default. Note that this
+    // is pretty much what Titan's regex predicate is.
     val matches: BiPredicate[String,String] = new BiPredicate[String,String] {
-
-      // Compile the regex only once...
-      val compiledRegex: Regex = regex.r
-      println(regex)
-
-      // So you noticed that `valueB` never gets used, eh? You are probably thinking: "You don't understand how
-      // `BiPredicate` works! You must want a `Predicate`". Unfortunately, it is tinkerpop that are confused. Check out
-      // their implementation of `OrBiPredicate` (another example of something that ought to be a `Predicate`).
-      @Override
-      override def test(valueA: String, valueB: String): Boolean = {
-        println(valueA)
-        val r = compiledRegex.findFirstMatchIn(valueA).isDefined
-        println(r)
-        r
-      }
+      override def test(valueA: String, valueB: String): Boolean = valueA.matches(valueB)
     }
 
-    override def eval(context: Map[String,QueryValue[_]]): P[String] = P.test(matches, "").asInstanceOf[P[String]]
+    override def eval(context: Map[String,QueryValue[_]]): P[String] =
+      P.test(matches, regex.eval(context)).asInstanceOf[P[String]]
   }
   case class Variable[T](name: String) extends QueryValue[T] {
     override def eval(context: Map[String,QueryValue[_]]): T = context(name).eval(context).asInstanceOf[T]
@@ -543,6 +533,10 @@ object QueryLanguage {
   case class WherePredicate[S,T](traversal: Traversal[S,T], where: QueryValue[P[String]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).where(where.eval(context))
+  }
+  case class WhereKeyPredicate[S,T](traversal: Traversal[S,T], k: QueryValue[String], where: QueryValue[P[String]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).where(k.eval(context), where.eval(context))
   }
   case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
