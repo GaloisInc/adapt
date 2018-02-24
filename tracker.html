@@ -1,0 +1,241 @@
+<html>
+  <body>
+
+    <table>
+      <caption><h3>Average milliseconds in async buffer</h3></caption>
+      <tr>
+        <td valign="top"><div id="avg-time-in-buffer-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="avg-time-in-buffer" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="avg-time-in-buffer-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="avg-time-in-buffer-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="avg-time-in-buffer-ymin">ymin<div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="avg-time-in-buffer-xmin">xmin<div></td>
+        <td align="right"><div id="avg-time-in-buffer-xmax">xmax<div></td>
+      </tr>
+    <table>
+
+    <table>
+      <caption><h3>Count of futures in async buffer</h3></caption>
+      <tr>
+        <td valign="top"><div id="count-futures-in-buffer-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="count-futures-in-buffer" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="count-futures-in-buffer-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="count-futures-in-buffer-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="count-futures-in-buffer-ymin">ymin<div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="count-futures-in-buffer-xmin">xmin<div></td>
+        <td align="right"><div id="count-futures-in-buffer-xmax">xmax<div></td>
+      </tr>
+    <table>
+
+    <table>
+      <caption><h3>Ingestion rate per second</h3></caption>
+      <tr>
+        <td valign="top"><div id="ingestion-rate-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="ingestion-rate" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="ingestion-rate-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="ingestion-rate-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="ingestion-rate-ymin">ymin<div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="ingestion-rate-xmin">xmin<div></td>
+        <td align="right"><div id="ingestion-rate-xmax">xmax<div></td>
+      </tr>
+    <table>
+
+<script>
+
+    const address = prompt("Please enter the address you want to track", "http://localhost:8080");
+    const url = address + "/api/status"
+    
+    // canvas      : Canvas on which to render
+    // getDataPoint: JSON => { x: number, y: number }
+    function Graph(canvas, minYdiv, maxYdiv, minXdiv, maxXdiv, currY, avgY, getDataPoint) {
+      this.canvas = canvas;
+      
+      this.minYdiv = minYdiv;
+      this.maxYdiv = maxYdiv;
+      this.minXdiv = minXdiv;
+      this.maxXdiv = maxXdiv;
+      this.currY   = currY;
+      this.avgY    = avgY;
+      
+      this.ctx = canvas.getContext('2d');
+      
+      this.ys = [];
+      this.avgYs = [];
+      this.xs = [];
+      
+      this.addDataPoint = function(obj) {
+        const point = getDataPoint(obj);
+       
+        if (!isNaN(point.y) && !isNaN(point.x)) {
+          this.ys.push(point.y);
+          this.xs.push(point.x);
+        
+          const last20y = this.ys.slice(-20).filter(x => !x.isNaN);
+          this.avgYs.push(last20y.reduce((a,b) => a + b, 0) / last20y.length);
+        }
+      }
+
+      this.redraw = function() {
+        // Erase everything
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // X and Y axis
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle="#000000";
+        this.ctx.moveTo(this.canvas.width, this.canvas.height);
+        this.ctx.lineTo(0,                 this.canvas.height);
+        this.ctx.lineTo(0,                 0);
+        this.ctx.stroke();
+
+        // scale the X coords from [minX, maxX] to [0, this.canvas.width]
+        const minX = Math.min(...this.xs);
+        const maxX = Math.max(...this.xs);
+        const mx = this.canvas.width / (maxX - minX);
+        const scaleX = x => (x - minX) * mx;
+        
+        // scale the Y coords from [minY, maxY] to [this.canvas.height, 0]
+        const minY = Math.min(...this.ys);
+        const maxY = Math.max(...this.ys);
+        const my = -this.canvas.height / (maxY - minY);
+        const scaleY = y => (y - minY) * my + this.canvas.height;
+
+        // X and Y axis labels
+        this.minYdiv.innerHTML = minY.toString();
+        this.maxYdiv.innerHTML = maxY.toString();
+        this.minXdiv.innerHTML = minX.toString();
+        this.maxXdiv.innerHTML = maxX.toString();
+
+        if (this.xs.length > 1) {
+
+          // Update the current & average values
+          this.currY.innerHTML = this.ys[this.ys.length - 1];
+          this.avgY.innerHTML = Math.round((this.avgYs[this.avgYs.length - 1] * 1000) / 1000);
+        
+          // plot the line graph
+          this.ctx.beginPath();
+          this.ctx.linewidth = 1;
+          this.ctx.strokeStyle="#0000FF";
+          this.ctx.moveTo(scaleX(this.xs[0]), scaleY(this.ys[0]));
+          for (let i = 1; i < this.xs.length; i++) {
+            const nextX = scaleX(this.xs[i]);
+            const nextY = scaleY(this.ys[i]);
+            if (!isNaN(nextX) && !isNaN(nextY))
+              this.ctx.lineTo(nextX, nextY);
+          }
+          this.ctx.stroke();
+
+          // plot the average line graph
+          this.ctx.beginPath();
+          this.ctx.linewidth = 1;
+          this.ctx.strokeStyle="#00FF00";
+          this.ctx.moveTo(scaleX(this.xs[0]), scaleY(this.avgYs[0]));
+          for (let i = 1; i < this.xs.length; i++) {
+
+            const nextX = scaleX(this.xs[i]);
+            const nextY = scaleY(this.avgYs[i]);
+            if (!isNaN(nextX) && !isNaN(nextY))
+              this.ctx.lineTo(nextX, nextY);
+          }
+          this.ctx.stroke();
+        }
+      }
+    }
+
+    const graphs = [
+      new Graph(
+        document.getElementById('avg-time-in-buffer'),
+        document.getElementById('avg-time-in-buffer-ymin'),
+        document.getElementById('avg-time-in-buffer-ymax'),
+        document.getElementById('avg-time-in-buffer-xmin'),
+        document.getElementById('avg-time-in-buffer-xmax'),
+        document.getElementById('avg-time-in-buffer-curr'),
+        document.getElementById('avg-time-in-buffer-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.averageMillisecondsInAsyncBuffer),
+        }),
+      ),
+      new Graph(
+        document.getElementById('count-futures-in-buffer'),
+        document.getElementById('count-futures-in-buffer-ymin'),
+        document.getElementById('count-futures-in-buffer-ymax'),
+        document.getElementById('count-futures-in-buffer-xmin'),
+        document.getElementById('count-futures-in-buffer-xmax'),
+        document.getElementById('count-futures-in-buffer-curr'),
+        document.getElementById('count-futures-in-buffer-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.admFuturesSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('ingestion-rate'),
+        document.getElementById('ingestion-rate-ymin'),
+        document.getElementById('ingestion-rate-ymax'),
+        document.getElementById('ingestion-rate-xmin'),
+        document.getElementById('ingestion-rate-xmax'),
+        document.getElementById('ingestion-rate-curr'),
+        document.getElementById('ingestion-rate-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Math.round(Number(obj.generalRecords.every) / Number(obj.generalRecords.secondsThisEvery)),
+        }),
+      ),
+    ];
+
+    // Schedule every second
+    let poll = window.setInterval(function(){
+      let req = new XMLHttpRequest();
+      req.open("GET", url);
+      req.addEventListener("load", function () {
+
+        const result = JSON.parse(this.responseText);
+        if (!result.currentlyIngesting) {
+          window.clearInterval(poll);
+          return;
+        }
+
+        for (let i = 0; i < graphs.length; i++) {
+          graphs[i].addDataPoint(result);
+          graphs[i].redraw();
+        }
+      });
+      req.send();
+    }, 1000);
+  </script>
+  </body>
+</html>

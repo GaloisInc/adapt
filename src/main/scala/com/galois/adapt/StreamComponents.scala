@@ -57,7 +57,10 @@ object FlowComponents {
           populationCounter.toMap,
           admFuturesCount,
           countOutOfBuffer,
-          averageMillisInAsyncBuffer
+          averageMillisInAsyncBuffer,
+          durationSeconds,
+          blockEdgesCount,
+          blockingNodes
         )
 
         populationCounter.clear()

@@ -26,7 +26,7 @@ class StatusActor extends Actor {
       Try(admFuturesTotal.toFloat / admFuturesCountsObserved.toFloat).getOrElse(0F)
     )
 
-    case PopulationLog(name, position, every, counterMap, admFuturesCount, countOutOfAsyncBuffer, averageMillisecondsInAsyncBuffer) =>
+    case PopulationLog(name, position, every, counterMap, admFuturesCount, countOutOfAsyncBuffer, averageMillisecondsInAsyncBuffer, secondsThisEvery, blockEdgesCount, blockingNodes) =>
       counterMap.foreach{ case (k,v) =>
         val key = s"$name: $k"
         populationLog += (key -> (populationLog.getOrElse(key, 0L) + v))
@@ -35,8 +35,12 @@ class StatusActor extends Actor {
       admFuturesTotal += admFuturesCount
       admFuturesLastObserved = admFuturesCount
 
+      generalRecords += ("every" -> every)
       generalRecords += ("countOutOfAsyncBuffer" -> countOutOfAsyncBuffer)
       generalRecords += ("averageMillisecondsInAsyncBuffer" -> averageMillisecondsInAsyncBuffer)
+      generalRecords += ("secondsThisEvery" -> secondsThisEvery)
+      generalRecords += ("blockEdgesCount" -> blockEdgesCount)
+      generalRecords += ("blockingNodes" -> blockingNodes)
 
     case InitMsg => currentlyIngesting = true
     case CompleteMsg => currentlyIngesting = false
@@ -52,7 +56,10 @@ case class PopulationLog(
   counter: Map[String,Long],
   admFuturesCount: Int,
   countOutOfAsyncBuffer: Int,
-  averageMillisInAsyncBuffer: Float
+  averageMillisInAsyncBuffer: Float,
+  secondsThisEvery: Double,
+  blockEdgesCount: Long,
+  blockingNodes: Long
 )
 
 case class IncrementCount(name: String)
