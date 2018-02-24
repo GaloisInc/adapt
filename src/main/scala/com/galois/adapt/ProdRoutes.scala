@@ -23,6 +23,7 @@ import akka.pattern.ask
 import scala.language.postfixOps
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+import akka.http.scaladsl.model.headers._
 
 
 object ProdRoutes {
@@ -47,113 +48,115 @@ object ProdRoutes {
 
 
   def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
-    PolicyEnforcementDemo.route(dbActor) ~
-    get {
-      pathPrefix("api"){
-        pathPrefix("status") {
-          import ApiJsonProtocol.statusReport
-          complete(
-            (statusActor ? GetStats).mapTo[StatusReport]
-          )
-        }
-      } ~
-      pathPrefix("query") {
-        pathPrefix("nodes") {
-          path(RemainingPath) { queryString =>
+    respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
+      PolicyEnforcementDemo.route(dbActor) ~
+      get {
+        pathPrefix("api") {
+          pathPrefix("status") {
+            import ApiJsonProtocol.statusReport
             complete(
-              queryResult(NodeQuery(queryString.toString), dbActor)
+              (statusActor ? GetStats).mapTo[StatusReport]
             )
           }
         } ~
-        pathPrefix("edges") {
-          path(RemainingPath) { queryString =>
-            complete(
-              queryResult(EdgeQuery(queryString.toString), dbActor)
-            )
-          }
-        } ~
-        pathPrefix("generic") {
-          path(RemainingPath) { queryString =>
-            complete(
-              queryResult(StringQuery(queryString.toString), dbActor)
-            )
-          }
-        } ~
-        pathPrefix("json") {
-          path(RemainingPath) { queryString =>
-            complete(
-              queryResult(StringQuery(queryString.toString, true), dbActor)
-            )
-          }
-        } ~
-        pathPrefix("cypher") {
-          path(RemainingPath) { queryString =>
-            complete(
-              queryResult(CypherQuery(queryString.toString), dbActor)
-            )
-          }
-        }
-      } ~
-      serveStaticFilesRoute
-    } ~
-    post {
-      pathPrefix("api") {
-        pathPrefix("makeTheiaQuery") {
-          formFieldMap { fields =>
-            complete {
-              Try(
-                MakeTheiaQuery(
-                  fields("type").toLowerCase match {
-                    case "backward" | "backwards" => TheiaQueryType.BACKWARD
-                    case "forward"  | "forwards"  => TheiaQueryType.FORWARD
-                    case "point_to_point" | "pointtopoint" | "ptp" => TheiaQueryType.POINT_TO_POINT
-                  },
-                  fields.get("sourceId").map(UUID.fromString),
-                  fields.get("sinkId").map(UUID.fromString),
-                  fields.get("startTimestamp").map(_.toLong),
-                  fields.get("endTimestamp").map(_.toLong)
-                )
-              ).map(q =>
-                (anomalyActor ? q).mapTo[Future[String]].flatMap(identity)
+        pathPrefix("query") {
+          pathPrefix("nodes") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(NodeQuery(queryString.toString), dbActor)
               )
             }
-          }
-        }
+          } ~
+            pathPrefix("edges") {
+              path(RemainingPath) { queryString =>
+                complete(
+                  queryResult(EdgeQuery(queryString.toString), dbActor)
+                )
+              }
+            } ~
+            pathPrefix("generic") {
+              path(RemainingPath) { queryString =>
+                complete(
+                  queryResult(StringQuery(queryString.toString), dbActor)
+                )
+              }
+            } ~
+            pathPrefix("json") {
+              path(RemainingPath) { queryString =>
+                complete(
+                  queryResult(StringQuery(queryString.toString, true), dbActor)
+                )
+              }
+            } ~
+            pathPrefix("cypher") {
+              path(RemainingPath) { queryString =>
+                complete(
+                  queryResult(CypherQuery(queryString.toString), dbActor)
+                )
+              }
+            }
+        } ~
+        serveStaticFilesRoute
       } ~
-      pathPrefix("query") {
-        path("nodes") {
-          formField('query) { queryString =>
-            complete(
-              queryResult(NodeQuery(queryString), dbActor)
-            )
+      post {
+        pathPrefix("api") {
+          pathPrefix("makeTheiaQuery") {
+            formFieldMap { fields =>
+              complete {
+                Try(
+                  MakeTheiaQuery(
+                    fields("type").toLowerCase match {
+                      case "backward" | "backwards" => TheiaQueryType.BACKWARD
+                      case "forward" | "forwards" => TheiaQueryType.FORWARD
+                      case "point_to_point" | "pointtopoint" | "ptp" => TheiaQueryType.POINT_TO_POINT
+                    },
+                    fields.get("sourceId").map(UUID.fromString),
+                    fields.get("sinkId").map(UUID.fromString),
+                    fields.get("startTimestamp").map(_.toLong),
+                    fields.get("endTimestamp").map(_.toLong)
+                  )
+                ).map(q =>
+                  (anomalyActor ? q).mapTo[Future[String]].flatMap(identity)
+                )
+              }
+            }
           }
         } ~
-        path("edges") {
-          formField('query) { queryString =>
-            complete(
-              queryResult(EdgeQuery(queryString), dbActor)
-            )
-          }
-        } ~
-        path("generic") {
-          formField('query) { queryString =>
-            complete(
-              queryResult(StringQuery(queryString), dbActor)
-            )
-          }
-        } ~
-        path("json") {
-          formField('query) { queryString =>
-            complete(
-              queryResult(StringQuery(queryString, true), dbActor)
-            )
-          }
-        } ~
-        path("cypher") {
-          formField('query) { queryString =>
-            complete(
-              queryResult(CypherQuery(queryString), dbActor)
-            )
+        pathPrefix("query") {
+          path("nodes") {
+            formField('query) { queryString =>
+              complete(
+                queryResult(NodeQuery(queryString), dbActor)
+              )
+            }
+          } ~
+          path("edges") {
+            formField('query) { queryString =>
+              complete(
+                queryResult(EdgeQuery(queryString), dbActor)
+              )
+            }
+          } ~
+          path("generic") {
+            formField('query) { queryString =>
+              complete(
+                queryResult(StringQuery(queryString), dbActor)
+              )
+            }
+          } ~
+          path("json") {
+            formField('query) { queryString =>
+              complete(
+                queryResult(StringQuery(queryString, true), dbActor)
+              )
+            }
+          } ~
+          path("cypher") {
+            formField('query) { queryString =>
+              complete(
+                queryResult(CypherQuery(queryString), dbActor)
+              )
+            }
           }
         }
       }
