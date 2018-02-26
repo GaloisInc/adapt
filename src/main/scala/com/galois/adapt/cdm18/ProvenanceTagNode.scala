@@ -25,7 +25,8 @@ case class ProvenanceTagNode(
 
   def asDBKeyValues = List(
     ("uuid", tagIdUuid),
-    ("subjectUuid", subjectUuid)
+    ("subjectUuid", subjectUuid),
+    ("host", host)
   ) ++
     flowObject.fold[List[(String,Any)]](List.empty)(v => List(("flowObjectUuid", v))) ++
     systemCall.fold[List[(String,Any)]](List.empty)(v => List(("systemCall", v))) ++
@@ -39,7 +40,7 @@ case class ProvenanceTagNode(
 
   def asDBEdges = Nil
     List((CDM18.EdgeTypes.subject,subjectUuid)) ++
-    List((CDM18.EdgeTypes.host,host)) ++
+//    List((CDM18.EdgeTypes.host,host)) ++
     flowObject.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(f => List((CDM18.EdgeTypes.flowObject, f))) ++
     prevTagId.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(p => List((CDM18.EdgeTypes.prevTagId, p))) ++
     tagIds.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(ts => ts.toList.map(t => (CDM18.EdgeTypes.tagId, t)))

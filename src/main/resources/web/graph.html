@@ -13,6 +13,7 @@
 
     <script type="text/javascript">
         var node_data_set, edge_data_set, network, labels;
+        var temp_node;  // hack for pulling out the host UUID value for making queries for host edge.
         // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
@@ -498,9 +499,14 @@
             node_queries.push(adjacent_query)
             var found_one_default = false
             return _.map(node_queries, function(q){
+            	if (_.isFunction(q.floating_query)) {
+            		var floating_q = q.floating_query(node)
+            	} else {
+            		var floating_q = q.floating_query
+            	}
                 var new_q = {
                     "name" : q.name,
-                    "floating_query" : q.floating_query,
+                    "floating_query" : floating_q,
                     "is_collapsed" : q.is_collapsed
                 }
                 if (q['is_default'] && ! found_one_default) {
