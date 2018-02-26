@@ -11,6 +11,7 @@ import akka.pattern.ask
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import akka.util.Timeout
+import com.galois.adapt.MapDBUtils.AlmostSet
 import com.galois.adapt.adm.ERStreamComponents._
 import com.galois.adapt.adm.UuidRemapper.{ExpireEverything, GetCdm2Adm, ResultOfGetCdm2Adm}
 import com.galois.adapt.cdm18._
@@ -27,7 +28,8 @@ object EntityResolution {
 
   val config: Config = ConfigFactory.load()
 
-  def apply(uuidRemapper: ActorRef, synthesizedSource: Source[ADM, _])(implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
+  def apply(uuidRemapper: ActorRef, synthesizedSource: Source[ADM, _], seenNodesSet: AlmostSet[UUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
+           (implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
@@ -61,7 +63,7 @@ object EntityResolution {
       .via(erWithoutRemapsFlow(uuidRemapper))
       .via(remapEdgeUuids(uuidRemapper))
       .merge(synthesizedSource.map(adm => Future.successful(Right(adm))))
-      .via(asyncDeduplicate(parallelism))
+      .via(asyncDeduplicate(parallelism, seenNodesSet, seenEdgesSet))
   }
 
 
@@ -155,7 +157,8 @@ object EntityResolution {
   //   - prevent duplicate edges from being re-emitted
   //   - prevent Edges from being emitted before both of their endpoints have been emitted
   //
-  private def asyncDeduplicate(parallelism: Int)(implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
+  private def asyncDeduplicate(parallelism: Int, seenNodesSet: AlmostSet[UUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
+                              (implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
 
       .map(x => {
@@ -171,9 +174,12 @@ object EntityResolution {
       }
       .statefulMapConcat[Either[EdgeAdm2Adm, ADM]](() => {
 
-        val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
-        val seenEdges = MutableSet.empty[EdgeAdm2Adm]                // edges seen (not necessarily emitted)
-        val blockedEdges = MutableMap.empty[UUID, List[EdgeAdm2Adm]] // Edges blocked by UUIDs that haven't arrived yet
+//        val seenNodes = MutableSet.empty[UUID]                       // UUIDs of nodes seen (and emitted) so far
+//        val seenEdges = MutableSet.empty[EdgeAdm2Adm]                // edges seen (not necessarily emitted)
+        val seenNodes = seenNodesSet
+        val seenEdges = seenEdgesSet
+
+      val blockedEdges = MutableMap.empty[UUID, List[EdgeAdm2Adm]] // Edges blocked by UUIDs that haven't arrived yet
 
         // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map
         def emitEdge(edge: EdgeAdm2Adm): List[Either[EdgeAdm2Adm, ADM]] = {
@@ -229,7 +235,12 @@ object EntityResolution {
       for (time <- timestampOf(cdm); if time > currentTime) {
         cdm match {
           case _: TimeMarker if time > currentTime => currentTime = time
-          case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime < 1400000000000000L) => currentTime = time
+
+          // For things that aren't time markers, only update the time if it is larger, but not too much larger than the
+          // previous time. With an exception made for old times that are much too old (looking at you ClearScope)
+          case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime < 1400000000000000L) =>
+            currentTime = time
+
           case _ => { }
         }
 
