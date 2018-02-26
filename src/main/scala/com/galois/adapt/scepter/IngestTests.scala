@@ -374,7 +374,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency, TimeMarker)
+  val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency, TimeMarker, RegistryKeyObject)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
