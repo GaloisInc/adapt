@@ -1,9 +1,13 @@
 package com.galois.adapt.adm
 
 import java.io.{File, FileWriter}
+import java.util.UUID
+import java.util.function.BiConsumer
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.pattern.ask
+import com.galois.adapt.MapDBUtils.AlmostMap
+import org.mapdb.HTreeMap
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -36,13 +40,23 @@ object UuidRemapper {
   case object ExpireEverything
 }
 
-class UuidRemapper(synActor: ActorRef, expiryTime: Long) extends Actor with ActorLogging {
+class UuidRemapper(
+    synActor: ActorRef,                     // Actor to whom synthesized nodes should be sent
+    expiryTime: Long,                       // How long to hold on to a CdmUUID (waiting for a remap) until we expire it
+    cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID], // Mapping for CDM uuids that have been mapped onto other CDM uuids
+    cdm2admMap: AlmostMap[CdmUUID,AdmUUID]  // Mapping for CDM uuids that have been mapped onto ADM uuids
+  ) extends Actor with ActorLogging {
 
   import UuidRemapper._
 
-  // We keep track of two large Maps containing UUID remap information
-  private val cdm2cdm: mutable.Map[CdmUUID, CdmUUID] = mutable.Map.empty
-  private val cdm2adm: mutable.Map[CdmUUID, AdmUUID]  = mutable.Map.empty
+  // We keep track of two large Maps containing UUID remap information. For performance/memory reasons, we use MapDB.
+  // We are wrapping the MapDB maps with Scala-like methods you'd find on something like:
+  //
+  //     val cdm2cdm: mutable.Map[CdmUUID, CdmUUID] = mutable.Map.empty
+  //     val cdm2adm: mutable.Map[CdmUUID, AdmUUID] = mutable.Map.empty
+  //
+  private val cdm2cdm = cdm2cdmMap
+  private val cdm2adm = cdm2admMap
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
   private val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
@@ -157,7 +171,7 @@ class UuidRemapper(synActor: ActorRef, expiryTime: Long) extends Actor with Acto
       val cdm2cdmCsv = new FileWriter(new File("cdm2cdmCsv.csv"))
 
       cdm2cdmCsv.write("remappedCdmUuid,cdmUuid\n")
-      for ((k,v) <- cdm2cdm) {
+      cdm2cdm.foreach { case (k,v) =>
         cdm2cdmCsv.write(k.uuid.toString ++ "," ++ v.toString() ++ "\n")
       }
 
@@ -166,7 +180,7 @@ class UuidRemapper(synActor: ActorRef, expiryTime: Long) extends Actor with Acto
       val cdm2admCsv = new FileWriter(new File("cdm2admCsv.csv"))
 
       cdm2admCsv.write("remappedCdmUuid,admUuid\n")
-      for ((k,v) <- cdm2adm) {
+      cdm2adm.foreach { case (k,v) =>
         cdm2admCsv.write(k.uuid.toString ++ "," ++ v.toString() ++ "\n")
       }
 

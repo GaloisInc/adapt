@@ -1,9 +1,12 @@
 package com.galois.adapt
 
 import java.nio.ByteBuffer
-import java.util.UUID
+import java.util
+import java.util.{Arrays, Comparator, UUID}
 
 import com.galois.adapt.cdm18._
+import org.mapdb.{DataInput2, DataOutput2, Serializer}
+import org.mapdb.serializer.GroupSerializer
 
 import scala.language.implicitConversions
 
@@ -32,7 +35,7 @@ package object adm {
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge[CDM18, CDM18]
   final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge[CDM18, ADM]
   final case class EdgeAdm2Cdm(src: AdmUUID, label: String, tgt: CdmUUID) extends Edge[ADM, CDM18]
-  final case class EdgeAdm2Adm(src: AdmUUID, label: String, tgt: AdmUUID) extends Edge[ADM, ADM]
+  final case class EdgeAdm2Adm(src: AdmUUID, label: String, tgt: AdmUUID) extends Edge[ADM, ADM] with Serializable
 
   /* Stands for Adapt Data Model. This is generated from CDM by
    *
