@@ -73,7 +73,7 @@ for i in $fileindices
 	
 for i in $fileindices
 	do
-		./ingest_script.sh -i ${files[i]} -p ${ports[i]} -db ${dbkeyspaces[i]}
+		./fca/ingest_script.sh -i ${files[i]} -p ${ports[i]} -db ${dbkeyspaces[i]} &
 	done
 
 #echo 'dbkeyspaces[0]' ${dbkeyspaces[0]}

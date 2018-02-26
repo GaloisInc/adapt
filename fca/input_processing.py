@@ -2,7 +2,7 @@
 
 import requests, readline, sys, json
 import collections, re
-import os
+import os, glob
 import dask.dataframe as dd
 
 def tupToIndices(tup):
@@ -315,6 +315,26 @@ def convertFimiFileToCxt(fimifile,cxtfile):
 	attributes=[num2roman(i) for i in range(1,num_attributes+1)]
 	context=[''.join(['X' if i in e else '.' for i in range(num_attributes)]) for e in fimi]
 	writeCxtFile(objects,attributes,context,cxtfile)
+	
+	
+def convert2InputCSV(contextName,contextdirectory,csvpath='',port=8080):
+	port_val=port
+	#get file from context directory where filename contains contextname
+	files=glob.glob(os.path.join(contextdirectory,'*.json'))
+	r=re.compile('(\w|\W)+_(?P<contextname>\w+)\.json')
+	contextFile=list(filter(lambda x: re.match(r,x).group('contextname').lower()==contextName.lower(),files))[0]
+	#generate input CSV
+	if csvpath=='':
+		outputfile=os.path.splitext(contextFile)[0]+'.csv'
+	else:
+		outputfile=csvpath
+	if os.path.exists(outputfile):
+		overwrite=input(outputfile+' already exists. Do you want to overwrite it? (Y/N)\n')
+		if overwrite.lower() not in ['y','yes']:
+			new_filename=input('New context file name (Default: '+os.path.splitext(outputfile)[0]+'_2.csv')
+			outputfile=(os.path.splitext(outputfile)[0]+'_2.csv' if new_filename=='' else new_filename)
+	convertSpec2File(contextFile,outputfile,csv_flag=False,port=port_val)
+	return 'Conversion successful. File '+outputfile+' created.'
 
 
 	
