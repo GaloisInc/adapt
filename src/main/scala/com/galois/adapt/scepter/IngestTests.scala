@@ -194,19 +194,19 @@ class General_TA1_Tests(
     }
   }
 
-  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
     }
   }
 
-  if ( ! List("faros").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("faros", "theia").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
     }
   }
 
-  if ( ! List().contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
     }
