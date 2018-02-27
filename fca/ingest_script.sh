@@ -67,10 +67,32 @@ while (( "$#" )); do
 	 fi
       ;; 
     -fp|--fca_params)
-         #pass a quoted string with the arguments to pass to the python fca script e.g "w=both i=cadets.csv m=0.05 p=8080 rs=implication.json o=concepts.txt oa=scores.csv"
+         #pass strings with the arguments to pass to the python fca script e.g -fp w=both i=cadets.csv m=0.05 p=8080 rs=implication.json o=concepts.txt oa=scores.csv
          # this would correspond to invoking python3 fcascript -w 'both' -i cadets.csv -m 0.05 -p 8080 -rs implication.json -o concepts.txt -oa scores.csv
-         FCA_PARAMS=$2
-         shift 2
+         #FCA_PARAMS=$2
+         len="$#"
+		 if [[ ($2 == "-c") || ($2 == "--conversion") || ($2 == "-i") || ($2 == "--ingest") || ($2 == "-p") || ($2 == "--port") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-db") || ($2 == "--dbkeysp2ce") || ($2 == "-f") || ($2 == "--fc2_only") || ($2 == "-g") || ($2 == "--gener2tion_only") || ($2 == "-q" ) || ($2 == "--query_input" ) || ($2 == "-csv") || ($2 == "--csv_input" ) ]]
+			then
+		   DEFAULT_FCA_VAL=1
+		   shift 1
+		else
+		    DEFAULT_FCA_VAL=0
+			for k in `seq 2 $len`
+				do  
+					a=${!k}
+						if [[ ($a == "-c") || ($a == "--conversion") || ($a == "-i") || ($a == "--ingest") || ($a == "-p") || ($a == "--port") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-db") || ($a == "--dbkeyspace") || ($a == "-f") || ($a == "--fca_only") || ($a == "-g") || ($a == "--generation_only") || ($a == "-q" ) || ($a == "--query_input" ) || ($a == "-csv") || ($a == "--csv_input" ) ]]
+							then 
+								#echo 'k' $k 'a' ${!k} 'condition!!!'
+								break
+							else 
+								#echo 'k' $k 'a' ${!k}
+								FCA_PARAMS+=($a)
+							fi			
+			done
+			s=${#FCA_PARAMS[@]}
+			#echo $s
+			shift "$s"
+	fi
       ;; 
     --) # end argument parsing
       shift
@@ -115,8 +137,9 @@ fca=$FCA
 #csv=$CSV
 #query=$QUERY
 default=$DEFAULT_VAL
-port_param=' p='
-fca_params=$FCA_PARAMS$port_param$port
+#port_param=' p='
+#fca_params=$FCA_PARAMS$port_param$port
+if ! [[ " ${FCA_PARAMS[@]} " =~ p=[0-9]+  ]]; then FCA_PARAMS+=(p=$port) ; fi
 
 if [[ $gen -eq 1 && $fca -eq 1 ]]
   then
@@ -187,7 +210,8 @@ fca_pipeline(){
 	 #The input to this function is a quoted string that contains the arguments to pass to the python fca script e.g "w=both i=cadets.csv m=0.05 p=8080 rs=implication.json o=concepts.txt oa=scores.csv"
      # this would correspond to invoking python3 fcascript -w 'both' -i cadets.csv -m 0.05 --port 8080 -rs implication.json -o concepts.txt -oa scores.csv
 	fcaparams=($@)
-	fca_params=, eval 'JOINED="${fcaparams[*]}"'
+	#echo 'fcaparams' ${fcaparams[@]}
+	fca_params=$(perl -le 'print join " ",@ARGV' "${fcaparams[@]}")
 	#echo 'FCA params' $fca_params
 	w=$(grep -o -E "w=(both|fca|context|analysis)" <<< $fca_params)
 	w=${w##*w=}
@@ -276,7 +300,7 @@ if [[ -z $pid ]]
 		if [[ $gen -eq 0 && $fca -eq 0 ]]
 		  then
 			echo 'Running the full input conversion/FCA pipeline'
-			sleep $SLEEP && conversion $default $port ${CONV[@]} && fca_pipeline $fca_params 
+			sleep $SLEEP && conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}
 		elif [[ $gen -eq 1 ]]
 		    then
 				echo 'Running the input conversion only'
@@ -284,7 +308,7 @@ if [[ -z $pid ]]
 		elif [[ $fca -eq 1 ]]
 			then
 				echo 'Running the FCA pipeline only'
-				sleep $SLEEP && fca_pipeline $fca_params 
+				sleep $SLEEP && fca_pipeline ${FCA_PARAMS[@]}
 			echo 'UI running. Nothing else to do.'
 		fi
 	else
@@ -292,7 +316,7 @@ if [[ -z $pid ]]
 		if [[ $gen -eq 0 && $fca -eq 0 ]]
 		  then
 			echo 'Running the full input conversion/FCA pipeline'
-			conversion $default $port ${CONV[@]} && fca_pipeline $fca_params 
+			conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}
 		elif [[ $gen -eq 1 ]]
 		    then
 				echo 'Running the input conversion only'
@@ -300,7 +324,7 @@ if [[ -z $pid ]]
 		elif [[ $fca -eq 1 ]]
 			then
 				echo 'Running the FCA pipeline only'
-				fca_pipeline $fca_params 
+				fca_pipeline ${FCA_PARAMS[@]}
 		else 
 			echo 'UI running. Nothing else to do.'
 		fi
