@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
+import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18._
 
@@ -63,7 +64,7 @@ object NoveltyDetection {
   trait PpmTree {
     def getCount: Int
     def update(e: Event, s: Subject, o: Object): Option[Boolean]
-    def getTreeReport(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeReport
+    def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
   }
   case object PpmTree {
     def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
@@ -94,21 +95,21 @@ object NoveltyDetection {
       }
     } else None
 
-    def getTreeReport(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeReport =
-      TreeReport(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
-        if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeReport(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
+    def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
+      TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
+        if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
       )
   }
 
   class QNode(counterFunc: () => Int) extends PpmTree {
     def getCount = counterFunc()
     def update(e: Event, s: Subject, o: Object): Option[Boolean] = Some(true)
-    def getTreeReport(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeReport =
-      TreeReport(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
+    def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
+      TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
   }
 }
 
-case class TreeReport(depth: Int, key: String, localProb: Float, globalProb: Float, count: Int, children: Set[TreeReport]) {
+case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) {
   override def toString = {
     val indent = (0 until (4 * depth)).map(_ => " ").mkString("")
     val depthString = if (depth < 10) s" $depth" else depth.toString
@@ -118,6 +119,12 @@ case class TreeReport(depth: Int, key: String, localProb: Float, globalProb: Flo
     s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
       children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString).mkString("\n", "", "")
   }
+
+  def leafNodes(nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
+    children.toList.flatMap {
+      case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc ++ List(key, nextKey), lp, gp, cnt))
+      case next => next.leafNodes(nameAcc :+ key)
+    }
 }
 
 
@@ -142,7 +149,13 @@ class NoveltyActor extends Actor with ActorLogging {
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => println(processFileTouches.getTreeReport().toString)
+    case CompleteMsg =>
+//      println(processFileTouches.getTreeReport().toString)
+      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+      println("")
+      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+      println("")
+      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
