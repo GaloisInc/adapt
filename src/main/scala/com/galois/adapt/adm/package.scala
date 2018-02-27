@@ -185,6 +185,8 @@ package object adm {
    *
    *  - ipProtocol
    *  - fileDescriptor
+   *
+   *  It also splits ports and addresses into seperate nodes
    */
   final case class AdmNetFlowObject(
     originalCdmUuids: Seq[CdmUUID],
@@ -215,6 +217,45 @@ package object adm {
     )
   }
 
+  // Represents a local and/or remote address of netflows
+  final case class AdmAddress(
+    address: String
+  ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(address))
+    override val originalCdmUuids: Seq[CdmUUID] = List.empty
+
+    def asDBKeyValues = List(
+      "uuid" -> uuid.uuid,
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "address" -> address
+    )
+
+    def toMap = Map(
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "address" -> address
+    )
+  }
+
+  // Represents a local and/or remote port of netflows
+  final case class AdmPort(
+    port: Int
+  ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(port.toString))
+    override val originalCdmUuids: Seq[CdmUUID] = List.empty
+
+    def asDBKeyValues = List(
+      "uuid" -> uuid.uuid,
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "port" -> port
+    )
+
+    def toMap = Map(
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "port" -> port
+    )
+  }
 
   /* Compared to 'cdm.SrcSinkObject' this leaves out
    *
