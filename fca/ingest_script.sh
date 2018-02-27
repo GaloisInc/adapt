@@ -136,32 +136,49 @@ pid=$(pgrep -f "sbt -mem [0-9]+ -Dadapt.runflow=ui -Dadapt.ingest.quitafteringes
 conversion(){
 	#$1=$default $2=$port array=CONV
 	default=$1
-	echo 'default' $default
+	#echo 'default' $default
 	port=$2 && shift 2
-	echo 'port' $port
+	#echo 'port' $port
 	conv_array=($@)
 	l=${#conv_array[@]}
+	#echo 'conv_array' ${conv_array[@]}
+	conv=$(perl -le 'print join " ",@ARGV' "${conv_array[@]}")
+	#echo 'conv' $conv
+	new_port=$(grep -o -E "p=[0-9]+" <<< $conv)
+	new_port=${new_port##*p=}
+	#echo 'new port' $new_port
+	context_name=$(grep -o -P "(n=)[^ ]+" <<< $conv)
+	context_name=${context_name##*n=}
+	#echo 'context name' $context_name
+	context_path=$(grep -o -P "cp=.+?\.csv" <<< $conv)
+	context_path=${context_path##*cp=}
+	#echo 'context path' $context_path
+	spec_directory=$(grep -o -P "(d=)[^ ]+" <<< $conv)
+	spec_directory=${spec_directory##*d=}
+	#echo 'spec directory' $spec_directory
 	if [[ $default -eq 1 ]]
 	  then
-	      echo "conversion with default values"
+	      #echo "conversion with default values"
           python3 ./fca/conversion_script.py -p $port
 	else
-	   if [[ $l -eq 1 ]]
+	   if [[ -z  "$new_port" && -z "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 	       then
-				echo "python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]}"
-				python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]}
-	   elif [[ $l -eq 2 ]]
+				#echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
+				python3 ./fca/conversion_script.py -p $port -n $context_name
+	   elif [[ -z  "$new_port" && -n "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]} -s ${conv_array[1]}"
-				python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]} -s ${conv_array[1]}
-	   elif [[ $l -eq 3 ]]
+			    #echo "python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory"
+				python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory
+	   elif [[ -z  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]} -s ${conv_array[1]} -n  ${conv_array[2]}"
-				python3 ./fca/conversion_script.py -p $port -c ${conv_array[0]} -s ${conv_array[1]} -n  ${conv_array[2]}
-	   elif [[ $l -ge 4 ]]
+			    #echo "python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory"
+				python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory
+	   elif [[ -n  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p ${conv_array[3]} -c ${conv_array[0]} -s ${conv_array[1]} -n  ${conv_array[2]}"
-				python3 ./fca/conversion_script.py -p ${conv_array[3]} -c ${conv_array[0]} -s ${conv_array[1]} -n  ${conv_array[2]}
+			    #echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
+				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
+	   else
+			python3 ./fca/conversion_script.py -p $port
 	   fi
 	 fi
 }
