@@ -16,7 +16,7 @@ object Fingerprinting {
   trait FingerprintModel {
     def getModel: String
 
-    def evaluate(p: String, v: String): Boolean
+    def evaluate(p: Set[String], v: String): Option[Boolean]
 
     //def getFinalStats(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeReport
   }
@@ -55,7 +55,7 @@ object Fingerprinting {
         D(depth) = process("depth")
         P(paths) = process("paths")
       } yield {
-        (name, depthsAndPaths(depth.toInt, paths))
+        (name.split(",").toSet, depthsAndPaths(depth.toInt, paths))
       }
 
       val bufferedSource = Source.fromFile(modelFilePath) // "test_file_path_model.json")
@@ -68,7 +68,7 @@ object Fingerprinting {
 
       // Function returns True if the FilePath is common to processName
       // otherwise it returns False and should raise an alarm.
-      def evaluate(processName: String, admPathNodePath: String): Boolean = {
+      def evaluate(processName: Set[String], admPathNodePath: String): Option[Boolean] = {
         //println(processName+" "+admPathNodePath)
         filePathModelMap.get(processName) match {
           case Some(depthToPath) => {
@@ -80,16 +80,13 @@ object Fingerprinting {
             }
             println(processName+" "+ admPathNodePath)
             println( "       " +pathInput+" "+ filePathModelMap(processName).paths.contains(pathInput).toString)
-            depthToPath.paths.contains(pathInput)
+            Some(depthToPath.paths.contains(pathInput))
           }
-          case None => false
+          case None => None
         }
         }
-
       }
-
     }
-
 }
 
 class FingerprintActor extends Actor with ActorLogging {
@@ -103,7 +100,7 @@ class FingerprintActor extends Actor with ActorLogging {
     // getting several size 0, size 2 sets
     // getting path nodes that don't start with /
     case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      filePathModel.evaluate(subPathNodes.toList.map(_.path).sorted.mkString(","), objPathNodes.toList.map(_.path).mkString(","))
+      filePathModel.evaluate(subPathNodes.map(_.path), objPathNodes.toList.map(_.path).mkString(","))
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
