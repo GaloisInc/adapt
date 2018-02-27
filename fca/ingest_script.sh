@@ -187,7 +187,7 @@ conversion(){
 	  then
 	      #echo "conversion with default values"
           python3 ./fca/conversion_script.py -p $port
-	else./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000
+	else
 	   if [[ -z  "$new_port" && -z "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 	       then
 				#echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
