@@ -9,6 +9,10 @@ while (( "$#" )); do
       LOAD=$2
       shift 2
       ;;
+    -I|--ingest_only)
+	  INGEST=1
+      shift 1
+      ;;
     -p|--port)
       PORT=$2
       shift 2
@@ -183,7 +187,7 @@ conversion(){
 	  then
 	      #echo "conversion with default values"
           python3 ./fca/conversion_script.py -p $port
-	else
+	else./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000
 	   if [[ -z  "$new_port" && -z "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 	       then
 				#echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
@@ -199,7 +203,7 @@ conversion(){
 	   elif [[ -n  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
 			    #echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
-				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
+				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $contex./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000t_path
 	   else
 			python3 ./fca/conversion_script.py -p $port
 	   fi
@@ -224,7 +228,7 @@ fca_pipeline(){
 	input=$(echo $input | cut -d= -f2-)
 	#echo 'fca input ' $input
 	spec_ext=".json"
-	workflow_default="both"
+	workflow_default="both"./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000
 	workflow_analysis="analysis"
 	support=$(grep -o -E "m=[0-9]\.*[0-9]*" <<< $fca_params)
 	support=${support##*m=}
@@ -292,25 +296,27 @@ fca_pipeline(){
 	fi
 }
 
-
-if [[ -z $pid ]]
-	then
-		echo 'Starting UI at port '$port
-		sbt -mem $mem -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=$dbkeyspace run &
-		if [[ $gen -eq 0 && $fca -eq 0 ]]
-		  then
-			echo 'Running the full input conversion/FCA pipeline'
-			sleep $SLEEP && conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}
-		elif [[ $gen -eq 1 ]]
-		    then
-				echo 'Running the input conversion only'
-				sleep $SLEEP && conversion $default $port ${CONV[@]}
-		elif [[ $fca -eq 1 ]]
-			then
-				echo 'Running the FCA pipeline only'
-				sleep $SLEEP && fca_pipeline ${FCA_PARAMS[@]}
-			echo 'UI running. Nothing else to do.'
-		fi
+if [[ $INGEST -eq 1 ]]
+ then
+	if [[ -z $pid ]]
+		then
+			echo 'Starting UI at port '$port
+			sbt -mem $mem -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=$dbkeyspace run &
+			if [[ $gen -eq 0 && $fca -eq 0 ]]
+				then
+					echo 'Running the full input conversion/FCA pipeline'
+					sleep $SLEEP && conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}
+			elif [[ $gen -eq 1 ]]
+				then
+					echo 'Running the input conversion only'
+					sleep $SLEEP && conversion $default $port ${CONV[@]}
+			elif [[ $fca -eq 1 ]]
+				then
+					echo 'Running the FCA pipeline only'
+					sleep $SLEEP && fca_pipeline ${FCA_PARAMS[@]}
+			else
+				echo 'UI running. Nothing else to do.'
+			fi
 	else
 		echo 'UI at port' $port 'already started. Starting input conversion and/or FCA pipeline'
 		if [[ $gen -eq 0 && $fca -eq 0 ]]
@@ -328,4 +334,5 @@ if [[ -z $pid ]]
 		else 
 			echo 'UI running. Nothing else to do.'
 		fi
+	fi
 fi
