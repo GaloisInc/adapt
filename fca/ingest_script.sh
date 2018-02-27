@@ -145,13 +145,6 @@ default=$DEFAULT_VAL
 #fca_params=$FCA_PARAMS$port_param$port
 if ! [[ " ${FCA_PARAMS[@]} " =~ p=[0-9]+  ]]; then FCA_PARAMS+=(p=$port) ; fi
 
-if [[ $gen -eq 1 && $fca -eq 1 ]]
-  then
-		gen=0
-		fca=0
-		echo 'WARNING: Ignoring -f and -g flags and running the full pipeline (i.e input generation followed by FCA and rule mining)'
-fi
-
 if [[ -n "$LOAD" ]] 
 	then
 		loadfiles=$LOAD
@@ -203,7 +196,7 @@ conversion(){
 	   elif [[ -n  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
 			    #echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
-				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $contex./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000t_path
+				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
 	   else
 			python3 ./fca/conversion_script.py -p $port
 	   fi
@@ -211,7 +204,7 @@ conversion(){
 }
 
 fca_pipeline(){
-	 #The input to this function is a quoted string that contains the arguments to pass to the python fca script e.g "w=both i=cadets.csv m=0.05 p=8080 rs=implication.json o=concepts.txt oa=scores.csv"
+	 #The input to this function is a space separated string that contains the arguments to pass to the python fca script e.g w=both i=cadets.csv m=0.05 p=8080 rs=implication.json o=concepts.txt oa=scores.csv
      # this would correspond to invoking python3 fcascript -w 'both' -i cadets.csv -m 0.05 --port 8080 -rs implication.json -o concepts.txt -oa scores.csv
 	fcaparams=($@)
 	#echo 'fcaparams' ${fcaparams[@]}
@@ -298,6 +291,13 @@ fca_pipeline(){
 
 if [[ $INGEST -eq 1 ]]
  then
+	if [[ $gen -eq 1 && $fca -eq 1 ]]
+		then
+			gen=0
+			fca=0
+			echo 'WARNING: Ignoring -f and -g flags and running the full pipeline (i.e input generation followed by FCA and rule mining)'
+	fi
+
 	if [[ -z $pid ]]
 		then
 			echo 'Starting UI at port '$port
