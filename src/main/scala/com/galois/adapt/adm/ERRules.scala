@@ -61,15 +61,31 @@ object ERRules {
     }
 
   // Resolve a 'NetFlowObject'
+  object NetflowObjectEdges {
+    type AddressEdgeNode = (Edge[ADM,ADM], AdmAddress)
+    type PortEdgeNode = Option[(Edge[ADM,ADM], AdmPort)]
+  }
   def resolveNetflow(n: NetFlowObject):
     (
       AdmNetFlowObject,
-      UuidRemapper.PutCdm2Adm
+      UuidRemapper.PutCdm2Adm,
+      NetflowObjectEdges.AddressEdgeNode,
+      NetflowObjectEdges.AddressEdgeNode,
+      NetflowObjectEdges.PortEdgeNode,
+      NetflowObjectEdges.PortEdgeNode
     ) = {
       val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort)
+      val newLP = AdmPort(n.localPort)
+      val newLA = AdmAddress(n.localAddress)
+      val newRP = AdmPort(n.remotePort)
+      val newRA = AdmAddress(n.remoteAddress)
       (
         newN,
-        UuidRemapper.PutCdm2Adm(CdmUUID(n.getUuid), newN.uuid)
+        UuidRemapper.PutCdm2Adm(CdmUUID(n.getUuid), newN.uuid),
+        (EdgeAdm2Adm(newN.uuid, "localAddress", newLA.uuid), newLA),
+        (EdgeAdm2Adm(newN.uuid, "remoteAddress", newRA.uuid), newRA),
+        if (n.localPort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "localPort", newLP.uuid), newLP)) },
+        if (n.remotePort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "remotePort", newRP.uuid), newRP)) }
       )
     }
 
