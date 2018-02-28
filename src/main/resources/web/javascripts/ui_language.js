@@ -152,8 +152,19 @@ var node_appearance = [
         }
     }, 
 
+
 // ADM:
     {
+        name: "Host",
+        is_relevant: function(n) { return n.db_label === "Host" || n.db_label === "AdmHost" },
+        icon_unicode: "\uf390",
+        size: 40,
+        make_node_label: function(node) {
+            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'][0]['value']+"\n" : "no_host_name"+"\n"
+            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'][0]['value'] : "(unknown_type)"
+            return hostName + "(" + hostType + ")"
+        }
+    }, {
         name : "ADM Path Node",
         is_relevant : function(n) { return n.db_label === "AdmPathNode" },
         icon_unicode : "\uf3fb",
@@ -558,12 +569,22 @@ var predicates = [
     }, 
 
 // Principal
-       {
+    {
         name : "Processes Owned",
         is_relevant : function(n) { return n.db_label === "Principal"},
         floating_query : ".in('localPrincipal').hasLabel('Subject')",
         is_default : true
     },
+
+
+
+// Both CDM and ADM Hosts:
+    {
+        name : "Host",
+        is_relevant : function(node) { return node['properties'].hasOwnProperty('host') },
+        floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'][0]['value'] +")" }
+    },
+
 
 // ADM:
 

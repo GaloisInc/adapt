@@ -240,10 +240,18 @@ object ERStreamComponents {
 
         case Timed(t, n: NetFlowObject) =>
 
-          val (nP, remap) = resolveNetflow(n)
+          val (nP, remap, (ra, raEdge), (la, laEdge), remotePort, localPort) = resolveNetflow(n)
           val remapTimed = remap.copy(time = Some(t))
 
-          Stream(Right(nP)).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
+          Stream.concat(
+            Stream(Right(nP)),
+            Stream(Left(ra)),
+            Stream(Right(raEdge)),
+            Stream(Left(la)),
+            Stream(Right(laEdge)),
+            remotePort.toList.flatMap { case (rp,rpEdge) => Stream(Left(rp), Right(rpEdge)) },
+            localPort.toList.flatMap { case (lp,lpEdge) => Stream(Left(lp), Right(lpEdge)) }
+          ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
 
         case Timed(t, fo: FileObject) =>

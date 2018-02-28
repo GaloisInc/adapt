@@ -34,6 +34,7 @@ case class Event(
     ("uuid", uuid),
     ("eventType", eventType.toString),
     ("timestampNanos", timestampNanos)
+//    ("host", host)  // Let's just throw this away since the subject and predObj will always have the same value.
   ) ++
     sequence.fold[List[(String,Any)]](List.empty)(v => List(("sequence", v))) ++
     threadId.fold[List[(String,Any)]](List.empty)(v => List(("threadId", v))) ++

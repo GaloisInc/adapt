@@ -26,11 +26,11 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import org.mapdb.{DB, DBMaker}
+import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
 import com.galois.adapt.fingerprinting.{FingerprintActor, NetworkFingerprintActor, TestActor}
-
+import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -101,7 +101,27 @@ object Application extends App {
     (ref, source)
   }
 
-  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos), name = "uuidRemapper")
+  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap(
+    db.hashMap("cdm2cdm", Serializer.UUID, Serializer.UUID).createOrOpen(),
+    (cdmUuid: CdmUUID) => cdmUuid.uuid, (uuid: UUID) => CdmUUID(uuid),
+    (cdmUuid: CdmUUID) => cdmUuid.uuid, (uuid: UUID) => CdmUUID(uuid)
+  )
+  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap(
+    db.hashMap("cdm2adm", Serializer.UUID, Serializer.UUID).createOrOpen(),
+    (cdmUuid: CdmUUID) => cdmUuid.uuid, (uuid: UUID) => CdmUUID(uuid),
+    (admUuid: AdmUUID) => admUuid.uuid, (uuid: UUID) => AdmUUID(uuid)
+  )
+
+  val seenNodes: AlmostSet[UUID] = MapDBUtils.almostSet(
+    db.hashSet("seenNodes", Serializer.UUID).createOrOpen().asInstanceOf[HTreeMap.KeySet[UUID]],
+    identity[UUID], identity[UUID]
+  )
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(
+    db.hashSet("seenEdges").createOrOpen().asInstanceOf[HTreeMap.KeySet[EdgeAdm2Adm]],
+    identity[EdgeAdm2Adm], identity[EdgeAdm2Adm]
+  )
+
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap), name = "uuidRemapper")
 
 
   val ta1 = config.getString("adapt.env.ta1")
@@ -149,13 +169,13 @@ object Application extends App {
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
         case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
+        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[CDM18](2))
 
           broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast ~> EntityResolution(uuidRemapper, synSource) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
 
           SinkShape(broadcast.in)
         })
@@ -208,7 +228,7 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[Any](9))
 
-            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource))
+            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
               .via(printCounter("DB Writer", statusActor, 1000))
               .via(Flow.fromFunction {
                 case Left(e) => e
@@ -291,7 +311,7 @@ object Application extends App {
       val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
-        .via(EntityResolution(uuidRemapper, synSource))
+        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
 
           val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
