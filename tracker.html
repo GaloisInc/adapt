@@ -73,6 +73,79 @@
       </tr>
     </table>
 
+    <table>
+      <caption><h3>Unreceived UUIDs blocking (in UuidRemapper)</h3></caption>
+      <tr>
+        <td valign="top"><div id="uuids-blocking-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="uuids-blocking" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="uuids-blocking-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="uuids-blocking-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="uuids-blocking-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="uuids-blocking-xmin">xmin</div></td>
+        <td align="right"><div id="uuids-blocking-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>UUIDs blocked (in UuidRemapper)</h3></caption>
+      <tr>
+        <td valign="top"><div id="uuids-blocked-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="uuids-blocked" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="uuids-blocked-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="uuids-blocked-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="uuids-blocked-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="uuids-blocked-xmin">xmin</div></td>
+        <td align="right"><div id="uuids-blocked-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Tip of the stream time (in ER)</h3></caption>
+      <tr>
+        <td valign="top"><div id="er-time-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="er-time" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="er-time-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="er-time-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="er-time-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="er-time-xmin">xmin</div></td>
+        <td align="right"><div id="er-time-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+
 <script>
 
     const address = prompt("Please enter the address you want to track", "http://localhost:8080");
@@ -213,6 +286,45 @@
         obj => ({
             x: Date.now(),
             y: Math.round(Number(obj.generalRecords.every) / Number(obj.generalRecords.secondsThisEvery)),
+        }),
+      ),
+      new Graph(
+        document.getElementById('uuids-blocking'),
+        document.getElementById('uuids-blocking-ymin'),
+        document.getElementById('uuids-blocking-ymax'),
+        document.getElementById('uuids-blocking-xmin'),
+        document.getElementById('uuids-blocking-xmax'),
+        document.getElementById('uuids-blocking-curr'),
+        document.getElementById('uuids-blocking-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.uuidsBlocking),
+        }),
+      ),
+      new Graph(
+        document.getElementById('uuids-blocked'),
+        document.getElementById('uuids-blocked-ymin'),
+        document.getElementById('uuids-blocked-ymax'),
+        document.getElementById('uuids-blocked-xmin'),
+        document.getElementById('uuids-blocked-xmax'),
+        document.getElementById('uuids-blocked-curr'),
+        document.getElementById('uuids-blocked-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.blockedUuidResponses),
+        }),
+      ),
+      new Graph(
+        document.getElementById('er-time'),
+        document.getElementById('er-time-ymin'),
+        document.getElementById('er-time-ymax'),
+        document.getElementById('er-time-xmin'),
+        document.getElementById('er-time-xmax'),
+        document.getElementById('er-time-curr'),
+        document.getElementById('er-time-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.currentTime),
         }),
       ),
     ];

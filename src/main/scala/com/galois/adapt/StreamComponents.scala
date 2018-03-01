@@ -39,14 +39,21 @@ object FlowComponents {
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
         import collection.JavaConverters._
 
+        // Async buffer stats
         val admFuturesCount = EntityResolution.asyncTime.values().asScala.size
         val measuredMillis = EntityResolution.totalHistoricalTimeInAsync
         val countOutOfBuffer = EntityResolution.totalHistoricalCountInAsync
         val averageMillisInAsyncBuffer = Try(measuredMillis.toFloat / countOutOfBuffer).getOrElse(0F)
 
+        // Ordering nodes stats
         val blockEdgesCount = EntityResolution.blockedEdgesCount.get()
         val blockingNodes = EntityResolution.blockingNodes.size
+
         val currentTime = EntityResolution.currentTime
+
+        // UuidRemapper related stats
+        val uuidsBlocking: Int = Application.blocking.size
+        val blockedUuidResponses: Int = Application.blocking.values.map(_._1.length).sum
 
         println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  ADM buffer: $admFuturesCount.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
 
@@ -60,7 +67,10 @@ object FlowComponents {
           averageMillisInAsyncBuffer,
           durationSeconds,
           blockEdgesCount,
-          blockingNodes
+          blockingNodes,
+          uuidsBlocking,
+          blockedUuidResponses,
+          currentTime
         )
 
         populationCounter.clear()

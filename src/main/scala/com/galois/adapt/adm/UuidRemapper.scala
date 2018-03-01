@@ -44,7 +44,8 @@ class UuidRemapper(
     synActor: ActorRef,                     // Actor to whom synthesized nodes should be sent
     expiryTime: Long,                       // How long to hold on to a CdmUUID (waiting for a remap) until we expire it
     cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID], // Mapping for CDM uuids that have been mapped onto other CDM uuids
-    cdm2admMap: AlmostMap[CdmUUID,AdmUUID]  // Mapping for CDM uuids that have been mapped onto ADM uuids
+    cdm2admMap: AlmostMap[CdmUUID,AdmUUID], // Mapping for CDM uuids that have been mapped onto ADM uuids
+    blockingMap: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])]
   ) extends Actor with ActorLogging {
 
   import UuidRemapper._
@@ -59,7 +60,7 @@ class UuidRemapper(
   private val cdm2adm = cdm2admMap
 
   // However, we also keep track of a Map of "CDM_UUID -> the Actors that want to know what that ID maps to"
-  private val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
+  private val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = blockingMap
 
   // Keep track of current time art the tip of the stream, along with things that will expire
   var currentTime: Long = 0

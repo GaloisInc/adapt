@@ -32,6 +32,7 @@ import FlowComponents._
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
@@ -111,6 +112,7 @@ object Application extends App {
     (cdmUuid: CdmUUID) => cdmUuid.uuid, (uuid: UUID) => CdmUUID(uuid),
     (admUuid: AdmUUID) => admUuid.uuid, (uuid: UUID) => AdmUUID(uuid)
   )
+  val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
 
   val seenNodes: AlmostSet[UUID] = MapDBUtils.almostSet(
     db.hashSet("seenNodes", Serializer.UUID).createOrOpen().asInstanceOf[HTreeMap.KeySet[UUID]],
@@ -121,7 +123,7 @@ object Application extends App {
     identity[EdgeAdm2Adm], identity[EdgeAdm2Adm]
   )
 
-  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap), name = "uuidRemapper")
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
 
 
   val ta1 = config.getString("adapt.env.ta1")

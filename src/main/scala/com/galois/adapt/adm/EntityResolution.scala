@@ -143,7 +143,6 @@ object EntityResolution {
 
   type OrderAndDedupFlow = Flow[Future[Either[EdgeAdm2Adm, ADM]], Either[EdgeAdm2Adm, ADM], NotUsed]
 
-//  var inAsyncBuffer: AtomicInteger = new AtomicInteger(0)
   val asyncTime = new ConcurrentHashMap[Long, Long]()
   var totalHistoricalTimeInAsync: Long = 0
   var totalHistoricalCountInAsync: Int = 0
