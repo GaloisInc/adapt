@@ -109,8 +109,7 @@ object ERRules {
       newFo,
       UuidRemapper.PutCdm2Adm(CdmUUID(f.getUuid), newFo.uuid),
       f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal))),
-      f.peInfo.map(path => {
-        val pathNode = AdmPathNode.normalized(path)
+      f.peInfo.flatMap(AdmPathNode.normalized).map(pathNode => {
         (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
       })
     )
@@ -118,7 +117,7 @@ object ERRules {
 
   // Resolve a 'RegistryKeyObject'
   object RegistryKeyObjectEdges {
-    type FilePathEdgeNode = (Edge[ADM,ADM], AdmPathNode)
+    type FilePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
   }
   def resolveRegistryKeyObject(r: RegistryKeyObject):
     (
@@ -130,10 +129,9 @@ object ERRules {
       (
         newFo,
         UuidRemapper.PutCdm2Adm(CdmUUID(r.getUuid), newFo.uuid),
-        {
-          val pathNode = AdmPathNode.normalized(r.key)
+        AdmPathNode.normalized(r.key).map(pathNode =>
           (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
-        }
+        )
       )
     }
 
@@ -194,28 +192,24 @@ object ERRules {
         e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject", CdmUUID(obj))),
         e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject2", CdmUUID(obj))),
 
-        e.predicateObjectPath.flatMap(path => {
+        e.predicateObjectPath.flatMap(AdmPathNode.normalized).flatMap(pathNode => {
           e.predicateObject.map(predicateObject => {
-            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject), label, pathNode.uuid), pathNode)
           })
         }),
-        e.predicateObject2Path.flatMap(path => {
+        e.predicateObject2Path.flatMap(AdmPathNode.normalized).flatMap(pathNode => {
           e.predicateObject2.map(predicateObject2 => {
-            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject2), label, pathNode.uuid), pathNode)
           })
         }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(cmdLine => {
-          val pathNode = AdmPathNode.normalized(cmdLine)
+        e.properties.getOrElse(Map()).get("exec").flatMap(AdmPathNode.normalized).flatMap(pathNode => {
           e.subjectUuid.map(subj =>
             (EdgeCdm2Adm(CdmUUID(subj), "exec", pathNode.uuid), pathNode)
           )
         }),
-        e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
-          val pathNode = AdmPathNode.normalized(cmdLine)
+        e.properties.getOrElse(Map()).get("exec").flatMap(AdmPathNode.normalized).map(pathNode => {
           (EdgeCdm2Adm(CdmUUID(e.getUuid), "eventExec", pathNode.uuid), pathNode)
         })
       )
@@ -244,8 +238,7 @@ object ERRules {
     )] =
     if (s.subjectType != SUBJECT_PROCESS && s.parentSubject.isDefined) {
       Right((
-        s.cmdLine.map(cdm => {
-          val pathNode = AdmPathNode.normalized(cdm)
+        s.cmdLine.flatMap(AdmPathNode.normalized).map(pathNode => {
           (EdgeCdm2Adm(CdmUUID(s.parentSubject.get), "cmdLine", pathNode.uuid), pathNode)
         }),
         UuidRemapper.PutCdm2Cdm(CdmUUID(s.getUuid), CdmUUID(s.parentSubject.get))
@@ -258,8 +251,7 @@ object ERRules {
         UuidRemapper.PutCdm2Adm(CdmUUID(s.getUuid), newSubj.uuid),
         EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(s.localPrincipal)),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent))),
-        s.cmdLine.map(cdm => {
-          val pathNode = AdmPathNode.normalized(cdm)
+        s.cmdLine.flatMap(AdmPathNode.normalized).map(pathNode => {
           (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)
         })
       ))
