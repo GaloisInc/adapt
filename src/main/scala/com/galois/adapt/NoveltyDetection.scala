@@ -3,7 +3,8 @@ package com.galois.adapt
 import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_READ, EVENT_WRITE, EVENT_EXECUTE}
+import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
+import java.io.{PrintWriter, File}
 
 
 object NoveltyDetection {
@@ -68,15 +69,25 @@ trait PpmTree {
 }
 case object PpmTree {
   def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
+  def apply(filter: F, discriminators: D, serialized: TreeRepr):PpmTree =  new SymbolNode(filter, discriminators, Some(serialized))
 }
 
 
-class SymbolNode(filter: F, discriminators: D) extends PpmTree {
+class SymbolNode(filter: F, discriminators: D, repr: Option[TreeRepr] = None) extends PpmTree {
   private var counter = 0
   def getCount: Int = counter
 
   var children = Map.empty[ExtractedValue, PpmTree]
-  children = children + ("_?_" -> new QNode(() => children.size - 1))
+
+  repr.fold[Unit] {
+    children = children + ("_?_" -> new QNode(() => children.size - 1))
+  } { thisTree =>
+    counter = thisTree.count
+    children = thisTree.children.map {
+      case c if c.key == "_?_" => c.key -> new QNode(() => children.size - 1)
+      case c => c.key -> new SymbolNode(filter, discriminators.tail, Some(c))
+    }.toMap
+  }
 
   def totalChildCounts = children.values.map(_.getCount).sum
 
@@ -91,14 +102,15 @@ class SymbolNode(filter: F, discriminators: D) extends PpmTree {
         val extracted = discriminator(e, s, o)
         val childExists = children.contains(extracted)
         val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
-        if ( ! childExists) {
-          children = children + (extracted -> childNode)
-        }
         val childLocalProb = localChildProbability(extracted)
         val childGlobalProb = yourProb * parentGlobalProb
         if (childExists) childNode.update(e, s, o, childLocalProb, childGlobalProb).map { l =>
           (extracted, childLocalProb, childGlobalProb, childNode.getCount) :: l
-        } else Some(List((extracted, childLocalProb, childGlobalProb, childNode.getCount)))  // TODO: reconsider: this throws away the details of the first event to create a child.
+        } else {
+          children = children + (extracted -> childNode)
+          childNode.update(e, s, o, childLocalProb, childGlobalProb)
+          Some(List((extracted, childLocalProb, childGlobalProb, childNode.getCount)))
+        }
     }
   } else None
 
@@ -117,7 +129,7 @@ class QNode(counterFunc: () => Int) extends PpmTree {
 }
 
 
-case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) {
+case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
   override def toString = {
     val indent = (0 until (4 * depth)).map(_ => " ").mkString("")
     val depthString = if (depth < 10) s" $depth" else depth.toString
@@ -128,11 +140,51 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
       children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString).mkString("\n", "", "")
   }
 
+//  def toString[A](sortFunc: TreeRepr => A)(implicit ordering: Ordering[A]) = ???
+
   def leafNodes(nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
     children.toList.flatMap {
       case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc ++ List(key, nextKey), lp, gp, cnt))
       case next => next.leafNodes(nameAcc :+ key)
     }
+
+  def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
+
+  def writeToFile(filePath: String): Unit = {
+    val pw = new PrintWriter(new File(filePath))
+    this.toFlat.foreach(f => pw.write(TreeRepr.flatToCsvString(f)+"\n"))
+    pw.close()
+  }
+}
+case object TreeRepr {
+  def fromFlat(repr: List[(Int,ExtractedValue,Float,Float,Int)]): TreeRepr = {
+    def fromFlatRecursive(repr: List[(Int,ExtractedValue,Float,Float,Int)], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[(Int,ExtractedValue,Float,Float,Int)]) = {
+      val thisDepthList = repr.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
+      val remainder = repr.drop(thisDepthList.size)
+      val nextDepth = remainder.headOption.map(_._1)
+      nextDepth match {
+        case None =>  // this is the last item in the list
+          (accAtThisDepth ++ thisDepthList).toSet -> remainder
+        case Some(d) if d == atDepth => // resuming after the decent case
+          fromFlatRecursive(remainder, atDepth, accAtThisDepth ++ thisDepthList)
+        case Some(d) if d < atDepth  => // returning to parent case
+          (thisDepthList.dropRight(1) ++ thisDepthList.lastOption.map(_.copy(children = accAtThisDepth.toSet))).toSet -> remainder
+        case Some(d) if d > atDepth  => // descending into the child case
+          val (childSet, nextRemainder) = fromFlatRecursive(remainder, atDepth + 1, List.empty)
+          val updatedThisDepthList = accAtThisDepth ++ thisDepthList.dropRight(1) :+ thisDepthList.last.copy(children = childSet)
+          fromFlatRecursive(nextRemainder, atDepth, updatedThisDepthList)
+      }
+    }
+    fromFlatRecursive(repr, 0, List.empty)._1.head
+  }
+
+  def flatToCsvString(t: (Int, ExtractedValue, Float, Float, Int)): String = s"${t._1},${t._2},${t._3},${t._4},${t._5}"
+  def csvStringToFlat(s: String): (Int, ExtractedValue, Float, Float, Int) = {
+    val a = s.split(",")
+    (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
+  }
+
+  def readFromFile(filePath: String): TreeRepr = TreeRepr.fromFlat(scala.io.Source.fromFile(filePath).getLines().map(TreeRepr.csvStringToFlat).toList)
 }
 
 
@@ -141,29 +193,38 @@ class NoveltyActor extends Actor with ActorLogging {
 
   val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE
   val ds = List(
-    (e: Event, s: Subject, o: Object) => s._2.toList.map(_.path).sorted.mkString("[", ",", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", ",", "]")
+    (e: Event, s: Subject, o: Object) => s._2.toList.map(_.path).sorted.mkString("[", " | ", "]"),
+    (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", " | ", "]")
   )
 
-  val processFileTouches = PpmTree(f, ds)
-  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
-  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
+  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
+
+  val processFileTouches = PpmTree(f, ds, repr)
+  println(processFileTouches.getTreeRepr().toString)
+
+//  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
+//  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
 
   def receive = {
     case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes).map(println)
-      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
-      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
+      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
+//      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
+//      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
       sender() ! Ack
 
-    case InitMsg => sender() ! Ack
+    case InitMsg =>
+      sender() ! Ack
     case CompleteMsg =>
-//      println(processFileTouches.getTreeReport().toString)
+//      println(processFileTouches.getTreeRepr().toString)
 //      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 //      println("")
 //      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 //      println("")
 //      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+
+//      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
+//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.fromFile("/Users/ryan/Desktop/foo2.csv")}")
+
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
