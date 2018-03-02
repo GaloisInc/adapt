@@ -8,6 +8,7 @@ import com.galois.adapt.cdm18._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
+import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
@@ -141,13 +142,40 @@ package object adm {
   }
 
   case object AdmPathNode {
-    def normalized(path: String): AdmPathNode = {
-      val segments = path.trim.split("/",-1)
-      segments.last match {
-        case "." | "" => new AdmPathNode(segments.init.mkString("/"))
-        case ".." if segments.length > 2 => new AdmPathNode(segments.init.init.mkString("/"))
-        case _ => new AdmPathNode(segments.mkString("/"))
+    def normalized(path: String): Option[AdmPathNode] = {
+
+      // Garbage
+      if (path == "" || path == "<unknown>")
+        return None
+
+      var segs: List[String] = path.trim.split("/",-1).toList
+
+      val absolute: Boolean = if (segs.head == "") {
+        segs = segs.tail
+        true
+      } else {
+        false
       }
+
+      var segsRev: List[String] = List.empty
+      var backhops: Int = 0
+
+      for (seg <- segs) {
+        seg match {
+          case "." => { /* this adds no information, ignore it */ }
+          case ".." => if (segsRev.isEmpty) { backhops += 1 } else { segsRev = segsRev.tail }
+          case other => segsRev = other :: segsRev
+        }
+      }
+
+      // This is for nonsense like `/../foo`.
+      if (absolute && backhops > 0) return None
+
+      // This is for filtering out paths that have no meaningful information
+      if (segsRev.isEmpty && !absolute) return None
+
+      val norm = (if (absolute) { "/" } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString("/")
+      Some(AdmPathNode(norm))
     }
   }
 

@@ -272,7 +272,7 @@ object ERStreamComponents {
 
           Stream.concat(
             Some(Right(irFileObject)),
-            extractPathsAndEdges(Some(path))
+            extractPathsAndEdges(path)
           ).map(elem => (uuidRemapper ? remapTimed).map(_ => elem))
 
         case Timed(t, u: UnnamedPipeObject) =>
