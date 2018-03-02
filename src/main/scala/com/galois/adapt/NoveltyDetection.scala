@@ -91,28 +91,34 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
 
   def totalChildCounts = children.values.map(_.getCount).sum
 
-  def localChildProbability(identifier: ExtractedValue): Float = totalChildCounts match {
-    case 0 => 0F
-    case childCount => children.getOrElse(identifier, children("_?_")).getCount.toFloat / childCount
-  }
+  def localChildProbability(identifier: ExtractedValue): Float =
+    children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
+  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
     counter += 1
     discriminators match {
       case Nil => Set.empty
       case discriminator :: remainingDiscriminators =>
         val extractedSet = discriminator(e, s, o)
+        if (extractedSet.size > 1) counter += (extractedSet.size - 1) // ensure the parent counts equal to the size of the flattened set. `- 1` because the counter is always incremented by one (even if no discriminators match the children)
         extractedSet.flatMap { extracted =>
-          val childExists = children.contains(extracted)
+
+          val childExists = children.contains(extracted)  // Merge suffixes? Would have to alter existing child nodes in the case of a child key being the suffix of the incoming key.
+          // What to do about a suffix merged into a full path, followed by another full path which could have had the suffix applied to it?
+          // Perhaps suffix nodes should accumulate in their own nodes, and counted in aggregate on read. This would almost require parent counts to be computed lazily.
+          // ...or skip suffix folding entirely.
+
           val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
           val childLocalProb = localChildProbability(extracted)
-          val thisGlobalProb = yourProb * parentGlobalProb
+          val thisGlobalProb = thisLocalProb * parentGlobalProb
           if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
-            (extracted, childLocalProb, thisGlobalProb, childNode.getCount) :: alarmList
+            // Append information about the child:
+            (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
           } else {
             children = children + (extracted -> childNode)
-            childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all child alerts which occur as a result of the parent alert
-            Set(List((extracted, childLocalProb, thisGlobalProb, children("_?_").getCount /*childNode.getCount*/ )))
+            childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
+            // Begin information about the child:
+            Set(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
           }
         }
     }
@@ -202,13 +208,13 @@ case object TreeRepr {
 class NoveltyActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE
+  val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
   val ds = List(
     (e: Event, s: Subject, o: Object) => s._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.map(_.path).suffixFold //.toList.sorted //.mkString("[", " | ", "]")
+    (e: Event, s: Subject, o: Object) => o._2.map(_.path) //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
   )
 
-  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_full-bovia-training_FLAT.csv")
+  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
 
   val processFileTouches = PpmTree(f, ds, repr)
   println(processFileTouches.getTreeRepr().toString)
@@ -233,7 +239,7 @@ class NoveltyActor extends Actor with ActorLogging {
 //      println("")
 //      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 
-      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_full-bovia-training_FLAT2.csv")
+      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_bovia-trained_full.csv")
 //      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
       println("Done")
 
