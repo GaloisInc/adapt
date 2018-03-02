@@ -13,12 +13,12 @@ object NoveltyDetection {
   type Object = (ADM, Set[AdmPathNode])
 
   type ExtractedValue = String
-  type Discriminator = (Event, Subject, Object) => ExtractedValue
+  type Discriminator = (Event, Subject, Object) => Set[ExtractedValue]
   type D = List[Discriminator]
   type F = (Event, Subject, Object) => Boolean
 
   val noveltyThreshold: Float = 0.01F
-  type IsNovel = Option[List[(String, Float)]]
+  type IsNovel = Set[List[(String, Float)]]
 
   case class NoveltyTree(filter: F, discriminators: D) {
     var children = Map.empty[ExtractedValue, NoveltyTree]
@@ -42,29 +42,29 @@ object NoveltyDetection {
       val historicalNoveltyRate = localNovelty
       counter += 1
       discriminators match {
-        case Nil => None
-
+        case Nil => Set.empty[List[(String, Float)]]
         case discriminator :: remainingDiscriminators =>
-          val extracted = discriminator(e, s, o)
-          val childExists = children.contains(extracted)
-          val childTree = children.getOrElse(extracted, new NoveltyTree(filter, remainingDiscriminators))
-          children = children + (extracted -> childTree)
-          val childUpdateResult = childTree.update(e, s, o)
-
-          if (childUpdateResult.isDefined)
-            childUpdateResult.map(childPaths => (extracted -> historicalNoveltyRate) :: childPaths)
-          else if (!childExists && historicalNoveltyRate < noveltyThreshold)  // TODO: consider if we should ALSO emit another detection if this still matches here. => List[List[String]]
-            Some(List(extracted -> historicalNoveltyRate))
-          else None
+          val extractedSet = discriminator(e, s, o)
+          extractedSet.flatMap { extracted =>
+            val childExists = children.contains(extracted)
+            val childTree = children.getOrElse(extracted, new NoveltyTree(filter, remainingDiscriminators))
+            children = children + (extracted -> childTree)
+            val childUpdateResults = childTree.update(e, s, o)
+            if (childUpdateResults.nonEmpty)
+              childUpdateResults.map(childPaths => (extracted -> historicalNoveltyRate) :: childPaths)
+            else if ( ! childExists && historicalNoveltyRate < noveltyThreshold)  // TODO: consider if we should ALSO emit another detection if this still matches here. (i.e. append to the set from the previous condition?)
+              Set(List(extracted -> historicalNoveltyRate))
+            else Set.empty[List[(String, Float)]]
+          }
       }
-    } else None
+    } else Set.empty[List[(String, Float)]]
   }
 }
 
 
 trait PpmTree {
   def getCount: Int
-  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Option[List[(String, Float, Float, Int)]]
+  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Set[List[(String, Float, Float, Int)]]
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
@@ -73,59 +73,70 @@ case object PpmTree {
 }
 
 
-class SymbolNode(filter: F, discriminators: D, repr: Option[TreeRepr] = None) extends PpmTree {
+class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = None) extends PpmTree {
   private var counter = 0
   def getCount: Int = counter
 
   var children = Map.empty[ExtractedValue, PpmTree]
 
   repr.fold[Unit] {
-    children = children + ("_?_" -> new QNode(() => children.size - 1))
+    children = children + ("_?_" -> new QNode(children))
   } { thisTree =>
     counter = thisTree.count
     children = thisTree.children.map {
-      case c if c.key == "_?_" => c.key -> new QNode(() => children.size - 1)
+      case c if c.key == "_?_" => c.key -> new QNode(children)
       case c => c.key -> new SymbolNode(filter, discriminators.tail, Some(c))
     }.toMap
   }
 
   def totalChildCounts = children.values.map(_.getCount).sum
 
-  def localChildProbability(identifier: ExtractedValue): Float =
-    children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
+  def localChildProbability(identifier: ExtractedValue): Float = totalChildCounts match {
+    case 0 => 0F
+    case childCount => children.getOrElse(identifier, children("_?_")).getCount.toFloat / childCount
+  }
 
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Option[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
+  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
     counter += 1
     discriminators match {
-      case Nil => None
+      case Nil => Set.empty
       case discriminator :: remainingDiscriminators =>
-        val extracted = discriminator(e, s, o)
-        val childExists = children.contains(extracted)
-        val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
-        val childLocalProb = localChildProbability(extracted)
-        val childGlobalProb = yourProb * parentGlobalProb
-        if (childExists) childNode.update(e, s, o, childLocalProb, childGlobalProb).map { l =>
-          (extracted, childLocalProb, childGlobalProb, childNode.getCount) :: l
-        } else {
-          children = children + (extracted -> childNode)
-          childNode.update(e, s, o, childLocalProb, childGlobalProb)
-          Some(List((extracted, childLocalProb, childGlobalProb, childNode.getCount)))
+        val extractedSet = discriminator(e, s, o)
+        extractedSet.flatMap { extracted =>
+          val childExists = children.contains(extracted)
+          val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
+          val childLocalProb = localChildProbability(extracted)
+          val thisGlobalProb = yourProb * parentGlobalProb
+          if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
+            (extracted, childLocalProb, thisGlobalProb, childNode.getCount) :: alarmList
+          } else {
+            children = children + (extracted -> childNode)
+            childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all child alerts which occur as a result of the parent alert
+            Set(List((extracted, childLocalProb, thisGlobalProb, children("_?_").getCount /*childNode.getCount*/ )))
+          }
         }
     }
-  } else None
+  } else Set.empty
 
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
       if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
     )
+
+  override def equals(obj: scala.Any) = obj.isInstanceOf[SymbolNode] && {
+    val o = obj.asInstanceOf[SymbolNode]
+    o.filter == filter && o.discriminators == discriminators && o.getCount == getCount && o.children == children
+  }
 }
 
 
-class QNode(counterFunc: () => Int) extends PpmTree {
-  def getCount = counterFunc()
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Option[List[(String, Float, Float, Int)]] = Some(Nil)
+class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
+  def getCount = siblings.size - 1
+  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = Set(Nil)
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
+
+  override def equals(obj: scala.Any) = obj.isInstanceOf[QNode] && obj.asInstanceOf[QNode].getCount == getCount
 }
 
 
@@ -193,11 +204,11 @@ class NoveltyActor extends Actor with ActorLogging {
 
   val f = (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE
   val ds = List(
-    (e: Event, s: Subject, o: Object) => s._2.toList.map(_.path).sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.toList.map(_.path).sorted.mkString("[", " | ", "]")
+    (e: Event, s: Subject, o: Object) => s._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
+    (e: Event, s: Subject, o: Object) => o._2.map(_.path).suffixFold //.toList.sorted //.mkString("[", " | ", "]")
   )
 
-  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
+  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_full-bovia-training_FLAT.csv")
 
   val processFileTouches = PpmTree(f, ds, repr)
   println(processFileTouches.getTreeRepr().toString)
@@ -215,16 +226,18 @@ class NoveltyActor extends Actor with ActorLogging {
     case InitMsg =>
       sender() ! Ack
     case CompleteMsg =>
-//      println(processFileTouches.getTreeRepr().toString)
+      println(processFileTouches.getTreeRepr().toString)
 //      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 //      println("")
 //      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 //      println("")
 //      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 
-//      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
-//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.fromFile("/Users/ryan/Desktop/foo2.csv")}")
+      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_full-bovia-training_FLAT2.csv")
+//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
+      println("Done")
 
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
+
