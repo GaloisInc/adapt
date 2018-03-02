@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.NoveltyDetection.Event
 import com.galois.adapt.{Ack, CompleteMsg, InitMsg}
 import com.galois.adapt.adm._
+import com.galois.adapt.cdm18.EventType
 
 import scala.io.Source
 import scala.util.parsing.json.JSON
@@ -11,7 +12,6 @@ import scala.util.parsing.json.JSON
 
 object Fingerprinting {
   type M = String // needs to be filetouch or network
-
 
   trait FingerprintModel {
     def getModel: String
@@ -167,8 +167,8 @@ class FingerprintActor extends Actor with ActorLogging {
   val filePathModel = FingerprintModel("filetouch", "/Users/nls/repos/adapt/src/main/resources/model_file_touch_cadets.json")
   println(filePathModel.getModel)
 
-  val networkAttributeModel = FingerprintModel("network", "/Users/nls/repos/adapt/src/main/resources/model_network_attribute_cadets.json")
-  println(filePathModel.getModel)
+  //val networkAttributeModel = FingerprintModel("network", "/Users/nls/repos/adapt/src/main/resources/model_network_attribute_cadets.json")
+  //println(filePathModel.getModel)
 
 
   def receive = {
@@ -184,6 +184,7 @@ class FingerprintActor extends Actor with ActorLogging {
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
+
 
 
 class NetworkFingerprintActor extends Actor with ActorLogging {
@@ -214,13 +215,14 @@ class NetworkFingerprintActor extends Actor with ActorLogging {
 }
 
 
+
 class TestActor extends Actor with ActorLogging {
 
 
   def receive = {
 
-    case (Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      println(subPathNodes.toString()+" "+objPathNodes.toString())
+    case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventVec: Map[EventType,Int]) =>
+      println(s.toString+" "+subPathNodes.map(_.path).mkString(",")+" "+eventVec.toString())
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
@@ -228,6 +230,5 @@ class TestActor extends Actor with ActorLogging {
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
-
 
 

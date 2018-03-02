@@ -29,8 +29,9 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
-import com.galois.adapt.fingerprinting.{FingerprintActor, NetworkFingerprintActor, TestActor}
+import com.galois.adapt.fingerprinting.{FingerprintActor, KNNActor, NetworkFingerprintActor, TestActor}
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -424,97 +425,6 @@ object Application extends App {
           Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
         )
 
-/*    case "fingerprinting" =>
-      println("Running Process Fingerprinting Flow")
-      val fingerprintActor = system.actorOf(Props(classOf[FingerprintActor]), "fingerprinting")
-      CDMSource.cdm18(ta1)
-        .via(printCounter("Fingerprinting", statusActor))
-        .via(EntityResolution(uuidRemapper, synSource))
-        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
-
-        val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
-        val everything = collection.mutable.Map.empty[AdmUUID, ADM]
-
-        type AdmUUIDReferencingPathNodes = AdmUUID
-        val pathNodeUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
-        val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
-
-        val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
-          EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
-
-      {
-        case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
-          .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
-            val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-          val t = (e._1, Some(sub), e._3)
-            if (t._3.isDefined) {
-              if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-              val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-              val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-              List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-            } else {
-              events += (src -> t)
-              Nil
-            }
-          }
-        case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
-          .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-            val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-          val t = (e._1, e._2, Some(obj))
-            if (t._2.isDefined) {
-              if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-              val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-              val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-              List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-            } else {
-              events += (src -> t)
-              Nil
-            }
-          }
-        case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
-          .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-            val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-          val t = (e._1, e._2, Some(obj))
-            if (t._2.isDefined) {
-              if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-              val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-              val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-              List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-            } else {
-              events += (src -> t)
-              Nil
-            }
-          }
-        case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
-          // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
-          val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
-          pathNodeUses += (subObj -> newSet)
-          Nil
-        case Right(adm: AdmEvent) =>
-          events += (adm.uuid -> (adm, None, None))
-          Nil
-        case Right(adm: AdmSubject) =>
-          everything += (adm.uuid -> adm)
-          Nil
-        case Right(adm: AdmFileObject) =>
-          everything += (adm.uuid -> adm)
-          Nil
-        case Right(adm: AdmNetFlowObject) =>
-          everything += (adm.uuid -> adm)
-          Nil
-        case Right(adm: AdmSrcSinkObject) =>
-          everything += (adm.uuid -> adm)
-          Nil
-        case Right(adm: AdmPathNode) =>
-          pathNodes += (adm.uuid -> adm)
-          Nil
-        case _ => Nil
-      }
-      }
-        .runWith(
-          Sink.actorRefWithAck(fingerprintActor, InitMsg, Ack, CompleteMsg)
-        )
-*/
     case "fingerprinting" =>
       println("Running Process Fingerprinting Flow")
       val fingerprintActor = system.actorOf(Props(classOf[FingerprintActor]), "fingerprinting")
@@ -615,7 +525,73 @@ object Application extends App {
           Sink.actorRefWithAck(fingerprintActor, InitMsg, Ack, CompleteMsg)
         )
 
-    case "networkFingerprint" => //Note currently functioning
+    case "knn" =>
+      println("Running Process knn Flow")
+      val knnActor = system.actorOf(Props(classOf[KNNActor]), "knn")
+      CDMSource.cdm18(ta1)
+        .via(printCounter("test", statusActor))
+        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+        .statefulMapConcat[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]{ () =>
+        val eventTimeSpan: Long = "300".toLong // 300000000000 <- that is 5 minutes in nanoseconds
+
+        val processes = collection.mutable.Map.empty[AdmUUID, AdmSubject]
+        val events = collection.mutable.Map.empty[AdmUUID, AdmEvent]
+
+        val subEvents = collection.mutable.Map.empty[AdmUUID, Set[AdmUUID]]
+
+        type AdmUUIDSubject = AdmUUID
+        val subFridge: Fridge[AdmUUID] = Fridge.empty
+
+        type AdmUUIDReferencingPathNodes = AdmUUID
+        val pathNodeNameUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
+        val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
+
+        {
+        case Left(EdgeAdm2Adm(src, "subject", tgt)) => processes.get(tgt) // event -> subject
+          .fold(List.empty[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]) { sub =>
+          val newSet: Set[AdmUUID] = subEvents.getOrElse(tgt,Set.empty[AdmUUID]).+(src)
+          subEvents += (tgt -> newSet)
+
+          val e = events(src) // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+          if ( ! subFridge.keySet.contains(tgt)) subFridge.updateExpiryTime(tgt,e.earliestTimestampNanos)
+
+          val returnList = new collection.mutable.ListBuffer[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]()
+          while (subFridge.peekFirstToExpire.exists { case (_,t) => t <= (e.latestTimestampNanos - eventTimeSpan)}) {
+            val (keysToExpire, _) = subFridge.popFirstToExpire().get
+
+            for (admUuid <- keysToExpire) {
+              val subPathNodes = pathNodeNameUses.getOrElse(admUuid, Set.empty).map(pathNodes.apply)
+              val eventVec = subEvents.getOrElse(admUuid,Set.empty).map(events.apply).toList.map(_.eventType)
+                .foldLeft[Map[EventType,Int]](Map.empty)((m,c)=>m+(c->(m.getOrElse(c,0)+1)))
+              returnList.append((sub,subPathNodes,eventVec))
+            }
+          }
+          if (returnList.nonEmpty) returnList.toList
+          else Nil
+        }
+
+        case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec").contains(label) =>
+          // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
+          val newSet: Set[AdmUUID] = pathNodeNameUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
+          pathNodeNameUses += (subObj -> newSet)
+          Nil
+        case Right(adm: AdmEvent) =>
+          events += (adm.uuid -> adm)
+          Nil
+        case Right(adm: AdmSubject) =>
+          processes += (adm.uuid -> adm)
+          Nil
+        case Right(adm: AdmPathNode) =>
+          pathNodes += (adm.uuid -> adm)
+          Nil
+        case _ => Nil
+      }
+      }
+        .runWith(
+          Sink.actorRefWithAck(knnActor, InitMsg, Ack, CompleteMsg)
+        )
+
+/*    case "networkFingerprint" => //Note currently functioning
       println("Running Process Fingerprinting Flow")
       val fingerprintActor = system.actorOf(Props(classOf[NetworkFingerprintActor]), "networkFingerprint")
       CDMSource.cdm18(ta1)
@@ -728,7 +704,7 @@ object Application extends App {
       }
         .runWith(
           Sink.actorRefWithAck(fingerprintActor, InitMsg, Ack, CompleteMsg)
-        )
+        )*/
 
     case _ =>
       println("Unknown runflow argument. Quitting.")
