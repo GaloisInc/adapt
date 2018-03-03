@@ -29,7 +29,8 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
 
   var queryQueue = List.empty[UUID]
   val freq = config.getInt("adapt.runtime.expansionqueryfreq")
-  context.system.scheduler.schedule(freq seconds, freq seconds)(context.self ! MakeExpansionQueries)
+  val cancelable = context.system.scheduler.schedule(freq seconds, freq seconds)(context.self ! MakeExpansionQueries)
+  Application.system.registerOnTermination(cancelable.cancel())
 
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
