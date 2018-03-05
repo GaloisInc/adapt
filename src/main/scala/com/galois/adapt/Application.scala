@@ -108,7 +108,7 @@ object Application extends App {
     }
   }))
 
-  def getNamespaces: List[String] = namespaces.toList.flatMap(ns => List("cdm_" + ns, ns))
+  def getNamespaces: List[String] = List("cdm") ++ namespaces.toList.flatMap(ns => List("cdm_" + ns, ns))
 
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
