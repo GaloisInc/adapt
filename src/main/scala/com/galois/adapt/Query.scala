@@ -155,6 +155,9 @@ object Query {
   // Is this Neo4j or not
   val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
 
+  // Gross hack to get all of the expected UUID namespaces
+  def getNamespaces: List[String] = Application.getNamespaces
+
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {
 
@@ -192,8 +195,12 @@ object Query {
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
+      // NOTE: this is no longer exactly a UUID - it is a franken-UUID supporting namespaces.
+      // For example, it should accept `cdm_cadets_123e4567-e89b-12d3-a456-426655440000`.
+      //
+      // We make one parser level exceptions around this: `has('uuid',<uuid-lit>)`
       def uuid: Parser[QueryValue[String /*java.util.UUID*/ ]] = ( variable(uids) |
-        """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
+        """([0-9a-zA-Z-]*_)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(s) //java.util.UUID.fromString(s))
         }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
 
@@ -256,8 +263,11 @@ object Query {
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
-            case _~_~_~v~_ if isNeo4j => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v)
-            case _~_~_~v~_ => (t: Tr) => HasValue(t, Raw("uuid"), v)
+            case _~_~_~Raw(u: String)~_ if u.length == 36 => {
+              val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: getNamespaces.map(ns => Raw(ns + "_" + u))))
+              (t: Tr) => HasPredicate(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), nsPred)
+            }
+            case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)
           }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }

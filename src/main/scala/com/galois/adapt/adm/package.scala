@@ -16,25 +16,25 @@ package object adm {
 
   case class CdmUUID(uuid: UUID, namespace: String) extends Serializable { // extends AnyVal
     // Raw DB representation with namespace
-    def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { this.namespace + uuid.toString }
+    def rendered: String = if (this.namespace.isEmpty) { s"cdm_${uuid.toString}" } else { s"cdm_${this.namespace}_${uuid.toString}" }
   }
   object CdmUUID {
     // Decode raw DB representation
     def fromRendered(s: String): CdmUUID = {
       val (provider, uuid) = s.splitAt(s.length - 36)
-      CdmUUID(UUID.fromString(uuid), provider.stripSuffix("-"))
+      CdmUUID(UUID.fromString(uuid), provider.stripSuffix("_"))
     }
   }
 
   case class AdmUUID(uuid: UUID, namespace: String) extends Serializable { // extends AnyVal
     // Raw DB representation with namespace
-    def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { s"${this.namespace}-${uuid.toString}" }
+    def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { s"${this.namespace}_${uuid.toString}" }
   }
   object AdmUUID {
     // Decode raw DB representation
     def fromRendered(s: String): AdmUUID = {
       val (provider, uuid) = s.splitAt(s.length - 36)
-      AdmUUID(UUID.fromString(uuid), provider.stripSuffix("-"))
+      AdmUUID(UUID.fromString(uuid), provider.stripSuffix("_"))
     }
   }
 
