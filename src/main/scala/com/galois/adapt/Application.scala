@@ -30,6 +30,7 @@ import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -102,23 +103,56 @@ object Application extends App {
     (ref, source)
   }
 
-  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap(
-    db.hashMap("cdm2cdm").createOrOpen().asInstanceOf[HTreeMap[CdmUUID,CdmUUID]],
-    identity[CdmUUID], identity[CdmUUID], identity[CdmUUID], identity[CdmUUID]
-  )
-  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap(
-    db.hashMap("cdm2adm").createOrOpen().asInstanceOf[HTreeMap[CdmUUID,AdmUUID]],
-    identity[CdmUUID], identity[CdmUUID], identity[AdmUUID], identity[AdmUUID]
-  )
-  val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
+  // These are the maps that `UUIDRemapper` will use
+  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
+    db.hashMap("cdm2cdm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen(),
 
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(
-    db.hashSet("seenNodes").createOrOpen().asInstanceOf[HTreeMap.KeySet[AdmUUID]],
-    identity[AdmUUID], identity[AdmUUID]
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
   )
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(
-    db.hashSet("seenEdges").createOrOpen().asInstanceOf[HTreeMap.KeySet[EdgeAdm2Adm]],
-    identity[EdgeAdm2Adm], identity[EdgeAdm2Adm]
+  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
+    db.hashMap("cdm2adm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen(),
+
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+    { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
+  )
+
+  // These are the maps/sets the async and dedup stage of ER will use
+  val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
+    db.hashSet("seenNodes")
+      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+
+    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
+  )
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
+    db.hashSet("seenEdges")
+      .serializer(new SerializerArrayTuple(
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.UUID,
+        Serializer.UUID)
+      )
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+
+    {
+      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
+        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
+    },
+    {
+      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
+        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
+    }
   )
 
   val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
