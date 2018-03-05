@@ -8,41 +8,43 @@ import smile.math.distance.Distance
 import smile.validation.CrossValidation
 import java.io.{FileInputStream, ObjectOutputStream, PrintWriter}
 
+import com.galois.adapt.EventTypeKNN.EventVec
 import com.thoughtworks.xstream.XStream
 
 import scala.collection.immutable
 import scala.io.Source
+
+class JaccardDistance extends Distance[EventVec] {
+  override def d(x: EventVec, y: EventVec): Double = {
+    val denominator = x.zip(y).count(z=>z._1+z._2>0)
+    val numerator = x.zip(y).count(z=>z._1*z._2>0)
+    1-numerator.toDouble/denominator.toDouble
+  }
+}
+
+class GeneralizedJaccardDistance extends Distance[EventVec] {
+  override def d(x: EventVec, y: EventVec): Double = {
+    val denominator = x.zip(y).map(z=>math.max(z._1,z._2)).sum
+    val numerator = x.zip(y).map(z=>math.min(z._1,z._2)).sum
+    1-numerator.toDouble/denominator.toDouble
+  }
+}
+
+class CosineDistance extends Distance[EventVec] {
+  override def d(x: EventVec, y: EventVec): Double = {
+    val magnitude_x = math.sqrt(x.map(z=>z*z).sum.toDouble)
+    val magnitude_y = math.sqrt(y.map(z=>z*z).sum.toDouble)
+    val numerator = x.zip(y).map(z=>z._1*z._2).sum.toDouble
+    1-numerator.toDouble/(magnitude_x*magnitude_y)
+  }
+}
+
 
 object EventTypeKNN {
   type ProcessName = Set[String]
   type EventCounts = Map[EventType,Int]
   type EventVec = Array[Int]
   type ConfusionTuple = (Int,Int,Int,Int) //tp,fp,fn,tn
-
-  class JaccardDistance extends Distance[EventVec] {
-    override def d(x: EventVec, y: EventVec): Double = {
-      val denominator = x.zip(y).count(z=>z._1+z._2>0)
-      val numerator = x.zip(y).count(z=>z._1*z._2>0)
-      1-numerator.toDouble/denominator.toDouble
-    }
-  }
-
-  class GeneralizedJaccardDistance extends Distance[EventVec] {
-    override def d(x: EventVec, y: EventVec): Double = {
-      val denominator = x.zip(y).map(z=>math.max(z._1,z._2)).sum
-      val numerator = x.zip(y).map(z=>math.min(z._1,z._2)).sum
-      1-numerator.toDouble/denominator.toDouble
-    }
-  }
-
-  class CosineDistance extends Distance[EventVec] {
-    override def d(x: EventVec, y: EventVec): Double = {
-      val magnitude_x = math.sqrt(x.map(z=>z*z).sum.toDouble)
-      val magnitude_y = math.sqrt(y.map(z=>z*z).sum.toDouble)
-      val numerator = x.zip(y).map(z=>z._1*z._2).sum.toDouble
-      1-numerator.toDouble/(magnitude_x*magnitude_y)
-    }
-  }
 
   class EventTypeKNNTrain {
     var dataMap: Map[ProcessName,Array[EventCounts]] = Map.empty
@@ -257,7 +259,7 @@ class KNNTrainActor extends Actor with ActorLogging {
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => eventTypeKNNTrain.testSelectWriteModels(3);"All Done!" //upon completion save trained models and print summary stats
+    case CompleteMsg => "Almost Done!"; eventTypeKNNTrain.testSelectWriteModels(3);"All Done!" //upon completion save trained models and print summary stats
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
