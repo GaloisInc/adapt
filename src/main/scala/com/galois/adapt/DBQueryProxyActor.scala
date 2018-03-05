@@ -69,7 +69,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Write a batch of CDM to the DB
     case WriteCdmToNeo4jDB(cdms) =>
-      Future(dbNodeableTx(cdms).recover{ case e: Throwable => log.error(s"Failure writing to DB with CDMs: ${cdms.length}"); e.printStackTrace()})
+      dbNodeableTx(cdms).recover{ case e: Throwable => log.error(s"Failure writing to DB with CDMs: ${cdms.length}"); e.printStackTrace()}
       sender() ! Ack
 
     // Write a batch of ADM to the DB

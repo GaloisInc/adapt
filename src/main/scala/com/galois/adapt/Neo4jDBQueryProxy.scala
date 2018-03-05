@@ -10,7 +10,7 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.CDM18
 import com.steelbridgelabs.oss.neo4j.structure.Neo4JGraph
-import com.steelbridgelabs.oss.neo4j.structure.providers.Neo4JNativeElementIdProvider
+import com.steelbridgelabs.oss.neo4j.structure.providers.{DatabaseSequenceElementIdProvider, Neo4JNativeElementIdProvider}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
@@ -21,6 +21,7 @@ import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException
 import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
 import org.apache.tinkerpop.gremlin.structure.T
 import org.neo4j.driver.v1.{StatementResult, Transaction, TransactionWork}
+import org.neo4j.tinkerpop.api.Neo4jGraphAPI
 import spray.json._
 
 import scala.collection.JavaConverters._
@@ -43,8 +44,8 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   val driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "badpassword"), NeoConfig.build().withoutEncryption().toConfig)
 
-  val session = driver.session()
-  val tx = session.beginTransaction()
+  val indexSession = driver.session()
+  val tx = indexSession.beginTransaction()
 
   // NOTE: The UI expects a specific format and collection of labels on each node.
   // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
@@ -78,7 +79,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 //  tx.commitAsync()
   tx.success()
   tx.close()
-  session.close()
+  indexSession.close()
 
 
 
@@ -172,164 +173,171 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 //  val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
 
-  val provider = new Neo4JNativeElementIdProvider()
+  val provider =
+    new Neo4JNativeElementIdProvider()
+//    new DatabaseSequenceElementIdProvider(driver)
   val graph/*: Graph*/ = new Neo4JGraph(driver, provider, provider) //vertexIdProvider, edgeIdProvider)
 
 
   val shouldLogDuplicates: Boolean = config.getBoolean("adapt.ingest.logduplicates")
 
 
-  def findVertex(uuid: UUID, inThisTx: MutableMap[UUID, Vertex]): Option[Vertex] = inThisTx.get(uuid)
-//    .map{v => if (UUID.fromString(v.property[String]("uuid").value()) != uuid) log.error(s"Specified: $uuid, Found: ${v.property[String]("uuid").value()}"); v}
-    .orElse {    // TODO: Verify this works with Alec's new parameterized UUIDs.
-
-
-      val lookupResults = graph.traversal().V().hasLabel("Node").has("uuid", uuid.toString).asScala.toList
-      log.info(s"Looked up: ${lookupResults.map(_.property[String]("uuid").value())}")
-      require(lookupResults.lengthCompare(1) <= 0, s"Looking up a node by its uuid: $uuid failed because multiple results were returned: $lookupResults")
-      lookupResults.headOption.map{v =>
-        inThisTx(uuid) = v
-        v
-      }
-    }
 
 
   def dbNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = {
-
-
-
-    val verticesInThisTX = MutableMap.empty[UUID, Vertex]
-
-    log.info(s"Starting transaction.")
-    //    val transaction = neoGraph.beginTx()
-//    val transaction = graph.tx()
-//    transaction.open()
+    val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
 //    val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
-    val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
+    def queryWithCypher: Try[Unit] = {
+      val verticesInThisTX = MutableMap.empty[UUID, Vertex]
 
-    val identifiers = mutable.Map.empty[UUID, String]
-    def getName(uuid: UUID): String = identifiers.getOrElse(uuid, {identifiers(uuid) = Random.alphanumeric.filter(_.isLetter).take(10).mkString.toLowerCase; identifiers(uuid)})
+      log.info(s"Starting transaction.")
 
-    val (query, params) = cdms.foldLeft("" -> Map.empty[String,AnyRef]) { case ((query: String, allparams: Map[String,AnyRef]), cdm: DBNodeable[_]) =>
-      val thisName = getName(cdm.getUuid)
+      val identifiers = mutable.Map.empty[UUID, String]
 
-      val props = cdm.asDBKeyValues.toMap.map {
-        case (k, v: UUID) => s"${thisName}_$k" -> v.toString
-        case (k, other)   => s"${thisName}_$k" -> other.asInstanceOf[AnyRef]
-      }
-      val cdmTypeName = cdm.getClass.getSimpleName
-      val stmtProps = cdm.asDBKeyValues.map(k => s"${k._1}: ${"$"}${thisName}_${k._1}").sorted.mkString("{", ", ", "}")
+      def getName(uuid: UUID): String = identifiers.getOrElse(uuid, {identifiers(uuid) = Random.alphanumeric.filter(_.isLetter).take(10).mkString.toLowerCase; identifiers(uuid)})
 
-      val edgesStmt = cdm.asDBEdges.map { case (edgeName, toUuid) =>
-        val isNew = ! identifiers.contains(toUuid)
-        val otherName = getName(toUuid)
-        val otherStmt = if (isNew) s"""MERGE ($otherName: Node {uuid: "$toUuid"}) """ else ""
-//        s"""MERGE ($otherName: Node {uuid: "$toUuid"}) CREATE UNIQUE ($thisName)-[:$edgeName]->($otherName)"""
-        s"""${otherStmt}MERGE ($thisName)-[:$edgeName]->($otherName)"""
-      }
+      val (query, params) = cdms.foldLeft("" -> Map.empty[String, AnyRef]) { case ((query: String, allparams: Map[String, AnyRef]), cdm: DBNodeable[_]) =>
+        val thisName = getName(cdm.getUuid)
 
-      val baseStmt = s"MERGE ($thisName: $cdmTypeName $stmtProps) ${edgesStmt.mkString(" ")}\n"
-
-      (query + baseStmt) -> (allparams ++ props)
-    }
-
-
-    Try {
-      val s = driver.session()
-      s.writeTransaction(new TransactionWork[StatementResult] {
-        def execute(tx: Transaction) = tx.run(query, params.asJava)
-      })
-      s.close()
-    }
-
-
-
-    val cdmToNodeResults = cdms.map { cdm =>
-      Try {
+        val props = cdm.asDBKeyValues.toMap.map {
+          case (k, v: UUID) => s"${thisName}_$k" -> v.toString
+          case (k, other) => s"${thisName}_$k" -> other.asInstanceOf[AnyRef]
+        }
         val cdmTypeName = cdm.getClass.getSimpleName
-        val thisNeo4jVertex = findVertex(cdm.getUuid, verticesInThisTX).getOrElse({
+        val stmtProps = cdm.asDBKeyValues.map(k => s"${k._1}: ${"$"}${thisName}_${k._1}").sorted.mkString("{", ", ", "}")
+
+        val edgesStmt = cdm.asDBEdges.collect { case (edgeName, toUuid) if toUuid != skipEdgesToThisUuid =>
+          val isNew = !identifiers.contains(toUuid)
+          val otherName = getName(toUuid)
+          val otherStmt = if (isNew) s"""MERGE ($otherName: Node {uuid: "$toUuid"}) """ else ""
+//        s"""MERGE ($otherName: Node {uuid: "$toUuid"}) CREATE UNIQUE ($thisName)-[:$edgeName]->($otherName)"""
+          s"""${otherStmt}MERGE ($thisName)-[:$edgeName]->($otherName)"""
+        }
+
+        val baseStmt = s"MERGE ($thisName: $cdmTypeName $stmtProps) ${edgesStmt.mkString(" ")}\n"
+
+        (query + baseStmt) -> (allparams ++ props)
+      }
+
+      Try {
+        val s = driver.session()
+        s.writeTransaction(new TransactionWork[StatementResult] {
+          def execute(tx: Transaction) = tx.run(query, params.asJava)
+        })
+        s.close()
+      }
+    }
+
+
+
+
+    def queryWithGremlin = {
+      val transaction = graph.tx()
+//    transaction.open()
+
+      log.info(s"New transaction...")
+
+      def findVertex(uuid: UUID, inThisTx: MutableMap[UUID, Vertex]): Option[Vertex] = inThisTx.get(uuid)
+//    .map{v => if (UUID.fromString(v.property[String]("uuid").value()) != uuid) log.error(s"Specified: $uuid, Found: ${v.property[String]("uuid").value()}"); v}
+        .orElse {    // TODO: Verify this works with Alec's new parameterized UUIDs.
+
+        val lookupResults = graph.traversal().V().hasLabel("Node").has("uuid", uuid.toString).asScala.toList
+//        val lookupResults2 = graph.execute(s"""MATCH (n: Node {uuid: "$uuid"}) RETURN n.id""")
+//        log.info(lookupResults2.toString())
+
+        lookupResults.foreach(r => log.info(s"Looked up: ${r.property[String]("uuid").value()}  ${r.isInstanceOf[Vertex]}"))
+        require(lookupResults.lengthCompare(1) <= 0, s"Looking up a node by its uuid: $uuid failed because multiple results were returned: $lookupResults")
+        lookupResults.headOption.map { v =>
+          inThisTx(uuid) = v
+          v
+        }.orElse {
+//          log.info(s"cound not find: $uuid  Looking up the hard way.");
+          Query.run[Vertex](s"g.V().hasLabel('Node').has('uuid',$uuid)", graph).get.toList.headOption.map { v =>
+            inThisTx(uuid) = v
+            v
+          }
+        }
+      }
+
+      val verticesInThisTX = MutableMap.empty[UUID, Vertex]
+
+      val cdmToNodeResults = cdms.map { cdm =>
+        Try {
+          val cdmTypeName = cdm.getClass.getSimpleName
+          val thisNeo4jVertex = findVertex(cdm.getUuid, verticesInThisTX).getOrElse {
 //          log.info(s"Creating node for: ${cdm.getUuid}")
-          // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
-          // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
+            // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
+            // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 //          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(cdmTypeName)) // Throws an exception instead of creating duplicate UUIDs.
 
-
-
-          val newVertex  = graph.addVertex(T.label, s"Node::$cdmTypeName")  // TODO: Verify that this is how multiple Neo4j labels are created via gremlin!
-          verticesInThisTX += (cdm.getUuid -> newVertex)
-          newVertex
-        })
-
-        cdm.asDBKeyValues.foreach {
-          // TODO: should log if new value is replacing a different value!
-          case (k, v: UUID) => thisNeo4jVertex.property(k, v.toString)
-          case (k, v: Int)  => thisNeo4jVertex.property(k, v.toLong)  // Bolt protocol supports fewer types: https://github.com/SteelBridgeLabs/neo4j-gremlin-bolt/blob/master/src/main/java/com/steelbridgelabs/oss/neo4j/structure/Neo4JBoltSupport.java#L36
-          case (k,v) => try {
-            thisNeo4jVertex.property(k, v)
-          } catch {
-            case e: Exception =>
-              println(s"Tried (and failed) to set the key $k to the value $v on a Neo4j node")
-              e.printStackTrace()
+            val newVertex = graph.addVertex(T.label, s"Node::$cdmTypeName", "uuid", cdm.getUuid.toString)  // TODO: Verify that this is how multiple Neo4j labels are created via gremlin!
+            verticesInThisTX += (cdm.getUuid -> newVertex)
+            newVertex
           }
-        }
 
-        cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
-          if (toUuid != skipEdgesToThisUuid) findVertex(toUuid, verticesInThisTX) /*verticesInThisTX.get(toUuid)*/ match {
-            case Some(toNeo4jVertex) =>
-//              val relationship = new RelationshipType() { def name: String = edgeName.toString }
-//              thisNeo4jVertex.createRelationshipTo(toNeo4jVertex, relationship)
-              thisNeo4jVertex.addEdge(edgeName.toString, toNeo4jVertex)
-            case None =>
-//              val destinationNode = Option(neoGraph.findNode(Label.label("Node"), "uuid", toUuid.toString)).getOrElse {
-//                verticesInThisTX(toUuid) = neoGraph.createNode(Label.label("Node"))  // Create empty node
-//                verticesInThisTX(toUuid)
-//              }
+          cdm.asDBKeyValues.foreach {
+            // TODO: should log if new value is replacing a different value!
+            case (k, v: UUID) => thisNeo4jVertex.property(k, v.toString)
+            case (k, v: Int) => thisNeo4jVertex.property(k, v.toLong)  // This library/protocol supports fewer types: https://github.com/SteelBridgeLabs/neo4j-gremlin-bolt/blob/master/src/main/java/com/steelbridgelabs/oss/neo4j/structure/Neo4JBoltSupport.java#L36
+            case (k, v) => try {
+              thisNeo4jVertex.property(k, v)
+            } catch {
+              case e: Exception =>
+                println(s"Tried (and failed) to set the key $k to the value $v on a Neo4j node")
+                e.printStackTrace()
+            }
+          }
 
+          cdm.asDBEdges.foreach { case (edgeName, toUuid) =>
+            if (toUuid != skipEdgesToThisUuid) findVertex(toUuid, verticesInThisTX) /*verticesInThisTX.get(toUuid)*/ match {
+              case Some(toNeo4jVertex) =>
+                thisNeo4jVertex.addEdge(edgeName.toString, toNeo4jVertex)
+              case None =>
 //              log.info(s"Creating node for edge to: ${toUuid}")
-              val destinationNode = //findVertex(toUuid).getOrElse {
-                graph.addVertex(T.label, "Node", "uuid", toUuid.toString)//  v.property("uuid", toUuid.toString)
-//              }
-//              verticesInThisTX(toUuid) = destinationNode
-//              val relationship = new RelationshipType() { def name: String = edgeName.toString }
-//              thisNeo4jVertex.createRelationshipTo(destinationNode, relationship)
-              thisNeo4jVertex.addEdge(edgeName.toString, destinationNode)
-          }
-        }
-        Some(cdm.getUuid)
-      }.recoverWith {
-        case e: org.neo4j.driver.v1.exceptions.ClientException =>
-//          log.error(e.getMessage.split("\n").take(5).mkString("\n"))
-          log.error(s"CLIENT EXCEPTION")
-          Success(None)
-        case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) log.info(s"Skipping duplicate creation of node: ${cdm.getUuid}")
-          Success(None)
-        //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
-        case e =>
-          log.error("UNKNOWN FAILURE IN TRANSACTION:")
-          e.printStackTrace()
-          Failure(e)
-      }
-    }
+                val destinationNode = graph.addVertex(T.label, "Node", "uuid", toUuid.toString)
 
-    Try {
-      if (cdmToNodeResults.forall(_.isSuccess)) {
+                verticesInThisTX(toUuid) = destinationNode
+                thisNeo4jVertex.addEdge(edgeName.toString, destinationNode)
+            }
+          }
+          Some(cdm.getUuid)
+        }.recoverWith {
+//        case e: org.neo4j.driver.v1.exceptions.ClientException =>   // This is thrown only by the commit below.
+//          log.error(s"CLIENT EXCEPTION")
+//          Success(None)
+          case e: ConstraintViolationException =>
+            if (shouldLogDuplicates) log.info(s"Skipping duplicate creation of node: ${cdm.getUuid}")
+            Success(None)
+          //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
+          case e =>
+            log.error("UNKNOWN FAILURE IN TRANSACTION:")
+            e.printStackTrace()
+            Failure(e)
+        }
+      }
+
+      Try {
+        if (cdmToNodeResults.forall(_.isSuccess)) {
 //        transaction.success()
 //        log.info("finished transaction. trying to commit.")
-//        transaction.commit()
-//        transaction.close()
-        log.info("transaction successful")
-      } else {
-        log.error(s"DETECTABLE TRANSACTION FAILURE! CDMs:\n${cdms.length}")
-        val errorMessages = cdmToNodeResults.collect{ case t: Failure[_] => t.exception.getMessage}
+          transaction.commit()
+          transaction.close()
+          log.info("transaction successful")
+        } else {
+          log.error(s"DETECTABLE TRANSACTION FAILURE! CDMs:\n${cdms.length}")
+          val errorMessages = cdmToNodeResults.collect { case t: Failure[_] => t.exception.getMessage }
 //        transaction.failure()
-//        transaction.rollback()
-//        transaction.close()
-        throw new RuntimeException(s"Transaction rolled back due to: ${errorMessages.mkString("\n", "\n", "")}")
+          transaction.rollback()
+          transaction.close()
+          throw new RuntimeException(s"Transaction rolled back due to: ${errorMessages.mkString("\n", "\n", "")}")
+        }
       }
     }
+
+    queryWithCypher
+//    queryWithGremlin
   }
 
 
@@ -345,12 +353,12 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
-            .orElse(findVertex(edge.src.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
+//            .orElse(findVertex(edge.src.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
           val target = verticesInThisTX
             .get(edge.tgt)
-            .orElse(findVertex(edge.tgt.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
+//            .orElse(findVertex(edge.tgt.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
 //          source.createRelationshipTo(target, new RelationshipType() {
@@ -416,10 +424,11 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
       println(s"Received Cypher query: $q")
       sender() ! Future { Try {
 //        DBQueryProxyActor.toJson(neoGraph.execute(q).asScala.toList)
-        val tx = session.beginTransaction()
-        val result = DBQueryProxyActor.toJson(tx.run(q).asScala.toList)
-        tx.success()
-        tx.close()
+//        val tx = indexSession.beginTransaction()
+//        val result = DBQueryProxyActor.toJson(tx.run(q).asScala.toList)
+//        tx.success()
+//        tx.close()
+        ???
       } }
 
     case InitMsg =>
