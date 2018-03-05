@@ -18,8 +18,8 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T]
 
   // Writing CDM and ADM in a transaction
-  def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit]
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit]
+  def dbNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit]
+  def admTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit]
 
 
   var streamsFlowingInToThisActor = 0
@@ -69,12 +69,12 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Write a batch of CDM to the DB
     case WriteCdmToNeo4jDB(cdms) =>
-      DBNodeableTx(cdms).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
+      Future(dbNodeableTx(cdms).recover{ case e: Throwable => log.error(s"Failure writing to DB with CDMs: ${cdms.length}"); e.printStackTrace()})
       sender() ! Ack
 
     // Write a batch of ADM to the DB
     case WriteAdmToNeo4jDB(adms) =>
-      AdmTx(adms).getOrElse(log.error(s"Failure writing to DB with ADMs: ")) //$adms"))
+      admTx(adms).getOrElse(log.error(s"Failure writing to DB with ADMs: ")) //$adms"))
       sender() ! Ack
 
     case Failure(e: Throwable) =>

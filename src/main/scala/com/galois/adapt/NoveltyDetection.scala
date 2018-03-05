@@ -12,15 +12,17 @@ object NoveltyDetection {
   type Subject = (AdmSubject, Set[AdmPathNode])
   type Object = (ADM, Set[AdmPathNode])
 
+  type IncomingDataShape = (Event, Subject, Object)
+
   type ExtractedValue = String
-  type Discriminator = (Event, Subject, Object) => Set[ExtractedValue]
-  type D = List[Discriminator]
-  type F = (Event, Subject, Object) => Boolean
+  type Discriminator[DataShape] = DataShape => Set[ExtractedValue]
+//  type D[DataShape] = List[Discriminator[DataShape]]
+  type Filter[DataShape] = DataShape => Boolean
 
   val noveltyThreshold: Float = 0.01F
   type IsNovel = Set[List[(String, Float)]]
 
-  case class NoveltyTree(filter: F, discriminators: D) {
+  case class NoveltyTree(filter: Filter[IncomingDataShape], discriminators: List[Discriminator[IncomingDataShape]]) {
     var children = Map.empty[ExtractedValue, NoveltyTree]
     var counter = 0
 
@@ -68,12 +70,12 @@ trait PpmTree {
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
-  def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
-  def apply(filter: F, discriminators: D, serialized: TreeRepr):PpmTree =  new SymbolNode(filter, discriminators, Some(serialized))
+//  def apply(filter: Filter, discriminators: List[Discriminator]): PpmTree = new SymbolNode(filter, discriminators)
+  def apply(filter: Filter[IncomingDataShape], discriminators: List[Discriminator[IncomingDataShape]], serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
 }
 
 
-class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = None) extends PpmTree {
+class SymbolNode(val filter: Filter[IncomingDataShape], val discriminators: List[Discriminator[IncomingDataShape]], repr: Option[TreeRepr] = None) extends PpmTree {
   private var counter = 0
   def getCount: Int = counter
 
@@ -91,8 +93,10 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
 
   def totalChildCounts = children.values.map(_.getCount).sum
 
-  def localChildProbability(identifier: ExtractedValue): Float =
-    children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
+  def localChildProbability(identifier: ExtractedValue): Float = totalChildCounts match {
+    case 0 => 0F
+    case totalCounts => children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalCounts
+  }
 
   def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
     counter += 1
@@ -208,22 +212,24 @@ case object TreeRepr {
 class NoveltyActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
-  val ds = List(
-    (e: Event, s: Subject, o: Object) => s._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.map(_.path) //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
+  val f: Filter[IncomingDataShape] = t => t._1.eventType == EVENT_READ || t._1.eventType == EVENT_WRITE //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
+  val ds: List[Discriminator[IncomingDataShape]] = List(
+    d => d._2._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
+    d => d._3._2.map(_.path) //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
   )
 
-  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
+//  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/experiments/cadets-bovia_processFileTouches_full.csv")
 
-  val processFileTouches = PpmTree(f, ds, repr)
+  val processFileTouches = PpmTree(f, ds)//, repr)
   println(processFileTouches.getTreeRepr().toString)
 
 //  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
 //  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
 
   def receive = {
-    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+    case data: IncomingDataShape =>
+      val (e, s, subPathNodes, o, objPathNodes) = (data._1, data._2._1, data._2._2, data._3._1, data._3._2)
+//    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
       processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
 //      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
 //      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
@@ -239,7 +245,7 @@ class NoveltyActor extends Actor with ActorLogging {
 //      println("")
 //      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 
-      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_bovia-trained_full.csv")
+      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/experiments/clearscope-bovia_process-file-touches.csv")
 //      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
       println("Done")
 
@@ -247,3 +253,18 @@ class NoveltyActor extends Actor with ActorLogging {
   }
 }
 
+
+sealed trait TA1Team
+case object CADETS extends TA1Team
+
+case class PpmInstance[TA1 <: TA1Team, DataShape](ta1: TA1, name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]])
+
+object NoveltyInstances {
+  val processFileTouches = PpmInstance(CADETS, "Process file touches",
+    (t: IncomingDataShape) => t._1.eventType == EVENT_READ || t._1.eventType == EVENT_WRITE,
+    List[Discriminator[IncomingDataShape]](
+      {case (e, s, o) => s._2.map(_.path)},
+      {case (e, s, o) => o._2.map(_.path)}
+    )
+  )
+}

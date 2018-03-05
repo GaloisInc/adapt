@@ -43,7 +43,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
   // TinkerGraph doesn't need transactions
   override def FutureTx[T](body: => T)(implicit ec: ExecutionContext) = Future { body }
 
-  override def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = {
+  override def dbNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = {
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val cdmToNodeResults: Seq[Try[Unit]] = cdms map { cdm =>
@@ -82,7 +82,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       .getOrElse(Success(()))
   }
 
-  override def AdmTx(adms: Seq[Either[adm.EdgeAdm2Adm, adm.ADM]]): Try[Unit] = {
+  override def admTx(adms: Seq[Either[adm.EdgeAdm2Adm, adm.ADM]]): Try[Unit] = {
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 

@@ -35,8 +35,14 @@ lazy val adapt = (project in file(".")).settings(
 //    "org.neo4j" % "neo4j-lucene-upgrade" % neoV,
     "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
-//    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
+
+
+
+    "org.neo4j.driver" % "neo4j-java-driver" % "1.5.1",
+    "com.steelbridgelabs.oss" % "neo4j-gremlin-bolt" % "0.2.27",
+
 //    "org.neo4j" % "neo4j-bolt" % neoV
+
 
 //    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
 
