@@ -1,12 +1,12 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
-import com.galois.adapt.adm.{AdmPathNode, AdmSubject}
+import com.galois.adapt.adm.{AdmPathNode, AdmSubject, CdmUUID}
 import com.galois.adapt.cdm18.EventType
 import smile.classification._
 import smile.math.distance.Distance
 import smile.validation.CrossValidation
-import java.io.{FileInputStream, ObjectOutputStream, PrintWriter}
+import java.io.{FileInputStream, PrintWriter}
 
 import com.galois.adapt.EventTypeKNN.EventVec
 import com.thoughtworks.xstream.XStream
@@ -46,12 +46,29 @@ object EventTypeKNN {
   type EventVec = Array[Int]
   type ConfusionTuple = (Int,Int,Int,Int) //tp,fp,fn,tn
 
-  class EventTypeKNNTrain {
+  class EventTypeKNNTrain(maliciousFiles: List[String]) {
     var dataMap: Map[ProcessName,Array[EventCounts]] = Map.empty
 
+    def loadMaliciousData(maliciousFile: String): Seq[String] = {
+      val src = Source.fromFile(maliciousFile)
+      val iter = src.getLines().drop(1).map(_.split(","))
+      val malSeq = iter.flatMap(x=> List(x(4).split(";"),x(6).split(";")))
+        .toSeq.flatten
+      src.close()
+      malSeq
+    }
+
+/*
+    val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
+    def getMalData(): Unit = {
+      maliciousData.foreach(x=>println(x))
+    }
+*/
     def collect(s: AdmSubject, subPaths: Set[String], eventMap: EventCounts): Unit = {
-      val newArray = dataMap.getOrElse(subPaths,Array(Map.empty[EventType,Int])) :+ eventMap
-      dataMap += (subPaths -> newArray)
+      //if (! s.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
+        val newArray = dataMap.getOrElse(subPaths, Array(Map.empty[EventType, Int])) :+ eventMap
+        dataMap += (subPaths -> newArray)
+      //}
     }
 
     def transformData(data: Map[ProcessName,Array[EventCounts]]): (Array[EventVec],Array[ProcessName]) = {
@@ -221,6 +238,7 @@ object EventTypeKNN {
         write(xml)
         close
       }
+      println("All Done for reals!")
     }
   }
 
@@ -250,16 +268,17 @@ object EventTypeKNN {
 
 class KNNTrainActor extends Actor with ActorLogging {
   import EventTypeKNN._
-  val eventTypeKNNTrain = new EventTypeKNNTrain()
+  val eventTypeKNNTrain = new EventTypeKNNTrain(List("bovia_webshell.csv"))
+
 
   def receive = {
 
     case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventMap: EventCounts) =>
-      eventTypeKNNTrain.collect(s,subPathNodes.map(_.path),eventMap)
+      //eventTypeKNNTrain.collect(s,subPathNodes.map(_.path),eventMap)
       sender() ! Ack
 
-    case InitMsg => sender() ! Ack
-    case CompleteMsg => "Almost Done!"; eventTypeKNNTrain.testSelectWriteModels(3);"All Done!" //upon completion save trained models and print summary stats
+    case InitMsg => /*eventTypeKNNTrain.getMalData();*/ sender() ! Ack
+    case CompleteMsg => println("Almost Done!"); eventTypeKNNTrain.testSelectWriteModels(3);println("All Done!") //upon completion save trained models and print summary stats
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
@@ -275,7 +294,7 @@ class KNNActor extends Actor with ActorLogging {
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => "All Done" //upon completion save trained models and print summary stats
+    case CompleteMsg => println("All Done") //upon completion save trained models and print summary stats
     case x => log.error(s"Received Unknown Message: $x")
   }
 }

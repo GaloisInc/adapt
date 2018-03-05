@@ -527,7 +527,7 @@ object Application extends App {
 
     case "knn" =>
       println("Running Process knn Flow")
-      val knnActor = system.actorOf(Props(classOf[KNNActor]), "knn")
+      val knnActor = system.actorOf(Props(classOf[KNNTrainActor]), "knn")
       CDMSource.cdm18(ta1)
         .via(printCounter("knn", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
