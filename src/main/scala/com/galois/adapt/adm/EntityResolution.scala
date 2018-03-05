@@ -28,8 +28,8 @@ object EntityResolution {
 
   val config: Config = ConfigFactory.load()
 
-  def apply(uuidRemapper: ActorRef, synthesizedSource: Source[ADM, _], seenNodesSet: AlmostSet[UUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
-           (implicit system: ActorSystem): Flow[CDM, Either[EdgeAdm2Adm, ADM], NotUsed] = {
+  def apply(uuidRemapper: ActorRef, synthesizedSource: Source[ADM, _], seenNodesSet: AlmostSet[AdmUUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
+           (implicit system: ActorSystem): Flow[(String,CDM), Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
@@ -37,9 +37,9 @@ object EntityResolution {
     val delay: FiniteDuration = 5 seconds
 
     // TODO: this is a hack
-    def endHack(cdm: CDM): CDM = {
+    def endHack(cdm: (String,CDM)): (String,CDM) = {
       cdm match {
-        case EndMarker(session, counts) =>
+        case (_, EndMarker(session, counts)) =>
 
           println(s"Reached end of session with session number: $session: ")
           for ((k,v) <- counts) {
@@ -56,8 +56,8 @@ object EntityResolution {
       cdm
     }
 
-    Flow[CDM]
-      .concat(Source.fromIterator[CDM](() => Iterator(TimeMarker(Long.MaxValue), EndMarker(-1,Map()))))
+    Flow[(String,CDM)]
+      .concat(Source.fromIterator[(String,CDM)](() => Iterator(("",TimeMarker(Long.MaxValue)), ("",EndMarker(-1,Map())))))
       .map(endHack)
       .via(annotateTime)
       .via(erWithoutRemapsFlow(uuidRemapper))
@@ -67,7 +67,7 @@ object EntityResolution {
   }
 
 
-  type ErFlow = Flow[Timed[CDM], Future[Either[Edge[_, _], ADM]], NotUsed]
+  type ErFlow = Flow[(String,Timed[CDM]), Future[Either[Edge[_, _], ADM]], NotUsed]
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs
   private def erWithoutRemapsFlow(uuidRemapper: ActorRef)(implicit t: Timeout, ec: ExecutionContext): ErFlow =
@@ -99,7 +99,7 @@ object EntityResolution {
        *                                      `-__________-'
        */
 
-      val broadcast = b.add(Broadcast[Timed[CDM]](3))
+      val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
       val merge = b.add(Merge[Future[Either[Edge[_, _], ADM]]](3))
 
       broadcast ~> EventResolution(uuidRemapper, (config.getInt("adapt.adm.eventexpirysecs") seconds).toNanos) ~> merge
@@ -156,7 +156,7 @@ object EntityResolution {
   //   - prevent duplicate edges from being re-emitted
   //   - prevent Edges from being emitted before both of their endpoints have been emitted
   //
-  private def asyncDeduplicate(parallelism: Int, seenNodesSet: AlmostSet[UUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
+  private def asyncDeduplicate(parallelism: Int, seenNodesSet: AlmostSet[AdmUUID], seenEdgesSet: AlmostSet[EdgeAdm2Adm])
                               (implicit t: Timeout, ec: ExecutionContext): OrderAndDedupFlow =
     Flow[Future[Either[EdgeAdm2Adm, ADM]]]
 
@@ -226,11 +226,12 @@ object EntityResolution {
 
   var currentTime: Long = 0
 
-  def annotateTime: Flow[CDM, Timed[CDM], _] = Flow[CDM].statefulMapConcat{ () =>
+  def annotateTime: Flow[(String,CDM), (String,Timed[CDM]), _] = Flow[(String,CDM)].statefulMapConcat{ () =>
 //    var currentTime: Long = 0
     val maxTimeJump: Long = (config.getInt("adapt.adm.maxtimejumpsecs") seconds).toNanos
 
-    (cdm: CDM) => {
+    { case (provider, cdm: CDM) =>
+
       for (time <- timestampOf(cdm); if time > currentTime) {
         cdm match {
           case _: TimeMarker if time > currentTime => currentTime = time
@@ -244,7 +245,7 @@ object EntityResolution {
         }
 
       }
-      List(Timed(currentTime, cdm))
+      List((provider, Timed(currentTime, cdm)))
     }
   }
 
