@@ -29,7 +29,7 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
-import com.galois.adapt.fingerprinting.{FingerprintActor, KNNActor, NetworkFingerprintActor, TestActor}
+import com.galois.adapt.fingerprinting.{FingerprintActor, NetworkFingerprintActor, TestActor}
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 
 import scala.collection.JavaConverters._
@@ -529,10 +529,10 @@ object Application extends App {
       println("Running Process knn Flow")
       val knnActor = system.actorOf(Props(classOf[KNNActor]), "knn")
       CDMSource.cdm18(ta1)
-        .via(printCounter("test", statusActor))
+        .via(printCounter("knn", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]{ () =>
-        val eventTimeSpan: Long = "300".toLong // 300000000000 <- that is 5 minutes in nanoseconds
+        val eventTimeSpan: Long = "300000000000".toLong // 300000000000 <- that is 5 minutes in nanoseconds
 
         val processes = collection.mutable.Map.empty[AdmUUID, AdmSubject]
         val events = collection.mutable.Map.empty[AdmUUID, AdmEvent]
@@ -563,7 +563,10 @@ object Application extends App {
               val subPathNodes = pathNodeNameUses.getOrElse(admUuid, Set.empty).map(pathNodes.apply)
               val eventVec = subEvents.getOrElse(admUuid,Set.empty).map(events.apply).toList.map(_.eventType)
                 .foldLeft[Map[EventType,Int]](Map.empty)((m,c)=>m+(c->(m.getOrElse(c,0)+1)))
-              returnList.append((sub,subPathNodes,eventVec))
+              if (subPathNodes.nonEmpty) {
+                returnList.append((sub,subPathNodes,eventVec))
+                if (subEvents.contains(admUuid)) subEvents -= admUuid
+              }
             }
           }
           if (returnList.nonEmpty) returnList.toList

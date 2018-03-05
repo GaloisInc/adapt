@@ -42,6 +42,7 @@ lazy val adapt = (project in file(".")).settings(
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
     "com.github.haifengl" %% "smile-scala" % "1.5.1",
+    "com.thoughtworks.xstream" % "xstream" % "1.4.10",
     "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
   ),
 
