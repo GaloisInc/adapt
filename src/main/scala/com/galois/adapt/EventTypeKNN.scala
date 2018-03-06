@@ -8,7 +8,7 @@ import smile.math.distance.Distance
 import smile.validation.CrossValidation
 import java.io.{FileInputStream, PrintWriter}
 
-import com.galois.adapt.EventTypeKNN.EventVec
+import com.galois.adapt.EventTypeKNN.{EventCounts, EventVec, ProcessName}
 import com.thoughtworks.xstream.XStream
 
 import scala.collection.immutable
@@ -50,25 +50,27 @@ object EventTypeKNN {
     var dataMap: Map[ProcessName,Array[EventCounts]] = Map.empty
 
     def loadMaliciousData(maliciousFile: String): Seq[String] = {
-      val src = Source.fromFile(maliciousFile)
+      val src = scala.io.Source.fromFile(maliciousFile)
       val iter = src.getLines().drop(1).map(_.split(","))
       val malSeq = iter.flatMap(x=> List(x(4).split(";"),x(6).split(";")))
-        .toSeq.flatten
+        .toList.flatten
       src.close()
       malSeq
     }
+    /*val srcs = maliciousFiles.map(x=>scala.io.Source.fromFile(x))
+    val iters: List[Array[String]] = srcs.flatMap(x=>x.getLines().drop(1).map(_.split(",")))
+    val maliciousData: List[String] = iters.flatMap(x=> List(x(4).split(";"),x(6).split(";"))).flatten
+    srcs.foreach(_.close())
+    */val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
 
-/*
-    val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
     def getMalData(): Unit = {
       maliciousData.foreach(x=>println(x))
     }
-*/
-    def collect(s: AdmSubject, subPaths: Set[String], eventMap: EventCounts): Unit = {
-      //if (! s.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
-        val newArray = dataMap.getOrElse(subPaths, Array(Map.empty[EventType, Int])) :+ eventMap
-        dataMap += (subPaths -> newArray)
-      //}
+    def collect(kNNInput: KNNInput): Unit = {
+      if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
+        val newArray = dataMap.getOrElse(kNNInput.processName, Array(Map.empty[EventType, Int])) :+ kNNInput.eventCounts
+        dataMap += (kNNInput.processName -> newArray)
+      }
     }
 
     def transformData(data: Map[ProcessName,Array[EventCounts]]): (Array[EventVec],Array[ProcessName]) = {
@@ -251,17 +253,22 @@ object EventTypeKNN {
 
     val modelMap = readModel(knnModelFile).asInstanceOf[Map[ProcessName,KNN[EventVec]]]
 
-    def evaluate(s: AdmSubject, subPaths: ProcessName, eventMap: EventCounts): Option[Boolean] = {
+    def evaluate(knnInput: KNNInput): Option[Boolean] = {
       val eventVec = EventType.values
-        .map(e => eventMap
+        .map(e => knnInput.eventCounts
           .getOrElse(e,0))
         .toArray
 
-      modelMap.get(subPaths) match {
-        case Some(mdl) => println(subPaths.mkString(",")+" "+mdl.predict(eventVec).toString)
+      modelMap.get(knnInput.processName) match {
+        case Some(mdl) => println(knnInput.processName.mkString(",")+" "+mdl.predict(eventVec).toString)
           Some(mdl.predict(eventVec) == 1)
         case _ => None
       }
+    }
+  }
+  def test[T](x: T): Boolean = {
+    x match {
+      case _<: String => true
     }
   }
 }
@@ -269,12 +276,12 @@ object EventTypeKNN {
 class KNNTrainActor extends Actor with ActorLogging {
   import EventTypeKNN._
   val eventTypeKNNTrain = new EventTypeKNNTrain(List("bovia_webshell.csv"))
-
+  eventTypeKNNTrain.getMalData()
 
   def receive = {
 
     case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventMap: EventCounts) =>
-      //eventTypeKNNTrain.collect(s,subPathNodes.map(_.path),eventMap)
+      eventTypeKNNTrain.collect(KNNInput(s,subPathNodes.map(_.path),eventMap))
       sender() ! Ack
 
     case InitMsg => /*eventTypeKNNTrain.getMalData();*/ sender() ! Ack
@@ -290,7 +297,7 @@ class KNNActor extends Actor with ActorLogging {
   def receive = {
 
     case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventMap: EventCounts) =>
-      eventTypeKNNEvaluate.evaluate(s,subPathNodes.map(_.path),eventMap)
+      eventTypeKNNEvaluate.evaluate(KNNInput(s,subPathNodes.map(_.path),eventMap))
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
@@ -298,3 +305,6 @@ class KNNActor extends Actor with ActorLogging {
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
+
+case class KNNInput(process: AdmSubject,processName: ProcessName, eventCounts: EventCounts)
+

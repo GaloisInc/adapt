@@ -530,6 +530,7 @@ object Application extends App {
       val knnActor = system.actorOf(Props(classOf[KNNTrainActor]), "knn")
       CDMSource.cdm18(ta1)
         .via(printCounter("knn", statusActor))
+          .via()
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]{ () =>
         val eventTimeSpan: Long = "300000000000".toLong // 300000000000 <- that is 5 minutes in nanoseconds

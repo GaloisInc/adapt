@@ -5,6 +5,7 @@ import com.galois.adapt.NoveltyDetection.Event
 import com.galois.adapt.{Ack, CompleteMsg, InitMsg}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.EventType
+import com.galois.adapt.fingerprinting.Fingerprinting.ProcessName
 
 import scala.io.Source
 import scala.util.parsing.json.JSON
@@ -12,6 +13,8 @@ import scala.util.parsing.json.JSON
 
 object Fingerprinting {
   type M = String // needs to be filetouch or network
+  type ProcessName = Set[String]
+
 
   trait FingerprintModel {
     def getModel: String
@@ -214,21 +217,4 @@ class NetworkFingerprintActor extends Actor with ActorLogging {
   }
 }
 
-
-
-class TestActor extends Actor with ActorLogging {
-
-
-  def receive = {
-
-    case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventVec: Map[EventType,Int]) =>
-      println(s.toString+" "+subPathNodes.map(_.path).mkString(",")+" "+eventVec.toString())
-      sender() ! Ack
-
-    case InitMsg => sender() ! Ack
-    case CompleteMsg => println("All done!")
-    case x => log.error(s"Received Unknown Message: $x")
-  }
-}
-
-
+case class FileFingerprintInput(processName: ProcessName,attributeNameMap: Map[String,String])
