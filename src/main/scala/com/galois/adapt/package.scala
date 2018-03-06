@@ -25,4 +25,9 @@ package object adapt {
     // Some CDM statements translate to more than one node. We put extra nodes into 'supportNodes'
     def supportNodes: List[(UUID, List[Any], List[(EdgeType, UUID)])] = List()
   }
+
+
+  implicit class StringSetMethods(val set: Set[String]) extends AnyVal {
+    def suffixFold: Set[String] = set.foldLeft(Set.empty[String])((acc, p) => if ((acc ++ set.-(p)).exists(s => s.endsWith(p))) acc else acc + p)
+  }
 }

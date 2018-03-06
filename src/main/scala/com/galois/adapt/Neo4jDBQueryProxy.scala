@@ -211,7 +211,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
     val transaction = neoGraph.beginTx()
-    val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
+    val verticesInThisTX = MutableMap.empty[(UUID,String), NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
@@ -221,12 +221,12 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
-            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
           val target = verticesInThisTX
             .get(edge.tgt)
-            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
             .getOrElse(throw AdmInvariantViolation(edge))
 
           source.createRelationshipTo(target, new RelationshipType() {
@@ -241,13 +241,13 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
           val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
-          verticesInThisTX += (adm.uuid.uuid -> newVertex)
+          verticesInThisTX += (admToTuple(adm.uuid) -> newVertex)
           newVertex
         })
 
+        thisNeo4jVertex.setProperty("uuid", adm.uuid.rendered)
         adm.asDBKeyValues.foreach {
-          case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
-          case (k, v) => thisNeo4jVertex.setProperty(k, v)
+          case (k, v) => if (k != "uuid") { thisNeo4jVertex.setProperty(k, v) }
         }
 
         Some(adm.uuid)
@@ -299,13 +299,15 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
 object Neo4jFlowComponents {
 
-  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM18, NotUsed] = Flow[CDM18]
-    .collect { case cdm: DBNodeable[_] => cdm }
+  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
+                            (implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
+    .collect { case (_, cdm: DBNodeable[_]) => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
-  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
+  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
+                            (implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
