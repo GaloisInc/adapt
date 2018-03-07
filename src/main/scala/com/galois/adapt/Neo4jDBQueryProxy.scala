@@ -43,6 +43,8 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
   val config: Config = ConfigFactory.load()
 
   val driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "badpassword"), NeoConfig.build().withoutEncryption().toConfig)
+  val txSize = 100
+
 
   val indexSession = driver.session()
   val tx = indexSession.beginTransaction()
@@ -341,71 +343,92 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
   }
 
 
-  def admTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
-    val transaction = graph.tx()
-    val verticesInThisTX = MutableMap.empty[UUID, Vertex]
-
-    val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
-
-    val admToNodeResults = adms map {
-      case Left(edge) => Try {
-
-        if (edge.tgt.uuid != skipEdgesToThisUuid) {
-          val source = verticesInThisTX
-            .get(edge.src)
-//            .orElse(findVertex(edge.src.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
-            .getOrElse(throw AdmInvariantViolation(edge))
-
-          val target = verticesInThisTX
-            .get(edge.tgt)
-//            .orElse(findVertex(edge.tgt.uuid, verticesInThisTX)) // Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
-            .getOrElse(throw AdmInvariantViolation(edge))
-
-//          source.createRelationshipTo(target, new RelationshipType() {
-//            def name: String = edge.label
-//          })
-          source.addEdge(edge.label, target)
-        }
-      }
-
-      case Right(adm) => Try {
-        val admTypeName = adm.getClass.getSimpleName
-        val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
-          // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
-          // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-//          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
-          val newVertex  = graph.addVertex(T.label, s"Node::$admTypeName")  // TODO: Verify that this is how multiple Neo4j labels are created via gremlin!
-
-          verticesInThisTX += (adm.uuid.uuid -> newVertex)
-          newVertex
-        })
-
-        adm.asDBKeyValues.foreach {
-          case (k, v: UUID) => thisNeo4jVertex.property(k, v.toString)
-          case (k, v) => thisNeo4jVertex.property(k, v)
-        }
-
-        Some(adm.uuid)
-      }.recoverWith {
-        case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${adm.uuid}")
-          Success(None)
-        case e: Throwable => Failure(e)
-      }
-    }
+  def admTx(edgesAndNodes: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
+//    val transaction = graph.tx()
 
     Try {
-      if (admToNodeResults.forall(_.isSuccess)) {
-//        transaction.success()
-        transaction.commit()
-      } else {
-        println(s"TRANSACTION FAILURE! ADMs:\n")
-        admToNodeResults foreach { case t if t.isFailure => t.failed.get.printStackTrace() }
-//        transaction.failure()
-        transaction.rollback()
+      val s = driver.session()
+
+      for (adms <- edgesAndNodes.grouped(txSize)) {
+
+
+        val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
+       // log.info(s"Starting transaction.")
+
+
+        val identifiers = mutable.Map.empty[AdmUUID, String]
+
+        def randomIdent(): String = Random.alphanumeric.filter(_.isLetter).take(10).mkString.toLowerCase
+
+        val params = mutable.Map.empty[String, AnyRef]
+
+        def toNeo4j(i: AnyRef): AnyRef = i match {
+          case u: UUID => u.toString
+          case s: List[_] => s.map(_.toString).mkString(";")
+          case i => i
+        }
+        // Start by creating all of the nodes
+        val nodesCreated = mutable.ListBuffer.empty[String]
+        for (adm <- adms.collect { case Right(node) => node }) {
+          val thisName: String = randomIdent()
+          val admTypeName: String = adm.getClass.getSimpleName
+
+          val stmtProps: List[String] = for ((k, v) <- adm.asDBKeyValues) yield {
+            val propKeyName = s"${thisName}_$k"
+            params.put(propKeyName, toNeo4j(v.asInstanceOf[AnyRef]))
+            s"$k: ${"$"}$propKeyName"
+          }
+          identifiers.put(adm.uuid, thisName)
+          nodesCreated += s"($thisName :$admTypeName:Node ${stmtProps.sorted.mkString("{", ", ", "}")})"
+        }
+
+        // Now, create all of the edges, also constructing queries to nodes not already mentioned
+        val nodesMatched = mutable.ListBuffer.empty[String]
+        val edgesCreated = mutable.ListBuffer.empty[String]
+        for (edge <- adms.collect { case Left(edge) => edge }) {
+
+          val sourceName: String = identifiers.get(edge.src) match {
+            case Some(name) => name
+            case None => {
+              val newName: String = randomIdent()
+              val uuidName = s"${newName}_uuid"
+              params.put(uuidName, toNeo4j(edge.src.uuid))
+              nodesMatched += s"($newName :Node { uuid: ${"$"}$uuidName })"
+              identifiers.put(edge.src, newName)
+              newName
+            }
+          }
+
+          val targetName: String = identifiers.get(edge.tgt) match {
+            case Some(name) => name
+            case None => {
+              val newName: String = randomIdent()
+              val uuidName = s"${newName}_uuid"
+              params.put(uuidName, toNeo4j(edge.tgt.uuid))
+              nodesMatched += s"($newName :Node { uuid: ${"$"}$uuidName })"
+              identifiers.put(edge.tgt, newName)
+              newName
+            }
+          }
+          edgesCreated += s"($sourceName)-[:`${edge.label}`]->($targetName)"
+        }
+
+        val nodesMatchedStr = if (nodesMatched.isEmpty) { "" } else { "MATCH\n" + nodesMatched.mkString(",\n") }
+        val nodesCreatedStr = if (nodesCreated.isEmpty) { "" } else { "CREATE\n" + nodesCreated.mkString(",\n") }
+        val edgesCreatedStr = if (edgesCreated.isEmpty) { "" } else { "CREATE\n" + edgesCreated.mkString(",\n") }
+
+        s.writeTransaction(new TransactionWork[StatementResult] {
+          def execute(tx: Transaction) = tx.run(
+            List(nodesMatchedStr, nodesCreatedStr, edgesCreatedStr).mkString("\n\n"),
+            params.asJava
+          )
+        })
+
       }
-      transaction.close()
+
+      s.close()
     }
+
   }
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future {
@@ -452,7 +475,7 @@ object Neo4jFlowComponents {
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
-    .groupedWithin(1000, 1 second)
+    .groupedWithin(15000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

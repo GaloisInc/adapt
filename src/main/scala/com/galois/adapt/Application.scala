@@ -187,7 +187,7 @@ object Application extends App {
       if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
 
       startWebServer()
-      CDMSource.cdm18(ta1).via(printCounter(name, statusActor)).runWith(sink)
+      CDMSource.cdm18(ta1).via(printCounter(name, statusActor, 500)).runWith(sink)
 
     case "csvmaker" | "csv" =>
 
