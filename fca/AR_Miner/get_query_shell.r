@@ -44,7 +44,7 @@ AttributesofObject<-list()
 UniqueAttributeList=list()
 #id_unique<-query_result[objectsdata] %>% distinct()
 UniqueObjectList <- unique(query_result[, names(query_result)[1]])
-UniqueObjectList=UniqueObjectList[1:nb]
+#UniqueObjectList=UniqueObjectList[1:nb] 
 for (i in 1:length(UniqueObjectList)){#for each object
   tmp=NULL
   for(j in 2:length(names(query_result))){ # for each column of the attributes

@@ -80,8 +80,6 @@ write.csv(file=paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",M
 cat('\n Saving Rules \n')
 cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
 
-
-
 cat('\n Calculating Scores of the Rules \n')
 TopViolatedRulesForEachObjectConfidence=""
 TopViolatedRulesForEachObjectLift=""
@@ -163,9 +161,9 @@ df.ObjectsWithScores=do.call(rbind, Map(data.frame,
                                           )
 ) 
 
+
+cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
 cat('\n Saving Scores of the Rules \n')
-
-
 write.csv(file=output_scoring_file, df.ObjectsWithScores)
 cat('\n Check ===> :  ',output_scoring_file)
 
