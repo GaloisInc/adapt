@@ -370,7 +370,7 @@ def generateContextFiles(inputfile,outputfile=sys.stdout,csv_flag=False):
 			
 		
 			
-def fca_execution(inputfile,specfile,workflow,port=8080,fca_algo='python',fcbo_path='',csv=False,ncpus=1,min_support=0,disable_naming=False,queryres='',output=sys.stdout,analysis_output=sys.stdout,rules_spec='./rulesSpecs/rules_implication_all.json',concept_file=''):
+def fca_execution(inputfile,specfile,workflow,quiet_flag=True,port=8080,fca_algo='python',fcbo_path='',csv=False,ncpus=1,min_support=0,disable_naming=False,queryres='',output=sys.stdout,analysis_output=sys.stdout,rules_spec='./rulesSpecs/rules_implication_all.json',concept_file=''):
 	port_val=port
 	type_json=('context' if csv==False else 'csv')
 	parallel=(True if ncpus>1 else False)

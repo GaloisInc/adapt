@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PARAMS=()
-SLEEP=30
+SLEEP=60
 
 while (( "$#" )); do
   case "$1" in
@@ -75,7 +75,7 @@ while (( "$#" )); do
          # this would correspond to invoking python3 fcascript -w 'both' -i cadets.csv -m 0.05 -p 8080 -rs implication.json -o concepts.txt -oa scores.csv
          #FCA_PARAMS=$2
          len="$#"
-		 if [[ ($2 == "-c") || ($2 == "--conversion") || ($2 == "-i") || ($2 == "--ingest") || ($2 == "-p") || ($2 == "--port") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-db") || ($2 == "--dbkeysp2ce") || ($2 == "-f") || ($2 == "--fc2_only") || ($2 == "-g") || ($2 == "--gener2tion_only") || ($2 == "-q" ) || ($2 == "--query_input" ) || ($2 == "-csv") || ($2 == "--csv_input" ) ]]
+		 if [[ ($2 == "-c") || ($2 == "--conversion") || ($2 == "-i") || ($2 == "--ingest") || ($2 == "-p") || ($2 == "--port") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-db") || ($2 == "--dbkeyspace") || ($2 == "-f") || ($2 == "--fca_only") || ($2 == "-g") || ($2 == "--generation_only") || ($2 == "-q" ) || ($2 == "--query_input" ) || ($2 == "-csv") || ($2 == "--csv_input" ) ]]
 			then
 		   DEFAULT_FCA_VAL=1
 		   shift 1
@@ -98,10 +98,6 @@ while (( "$#" )); do
 			shift "$s"
 	fi
       ;; 
-    --) # end argument parsing
-      shift
-      breakinput=$(grep -o -E "/i|s=.+\.json|csv|cxt|fimi" <<< $fca_params)
-      ;;
     --) # end argument parsing
       shift
       break
@@ -144,13 +140,19 @@ default=$DEFAULT_VAL
 #port_param=' p='
 #fca_params=$FCA_PARAMS$port_param$port
 if ! [[ " ${FCA_PARAMS[@]} " =~ p=[0-9]+  ]]; then FCA_PARAMS+=(p=$port) ; fi
-
+if [[ $gen -eq 1 && $fca -eq 1 ]]
+		then
+			gen=0
+			fca=0
+			echo 'WARNING: Ignoring -f and -g flags and running the full pipeline (i.e input generation followed by FCA and rule mining)'
+fi
 if [[ -n "$LOAD" ]] 
 	then
 		loadfiles=$LOAD
 	    sbt -mem $mem -Dadapt.runflow=db -Dadapt.ingest.quitafteringest=yes -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=$dbkeyspace -Dadapt.ingest.loadfiles.0=$loadfiles run
 fi
-pid=$(pgrep -f "sbt -mem [0-9]+ -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=9000 -Dadapt.runtime.dbkeyspace=neo4j run")
+if [[ $INGEST -eq 1 && -z "$LOAD" ]] ; then echo "No files to be ingested were provided. No task to be done. Stopping here." ; fi 
+pid=$(pgrep -f "sbt -mem [0-9]+ -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=neo4j run")
 #echo 'pid' $pid
 
 conversion(){
@@ -183,21 +185,22 @@ conversion(){
 	else
 	   if [[ -z  "$new_port" && -z "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 	       then
-				#echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
+				echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
 				python3 ./fca/conversion_script.py -p $port -n $context_name
 	   elif [[ -z  "$new_port" && -n "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 			then
-			    #echo "python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory"
+			    echo "python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory"
 				python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory
 	   elif [[ -z  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    #echo "python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory"
+			    echo "python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory"
 				python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory
 	   elif [[ -n  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    #echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
+			    echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
 				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
 	   else
+	        echo "python3 ./fca/conversion_script.py -p $port"
 			python3 ./fca/conversion_script.py -p $port
 	   fi
 	 fi
@@ -221,7 +224,7 @@ fca_pipeline(){
 	input=$(echo $input | cut -d= -f2-)
 	#echo 'fca input ' $input
 	spec_ext=".json"
-	workflow_default="both"./fca/ingest_script.sh -p 9000 -f -fp "w=both m=0.05 s=fca/contextSpecFiles/neo4jspec_ProcessEvent.json rs=fca/rulesSpecs/rules_implication_all.json" -m 4000
+	workflow_default="both"
 	workflow_analysis="analysis"
 	support=$(grep -o -E "m=[0-9]\.*[0-9]*" <<< $fca_params)
 	support=${support##*m=}
@@ -289,15 +292,8 @@ fca_pipeline(){
 	fi
 }
 
-if [[ $INGEST -eq 1 ]]
+if [[ $INGEST -ne 1 ]]
  then
-	if [[ $gen -eq 1 && $fca -eq 1 ]]
-		then
-			gen=0
-			fca=0
-			echo 'WARNING: Ignoring -f and -g flags and running the full pipeline (i.e input generation followed by FCA and rule mining)'
-	fi
-
 	if [[ -z $pid ]]
 		then
 			echo 'Starting UI at port '$port
@@ -322,14 +318,17 @@ if [[ $INGEST -eq 1 ]]
 		if [[ $gen -eq 0 && $fca -eq 0 ]]
 		  then
 			echo 'Running the full input conversion/FCA pipeline'
+			echo "conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}"
 			conversion $default $port ${CONV[@]} && fca_pipeline ${FCA_PARAMS[@]}
 		elif [[ $gen -eq 1 ]]
 		    then
 				echo 'Running the input conversion only'
+				echo "conversion $default $port ${CONV[@]}"
 				conversion $default $port ${CONV[@]}
 		elif [[ $fca -eq 1 ]]
 			then
 				echo 'Running the FCA pipeline only'
+				echo "fca_pipeline ${FCA_PARAMS[@]}"
 				fca_pipeline ${FCA_PARAMS[@]}
 		else 
 			echo 'UI running. Nothing else to do.'
