@@ -252,7 +252,7 @@ def runAnalysis(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_
 
 
 
-def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
+def runAnalysisParallel_old(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
 	rule_spec=unpackRules(rule_spec_file)
 	print('rule_spec',rule_spec)
 	if c_flag==False:
@@ -279,6 +279,42 @@ def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=
 				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
 	for x in executors_list:
 		analysis.printComputedRules(x.result(),fca_context,output,json_flag=True)
+		
+		
+def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output_csv=sys.stdout):
+	rule_spec=unpackRules(rule_spec_file)
+	print('rule_spec',rule_spec)
+	if c_flag==False:
+		itemsets={frozenset(c[1]) for c in trans_concepts}
+	else:
+		itemsets={frozenset(c) for c in trans_concepts}
+	measureRules={k:v for k,v in rule_spec.items() if k in supported_rules and not('implication' in k or 'disjointness' in k)}
+	print('measureRules',measureRules)
+	imp_rules={k:v for k,v in rule_spec.items() if k in supported_rules and 'implication' in k}
+	disjointness={k:v for k,v in rule_spec.items() if k in supported_rules and 'disjointness' in k}
+	executors_list = []
+	with ThreadPoolExecutor(max_workers=5) as executor:
+		if measureRules!={}:
+			executors_list+=[executor.submit(analysis.doMeasureRules,measureRules,fca_context,itemsets,namedentities)]
+		if imp_rules!={}:
+		   executors_list+=[executor.submit(ruleFunction[rule],fca_context,itemsets,imp_rules[rule]['min_threshold'],imp_rules[rule]['num_rules'],namedentities) for rule in imp_rules.keys()]
+		if disjointness!={}:
+		   executors_list+=[executor.submit(analysis.doDisjRules,fca_context,itemsets,disjointness[rule]['num_rules'],namedentities,output) for rule in disjointness]
+
+		#for rule in rule_type:
+			#if rule in ruleFunction and 'disjointness' not in rule:
+				#executors_list.append(executor.submit(ruleFunction[rule],fca_context,itemsets,rule_thresholds[rule],num_rules,namedentities))
+			#else:
+				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
+	header=[','.join(["Objects","TypeRule","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence","TopViolatedRulesForEachObjectConfidence","TopScoreConfidence","AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift","TopScoreLift"])+'\n']
+	csv_body=[analysis.produceScoreCSV(x.result(),fca_context,output_csv) for x in executors_list]
+	csvContent=''.join(header+csv_body)
+	if output_csv==sys.stdout:
+		print(csvContent)	
+	else:
+		with open(output_csv,'a+') as f:
+			f.write(csvContent)
+
 
 def parseConceptFile(concept_file):
 	with open(concept_file,'r') as f:
@@ -402,7 +438,7 @@ def fca_execution(inputfile,specfile,workflow,quiet_flag=True,port=8080,fca_algo
 			else:
 				trans_concepts=res.itemsets
 			named=res.naming
-			runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output=analysis_output)
+			runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output_csv=analysis_output)
 	else: #run the analysis of the concepts if the 'analysis' flag found
 		print('workflow',workflow)
 		if concept_file=='':
@@ -419,7 +455,7 @@ def fca_execution(inputfile,specfile,workflow,quiet_flag=True,port=8080,fca_algo
 			parsed_concepts=fca.parseCfcaOutput(concept_file)
 			trans_concepts=parsed_concepts['itemsets']
 			named=parsed_concepts['named']
-		runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output=analysis_output)
+		runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output_csv=analysis_output)
 
 
 
