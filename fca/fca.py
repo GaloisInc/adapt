@@ -41,12 +41,13 @@ def naming(*disable_naming):
 			named=False
 	return named
 
-def fca(fca_context,min_support,named,file_out,proceed_flag=True): #run FCbO on context fca_context
+def fca(fca_context,min_support,named,file_out,proceed_flag=True,quiet_flag=True): #run FCbO on context fca_context
 	if min_support==0:
 		concepts=fca_context.generateAllIntents() #generate all concepts if the minimal support is set to 0
 	else:
 		concepts=fca_context.generateAllIntentsWithSupp(min_support) #otherwise only generate the concepts whose minimal support is above the value provided by the user
-	fca_context.printConcepts(concepts,outputfile=file_out,namedentities=named)#output the concepts
+	if ((file_out!=sys.stdout) or (file_out==sys.stdout and quiet_flag==False)): 
+		fca_context.printConcepts(concepts,outputfile=file_out,namedentities=named)#output the concepts
 	if proceed_flag==True:
 		trans_concepts=fca_context.returnConcepts(concepts,namedentities=named)
 		return FCAoutput(concepts=trans_concepts,context=fca_context,naming=named,itemsets=set())
@@ -110,7 +111,7 @@ def fcaC(fcbo_path,fca_context,min_support,sourcefile,fimifile,named,output,proc
 		result=fcaCReturn(fca_context,itemsets,proceed_flag,False,[])
 	return result
 
-def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1,port=8080):
+def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,quiet=True,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1,port=8080):
 	#print('runFCA queryres',queryres)
 	#add code_flag switch to allow bypass of my python code+add naming of c fimi results
 	if code_flag not in code_flag_options:
@@ -137,7 +138,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 			#print('fca_context context', type(fca_context.context), len(fca_context.context))
 			#print('fca_context attributes', type(fca_context.attributes), len(fca_context.attributes))
 			#print('fca_context objects', type(fca_context.objects), len(fca_context.objects))
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if type_json=='context' or type_json=='query':
@@ -152,7 +153,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 		fca_context=fcbo.Context(inputfile,queryres,type_json,port=port_val)#a context input file has to be specified (in cxt or fimi format)
 		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		if flag=='python':
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if fileext=='fimi':
@@ -173,7 +174,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 				ip.convertQueryRes(res,obj_name,att_name,inputfile) #generation of a context file saved in inputfile
 			else:
 				ip.convertCSVRes(specfile,inputfile)
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if os.path.splitext(inputfile)[1].replace('.','')=='fimi':
@@ -392,7 +393,7 @@ def fca_execution(inputfile,specfile,workflow,quiet_flag=True,port=8080,fca_algo
 			naming=disable_naming
 		else:
 			naming=False
-		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus,port=port_val)
+		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,quiet=quiet_flag,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus,port=port_val)
 		print('FCA finished. Concepts generated')
 		if workflow=='both':
 			fca_context=res.context
