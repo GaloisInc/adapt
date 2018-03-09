@@ -208,11 +208,10 @@ cat('\n ############### Association Rule Mining ######################## \n')
                                             "TopScoreLift"= as.list(TopScoreLift)
     ))
     
-    cat('\n Saving Scores of the Rules \n')
     
-    
-    write.csv(file=output_scoring_file, df.ObjectsWithScores)
-    cat('\n Check ===> :  ',output_scoring_file)
+    cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
+     write.csv(file=output_scoring_file, df.ObjectsWithScores)
+    cat('\n Saving Scores of the Rules in ===> :  ',output_scoring_file)
     
      
 

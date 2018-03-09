@@ -29,14 +29,34 @@ library("wordcloud")
 library("RColorBrewer")
    
 
-Listviews=c("ProcessEvent",
-            "ProcessEventExec",
-            "ProcessNetFlow",
+Listviews=c( "ProcessEvent",
+             "ProcessEventExec",
+            "ProcessNetflow",
             "ProcessByIPPort",
             "FileEventType",
             "FileEventExec",
-            "FileEvent")
+             "FileEvent"
+            )
 
+
+dbkeyspace=c("Cadet_Pandex",
+             "Cadet-Bovia",
+             "Cadets_benign",
+             "5dir-benign",
+             "5dir-bovia",
+             "5dir-pandex",
+             "cleqrcope-benign",
+             "clearscope-bovia",
+             "clearscop-pandex",
+            "trace-bovia" ,
+            "trace-pandex",
+            "Trace_Benign"
+             )
+
+
+
+
+Consider_List_objects_as_GroundTruth=TRUE
 myWorkingDirectory=getwd()
 TRANSFORM_RCF_TO_CSV=FALSE
 LOAD_RCF=FALSE
@@ -45,18 +65,22 @@ Load_Data_From_Neo4j=FALSE
 Score_Simple_Processing=FALSE
 CREATE_RCF_WITH_PYTHON=FALSE
 options(max.print=10000000)
+COMPUTE_RARE=FALSE
 
+
+
+database=as.character(dbkeyspace[5])
 cat('\n ############### Association Rule Mining ######################## \n')
-for (k in 1:length(Listviews)){
+for (k in 3:3){#length(Listviews)){
   
   cat("\n processing view 1: ", as.character(Listviews[k]))  
-                              }  ## for views
+                           
 
 
   currentview=as.character(Listviews[k])
-  JsonSpecFile =paste0('./contextSpecFiles/neo4jspec_',currentview,'.json',sep="")
-  rcf_context_file=paste0(myWorkingDirectory,"/contexts/Context_",currentview,".rcf",sep="")
-  csv_file=paste0(myWorkingDirectory,"/contexts/Context_",currentview,".csv",sep="")
+  JsonSpecFile =paste0('../contextSpecFiles/neo4jspec_',currentview,'.json',sep="")
+  rcf_context_file=paste0(myWorkingDirectory,"/contexts/",database,"/Context_",currentview,".rcf",sep="")
+  csv_file=paste0(myWorkingDirectory,"/contexts/",database,"/Context_",currentview,".csv",sep="")
   
   
   #############EXTRACT DATA FROM SERVER AND save context as RCF AND csv files
@@ -126,7 +150,7 @@ for (k in 1:length(Listviews)){
   }
   
   ################ Load objects, attributes and binary matrix from CSV TO suitable variables.
-  if(LOAD_CSV){
+ 
     cat('\n Init System LOAD FROM  CSV... \n ')
     cat('\n Parameters are: \n ')
     cat('\n CSV \n ',csv_file)
@@ -138,31 +162,46 @@ for (k in 1:length(Listviews)){
     ObjectOfAttributes=returns_args$ObjectOfAttributes
     
     
-  }
+ 
   ###############################################  generate the rules and display the running cpu time
-  x <- matrix(data=NA,byrow=FALSE,ncol = 8, nrow=8)
-  y <- matrix(data=NA,byrow=TRUE,ncol = 8, nrow=8)
-  z <- matrix(data=NA,byrow=TRUE,ncol = 8, nrow=8)
+  x <- matrix(data=NA,byrow=FALSE,ncol = 12, nrow=12)
+  y <- matrix(data=NA,byrow=TRUE,ncol = 12, nrow=12)
+  z <- matrix(data=NA,byrow=TRUE,ncol = 12, nrow=12)
   
-  Conf=c(50,60,70,80,90,95,97,100)
-  Sup=c(50,60,70,80,90,95,97,100)
+  
+  if(Consider_List_objects_as_GroundTruth==TRUE){
+    gt_file= fromJSON("/home/terminator2/Documents/Adapt_Project/Database/Engagement_2/ground_truth/groundtruthadmuuids/cadets_pandex_webshell.json",simplifyVector = TRUE) 
+    gt_Objects=as.list(gt_file)
+    gt_Objects=as.character(unlist(gt_Objects))
+    cat("processing Objects in GT file Only")
+    indx= intersect(  gt_Objects,  List_Objects)
+    
+    indx=which(List_Objects %in% indx)
+    
+    
+  }
+
+    
+  Conf=c(10,20,30,40,50,60,70,80,90,95,97,100)
+  Sup=c(10,20,30,40,50,60,70,80,90,95,97,100)
   DisplayFull=FALSE ## IF YES SAVES DATA TO DISK (TXT FILES)
   ContextFileRCF=rcf_context_file
-  for(i in 1:8){
+  for(i in 1:3){
     MinSup=Sup[i]
     
-    for(j in 1:8){
+    for(j in 1:3){
+      #if (i==j) next
       MinConf=Conf[j]
       cat('\n ##################sup \n',MinSup)
       cat('\n ###############conf \n',MinConf)
       #listresult=c(listresult,paste("Conf_",MinConf,"_Sup_",MinSup,sep=""))
       ##-----------------------------------------LESS DETAILS OF RULES
-      tic("FreqAsRules" )
+     tic("FreqAsRules" )
       SoftAssRulescmd=paste0(getwd(),"/coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
       SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
       t=toc()
       
-      if(DisplayFull)capture.output(SoftAssRulesresult,file=paste0("./contexts/AssociationRulesOnly_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
+      if(DisplayFull)capture.output(SoftAssRulesresult,file=paste0("./contexts/",database,"/data/",currentview,"/AssociationRulesOnly_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
       CoronOutPut=as.list(SoftAssRulesresult)
       CoronOutPut=lapply(CoronOutPut,function(x)x[!is.na(x)])
       CoronOutPut=lapply(CoronOutPut,function(x)x[!x==""])
@@ -174,20 +213,24 @@ for (k in 1:length(Listviews)){
       CondRules=lapply(CondRules, function(x)gsub("=", '', x, fixed = T))
       CondRules=lapply(CondRules, function(x)gsub(" ", '', x, fixed = T))
       NbRules=as.integer(length(CondRules))
-      cat("\014")  
+     # cat("\014")  
       cat('nb Association Rules',NbRules) 
       x[i,j]=as.integer(gsub(",", '', NbRules, fixed = T))
+      if(x[i,j]==0)next
       cputime=t$toc-t$tic
       #TimeAssruleslistresulttext=c(TimeAssruleslistresulttext,as.character(cputime))
       y[i,j]=as.double(cputime)
       
       ResRules=lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
       values=lapply(strsplit(as.character(ResRules),"}"),"[",2)
+      cat('\n saving support \n') 
       Support=lapply(strsplit(as.character(values),";"),"[",1)
       Support=lapply(strsplit(as.character(Support),"\\["),"[",2)
       Support=lapply(Support, function(x)gsub("%", '', x, fixed = T))
       Support=lapply(Support, function(x)gsub("]", '', x, fixed = T))
       Support=as.numeric(Support)
+      cat('\n saving confidence \n') 
+      
       Confidence=lapply(strsplit(as.character(values),";"),"[",2)   
       Confidence=lapply(strsplit(as.character(Confidence),"\\["),"[",2)
       Confidence=lapply(strsplit(as.character(Confidence),"%"),"[",1)
@@ -203,32 +246,34 @@ for (k in 1:length(Listviews)){
       Lift=lapply(strsplit(as.character(Lift),"="),"[",2)
       Lift=as.numeric(Lift)
       
+      cat('\n saving rules db \n') 
       
       df.AssocRulesOutPut=data.frame()
-      df.AssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
-      write.csv(file=paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.AssocRulesOutPut)
+    df.AssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
+  write.csv(file=paste0("./contexts/",database,"/data/",currentview,"/AssociationRules_Only_Conf_",currentview,"_MinConf_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.AssocRulesOutPut)
       #
       #
       #min(df.AssocRulesOutPut$Confidence)
       #=======================================================================scoring
       #ent = 0-sum([numpy.log2(1-rules[e]) for e in rules.keys() if e[0]<=setS and not(e[1]<=setS)])
-      ScoresOfObjects=""
-      if(! (Score_Simple_Processing)){
-        CondRules=lapply(CondRules, function(x)unlist(strsplit(x,split=',')))
-        ResRules=lapply(ResRules, function(x)unlist(strsplit(x,split=',')))
+ #     ScoresOfObjects=""
+#if(! (Score_Simple_Processing)){
+  #      cat('\n sapply \n') 
+ #       CondRules=lapply(CondRules, function(x)unlist(strsplit(x,split=',')))
+ #       ResRules=lapply(ResRules, function(x)unlist(strsplit(x,split=',')))
         
-        FinalScoreList<-lapply(AttributesofObject,function(x){
+#FinalScoreList<-lapply(AttributesofObject,function(x){
           
-          indicator=mapply(function(y,z){any(x %in% y) & !any(x %in%z ) },y=CondRules,z=ResRules)
+   #       indicator=mapply(function(y,z){any(x %in% y) & !any(x %in%z ) },y=CondRules,z=ResRules)
           
-          sum(log2(1-Confidence[indicator]/100))
+  #        sum(log2(1-Confidence[indicator]/100))
           
-        }
-        )
+ #       }
+ #       )
         
-        unlist(FinalScoreList)
-        FinalScoreList=lapply(FinalScoreList,function(x)0-x)
-      }
+ #       unlist(FinalScoreList)
+  #      FinalScoreList=lapply(FinalScoreList,function(x)0-x)
+#}
       ######     
       ##     # Dif=setdiff(CondRules2,ResRules2)
       #  for(Obj in 1:length(List_Objects)){
@@ -247,8 +292,11 @@ for (k in 1:length(Listviews)){
       #}
       #ScoresOfObjects=ScoresOfObjects[-1]
       #######
+
+    
       Score_Simple_Processing=TRUE
       if(Score_Simple_Processing){
+        cat('\n Score_Simple_Processing \n') 
         TopViolatedRulesForEachObjectConfidence=""
         TopViolatedRulesForEachObjectLift=""
         ViolatedRulesForEachObjectConfidence=""
@@ -261,7 +309,8 @@ for (k in 1:length(Listviews)){
         CondRules=lapply(CondRules, function(x)unlist(strsplit(as.character(x),split=',')))
         ResRules=lapply(ResRules, function(x)unlist(strsplit(as.character(x),split=',')))
         
-        for(Obj in 1:length(List_Objects)){
+        for(Obj in 1: length(List_Objects)){
+        #if(Consider_List_objects_as_GroundTruth==TRUE) if(Obj !in indx) next
           GlobalscoreConf=0.0
           GlobalscoreLift=0.0
           Max_ScoreConf=0.0
@@ -276,7 +325,7 @@ for (k in 1:length(Listviews)){
             RulescoreConf=0.0
             RulescoreLift=0.0
             if(length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 & length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0        )
-            {##Violation =============================================
+            {##Violation ============================================= stackoverflow
               ##violation with score based on confidence
               nbViolatedRules=nbViolatedRules+1
               RulescoreConf=log2(1-as.double(Confidence[Rule])/100)
@@ -313,7 +362,7 @@ for (k in 1:length(Listviews)){
             }###================================================endif violation
             
           }##for rules
-          if(nbViolatedRules>0)
+          if(nbViolatedRules>0) 
           {
             GlobalscoreConf=(0-GlobalscoreConf)/nbViolatedRules
             AVGScoresOfObjectsConfidence=c(AVGScoresOfObjectsConfidence,GlobalscoreConf)
@@ -331,7 +380,7 @@ for (k in 1:length(Listviews)){
           
         }#for obj
         
-        AVGScoresOfObjectsLift=AVGScoresOfObjectsLift[-1]
+        AVGScoresOfObjectsLift =AVGScoresOfObjectsLift[-1]
         TopViolatedRulesForEachObjectLift=TopViolatedRulesForEachObjectLift[-1]
         TopScoreLift=TopScoreLift[-1]
         ViolatedRulesForEachObjectLift= ViolatedRulesForEachObjectLift[-1]
@@ -355,12 +404,16 @@ for (k in 1:length(Listviews)){
       #  save(ViolatedRulesForEachObjectConfidence,file=paste0("./contexts/ViolatedRulesForEachObjectConfidence_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".RData",sep=""))
       
       df.ObjectsWithScores=data.frame(matrix(ncol = 9, nrow = 0))
-      colnames (df.ObjectsWithScores)=c("Objects","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence",
-                                        "TopViolatedRulesForEachObjectConfidence","TopScoreConfidence",
-                                        "ViolatedRulesForEachObjectLift", "AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift",
-                                        "TopScoreLift")
+     # colnames (df.ObjectsWithScores)=c("Objects","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence",
+                #                        "TopViolatedRulesForEachObjectConfidence","TopScoreConfidence",
+                 #                       "ViolatedRulesForEachObjectLift", "AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift",
+                  #                      "TopScoreLift")
       
-      
+      if(length(ViolatorObjectList)==0) {colnames (df.ObjectsWithScores)=c("Objects","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence",
+                                                                           "TopViolatedRulesForEachObjectConfidence","TopScoreConfidence",
+                                                                           "ViolatedRulesForEachObjectLift", "AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift",
+                                                                           "TopScoreLift")}
+      else{
       df.ObjectsWithScores=do.call(rbind, Map(data.frame, 
                                               "Objects"=as.list(ViolatorObjectList), 
                                               "ViolatedRulesForEachObjectConfidence"=as.list(ViolatedRulesForEachObjectConfidence),
@@ -373,12 +426,15 @@ for (k in 1:length(Listviews)){
                                               "TopViolatedRulesForEachObjectLift"=as.list(TopViolatedRulesForEachObjectLift),
                                               "TopScoreLift"= as.list(TopScoreLift)
       ))
+      }
       
-      save(df.ObjectsWithScores,file=paste0("./contexts/df.ObjectsWithScores_Conf_",currentview,
+      save(df.ObjectsWithScores,file=paste0("./contexts/",database,"/data/",currentview,"/df.Objects_WithScores_Conf_",currentview,
                                             "_",MinConf,"_Sup_",MinSup,".RData",sep=""))
       
-      write.csv(file=paste0("./contexts/Objects_With_Scores_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.ObjectsWithScores)
-      
+      write.csv(file=paste0("./contexts/",database,"/data/",currentview,"/Objects_With_Scores_",currentview,
+                            "_Conf_",MinConf,"_Sup_",MinSup,".csv",sep=""), 
+                df.ObjectsWithScores)
+      cat("\n nb violator object \n",length(as.list(ViolatorObjectList)))
       
       
       #      Confidence=as.numeric(Confidence)
@@ -469,16 +525,17 @@ for (k in 1:length(Listviews)){
       if(DisplayFull){
         AssRulescmd=paste0(getwd(),"/coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full -examples",sep="") #>thisresults2.txt
         AssRulesresult=try(system(AssRulescmd, intern = TRUE,  wait = TRUE)) 
-        capture.output(AssRulesresult,file=paste0("./contexts/AssociationRulesWithFullDetails_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
+        capture.output(AssRulesresult,file=paste0("./contexts/",database,"/data/",currentview,"/AssociationRulesWithFullDetails_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
       }
       #CoronOutPut=as.list(AssRulesresult)
       #
       #--------------------------------------------------------------------------------------------------------------RARE RULES
       #tic("RarAsRules"  )
+      if(COMPUTE_RARE){
       RareAssRulescmd=paste0(getwd(),"/coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:BtB -rule:rare  -full",sep="")  #-full -examples",sep="")
       RareAssRulesresult=try(system(RareAssRulescmd, intern = TRUE,  wait = TRUE)) 
       #toc()  
-      if(DisplayFull)capture.output(RareAssRulesresult,file=paste0("./contexts/Rare_AssociationRules_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
+      if(DisplayFull)capture.output(RareAssRulesresult,file=paste0("./contexts/",database,"/data/",currentview,"/Rare_AssociationRules_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".txt",sep=""))
       #####################
       CoronOutPut=as.list(RareAssRulesresult)
       CoronOutPut=lapply(CoronOutPut,function(x)x[!is.na(x)])
@@ -491,7 +548,7 @@ for (k in 1:length(Listviews)){
       CondRules=lapply(CondRules, function(x)gsub("=", '', x, fixed = T))
       CondRules=lapply(CondRules, function(x)gsub(" ", '', x, fixed = T))
       NbRulesrare=as.integer(length(CondRules))
-      cat("\014")  
+    cat("\014")  
       cat('nb Association Rules',NbRulesrare) 
       ResRules=lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
       values=lapply(strsplit(as.character(ResRules),"}"),"[",2)
@@ -517,7 +574,7 @@ for (k in 1:length(Listviews)){
       ResRules=lapply(ResRules, function(x)gsub(" ", '', x, fixed = T))
       df.RareAssocRulesOutPut=data.frame()  
       df.RareAssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
-      write.csv(file=paste0("./contexts/Rares_AssociationRules_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.RareAssocRulesOutPut)
+      write.csv(file=paste0("./contexts/",database,"/",currentview,"/Rares_AssociationRules_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.RareAssocRulesOutPut)
       
       
       
@@ -526,18 +583,24 @@ for (k in 1:length(Listviews)){
       #NbRulesrare= unlist(strsplit(as.character(df.RareAssocRulesOutPut$V1[length(df.RareAssocRulesOutPut$V1)]),":"))[2]
       #cat('nb Association Rules',NbRulesrare)
       #RareAssruleslistresulttext=c(RareAssruleslistresulttext,NbRulesrare)
-      z[i,j]=as.integer(gsub(",", '', NbRulesrare, fixed = T))
+   #   z[i,j]=as.integer(gsub(",", '', NbRulesrare, fixed = T))
+      }#rare
     } #for j
   }# for i
   
+  save(x,file=paste0("./contexts/",database,"/data/",currentview,"/NB_AssociationRules_",currentview,"_Conf_",MinConf,"_Sup_",MinSup,".RData",sep=""))
   
-  ###############################---------------------------------------------------------------------------###display the results
+  save(y,file=paste0("./contexts/",database,"/data/",currentview,"/CPU_AssociationRules_",currentview,"_Conf_",MinConf,"_Sup_",MinSup,".RData",sep=""))
+  
+}  ## for views
+  
+   ###############################---------------------------------------------------------------------------###display the results
   #Build the matrix data to look like a correlation matrix
   #x <- matrix(rnorm(64), nrow=8)
   xval <- formatC(x, format="f", digits=2)
   pal <- colorRampPalette(c(rgb(0.96,0.96,1), rgb(0.1,0.1,0.9)), space = "rgb")
   y_val <- formatC(y, format="f", digits=2)
-  
+  library(gplots)
   #Plot the matrix
   jpeg(file=paste0("./images/im_assocrules_",currentview,".jpg",sep=""))
   

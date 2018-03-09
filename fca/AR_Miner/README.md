@@ -7,6 +7,7 @@ For example, to install a package from R, we do:
 
 install.packages("RJSONIO",repos = "http://cran.us.r-project.org")
 install.packages("jsonlite",repos = "http://cran.us.r-project.org")
+install.packages("curl",repos = "http://cran.us.r-project.org")
 ...
  
 It is preferable to install RStudio to manage the project and execute the scripts. Although, the use of shell scripts is also possible as detailed below.
