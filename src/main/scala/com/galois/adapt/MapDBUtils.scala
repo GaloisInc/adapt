@@ -18,12 +18,14 @@ object MapDBUtils {
     def update(key: K, value: V): Unit
     def get(key: K): Option[V]
     def foreach(func: (K, V) => Unit): Unit
+    def size: Int
   }
 
   // Subset of the `Set` trait. I'm too lazy to implement more of it.
   trait AlmostSet[V] {
     def contains(value: V): Boolean
     def add(value: V): Unit
+    def size: Int
   }
 
   // Wrap a MapDB map into an `AlmostMap`
@@ -44,6 +46,8 @@ object MapDBUtils {
     def foreach(func: (K2, V2) => Unit): Unit = map.forEach(new BiConsumer[K1, V1] {
       override def accept(k1: K1, v1: V1): Unit = func(outKey(k1), outValue(v1))
     })
+
+    def size: Int = map.size()
   }
 
   // Wrap a MapDB set into an `AlmostSet`
@@ -55,6 +59,8 @@ object MapDBUtils {
     def contains(v2: V2): Boolean = set.contains(intoValue(v2))
 
     def add(v2: V2): Unit = set.add(intoValue(v2))
+
+    def size: Int = set.size()
   }
 
 }
