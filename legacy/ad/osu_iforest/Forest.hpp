@@ -40,6 +40,8 @@ public:
 	std::vector<double> getScore(doubleframe *df, int type);
 	void writeScoreDatabase(doubleframe *dtTestNorm, doubleframe *dtTestAnom, char fName[]);
 
+	void printNumLeafandDepths();
+
 	virtual double instanceScore(double *inst);
 	std::vector<double> AnomalyScore(doubleframe* df);
 	virtual std::vector<double> pathLength(double *inst);

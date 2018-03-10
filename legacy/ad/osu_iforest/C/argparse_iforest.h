@@ -13,8 +13,8 @@ struct parsed_args {
     bool header;
     bool verbose;
     int window_size;
-    int columns;
+    char* test_file_name;
+    int check_range;
 };
-
 
 #endif

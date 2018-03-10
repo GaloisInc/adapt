@@ -358,7 +358,12 @@ int main(int argc, char* argv[]) {
 	bool header = pargs->header;
 //	bool verbose = pargs->verbose;
 	bool rsample = nsample != 0;
-	int useColumns = 0;
+	ntstring test_file_name = pargs->test_file_name;
+	int checkRange = pargs->check_range;
+	if(checkRange > 0){
+		Tree::checkRange = true;
+	}
+//	int useColumns = 0;
 //	int trainsampIdx = pargs->columns;//c for train sample size option
 //	std::cout << useColumns << std::endl;
 //	int windowSize = pargs->window_size;
@@ -368,25 +373,67 @@ int main(int argc, char* argv[]) {
 	doubleframe* dt = conv_frame(double, ntstring, csv); //read data to the global variable
 	nsample = nsample == 0 ? dt->nrow : nsample;
 
+	// read test data
+	ntstringframe* testcsv = read_csv(test_file_name, header, false, false);
+	ntstringframe* testmetadata = split_frame(ntstring, testcsv, metacol, true);
+	doubleframe* testdt = conv_frame(double, ntstring, testcsv); //read data to the global variable
+//	std::cout << input_name << "\n"  << test_file_name << std::flush;
+
+//	for(int i = 0; i < 10; i++){
+//		for(int j = 0; j < dt->ncol; j++){
+//			std::cout << dt->data[i][j] << ", ";
+//		}
+//		std::cout << endl;
+//	}
+//	std::cout << endl;
+//	for(int i = 0; i < 10; i++){
+//		for(int j = 0; j < dt->ncol; j++){
+//			std::cout << testdt->data[i][j] << ", ";
+//		}
+//		std::cout << endl;
+//	}
+
 	std::cout << "# Trees     = " << ntree << std::endl;
 	std::cout << "# Samples   = " << nsample << std::endl;
-//	std::cout << "# MaxHeight = " << maxheight << std::endl;
-	std::cout << "Original Data Dimension: " << dt->nrow << "," << dt->ncol
+	std::cout << "# MaxHeight = " << maxheight << std::endl;
+	std::cout << "Check Range = " << Tree::checkRange << std::endl;
+	std::cout << "Train Data Dimension: " << dt->nrow << "," << dt->ncol
 			<< std::endl;
-
-	if (useColumns > 0 && dt->ncol > useColumns) {
-		doubleframe* temp = copyCols(dt, 0, useColumns - 1);
-		dt = temp;
-		std::cout << "Using columns: " << dt->ncol << std::endl;
-	}
+	std::cout << " Test Data Dimension: " << testdt->nrow << "," << testdt->ncol
+				<< std::endl;
+	std::cout << "Meta cols: " << metadata->ncol << std::endl;
+	std::cout << "input_name: " << input_name << std::endl;
+	std::cout << "test_name:  " << test_file_name << std::endl;
+	std::cout << "output_name:" << output_name << std::endl;
+//	if (useColumns > 0 && dt->ncol > useColumns) {
+//		doubleframe* temp = copyCols(dt, 0, useColumns - 1);
+//		dt = temp;
+//		std::cout << "Using columns: " << dt->ncol << std::endl;
+//	}
 
 //	std::cout << "CheckRange = " << Tree::checkRange << std::endl;
 //	std::cout << "Volume = " << Tree::useVolumeForScore << std::endl;
 
 	// standard IsolationForest
+	char temp[1000];
 	IsolationForest iff(ntree, dt, nsample, maxheight, rsample);
+	iff.printNumLeafandDepths();
+	char *ptr = strchr(input_name, '/') + 1;
+	while(strchr(ptr, '/') != NULL){
+		ptr = strchr(ptr, '/') + 1;
+	}
+	sprintf(temp, "%s/TrainScores/chkrng_%d_%s", output_name, checkRange, ptr);
 	std::vector<double> scores = iff.AnomalyScore(dt);
-	printScoreToFile(scores, csv, metadata, dt, output_name);
+	printScoreToFile(scores, csv, metadata, dt, temp);
+
+	ptr = strchr(test_file_name, '/') + 1;
+	while(strchr(ptr, '/') != NULL){
+		ptr = strchr(ptr, '/') + 1;
+	}
+	sprintf(temp, "%s/TestScores/chkrng_%d_%s", output_name, checkRange, ptr);
+	scores.clear();
+	scores = iff.AnomalyScore(testdt);
+	printScoreToFile(scores, testcsv, testmetadata, testdt, temp);
 
 	return 0;
 }
