@@ -2,7 +2,8 @@ package com.galois.adapt
 
 import java.util.function.BiConsumer
 
-import org.mapdb.HTreeMap
+import org.mapdb.BTreeMapJava.KeySet
+import org.mapdb.{BTreeMap, BTreeMapJava, HTreeMap}
 
 /* This object contains utilities for wrapping MapDB map and set types into more palatable scala ones.
  *

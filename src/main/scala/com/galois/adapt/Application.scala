@@ -158,7 +158,6 @@ object Application extends App {
       .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .createOrOpen()
       .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-
     { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
   )
   val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
@@ -183,7 +182,8 @@ object Application extends App {
     }
   )
 
-  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
+  val cdmUuidExpiryTime = config.getLong("adapt.adm.cdmexpirytime")
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, cdmUuidExpiryTime, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
 
 
   val ta1 = config.getString("adapt.env.ta1")

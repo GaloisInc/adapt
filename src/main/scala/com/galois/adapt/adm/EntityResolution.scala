@@ -32,7 +32,7 @@ object EntityResolution {
            (implicit system: ActorSystem): Flow[(String,CDM), Either[EdgeAdm2Adm, ADM], NotUsed] = {
 
     implicit val ec: ExecutionContext = system.dispatcher
-    implicit val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutSeconds") seconds)
+    val timeout: Timeout = Timeout.durationToTimeout(config.getLong("adapt.adm.timeoutseconds") seconds)
     val parallelism: Int = config.getInt("adapt.adm.parallelism")
     val delay: FiniteDuration = 5 seconds
 
@@ -52,7 +52,6 @@ object EntityResolution {
 
         case _ => /* do nothing */
       }
-
       cdm
     }
 
@@ -60,10 +59,10 @@ object EntityResolution {
       .concat(Source.fromIterator[(String,CDM)](() => Iterator(("",TimeMarker(Long.MaxValue)), ("",EndMarker(-1,Map())))))
       .map(endHack)
       .via(annotateTime)
-      .via(erWithoutRemapsFlow(uuidRemapper))
-      .via(remapEdgeUuids(uuidRemapper))
+      .via(erWithoutRemapsFlow(uuidRemapper)(timeout, ec))
+      .via(remapEdgeUuids(uuidRemapper)(timeout, ec))
       .merge(synthesizedSource.map(adm => Future.successful(Right(adm))))
-      .via(asyncDeduplicate(parallelism, seenNodesSet, seenEdgesSet))
+      .via(asyncDeduplicate(parallelism, seenNodesSet, seenEdgesSet)(timeout, ec))
   }
 
 
@@ -126,13 +125,16 @@ object EntityResolution {
         tgt_new <- (uuidRemapper ? GetCdm2Adm(tgt)).mapTo[ResultOfGetCdm2Adm]
       } yield EdgeAdm2Adm(src, lbl, tgt_new.target)
 
-      case EdgeCdm2Cdm(src, lbl, tgt) => for {
-        src_new <- (uuidRemapper ? GetCdm2Adm(src)).mapTo[ResultOfGetCdm2Adm]
-        tgt_new <- (uuidRemapper ? GetCdm2Adm(tgt)).mapTo[ResultOfGetCdm2Adm]
-      } yield EdgeAdm2Adm(src_new.target, lbl, tgt_new.target)
+      case EdgeCdm2Cdm(src, lbl, tgt) =>
+        val srcFuture = (uuidRemapper ? GetCdm2Adm(src)).mapTo[ResultOfGetCdm2Adm]
+        val tgtFuture = (uuidRemapper ? GetCdm2Adm(tgt)).mapTo[ResultOfGetCdm2Adm]
+        for {
+          src_new <- srcFuture
+          tgt_new <- tgtFuture
+        } yield EdgeAdm2Adm(src_new.target, lbl, tgt_new.target)
     }
 
-    val id = Random.nextLong()
+//    val id = Random.nextLong()
 
     Flow[Future[Either[Edge[_, _], ADM]]].map(_.flatMap {
       case Left(edge) => remapEdge(edge).map(Left(_))
@@ -241,7 +243,7 @@ object EntityResolution {
           case _ if time > currentTime && (time - currentTime < maxTimeJump || currentTime < 1400000000000000L) =>
             currentTime = time
 
-          case _ => { }
+          case _ => ()
         }
 
       }
