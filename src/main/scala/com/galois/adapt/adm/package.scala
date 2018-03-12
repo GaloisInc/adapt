@@ -181,11 +181,47 @@ package object adm {
   case object AdmPathNode {
     def normalized(path: String, provider: String): Option[AdmPathNode] = {
 
+      var pathFixed: String = path.trim
+
       // Garbage
-      if (path == "" || path == "<unknown>")
+      if (pathFixed == "" || pathFixed == "<unknown>" || pathFixed == "unknown")
         return None
 
-      var segs: List[String] = path.trim.split("/",-1).toList
+      // We can't do this because this is a common use: "<quoted program>" "<quoted arg>"
+//      // Some 5D paths have extra quotes around them: "\"C:\\ProgData\\ .... \\ ...\"". This step removes them
+//      if (pathFixed.startsWith("\"") && pathFixed.endsWith("\"") && pathFixed.length > 1) {
+//        pathFixed = pathFixed.substring(1, pathFixed.length - 1)
+//      }
+
+      var isWindows = Application.isWindows(provider)
+      if (isWindows) {
+        // Paths are often case insensitive
+        pathFixed = pathFixed.toLowerCase
+
+        // Some windows paths have path variables in them. We make a best effort to expand these
+        pathFixed = pathFixed
+          .replaceAll("%systemroot%","\\\\windows")
+          .replaceAll("%windir%","\\\\windows")
+          .replaceAll("%system32%","\\\\windows\\\\system32")
+          .replaceAll("%programfiles%", "\\\\program files")
+          .replaceAll("%osdrive%", "\\\\")
+          .replaceAll("%systemdrive%", "\\\\")
+
+        // Some windows paths start with "C:\\" and others with "\\". We strip off the "C:\\"
+        if (pathFixed.startsWith("c:\\")) {
+          pathFixed = pathFixed.substring(2, pathFixed.length)
+        }
+
+        // Ditto for "\\Device\\HarddiskVolume1" and "Device\\HarddiskVolume1"
+        if (pathFixed.startsWith("\\device\\harddiskvolume1\\")) {
+          pathFixed = pathFixed.substring(23, pathFixed.length)
+        } else if (pathFixed.startsWith("device\\harddiskvolume1\\")) {
+          pathFixed = pathFixed.substring(22, pathFixed.length)
+        }
+      }
+
+      val (sep,splitSep) = if (isWindows) { ("\\", "\\\\") } else { ("/", "/") }
+      var segs: List[String] = pathFixed.split(splitSep,-1).toList
 
       val absolute: Boolean = if (segs.head == "") {
         segs = segs.tail
@@ -199,7 +235,7 @@ package object adm {
 
       for (seg <- segs) {
         seg match {
-          case "." => { /* this adds no information, ignore it */ }
+          case "." | "" => { /* this adds no information, ignore it */ }
           case ".." => if (segsRev.isEmpty) { backhops += 1 } else { segsRev = segsRev.tail }
           case other => segsRev = other :: segsRev
         }
@@ -211,7 +247,7 @@ package object adm {
       // This is for filtering out paths that have no meaningful information
       if (segsRev.isEmpty && !absolute) return None
 
-      val norm = (if (absolute) { "/" } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString("/")
+      val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
       Some(AdmPathNode(norm, provider))
     }
   }
