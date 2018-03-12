@@ -9,67 +9,28 @@ import java.io.{PrintWriter, File}
 
 object NoveltyDetection {
   type Event = AdmEvent
-  type Subject = (AdmSubject, Set[AdmPathNode])
-  type Object = (ADM, Set[AdmPathNode])
+  type Subject = (AdmSubject, Option[AdmPathNode])
+  type Object = (ADM, Option[AdmPathNode])
 
   type ExtractedValue = String
-  type Discriminator = (Event, Subject, Object) => Set[ExtractedValue]
+  type Discriminator = (Event, Subject, Object) => ExtractedValue
   type D = List[Discriminator]
   type F = (Event, Subject, Object) => Boolean
 
   val noveltyThreshold: Float = 0.01F
-  type IsNovel = Set[List[(String, Float)]]
-
-  case class NoveltyTree(filter: F, discriminators: D) {
-    var children = Map.empty[ExtractedValue, NoveltyTree]
-    var counter = 0
-
-    def globalNoveltyRate = ???
-
-    def localNovelty: Float = if (counter == 0) 1F else children.size / counter.toFloat
-//    def getChildCount: Int = counter  // if (children.isEmpty) counter else children.map(_._2.getChildCount).sum
-//    def subtreeNovelty: Float = Try[Float](children.size / getChildCount.toFloat).getOrElse(1F)
-
-    def print(yourDepth: Int, key: String): Unit = {
-      val prefix = (0 until (4 * yourDepth)).map(_ => " ").mkString("")
-      println("\t")
-      println(s"$prefix### Tree at depth: $yourDepth  for key: $key")
-      println(s"${prefix}Counter: $counter  Children keys: ${children.keys}")
-      children.foreach { case (k, v) => v.print(yourDepth + 1, k) }
-    }
-
-    def update(e: Event, s: Subject, o: Object): IsNovel = if (filter(e, s, o)) {
-      val historicalNoveltyRate = localNovelty
-      counter += 1
-      discriminators match {
-        case Nil => Set.empty[List[(String, Float)]]
-        case discriminator :: remainingDiscriminators =>
-          val extractedSet = discriminator(e, s, o)
-          extractedSet.flatMap { extracted =>
-            val childExists = children.contains(extracted)
-            val childTree = children.getOrElse(extracted, new NoveltyTree(filter, remainingDiscriminators))
-            children = children + (extracted -> childTree)
-            val childUpdateResults = childTree.update(e, s, o)
-            if (childUpdateResults.nonEmpty)
-              childUpdateResults.map(childPaths => (extracted -> historicalNoveltyRate) :: childPaths)
-            else if ( ! childExists && historicalNoveltyRate < noveltyThreshold)  // TODO: consider if we should ALSO emit another detection if this still matches here. (i.e. append to the set from the previous condition?)
-              Set(List(extracted -> historicalNoveltyRate))
-            else Set.empty[List[(String, Float)]]
-          }
-      }
-    } else Set.empty[List[(String, Float)]]
-  }
+  type Alarm = List[(String, Float, Float, Int)]
 }
 
 
 trait PpmTree {
   def getCount: Int
-  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Set[List[(String, Float, Float, Int)]]
+  def update(e: Event, s: Subject, o: Object): Option[Alarm] = this.update(e, s, o, 1F, 1F)
+  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm]
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
-  def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
-  def apply(filter: F, discriminators: D, serialized: TreeRepr):PpmTree =  new SymbolNode(filter, discriminators, Some(serialized))
+//  def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
+  def apply(filter: F, discriminators: D, serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
 }
 
 
@@ -94,35 +55,35 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
   def localChildProbability(identifier: ExtractedValue): Float =
     children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
+  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Option[Alarm] = if (filter(e,s,o)) {
     counter += 1
     discriminators match {
-      case Nil => Set.empty
+      case Nil => None
       case discriminator :: remainingDiscriminators =>
-        val extractedSet = discriminator(e, s, o)
-        if (extractedSet.size > 1) counter += (extractedSet.size - 1) // ensure the parent counts equal to the size of the flattened set. `- 1` because the counter is always incremented by one (even if no discriminators match the children)
-        extractedSet.flatMap { extracted =>
+        val extracted = discriminator(e, s, o)
+//        if (extracted.size > 1) counter += (extracted.size - 1) // ensure the parent counts equal to the size of the flattened set. `- 1` because the counter is always incremented by one (even if no discriminators match the children)
+//        extracted.flatMap { extracted =>
 
-          val childExists = children.contains(extracted)  // Merge suffixes? Would have to alter existing child nodes in the case of a child key being the suffix of the incoming key.
-          // What to do about a suffix merged into a full path, followed by another full path which could have had the suffix applied to it?
-          // Perhaps suffix nodes should accumulate in their own nodes, and counted in aggregate on read. This would almost require parent counts to be computed lazily.
-          // ...or skip suffix folding entirely.
+        val childExists = children.contains(extracted)  // Merge suffixes? Would have to alter existing child nodes in the case of a child key being the suffix of the incoming key.
+        // What to do about a suffix merged into a full path, followed by another full path which could have had the suffix applied to it?
+        // Perhaps suffix nodes should accumulate in their own nodes, and counted in aggregate on read. This would almost require parent counts to be computed lazily.
+        // ...or skip suffix folding entirely.
 
-          val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
-          val childLocalProb = localChildProbability(extracted)
-          val thisGlobalProb = thisLocalProb * parentGlobalProb
-          if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
-            // Append information about the child:
-            (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
-          } else {
-            children = children + (extracted -> childNode)
-            childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
-            // Begin information about the child:
-            Set(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
-          }
+        val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
+        val childLocalProb = localChildProbability(extracted)
+        val thisGlobalProb = thisLocalProb * parentGlobalProb
+        if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
+          // Append information about the child:
+          (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
+        } else {
+          children = children + (extracted -> childNode)
+          childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
+          // Begin reporting information about the child:
+          Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
         }
+//        }
     }
-  } else Set.empty
+  } else None
 
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
@@ -138,12 +99,75 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
 
 class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
   def getCount = siblings.size - 1
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = Set(Nil)
+  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Option[Alarm] = Some(Nil)
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
-
   override def equals(obj: scala.Any) = obj.isInstanceOf[QNode] && obj.asInstanceOf[QNode].getCount == getCount
 }
+
+
+
+
+
+class NoveltyActor extends Actor with ActorLogging {
+  import NoveltyDetection._
+
+  val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
+  val ds = List(
+    (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"), //.toList.sorted.mkString("[", " | ", "]"),
+    (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>") //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
+  )
+
+  val repr = Some(TreeRepr.readFromFile("/Users/ryan/Desktop/ppm_experiments/cadets-bovia_processFileTouches.csv"))
+
+  val processFileTouches = PpmTree(f, ds, repr)
+  println(processFileTouches.getTreeRepr().toString)
+
+//  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
+//  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
+
+
+  def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
+    val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
+    val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
+    val combined = subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
+    combined
+  }
+
+
+  def receive = {
+    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+      val flatEvents = flatten(e, s, subPathNodes, o, objPathNodes)
+
+      val processFileTouchAlarms: Set[Alarm] = flatEvents.map((processFileTouches.update _).tupled).flatten
+      processFileTouchAlarms.foreach(println)
+
+//      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
+//      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
+      sender() ! Ack
+
+    case InitMsg =>
+      sender() ! Ack
+    case CompleteMsg =>
+      println(processFileTouches.getTreeRepr().toString)
+//      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+//      println("")
+//      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+//      println("")
+//      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
+
+
+//      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/ppm_experiments/cadets-bovia_processFileTouches.csv")
+      
+
+//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
+      println("Done")
+
+    case x => log.error(s"Received Unknown Message: $x")
+  }
+}
+
+
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
@@ -203,47 +227,3 @@ case object TreeRepr {
 
   def readFromFile(filePath: String): TreeRepr = TreeRepr.fromFlat(scala.io.Source.fromFile(filePath).getLines().map(TreeRepr.csvStringToFlat).toList)
 }
-
-
-class NoveltyActor extends Actor with ActorLogging {
-  import NoveltyDetection._
-
-  val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
-  val ds = List(
-    (e: Event, s: Subject, o: Object) => s._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.map(_.path) //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
-  )
-
-  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
-
-  val processFileTouches = PpmTree(f, ds, repr)
-  println(processFileTouches.getTreeRepr().toString)
-
-//  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
-//  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
-
-  def receive = {
-    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
-//      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
-//      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
-      sender() ! Ack
-
-    case InitMsg =>
-      sender() ! Ack
-    case CompleteMsg =>
-      println(processFileTouches.getTreeRepr().toString)
-//      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
-//      println("")
-//      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
-//      println("")
-//      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
-
-      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_bovia-trained_full.csv")
-//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
-      println("Done")
-
-    case x => log.error(s"Received Unknown Message: $x")
-  }
-}
-
