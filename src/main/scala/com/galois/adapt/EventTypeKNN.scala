@@ -186,6 +186,7 @@ object EventTypeKNN {
 
             (acc._1+confusionTuple._1,acc._2+confusionTuple._2,acc._3+confusionTuple._3,acc._4+confusionTuple._4)
         }
+      println(distance,k,confusionTuple)
       (distance,k,confusionTuple)
     }
 
@@ -219,6 +220,7 @@ object EventTypeKNN {
         val modelChoices = for (d <- distances; k <- numNeighbors) yield getKNNValidationStats(data._1,data._2, d, k)
         val bestParams = selectBestModel(modelChoices)
         val bestModel = knn[EventVec](data._1, data._2, bestParams._1, bestParams._2)
+        println(bestModel)
         processName ->
           bestModelIfExists(bestModel, data._3, data._4, bestParams._1, bestParams._2, falseAlarmThreshold)
       }.toMap
