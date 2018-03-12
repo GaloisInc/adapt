@@ -12,12 +12,14 @@ import scala.util.parsing.json.JSON
 
 
 object Fingerprinting {
+  case class depthsAndPaths(depth: Int, paths: List[String])
   type M = String // needs to be filetouch or network
   type ProcessName = Set[String]
 
 
   trait FingerprintModel {
     def getModel: String
+    def getModelMap: Map[Set[String],depthsAndPaths]
     def getTrueCount: Int
     def getFalseCount: Int
     def evaluate(p: Set[String], mv: Map[String,String]): Option[Boolean]
@@ -28,10 +30,10 @@ object Fingerprinting {
   case object FingerprintModel {
     def apply(model: M, modelFilePath: String): FingerprintModel = model match {
       case "filetouch" => new FiletouchModelEvaluator(modelFilePath)
-      case "network" => new NetworkModelEvaluator(modelFilePath)
+      //case "network" => new NetworkModelEvaluator(modelFilePath)
     }
   }
-    class NetworkModelEvaluator(str: String) extends  FingerprintModel {
+ /*   class NetworkModelEvaluator(str: String) extends  FingerprintModel {
       private var trueCounter = 0
       private var falseCounter = 0
       def getTrueCount: Int = trueCounter
@@ -74,6 +76,7 @@ object Fingerprinting {
         networkAttributeModelMap.toString()
       }
 
+      def getModelMap(): Map[Set[String],attributesAndValues]
       // Function returns True if the FilePath is common to processName
       // otherwise it returns False and should raise an alarm.
       def evaluate(processName: Set[String], admNetFlowAttributeMap: Map[String,String]): Option[Boolean] = {
@@ -92,7 +95,7 @@ object Fingerprinting {
       }
     }
 
-
+*/
 
     class FiletouchModelEvaluator(modelFilePath: String) extends FingerprintModel {
       private var trueCounter = 0
@@ -117,7 +120,7 @@ object Fingerprinting {
 
       // Example data holding selected model params
       //val jsonString = "{\"processes\": [{\"name\": \"postgres\", \"depth\": -1, \"paths\": [\"/usr/local/pgsql/data/base/12730/\", \"/tmp/\", \"/usr/local/pgsql/data/pg_stat_tmp/\", \"/usr/local/pgsql/data/\", \"/usr/local/pgsql/data/base/16384/\", \"/usr/local/pgsql/data/global/\"]}, {\"name\":\"atrun,cron,sh\",\"depth\": 2, \"paths\": [\"/etc/\", \"/libexec/\", \"/\", \"/lib/\", \"/dev/\", \"/bin/\", \"/var/\", \"/usr/\"]}]}"
-      case class depthsAndPaths(depth: Int, paths: List[String])
+
 
       val filePathModel = (jsonString: String) => for {
         Some(M(map)) <- List(JSON.parseFull(jsonString))
@@ -138,6 +141,9 @@ object Fingerprinting {
         filePathModelMap.toString()
       }
 
+      def getModelMap(): Map[Set[String],depthsAndPaths] = {
+        filePathModelMap
+      }
       // Function returns True if the FilePath is common to processName
       // otherwise it returns False and should raise an alarm.
       def evaluate(processName: Set[String], fileToAdmPathNodePath: Map[String,String]): Option[Boolean] = {

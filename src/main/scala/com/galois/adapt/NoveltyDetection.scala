@@ -4,7 +4,10 @@ import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
-import java.io.{PrintWriter, File}
+import java.io.{File, PrintWriter}
+
+import com.galois.adapt.fingerprinting.Fingerprinting
+import com.galois.adapt.fingerprinting.Fingerprinting.FingerprintModel
 
 
 object NoveltyDetection {
@@ -64,7 +67,7 @@ object NoveltyDetection {
 
 trait PpmTree {
   def getCount: Int
-  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Set[List[(String, Float, Float, Int)]]
+  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Set[List[(String,String,String, Float, Float, Int)]]
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
@@ -94,7 +97,7 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
   def localChildProbability(identifier: ExtractedValue): Float =
     children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = if (filter(e,s,o)) {
+  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Set[List[(String,String,String, Float, Float, Int)]] = if (filter(e,s,o)) {
     counter += 1
     discriminators match {
       case Nil => Set.empty
@@ -113,12 +116,12 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
           val thisGlobalProb = thisLocalProb * parentGlobalProb
           if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
             // Append information about the child:
-            (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
+            (s._1.uuid.toString,s._1.originalCdmUuids.toString(),extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
           } else {
             children = children + (extracted -> childNode)
             childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
             // Begin information about the child:
-            Set(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
+            Set(List((o._1.uuid.toString,o._1.originalCdmUuids.toString(),extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
           }
         }
     }
@@ -138,7 +141,7 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
 
 class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
   def getCount = siblings.size - 1
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String, Float, Float, Int)]] = Set(Nil)
+  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Set[List[(String,String,String, Float, Float, Int)]] = Set(Nil)
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
 
@@ -211,20 +214,33 @@ class NoveltyActor extends Actor with ActorLogging {
   val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
   val ds = List(
     (e: Event, s: Subject, o: Object) => s._2.map(_.path), //.toList.sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.map(_.path) //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
+    (e: Event, s: Subject, o: Object) => o._2.map(_.path)//.split("/").init.mkString("/") + "/") //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
   )
 
-  val repr = TreeRepr.readFromFile("/Users/ryan/Desktop/cadets-bovia_processFileTouches_full.csv")
+  //val repr = TreeRepr.readFromFile("/Users/nls/Desktop/no_depth_cadets_bovia.csv")
 
-  val processFileTouches = PpmTree(f, ds, repr)
+  val processFileTouches = PpmTree(f, ds)//, repr)
   println(processFileTouches.getTreeRepr().toString)
 
-//  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
+  /// Trying out a thing
+  import Fingerprinting._
+
+  val filePathModel = FingerprintModel("filetouch", "/Users/nls/repos/adapt/src/main/resources/model_file_touch_cadets.json")
+  val filePathModelMap = filePathModel.getModelMap
+
+  //  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
 //  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
 
   def receive = {
     case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
-      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes).foreach(println)
+      processFileTouches.update(e, s -> subPathNodes, o -> objPathNodes)
+        .foreach(println)/*x => x match {
+          case a :: b :: _ => {val pnames = filePathModelMap.keys.filter(p => p.contains(a._1))//filePathModel.evaluate()
+            val whitelistFiles: Iterable[String] = pnames.flatMap(p => filePathModelMap.get(p)).map(_.paths).flatten
+            if (! whitelistFiles.map(f => b._1.startsWith(f) || f.startsWith(b._1)).fold(false)(_||_)) println(x)
+          }
+          case _ => println(x)
+        })*/
 //      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
 //      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
       sender() ! Ack
@@ -239,7 +255,7 @@ class NoveltyActor extends Actor with ActorLogging {
 //      println("")
 //      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 
-      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/cadets-pandex_processFileTouches_bovia-trained_full.csv")
+      processFileTouches.getTreeRepr().writeToFile("/Users/nls/Desktop/no_depth_cadets_bovia.csv")
 //      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
       println("Done")
 

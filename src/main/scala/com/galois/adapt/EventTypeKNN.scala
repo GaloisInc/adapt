@@ -46,7 +46,7 @@ object EventTypeKNN {
   type EventVec = Array[Int]
   type ConfusionTuple = (Int,Int,Int,Int) //tp,fp,fn,tn
 
-  class EventTypeKNNTrain(maliciousFiles: List[String]) {
+  class EventTypeKNNTrain/*(maliciousFiles: List[String])*/ {
     var dataMap: Map[ProcessName,Array[EventCounts]] = Map.empty
 
     def loadMaliciousData(maliciousFile: String): Seq[String] = {
@@ -57,20 +57,18 @@ object EventTypeKNN {
       src.close()
       malSeq
     }
-    /*val srcs = maliciousFiles.map(x=>scala.io.Source.fromFile(x))
-    val iters: List[Array[String]] = srcs.flatMap(x=>x.getLines().drop(1).map(_.split(",")))
-    val maliciousData: List[String] = iters.flatMap(x=> List(x(4).split(";"),x(6).split(";"))).flatten
-    srcs.foreach(_.close())
-    */val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
+/*
+    val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
 
     def getMalData(): Unit = {
       maliciousData.foreach(x=>println(x))
     }
+*/
     def collect(kNNInput: KNNInput): Unit = {
-      if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
+      //if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
         val newArray = dataMap.getOrElse(kNNInput.processName, Array(Map.empty[EventType, Int])) :+ kNNInput.eventCounts
         dataMap += (kNNInput.processName -> newArray)
-      }
+      //}
     }
 
     def transformData(data: Map[ProcessName,Array[EventCounts]]): (Array[EventVec],Array[ProcessName]) = {
@@ -231,8 +229,6 @@ object EventTypeKNN {
       val toStore: Map[ProcessName,KNN[EventVec]] = processModels
         .filter(x => x._2._1.isDefined)
         .map(x => x._1 -> x._2._1.get)
-      val storeMe = toStore.get(Set("sh","dd"))
-      smile.write.xstream(storeMe,"knnmodel.ser")
 
       val xstream = new XStream
       val xml = xstream.toXML(toStore)
@@ -240,7 +236,7 @@ object EventTypeKNN {
         write(xml)
         close
       }
-      println("All Done for reals!")
+
     }
   }
 
@@ -266,17 +262,12 @@ object EventTypeKNN {
       }
     }
   }
-  def test[T](x: T): Boolean = {
-    x match {
-      case _<: String => true
-    }
-  }
 }
 
 class KNNTrainActor extends Actor with ActorLogging {
   import EventTypeKNN._
-  val eventTypeKNNTrain = new EventTypeKNNTrain(List("bovia_webshell.csv"))
-  eventTypeKNNTrain.getMalData()
+  val eventTypeKNNTrain = new EventTypeKNNTrain//(List("bovia_webshell.csv"))
+  //eventTypeKNNTrain.getMalData()
 
   def receive = {
 
@@ -285,7 +276,7 @@ class KNNTrainActor extends Actor with ActorLogging {
       sender() ! Ack
 
     case InitMsg => /*eventTypeKNNTrain.getMalData();*/ sender() ! Ack
-    case CompleteMsg => println("Almost Done!"); eventTypeKNNTrain.testSelectWriteModels(3);println("All Done!") //upon completion save trained models and print summary stats
+    case CompleteMsg => eventTypeKNNTrain.testSelectWriteModels(3);println("All Done!") //upon completion save trained models and print summary stats
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
