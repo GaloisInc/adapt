@@ -8,6 +8,7 @@ import com.galois.adapt.cdm18._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
@@ -185,15 +186,64 @@ package object adm {
 
       // Garbage
       if (pathFixed == "" || pathFixed == "<unknown>" || pathFixed == "unknown")
-        return None
-
-      // We can't do this because this is a common use: "<quoted program>" "<quoted arg>"
-//      // Some 5D paths have extra quotes around them: "\"C:\\ProgData\\ .... \\ ...\"". This step removes them
-//      if (pathFixed.startsWith("\"") && pathFixed.endsWith("\"") && pathFixed.length > 1) {
-//        pathFixed = pathFixed.substring(1, pathFixed.length - 1)
-//      }
+      return None
 
       var isWindows = Application.isWindows(provider)
+
+      val n: Int = pathFixed.length
+
+      // For command lines, we try to rip off arguments.
+      val end: Int = if (!isWindows) {
+
+        // We don't try this for windows because their paths too often have unescaped spaces. Think "start menu" not
+        // quoted and without an escaping '\' before the space.
+
+        // This will produce the first index into the string
+        @tailrec
+        def commandEndIndex(acc: Int): Int = {
+          if (acc >= n)
+            return n
+
+          pathFixed.charAt(acc) match {
+            // Break on whitespace
+            case c if c.isWhitespace => acc
+
+            // Skip over the next character if the current one is a backslash
+            case '\\' => commandEndIndex(acc + 2)
+
+            // Whenever you encounter quotes, keep consuming characters until you find the matching quote on the other
+            // side
+            case c@('\"' | '\'') =>
+              var j = acc + 1
+              while (j < n && pathFixed.charAt(j) != c) j += 1
+              commandEndIndex(j + 1)
+
+            // For everything else just advance one charactet
+            case _ => commandEndIndex(acc + 1)
+          }
+        }
+
+        commandEndIndex(0)
+
+      } else {
+
+        // The only thing that is safe for windows is to take drop what comes after a quoted path.
+        if (pathFixed.charAt(0) == '\"') {
+          var j = 1
+          while (j < n && pathFixed.charAt(j) != '\"') j += 1
+          j + 1
+        } else {
+          n
+        }
+      }
+
+      pathFixed = pathFixed.substring(0,end)
+
+      // Some 5D paths have extra quotes around them: "\"C:\\ProgData\\ .... \\ ...\"". This step removes them
+      if (pathFixed.startsWith("\"") && pathFixed.endsWith("\"") && pathFixed.length > 1) {
+        pathFixed = pathFixed.substring(1, pathFixed.length - 1)
+      }
+
       if (isWindows) {
         // Paths are often case insensitive
         pathFixed = pathFixed.toLowerCase
