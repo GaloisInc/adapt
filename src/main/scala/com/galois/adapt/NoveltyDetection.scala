@@ -4,7 +4,9 @@ import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
-import java.io.{PrintWriter, File}
+import java.io.{File, PrintWriter}
+
+import scala.util.Try
 
 
 object NoveltyDetection {
@@ -29,7 +31,6 @@ trait PpmTree {
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
-//  def apply(filter: F, discriminators: D): PpmTree = new SymbolNode(filter, discriminators)
   def apply(filter: F, discriminators: D, serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
 }
 
@@ -61,8 +62,6 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
       case Nil => None
       case discriminator :: remainingDiscriminators =>
         val extracted = discriminator(e, s, o)
-//        if (extracted.size > 1) counter += (extracted.size - 1) // ensure the parent counts equal to the size of the flattened set. `- 1` because the counter is always incremented by one (even if no discriminators match the children)
-//        extracted.flatMap { extracted =>
 
         val childExists = children.contains(extracted)  // Merge suffixes? Would have to alter existing child nodes in the case of a child key being the suffix of the incoming key.
         // What to do about a suffix merged into a full path, followed by another full path which could have had the suffix applied to it?
@@ -81,7 +80,6 @@ class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = 
           // Begin reporting information about the child:
           Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
         }
-//        }
     }
   } else None
 
@@ -106,64 +104,79 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 }
 
 
-
+case class PpmDefinition(name: String, filter: F, discriminators: D) {
+  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
+  val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
+  val tree = PpmTree(filter, discriminators, inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
+  def observe(observation: (Event, Subject, Object)): Option[Alarm] = (tree.update _).tupled(observation)
+  def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+  def prettyString: String = tree.getTreeRepr(key = name).toString
+}
 
 
 class NoveltyActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  val f = (e: Event, s: Subject, o: Object) => (e.eventType == EVENT_READ || e.eventType == EVENT_WRITE) //&& s._2.map(_.path).intersect(Set("bounce","master","local","qmgr")).isEmpty
-  val ds = List(
-    (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"), //.toList.sorted.mkString("[", " | ", "]"),
-    (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>") //.suffixFold.toList.sorted //.mkString("[", " | ", "]")
+  def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
+  val ppmList = List(
+     PpmDefinition( "ProcessFileTouches",
+       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+       List(
+         (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+         (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+       )
+    ),
+    PpmDefinition( "FilesTouchedByProcesses",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+      List(
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition( "FilesExecutedByProcesses",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_EXECUTE,
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition("ProcessesWithNetworkActivity",
+      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    )
   )
-
-  val repr = Some(TreeRepr.readFromFile("/Users/ryan/Desktop/ppm_experiments/cadets-bovia_processFileTouches.csv"))
-
-  val processFileTouches = PpmTree(f, ds, repr)
-  println(processFileTouches.getTreeRepr().toString)
-
-//  val processesThatReadFiles = PpmTree((e,s,o) => e.eventType == EVENT_READ, ds.reverse)
-//  val filesExecutedByProcesses = PpmTree((e,s,o) => e.eventType == EVENT_EXECUTE, ds)
 
 
   def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
     val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
     val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
-    val combined = subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
-    combined
+    subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
   }
 
 
   def receive = {
-    case (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+    case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+
       val flatEvents = flatten(e, s, subPathNodes, o, objPathNodes)
+      ppmList.foreach(ppm => flatEvents.foreach(e => ppm.observe(e).foreach(println)))
 
-      val processFileTouchAlarms: Set[Alarm] = flatEvents.map((processFileTouches.update _).tupled).flatten
-      processFileTouchAlarms.foreach(println)
-
-//      processesThatReadFiles.update(e, s -> subPathNodes, o -> objPathNodes)
-//      filesExecutedByProcesses.update(e, s -> subPathNodes, o -> objPathNodes)
       sender() ! Ack
 
-    case InitMsg =>
-      sender() ! Ack
+    case InitMsg => sender() ! Ack
     case CompleteMsg =>
-      println(processFileTouches.getTreeRepr().toString)
-//      println(processFileTouches.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
-//      println("")
-//      println(processesThatReadFiles.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
-//      println("")
-//      println(filesExecutedByProcesses.getTreeRepr().leafNodes().filter(_._1.last == "_?_").sortBy(t => 1F - t._2).mkString("\n"))
 
+      ppmList.foreach{ppm =>
+        ppm.saveState()
+        println(ppm.prettyString)
+      }
 
-//      processFileTouches.getTreeRepr().writeToFile("/Users/ryan/Desktop/ppm_experiments/cadets-bovia_processFileTouches.csv")
-      
-
-//      println(s"EQUALS: ${processFileTouches.getTreeRepr() == TreeRepr.readFromFile("/Users/ryan/Desktop/foo2.csv")}")
       println("Done")
 
-    case x => log.error(s"Received Unknown Message: $x")
+    case x =>
+      log.error(s"Received Unknown Message: $x")
+      sender() ! Ack
   }
 }
 
