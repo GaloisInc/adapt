@@ -368,6 +368,13 @@ object Application extends App {
         .runWith(Sink.foreach(println))
 
 
+    case "fsox" =>
+      CDMSource.cdm18(ta1)
+        .via(printCounter("Novelty FSOX", statusActor))
+        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+        .via(FSOX.apply)
+        .runWith(Sink.foreach(println))
+
     case "novelty" | "novel" =>
       println("Running Novelty Detection Flow")
       val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
