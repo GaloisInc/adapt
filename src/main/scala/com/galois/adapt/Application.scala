@@ -595,7 +595,7 @@ object Application extends App {
         .via(printCounter("knn", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]{ () =>
-        val eventTimeSpan: Long = "300000000000".toLong // 300000000000 <- that is 5 minutes in nanoseconds
+        val eventTimeSpan: Long = (10 minutes).toNanos //"300000000000".toLong <- that is 5 minutes in nanoseconds
 
         val processes = collection.mutable.Map.empty[AdmUUID, AdmSubject]
         val events = collection.mutable.Map.empty[AdmUUID, AdmEvent]
@@ -612,10 +612,15 @@ object Application extends App {
         {
         case Left(EdgeAdm2Adm(src, "subject", tgt)) => processes.get(tgt) // event -> subject
           .fold(List.empty[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]) { sub =>
+
+          // Add new event-to-process edge to process-to-event-set map
           val newSet: Set[AdmUUID] = subEvents.getOrElse(tgt,Set.empty[AdmUUID]).+(src)
           subEvents += (tgt -> newSet)
 
           val e = events(src) // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+
+          // TODO: Is the first event associated with the process we see the oldest event?
+          // If we haven't seen this subject before, add the timestamp of its first seen event
           if ( ! subFridge.keySet.contains(tgt)) subFridge.updateExpiryTime(tgt,e.earliestTimestampNanos)
 
           val returnList = new collection.mutable.ListBuffer[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]()

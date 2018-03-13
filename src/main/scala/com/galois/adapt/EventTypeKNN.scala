@@ -46,7 +46,7 @@ object EventTypeKNN {
   type EventVec = Array[Int]
   type ConfusionTuple = (Int,Int,Int,Int) //tp,fp,fn,tn
 
-  class EventTypeKNNTrain/*(maliciousFiles: List[String])*/ {
+  class EventTypeKNNTrain(maliciousFiles: List[String]) {
     var dataMap: Map[ProcessName,Array[EventCounts]] = Map.empty
 
     def loadMaliciousData(maliciousFile: String): Seq[String] = {
@@ -57,18 +57,16 @@ object EventTypeKNN {
       src.close()
       malSeq
     }
-/*
     val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
 
     def getMalData(): Unit = {
       maliciousData.foreach(x=>println(x))
     }
-*/
     def collect(kNNInput: KNNInput): Unit = {
-      //if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
+      if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
         val newArray = dataMap.getOrElse(kNNInput.processName, Array(Map.empty[EventType,Int])) :+ kNNInput.eventCounts
         dataMap += (kNNInput.processName -> newArray)
-      //}
+      }
     }
 
     def transformData(data: Map[ProcessName,Array[EventCounts]]): (Array[EventVec],Array[ProcessName]) = {
@@ -206,9 +204,17 @@ object EventTypeKNN {
 
     def testSelectWriteModels(falseAlarmThreshold: Int): Unit = {
 
+      val distances = List(new CosineDistance, new GeneralizedJaccardDistance, new JaccardDistance)
+      val numNeighbors = List(1, 3)
+
       dataMap.foreach(x => println(x._1+" "+x._2.length.toString))
 
-      val generalData = transformData(dataMap) //(X,y)
+      // Remove unnecessary duplicate vectors following formula
+      // cv_folds*max(numNeighbors) = train_percent*max(number of duplicates)
+      val filteredDataMap: Map[ProcessName, Array[EventCounts]] = dataMap
+        .map(p => (p._1,p._2.groupBy(x => x).flatMap(_._2.take(15)).toArray))
+
+      val generalData = transformData(filteredDataMap) //(X,y)
       val processNames = generalData._2.toSet
 
       processNames.foreach(p => println(generalData._1.length.toString+" "+generalData._2.count(ps=>ps==p)))
@@ -223,8 +229,6 @@ object EventTypeKNN {
         println("Train Trues " + data._2.count(_ == 1).toString)
         println("Test Trues " + data._4.count(_ == 1).toString)
 
-          val distances = List(new CosineDistance, new GeneralizedJaccardDistance, new JaccardDistance)
-          val numNeighbors = List(1, 3)
           val modelChoices = for (d <- distances; k <- numNeighbors) yield getKNNValidationStats(data._1, data._2, d, k)
           val bestParams = selectBestModel(modelChoices)
 
@@ -302,7 +306,7 @@ object EventTypeKNN {
 
 class KNNTrainActor extends Actor with ActorLogging {
   import EventTypeKNN._
-  val eventTypeKNNTrain = new EventTypeKNNTrain//(List("bovia_webshell.csv"))
+  val eventTypeKNNTrain = new EventTypeKNNTrain(List("bovia_webshell.csv"))
   //eventTypeKNNTrain.getMalData()
 
   def receive = {
