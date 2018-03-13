@@ -66,13 +66,13 @@ object EventTypeKNN {
 */
     def collect(kNNInput: KNNInput): Unit = {
       //if (! kNNInput.process.originalCdmUuids.map(x=>maliciousData.contains(x.toString)).fold(false)(_||_)) {
-        val newArray = dataMap.getOrElse(kNNInput.processName, Array(Map.empty[EventType, Int])) :+ kNNInput.eventCounts
+        val newArray = dataMap.getOrElse(kNNInput.processName, Array(Map.empty[EventType,Int])) :+ kNNInput.eventCounts
         dataMap += (kNNInput.processName -> newArray)
       //}
     }
 
     def transformData(data: Map[ProcessName,Array[EventCounts]]): (Array[EventVec],Array[ProcessName]) = {
-    val dataPairs = data.toList//.filter(x => x._2.length>=10)
+    val dataPairs = data.toList.filter(x => x._2.length>=6)
       .flatMap( x => x._2
       .map(emap => (x._1,EventType.values
         .map(e => emap
@@ -82,7 +82,7 @@ object EventTypeKNN {
 
     }
 
-    def stratifiedSplit(X: Array[EventVec],y: Array[Int],trainPercent: Int = 50): (Array[EventVec], Array[Int],Array[EventVec], Array[Int]) ={
+    def stratifiedSplit(X: Array[EventVec],y: Array[Int],trainPercent: Int = 60): (Array[EventVec], Array[Int],Array[EventVec], Array[Int]) ={
       val pairs: Array[(EventVec, Int)] = X.zip(y)
       val trueLabel = pairs.filter(x => x._2 == 1)
       val falseLabel = pairs.filter(x => x._2 == 0)
@@ -115,7 +115,7 @@ object EventTypeKNN {
           case 1 if y_actual(x._2)==1 => (acc._1,acc._2,acc._3,acc._4 +1)
           case 1 => (acc._1,acc._2+1,acc._3,acc._4)
           case 0 if y_actual(x._2)==1 => (acc._1,acc._2,acc._3+1,acc._4 )
-          case 0 => (acc._1+1,acc._2,acc._3,acc._4 +1)
+          case 0 => (acc._1+1,acc._2,acc._3,acc._4)
         })
     }
 
@@ -223,15 +223,11 @@ object EventTypeKNN {
         println("Train Trues " + data._2.count(_ == 1).toString)
         println("Test Trues " + data._4.count(_ == 1).toString)
 
-        val bestParams = if (dataMap(processName).length >= 6) {
-          val distances = List(new JaccardDistance, new GeneralizedJaccardDistance, new CosineDistance)
-          val numNeighbors = List(1, 3, 5)
+          val distances = List(new CosineDistance, new GeneralizedJaccardDistance, new JaccardDistance)
+          val numNeighbors = List(1, 3)
           val modelChoices = for (d <- distances; k <- numNeighbors) yield getKNNValidationStats(data._1, data._2, d, k)
-          selectBestModel(modelChoices)
-        }
-        else {
-          (new GeneralizedJaccardDistance,1,(0,0,0,0)) //default model for processes with too few instances
-        }
+          val bestParams = selectBestModel(modelChoices)
+
         println(bestParams)
 
         val bestModel = knn[EventVec](data._1, data._2, bestParams._1, bestParams._2)
@@ -274,14 +270,14 @@ object EventTypeKNN {
         println(p.mkString("-")+","
           +tp.getOrElse(p,0)+","
           +fn.getOrElse(p,0)+","
-          +noPrediction.getOrElse(p,0)+","
+          +noPrediction.getOrElse(p,0)
         )
       }
 
     }
     val modelMap = readModel(knnModelFile).asInstanceOf[Map[ProcessName,KNN[EventVec]]]
 
-    def evaluate(knnInput: KNNInput): Option[Boolean] = {
+    def evaluate(knnInput: KNNInput): Int = {
       val eventVec = EventType.values
         .map(e => knnInput.eventCounts
           .getOrElse(e,0))
@@ -292,12 +288,13 @@ object EventTypeKNN {
           val prediction = mdl.predict(eventVec)
           prediction match {
             case 1 => val newInt = tp.getOrElse(knnInput.processName,0) + 1; tp += (knnInput.processName -> newInt)
+              prediction //This means the input (event type count vector) is predicted to come from the given process name
             case _ => val newInt = fn.getOrElse(knnInput.processName,0) + 1; fn += (knnInput.processName -> newInt)
+              prediction //We raise an alarm when the prediction is 0
           }
-          Some(prediction == 1)
         case _ =>
           val newInt = noPrediction.getOrElse(knnInput.processName,0) + 1; noPrediction += (knnInput.processName -> newInt)
-          None
+          1
       }
     }
   }
@@ -327,15 +324,15 @@ class KNNActor extends Actor with ActorLogging {
   def receive = {
 
     case (s: AdmSubject, subPathNodes: Set[AdmPathNode], eventMap: EventCounts) =>
-      println(subPathNodes.map(_.path).mkString(","),
-      eventTypeKNNEvaluate.evaluate(KNNInput(s,subPathNodes.map(_.path),eventMap)))
+      val prediction = eventTypeKNNEvaluate.evaluate(KNNInput(s,subPathNodes.map(_.path),eventMap))
+      if (prediction == 0) println(subPathNodes.map(_.path).mkString(",")+" Alarm!")
       sender() ! Ack
 
     case InitMsg => sender() ! Ack
-    case CompleteMsg => println("All Done"); eventTypeKNNEvaluate.printSummaryStats()
+    case CompleteMsg => eventTypeKNNEvaluate.printSummaryStats(); println("All Done!")
     case x => log.error(s"Received Unknown Message: $x")
   }
 }
 
-case class KNNInput(process: AdmSubject,processName: ProcessName, eventCounts: EventCounts)
+case class KNNInput(process: AdmSubject, processName: ProcessName, eventCounts: EventCounts)
 
