@@ -83,10 +83,10 @@ object Application extends App {
   Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
 
   // Get namespaces if there are any
-  private val namespaces: mutable.Set[String] = mutable.Set.empty
+  private val namespaces: mutable.Map[String,Boolean] = mutable.Map.empty
 
   // Global mutable state for figuring out what namespaces we currently have
-  def addNamespace(ns: String): Unit = Application.namespaces.add(ns)
+  def addNamespace(ns: String, isWindows: Boolean): Unit = Application.namespaces(ns) = isWindows
 
   // Load up all of the namespaces, and then write them back out on shutdown
   val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
@@ -96,7 +96,7 @@ object Application extends App {
 
     val in = new BufferedReader(new InputStreamReader(new FileInputStream(namespacesFile)))
     for (line <- in.lines().iterator().asScala)
-      addNamespace(line)
+      addNamespace(line, false)
     in.close()
   }
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
@@ -108,7 +108,10 @@ object Application extends App {
     }
   }))
 
-  def getNamespaces: List[String] = List("cdm") ++ namespaces.toList.flatMap(ns => List("cdm_" + ns, ns))
+  def getNamespaces: List[String] = List("cdm") ++ namespaces.keySet.toList.flatMap(ns => List("cdm_" + ns, ns))
+
+  // This only works during ingestion - it won't work when we read namespaces out of the DB
+  def isWindows(ns: String): Boolean = namespaces.getOrElse(ns, false)
 
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
@@ -532,37 +535,37 @@ object CDMSource {
       case "cadets"         =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "cadets"
-        Application.addNamespace("cadets")
+        Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("cadets" -> _)
       case "clearscope"     =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "clearscope"
-        Application.addNamespace("clearscope")
+        Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("clearscope" -> _)
       case "faros"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "faros"
-        Application.addNamespace("faros")
+        Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("faros" -> _)
       case "fivedirections" =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "fivedirections"
-        Application.addNamespace("fivedirections")
+        Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("fivedirections" -> _)
       case "theia"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "theia"
-        Application.addNamespace("theia")
+        Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
           .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
         Application.instrumentationSource = "trace"
-        Application.addNamespace("trace")
+        Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("trace" -> _)
       case "kafkaTest"      =>
-        Application.addNamespace("kafkaTest")
+        Application.addNamespace("kafkaTest", isWindows = false)
         val src = kafkaSource("kafkaTest", kafkaCdm17Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map("kafkaTest" -> _)
       case _ =>
@@ -573,11 +576,12 @@ object CDMSource {
         val startStream = paths.foldLeft(Source.empty[Try[(String,CDM17)]])((a,b) => a.concat{
           Source.fromIterator[Try[(String,CDM17)]](() => {
             val read = CDM17.readData(b._2, None)
-            Application.addNamespace(b._1)
 
             read.map(_._1) match {
               case Failure(_) => None
-              case Success(s) => Application.instrumentationSource = Ta1Flows.getSourceName(s)
+              case Success(s) =>
+                Application.instrumentationSource = Ta1Flows.getSourceName(s)
+                Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
             }
 
             read.get._2.map(_.map(b._1 -> _))
@@ -613,35 +617,35 @@ object CDMSource {
       case "cadets"         =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "cadets"
-        Application.addNamespace("cadets")
+        Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "clearscope"     =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "clearscope"
-        Application.addNamespace("clearscope")
+        Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "faros"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "faros"
-        Application.addNamespace("faros")
+        Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "fivedirections" =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "fivedirections"
-        Application.addNamespace("fivedirections")
+        Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "theia"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "theia"
-        Application.addNamespace("theia")
+        Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
         Application.instrumentationSource = "trace"
-        Application.addNamespace("trace")
+        Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "kafkaTest"      =>
-        Application.addNamespace("kafkaTest")
+        Application.addNamespace("kafkaTest", isWindows = false)
         val src = kafkaSource("kafkaTest", kafkaCdm18Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case _ =>
@@ -655,7 +659,7 @@ object CDMSource {
             case Failure(_) => None
             case Success(s) => {
               Application.instrumentationSource = Ta1Flows.getSourceName(s)
-              Application.addNamespace(b._1)
+              Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
             }
           }
 
@@ -670,7 +674,7 @@ object CDMSource {
               case Failure(_) => None
               case Success(s) => {
                 Application.instrumentationSource = Ta1Flows.getSourceName(s)
-                Application.addNamespace(b._1)
+                Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
               }
             }
 
@@ -763,4 +767,12 @@ object CDMSource {
 object Ta1Flows {
   // Get the name of the instrumentation source
   def getSourceName(a: AnyRef): String = a.toString.split("_").last.toLowerCase
+
+  // Get whether a source is windows of not
+  def isWindows(s: String): Boolean = s match {
+    case "fivedirections" => true
+    case "faros" => true
+    case "marple" => true
+    case _ => false
+  }
 }
