@@ -252,7 +252,7 @@ def runAnalysis(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_
 
 
 
-def runAnalysisParallel_old(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
+def runAnalysisParallel_old2(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
 	rule_spec=unpackRules(rule_spec_file)
 	print('rule_spec',rule_spec)
 	if c_flag==False:
@@ -306,13 +306,13 @@ def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=
 				#executors_list.append(executor.submit(ruleFunction[rule],fca_context,itemsets,rule_thresholds[rule],num_rules,namedentities))
 			#else:
 				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
-	header=[','.join(["Objects","TypeRule","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence","TopViolatedRulesForEachObjectConfidence","TopScoreConfidence","AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift","TopScoreLift"])+'\n']
+	header=[','.join(["Objects","TypeRule","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence","TopViolatedRulesForEachObjectConfidence","TopScoreConfidence","ViolatedRulesForEachObjectLift","AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift","TopScoreLift"])+'\n']
 	csv_body=[analysis.produceScoreCSV(x.result(),fca_context,output_csv) for x in executors_list]
 	csvContent=''.join(header+csv_body)
 	if output_csv==sys.stdout:
 		print(csvContent)	
 	else:
-		with open(output_csv,'a+') as f:
+		with open(output_csv,'w') as f:
 			f.write(csvContent)
 
 

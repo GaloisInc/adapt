@@ -572,10 +572,14 @@ def produceScoreCSVPerRuleType(vios,context,rules,type_rule,namedentities=False)
 			violated_rules=dict((e,rules[e]) for e in rules.keys() if e[0] <= setAtts and not(e[1] <= setAtts))
 			max_violated_rule_conf=max(violated_rules.items(), key=(lambda x: x[1][0]))
 			max_violated_rule_lift=max(violated_rules.items(), key=(lambda x: x[1][1]))
-			violated_rules_per_obj='#'.join([';'.join(list(list(v[0])))+'=>'+';'.join(list(list(v[1]))) for v in violated_rules.keys()])
-			top_violated_rule_conf=';'.join(list(list(max_violated_rule_conf[0][0])))+'=>'+';'.join(list(list(max_violated_rule_conf[0][1])))
-			top_violated_rule_lift=';'.join(list(list(max_violated_rule_lift[0][0])))+'=>'+';'.join(list(list(max_violated_rule_lift[0][1])))
-			csv_output.append(','.join([obj,type_rule,violated_rules_per_obj,str(avg_entconf),top_violated_rule_conf,str(max_violated_rule_conf[1][0]),str(avg_entlift),top_violated_rule_lift,str(max_violated_rule_lift[1][0])]))
+			#print('max_violated_rule_conf',max_violated_rule_conf,'max_violated_rule_lift',max_violated_rule_lift)
+			violated_rules_per_obj_conf=' | '.join([','.join(list(list(v[0][0])))+'=>'+','.join(list(list(v[0][1])))+' Score: ='+str(v[1][0]) for v in violated_rules.items()])
+			violated_rules_per_obj_lift=' | '.join([','.join(list(list(v[0][0])))+'=>'+','.join(list(list(v[0][1])))+' Score: ='+str(v[1][1]) for v in violated_rules.items()])
+			top_violated_rule_conf=','.join(list(list(max_violated_rule_conf[0][0])))+'=>'+','.join(list(list(max_violated_rule_conf[0][1])))+' Score: ='+str(max_violated_rule_conf[1][0])
+			top_violated_rule_lift=','.join(list(list(max_violated_rule_lift[0][0])))+'=>'+','.join(list(list(max_violated_rule_lift[0][1])))+' Score: ='+str(max_violated_rule_lift[1][1])
+			#print('top_violated_rule_conf',top_violated_rule_conf,'top_violated_rule_lift',top_violated_rule_lift)
+			line=[obj,type_rule,violated_rules_per_obj_conf,str(avg_entconf),top_violated_rule_conf,str(max_violated_rule_conf[1][0]),violated_rules_per_obj_lift,str(avg_entlift),top_violated_rule_lift,str(max_violated_rule_lift[1][0])]
+			csv_output.append(','.join(map(lambda x: """\"""" + x + """\"""", line)))
 	return '\n'.join(csv_output)
 			
 def produceScoreCSV(rule_gen_results,context,output_csv):
