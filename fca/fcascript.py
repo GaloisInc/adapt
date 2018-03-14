@@ -22,7 +22,7 @@ parser.add_argument('--queryres','-q',help="JSON file containing results of a qu
 #Either an context input file (in fimi or cxt format) or a query specification file (in json format+contains 'spec' in filename) is required. Otherwise, an error is thrown.
 parser.add_argument('--csv',help='Specifies whether the specification file gives details about the csv files to use to construct a context',action='store_true')
 parser.add_argument('--quiet',help='Suppresses the printing of concepts on the screen',action='store_true')
-parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbo should be used instead of FCbO',type=int,default=1)
+parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbO should be used instead of FCbO',type=int,default=1)
 parser.add_argument('--min_support','-m',help="Minimum support of the concepts to be computed (float required). Default:0",type=float,default=0)
 #argument to specify the minimal support of the concepts to be returned by FCbO. A default of 0 is set, which means that all concepts are genrated by default.
 parser.add_argument('--port',help="Query port. Default:8080",type=int,default=8080)
