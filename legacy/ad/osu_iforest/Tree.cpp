@@ -221,7 +221,7 @@ void Tree::printDepthAndNodeSize(std::ofstream &out){
 		out << "-";
 	out << "(" << depth
 		<< ", " << nodeSize << ", " << newNodeSize
-		<< ", " << exp(volume)
+//		<< ", " << exp(volume)
 		<< ", " << splittingAtt
 		<< ", " << minAttVal
 		<< ", " << splittingPoint

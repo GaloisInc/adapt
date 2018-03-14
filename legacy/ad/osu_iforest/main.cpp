@@ -186,6 +186,31 @@ std::vector<int> getRandomIdx(int nsample, int nrow) {
 	return sampleIndex;
 }
 
+doubleframe *combine(doubleframe *dt1, doubleframe *dt2){
+	doubleframe *dtOn = new doubleframe();
+
+	dtOn->column_major = dt1->column_major;
+	dtOn->ncol = dt1->ncol;
+	dtOn->nrow = dt1->nrow + dt2->nrow;
+
+	dtOn->data = new double *[dtOn->nrow];
+	for (int ii = 0; ii < dtOn->nrow; ++ii) {
+		dtOn->data[ii] = new double[dtOn->ncol];
+	}
+	int i = 0, j = 0;
+	for (int ii = 0; ii < dtOn->nrow; ++ii) {
+		for (int jj = 0; jj < dtOn->ncol; ++jj) {
+			if(ii < dt1->nrow)
+				dtOn->data[ii][jj] = dt1->data[i][jj];
+			else
+				dtOn->data[ii][jj] = dt2->data[j][jj];
+		}
+		if(ii < dt1->nrow) i++;
+		else j++;
+	}
+	return dtOn;
+}
+
 doubleframe *createTrainingSet(doubleframe *dtTrainNorm, doubleframe *dtTrainAnom, int numNorm, int numAnom){
 	doubleframe *dtOn = new doubleframe();
 
@@ -220,7 +245,7 @@ doubleframe *createTrainingSet(doubleframe *dtTrainNorm, doubleframe *dtTrainAno
 
 std::vector<int> getRestIdx(std::vector<int> idx, int nrow){
 	std::vector<int> restidx;
-	bool track[nrow];
+	bool *track = new bool[nrow];
 	for(int i = 0; i < nrow; ++i)
 		track[i] = true;
 	for(int i = 0; i < (int)idx.size(); ++i)
@@ -229,6 +254,7 @@ std::vector<int> getRestIdx(std::vector<int> idx, int nrow){
 		if(track[i] == true)
 			restidx.push_back(i);
 	}
+	delete []track;
 	return restidx;
 }
 
@@ -346,6 +372,7 @@ void printScoreToFile(const vector<double> &scores, ntstringframe* csv,
 }
 
 int main(int argc, char* argv[]) {
+	std::time_t st = std::time(nullptr);
 	srand(0); //randomize for random number generator.
 	// parse argument from command line
 	parsed_args* pargs = parse_args(argc, argv);
@@ -360,6 +387,8 @@ int main(int argc, char* argv[]) {
 	bool rsample = nsample != 0;
 	ntstring test_file_name = pargs->test_file_name;
 	int checkRange = pargs->check_range;
+	int normType = pargs->normalization_type;
+	int skipLimit = pargs->skip_limit;
 	if(checkRange > 0){
 		Tree::checkRange = true;
 	}
@@ -377,7 +406,45 @@ int main(int argc, char* argv[]) {
 	ntstringframe* testcsv = read_csv(test_file_name, header, false, false);
 	ntstringframe* testmetadata = split_frame(ntstring, testcsv, metacol, true);
 	doubleframe* testdt = conv_frame(double, ntstring, testcsv); //read data to the global variable
-//	std::cout << input_name << "\n"  << test_file_name << std::flush;
+
+	// perform normalization
+	if(normType == 1){//convert all features to binary i.e. all non-zero to 1
+		for(int i = 0; i < dt->nrow; i++){
+			for(int j = 0; j < dt->ncol; j++){
+				if(dt->data[i][j] != 0)
+					dt->data[i][j] = 1;
+			}
+		}
+		for(int i = 0; i < testdt->nrow; i++){
+			for(int j = 0; j < testdt->ncol; j++){
+				if(testdt->data[i][j] != 0)
+					testdt->data[i][j] = 1;
+			}
+		}
+	}else if(normType == 2){// normalize each row to sum to 1
+		for(int i = 0; i < dt->nrow; i++){
+			double sum = 0;
+			for(int j = 0; j < dt->ncol; j++){
+				sum += dt->data[i][j];
+			}
+			if(sum > 0){
+				for(int j = 0; j < dt->ncol; j++){
+					dt->data[i][j] /= sum;
+				}
+			}
+		}
+		for(int i = 0; i < testdt->nrow; i++){
+			double sum = 0;
+			for(int j = 0; j < testdt->ncol; j++){
+				sum += testdt->data[i][j];
+			}
+			if(sum > 0){
+				for(int j = 0; j < testdt->ncol; j++){
+					testdt->data[i][j] /= sum;
+				}
+			}
+		}
+	}
 
 //	for(int i = 0; i < 10; i++){
 //		for(int j = 0; j < dt->ncol; j++){
@@ -397,43 +464,84 @@ int main(int argc, char* argv[]) {
 	std::cout << "# Samples   = " << nsample << std::endl;
 	std::cout << "# MaxHeight = " << maxheight << std::endl;
 	std::cout << "Check Range = " << Tree::checkRange << std::endl;
-	std::cout << "Train Data Dimension: " << dt->nrow << "," << dt->ncol
-			<< std::endl;
-	std::cout << " Test Data Dimension: " << testdt->nrow << "," << testdt->ncol
-				<< std::endl;
+	std::cout << "Norm. Type  = " << normType << std::endl;
+	std::cout << "Skip Limit  = " << skipLimit << std::endl;
+	std::cout << "Train Data Dimension: " << dt->nrow << "," << dt->ncol << std::endl;
+	std::cout << " Test Data Dimension: " << testdt->nrow << "," << testdt->ncol << std::endl;
 	std::cout << "Meta cols: " << metadata->ncol << std::endl;
 	std::cout << "input_name: " << input_name << std::endl;
 	std::cout << "test_name:  " << test_file_name << std::endl;
 	std::cout << "output_name:" << output_name << std::endl;
-//	if (useColumns > 0 && dt->ncol > useColumns) {
-//		doubleframe* temp = copyCols(dt, 0, useColumns - 1);
-//		dt = temp;
-//		std::cout << "Using columns: " << dt->ncol << std::endl;
-//	}
 
-//	std::cout << "CheckRange = " << Tree::checkRange << std::endl;
-//	std::cout << "Volume = " << Tree::useVolumeForScore << std::endl;
+	char cmd[1000];
+	std::map<std::string,OnlineIF *> IFModels;
+	std::map<std::string,bool> used;
+	for(int nCmd = 0; nCmd < metadata->nrow; nCmd++){
+		strcpy(cmd, metadata->data[nCmd][0]);
+		if(used.find(cmd) != used.end())
+			continue;
+		used[cmd] = true;
+		std::cout << "\nCMD: " << cmd;
 
-	// standard IsolationForest
-	char temp[1000];
-	IsolationForest iff(ntree, dt, nsample, maxheight, rsample);
-	iff.printNumLeafandDepths();
-	char *ptr = strchr(input_name, '/') + 1;
-	while(strchr(ptr, '/') != NULL){
-		ptr = strchr(ptr, '/') + 1;
+		std::vector<int> cmdIdx;
+		for(int i = 0; i < metadata->nrow; i++){
+			if(strcmp(cmd, metadata->data[i][0]) == 0)
+				cmdIdx.push_back(i);
+		}
+		std::cout << " -> " << cmdIdx.size() << std::endl;
+		if((int)cmdIdx.size() < skipLimit)
+			continue;
+		std::vector<int> restidx = getRestIdx(cmdIdx, dt->nrow);
+
+		doubleframe *dtTrain = copySelectedRows(dt, cmdIdx,  0,  cmdIdx.size()-1);
+		doubleframe *dtRest =  copySelectedRows(dt, restidx, 0, restidx.size()-1);
+
+		int nOther = (int)ceil(30.0 * dtTrain->nrow / 70.0);
+		if(dtTrain->nrow < nsample){
+			nOther = nsample - dtTrain->nrow;
+		}
+		std::vector<int> oidx = getRandomIdx(nOther, dtRest->nrow);
+		doubleframe *dtOther =  copySelectedRows(dtRest, oidx, 0, oidx.size()-1);
+		doubleframe *dtInitTrain = combine(dtTrain, dtOther);
+
+		// create tree structure
+		OnlineIF *iff = new OnlineIF(ntree, dtInitTrain, nsample, maxheight, rsample, dtInitTrain->nrow);
+//		char f1[100], f2[100];
+//		sprintf(f1, "%s/%sInitTree.txt", output_name, cmd);
+//		sprintf(f2, "%s/%sModTree.txt", output_name,  cmd);
+//		ofstream o1(f1), o2(f2);
+//		iff.printStat(o1);
+		// update counts from the training data
+		iff->setWindowSize(dtTrain->nrow);
+		for(int i = 0; i < dtTrain->nrow; i++)
+			iff->update(dtTrain->data[i]);
+//		iff.printStat(o2);
+
+		// delete the data frames
+		deletedoubleframe(dtInitTrain);
+		deletedoubleframe(dtTrain);
+		deletedoubleframe(dtOther);
+		deletedoubleframe(dtRest);
+
+		iff->printNumLeafandDepths();
+		IFModels[cmd] = iff;
 	}
-	sprintf(temp, "%s/TrainScores/chkrng_%d_%s", output_name, checkRange, ptr);
-	std::vector<double> scores = iff.AnomalyScore(dt);
-	printScoreToFile(scores, csv, metadata, dt, temp);
+	std::cout << "\nTotal Command: " << IFModels.size() << std::endl;
+	std::cout << "Time to create IF Models: " << std::time(nullptr) - st << " seconds\n";
 
-	ptr = strchr(test_file_name, '/') + 1;
-	while(strchr(ptr, '/') != NULL){
-		ptr = strchr(ptr, '/') + 1;
+	for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin(); iff != IFModels.end(); iff++){
+		std::vector<double> scores = iff->second->AnomalyScore(dt);
+		char temp[1000];
+		sprintf(temp, "%s/%sTrainScores.csv", output_name, iff->first.c_str());
+		printScoreToFile(scores, csv, metadata, dt, temp);
+
+		scores.clear();
+		scores = iff->second->AnomalyScore(testdt);
+		sprintf(temp, "%s/%sTestScores.csv", output_name, iff->first.c_str());
+		printScoreToFile(scores, testcsv, testmetadata, testdt, temp);
+		// delete the model
+		delete iff->second;
 	}
-	sprintf(temp, "%s/TestScores/chkrng_%d_%s", output_name, checkRange, ptr);
-	scores.clear();
-	scores = iff.AnomalyScore(testdt);
-	printScoreToFile(scores, testcsv, testmetadata, testdt, temp);
-
+	std::cout << "Time Elapsed: " << std::time(nullptr) - st << " seconds\n";
 	return 0;
 }

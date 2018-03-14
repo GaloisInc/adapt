@@ -15,6 +15,8 @@ struct parsed_args {
     int window_size;
     char* test_file_name;
     int check_range;
+    int normalization_type;
+    int skip_limit;
 };
 
 #endif
