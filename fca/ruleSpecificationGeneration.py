@@ -3,13 +3,17 @@ import argparse
 from joblib import Parallel,delayed
 
 def specGeneration(dict_rule_properties,path_json):
+	#print('spec generation')
 	json_dic={'rules':{}}
 	#print(paths)
 	#print(dict_rule_properties)
-	for k,v in dict_rule_properties.items():
-		type_rule=k
-		min_thresh=v[0]
-		num_rules=v[1]
+	for v in dict_rule_properties:
+		type_rule=v[0]
+		print('type_rule',type_rule)
+		min_thresh=v[1]
+		print('min_thresh',min_thresh)
+		num_rules=v[2]
+		print('num_rules',num_rules)
 		if num_rules.isdigit()==False and num_rules!='*':
 			sys.exit('Incorrect number of rule violations. Expecting an integer or *')
 		elif (min_thresh.replace('.','',1).isdigit()==False) or (min_thresh.replace('.','',1).isdigit()==True and (float(min_thresh)>1 or float(min_thresh)<0)):
@@ -26,9 +30,12 @@ if __name__ == '__main__':
 	args=parser.parse_args()
 	#generate dictionary from command line arguments
 	rule_properties=args.rule_properties
-	paths=dict((v[0],v[-1]) for v in rule_properties)
-	dict_rule_properties=(dict((v[0],v[1:-1]) for v in rule_properties))
+	#print(rule_properties)
+	#paths=dict((v[0],v[-1]) for v in rule_properties)
+	#dict_rule_properties=(dict((v[0],v[1:-1]) for v in rule_properties))
 	#print(paths)
 	#print(dict_rule_properties)
 	#map(specGeneration(dict_rule_properties,paths))
-	Parallel(n_jobs=-1)(delayed(specGeneration)({k:dict_rule_properties[k]},paths[k]) for k in paths.keys())
+	#for k in range(len(rule_properties)):
+	#	print(rule_properties[k][0:-1])
+	Parallel(n_jobs=-1)(delayed(specGeneration)([rule_properties[k][0:-1]],rule_properties[k][-1]) for k in range(len(rule_properties)))
