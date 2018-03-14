@@ -248,22 +248,22 @@ fca_pipeline(){
 			  then
 			    if [[ -n "$concept_output" && -n "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
+					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
 				elif [[ -z "$concept_output" && -n "$analysis_output" ]]
 			      then
-			        python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port -rs $spec_rules -oa $analysis_output
+			        python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules -oa $analysis_output
 			    elif [[ -n "$concept_output" && -z "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules 
+					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules 
 				else 
-				    python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port -rs $spec_rules 
+				    python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules 
 				fi
 			  else
 			    if [[ -n "$concept_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port -o $concept_output 
+					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output 
 				  else
-				    python3 ./fca/fcascript.py -w $w -s $input -m $support --port $port 
+				    python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port 
 				fi
 			  fi
 		else
@@ -271,22 +271,22 @@ fca_pipeline(){
 			  then
 			    if [[ -n "$concept_output" && -n "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
+					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
 				elif [[ -z "$concept_output" && -n "$analysis_output" ]]
 			      then
-			        python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port -rs $spec_rules -oa $analysis_output
+			        python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules -oa $analysis_output
 			    elif [[ -n "$concept_output" && -z "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules 
+					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules 
 				else 
-				    python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port -rs $spec_rules 
+				    python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules 
 				fi
 			  else
 			    if [[ -n "$concept_output" ]]
 			      then
-					python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port -o $concept_output 
+					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output 
 				  else
-				    python3 ./fca/fcascript.py -w $w -i $input -m $support --port $port 
+				    python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port 
 				fi
 			  fi
 	fi
