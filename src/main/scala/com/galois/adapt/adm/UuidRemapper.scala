@@ -67,11 +67,9 @@ class UuidRemapper(
   var expiryTimes: Fridge[CdmUUID] = Fridge.empty
 
   // Expire old UUIDs based on the current time
-  private def updateTimeAndExpireOldUuids(time: Long): Unit = {
-
+  private def updateTimeAndExpireOldUuids(time: Long): Unit = if (time > currentTime) {
     // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several "tip
     // of the streams".
-    if (time <= currentTime) return
     currentTime = time
 
     while (expiryTimes.peekFirstToExpire.exists { case (_,t) => t <= currentTime }) {
