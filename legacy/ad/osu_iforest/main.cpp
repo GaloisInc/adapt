@@ -361,6 +361,7 @@ void printScoreToFile(const vector<double> &scores, ntstringframe* csv,
 			(int (*)(const void *, const void *))ObjCmp);
 
 	for (int i = 0; i < (int) scores.size(); i++) {
+		if(scores[idx[i].idx] <= 0) continue;
 		for(int j = 0; j < metadata->ncol; ++j)
 			outscore << metadata->data[idx[i].idx][j] << ",";
 		for(int j = 0; j < dt->ncol; ++j)
@@ -389,6 +390,7 @@ int main(int argc, char* argv[]) {
 	int checkRange = pargs->check_range;
 	int normType = pargs->normalization_type;
 	int skipLimit = pargs->skip_limit;
+	int thParam = pargs->th_param;
 	if(checkRange > 0){
 		Tree::checkRange = true;
 	}
@@ -466,6 +468,7 @@ int main(int argc, char* argv[]) {
 	std::cout << "Check Range = " << Tree::checkRange << std::endl;
 	std::cout << "Norm. Type  = " << normType << std::endl;
 	std::cout << "Skip Limit  = " << skipLimit << std::endl;
+	std::cout << "TH param    = " << thParam << std::endl;
 	std::cout << "Train Data Dimension: " << dt->nrow << "," << dt->ncol << std::endl;
 	std::cout << " Test Data Dimension: " << testdt->nrow << "," << testdt->ncol << std::endl;
 	std::cout << "Meta cols: " << metadata->ncol << std::endl;
@@ -476,6 +479,7 @@ int main(int argc, char* argv[]) {
 	char cmd[1000];
 	std::map<std::string,OnlineIF *> IFModels;
 	std::map<std::string,bool> used;
+	std::map<std::string,double> TH;
 	for(int nCmd = 0; nCmd < metadata->nrow; nCmd++){
 		strcpy(cmd, metadata->data[nCmd][0]);
 		if(used.find(cmd) != used.end())
@@ -515,7 +519,32 @@ int main(int argc, char* argv[]) {
 		iff->setWindowSize(dtTrain->nrow);
 		for(int i = 0; i < dtTrain->nrow; i++)
 			iff->update(dtTrain->data[i]);
+		// change nsample size to use a # of training data to normalize iforest score
+		iff->setnsample(dtTrain->nrow);
 //		iff.printStat(o2);
+
+		// get score for training data
+		std::vector<double> scores = iff->AnomalyScore(dtTrain);
+		std::sort(scores.begin(), scores.end());
+		// compute threshold
+		int rnk = 1;
+		double th = scores[scores.size()-1];
+		for(int i = scores.size()-1; i >= (thParam-1); i--){
+			th = scores[i];
+			bool found = true;
+			for(int j = 1; j < thParam; j++){
+				if(th != scores[i-j]){
+					found = false;
+					break;
+				}
+			}
+			if(found){
+				rnk = scores.size() - i;
+				break;
+			}
+		}
+		std::cout << "TH = " << th << "(" << rnk << ")" << std::endl;
+		TH[cmd] = th;
 
 		// delete the data frames
 		deletedoubleframe(dtInitTrain);
@@ -526,22 +555,37 @@ int main(int argc, char* argv[]) {
 		iff->printNumLeafandDepths();
 		IFModels[cmd] = iff;
 	}
-	std::cout << "\nTotal Command: " << IFModels.size() << std::endl;
+	std::cout << "\nTotal Models built: " << IFModels.size() << std::endl;
 	std::cout << "Time to create IF Models: " << std::time(nullptr) - st << " seconds\n";
 
-	for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin(); iff != IFModels.end(); iff++){
-		std::vector<double> scores = iff->second->AnomalyScore(dt);
-		char temp[1000];
-		sprintf(temp, "%s/%sTrainScores.csv", output_name, iff->first.c_str());
-		printScoreToFile(scores, csv, metadata, dt, temp);
+	std::vector<double> scores;
+	for(int i = 0; i < testdt->nrow; i++){
+		strcpy(cmd, testmetadata->data[i][0]);
+		double curScore = 1;
+		if(IFModels.find(cmd) == IFModels.end()){
+			for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin();
+					iff != IFModels.end(); iff++){
+				double tscore = iff->second->instanceScore(testdt->data[i]);
+				if(tscore > TH[iff->first] && tscore < curScore)
+					curScore = tscore;
+			}
+			if(curScore == 1)
+				curScore = 0;
+		}else{
+			curScore = IFModels[cmd]->instanceScore(testdt->data[i]);
+			if(curScore <= TH[cmd])
+				curScore = 0;
+		}
+		scores.push_back(curScore);
+	}
 
-		scores.clear();
-		scores = iff->second->AnomalyScore(testdt);
-		sprintf(temp, "%s/%sTestScores.csv", output_name, iff->first.c_str());
-		printScoreToFile(scores, testcsv, testmetadata, testdt, temp);
-		// delete the model
+	printScoreToFile(scores, testcsv, testmetadata, testdt, output_name);
+
+	// delete the model
+	for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin(); iff != IFModels.end(); iff++){
 		delete iff->second;
 	}
-	std::cout << "Time Elapsed: " << std::time(nullptr) - st << " seconds\n";
+
+	std::cout << "Total Time Elapsed: " << std::time(nullptr) - st << " seconds\n";
 	return 0;
 }

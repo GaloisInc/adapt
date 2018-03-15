@@ -1,6 +1,6 @@
 #include "argparse_iforest.h"
 
-#define NOPTS 13
+#define NOPTS 14
 #define IOPT 0
 #define OOPT 1
 #define MOPT 2
@@ -14,6 +14,7 @@
 #define ROPT 10
 #define NOPT 11
 #define KOPT 12
+#define ZOPT 13
 
 d(option)* option_spec() {
     d(option)* opts = vecalloc(option,NOPTS);
@@ -147,7 +148,16 @@ d(option)* option_spec() {
         .isflag = false,
         .flagged = false
     };
-
+    opts[ZOPT] = (option){
+        .sarg = 'z',
+        .larg = "threshold",
+        .name = "Z",
+        .desc = "Specify z (threshold is selected as top anomaly score shared by at least z instances)",
+        .default_value = "1",
+        .value = NULL,
+        .isflag = false,
+        .flagged = false
+    };
     return opts;
 }
 
@@ -191,5 +201,6 @@ parsed_args* validate_args(d(option*) opts) {
     pargs->check_range = strtol(opts[ROPT].value,NULL,10);
     pargs->normalization_type = strtol(opts[NOPT].value,NULL,10);
     pargs->skip_limit = strtol(opts[KOPT].value,NULL,10);
+    pargs->th_param = strtol(opts[ZOPT].value,NULL,10);
     return pargs;
 }

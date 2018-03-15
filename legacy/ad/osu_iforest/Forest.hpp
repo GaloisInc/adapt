@@ -41,6 +41,9 @@ public:
 	void writeScoreDatabase(doubleframe *dtTestNorm, doubleframe *dtTestAnom, char fName[]);
 
 	void printNumLeafandDepths();
+	void setnsample(int ns){
+		nsample = ns;
+	}
 
 	virtual double instanceScore(double *inst);
 	std::vector<double> AnomalyScore(doubleframe* df);

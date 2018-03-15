@@ -17,6 +17,7 @@ struct parsed_args {
     int check_range;
     int normalization_type;
     int skip_limit;
+    int th_param;
 };
 
 #endif
