@@ -57,7 +57,7 @@ object EventTypeKNN {
       src.close()
       malSeq
     }
-    val maliciousData = maliciousFiles.flatMap(x=>loadMaliciousData(x))
+    val maliciousData: List[String] = Nil//maliciousFiles.flatMap(x=>loadMaliciousData(x))
 
     def getMalData(): Unit = {
       maliciousData.foreach(x=>println(x))
@@ -306,8 +306,9 @@ object EventTypeKNN {
 
 class KNNTrainActor extends Actor with ActorLogging {
   import EventTypeKNN._
-  val eventTypeKNNTrain = new EventTypeKNNTrain(List("bovia_webshell.csv"))
+  val eventTypeKNNTrain = new EventTypeKNNTrain(List(/*"bovia_webshell.csv"*/))
   //eventTypeKNNTrain.getMalData()
+
 
   def receive = {
 
@@ -323,6 +324,15 @@ class KNNTrainActor extends Actor with ActorLogging {
 
 class KNNActor extends Actor with ActorLogging {
   import EventTypeKNN._
+
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) + "ns")
+    result
+  }
+
   val eventTypeKNNEvaluate = new EventTypeKNNEvaluate("knnmodels.xml")
 
   def receive = {
