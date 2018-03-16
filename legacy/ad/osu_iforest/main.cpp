@@ -611,12 +611,12 @@ int main(int argc, char* argv[]) {
 		char tmp1[1000], tmp2[1000];
 		string s(output_name);
 		if(s.find_last_of('.') != string::npos){
-			sprintf(tmp1, "%s_relevent.csv", s.substr(0, s.find_last_of('.')).c_str());
-			sprintf(tmp2, "%s_irrelevent.csv", s.substr(0, s.find_last_of('.')).c_str());
+			sprintf(tmp1, "%s_relevant.csv", s.substr(0, s.find_last_of('.')).c_str());
+			sprintf(tmp2, "%s_irrelevant.csv", s.substr(0, s.find_last_of('.')).c_str());
 		}
 		else{
-			sprintf(tmp1, "%s_relevent.csv", output_name);
-			sprintf(tmp2, "%s_irrelevent.csv", output_name);
+			sprintf(tmp1, "%s_relevant.csv", output_name);
+			sprintf(tmp2, "%s_irrelevant.csv", output_name);
 		}
 		printScoreToFile(scoresRel, testcsv, testmetadata, testdt, tmp1);
 		printScoreToFile(scoresIrrel, testcsv, testmetadata, testdt, tmp2);
