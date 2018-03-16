@@ -29,10 +29,10 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
-import com.galois.adapt.fingerprinting.{FingerprintActor, NetworkFingerprintActor}
+import com.galois.adapt.fingerprinting.{FingerprintActor}
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 import org.mapdb.serializer.SerializerArrayTuple
-
+import FilterFlow._
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -601,7 +601,7 @@ object Application extends App {
       println("Running Process knn Flow")
       val knnActor = system.actorOf(Props(classOf[KNNTrainActor]), "knn")
       CDMSource.cdm18(ta1)
-        //.filter { case (_,cdm18) => yourSet.contains(cdm18) }
+        .via(filterByUUIDs(e2MaliciousUUIDs(ta1)))
         .via(printCounter("knn", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(AdmSubject, Set[AdmPathNode], Map[EventType,Int])]{ () =>
