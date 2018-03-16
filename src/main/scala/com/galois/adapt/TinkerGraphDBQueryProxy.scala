@@ -52,7 +52,10 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
         // Create the node
         val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, cdmTypeName) +: cdm.asDBKeyValues)
-          .flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
+          .flatMap {
+            case (k, u: UUID) => List(k, u.toString)
+            case (k, v) => List(k, v.asInstanceOf[AnyRef])
+          }
         assert(props.length % 2 == 0, s"Properties should have even size: $props")
         val thisVertex = graph.addVertex(props: _*)
         nodeIds += (cdm.getUuid -> thisVertex)
@@ -105,7 +108,10 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         val admTypeName = adm.getClass.getSimpleName
 
         val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) +: adm.asDBKeyValues)
-          .flatMap { case (k, v) => List(k, v.asInstanceOf[AnyRef]) }
+          .flatMap {
+            case (k, u: UUID) => List(k, u.toString)
+            case (k, v) => List(k, v.asInstanceOf[AnyRef])
+          }
 
         assert(props.length % 2 == 0, s"Properties should have even size: $props")
         val newNode = graph.addVertex(props: _*)
