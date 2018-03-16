@@ -18,6 +18,7 @@ struct parsed_args {
     int normalization_type;
     int skip_limit;
     int th_param;
+    int sep_alarm;
 };
 
 #endif

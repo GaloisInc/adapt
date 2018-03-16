@@ -1,6 +1,6 @@
 #include "argparse_iforest.h"
 
-#define NOPTS 14
+#define NOPTS 15
 #define IOPT 0
 #define OOPT 1
 #define MOPT 2
@@ -15,6 +15,7 @@
 #define NOPT 11
 #define KOPT 12
 #define ZOPT 13
+#define POPT 14
 
 d(option)* option_spec() {
     d(option)* opts = vecalloc(option,NOPTS);
@@ -158,6 +159,16 @@ d(option)* option_spec() {
         .isflag = false,
         .flagged = false
     };
+    opts[POPT] = (option){
+        .sarg = 'p',
+        .larg = "sep_alarms",
+        .name = "P",
+        .desc = "Specify whether to write the alarms in separate file",
+        .default_value = "0",
+        .value = NULL,
+        .isflag = false,
+        .flagged = false
+    };
     return opts;
 }
 
@@ -202,5 +213,6 @@ parsed_args* validate_args(d(option*) opts) {
     pargs->normalization_type = strtol(opts[NOPT].value,NULL,10);
     pargs->skip_limit = strtol(opts[KOPT].value,NULL,10);
     pargs->th_param = strtol(opts[ZOPT].value,NULL,10);
+    pargs->sep_alarm = strtol(opts[POPT].value,NULL,10);
     return pargs;
 }

@@ -391,6 +391,7 @@ int main(int argc, char* argv[]) {
 	int normType = pargs->normalization_type;
 	int skipLimit = pargs->skip_limit;
 	int thParam = pargs->th_param;
+	int sepAlarms = pargs->sep_alarm;
 	if(checkRange > 0){
 		Tree::checkRange = true;
 	}
@@ -469,6 +470,7 @@ int main(int argc, char* argv[]) {
 	std::cout << "Norm. Type  = " << normType << std::endl;
 	std::cout << "Skip Limit  = " << skipLimit << std::endl;
 	std::cout << "TH param    = " << thParam << std::endl;
+	std::cout << "Sep. Alarms = " << sepAlarms << std::endl;
 	std::cout << "Train Data Dimension: " << dt->nrow << "," << dt->ncol << std::endl;
 	std::cout << " Test Data Dimension: " << testdt->nrow << "," << testdt->ncol << std::endl;
 	std::cout << "Meta cols: " << metadata->ncol << std::endl;
@@ -558,28 +560,67 @@ int main(int argc, char* argv[]) {
 	std::cout << "\nTotal Models built: " << IFModels.size() << std::endl;
 	std::cout << "Time to create IF Models: " << std::time(nullptr) - st << " seconds\n";
 
-	std::vector<double> scores;
-	for(int i = 0; i < testdt->nrow; i++){
-		strcpy(cmd, testmetadata->data[i][0]);
-		double curScore = 1;
-		if(IFModels.find(cmd) == IFModels.end()){
-			for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin();
-					iff != IFModels.end(); iff++){
-				double tscore = iff->second->instanceScore(testdt->data[i]);
-				if(tscore > TH[iff->first] && tscore < curScore)
-					curScore = tscore;
+	if(sepAlarms == 0){
+		std::vector<double> scores;
+		for(int i = 0; i < testdt->nrow; i++){
+			strcpy(cmd, testmetadata->data[i][0]);
+			double curScore = 1;
+			if(IFModels.find(cmd) == IFModels.end()){
+				for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin();
+						iff != IFModels.end(); iff++){
+					double tscore = iff->second->instanceScore(testdt->data[i]);
+					if(tscore > TH[iff->first] && tscore < curScore)
+						curScore = tscore;
+				}
+				if(curScore == 1)
+					curScore = 0;
+			}else{
+				curScore = IFModels[cmd]->instanceScore(testdt->data[i]);
+				if(curScore <= TH[cmd])
+					curScore = 0;
 			}
-			if(curScore == 1)
-				curScore = 0;
-		}else{
-			curScore = IFModels[cmd]->instanceScore(testdt->data[i]);
-			if(curScore <= TH[cmd])
-				curScore = 0;
+			scores.push_back(curScore);
 		}
-		scores.push_back(curScore);
-	}
 
-	printScoreToFile(scores, testcsv, testmetadata, testdt, output_name);
+		printScoreToFile(scores, testcsv, testmetadata, testdt, output_name);
+	}else{
+		std::vector<double> scoresRel;
+		std::vector<double> scoresIrrel;
+		for(int i = 0; i < testdt->nrow; i++){
+			strcpy(cmd, testmetadata->data[i][0]);
+			double curScore = 1;
+			if(IFModels.find(cmd) == IFModels.end()){
+				for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin();
+						iff != IFModels.end(); iff++){
+					double tscore = iff->second->instanceScore(testdt->data[i]);
+					if(tscore > TH[iff->first] && tscore < curScore)
+						curScore = tscore;
+				}
+				if(curScore == 1)
+					curScore = 0;
+				scoresRel.push_back(0);
+				scoresIrrel.push_back(curScore);
+			}else{
+				curScore = IFModels[cmd]->instanceScore(testdt->data[i]);
+				if(curScore <= TH[cmd])
+					curScore = 0;
+				scoresRel.push_back(curScore);
+				scoresIrrel.push_back(0);
+			}
+		}
+		char tmp1[1000], tmp2[1000];
+		string s(output_name);
+		if(s.find_last_of('.') != string::npos){
+			sprintf(tmp1, "%s_relevent.csv", s.substr(0, s.find_last_of('.')).c_str());
+			sprintf(tmp2, "%s_irrelevent.csv", s.substr(0, s.find_last_of('.')).c_str());
+		}
+		else{
+			sprintf(tmp1, "%s_relevent.csv", output_name);
+			sprintf(tmp2, "%s_irrelevent.csv", output_name);
+		}
+		printScoreToFile(scoresRel, testcsv, testmetadata, testdt, tmp1);
+		printScoreToFile(scoresIrrel, testcsv, testmetadata, testdt, tmp2);
+	}
 
 	// delete the model
 	for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin(); iff != IFModels.end(); iff++){
