@@ -31,6 +31,7 @@ $(function(){
 		// },
 
 		activeVisible: true, // Make sure, active nodes are visible (expanded)
+		aria: true, // Enable WAI-ARIA support
 	    autoActivate: true, // Automatically activate a node when it is focused using keyboard
 	    autoCollapse: false, // Automatically collapse all siblings, when a node is expanded
 	    autoScroll: false, // Automatically scroll nodes into visible area
@@ -52,7 +53,12 @@ $(function(){
 	    titlesTabbable: false, // Node titles can receive keyboard focus
 	    tooltip: false, // Use title as tooltip (also a callback could be specified)
 	    loadChildren: function(event, data) { 
-	    	$("#tree").fancytree("getRootNode").sortChildren(null, true) 
+	    	var tree = $("#tree")
+	    	tree.fancytree("getRootNode").sortChildren(null, true) 
+	    	tree.fancytree("getTree").visit( function(node){
+				// Expand all tree nodes
+				node.setExpanded(true);
+			})
 	    }
 	})
 })
