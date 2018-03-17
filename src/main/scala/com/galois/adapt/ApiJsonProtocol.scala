@@ -12,8 +12,22 @@ import scala.collection.JavaConverters._
 
 object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val statusReport = jsonFormat5(StatusReport)
+
+  implicit object uiTreeElementFormat extends JsonFormat[UiTreeElement] {
+    def write(obj: UiTreeElement) = obj match {
+      case node: UiTreeNode => uiTreeNodeFormat.write(node)
+      case folder: UiTreeFolder => uiTreeFolderFormat.write(folder)
+    }
+    def read(json: JsValue) =
+      if (json.asJsObject.fields.contains("folder")) uiTreeFolderFormat.read(json)
+      else uiTreeNodeFormat.read(json)
+  }
+  implicit val uiTreeNodeFormat = jsonFormat1(UiTreeNode)
+  implicit val uiTreeFolderFormat = jsonFormat3(UiTreeFolder.apply)
+
   implicit val c = jsonFormat3(UINode)
   implicit val d = jsonFormat3(UIEdge)
+
   implicit object UUIDFormat extends JsonFormat[UUID] {
     def write(uuid: UUID) = JsString(uuid.toString)
     def read(value: JsValue) = value match {

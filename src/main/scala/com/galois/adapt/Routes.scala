@@ -11,6 +11,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
@@ -24,9 +25,10 @@ import scala.language.postfixOps
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.headers._
+//import ApiJsonProtocol._
 
 
-object ProdRoutes {
+object Routes {
 
   val config = ConfigFactory.load()
 
@@ -47,7 +49,7 @@ object ProdRoutes {
     .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
+  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
@@ -57,6 +59,17 @@ object ProdRoutes {
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
             )
+          } ~
+          pathPrefix("ppm") {
+            path(Segment) { treeName =>
+              parameter('query.as(CsvSeq[String]).?) { querySeq =>
+                val query = querySeq.getOrElse(Seq.empty).toList
+                import ApiJsonProtocol._
+                complete(
+                  (ppmActor ? PpmTreeQuery(treeName, query)).mapTo[PpmTreeResult].map(_.toUiTree)
+                )
+              }
+            }
           }
         } ~
         pathPrefix("query") {

@@ -185,6 +185,7 @@ object Application extends App {
   val cdmUuidExpiryTime = config.getLong("adapt.adm.cdmexpirytime")
   val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, cdmUuidExpiryTime, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
 
+  val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
 
   val ta1 = config.getString("adapt.env.ta1")
 
@@ -194,7 +195,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
+    val route = Routes.mainRoute(dbActor, anomalyActor, statusActor, ppmActor)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }
@@ -368,9 +369,8 @@ object Application extends App {
         .runWith(Sink.foreach(println))
 
 
-    case "novelty" | "novel" =>
+    case "novelty" | "novel" | "ppm" =>
       println("Running Novelty Detection Flow")
-      val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
@@ -483,8 +483,9 @@ object Application extends App {
           }
         }
         .runWith(
-          Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
+          Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg)
         )
+      startWebServer()
 
     case _ =>
       println("Unknown runflow argument. Quitting.")
