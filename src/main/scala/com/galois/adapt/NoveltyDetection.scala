@@ -176,7 +176,7 @@ class PpmActor extends Actor with ActorLogging {
     case CompleteMsg =>
       ppmList.foreach{ppm =>
         ppm.saveState()
-        println(ppm.prettyString)
+//        println(ppm.prettyString)
       }
       println("Done")
 
@@ -193,7 +193,6 @@ case class PpmTreeResult(results: Option[List[(Long, Alarm)]]) {
     results.map { l =>
       l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
         val names = b._2.map(_._1)
-        println(names)
         UiTreeElement(names).map(_.merge(a)).getOrElse(a)
       }.toList
     }.getOrElse(List.empty).sortBy(_.title)

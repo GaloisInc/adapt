@@ -8,11 +8,14 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
 import scala.collection.JavaConverters._
+import scala.collection.SortedSet
 
 
 object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
+
   implicit val statusReport = jsonFormat5(StatusReport)
 
+  implicit def sortedSetFormat[T : JsonFormat : Ordering] = viaSeq[SortedSet[T], T](seq => SortedSet.empty)
   implicit object uiTreeElementFormat extends JsonFormat[UiTreeElement] {
     def write(obj: UiTreeElement) = obj match {
       case node: UiTreeNode => uiTreeNodeFormat.write(node)
@@ -25,8 +28,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val uiTreeNodeFormat = jsonFormat1(UiTreeNode)
   implicit val uiTreeFolderFormat = jsonFormat3(UiTreeFolder.apply)
 
-  implicit val c = jsonFormat3(UINode)
-  implicit val d = jsonFormat3(UIEdge)
+  implicit val uiNodeFormat = jsonFormat3(UINode)
+  implicit val uiEdgeFormat = jsonFormat3(UIEdge)
 
   implicit object UUIDFormat extends JsonFormat[UUID] {
     def write(uuid: UUID) = JsString(uuid.toString)

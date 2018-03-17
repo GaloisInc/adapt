@@ -47,13 +47,15 @@ $(function(){
 	    keyPathSeparator: "/", // Used by node.getKeyPath() and tree.loadKeyPath()
 	    minExpandLevel: 1, // 1: root node is not collapsible
 	    quicksearch: false, // Navigate to next node by typing the first letters
-	    rtl: false, // Enable RTL (right-to-left) mode
 	    selectMode: 2, // 1:single, 2:multi, 3:multi-hier
 	    tabindex: "0", // Whole tree behaves as one single control
 	    titlesTabbable: false, // Node titles can receive keyboard focus
-	    tooltip: false // Use title as tooltip (also a callback could be specified)
-	});
-});
+	    tooltip: false, // Use title as tooltip (also a callback could be specified)
+	    loadChildren: function(event, data) { 
+	    	$("#tree").fancytree("getRootNode").sortChildren(null, true) 
+	    }
+	})
+})
     </script>
 </head>
 <body>
