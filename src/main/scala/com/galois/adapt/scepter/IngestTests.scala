@@ -30,7 +30,6 @@ class General_TA1_Tests(
   val colors: Iterator[(String,String)] = Iterator.continually(Map(
     "000" -> Console.BLACK,
     "00F" -> Console.BLUE,
-    "0F0" -> Console.GREEN,
     "0FF" -> Console.CYAN,
     "F0F" -> Console.MAGENTA,
     "FF0" -> Console.YELLOW
@@ -92,26 +91,31 @@ class General_TA1_Tests(
   // Test uniqueness of... UUIDs
   // Some providers have suggested that they may reuse UUIDs. That would be bad.
   it should "not have any duplicate UUIDs" in {
-    val grouped: java.util.List[java.util.Map[java.util.UUID,java.lang.Long]] = if (ta1Source != "clearscope") {
+    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source != "clearscope") {
       graph.traversal().V()
         .values("uuid")
-        .groupCount[java.util.UUID]()
+        .groupCount[String]()
         .toList
     } else {
       graph.traversal().V()
         .not(__.hasLabel("FileObject")) // FileObjects can duplicate UUIDs
         .values("uuid")
-        .groupCount[java.util.UUID]()
+        .groupCount[String]()
         .toList
     }
 
-    val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
+    val offending: List[(String,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
+    var assertMsg: String = "\n"
     for ((uuid,count) <- offending) {
-      assert(
-        count <= 1,
-        s"Multiple nodes ($count nodes in this case) should not share the same UUID $uuid"
-      )
+      val (code, color) = colors.next()
+      toDisplay += s"g.V().has('uuid',${uuid}).limit(20):$code"
+      assertMsg += s"Multiple nodes ($count nodes in this case) should not share the same UUID $color$uuid${Console.RED}\n"
     }
+
+    assert(
+      offending.length <= 0,
+      assertMsg
+    )
   }
 
   if (graph.traversal().V().hasLabel("UnitDependency").count().next() > 0L) {
@@ -158,14 +162,14 @@ class General_TA1_Tests(
         .toList
 
       if (subjectsWithoutParents.isEmpty) {
-        assert(subjectsWithoutParents.length == 0)
+        assert(subjectsWithoutParents.length <= 0)
       } else {
         val (code, color) = colors.next()
         toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
         val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
         assert(
-          subjectsWithoutParents.length == 0,
+          subjectsWithoutParents.length <= 0,
           s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
         )
       }
@@ -181,14 +185,14 @@ class General_TA1_Tests(
       .toList
 
     if (eventsWithoutSubjectUuid.isEmpty) {
-      assert(eventsWithoutSubjectUuid.length == 0)
+      assert(eventsWithoutSubjectUuid.length <= 0)
     } else {
       val (code, color) = colors.next()
       toDisplay += s"g.V(${eventsWithoutSubjectUuid.map(_.id().toString).take(20).mkString(",")}):$code"
       val uuidsOfEventsWithoutSubjectUuid = eventsWithoutSubjectUuid.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
       assert(
-        eventsWithoutSubjectUuid.length == 0,
+        eventsWithoutSubjectUuid.length <= 0,
         s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutSubjectUuid${Console.RED}\n"
       )
     }
@@ -221,14 +225,14 @@ class General_TA1_Tests(
       .toList
 
     if (eventsWithoutThreadId.isEmpty) {
-      assert(eventsWithoutThreadId.length == 0)
+      assert(eventsWithoutThreadId.length <= 0)
     } else {
       val (code, color) = colors.next()
       toDisplay += s"g.V(${eventsWithoutThreadId.map(_.id().toString).take(20).mkString(",")}):$code"
       val uuidsOfEventsWithoutThreadId = eventsWithoutThreadId.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
       assert(
-        eventsWithoutThreadId.length == 0,
+        eventsWithoutThreadId.length <= 0,
         s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
       )
     }
@@ -247,14 +251,14 @@ class General_TA1_Tests(
       .toList
 
     if (malformedAddObjectEvents.isEmpty) {
-      assert(malformedAddObjectEvents.length == 0)
+      assert(malformedAddObjectEvents.length <= 0)
     } else {
       val (code, color) = colors.next()
       toDisplay += s"g.V(${malformedAddObjectEvents.map(_.id().toString).take(20).mkString(",")}):$code"
       val uuidsOfMalformedAddObjectEvents = malformedAddObjectEvents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
       assert(
-        malformedAddObjectEvents.length == 0,
+        malformedAddObjectEvents.length <= 0,
         s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
       )
     }
@@ -278,7 +282,7 @@ class General_TA1_Tests(
       val uuidsOfEventsNotOther = eventsNotOther.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
       assert(
-        eventsNotOther.length != 0,
+        eventsNotOther.length <= 0,
         s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsNotOther${Console.RED}\n"
       )
     }
@@ -296,14 +300,14 @@ class General_TA1_Tests(
       .toList
 
     if (malformedReadWriteEvents.isEmpty) {
-      assert(malformedReadWriteEvents.length == 0)
+      assert(malformedReadWriteEvents.length <= 0)
     } else {
       val (code, color) = colors.next()
       toDisplay += s"g.V(${malformedReadWriteEvents.map(_.id().toString).take(20).mkString(",")}):$code"
       val uuidsOfMalformedReadWriteEvents = malformedReadWriteEvents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
       assert(
-        malformedReadWriteEvents.length == 0,
+        malformedReadWriteEvents.length <= 0,
         s"\nSome 'EVENT_WRITE' or 'EVENT_READ' have unexpected predicate objects':\n$color$uuidsOfMalformedReadWriteEvents${Console.RED}\n"
       )
     }

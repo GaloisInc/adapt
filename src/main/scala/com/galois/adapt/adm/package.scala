@@ -8,6 +8,7 @@ import com.galois.adapt.cdm18._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
@@ -181,11 +182,96 @@ package object adm {
   case object AdmPathNode {
     def normalized(path: String, provider: String): Option[AdmPathNode] = {
 
-      // Garbage
-      if (path == "" || path == "<unknown>")
-        return None
+      var pathFixed: String = path.trim
 
-      var segs: List[String] = path.trim.split("/",-1).toList
+      // Garbage
+      if (pathFixed == "" || pathFixed == "<unknown>" || pathFixed == "unknown")
+      return None
+
+      var isWindows = Application.isWindows(provider)
+
+      val n: Int = pathFixed.length
+
+      // For command lines, we try to rip off arguments.
+      val end: Int = if (!isWindows) {
+
+        // We don't try this for windows because their paths too often have unescaped spaces. Think "start menu" not
+        // quoted and without an escaping '\' before the space.
+
+        // This will produce the first index into the string
+        @tailrec
+        def commandEndIndex(acc: Int): Int = {
+          if (acc >= n)
+            return n
+
+          pathFixed.charAt(acc) match {
+            // Break on whitespace
+            case c if c.isWhitespace => acc
+
+            // Skip over the next character if the current one is a backslash
+            case '\\' => commandEndIndex(acc + 2)
+
+            // Whenever you encounter quotes, keep consuming characters until you find the matching quote on the other
+            // side
+            case c@('\"' | '\'') =>
+              var j = acc + 1
+              while (j < n && pathFixed.charAt(j) != c) j += 1
+              commandEndIndex(j + 1)
+
+            // For everything else just advance one charactet
+            case _ => commandEndIndex(acc + 1)
+          }
+        }
+
+        commandEndIndex(0)
+
+      } else {
+
+        // The only thing that is safe for windows is to take drop what comes after a quoted path.
+        if (pathFixed.charAt(0) == '\"') {
+          var j = 1
+          while (j < n && pathFixed.charAt(j) != '\"') j += 1
+          j + 1
+        } else {
+          n
+        }
+      }
+
+      pathFixed = pathFixed.substring(0,end)
+
+      // Some 5D paths have extra quotes around them: "\"C:\\ProgData\\ .... \\ ...\"". This step removes them
+      if (pathFixed.startsWith("\"") && pathFixed.endsWith("\"") && pathFixed.length > 1) {
+        pathFixed = pathFixed.substring(1, pathFixed.length - 1)
+      }
+
+      if (isWindows) {
+        // Paths are often case insensitive
+        pathFixed = pathFixed.toLowerCase
+
+        // Some windows paths have path variables in them. We make a best effort to expand these
+        pathFixed = pathFixed
+          .replaceAll("%systemroot%","\\\\windows")
+          .replaceAll("%windir%","\\\\windows")
+          .replaceAll("%system32%","\\\\windows\\\\system32")
+          .replaceAll("%programfiles%", "\\\\program files")
+          .replaceAll("%osdrive%", "\\\\")
+          .replaceAll("%systemdrive%", "\\\\")
+
+        // Some windows paths start with "C:\\" and others with "\\". We strip off the "C:\\"
+        if (pathFixed.startsWith("c:\\")) {
+          pathFixed = pathFixed.substring(2, pathFixed.length)
+        }
+
+        // Ditto for "\\Device\\HarddiskVolume1" and "Device\\HarddiskVolume1"
+        if (pathFixed.startsWith("\\device\\harddiskvolume1\\")) {
+          pathFixed = pathFixed.substring(23, pathFixed.length)
+        } else if (pathFixed.startsWith("device\\harddiskvolume1\\")) {
+          pathFixed = pathFixed.substring(22, pathFixed.length)
+        }
+      }
+
+      val (sep,splitSep) = if (isWindows) { ("\\", "\\\\") } else { ("/", "/") }
+      var segs: List[String] = pathFixed.split(splitSep,-1).toList
 
       val absolute: Boolean = if (segs.head == "") {
         segs = segs.tail
@@ -199,7 +285,7 @@ package object adm {
 
       for (seg <- segs) {
         seg match {
-          case "." => { /* this adds no information, ignore it */ }
+          case "." | "" => { /* this adds no information, ignore it */ }
           case ".." => if (segsRev.isEmpty) { backhops += 1 } else { segsRev = segsRev.tail }
           case other => segsRev = other :: segsRev
         }
@@ -211,7 +297,7 @@ package object adm {
       // This is for filtering out paths that have no meaningful information
       if (segsRev.isEmpty && !absolute) return None
 
-      val norm = (if (absolute) { "/" } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString("/")
+      val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
       Some(AdmPathNode(norm, provider))
     }
   }

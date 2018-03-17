@@ -207,7 +207,7 @@ sealed trait UiTreeElement{
   def merge(other: UiTreeElement): Set[UiTreeElement]
   def merge(others: Set[UiTreeElement]): Set[UiTreeElement] =
     others.find(o => o.isInstanceOf[UiTreeFolder] && o.title == this.title) match {
-      case Some(existing: UiTreeFolder) => others - existing ++ existing.merge(this)
+      case Some(existing) => others - existing ++ existing.merge(this)
       case None => if (others contains this) others else others + this
     }
 }
