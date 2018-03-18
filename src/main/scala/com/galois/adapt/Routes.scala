@@ -1,22 +1,23 @@
 package com.galois.adapt
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json._
+import spray.json.DefaultJsonProtocol._
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
-
+import akka.http.scaladsl.model._
+//import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.marshalling.Marshaller._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
 import spray.json.{JsString, JsValue}
-//import akka.http.scaladsl.marshalling._
 import java.util.UUID
 import akka.actor.ActorRef
 import akka.util.Timeout
@@ -61,6 +62,11 @@ object Routes {
             )
           } ~
           pathPrefix("ppm") {
+            path("listTrees") {
+              complete(
+                (ppmActor ? ListPpmTrees).mapTo[PpmTreeNames].map(_.names)
+              )
+            } ~
             path(Segment) { treeName =>
               parameter('query.as(CsvSeq[String]).?) { querySeq =>
                 val query = querySeq.getOrElse(Seq.empty).toList

@@ -152,7 +152,7 @@ class PpmActor extends Actor with ActorLogging {
 
 
   def receive = {
-    case ListPpmTrees => sender() ! ppmList.map(_.name)
+    case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
 
     case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
@@ -187,6 +187,7 @@ class PpmActor extends Actor with ActorLogging {
 }
 
 case object ListPpmTrees
+case class PpmTreeNames(names: List[String])
 case class PpmTreeQuery(treeName: String, queryPath: List[ExtractedValue])
 case class PpmTreeResult(results: Option[List[(Long, Alarm)]]) {
   def toUiTree: List[UiTreeElement] = {
