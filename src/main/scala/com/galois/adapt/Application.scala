@@ -32,6 +32,8 @@ import FlowComponents._
 import com.bbn.tc.schema.avro.cdm18.TCCDMDatum
 import com.bbn.tc.services.kafka.NewCDMConsumer
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+import org.apache.kafka.clients.CommonClientConfigs
+import org.apache.kafka.common.config.SslConfigs
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
@@ -57,454 +59,458 @@ object Application extends App {
 
 
 
-  val kafkaConsumer = new KafkaSslConsumer()
-  kafkaConsumer.start()
-
-  println(kafkaConsumer.getConfig)
-
-  println("started.") // Done. quitting.")
-//  Runtime.getRuntime.halt(0)
 
 
 
 
 
-//  val quitOnError = config.getBoolean("adapt.runtime.quitonerror")
-//  val streamErrorStrategy: Supervision.Decider = {
-//    case e: Throwable =>
-//      e.printStackTrace()
-//      if (quitOnError) Runtime.getRuntime.halt(1)
-//      Supervision.Resume
-//  }
-//  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
-//  implicit val executionContext = system.dispatcher
-////    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
-////    dbFile.delete()
-//  val dbFilePath = "/tmp/map_" + Random.nextLong() + ".db"
-//
-//
-//  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
-//  new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
-//
-//  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-//
-//  // Start up the database
-//  val dbActor: ActorRef = runFlow match {
-//    case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
-//    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
-//  }
-//  val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
-//  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
-//  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
-//
-//  // Get namespaces if there are any
+
+
+
+
+
+
+
+  val quitOnError = config.getBoolean("adapt.runtime.quitonerror")
+  val streamErrorStrategy: Supervision.Decider = {
+    case e: Throwable =>
+      e.printStackTrace()
+      if (quitOnError) Runtime.getRuntime.halt(1)
+      Supervision.Resume
+  }
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
+  implicit val executionContext = system.dispatcher
+//    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
+//    dbFile.delete()
+  val dbFilePath = "/tmp/map_" + Random.nextLong() + ".db"
+
+
+  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+  new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
+
+  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+
+  // Start up the database
+  val dbActor: ActorRef = runFlow match {
+    case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
+    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
+  }
+  val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
+  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
+  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
+
+  // Get namespaces if there are any
   private val namespaces: mutable.Set[String] = mutable.Set.empty
-//
-//  // Global mutable state for figuring out what namespaces we currently have
+
+  // Global mutable state for figuring out what namespaces we currently have
   def addNamespace(ns: String): Unit = Application.namespaces.add(ns)
-//
-//  // Load up all of the namespaces, and then write them back out on shutdown
-//  val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
-//  println(namespacesFile)
-//  if (namespacesFile.exists && namespacesFile.canRead) {
-//    import scala.collection.JavaConverters._
-//
-//    val in = new BufferedReader(new InputStreamReader(new FileInputStream(namespacesFile)))
-//    for (line <- in.lines().iterator().asScala)
-//      addNamespace(line)
-//    in.close()
-//  }
-//  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-//    override def run(): Unit = {
-//      val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(namespacesFile)))
-//      for (namespace <- namespaces.toList)
-//        out.write(namespace+"\n")
-//      out.close()
-//    }
-//  }))
-//
+
+  // Load up all of the namespaces, and then write them back out on shutdown
+  val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
+  println(namespacesFile)
+  if (namespacesFile.exists && namespacesFile.canRead) {
+    import scala.collection.JavaConverters._
+
+    val in = new BufferedReader(new InputStreamReader(new FileInputStream(namespacesFile)))
+    for (line <- in.lines().iterator().asScala)
+      addNamespace(line)
+    in.close()
+  }
+  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+    override def run(): Unit = {
+      val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(namespacesFile)))
+      for (namespace <- namespaces.toList)
+        out.write(namespace+"\n")
+      out.close()
+    }
+  }))
+
   def getNamespaces: List[String] = List("cdm") ++ namespaces.toList.flatMap(ns => List("cdm_" + ns, ns))
-//
-//
-//  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
-//
-//  // Akka-streams makes this _way_ more difficult than I feel it ought to be, but here it is:
-//  //
-//  //   * an actor ref to which you send messages of type `ADM`
-//  //   * a source where those `ADM` magically appear
-//  //
-//  // To make the source complete, we have to send the actor a `akka.actor.Status.Success(())`.
-//  val (synActor: ActorRef, synSource: Source[ADM, _]) = {
-//    // If we support fanout, we would have to buffer everything sent to the sink, forever. Thankfully, the odds of
-//    // someone making another source from this publisher are low since the publisher's scope is limited to this block.
-//    val fanOut: Boolean = false
-//    val sink: Sink[ADM, Publisher[ADM]] = Sink.asPublisher[ADM](fanOut)
-//
-//    val (ref, synPublisher) = Source.actorRef(Int.MaxValue, OverflowStrategy.fail).toMat(sink)(Keep.both).run()
-//    val source: Source[ADM, _] = Source.fromPublisher(synPublisher)
-//
-//    (ref, source)
-//  }
-//
-//  // These are the maps that `UUIDRemapper` will use
-//  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
-//    db.hashMap("cdm2cdm")
-//      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .createOrOpen(),
-//
-//    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
-//    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
-//  )
-//  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
-//    db.hashMap("cdm2adm")
-//      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .createOrOpen(),
-//
-//    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
-//    { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
-//  )
-//
-//  // These are the maps/sets the async and dedup stage of ER will use
+
+
+  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
+
+  // Akka-streams makes this _way_ more difficult than I feel it ought to be, but here it is:
+  //
+  //   * an actor ref to which you send messages of type `ADM`
+  //   * a source where those `ADM` magically appear
+  //
+  // To make the source complete, we have to send the actor a `akka.actor.Status.Success(())`.
+  val (synActor: ActorRef, synSource: Source[ADM, _]) = {
+    // If we support fanout, we would have to buffer everything sent to the sink, forever. Thankfully, the odds of
+    // someone making another source from this publisher are low since the publisher's scope is limited to this block.
+    val fanOut: Boolean = false
+    val sink: Sink[ADM, Publisher[ADM]] = Sink.asPublisher[ADM](fanOut)
+
+    val (ref, synPublisher) = Source.actorRef(Int.MaxValue, OverflowStrategy.fail).toMat(sink)(Keep.both).run()
+    val source: Source[ADM, _] = Source.fromPublisher(synPublisher)
+
+    (ref, source)
+  }
+
+  // These are the maps that `UUIDRemapper` will use
+  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
+    db.hashMap("cdm2cdm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen(),
+
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
+  )
+  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
+    db.hashMap("cdm2adm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen(),
+
+    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+    { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
+  )
+
+  // These are the maps/sets the async and dedup stage of ER will use
   val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
-//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
-//    db.hashSet("seenNodes")
-//      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .createOrOpen()
-//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-//
-//    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
-//  )
-//  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
-//    db.hashSet("seenEdges")
-//      .serializer(new SerializerArrayTuple(
-//        Serializer.STRING,
-//        Serializer.STRING,
-//        Serializer.STRING,
-//        Serializer.UUID,
-//        Serializer.UUID)
-//      )
-//      .createOrOpen()
-//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-//
-//    {
-//      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
-//        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
-//    },
-//    {
-//      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
-//        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
-//    }
-//  )
-//
-//  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
-//
-//
-//  val ta1 = config.getString("adapt.env.ta1")
-//
-//  // Mutable state that gets updated during ingestion
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
+    db.hashSet("seenNodes")
+      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+
+    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
+  )
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
+    db.hashSet("seenEdges")
+      .serializer(new SerializerArrayTuple(
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.UUID,
+        Serializer.UUID)
+      )
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+
+    {
+      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
+        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
+    },
+    {
+      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
+        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
+    }
+  )
+
+  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, (10 minutes).toNanos, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
+
+
+  val ta1 = config.getString("adapt.env.ta1")
+
+  // Mutable state that gets updated during ingestion
   var instrumentationSource: String = "(not detected)"
   var failedStatements: List[(Int, String)] = Nil
+
+  def startWebServer(): Http.ServerBinding = {
+    println(s"Starting the web server at: http://$interface:$port")
+    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
+    val httpServer = Http().bindAndHandle(route, interface, port)
+    Await.result(httpServer, 10 seconds)
+  }
+
+  runFlow match {
+
+    case "ssltest" =>
+      println("Running Kafka SSL test")
+      CDMSource.cdm18(ta1).runWith(Sink.foreach(d => println(d._2)))  // tested. works.
+
+    case "accept" =>
+      println("Running acceptance tests")
+
+      val writeTimeout = Timeout(30.1 seconds)
+
+      val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+        val broadcast = b.add(Broadcast[(String,CDM18)](1))
+
+        broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+     //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
+        SinkShape(broadcast.in)
+      })
+
+      startWebServer()
+      CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
+        .via(printCounter("CDM events", statusActor))
+        .recover{ case e: Throwable => e.printStackTrace(); ??? }
+        .runWith(sink)
+
+
+    case "database" | "db" | "ingest" =>
+      val ingestCdm = config.getBoolean("adapt.ingest.producecdm")
+      val ingestAdm = config.getBoolean("adapt.ingest.produceadm")
+      val completionMsg = if (config.getBoolean("adapt.ingest.quitafteringest")) KillJVM else CompleteMsg
+      val writeTimeout = Timeout(30.1 seconds)
+
+      val (name, sink) = (ingestCdm, ingestAdm) match {
+        case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
+        case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
+        case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
+          import GraphDSL.Implicits._
+          val broadcast = b.add(Broadcast[(String,CDM18)](2))
+
+          broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+
+          SinkShape(broadcast.in)
+        })
+      }
+
+      println(s"Running database flow for $name with UI.")
+      if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
+
+      startWebServer()
+      CDMSource.cdm18(ta1).via(printCounter(name, statusActor)).runWith(sink)
+
+    case "csvmaker" | "csv" =>
+
+      val forCdm = config.getBoolean("adapt.ingest.producecdm")
+      val forAdm = config.getBoolean("adapt.ingest.produceadm")
+
+      val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
+
+      // CSV generation
+      //
+      // TODO: Alec find a way to have this exit on completion
+      (forCdm, forAdm) match {
+        case (true, false) =>
+          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+            import GraphDSL.Implicits._
+
+            val broadcast = graph.add(Broadcast[CDM18](8))
+
+            CDMSource.cdm18(ta1).via(printCounter("File Input", statusActor)).map(_._2) ~> broadcast.in
+
+            broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
+            broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
+            broadcast.out(2).collect{ case c: cdm17.FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
+            broadcast.out(3).collect{ case c: cdm17.RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
+            broadcast.out(4).collect{ case c: cdm17.ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
+            broadcast.out(5).collect{ case c: cdm17.Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
+            broadcast.out(6).collect{ case c: cdm17.Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
+            broadcast.out(7).collect{ case c: cdm17.SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
+
+            ClosedShape
+          }).run()
+
+        case (false, true) =>
+
+          // TODO: Alec find a better way to get the "blocked" CSV information
+          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+
+          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+            import GraphDSL.Implicits._
+
+            val broadcast = graph.add(Broadcast[Any](9))
+
+            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+              .via(printCounter("DB Writer", statusActor, 1000))
+              .via(Flow.fromFunction {
+                case Left(e) => e
+                case Right(ir) => ir
+              }) ~> broadcast.in
+
+            broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src,n), lbl, tgt) =>  src -> Map("src-name" -> n, "label" -> lbl, "target" -> tgt.rendered) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
+            broadcast.out(1).collect{ case c: AdmNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
+            broadcast.out(2).collect{ case c: AdmEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
+            broadcast.out(3).collect{ case c: AdmFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
+            broadcast.out(4).collect{ case c: AdmProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
+            broadcast.out(5).collect{ case c: AdmSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
+            broadcast.out(6).collect{ case c: AdmPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
+            broadcast.out(7).collect{ case c: AdmSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
+            broadcast.out(8).collect{ case c: AdmPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
+
+            ClosedShape
+          }).run()
+
+
+        case (false, false) =>
+          println("Generting CSVs for neither CDM not ADM - so... generating nothing!")
+          Source.empty
+
+        case (true, true) =>
+          println("This isn't implemented yet. TODO: Alec")
+          ???
+
+      }
+
+    case "ui" | "uionly" =>
+      println("Staring only the UI and doing nothing else.")
+      startWebServer()
+
+    case "valuebytes" =>
+      println("NOTE: this will run using CDM")
+
+      CDMSource.cdm17(ta1)
+        .collect{ case (_, e: cdm17.Event) if e.parameters.nonEmpty => e}
+        .flatMapConcat(
+          (e: cdm17.Event) => Source.fromIterator(
+            () => e.parameters.get.flatMap( v =>
+              v.valueBytes.map(b =>
+                List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
+              ).getOrElse(List.empty)).toIterator
+          )
+        )
+        .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
+
+
+    case "uniqueuuids" =>
+      println("Running unique UUID test")
+      CDMSource.cdm17(ta1)
+        .statefulMapConcat[(UUID,Boolean)] { () =>
+        import scala.collection.mutable.{Map => MutableMap}
+        val firstObservation = MutableMap.empty[UUID, CDM17]
+        val ignoreUuid = new UUID(0L,0L);
+        {
+          case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
+          case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
+            val comparison = firstObservation(c.getUuid) == c
+            if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
+            List()
+          case c: CDM17 with DBNodeable[_] =>
+            firstObservation += (c.getUuid -> c)
+            List()
+        }
+      }.runWith(Sink.ignore)
+
+
+    case "find" =>
+      println("Running FIND flow")
+      CDMSource.cdm18(ta1).via(printCounter("Find", statusActor))
+        .collect{ case (_, cdm: Event) if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
+        .runWith(Sink.foreach(println))
+
+
+    case "novelty" | "novel" =>
+      println("Running Novelty Detection Flow")
+      val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
+      CDMSource.cdm18(ta1)
+        .via(printCounter("Novelty", statusActor))
+        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
+
+          val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
+          val everything = collection.mutable.Map.empty[AdmUUID, ADM]
+
+          type AdmUUIDReferencingPathNodes = AdmUUID
+          val pathNodeUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
+          val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
+
+          val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
+            EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
+
+
+//        type NodeType = _
+//        type EdgeOpt = _
+//        val l: List[(NodeType, EdgeOpt)] = List.empty
+//        trait Direction
+//        object Forward extends Direction
+//        object Reverse extends Direction
 //
-//  def startWebServer(): Http.ServerBinding = {
-//    println(s"Starting the web server at: http://$interface:$port")
-//    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
-//    val httpServer = Http().bindAndHandle(route, interface, port)
-//    Await.result(httpServer, 10 seconds)
-//  }
+//        class Aggregated(left: Either[ADM, Aggregated], right: ADM)
 //
-//  runFlow match {
-//
-//    case "accept" =>
-//      println("Running acceptance tests")
-//
-//      val writeTimeout = Timeout(30.1 seconds)
-//
-//      val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
-//        import GraphDSL.Implicits._
-//        val broadcast = b.add(Broadcast[(String,CDM18)](1))
-//
-//        broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
-//     //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
-//        SinkShape(broadcast.in)
-//      })
-//
-//      startWebServer()
-//      CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
-//        .via(printCounter("CDM events", statusActor))
-//        .recover{ case e: Throwable => e.printStackTrace(); ??? }
-//        .runWith(sink)
-//
-//
-//    case "database" | "db" | "ingest" =>
-//      val ingestCdm = config.getBoolean("adapt.ingest.producecdm")
-//      val ingestAdm = config.getBoolean("adapt.ingest.produceadm")
-//      val completionMsg = if (config.getBoolean("adapt.ingest.quitafteringest")) KillJVM else CompleteMsg
-//      val writeTimeout = Timeout(30.1 seconds)
-//
-//      val (name, sink) = (ingestCdm, ingestAdm) match {
-//        case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
-//        case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-//        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
-//        case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
-//          import GraphDSL.Implicits._
-//          val broadcast = b.add(Broadcast[(String,CDM18)](2))
-//
-//          broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-//          broadcast ~> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
-//
-//          SinkShape(broadcast.in)
-//        })
-//      }
-//
-//      println(s"Running database flow for $name with UI.")
-//      if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
-//
-//      startWebServer()
-//      CDMSource.cdm18(ta1).via(printCounter(name, statusActor)).runWith(sink)
-//
-//    case "csvmaker" | "csv" =>
-//
-//      val forCdm = config.getBoolean("adapt.ingest.producecdm")
-//      val forAdm = config.getBoolean("adapt.ingest.produceadm")
-//
-//      val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
-//
-//      // CSV generation
-//      //
-//      // TODO: Alec find a way to have this exit on completion
-//      (forCdm, forAdm) match {
-//        case (true, false) =>
-//          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-//            import GraphDSL.Implicits._
-//
-//            val broadcast = graph.add(Broadcast[CDM18](8))
-//
-//            CDMSource.cdm18(ta1).via(printCounter("File Input", statusActor)).map(_._2) ~> broadcast.in
-//
-//            broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
-//            broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
-//            broadcast.out(2).collect{ case c: cdm17.FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
-//            broadcast.out(3).collect{ case c: cdm17.RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
-//            broadcast.out(4).collect{ case c: cdm17.ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
-//            broadcast.out(5).collect{ case c: cdm17.Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
-//            broadcast.out(6).collect{ case c: cdm17.Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
-//            broadcast.out(7).collect{ case c: cdm17.SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
-//
-//            ClosedShape
-//          }).run()
-//
-//        case (false, true) =>
-//
-//          // TODO: Alec find a better way to get the "blocked" CSV information
-//          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
-//
-//          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-//            import GraphDSL.Implicits._
-//
-//            val broadcast = graph.add(Broadcast[Any](9))
-//
-//            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
-//              .via(printCounter("DB Writer", statusActor, 1000))
-//              .via(Flow.fromFunction {
-//                case Left(e) => e
-//                case Right(ir) => ir
-//              }) ~> broadcast.in
-//
-//            broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src,n), lbl, tgt) =>  src -> Map("src-name" -> n, "label" -> lbl, "target" -> tgt.rendered) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
-//            broadcast.out(1).collect{ case c: AdmNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
-//            broadcast.out(2).collect{ case c: AdmEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
-//            broadcast.out(3).collect{ case c: AdmFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
-//            broadcast.out(4).collect{ case c: AdmProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
-//            broadcast.out(5).collect{ case c: AdmSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
-//            broadcast.out(6).collect{ case c: AdmPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
-//            broadcast.out(7).collect{ case c: AdmSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
-//            broadcast.out(8).collect{ case c: AdmPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
-//
-//            ClosedShape
-//          }).run()
-//
-//
-//        case (false, false) =>
-//          println("Generting CSVs for neither CDM not ADM - so... generating nothing!")
-//          Source.empty
-//
-//        case (true, true) =>
-//          println("This isn't implemented yet. TODO: Alec")
-//          ???
-//
-//      }
-//
-//    case "ui" | "uionly" =>
-//      println("Staring only the UI and doing nothing else.")
-//      startWebServer()
-//
-//    case "valuebytes" =>
-//      println("NOTE: this will run using CDM")
-//
-//      CDMSource.cdm17(ta1)
-//        .collect{ case (_, e: cdm17.Event) if e.parameters.nonEmpty => e}
-//        .flatMapConcat(
-//          (e: cdm17.Event) => Source.fromIterator(
-//            () => e.parameters.get.flatMap( v =>
-//              v.valueBytes.map(b =>
-//                List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
-//              ).getOrElse(List.empty)).toIterator
-//          )
-//        )
-//        .toMat(FileIO.toPath(Paths.get("ValueBytes.txt")))(Keep.right).run()
-//
-//
-//    case "uniqueuuids" =>
-//      println("Running unique UUID test")
-//      CDMSource.cdm17(ta1)
-//        .statefulMapConcat[(UUID,Boolean)] { () =>
-//        import scala.collection.mutable.{Map => MutableMap}
-//        val firstObservation = MutableMap.empty[UUID, CDM17]
-//        val ignoreUuid = new UUID(0L,0L);
-//        {
-//          case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
-//          case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
-//            val comparison = firstObservation(c.getUuid) == c
-//            if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
-//            List()
-//          case c: CDM17 with DBNodeable[_] =>
-//            firstObservation += (c.getUuid -> c)
-//            List()
+//        val leftThings = Map.empty[AdmUUID, Aggregated]
+//        val rightThings = Map.empty[AdmUUID, ADM]
+//        def foo(edge: EdgeAdm2Adm, labelFilter: String, dir: Direction = Forward) = if (edge.label == labelFilter) {
+//          val (left, right) = if (dir == Forward) edge.src -> edge.tgt else edge.tgt -> edge.src
+//          val t = (rightThings(left), rightThings(right))
 //        }
-//      }.runWith(Sink.ignore)
-//
-//
-//    case "find" =>
-//      println("Running FIND flow")
-//      CDMSource.cdm18(ta1).via(printCounter("Find", statusActor))
-//        .collect{ case (_, cdm: Event) if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
-//        .runWith(Sink.foreach(println))
-//
-//
-//    case "novelty" | "novel" =>
-//      println("Running Novelty Detection Flow")
-//      val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
-//      CDMSource.cdm18(ta1)
-//        .via(printCounter("Novelty", statusActor))
-//        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
-//        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
-//
-//          val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
-//          val everything = collection.mutable.Map.empty[AdmUUID, ADM]
-//
-//          type AdmUUIDReferencingPathNodes = AdmUUID
-//          val pathNodeUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
-//          val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
-//
-//          val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
-//            EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
-//
-//
-////        type NodeType = _
-////        type EdgeOpt = _
-////        val l: List[(NodeType, EdgeOpt)] = List.empty
-////        trait Direction
-////        object Forward extends Direction
-////        object Reverse extends Direction
-////
-////        class Aggregated(left: Either[ADM, Aggregated], right: ADM)
-////
-////        val leftThings = Map.empty[AdmUUID, Aggregated]
-////        val rightThings = Map.empty[AdmUUID, ADM]
-////        def foo(edge: EdgeAdm2Adm, labelFilter: String, dir: Direction = Forward) = if (edge.label == labelFilter) {
-////          val (left, right) = if (dir == Forward) edge.src -> edge.tgt else edge.tgt -> edge.src
-////          val t = (rightThings(left), rightThings(right))
-////        }
-//
-//
-//          {
-//            case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
-//              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
-//                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-//                val t = (e._1, Some(sub), e._3)
-//                if (t._3.isDefined) {
-//                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-//                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-//                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-//                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-//                } else {
-//                  events += (src -> t)
-//                  Nil
-//                }
-//              }
-//            case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
-//              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-//                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-//                val t = (e._1, e._2, Some(obj))
-//                if (t._2.isDefined) {
-//                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-//                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-//                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-//                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-//                } else {
-//                  events += (src -> t)
-//                  Nil
-//                }
-//              }
-//            case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
-//              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-//                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-//              val t = (e._1, e._2, Some(obj))
-//                if (t._2.isDefined) {
-//                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-//                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-//                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-//                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-//                } else {
-//                  events += (src -> t)
-//                  Nil
-//                }
-//              }
-//            case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
-//              // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
-//              val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
-//              pathNodeUses += (subObj -> newSet)
-//              Nil
-//
-//  //          case Left(edge) =>
-//  //              edge.label match { // throw away the referenced UUIDs!
-//  //                case "subject" | "flowObject" => everything -= edge.src
-//  //                case "eventExec" | "cmdLine" | "(cmdLine)" | "exec" | "localPrincipal" | "principal" | "path" | "(path)" => everything -= edge.tgt
-//  //                case "tagIds" | "prevTagId" => everything -= edge.src; everything -= edge.tgt
-//  //                case _ => ()  // "parentSubject"
-//  //              }
-//  //            List()
-//            case Right(adm: AdmEvent) =>
-//              events += (adm.uuid -> (adm, None, None))
-//              Nil
-//            case Right(adm: AdmSubject) =>
-//              everything += (adm.uuid -> adm)
-//              Nil
-//            case Right(adm: AdmFileObject) =>
-//              everything += (adm.uuid -> adm)
-//              Nil
-//            case Right(adm: AdmNetFlowObject) =>
-//              everything += (adm.uuid -> adm)
-//              Nil
-//            case Right(adm: AdmSrcSinkObject) =>
-//              everything += (adm.uuid -> adm)
-//              Nil
-//            case Right(adm: AdmPathNode) =>
-//              pathNodes += (adm.uuid -> adm)
-//              Nil
-//            case _ => Nil
-//          }
-//        }
-//        .runWith(
-//          Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
-//        )
-//
-//    case _ =>
-//      println("Unknown runflow argument. Quitting.")
-//      Runtime.getRuntime.halt(1)
-//  }
+
+
+          {
+            case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+                val t = (e._1, Some(sub), e._3)
+                if (t._3.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
+                } else {
+                  events += (src -> t)
+                  Nil
+                }
+              }
+            case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+                val t = (e._1, e._2, Some(obj))
+                if (t._2.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
+                } else {
+                  events += (src -> t)
+                  Nil
+                }
+              }
+            case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
+              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
+                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
+              val t = (e._1, e._2, Some(obj))
+                if (t._2.isDefined) {
+                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
+                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
+                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
+                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
+                } else {
+                  events += (src -> t)
+                  Nil
+                }
+              }
+            case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
+              // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
+              val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
+              pathNodeUses += (subObj -> newSet)
+              Nil
+
+  //          case Left(edge) =>
+  //              edge.label match { // throw away the referenced UUIDs!
+  //                case "subject" | "flowObject" => everything -= edge.src
+  //                case "eventExec" | "cmdLine" | "(cmdLine)" | "exec" | "localPrincipal" | "principal" | "path" | "(path)" => everything -= edge.tgt
+  //                case "tagIds" | "prevTagId" => everything -= edge.src; everything -= edge.tgt
+  //                case _ => ()  // "parentSubject"
+  //              }
+  //            List()
+            case Right(adm: AdmEvent) =>
+              events += (adm.uuid -> (adm, None, None))
+              Nil
+            case Right(adm: AdmSubject) =>
+              everything += (adm.uuid -> adm)
+              Nil
+            case Right(adm: AdmFileObject) =>
+              everything += (adm.uuid -> adm)
+              Nil
+            case Right(adm: AdmNetFlowObject) =>
+              everything += (adm.uuid -> adm)
+              Nil
+            case Right(adm: AdmSrcSinkObject) =>
+              everything += (adm.uuid -> adm)
+              Nil
+            case Right(adm: AdmPathNode) =>
+              pathNodes += (adm.uuid -> adm)
+              Nil
+            case _ => Nil
+          }
+        }
+        .runWith(
+          Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
+        )
+
+    case _ =>
+      println("Unknown runflow argument. Quitting.")
+      Runtime.getRuntime.halt(1)
+  }
 }
 
 
@@ -735,6 +741,23 @@ object CDMSource {
       Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))
     ) .map(parser)
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
+
+//  def kafkaSslSource[C](ta1Topic: String): Source[C, _] = {
+
+    // configure the following three settings for SSL Encryption
+//    properties.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, securityProtocol)
+//    properties.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, truststoreLocation)
+//    properties.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, truststorePassword)
+//
+//    // configure the following three settings for SSL Authentication
+//    properties.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, keystoreLocation)
+//    properties.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, keystorePassword)
+//    properties.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, sslKey)
+
+//    val kafkaConsumer = new KafkaSslConsumer()
+//    kafkaConsumer.start()
+//    Source.fromPublisher()
+//  }
 
   // Parse a `CDM17` from a kafka record
   def kafkaCdm17Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM17] = Try {
