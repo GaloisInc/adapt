@@ -190,14 +190,12 @@ case object ListPpmTrees
 case class PpmTreeNames(names: List[String])
 case class PpmTreeQuery(treeName: String, queryPath: List[ExtractedValue])
 case class PpmTreeResult(results: Option[List[(Long, Alarm)]]) {
-  def toUiTree: List[UiTreeElement] = {
-    results.map { l =>
-      l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
-        val names = b._2.map(_._1)
-        UiTreeElement(names).map(_.merge(a)).getOrElse(a)
-      }.toList
-    }.getOrElse(List.empty).sortBy(_.title)
-  }
+  def toUiTree: List[UiTreeElement] = results.map { l =>
+    l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
+      val names = b._2.map(_._1)
+      UiTreeElement(names).map(_.merge(a)).getOrElse(a)
+    }.toList
+  }.getOrElse(List.empty).sortBy(_.title)
 }
 
 
@@ -218,12 +216,14 @@ case object UiTreeElement {
     case (extracted, Some(f: UiTreeFolder)) => Some(UiTreeFolder(extracted, children = Set(f)))
   }
 }
+
 case class UiTreeNode(title: String) extends UiTreeElement {
   def merge(other: UiTreeElement) = other match {
     case o: UiTreeFolder => o merge this
     case o: UiTreeElement => if (this.title == o.title) Set(this) else Set(this, o)
   }
 }
+
 case class UiTreeFolder(title: String, folder: Boolean = true, children: Set[UiTreeElement] = Set.empty) extends UiTreeElement {
   def merge(other: UiTreeElement): Set[UiTreeElement] = other match {
     case node: UiTreeNode =>
