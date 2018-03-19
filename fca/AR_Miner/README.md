@@ -8,6 +8,24 @@ For example, to install a package from R, we do:
 install.packages("RJSONIO",repos = "http://cran.us.r-project.org")
 install.packages("jsonlite",repos = "http://cran.us.r-project.org")
 install.packages("curl",repos = "http://cran.us.r-project.org")
+install.packages("grid",repos = "http://cran.us.r-project.org")
+install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+install.packages("gridBase",repos = "http://cran.us.r-project.org")
+install.packages("gridExtra",repos = "http://cran.us.r-project.org")
+install.packages("grid",repos = "http://cran.us.r-project.org")
+install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+install.packages("lattice",repos = "http://cran.us.r-project.org")
+install.packages("latticeExtra",repos = "http://cran.us.r-project.org")
+install.packages("dplyr",repos = "http://cran.us.r-project.org")
+install.packages("tidyr",repos = "http://cran.us.r-project.org")
+install.packages("glue",repos = "http://cran.us.r-project.org")
+install.packages("reshape2",repos = "http://cran.us.r-project.org")
+install.packages("stringi",repos = "http://cran.us.r-project.org")
+install.packages("stringr",repos = "http://cran.us.r-project.org")
+install.packages("data.table",repos = "http://cran.us.r-project.org")
+install.packages("RNeo4j",repos = "http://cran.us.r-project.org")
+install.packages("RCurl",repos = "http://cran.us.r-project.org")
+install.packages("plyr",repos = "http://cran.us.r-project.org")
 ...
  
 It is preferable to install RStudio to manage the project and execute the scripts. Although, the use of shell scripts is also possible as detailed below.
@@ -55,18 +73,64 @@ Example:
 
 *$> ./check_csv_contexts.sh*
 
-### Data Processing:
+### Data Processing and scoring:
 
-*$> ./Context_scoring_From_CSV.sh*: is actually the second main shell that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* string, a produced *csv context file*, an *rcf file*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
-
-![Exxample of scoring output](./img/rank.jpeg)
-
-![Exxample of ranking the scores](./img/rank2.jpeg)
+\$> ./Context_scoring_From__CSV.sh: is actually the second main shell that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* string, a produced *csv context file*, an *rcf file*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
 
  
- ### Data Visualisation:
+Default example to run in \$> *./Context_scoring_From__CSV.sh* :
+
+*#!/bin/bash *
+
+*context_name='ProcessEvent'*
+
+*csv_file='./contexts/Context_ProcessEvent.csv'*
+
+*rcf_file='./contexts/Context_ProcessEvent.rcf'*
+
+*output_scoring_file='./contexts/Scoring_Of_Context_ProcessEvent.csv'*
+
+*MinSup='90'*
+
+*MinConf='90'*
+
+*Rscript contexts_scoring_shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf*
  
- *Rule_coloring.r* (unedr progress): generates an HTML file for coloring the rules, and a word cloud of the objects that violate rules, regarding their score.
+ 
+![Example of scoring output](./img/rank.jpeg)
+
+![Example of the scores ranking](./img/rank2.jpeg)
+
+
+### Data scoring with feedback analysis:
+ 
+ \$>  *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*: The aim with this analysis is to include the rules, which were generated with the benign DB as feedback during the scoring and ranking. It uses the previously generated scores file *Scoring_Of_Context_ProcessEvent.csv* that becomes the input of the feedback analysis as *Input_Scoring_Of_Context_ProcessEvent.csv*. It also needs a benign association rules that are generated using the same context in the benign DB (*benign_rules.csv*). Finally, the scipt also needs a ground truth file for the adequate database (*gt_file*).
+ 
+Default example to run in \$> *./Scoring_Rules_Using_Benign_Feedback_Shell.sh* :
+
+*#!/bin/bash*
+*context_name='ProcessEvent'*
+*csv_file='./contexts/Context_ProcessEvent.csv'*
+*rcf_file='./contexts/Context_ProcessEvent.rcf'*
+*output_scoring_file='./contexts/Output_Scoring_Feedback_Of_Context_ProcessEvent.csv'*
+*MinSup='90'*
+*MinConf='90'*
+*Benign_file='./contexts/benign_rules.csv'*
+*original_scoring_file='./contexts/Input_Scoring_Of_Context_ProcessEvent.csv'*
+*gt_file='./contexts/gt_file.json'*
+*Rscript Scoring_Rules_Using_Benign_Feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file $gt_file*
  
 
-![Exxample of object scores cloud](./img/cloud.jpeg)
+### Violator objects analysis:
+
+\$>  *./Trajectory_Violator_Objects_Shell.sh*: This script analyses the variation of the positions of the violator objects in the ranked violator lists before and after the feedbacks have been taken into account. It takes as inputs: The scoring file produced with *./Context_scoring_From__CSV.sh*, the second scoring file produced with   *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*, and the adequate ground truth file.
+
+
+![Example of the violator objects analysis](./img/feedback.jpeg)
+
+### Data Visualisation:
+ 
+*Rule_coloring.r* (under progress): generates an HTML file for coloring the rules, and a word cloud of the objects that violate rules, regarding their score.
+ 
+
+![Example of object scores cloud](./img/cloud.jpeg)

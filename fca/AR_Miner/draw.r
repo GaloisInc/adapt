@@ -6,7 +6,7 @@ library(grid)
 library(ggplot2)
 library(lattice)
 
-gt_file= fromJSON("/home/terminator2/Documents/Adapt_Project/Database/Engagement_2/ground_truth/groundtruthadmuuids/fivedirections_bovia_simple.json",simplifyVector = TRUE) 
+gt_file= fromJSON("/home/terminator2/Documents/Adapt_Project/Database/Engagement_2/ground_truth/groundtruthadmuuids/cadets_pandex_webshell.json",simplifyVector = TRUE) 
 #cadets_pandex_drakon1.json",simplifyVector = TRUE) 
 #                   #cadets_pandex_webshell.json",simplifyVector = TRUE) 
 #gt_file=read.csv('/home/terminator2/Documents/Adapt_Project/Database/Engagement_2/ground_truth/CADETS/labeled_ground_truth/drakon1.csv') cadets_pandex_drakon1.json
@@ -21,19 +21,20 @@ length(gt_Objects)
 
  contextname=currentview
 
-for (i in 1:11){
+for (i in 5:11){
   sup=Sup[i]
-  for(j in 1:11){
+  for(j in 5:11){
     #if((i==2)&(j==1)) next
     conf=Conf[j]
     cat("\n ===============\n")
     cat("\n Sup: ",sup)
     cat("\n Conf: ",conf)
- input_scoring_file =paste0("./contexts/",database,"/data/",contextname,"/Objects_With_Scores_",contextname,"_Conf_",conf,"_Sup_",sup,".csv",sep="")
+ input_scoring_file =paste0("./contexts/",database,"/data/",contextname,"/Objects_With_Scores_FeedBack_",
+                            weight,"_",contextname,"_Conf_",conf,"_Sup_",sup,".csv",sep="")
  if (file.size(input_scoring_file) == 0) {
   next
  }
-Objects_With_Scores   <- read.csv(file=input_scoring_file) 
+Objects_With_Scores   <- read.csv(input_scoring_file) 
 Objects_With_Scores =arrange(Objects_With_Scores ,desc(AVGScoresOfObjectsConfidence))#AVGScoresOfObjectsLift))#AVGScoresOfObjectsConfidence))
 ObjectViolator=as.list(Objects_With_Scores$Objects)
 ObjectViolator=as.character(unlist(ObjectViolator))
@@ -64,7 +65,7 @@ if(length(TP)>0){
  #par(mfrow=c(2,1))
  #curve=plot(Allscores, type='l',xlabel="Position of the violator objects" , ylabel="score" )
  jpeg(filename=paste0("./contexts/",database,"/data/",contextname,
-                      "/_SpectralImage_WithConfidenceRanking_ffivedirections_bovia_simple_",contextname,"_Conf_",conf,"_Sup_",sup,".jpeg",sep=""))
+                      "/_SpectralImage_WithConfidenceRanking_cadets_pandex_webshell_weight_",weight,"_",contextname,"_Conf_",conf,"_Sup_",sup,".jpeg",sep=""))
  
 codbare=ggplot() +
     #for(k in 1:length(indx)){
@@ -77,7 +78,7 @@ codbare=ggplot() +
     #annotate("text", x = indx50percent, y = 5, angle = 90, label =topscore,   parse = TRUE)
 #  ggsave(filename="geomline.png", width=5.5, height=2*3, dpi=300)
     geom_vline(xintercept=length(ObjectViolator), color="white") +
-  # annotate("text", x = indx50percent, y = 5, angle = 90, label =score50percent,   parse = TRUE)+
+  #annotate("text", x = indx50percent, y = 5, angle = 90, label =score50percent,   parse = TRUE)+
   xlab("Position of the violator object") + ylab(" . ")
   
   

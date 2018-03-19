@@ -15,6 +15,9 @@ require(ggplot2)
 require(reshape2)
 library(stringi)
 library(data.table)
+library(stringi)
+library(stringr)
+
 library(RNeo4j)
 library('RCurl')
 library('RJSONIO')
@@ -45,7 +48,7 @@ dbkeyspace=c("Cadet_Pandex",
              "5dir-benign",
              "5dir-bovia",
              "5dir-pandex",
-             "cleqrcope-benign",
+             "clearscope-benign",
              "clearscope-bovia",
              "clearscop-pandex",
             "trace-bovia" ,
@@ -69,9 +72,9 @@ COMPUTE_RARE=FALSE
 
 
 
-database=as.character(dbkeyspace[5])
+database=as.character(dbkeyspace[11])
 cat('\n ############### Association Rule Mining ######################## \n')
-for (k in 3:3){#length(Listviews)){
+for (k in 1:length(Listviews)){
   
   cat("\n processing view 1: ", as.character(Listviews[k]))  
                            
@@ -82,7 +85,13 @@ for (k in 3:3){#length(Listviews)){
   rcf_context_file=paste0(myWorkingDirectory,"/contexts/",database,"/Context_",currentview,".rcf",sep="")
   csv_file=paste0(myWorkingDirectory,"/contexts/",database,"/Context_",currentview,".csv",sep="")
   
+  mainDir=paste0(myWorkingDirectory,"/contexts/",database  ,sep="")
+  subDir="data"
+  ifelse(!dir.exists(file.path(mainDir, subDir)), dir.create(file.path(mainDir, subDir)), FALSE)
+  mainDir=paste0(mainDir,"/",subDir  ,sep="")
   
+  subDir=  currentview 
+  ifelse(!dir.exists(file.path(mainDir, subDir)), dir.create(file.path(mainDir, subDir)), FALSE)
   #############EXTRACT DATA FROM SERVER AND save context as RCF AND csv files
   if(Load_Data_From_Neo4j){
     cat('\n Init System NEO4J=>RCF... \n ')
@@ -186,10 +195,10 @@ for (k in 3:3){#length(Listviews)){
   Sup=c(10,20,30,40,50,60,70,80,90,95,97,100)
   DisplayFull=FALSE ## IF YES SAVES DATA TO DISK (TXT FILES)
   ContextFileRCF=rcf_context_file
-  for(i in 1:3){
+  for(i in 5:11){
     MinSup=Sup[i]
     
-    for(j in 1:3){
+    for(j in 5:11){
       #if (i==j) next
       MinConf=Conf[j]
       cat('\n ##################sup \n',MinSup)
