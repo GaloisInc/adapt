@@ -88,7 +88,7 @@ class Context():
 		self.port=port
 		#print('json type (Context)',type_json)
 		self.typefile=detectTypeFile(filepath,type_json) #type of input file (cxt,fimi or json specification file)
-		print('self.typefile',self.typefile)
+		#print('self.typefile',self.typefile)
 		print('Parsing input')
 		if type_json!='query':
 			print('Parsing json', type_json)
@@ -178,8 +178,8 @@ class Context():
 		r=re.compile('(?P<attributes>.*)\s(?P<vals>(.*\s*)*)',re.M)
 		m=re.match(r,csv)
 		self.attributes,content=m.group('attributes').split(',')[1:],m.group('vals').split('\n')
-		print('attributes',len(self.attributes))
-		print('content',type(content),len(content),content[0])
+		#print('attributes',len(self.attributes))
+		#print('content',type(content),len(content),content[0])
 		self.objects,self.context=zip(*[(s.split(',',1)[0],s.split(',',1)[1].replace(',','')) for s in content])
 		#r2=re.compile('(?P<object>(\W|\w)*),(?P<context>([01],*)*)',re.M)
 		#self.objects=[]
@@ -218,7 +218,7 @@ class Context():
 		
 		
 	def read_file(self,filepath,type_json='context',port=8080): #generates context object depending on input (cxt file, fimi file or json query specification file)
-		print('Detecting input type')
+		#print('Detecting input type')
 		filetype=detectTypeFile(filepath,type_json)
 		port_val=port
 		print('filetype',filetype)

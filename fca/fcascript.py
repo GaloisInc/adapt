@@ -21,7 +21,8 @@ parser.add_argument('--queryres','-q',help="JSON file containing results of a qu
 # and a query specification file are provided, a query is sent to the database to generate a context that is saved to the input file. The input file is then used as input to FCbO.
 #Either an context input file (in fimi or cxt format) or a query specification file (in json format+contains 'spec' in filename) is required. Otherwise, an error is thrown.
 parser.add_argument('--csv',help='Specifies whether the specification file gives details about the csv files to use to construct a context',action='store_true')
-parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbo should be used instead of FCbO',type=int,default=1)
+parser.add_argument('--quiet',help='Suppresses the printing of concepts on the screen',action='store_true')
+parser.add_argument('--parallel','-pl',help='specifies number of processors to use in PCbO and that PCbO should be used instead of FCbO',type=int,default=1)
 parser.add_argument('--min_support','-m',help="Minimum support of the concepts to be computed (float required). Default:0",type=float,default=0)
 #argument to specify the minimal support of the concepts to be returned by FCbO. A default of 0 is set, which means that all concepts are genrated by default.
 parser.add_argument('--port',help="Query port. Default:8080",type=int,default=8080)
@@ -39,7 +40,7 @@ parser.add_argument('--analysis_outputfile','-oa',help='Full path to output file
 
 parser.add_argument('--concept_file','-cf',help='Full path to the file that contains the concepts to analyze',default='')
 
-parser.add_argument('--rules_spec','-rs',help='JSON file that specifies which rules should be computed along with their computation parameters',action='store',default='./rulesSpecs/rules_implication_all.json')
+parser.add_argument('--rules_spec','-rs',help='JSON file that specifies which rules should be computed along with their computation parameters',action='store',default='./rulesSpecs/rules_positive_implication.json')
 
 
 #launches concept generation with FCbO then analysis
@@ -53,6 +54,7 @@ if __name__ == '__main__':
 	fcaAlgo=args.fca_algo
 	fcboPath=args.fcbo_path
 	csv_flag=args.csv
+	quiet=args.quiet
 	type_json=('context' if csv_flag==False else 'csv')
 	inputfile=args.inputfile
 	specfile=args.specfile
@@ -69,7 +71,7 @@ if __name__ == '__main__':
 	output_file_analysis=args.analysis_outputfile
 	rulesSpec=args.rules_spec
 	conceptfile=args.concept_file
-	fca.fca_execution(inputfile,specfile,workflow,port=port_val,fca_algo=fcaAlgo,fcbo_path=fcboPath,csv=csv_flag,ncpus=nbcpus,min_support=minsupport,disable_naming=naming,queryres=queryres_file,output=outputfile,analysis_output=output_file_analysis,rules_spec=rulesSpec,concept_file=conceptfile)
+	fca.fca_execution(inputfile,specfile,workflow,quiet_flag=quiet,port=port_val,fca_algo=fcaAlgo,fcbo_path=fcboPath,csv=csv_flag,ncpus=nbcpus,min_support=minsupport,disable_naming=naming,queryres=queryres_file,output=outputfile,analysis_output=output_file_analysis,rules_spec=rulesSpec,concept_file=conceptfile)
 
 
 

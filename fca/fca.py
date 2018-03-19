@@ -41,12 +41,13 @@ def naming(*disable_naming):
 			named=False
 	return named
 
-def fca(fca_context,min_support,named,file_out,proceed_flag=True): #run FCbO on context fca_context
+def fca(fca_context,min_support,named,file_out,proceed_flag=True,quiet_flag=True): #run FCbO on context fca_context
 	if min_support==0:
 		concepts=fca_context.generateAllIntents() #generate all concepts if the minimal support is set to 0
 	else:
 		concepts=fca_context.generateAllIntentsWithSupp(min_support) #otherwise only generate the concepts whose minimal support is above the value provided by the user
-	fca_context.printConcepts(concepts,outputfile=file_out,namedentities=named)#output the concepts
+	if ((file_out!=sys.stdout) or (file_out==sys.stdout and quiet_flag==False)): 
+		fca_context.printConcepts(concepts,outputfile=file_out,namedentities=named)#output the concepts
 	if proceed_flag==True:
 		trans_concepts=fca_context.returnConcepts(concepts,namedentities=named)
 		return FCAoutput(concepts=trans_concepts,context=fca_context,naming=named,itemsets=set())
@@ -110,7 +111,7 @@ def fcaC(fcbo_path,fca_context,min_support,sourcefile,fimifile,named,output,proc
 		result=fcaCReturn(fca_context,itemsets,proceed_flag,False,[])
 	return result
 
-def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1,port=8080):
+def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_flag=True,outputfile=sys.stdout,quiet=True,disable_naming=False,csv_flag=False,parallel_flag=False,cpus=1,port=8080):
 	#print('runFCA queryres',queryres)
 	#add code_flag switch to allow bypass of my python code+add naming of c fimi results
 	if code_flag not in code_flag_options:
@@ -137,7 +138,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 			#print('fca_context context', type(fca_context.context), len(fca_context.context))
 			#print('fca_context attributes', type(fca_context.attributes), len(fca_context.attributes))
 			#print('fca_context objects', type(fca_context.objects), len(fca_context.objects))
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if type_json=='context' or type_json=='query':
@@ -152,7 +153,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 		fca_context=fcbo.Context(inputfile,queryres,type_json,port=port_val)#a context input file has to be specified (in cxt or fimi format)
 		print('context constructed. Dimension',fca_context.num_objects,'x',fca_context.num_attributes)
 		if flag=='python':
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if fileext=='fimi':
@@ -173,7 +174,7 @@ def runFCA(specfile,inputfile,queryres,min_support,code_flag,fcbo_path,proceed_f
 				ip.convertQueryRes(res,obj_name,att_name,inputfile) #generation of a context file saved in inputfile
 			else:
 				ip.convertCSVRes(specfile,inputfile)
-			result=fca(fca_context,min_support,named,outputfile,proceed_flag)
+			result=fca(fca_context,min_support,named,outputfile,proceed_flag,quiet_flag=quiet)
 		elif flag=='C':
 			min_support=math.floor(min_support*fca_context.num_objects)
 			if os.path.splitext(inputfile)[1].replace('.','')=='fimi':
@@ -251,7 +252,7 @@ def runAnalysis(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_
 
 
 
-def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
+def runAnalysisParallel_old2(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output=sys.stdout):
 	rule_spec=unpackRules(rule_spec_file)
 	print('rule_spec',rule_spec)
 	if c_flag==False:
@@ -278,6 +279,42 @@ def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=
 				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
 	for x in executors_list:
 		analysis.printComputedRules(x.result(),fca_context,output,json_flag=True)
+		
+		
+def runAnalysisParallel(fca_context,trans_concepts,rule_spec_file,namedentities=False,c_flag=False,output_csv=sys.stdout):
+	rule_spec=unpackRules(rule_spec_file)
+	print('rule_spec',rule_spec)
+	if c_flag==False:
+		itemsets={frozenset(c[1]) for c in trans_concepts}
+	else:
+		itemsets={frozenset(c) for c in trans_concepts}
+	measureRules={k:v for k,v in rule_spec.items() if k in supported_rules and not('implication' in k or 'disjointness' in k)}
+	print('measureRules',measureRules)
+	imp_rules={k:v for k,v in rule_spec.items() if k in supported_rules and 'implication' in k}
+	disjointness={k:v for k,v in rule_spec.items() if k in supported_rules and 'disjointness' in k}
+	executors_list = []
+	with ThreadPoolExecutor(max_workers=5) as executor:
+		if measureRules!={}:
+			executors_list+=[executor.submit(analysis.doMeasureRules,measureRules,fca_context,itemsets,namedentities)]
+		if imp_rules!={}:
+		   executors_list+=[executor.submit(ruleFunction[rule],fca_context,itemsets,imp_rules[rule]['min_threshold'],imp_rules[rule]['num_rules'],namedentities) for rule in imp_rules.keys()]
+		if disjointness!={}:
+		   executors_list+=[executor.submit(analysis.doDisjRules,fca_context,itemsets,disjointness[rule]['num_rules'],namedentities,output) for rule in disjointness]
+
+		#for rule in rule_type:
+			#if rule in ruleFunction and 'disjointness' not in rule:
+				#executors_list.append(executor.submit(ruleFunction[rule],fca_context,itemsets,rule_thresholds[rule],num_rules,namedentities))
+			#else:
+				#executors_list.append(executor.submit(analysis.doDisjRules,fca_context,itemsets,num_rules,namedentities))
+	header=[','.join(["Objects","TypeRule","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence","TopViolatedRulesForEachObjectConfidence","TopScoreConfidence","ViolatedRulesForEachObjectLift","AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift","TopScoreLift"])+'\n']
+	csv_body=[analysis.produceScoreCSV(x.result(),fca_context,output_csv) for x in executors_list]
+	csvContent=''.join(header+csv_body)
+	if output_csv==sys.stdout:
+		print(csvContent)	
+	else:
+		with open(output_csv,'w') as f:
+			f.write(csvContent)
+
 
 def parseConceptFile(concept_file):
 	with open(concept_file,'r') as f:
@@ -370,7 +407,7 @@ def generateContextFiles(inputfile,outputfile=sys.stdout,csv_flag=False):
 			
 		
 			
-def fca_execution(inputfile,specfile,workflow,port=8080,fca_algo='python',fcbo_path='',csv=False,ncpus=1,min_support=0,disable_naming=False,queryres='',output=sys.stdout,analysis_output=sys.stdout,rules_spec='./rulesSpecs/rules_implication_all.json',concept_file=''):
+def fca_execution(inputfile,specfile,workflow,quiet_flag=True,port=8080,fca_algo='python',fcbo_path='',csv=False,ncpus=1,min_support=0,disable_naming=False,queryres='',output=sys.stdout,analysis_output=sys.stdout,rules_spec='./rulesSpecs/rules_implication_all.json',concept_file=''):
 	port_val=port
 	type_json=('context' if csv==False else 'csv')
 	parallel=(True if ncpus>1 else False)
@@ -392,7 +429,7 @@ def fca_execution(inputfile,specfile,workflow,port=8080,fca_algo='python',fcbo_p
 			naming=disable_naming
 		else:
 			naming=False
-		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus,port=port_val)
+		res=runFCA(specfile,inputfile,queryres,min_support,fca_algo,fcbo_path,proceed_flag,outputfile=output_file,quiet=quiet_flag,disable_naming=naming,csv_flag=csv,parallel_flag=parallel,cpus=ncpus,port=port_val)
 		print('FCA finished. Concepts generated')
 		if workflow=='both':
 			fca_context=res.context
@@ -401,7 +438,7 @@ def fca_execution(inputfile,specfile,workflow,port=8080,fca_algo='python',fcbo_p
 			else:
 				trans_concepts=res.itemsets
 			named=res.naming
-			runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output=analysis_output)
+			runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output_csv=analysis_output)
 	else: #run the analysis of the concepts if the 'analysis' flag found
 		print('workflow',workflow)
 		if concept_file=='':
@@ -418,7 +455,7 @@ def fca_execution(inputfile,specfile,workflow,port=8080,fca_algo='python',fcbo_p
 			parsed_concepts=fca.parseCfcaOutput(concept_file)
 			trans_concepts=parsed_concepts['itemsets']
 			named=parsed_concepts['named']
-		runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output=analysis_output)
+		runAnalysisParallel(fca_context,trans_concepts,rules_spec,namedentities=named,c_flag=(fca_algo=='C'),output_csv=analysis_output)
 
 
 
