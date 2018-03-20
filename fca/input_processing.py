@@ -4,6 +4,7 @@ import requests, readline, sys, json
 import collections, re
 import os, glob
 import dask.dataframe as dd
+import itertools
 
 def tupToIndices(tup):
 	return tuple(i for i in range(len(tup)) if tup[i]==1)
@@ -317,10 +318,15 @@ def convertFimiFileToCxt(fimifile,cxtfile):
 	writeCxtFile(objects,attributes,context,cxtfile)
 	
 	
-def convert2InputCSV(contextName,contextdirectory,csvpath='',port=8080):
+def convert2InputCSV(contextName,contextdirectories,csvpath='',port=8080):
 	port_val=port
 	#get file from context directory where filename contains contextname
-	files=glob.glob(os.path.join(contextdirectory,'*.json'))
+	if type(contextdirectories)==str:
+		files=glob.glob(os.path.join(contextdirectories,'*.json'))
+	elif type(contextdirectories)==list:
+		files=list(itertools.chain.from_iterable([glob.glob(os.path.join(c,'*.json')) for c in contextdirectories]))
+	else:
+		sys.exit('Context directory '+ str(contextdirectories)+' type should be string or list and not '+type(contextdirectories))
 	r=re.compile('(\w|\W)+_(?P<contextname>\w+)\.json')
 	contextFile=list(filter(lambda x: re.match(r,x).group('contextname').lower()==contextName.lower(),files))[0]
 	#generate input CSV
