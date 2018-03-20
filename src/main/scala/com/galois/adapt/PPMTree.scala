@@ -7,6 +7,7 @@ import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
 
 import scala.util.Try
+import scala.util.parsing.json.JSON
 
 
 object NoveltyDetection {
@@ -119,6 +120,7 @@ case class PpmDefinition(name: String, filter: F, discriminators: D) {
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
+  val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
   def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
   val ppmList = List(
      PpmDefinition( "ProcessFileTouches",
@@ -146,6 +148,13 @@ class PpmActor extends Actor with ActorLogging {
       (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
       List(
         (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition("ProcessDirectoryTouches",
+      (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirFilter(e, s, o),
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path)
       )
     )
   )
@@ -298,4 +307,55 @@ case object TreeRepr {
   }
 
   def readFromFile(filePath: String): TreeRepr = TreeRepr.fromFlat(scala.io.Source.fromFile(filePath).getLines().map(TreeRepr.csvStringToFlat).toList)
+}
+
+case object ProcessDirectoryTouchesAux {
+  def readJSONFromFile(filePath: String): Map[String, Int] = {
+    class CC[T] {
+      def unapply(a: Any): Option[T] = Some(a.asInstanceOf[T])
+    }
+
+    object M extends CC[Map[String, Any]]
+
+    object N extends CC[List[Any]]
+
+    object S extends CC[String]
+
+    object D extends CC[Double]
+
+    val filePathModel = (jsonString: String) => for {
+      Some(M(map)) <- List(JSON.parseFull(jsonString))
+      N(processes) = map("processes")
+      M(process) <- processes
+      S(name) = process("name")
+      D(depth) = process("depth")
+    } yield {
+      (name, depth.toInt)
+    }
+
+    val bufferedSource = scala.io.Source.fromFile(filePath)
+    val filePathModelMap = filePathModel(bufferedSource.getLines.mkString).toMap
+    bufferedSource.close
+    filePathModelMap
+  }
+
+  val auxFilePath: Option[ExtractedValue] = Try(Application.config.getString("adapt.ppm.basedir") +
+    Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.auxfile")).toOption
+  val processToDepth: Map[String, Int] = auxFilePath.map(readJSONFromFile).getOrElse(Map.empty[String, Int])
+
+  def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
+    o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 &&
+      Set('/', '\\').contains(o._2.map(_.path).get.toString.head) &&
+      s._2.map(_.path).isDefined && s._2.map(_.path).get.length > 0
+  }
+
+  def dirAtDepth(process: String, path: String): String = {
+    val sepChar = if (path.head.toString=="/") "/" else "\\\\"
+    val depth = processToDepth.getOrElse(process, -1)
+    depth match {
+      case -1 => path.split(sepChar).init.mkString("", sepChar, sepChar)
+      case _ if path.count(_ == sepChar) < depth => path.split(sepChar).init.mkString("", sepChar, sepChar)
+      case _ => path.take(depth).mkString("", sepChar, sepChar)
+    }
+  }
 }
