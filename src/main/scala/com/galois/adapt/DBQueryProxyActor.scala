@@ -19,7 +19,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
   // Writing CDM and ADM in a transaction
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit]
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit]
+  def AdmTx(adms: Seq[Either[ADM, EdgeAdm2Adm]]): Try[Unit]
 
 
   var streamsFlowingInToThisActor = 0
@@ -114,7 +114,7 @@ case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
 
 case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable[_]])
-case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
+case class WriteAdmToNeo4jDB(irs: Seq[Either[ADM,EdgeAdm2Adm]])
 
 
 case object Ack

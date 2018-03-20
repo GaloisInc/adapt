@@ -209,14 +209,14 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
     }
   }
 
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
+  def AdmTx(adms: Seq[Either[ADM, EdgeAdm2Adm]]): Try[Unit] = {
     val transaction = neoGraph.beginTx()
     val verticesInThisTX = MutableMap.empty[(UUID,String), NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val admToNodeResults = adms map {
-      case Left(edge) => Try {
+      case Right(edge) => Try {
 
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
@@ -235,7 +235,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         }
       }
 
-      case Right(adm) => Try {
+      case Left(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
@@ -307,7 +307,7 @@ object Neo4jFlowComponents {
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
-                            (implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
+                            (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)

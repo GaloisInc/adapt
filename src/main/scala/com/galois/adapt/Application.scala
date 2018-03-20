@@ -14,7 +14,6 @@ import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.galois.adapt.adm.UuidRemapper.GetStillBlocked
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
@@ -116,29 +115,12 @@ object Application extends App {
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
-  // Akka-streams makes this _way_ more difficult than I feel it ought to be, but here it is:
-  //
-  //   * an actor ref to which you send messages of type `ADM`
-  //   * a source where those `ADM` magically appear
-  //
-  // To make the source complete, we have to send the actor a `akka.actor.Status.Success(())`.
-  val (synActor: ActorRef, synSource: Source[ADM, _]) = {
-    // If we support fanout, we would have to buffer everything sent to the sink, forever. Thankfully, the odds of
-    // someone making another source from this publisher are low since the publisher's scope is limited to this block.
-    val fanOut: Boolean = false
-    val sink: Sink[ADM, Publisher[ADM]] = Sink.asPublisher[ADM](fanOut)
-
-    val (ref, synPublisher) = Source.actorRef(Int.MaxValue, OverflowStrategy.fail).toMat(sink)(Keep.both).run()
-    val source: Source[ADM, _] = Source.fromPublisher(synPublisher)
-
-    (ref, source)
-  }
-
   // These are the maps that `UUIDRemapper` will use
   val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
     db.hashMap("cdm2cdm")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
       .createOrOpen(),
 
     { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
@@ -148,6 +130,7 @@ object Application extends App {
     db.hashMap("cdm2adm")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
       .createOrOpen(),
 
     { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
@@ -155,10 +138,11 @@ object Application extends App {
   )
 
   // These are the maps/sets the async and dedup stage of ER will use
-  val blocking: mutable.Map[CdmUUID, (List[ActorRef], Set[CdmUUID])] = mutable.Map.empty
+  val blocking: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
   val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
     db.hashSet("seenNodes")
       .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
       .createOrOpen()
       .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
     { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
@@ -172,6 +156,7 @@ object Application extends App {
         Serializer.UUID,
         Serializer.UUID)
       )
+      .counterEnable()
       .createOrOpen()
       .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
 
@@ -185,9 +170,7 @@ object Application extends App {
     }
   )
 
-  val cdmUuidExpiryTime = config.getLong("adapt.adm.cdmexpirytime")
-  val uuidRemapper: ActorRef = system.actorOf(Props(classOf[UuidRemapper], synActor, cdmUuidExpiryTime, cdm2cdmMap, cdm2admMap, blocking), name = "uuidRemapper")
-
+  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blocking, seenNodes, seenEdges)
 
   val ta1 = config.getString("adapt.env.ta1")
 
@@ -234,13 +217,13 @@ object Application extends App {
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
         case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges).to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
+        case (false, true) => "ADM" -> er.to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))   // TODO: Alec, why doesn't the ER flow pass along termination messages? (I suspect existential type parameters.)
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[(String,CDM18)](2))
 
           broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast ~> EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> er ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
 
           SinkShape(broadcast.in)
         })
@@ -286,15 +269,16 @@ object Application extends App {
         case (false, true) =>
 
           // TODO: Alec find a better way to get the "blocked" CSV information
-          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
+//          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
 
           RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
             import GraphDSL.Implicits._
 
             val broadcast = graph.add(Broadcast[Any](9))
 
-            CDMSource.cdm18(ta1).via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
-              .via(printCounter("DB Writer", statusActor, 1000))
+            CDMSource.cdm18(ta1)
+              .via(printCounter("DB Writer", statusActor, 10000))
+              .via(er)
               .via(Flow.fromFunction {
                 case Left(e) => e
                 case Right(ir) => ir
@@ -315,7 +299,7 @@ object Application extends App {
 
 
         case (false, false) =>
-          println("Generting CSVs for neither CDM not ADM - so... generating nothing!")
+          println("Generating CSVs for neither CDM not ADM - so... generating nothing!")
           Source.empty
 
         case (true, true) =>
@@ -374,7 +358,7 @@ object Application extends App {
     case "fsox" =>
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty FSOX", statusActor))
-        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+        .via(er)
         .via(FSOX.apply)
         .runWith(Sink.foreach(println))
 
@@ -383,7 +367,7 @@ object Application extends App {
       val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
-        .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
+        .via(er)
         .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
 
           val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
@@ -415,7 +399,7 @@ object Application extends App {
 
 
           {
-            case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
+            case Right(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
               .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
                 val t = (e._1, Some(sub), e._3)
@@ -429,7 +413,7 @@ object Application extends App {
                   Nil
                 }
               }
-            case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
+            case Right(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
               .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
                 val t = (e._1, e._2, Some(obj))
@@ -443,7 +427,7 @@ object Application extends App {
                   Nil
                 }
               }
-            case Left(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
+            case Right(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
               .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
               val t = (e._1, e._2, Some(obj))
@@ -457,7 +441,7 @@ object Application extends App {
                   Nil
                 }
               }
-            case Left(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
+            case Right(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
               // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
               val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
               pathNodeUses += (subObj -> newSet)
@@ -471,22 +455,22 @@ object Application extends App {
   //                case _ => ()  // "parentSubject"
   //              }
   //            List()
-            case Right(adm: AdmEvent) =>
+            case Left(adm: AdmEvent) =>
               events += (adm.uuid -> (adm, None, None))
               Nil
-            case Right(adm: AdmSubject) =>
+            case Left(adm: AdmSubject) =>
               everything += (adm.uuid -> adm)
               Nil
-            case Right(adm: AdmFileObject) =>
+            case Left(adm: AdmFileObject) =>
               everything += (adm.uuid -> adm)
               Nil
-            case Right(adm: AdmNetFlowObject) =>
+            case Left(adm: AdmNetFlowObject) =>
               everything += (adm.uuid -> adm)
               Nil
-            case Right(adm: AdmSrcSinkObject) =>
+            case Left(adm: AdmSrcSinkObject) =>
               everything += (adm.uuid -> adm)
               Nil
-            case Right(adm: AdmPathNode) =>
+            case Left(adm: AdmPathNode) =>
               pathNodes += (adm.uuid -> adm)
               Nil
             case _ => Nil

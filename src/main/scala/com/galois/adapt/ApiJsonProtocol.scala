@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 
 
 object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val statusReport = jsonFormat5(StatusReport)
+  implicit val statusReport = jsonFormat3(StatusReport)
   implicit val c = jsonFormat3(UINode)
   implicit val d = jsonFormat3(UIEdge)
   implicit object UUIDFormat extends JsonFormat[UUID] {

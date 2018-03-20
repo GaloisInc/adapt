@@ -2,54 +2,6 @@
   <body>
 
     <table>
-      <caption><h3>Average milliseconds in async buffer</h3></caption>
-      <tr>
-        <td valign="top"><div id="avg-time-in-buffer-ymax">ymax</div></td>
-        <td rowspan=3 colspan=2>
-          <canvas id="avg-time-in-buffer" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
-        </td>
-      </tr>
-      <tr>
-        <td valign="center">
-          <div id="avg-time-in-buffer-curr" style="color:#0000FF">ycurr</div><br/>
-          <div id="avg-time-in-buffer-avg" style="color:#00FF00">yavg</div>
-        </td>
-      </tr>
-      <tr>
-        <td valign="bottom"><div id="avg-time-in-buffer-ymin">ymin</div></td>
-      </tr>
-      <tr>
-        <td></td>
-        <td align="left"><div id="avg-time-in-buffer-xmin">xmin</div></td>
-        <td align="right"><div id="avg-time-in-buffer-xmax">xmax</div></td>
-      </tr>
-    </table>
-
-    <table>
-      <caption><h3>Count of futures in async buffer</h3></caption>
-      <tr>
-        <td valign="top"><div id="count-futures-in-buffer-ymax">ymax</div></td>
-        <td rowspan=3 colspan=2>
-          <canvas id="count-futures-in-buffer" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
-        </td>
-      </tr>
-      <tr>
-        <td valign="center">
-          <div id="count-futures-in-buffer-curr" style="color:#0000FF">ycurr</div><br/>
-          <div id="count-futures-in-buffer-avg" style="color:#00FF00">yavg</div>
-        </td>
-      </tr>
-      <tr>
-        <td valign="bottom"><div id="count-futures-in-buffer-ymin">ymin</div></td>
-      </tr>
-      <tr>
-        <td></td>
-        <td align="left"><div id="count-futures-in-buffer-xmin">xmin</div></td>
-        <td align="right"><div id="count-futures-in-buffer-xmax">xmax</div></td>
-      </tr>
-    </table>
-
-    <table>
       <caption><h3>Ingestion rate per second</h3></caption>
       <tr>
         <td valign="top"><div id="ingestion-rate-ymax">ymax<div></td>
@@ -144,7 +96,102 @@
         <td align="right"><div id="er-time-xmax">xmax</div></td>
       </tr>
     </table>
+    
+    <table>
+      <caption><h3>Size of Cdm2Cdm Map</h3></caption>
+      <tr>
+        <td valign="top"><div id="cdm2cdm-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="cdm2cdm-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="cdm2cdm-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="cdm2cdm-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="cdm2cdm-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="cdm2cdm-size-xmin">xmin</div></td>
+        <td align="right"><div id="cdm2cdm-size-xmax">xmax</div></td>
+      </tr>
+    </table>
 
+    <table>
+      <caption><h3>Size of Cdm2Adm Map</h3></caption>
+      <tr>
+        <td valign="top"><div id="cdm2adm-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="cdm2adm-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="cdm2adm-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="cdm2adm-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="cdm2adm-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="cdm2adm-size-xmin">xmin</div></td>
+        <td align="right"><div id="cdm2adm-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Size of Seen Nodes Set</h3></caption>
+      <tr>
+        <td valign="top"><div id="seen-nodes-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="seen-nodes-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="seen-nodes-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="seen-nodes-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="seen-nodes-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="seen-nodes-size-xmin">xmin</div></td>
+        <td align="right"><div id="seen-nodes-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Size of Seen Edges Set</h3></caption>
+      <tr>
+        <td valign="top"><div id="seen-edges-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="seen-edges-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="seen-edges-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="seen-edges-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="seen-edges-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="seen-edges-size-xmin">xmin</div></td>
+        <td align="right"><div id="seen-edges-size-xmax">xmax</div></td>
+      </tr>
+    </table>
 
 <script>
 
@@ -250,32 +297,6 @@
 
     const graphs = [
       new Graph(
-        document.getElementById('avg-time-in-buffer'),
-        document.getElementById('avg-time-in-buffer-ymin'),
-        document.getElementById('avg-time-in-buffer-ymax'),
-        document.getElementById('avg-time-in-buffer-xmin'),
-        document.getElementById('avg-time-in-buffer-xmax'),
-        document.getElementById('avg-time-in-buffer-curr'),
-        document.getElementById('avg-time-in-buffer-avg'),
-        obj => ({
-            x: Date.now(),
-            y: Number(obj.generalRecords.averageMillisecondsInAsyncBuffer),
-        }),
-      ),
-      new Graph(
-        document.getElementById('count-futures-in-buffer'),
-        document.getElementById('count-futures-in-buffer-ymin'),
-        document.getElementById('count-futures-in-buffer-ymax'),
-        document.getElementById('count-futures-in-buffer-xmin'),
-        document.getElementById('count-futures-in-buffer-xmax'),
-        document.getElementById('count-futures-in-buffer-curr'),
-        document.getElementById('count-futures-in-buffer-avg'),
-        obj => ({
-            x: Date.now(),
-            y: Number(obj.admFuturesSize),
-        }),
-      ),
-      new Graph(
         document.getElementById('ingestion-rate'),
         document.getElementById('ingestion-rate-ymin'),
         document.getElementById('ingestion-rate-ymax'),
@@ -324,9 +345,61 @@
         document.getElementById('er-time-avg'),
         obj => ({
             x: Date.now(),
-            y: Number(obj.generalRecords.currentTime),
+            y: Number(obj.generalRecords.monotonicTime),
         }),
       ),
+      new Graph(
+        document.getElementById('cdm2cdm-size'),
+        document.getElementById('cdm2cdm-size-ymin'),
+        document.getElementById('cdm2cdm-size-ymax'),
+        document.getElementById('cdm2cdm-size-xmin'),
+        document.getElementById('cdm2cdm-size-xmax'),
+        document.getElementById('cdm2cdm-size-curr'),
+        document.getElementById('cdm2cdm-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.cdm2cdmSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('cdm2adm-size'),
+        document.getElementById('cdm2adm-size-ymin'),
+        document.getElementById('cdm2adm-size-ymax'),
+        document.getElementById('cdm2adm-size-xmin'),
+        document.getElementById('cdm2adm-size-xmax'),
+        document.getElementById('cdm2adm-size-curr'),
+        document.getElementById('cdm2adm-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.cdm2admSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('seen-nodes-size'),
+        document.getElementById('seen-nodes-size-ymin'),
+        document.getElementById('seen-nodes-size-ymax'),
+        document.getElementById('seen-nodes-size-xmin'),
+        document.getElementById('seen-nodes-size-xmax'),
+        document.getElementById('seen-nodes-size-curr'),
+        document.getElementById('seen-nodes-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.seenNodesSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('seen-edges-size'),
+        document.getElementById('seen-edges-size-ymin'),
+        document.getElementById('seen-edges-size-ymax'),
+        document.getElementById('seen-edges-size-xmin'),
+        document.getElementById('seen-edges-size-xmax'),
+        document.getElementById('seen-edges-size-curr'),
+        document.getElementById('seen-edges-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.seenEdgesSize),
+        }),
+      ), 
     ];
 
     // Schedule every second
