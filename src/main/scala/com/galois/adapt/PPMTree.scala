@@ -19,11 +19,59 @@ object NoveltyDetection {
 
   type ExtractedValue = String
   type Discriminator = (Event, Subject, Object) => ExtractedValue
-  type D = List[Discriminator]
-  type F = (Event, Subject, Object) => Boolean
+  type Filter = (Event, Subject, Object) => Boolean
 
-  val noveltyThreshold: Float = 0.01F
   type Alarm = List[(String, Float, Float, Int)]
+
+  private val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
+  val ppmList = List(
+    PpmDefinition( "ProcessFileTouches",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition( "FilesTouchedByProcesses",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+      List(
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition( "FilesExecutedByProcesses",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_EXECUTE,
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition("ProcessesWithNetworkActivity",
+      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+      )
+    ),
+    PpmDefinition("ProcessDirectoryTouches",
+      (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirFilter(e, s, o),
+      List(
+        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
+        (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path)
+      )
+    )
+  )
+}
+
+
+case class PpmDefinition(name: String, filter: Filter, discriminators: List[Discriminator]) {
+  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
+  val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
+  val tree = PpmTree(filter, discriminators, inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
+  var alarms: List[(Long,Alarm)] = List.empty
+  def observe(observation: (Event, Subject, Object)): Option[Alarm] = (tree.update _).tupled(observation)
+  def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = (System.currentTimeMillis -> a) :: alarms)
+  def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+  def prettyString: String = tree.getTreeRepr(key = name).toString
 }
 
 
@@ -34,11 +82,11 @@ trait PpmTree {
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
-  def apply(filter: F, discriminators: D, serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
+  def apply(filter: Filter, discriminators: List[Discriminator], serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
 }
 
 
-class SymbolNode(val filter: F, val discriminators: D, repr: Option[TreeRepr] = None) extends PpmTree {
+class SymbolNode(val filter: Filter, val discriminators: List[Discriminator], repr: Option[TreeRepr] = None) extends PpmTree {
   private var counter = 0
   def getCount: Int = counter
 
@@ -107,60 +155,10 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 }
 
 
-case class PpmDefinition(name: String, filter: F, discriminators: D) {
-  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
-  val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
-  val tree = PpmTree(filter, discriminators, inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
-  var alarms: List[(Long,Alarm)] = List.empty
-  def observe(observation: (Event, Subject, Object)): Option[Alarm] = (tree.update _).tupled(observation)
-  def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = (System.currentTimeMillis -> a) :: alarms)
-  def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
-  def prettyString: String = tree.getTreeRepr(key = name).toString
-}
-
-
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  private val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
-  def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
-  val ppmList = List(
-     PpmDefinition( "ProcessFileTouches",
-       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
-       List(
-         (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
-         (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
-       )
-    ),
-    PpmDefinition( "FilesTouchedByProcesses",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
-      List(
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
-      )
-    ),
-    PpmDefinition( "FilesExecutedByProcesses",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_EXECUTE,
-      List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
-      )
-    ),
-    PpmDefinition("ProcessesWithNetworkActivity",
-      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
-      List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
-      )
-    ),
-    PpmDefinition("ProcessDirectoryTouches",
-      (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirFilter(e, s, o),
-      List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path)
-      )
-    )
-  )
-
+    def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
 
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
@@ -187,7 +185,7 @@ class PpmActor extends Actor with ActorLogging {
     case CompleteMsg =>
       ppmList.foreach{ppm =>
         ppm.saveState()
-//        println(ppm.prettyString)
+        println(ppm.prettyString)
       }
       println("Done")
 

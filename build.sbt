@@ -9,7 +9,7 @@ resolvers += Resolver.mavenLocal  // for BBN repositories built locally
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
-  version := "0.5",
+  version := "0.6.2",
   organization := "com.galois",
   scalaVersion := scalaV,
 
