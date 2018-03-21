@@ -41,7 +41,7 @@ lazy val adapt = (project in file(".")).settings(
 //    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
-
+    "com.univocity" % "univocity-parsers" % "2.6.1",
     "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
   ),
 

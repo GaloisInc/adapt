@@ -1,10 +1,12 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
+import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
+import scala.collection.JavaConverters._
 
 import scala.util.Try
 import scala.util.parsing.json.JSON
@@ -120,7 +122,7 @@ case class PpmDefinition(name: String, filter: F, discriminators: D) {
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
+  private val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
   def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
   val ppmList = List(
      PpmDefinition( "ProcessFileTouches",
@@ -273,8 +275,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
   def writeToFile(filePath: String): Unit = {
+    val settings = new CsvWriterSettings
     val pw = new PrintWriter(new File(filePath))
-    this.toFlat.foreach(f => pw.write(TreeRepr.flatToCsvString(f)+"\n"))
+    val writer = new CsvWriter(pw,settings)
+    this.toFlat.foreach(f => writer.writeRow(TreeRepr.flatToCsvArray(f)))
+    writer.close()
     pw.close()
   }
 }
@@ -300,13 +305,17 @@ case object TreeRepr {
     fromFlatRecursive(repr, 0, List.empty)._1.head
   }
 
-  def flatToCsvString(t: (Int, ExtractedValue, Float, Float, Int)): String = s"${t._1},${t._2},${t._3},${t._4},${t._5}"
-  def csvStringToFlat(s: String): (Int, ExtractedValue, Float, Float, Int) = {
-    val a = s.split(",")
+  def flatToCsvArray(t: (Int, ExtractedValue, Float, Float, Int)): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
+  def csvArrayToFlat(a: Array[String]): (Int, ExtractedValue, Float, Float, Int) = {
     (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
   }
 
-  def readFromFile(filePath: String): TreeRepr = TreeRepr.fromFlat(scala.io.Source.fromFile(filePath).getLines().map(TreeRepr.csvStringToFlat).toList)
+  def readFromFile(filePath: String): TreeRepr = {
+    val fileHandle = new File(filePath)
+    val parser = new CsvParser(new CsvParserSettings)
+    val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
+    TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
+  }
 }
 
 case object ProcessDirectoryTouchesAux {
@@ -344,14 +353,14 @@ case object ProcessDirectoryTouchesAux {
   val processToDepth: Map[String, Int] = auxFilePath.map(readJSONFromFile).getOrElse(Map.empty[String, Int])
 
   def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
-    o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 &&
-      Set('/', '\\').contains(o._2.map(_.path).get.toString.head) &&
-      s._2.map(_.path).isDefined && s._2.map(_.path).get.length > 0
+    o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 && // file path must exist and have length greater than 1
+      Set('/', '\\').contains(o._2.map(_.path).get.toString.head) && // file path must be absolute (or as close as we can get to forcing that)
+      s._2.map(_.path).isDefined && s._2.map(_.path).get.length > 0 // process name must exist and be a non-empty string
   }
 
   def dirAtDepth(process: String, path: String): String = {
     val sepChar = if (path.head.toString=="/") "/" else "\\\\"
-    val depth = processToDepth.getOrElse(process, -1)
+    val depth = processToDepth.getOrElse(process, -1) // default depth is directory file is contained in
     depth match {
       case -1 => path.split(sepChar).init.mkString("", sepChar, sepChar)
       case _ if path.count(_ == sepChar) < depth => path.split(sepChar).init.mkString("", sepChar, sepChar)
