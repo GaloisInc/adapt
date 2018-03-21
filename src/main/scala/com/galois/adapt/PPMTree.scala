@@ -5,7 +5,7 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 
 object NoveltyDetection {
@@ -55,9 +55,18 @@ case class PpmDefinition(name: String, filter: Filter, discriminators: List[Disc
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
   val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
   val tree = PpmTree(filter, discriminators, inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
-  var alarms: List[(Long,Alarm)] = List.empty
+  var alarms: Map[List[ExtractedValue], (Long, Alarm, Map[String, Int])] = Map.empty
+
   def observe(observation: (Event, Subject, Object)): Option[Alarm] = (tree.update _).tupled(observation)
-  def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = (System.currentTimeMillis -> a) :: alarms)
+  def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = alarms + (a.map(_._1) -> (System.currentTimeMillis, a, Map.empty[String,Int])))
+  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).map { a =>
+    if (rating.isDefined) // set the alarm rating in this namespace
+      alarms = alarms + (key -> a.copy(_3 = a._3 + (namespace -> rating.get)))
+    else // Unset the alarm rating.
+      alarms = alarms + (key -> a.copy(_3 = a._3 - namespace))
+    true
+  }.getOrElse(false)
+
   def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
   def prettyString: String = tree.getTreeRepr(key = name).toString
 }
@@ -70,7 +79,7 @@ trait PpmTree {
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
 }
 case object PpmTree {
-  def apply(filter: Filter, discriminators: List[Discriminator], serialized: Option[TreeRepr] = None):PpmTree =  new SymbolNode(filter, discriminators, serialized)
+  def apply(filter: Filter, discriminators: List[Discriminator], serialized: Option[TreeRepr] = None): PpmTree = new SymbolNode(filter, discriminators, serialized)
 }
 
 
@@ -151,29 +160,36 @@ class PpmActor extends Actor with ActorLogging {
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
 
-    case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[AdmPathNode], Some(o: ADM), objPathNodes: Set[AdmPathNode]) =>
+    case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[_], Some(o: ADM), objPathNodes: Set[_]) =>
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
         val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
         val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
         subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
       }
-      val flatEvents = flatten(e, s, subPathNodes, o, objPathNodes)
-      ppmList.foreach(ppm => flatEvents.foreach(e => ppm.recordAlarm(ppm.observe(e))))
+      Try (
+        flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
+      ) match {
+        case Success(flatEvents) => ppmList.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm (ppm.observe (e) ) ) )
+        case Failure(err) => log.warning(s"Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+      }
       sender() ! Ack
 
-    case PpmTreeQuery(treeName, queryPath) =>
+    case PpmTreeQuery(treeName, queryPath, namespace) =>
       val resultOpt = ppm(treeName).map(tree =>
-        if (queryPath.isEmpty) tree.alarms
-        else tree.alarms.filter(_._2.map(_._1).startsWith(queryPath))
+        if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_3 = a._3.get(namespace))).toList
+        else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_3 = v._3.get(namespace))}.toList
       )
       sender() ! PpmTreeResult(resultOpt)
+
+    case SetPpmRating(treeName, key, rating, namespace) =>
+      sender() ! ppm(treeName).map(tree => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace))
 
     case InitMsg => sender() ! Ack
 
     case CompleteMsg =>
-      ppmList.foreach{ppm =>
+      ppmList.foreach { ppm =>
         ppm.saveState()
-        println(ppm.prettyString)
+//        println(ppm.prettyString)
       }
       println("Done")
 
@@ -185,20 +201,25 @@ class PpmActor extends Actor with ActorLogging {
 
 case object ListPpmTrees
 case class PpmTreeNames(names: List[String])
-case class PpmTreeQuery(treeName: String, queryPath: List[ExtractedValue])
-case class PpmTreeResult(results: Option[List[(Long, Alarm)]]) {
+case class PpmTreeQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String)
+case class PpmTreeResult(results: Option[List[(Long, Alarm, Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._2.map(_._1)
-      UiTreeElement(names).map(_.merge(a)).getOrElse(a)
+
+      val someUiData = UiDataContainer(b._3)
+
+      UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
 }
+case class SetPpmRating(treeName: String, key: List[String], rating: Int, namespace: String)
 
 
 
 sealed trait UiTreeElement{
   val title: String
+  val data: UiDataContainer
   def merge(other: UiTreeElement): Set[UiTreeElement]
   def merge(others: Set[UiTreeElement]): Set[UiTreeElement] =
     others.find(o => o.isInstanceOf[UiTreeFolder] && o.title == this.title) match {
@@ -207,21 +228,21 @@ sealed trait UiTreeElement{
     }
 }
 case object UiTreeElement {
-  def apply(names: List[ExtractedValue]): Option[UiTreeElement] = names.foldRight[Option[UiTreeElement]](None){
-    case (extracted, None) => Some(UiTreeNode(extracted))
+  def apply(names: List[ExtractedValue], data: UiDataContainer): Option[UiTreeElement] = names.foldRight[Option[UiTreeElement]](None){
+    case (extracted, None) => Some(UiTreeNode(extracted, data))
     case (extracted, Some(n: UiTreeNode)) => Some(UiTreeFolder(extracted, children = Set(n)))
     case (extracted, Some(f: UiTreeFolder)) => Some(UiTreeFolder(extracted, children = Set(f)))
   }
 }
 
-case class UiTreeNode(title: String) extends UiTreeElement {
+case class UiTreeNode(title: String, data: UiDataContainer) extends UiTreeElement {
   def merge(other: UiTreeElement) = other match {
     case o: UiTreeFolder => o merge this
     case o: UiTreeElement => if (this.title == o.title) Set(this) else Set(this, o)
   }
 }
 
-case class UiTreeFolder(title: String, folder: Boolean = true, children: Set[UiTreeElement] = Set.empty) extends UiTreeElement {
+case class UiTreeFolder(title: String, folder: Boolean = true, data: UiDataContainer = UiDataContainer.empty, children: Set[UiTreeElement] = Set.empty) extends UiTreeElement {
   def merge(other: UiTreeElement): Set[UiTreeElement] = other match {
     case node: UiTreeNode =>
       Set(this, node)
@@ -239,6 +260,8 @@ case class UiTreeFolder(title: String, folder: Boolean = true, children: Set[UiT
   }
 }
 
+case class UiDataContainer(rating: Option[Int])
+case object UiDataContainer { def empty = UiDataContainer(None) }
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
