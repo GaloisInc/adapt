@@ -24,6 +24,7 @@ object EntityResolution {
   // easy access to them for logging/debugging purposes.
   var monotonicTime: Long = 0
   var sampledTime: Long = 0
+  var nodeCount: Long = 0
 
   // This is just for logging state held onto by the `EventResolution` branch of `erWithoutRemaps`
   var activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
@@ -44,26 +45,37 @@ object EntityResolution {
 
     val config: Config = ConfigFactory.load()
 
-    val maxTimeJump: Long     = (config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos
-    val uuidExpiryTime: Long  = (config.getInt("adapt.adm.cdmexpiryseconds") seconds).toNanos
-    val eventExpiryTime: Long = (config.getInt("adapt.adm.eventexpirysecs")  seconds).toNanos
-    val maxEventsMerged: Int  = config.getInt("adapt.adm.maxeventsmerged")
+    val maxTimeJump: Long      = (config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos
+    val uuidExpiryNanos: Long  = (config.getInt("adapt.adm.cdmexpiryseconds") seconds).toNanos
+    val uuidExpiryCount: Long  = config.getLong("adapt.adm.cdmexpirycount")
+    val eventExpiryNanos: Long = (config.getInt("adapt.adm.eventexpirysecs")  seconds).toNanos
+    val eventExpiryCount: Long = config.getLong("adapt.adm.eventexpirycount")
+    val maxEventsMerged: Int   = config.getInt("adapt.adm.maxeventsmerged")
 
-    val maxTimeMarker = ("", Timed(Long.MaxValue, TimeMarker(Long.MaxValue)))
-    lazy val maxTimeRemapper = Timed(Long.MaxValue, JustTime)
+    val maxTimeMarker = ("", Timed(Time.max, TimeMarker(Long.MaxValue)))
+    lazy val maxTimeRemapper = Timed(Time.max, JustTime)
 
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
-      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
+      .via(erWithoutRemaps(eventExpiryNanos, eventExpiryCount, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
-      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blocking))    // Remap UUIDs
+      .via(UuidRemapper(uuidExpiryNanos, uuidExpiryCount, cdm2cdmMap, cdm2admMap, blocking))    // Remap UUIDs
       .via(asyncDeduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
   }
 
 
   private type TimeFlow = Flow[(String,CDM), (String,Timed[CDM]), NotUsed]
-  case class Timed[+T](time: Long, unwrap: T)
+
+  // Since TA1s cannot be trusted to have a regularly increasing time value, we can't rely on just this for expiring
+  // things. The solution is to thread thorugh a node count - we're pretty sure that will increase proportionally to the
+  // number of nodes ingested ;)
+  case class Time(nanos: Long, count: Long)
+  object Time {
+    def max: Time = Time(Long.MaxValue, Long.MaxValue)
+  }
+
+  case class Timed[+T](time: Time, unwrap: T)
 
   // Annotate a flow of `CDM` with a monotonic time value corresponding roughly to the time when the CDM events were
   // observed on the instrumented machine.
@@ -79,6 +91,7 @@ object EntityResolution {
 
     Flow[(String,CDM)].map { case (provider, cdm: CDM) =>
 
+      nodeCount += 1
       for (time <- timestampOf(cdm); _ = { sampledTime = time; () }; if time > monotonicTime) {
         cdm match {
           case _: TimeMarker if time > monotonicTime => monotonicTime = time
@@ -92,7 +105,7 @@ object EntityResolution {
         }
       }
 
-      (provider, Timed(monotonicTime, cdm))
+      (provider, Timed(Time(monotonicTime, nodeCount), cdm))
     }
   }
 
@@ -103,6 +116,7 @@ object EntityResolution {
   // the UUID remapping stage.
   private def erWithoutRemaps(
     eventExpiryTime: Long,
+    eventExpiryCount: Long,
     maxEventsMerged: Int,
     activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState]
   ): ErFlow =
@@ -112,7 +126,7 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
-      broadcast ~> EventResolution(eventExpiryTime, maxEventsMerged, activeChains) ~> merge
+      broadcast ~> EventResolution(eventExpiryTime, eventExpiryCount, maxEventsMerged, activeChains) ~> merge
       broadcast ~> SubjectResolution.apply                                         ~> merge
       broadcast ~> OtherResolution.apply                                           ~> merge
 

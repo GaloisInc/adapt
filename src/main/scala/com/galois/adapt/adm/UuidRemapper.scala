@@ -1,16 +1,9 @@
 package com.galois.adapt.adm
 
-import java.io.{File, FileWriter}
-import java.util.UUID
-import java.util.function.BiConsumer
-
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef}
-import akka.pattern.ask
 import akka.stream.scaladsl.Flow
 import com.galois.adapt.MapDBUtils.AlmostMap
-import com.galois.adapt.adm.EntityResolution.Timed
-import org.mapdb.HTreeMap
+import com.galois.adapt.adm.EntityResolution.{Time, Timed}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -29,14 +22,16 @@ object UuidRemapper {
   type UuidRemapperFlow = Flow[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed]
 
   def apply(
-    expiryTime: Long,                      // How long to hold on to a CdmUUID (waiting for a remap) until we expire it
+    expiryNanos: Long,                      // How long to hold on to a CdmUUID (waiting for a remap) until we expire it
+    expiryCount: Long,                     // How many nodes to wait for to hold on to a CdmUUID until we expire it
+
     cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
     cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
     blocking: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]
   ): UuidRemapperFlow = Flow[Timed[UuidRemapperInfo]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]] { () =>
 
     // Keep track of current time art the tip of the stream, along with things that will expire
-    var currentTime: Long = 0
+    var currentTime: Time = Time(0,0)
     var expiryTimes: Fridge[CdmUUID] = Fridge.empty
 
 
@@ -70,16 +65,16 @@ object UuidRemapper {
 
 
     // Expire old UUIDs based on the current time. Note all this does is create a new node and call out to `putCdm2Adm`.
-    def updateTimeAndExpireOldUuids(time: Long): List[Either[ADM, EdgeAdm2Adm]] = {
+    def updateTimeAndExpireOldUuids(time: Time): List[Either[ADM, EdgeAdm2Adm]] = {
       var toReturn: mutable.ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty
 
-      if (time > currentTime) {
-        // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several "tip
-        // of the streams".
-        currentTime = time
+      if (time.nanos > currentTime.nanos) {
+        // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
+        // "tip of the streams".
+        currentTime = currentTime.copy(nanos = time.nanos)
 
-        while (expiryTimes.peekFirstToExpire.exists { case (_, t) => t <= currentTime }) {
-          val (keysToExpire, _) = expiryTimes.popFirstToExpire().get
+        while (expiryTimes.peekFirstNanosToExpire.exists { case (_, t) => t <= currentTime.nanos }) {
+          val (keysToExpire, _) = expiryTimes.popFirstNanosToExpire().get
 
           val emitted = for {
             cdmUuid <- keysToExpire
@@ -87,7 +82,30 @@ object UuidRemapper {
 
             originalCdms = originalCdmUuids.toList
             synthesizedAdm = AdmSynthesized(originalCdms)
-            _ = println(s"Expired ${synthesizedAdm.uuid}")
+            _ = println(s"Expired ${synthesizedAdm.uuid} (time based)")
+
+            out <- Left(synthesizedAdm) :: originalCdms.flatMap(cdmUuid => putCdm2Adm(cdmUuid, synthesizedAdm.uuid))
+          } yield out
+
+          toReturn ++= emitted
+        }
+      }
+
+      if (time.count > currentTime.count) {
+        // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
+        // "tip of the streams".
+        currentTime = currentTime.copy(count = time.count)
+
+        while (expiryTimes.peekFirstCountToExpire.exists { case (_, t) => t <= currentTime.count }) {
+          val (keysToExpire, _) = expiryTimes.popFirstCountToExpire().get
+
+          val emitted = for {
+            cdmUuid <- keysToExpire
+            (edges, originalCdmUuids) <- blocking.get(cdmUuid).toList
+
+            originalCdms = originalCdmUuids.toList
+            synthesizedAdm = AdmSynthesized(originalCdms)
+            _ = println(s"Expired ${synthesizedAdm.uuid} (count based)")
 
             out <- Left(synthesizedAdm) :: originalCdms.flatMap(cdmUuid => putCdm2Adm(cdmUuid, synthesizedAdm.uuid))
           } yield out
@@ -122,7 +140,8 @@ object UuidRemapper {
 
           // Set an expiry time, but only if there isn't one already
           if (!(expiryTimes.keySet contains advancedCdm)) {
-            expiryTimes.updateExpiryTime(advancedCdm, currentTime + expiryTime)
+            val expiryTime = currentTime.copy(nanos = currentTime.nanos + expiryNanos, count = currentTime.count + expiryCount)
+            expiryTimes.updateExpiryTime(advancedCdm, expiryTime)
           }
 
           List.empty
@@ -163,7 +182,7 @@ object UuidRemapper {
 
       // Update just the time
       case Timed(t, JustTime) =>
-        if (t == Long.MaxValue) { println("UUID remapping stage is emitting all its state...") }
+        if (t == Time.max) { println("UUID remapping stage is emitting all its state...") }
         updateTimeAndExpireOldUuids(t)
     }
   }

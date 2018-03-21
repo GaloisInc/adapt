@@ -3,7 +3,7 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.stream.scaladsl.Flow
-import com.galois.adapt.adm.EntityResolution.{CDM, Timed}
+import com.galois.adapt.adm.EntityResolution.{CDM, Time, Timed}
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
 
@@ -34,14 +34,16 @@ object ERStreamComponents {
 
     // This is the state we maintain per 'EventKey'
     case class EventMergeState(
-      wipAdmEvent: AdmEvent,                       // ADM event built up so far
+      wipAdmEvent: AdmEvent,                // ADM event built up so far
       dependent: Stream[UuidRemapperInfo],  // The path and edges that should be created with the AdmEvent
-      merged: Int                                  // The number of CDM events that have been folded in so far
+      merged: Int                           // The number of CDM events that have been folded in so far
     )
 
     def apply(
-      expireInNanos: Long,
-      maxEventsMerged: Int,
+      expireInNanos: Long,   // nanoseconds to wait before expiring an event chain
+      expireInCount: Long,   // node count to wait for before expiring an event chain
+      maxEventsMerged: Int,  // maximum number of events to put into an event chain
+
       activeChains: mutable.Map[EventKey, EventMergeState]
     ): TimedCdmToFutureAdm = Flow[(String,Timed[CDM])]
 
@@ -51,10 +53,12 @@ object ERStreamComponents {
         val expiryTimes: Fridge[EventKey] = Fridge.empty
 
         // Expire old events based on the current time
-        def expireOldChains(currentTime: Long): Stream[Timed[UuidRemapperInfo]] = {
+        def expireOldChains(currentTime: Time): Stream[Timed[UuidRemapperInfo]] = {
           var toReturnExpired = Stream[Timed[UuidRemapperInfo]]()
-          while (expiryTimes.peekFirstToExpire.exists { case (_,t) => t <= currentTime }) {
-            val (keysToExpire, _) = expiryTimes.popFirstToExpire().get
+
+          // Expire based on nanosecond timestamps
+          while (expiryTimes.peekFirstNanosToExpire.exists { case (_,t) => t <= currentTime.nanos }) {
+            val (keysToExpire, _) = expiryTimes.popFirstNanosToExpire().get
 
             for (keyToExpire <- keysToExpire) {
               val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
@@ -66,6 +70,22 @@ object ERStreamComponents {
               toReturnExpired = toReturn ++ toReturnExpired
             }
           }
+
+          // Expire based on node counts
+          while (expiryTimes.peekFirstCountToExpire.exists { case (_,t) => t <= currentTime.count }) {
+            val (keysToExpire, _) = expiryTimes.popFirstCountToExpire().get
+
+            for (keyToExpire <- keysToExpire) {
+              val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
+              val toReturn = Stream.concat(
+                Some(AnAdm(wipAdmEvent)),
+                dependent
+              ).map(elem => Timed(currentTime, elem))
+
+              toReturnExpired = toReturn ++ toReturnExpired
+            }
+          }
+
           toReturnExpired
         }
 
@@ -90,7 +110,7 @@ object ERStreamComponents {
                       dependent,
                       merged + 1
                     )
-                    expiryTimes.updateExpiryTime(eKey, currentTime + expireInNanos)
+                    expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
 
                     Stream.empty
 
@@ -117,7 +137,7 @@ object ERStreamComponents {
                       ),
                       1
                     )
-                    expiryTimes.updateExpiryTime(eKey, currentTime + expireInNanos)
+                    expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
 
                     toReturn
                 }
@@ -141,14 +161,14 @@ object ERStreamComponents {
                   ),
                   1
                 )
-                expiryTimes.updateExpiryTime(eKey, currentTime + expireInNanos)
+                expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
 
                 Stream.empty
             }
 
             toReturnChain ++ expireOldChains(currentTime)
 
-          case (_, Timed(_, TimeMarker(t))) => expireOldChains(t)
+          case (_, Timed(t, TimeMarker(_))) => expireOldChains(t)
 
           case _ => Stream.empty
         }
