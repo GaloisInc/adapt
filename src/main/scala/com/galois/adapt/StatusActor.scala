@@ -21,23 +21,25 @@ class StatusActor extends Actor {
       populationLog.toMap
     )
 
-    case PopulationLog(name, position, every, counterMap, secondsThisEvery, blockEdgesCount, blockingNodes, uuidsBlocking, blockedUuidResponses, cdm2cdmSize: Long, cdm2admSize, seenNodesSize, seenEdgesSize, currentTime) =>
-      counterMap.foreach{ case (k,v) =>
-        val key = s"$name: $k"
+    case p: PopulationLog =>
+      p.counter.foreach{ case (k,v) =>
+        val key = s"${p.name}: $k"
         populationLog += (key -> (populationLog.getOrElse(key, 0L) + v))
       }
 
-      generalRecords += ("every" -> every)
-      generalRecords += ("secondsThisEvery" -> secondsThisEvery)
-      generalRecords += ("blockEdgesCount" -> blockEdgesCount)
-      generalRecords += ("blockingNodes" -> blockingNodes)
-      generalRecords += ("uuidsBlocking" -> blockingNodes)
-      generalRecords += ("blockedUuidResponses" -> blockingNodes)
-      generalRecords += ("cdm2cdmSize" -> cdm2cdmSize)
-      generalRecords += ("cdm2admSize" -> cdm2admSize)
-      generalRecords += ("seenNodesSize" -> seenNodesSize)
-      generalRecords += ("seenEdgesSize" -> seenEdgesSize)
-      generalRecords += ("monotonicTime" -> currentTime)
+      generalRecords += ("every" -> p.every)
+      generalRecords += ("secondsThisEvery" -> p.secondsThisEvery)
+      generalRecords += ("blockEdgesCount" -> p.blockEdgesCount)
+      generalRecords += ("blockingNodes" -> p.blockingNodes)
+      generalRecords += ("uuidsBlocking" -> p.blockingNodes)
+      generalRecords += ("blockedUuidResponses" -> p.blockingNodes)
+      generalRecords += ("activeEventChains" -> p.activeEventChains)
+      generalRecords += ("cdm2cdmSize" -> p.cdm2cdmSize)
+      generalRecords += ("cdm2admSize" -> p.cdm2admSize)
+      generalRecords += ("seenNodesSize" -> p.seenNodesSize)
+      generalRecords += ("seenEdgesSize" -> p.seenEdgesSize)
+      generalRecords += ("monotonicTime" -> p.currentTime)
+      generalRecords += ("sampledTime" -> p.sampledTime)
 
     case InitMsg => currentlyIngesting = true
     case CompleteMsg => currentlyIngesting = false
@@ -56,11 +58,13 @@ case class PopulationLog(
   blockingNodes: Long,
   uuidsBlocking: Int,
   blockedUuidResponses: Int,
+  activeEventChains: Long,
   cdm2cdmSize: Long,
   cdm2admSize: Long,
   seenNodesSize: Long,
   seenEdgesSize: Long,
-  currentTime: Long
+  currentTime: Long,
+  sampledTime: Long
 )
 
 case class IncrementCount(name: String)

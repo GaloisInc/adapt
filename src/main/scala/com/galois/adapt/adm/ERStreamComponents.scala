@@ -29,22 +29,25 @@ object ERStreamComponents {
 
     // In order to consider merging two events, we need them to have the same key, which consists of the subject UUID,
     // predicate object UUID, and predicate object 2 UUID.
-    private type EventKey = (String, Option[UUID], Option[UUID], Option[UUID])
+    type EventKey = (String, Option[UUID], Option[UUID], Option[UUID])
     private def key(e: Event, p: String): EventKey = (p, e.subjectUuid, e.predicateObject, e.predicateObject2)
 
     // This is the state we maintain per 'EventKey'
-    private case class EventMergeState(
+    case class EventMergeState(
       wipAdmEvent: AdmEvent,                       // ADM event built up so far
       dependent: Stream[UuidRemapperInfo],  // The path and edges that should be created with the AdmEvent
       merged: Int                                  // The number of CDM events that have been folded in so far
     )
 
-    def apply(expireInNanos: Long, maxEventsMerged: Int): TimedCdmToFutureAdm = Flow[(String,Timed[CDM])]
+    def apply(
+      expireInNanos: Long,
+      maxEventsMerged: Int,
+      activeChains: mutable.Map[EventKey, EventMergeState]
+    ): TimedCdmToFutureAdm = Flow[(String,Timed[CDM])]
 
       .statefulMapConcat { () =>
 
         // INVARIANT: the keys in the fridge should match the keys of the active chains
-        val activeChains: mutable.Map[EventKey, EventMergeState] = mutable.Map.empty
         val expiryTimes: Fridge[EventKey] = Fridge.empty
 
         // Expire old events based on the current time

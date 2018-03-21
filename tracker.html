@@ -96,7 +96,32 @@
         <td align="right"><div id="er-time-xmax">xmax</div></td>
       </tr>
     </table>
-    
+   
+    <table>
+      <caption><h3>Tip of the stream time (in ER), not-monotonic</h3></caption>
+      <tr>
+        <td valign="top"><div id="sampled-time-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="sampled-time" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="sampled-time-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="sampled-time-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="sampled-time-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="sampled-time-xmin">xmin</div></td>
+        <td align="right"><div id="sampled-time-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+
     <table>
       <caption><h3>Size of Cdm2Cdm Map</h3></caption>
       <tr>
@@ -120,6 +145,31 @@
         <td align="right"><div id="cdm2cdm-size-xmax">xmax</div></td>
       </tr>
     </table>
+ 
+    <table>
+      <caption><h3>Number of active event chains</h3></caption>
+      <tr>
+        <td valign="top"><div id="eventchains-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="eventchains-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="eventchains-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="eventchains-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="eventchains-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="eventchains-size-xmin">xmin</div></td>
+        <td align="right"><div id="eventchains-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
 
     <table>
       <caption><h3>Size of Cdm2Adm Map</h3></caption>
@@ -346,6 +396,33 @@
         obj => ({
             x: Date.now(),
             y: Number(obj.generalRecords.monotonicTime),
+        }),
+      ),
+      new Graph(
+        document.getElementById('sampled-time'),
+        document.getElementById('sampled-time-ymin'),
+        document.getElementById('sampled-time-ymax'),
+        document.getElementById('sampled-time-xmin'),
+        document.getElementById('sampled-time-xmax'),
+        document.getElementById('sampled-time-curr'),
+        document.getElementById('sampled-time-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.sampledTime),
+        }),
+      ),
+
+      new Graph(
+        document.getElementById('eventchains-size'),
+        document.getElementById('eventchains-size-ymin'),
+        document.getElementById('eventchains-size-ymax'),
+        document.getElementById('eventchains-size-xmin'),
+        document.getElementById('eventchains-size-xmax'),
+        document.getElementById('eventchains-size-curr'),
+        document.getElementById('eventchains-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.activeEventChains),
         }),
       ),
       new Graph(

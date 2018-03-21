@@ -13,7 +13,7 @@ import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
@@ -29,6 +29,7 @@ import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+import com.galois.adapt.adm.EntityResolution.Timed
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
@@ -235,12 +236,22 @@ object Application extends App {
       startWebServer()
       CDMSource.cdm18(ta1).via(printCounter(name, statusActor)).runWith(sink)
 
+//    case "time" =>
+//
+//      CDMSource.cdm18(ta1)
+//        .via(printCounter("File Input", statusActor))
+//        .via(EntityResolution.annotateTime((config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos))
+//        .map((x: (String,Timed[CDM18])) => ByteString(x._2.time + "\n"))
+//        .runWith(FileIO.toPath(Paths.get("timestamps")))
+
     case "csvmaker" | "csv" =>
 
       val forCdm = config.getBoolean("adapt.ingest.producecdm")
       val forAdm = config.getBoolean("adapt.ingest.produceadm")
 
       val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
+      startWebServer()
+      statusActor ! InitMsg
 
       // CSV generation
       //

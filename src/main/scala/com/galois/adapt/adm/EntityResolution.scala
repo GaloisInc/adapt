@@ -6,7 +6,7 @@ import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
-import com.galois.adapt.adm.ERStreamComponents._
+import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -24,6 +24,9 @@ object EntityResolution {
   // easy access to them for logging/debugging purposes.
   var monotonicTime: Long = 0
   var sampledTime: Long = 0
+
+  // This is just for logging state held onto by the `EventResolution` branch of `erWithoutRemaps`
+  var activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
 
   // This is just for logging state held onto by `asyncDeduplicate` .
   var blockedEdgesCount: Long = 0
@@ -52,7 +55,7 @@ object EntityResolution {
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
-      .via(erWithoutRemapsFlow(eventExpiryTime, maxEventsMerged))             // Entity resolution without remaps
+      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blocking))    // Remap UUIDs
       .via(asyncDeduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
@@ -76,8 +79,7 @@ object EntityResolution {
 
     Flow[(String,CDM)].map { case (provider, cdm: CDM) =>
 
-      for (time <- timestampOf(cdm); if time > monotonicTime) {
-        sampledTime = time
+      for (time <- timestampOf(cdm); _ = { sampledTime = time; () }; if time > monotonicTime) {
         cdm match {
           case _: TimeMarker if time > monotonicTime => monotonicTime = time
 
@@ -99,16 +101,20 @@ object EntityResolution {
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs, Edges, and general information to hand of to
   // the UUID remapping stage.
-  private def erWithoutRemapsFlow(eventExpiryTime: Long, maxEventsMerged: Int): ErFlow =
+  private def erWithoutRemaps(
+    eventExpiryTime: Long,
+    maxEventsMerged: Int,
+    activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState]
+  ): ErFlow =
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
 
       val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
-      broadcast ~> EventResolution(eventExpiryTime, maxEventsMerged) ~> merge
-      broadcast ~> SubjectResolution.apply                           ~> merge
-      broadcast ~> OtherResolution.apply                             ~> merge
+      broadcast ~> EventResolution(eventExpiryTime, maxEventsMerged, activeChains) ~> merge
+      broadcast ~> SubjectResolution.apply                                         ~> merge
+      broadcast ~> OtherResolution.apply                                           ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })
