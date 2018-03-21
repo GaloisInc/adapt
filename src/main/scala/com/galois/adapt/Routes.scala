@@ -72,7 +72,7 @@ object Routes {
                 val query = querySeq.getOrElse(Seq.empty).toList
                 import ApiJsonProtocol._
                 complete(
-                  (ppmActor ? PpmTreeQuery(treeName, query)).mapTo[PpmTreeResult].map(_.toUiTree)
+                  (ppmActor ? PpmTreeQuery(treeName, query)).mapTo[PpmTreeResult].map(t => List(UiTreeFolder(treeName, true, t.toUiTree.toSet)))
                 )
               }
             }

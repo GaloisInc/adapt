@@ -378,7 +378,7 @@ object Application extends App {
         .via(FSOX.apply)
         .runWith(Sink.foreach(println))
 
-    case "novelty" | "novel" | "ppm" =>
+    case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
