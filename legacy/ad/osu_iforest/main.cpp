@@ -495,6 +495,8 @@ int main(int argc, char* argv[]) {
 				cmdIdx.push_back(i);
 		}
 		std::cout << " -> " << cmdIdx.size() << std::endl;
+		if(strcmp(cmd, "NA") == 0)// No model building for command NA i.e. whose command is unknown
+			continue;
 		if((int)cmdIdx.size() < skipLimit)
 			continue;
 		std::vector<int> restidx = getRestIdx(cmdIdx, dt->nrow);
@@ -611,18 +613,18 @@ int main(int argc, char* argv[]) {
 		char tmp1[1000], tmp2[1000];
 		string s(output_name);
 		if(s.find_last_of('.') != string::npos){
-			sprintf(tmp1, "%s_relevant.csv", s.substr(0, s.find_last_of('.')).c_str());
-			sprintf(tmp2, "%s_irrelevant.csv", s.substr(0, s.find_last_of('.')).c_str());
+			sprintf(tmp1, "%s_common_process_alarms.csv", s.substr(0, s.find_last_of('.')).c_str());
+			sprintf(tmp2, "%s_uncommon_process_alarms.csv", s.substr(0, s.find_last_of('.')).c_str());
 		}
 		else{
-			sprintf(tmp1, "%s_relevant.csv", output_name);
-			sprintf(tmp2, "%s_irrelevant.csv", output_name);
+			sprintf(tmp1, "%s_common_process_alarms.csv", output_name);
+			sprintf(tmp2, "%s_uncommon_process_alarms.csv", output_name);
 		}
 		printScoreToFile(scoresRel, testcsv, testmetadata, testdt, tmp1);
 		printScoreToFile(scoresIrrel, testcsv, testmetadata, testdt, tmp2);
 	}
 
-	// delete the model
+	// delete the models
 	for(std::map<std::string,OnlineIF *>::iterator iff = IFModels.begin(); iff != IFModels.end(); iff++){
 		delete iff->second;
 	}
