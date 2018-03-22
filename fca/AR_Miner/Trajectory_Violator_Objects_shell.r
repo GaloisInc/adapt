@@ -6,6 +6,10 @@ library(grid)
 library(ggplot2)
 library(lattice)
 library(latticeExtra)
+library('RCurl')
+library('RJSONIO')
+library('plyr')
+library(jsonlite)
 
 args <- commandArgs()
 print(args)
@@ -16,6 +20,7 @@ contextname=as.character(args[9])
 sup=as.numeric(args[10])
 conf=as.numeric(args[11])
   
+cat("reading \n",input_scoring_file)
 gt_Objects=as.list(gt_file)
 gt_Objects=as.character(unlist(gt_Objects))
   
@@ -24,6 +29,7 @@ gt_Objects=as.character(unlist(gt_Objects))
     cat("\n Conf: ",conf)
     if(!file.exists(input_scoring_file))stop(" input_scoring_file does not exist")
     if (file.size(input_scoring_file) == 0)   stop("input_scoring_file is null")
+    cat("reading feedback_input_scoring_file\n",input_scoring_file)
     
     Objects_With_Scores   <- read.csv(input_scoring_file) 
     ObjectViolator=as.list(Objects_With_Scores$Objects)
@@ -31,6 +37,7 @@ gt_Objects=as.character(unlist(gt_Objects))
     length(ObjectViolator) 
     if(length(ObjectViolator) ==0) stop(" The set of violator Objects is empty ")
     Objects_With_Scores =arrange(Objects_With_Scores ,desc(AVGScoresOfObjectsConfidence))#AVGScoresOfObjectsLift))#AVGScoresOfObjectsConfidence))
+    cat("reading Original_input_scoring_file \n",Original_input_scoring_file)
     
     if(!file.exists(Original_input_scoring_file))stop(" Original_input_scoring_file does not exist")
     if (file.size(Original_input_scoring_file) == 0)   stop("Original_input_scoring_file is null")
@@ -53,6 +60,10 @@ gt_Objects=as.character(unlist(gt_Objects))
       cat("\n")
       cat(paste0(Original_indx,sep = ','))
         #  par(mar=c(5, 4, 4, 6) + 0.1)
+      filename=paste0("./contexts/",contextname,
+                      "_FEEDBACK_Trajectory_Conf_",conf,"_Sup_",sup,".jpeg",sep="")
+      jpeg(filename)
+      
       title=paste0("Violator objects tractory analysis"," Sup:",sup,"|Conf:",conf,sep="")
       plot(1:length(TP),indx, type='l',xlab="Attack objects (True positives)" ,
            ylab="Position in the ranked list (Conf)" ,col="red",main=title,ylim=range(  min(indx,Original_indx),max(indx,Original_indx)))
@@ -71,8 +82,8 @@ gt_Objects=as.character(unlist(gt_Objects))
       
       #axis(1,pretty(1:length(TP)))
       #mtext("Attack objects (True positives)",side=1,col="black",line=2.5)  
-      
-     
+      dev.off() 
+      cat("\n image saved in \n",filename)
       
     }
   

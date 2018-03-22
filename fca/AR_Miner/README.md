@@ -97,7 +97,7 @@ Example:
 
 ### Data Processing and scoring:
 
-\$> ./Context_scoring_From_CSV.sh: in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/Context_Scoring_From_CSV.sh.
+\$> ./context_scoring_From_CSV.sh: in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/c./C  ontext_Scoring_From_CSV.sh.
 It is the second main script that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* as string, the previously produced *csv context*, and *rcf context files*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
 An output example is in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Scoring_Of_Context_ProcessEvent-cadet-pandex.csv.
  
@@ -140,12 +140,13 @@ Default example to run in \$> *./Scoring_Rules_Using_Benign_Feedback_Shell.sh* :
 *MinConf='97'*
 *Benign_file='./contexts/AssociationRules_Benign_ProcessEvent-Cadet-Pandex.csv'*
 *original_scoring_file='./contexts/Scoring_Of_Context_ProcessEvent-cadet-pandex.csv'*
-*Rscript Scoring_Rules_Using_Benign_Feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file*
+*Rscript Scoring_Rules_Using_Benign_feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file*
  
+ An output example of this script is in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Output_Scoring_Feedback_Of_Context_ProcessEvent.csv:
 
 ### Violator objects analysis:
 
-\$>  *./Trajectory_Violator_Objects_Shell.sh*: This script analyses the variation of the positions of the violator objects in the ranked violator lists before and after the feedbacks have been taken into account. It takes as inputs: The scoring file produced with *./Context_scoring_From__CSV.sh*, the second scoring file produced with   *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*, and the adequate ground truth file.
+\$>  *./Trajectory_Violator_Objects_Shell.sh*: This script analyses the variation of the positions of the violator objects in the ranked violator lists before and after the feedbacks have been taken into account. It takes as inputs: The scoring file produced with *./Context_scoring_From_CSV.sh*, the second scoring file produced with   *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*, and the adequate ground truth file (eg. cadets_pandex_webshell.json).
 
 
 ![Example of the violator objects analysis](./img/feedback.jpeg)
