@@ -18,8 +18,6 @@ sudo apt-get install libcairo2-dev
 
 sudo apt-get install libxt-dev
 
-sudo apt-get install git-core
-
 
 After that, it is necessary to install some packages before executing the scripts. They are detailed in *chek_packages.r*.
 For example, to install a package from R, we do:
