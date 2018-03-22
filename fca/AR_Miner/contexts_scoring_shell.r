@@ -108,10 +108,11 @@ cat('\n ############### Association Rule Mining ######################## \n')
         cat('Obj \n',Obj)
         for(Rule in 1:length(CoronOutPut)){
           RulescoreConf=0.0
-          RulescoreLift=0.0
-          if(length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 & length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0        )
-          {##Violation =============================================
-            ##violation with score based on confidence
+          RulescoreLift=0.0 
+          if(length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0)
+          {
+            if( length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 )
+            {##Violation =============================================  ##violation with score based on confidence
             nbViolatedRules=nbViolatedRules+1
             RulescoreConf=log2(1-as.double(Confidence[Rule])/100)
             GlobalscoreConf=GlobalscoreConf+RulescoreConf
@@ -143,7 +144,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
             }
             
             
-            
+            } 
           }###================================================endif violation
           
         }##for rules
@@ -209,8 +210,8 @@ cat('\n ############### Association Rule Mining ######################## \n')
     ))
     
     
-    cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
-     write.csv(file=output_scoring_file, df.ObjectsWithScores)
+    cat('\n Association Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
+    write.csv(file=output_scoring_file, df.ObjectsWithScores)
     cat('\n Saving Scores of the Rules in ===> :  ',output_scoring_file)
     
      
