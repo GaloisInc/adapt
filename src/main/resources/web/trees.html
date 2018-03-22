@@ -5,6 +5,7 @@
     <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
     <script type="text/javascript" src="javascripts/underscore.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
+    <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
     <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
     <script type="text/javascript">
 
@@ -38,10 +39,10 @@ $(function(){
 
 	function createFancyTree(treeName) {
 		
-		var shouldExpand = false
+		var shouldExpandAll = false
 
 		$("#" + treeName).fancytree({
-			extensions: ["filter", "table", "childcounter"],
+			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
 			source: {
 				url: "/api/ppm/" + treeName,
 				cache: false
@@ -75,7 +76,6 @@ $(function(){
 				// $tdList.eq(3).text("node.data")
 				$tdList.eq(4).html(
 					'<a target="_blank" href="/#g.V().hasLabel(\'AdmPathNode\').has(\'path\',\''+ node.title +'\')">Show Graph</a>'
-					// '<input name="important" type="checkbox" value="' + node.key + '">'
 				)
 			},
 
@@ -109,7 +109,7 @@ $(function(){
 					return x === y ? 0 : x > y ? 1 : -1
 				}
 		    	tree.fancytree("getRootNode").sortChildren(sortFunc, true) 
-		    	if (shouldExpand) {
+		    	if (shouldExpandAll) {
 		    		tree.fancytree("getTree").visit( function(node){
 						node.setExpanded(true)// Expand all tree nodes
 					})
