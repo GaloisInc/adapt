@@ -1,15 +1,17 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
+import spray.json.DefaultJsonProtocol._
+import spray.json._
+
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
-import scala.collection.JavaConverters._
 
+import scala.collection.JavaConverters._
 import scala.util.Try
-import scala.util.parsing.json.JSON
 
 
 object NoveltyDetection {
@@ -317,38 +319,24 @@ case object TreeRepr {
 }
 
 case object ProcessDirectoryTouchesAux {
-  def readJSONFromFile(filePath: String): Map[String, Int] = {
-    class CC[T] {
-      def unapply(a: Any): Option[T] = Some(a.asInstanceOf[T])
-    }
-
-    object M extends CC[Map[String, Any]]
-
-    object N extends CC[List[Any]]
-
-    object S extends CC[String]
-
-    object D extends CC[Double]
-
-    val filePathModel = (jsonString: String) => for {
-      Some(M(map)) <- List(JSON.parseFull(jsonString))
-      N(processes) = map("processes")
-      M(process) <- processes
-      S(name) = process("name")
-      D(depth) = process("depth")
-    } yield {
-      (name, depth.toInt)
-    }
+  def readJsonFile(filePath: String): Map[String,Int] = {
+    case class ProcessDepth(name: String, depth: Int)
+    implicit val ProcessToDepthFormat = jsonFormat2(ProcessDepth)
 
     val bufferedSource = scala.io.Source.fromFile(filePath)
-    val filePathModelMap = filePathModel(bufferedSource.getLines.mkString).toMap
-    bufferedSource.close
-    filePathModelMap
+    val jsonString = bufferedSource.getLines.mkString
+    bufferedSource.close()
+
+    val processDepthList = jsonString.parseJson.asJsObject.getFields("processes") match {
+      case Seq(processes) => processes.convertTo[List[ProcessDepth]]
+      case x => deserializationError("Do not understand how to deserialize " + x)
+    }
+    processDepthList.map(x => x.name -> x.depth).toMap
   }
 
   val auxFilePath: Option[ExtractedValue] = Try(Application.config.getString("adapt.ppm.basedir") +
     Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.auxfile")).toOption
-  val processToDepth: Map[String, Int] = auxFilePath.map(readJSONFromFile).getOrElse(Map.empty[String, Int])
+  val processToDepth: Map[String, Int] = auxFilePath.map(readJsonFile).getOrElse(Map.empty[String, Int])
 
   def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
     o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 && // file path must exist and have length greater than 1
