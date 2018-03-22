@@ -3,6 +3,7 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util.UUID
+import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
@@ -116,24 +117,47 @@ object Application extends App {
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
+  val mapdbCdm2CdmOverflow = db.hashMap("cdm2cdmOverflow")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .createOrOpen()
+  val mapdbCdm2Cdm = db.hashMap("cdm2cdm")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .expireOverflow(mapdbCdm2CdmOverflow)
+    .expireAfterCreate()
+    .expireAfterGet()
+    .expireMaxSize(1000000)
+    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .createOrOpen()
+
+  val mapdbCdm2AdmOverflow = db.hashMap("cdm2admOverflow")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .createOrOpen()
+  val mapdbCdm2Adm = db.hashMap("cdm2adm")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .expireOverflow(mapdbCdm2AdmOverflow)
+    .expireAfterCreate()
+    .expireAfterGet()
+    .expireMaxSize(1000000)
+    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .createOrOpen()
+
+
   // These are the maps that `UUIDRemapper` will use
   val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
-    db.hashMap("cdm2cdm")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .counterEnable()
-      .createOrOpen(),
-
+    mapdbCdm2Cdm,
     { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
     { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
   )
   val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
-    db.hashMap("cdm2adm")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .counterEnable()
-      .createOrOpen(),
-
+    mapdbCdm2Adm,
     { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
     { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
   )
