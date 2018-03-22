@@ -38,7 +38,7 @@ MinSup=as.numeric(args[10])
 MinConf=as.numeric(args[11])
 benign_input_association_rules_file=as.character(args[12])
 violators_file=as.character(args[13])
-gt_file=as.character(args[14])
+#gt_file=as.character(args[14])
 myWorkingDirectory=getwd()
 options(max.print=10000000)
 
@@ -146,8 +146,8 @@ cat('\n ############### Association Rule Mining ######################## \n')
         CurrentScoreRules=as.vector(as.numeric(CurrentScoreRules))
         CurrentScoreRules=replace(CurrentScoreRules, CurrentScoreRules==Inf, 100)
         weightVector = as.list(CurrentListRules %in% BenignAssociationRulesList)
-        weightVector=ifelse(weightVector=="FALSE",1,weight/length(which(weightVector==TRUE)))
-        #  weightVector=ifelse(weightVector=="FALSE",weight*2^length(which(weightVector==FALSE)),weight*0.9^length(which(weightVector==TRUE)))
+        #weightVector=ifelse(weightVector=="FALSE",1,weight/length(which(weightVector==TRUE)))
+         weightVector=ifelse(weightVector=="FALSE",2^length(which(weightVector==FALSE)),0.7^length(which(weightVector==TRUE)))
         
         
         ResultScoreVector=weightVector*CurrentScoreRules

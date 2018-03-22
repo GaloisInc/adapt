@@ -6,26 +6,47 @@ It is necessary to install some packages before executing the scripts. They are 
 For example, to install a package from R, we do:
 
 install.packages("RJSONIO",repos = "http://cran.us.r-project.org")
+
 install.packages("jsonlite",repos = "http://cran.us.r-project.org")
+
 install.packages("curl",repos = "http://cran.us.r-project.org")
+
 install.packages("grid",repos = "http://cran.us.r-project.org")
+
 install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+
 install.packages("gridBase",repos = "http://cran.us.r-project.org")
+
 install.packages("gridExtra",repos = "http://cran.us.r-project.org")
+
 install.packages("grid",repos = "http://cran.us.r-project.org")
+
 install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+
 install.packages("lattice",repos = "http://cran.us.r-project.org")
+
 install.packages("latticeExtra",repos = "http://cran.us.r-project.org")
+
 install.packages("dplyr",repos = "http://cran.us.r-project.org")
+
 install.packages("tidyr",repos = "http://cran.us.r-project.org")
+
 install.packages("glue",repos = "http://cran.us.r-project.org")
+
 install.packages("reshape2",repos = "http://cran.us.r-project.org")
+
 install.packages("stringi",repos = "http://cran.us.r-project.org")
+
 install.packages("stringr",repos = "http://cran.us.r-project.org")
+
 install.packages("data.table",repos = "http://cran.us.r-project.org")
+
 install.packages("RNeo4j",repos = "http://cran.us.r-project.org")
+
 install.packages("RCurl",repos = "http://cran.us.r-project.org")
+
 install.packages("plyr",repos = "http://cran.us.r-project.org")
+
 ...
  
 It is preferable to install RStudio to manage the project and execute the scripts. Although, the use of shell scripts is also possible as detailed below.
@@ -34,13 +55,14 @@ It is preferable to install RStudio to manage the project and execute the script
  
 ## Running AR-RULES MINING: 
 ### Data Generation and Preparation:
-It is the first step of the workflow. It starts by interrogating the Neo4J database using a json specification file, and generates the formal context files with two formats: csv, and rcf.
+It is the first step of the workflow. It starts by querying the Neo4J database using a json specification file, and generates the formal context files with two formats: csv, and rcf.
 This step can be done, either by *calling get_query.r* from RStudio, or using the bash script *extractProcessEvent.sh*. The needed information are: an input json specification file that conains the Gremlin query, an output csv file, and an output rcf file.
+It is available in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/extractProcessEvent.sh
 
 Example: 
 
-*$> ./extractProcessEvent.sh*
-It will create the ProcessEvent context files: *'./contexts/ProcessEventSample.csv'* and *'./contexts/PrecessEventSample.rcf'*.
+*$> ./extractProcessEvent.sh*:
+It will create the ProcessEvent context files: *'./contexts/ProcessEventSample.csv'* and *'./contexts/PrecessEventSample.rcf'*. One can use the pre-produced file for Cadet-Pandex DB: https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Context_ProcessEvent.csv, https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Context_ProcessEvent.rcf.
 
 We can do the same process under un R environment:
 
@@ -48,7 +70,7 @@ We can do the same process under un R environment:
 
 *R prompt> get_query("JsonSpecFile"","rcf_context_file","csv_file"")*
 
-![Exxample of csv context](./img/context.jpeg)
+![Example of produced csv context](./img/context.jpeg)
 
 In this first step, many other sub-modules are also available:
 
@@ -75,10 +97,11 @@ Example:
 
 ### Data Processing and scoring:
 
-\$> ./Context_scoring_From__CSV.sh: is actually the second main shell that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* string, a produced *csv context file*, an *rcf file*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
+\$> ./Context_scoring_From_CSV.sh: in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/Context_Scoring_From_CSV.sh.
+It is the second main script that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* as string, the previously produced *csv context*, and *rcf context files*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
 
  
-Default example to run in \$> *./Context_scoring_From__CSV.sh* :
+Default example to run is \$> *./Context_scoring_From_CSV.sh* :
 
 *#!/bin/bash *
 
@@ -90,9 +113,9 @@ Default example to run in \$> *./Context_scoring_From__CSV.sh* :
 
 *output_scoring_file='./contexts/Scoring_Of_Context_ProcessEvent.csv'*
 
-*MinSup='90'*
+*MinSup='97'*
 
-*MinConf='90'*
+*MinConf='97'*
 
 *Rscript contexts_scoring_shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf*
  
@@ -104,7 +127,7 @@ Default example to run in \$> *./Context_scoring_From__CSV.sh* :
 
 ### Data scoring with feedback analysis:
  
- \$>  *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*: The aim with this analysis is to include the rules, which were generated with the benign DB as feedback during the scoring and ranking. It uses the previously generated scores file *Scoring_Of_Context_ProcessEvent.csv* that becomes the input of the feedback analysis as *Input_Scoring_Of_Context_ProcessEvent.csv*. It also needs a benign association rules that are generated using the same context in the benign DB (*benign_rules.csv*). Finally, the scipt also needs a ground truth file for the adequate database (*gt_file*).
+ \$>  *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*: The aim with this analysis is to include the rules, which were generated with the benign DB as feedback during the scoring and ranking. It uses the previously generated scores file *Scoring_Of_Context_ProcessEvent.csv* that becomes the input of the feedback analysis as *original_scoring_file* in the shell script. It also needs a benign association rules that are generated using the same context in the benign DB (*benign_rules.csv* available for caet panedx in ). 
  
 Default example to run in \$> *./Scoring_Rules_Using_Benign_Feedback_Shell.sh* :
 
@@ -117,7 +140,6 @@ Default example to run in \$> *./Scoring_Rules_Using_Benign_Feedback_Shell.sh* :
 *MinConf='90'*
 *Benign_file='./contexts/benign_rules.csv'*
 *original_scoring_file='./contexts/Input_Scoring_Of_Context_ProcessEvent.csv'*
-*gt_file='./contexts/gt_file.json'*
 *Rscript Scoring_Rules_Using_Benign_Feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file $gt_file*
  
 
