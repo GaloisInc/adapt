@@ -9,4 +9,4 @@ Benign_file='./contexts/AssociationRules_Benign_ProcessEvent-Cadet-Pandex.csv'
 #'./contexts/benign_rules.csv'
 original_scoring_file='./contexts/Scoring_Of_Context_ProcessEvent-cadet-pandex.csv'
 #/contexts/Input_Scoring_Of_Context_ProcessEvent.csv'
-Rscript Scoring_Rules_Using_Benign_Feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file 
+Rscript Scoring_Rules_Using_Benign_feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file 
