@@ -2,8 +2,29 @@
 
 ## Prerequisites
 We have used R cran version 3.4.3 to write the scripts in the repository. 
-It is necessary to install some packages before executing the scripts. They are detailed in *chek_packages.r*.
+To install R for ubuntu, we need to run the following commads:
+
+sudo sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list'
+
+gpg --keyserver keyserver.ubuntu.com --recv-key E084DAB9
+
+gpg -a --export E084DAB9 | sudo apt-key add -
+
+sudo apt-get update
+
+sudo apt-get -y install r-base libapparmor1 libcurl4-openssl-dev libcurl4-gnutls-dev libxml2-dev libssl-dev gdebi-core
+
+sudo apt-get install libcairo2-dev
+
+sudo apt-get install libxt-dev
+
+sudo apt-get install git-core
+
+
+After that, it is necessary to install some packages before executing the scripts. They are detailed in *chek_packages.r*.
 For example, to install a package from R, we do:
+
+$R>
 
 install.packages("RJSONIO",repos = "http://cran.us.r-project.org")
 
