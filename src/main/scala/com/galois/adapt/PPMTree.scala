@@ -60,7 +60,7 @@ object NoveltyDetection {
 //        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
 //      )
 //    ),
-    PpmDefinition( "ProcessDirectoryTouches",
+    PpmDefinition( "ProcessDirectoryTouchesV1",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
       List(
         (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
