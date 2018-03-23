@@ -14,7 +14,7 @@ object NoveltyDetection {
   type Object = (ADM, Option[AdmPathNode])
 
   type ExtractedValue = String
-  type Discriminator = (Event, Subject, Object) => ExtractedValue
+  type Discriminator = (Event, Subject, Object) => List[ExtractedValue]
   type Filter = (Event, Subject, Object) => Boolean
 
   type Alarm = List[(String, Float, Float, Int)]
@@ -23,28 +23,34 @@ object NoveltyDetection {
     PpmDefinition( "ProcessFileTouches",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
+        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
     PpmDefinition( "FilesTouchedByProcesses",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>")),
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
     PpmDefinition( "FilesExecutedByProcesses",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_EXECUTE,
       List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>"),
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path).getOrElse("<no_path_node>")
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
+        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
     PpmDefinition("ProcessesWithNetworkActivity",
       (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
       List(
-        (e: Event, s: Subject, o: Object) => s._2.map(_.path).getOrElse("<no_path_node>")
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>"))
+      )
+    ),
+    PpmDefinition("DirectoryStructure",
+      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmFileObject],
+      List(
+        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
       )
     )
   )
@@ -54,10 +60,11 @@ object NoveltyDetection {
 case class PpmDefinition(name: String, filter: Filter, discriminators: List[Discriminator]) {
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
   val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
-  val tree = PpmTree(filter, discriminators, inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
+  val tree = PpmTree(inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
   var alarms: Map[List[ExtractedValue], (Long, Alarm, Map[String, Int])] = Map.empty
 
-  def observe(observation: (Event, Subject, Object)): Option[Alarm] = (tree.update _).tupled(observation)
+  def observe(observation: (Event, Subject, Object)): Option[Alarm] = if (filter(observation._1, observation._2, observation._3))
+    tree.observe(PpmTree.prepareObservation(observation._1, observation._2, observation._3, discriminators)) else None
   def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = alarms + (a.map(_._1) -> (System.currentTimeMillis, a, Map.empty[String,Int])))
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).map { a =>
     if (rating.isDefined) // set the alarm rating in this namespace
@@ -74,16 +81,21 @@ case class PpmDefinition(name: String, filter: Filter, discriminators: List[Disc
 
 trait PpmTree {
   def getCount: Int
-  def update(e: Event, s: Subject, o: Object): Option[Alarm] = this.update(e, s, o, 1F, 1F)
-  def update(e: Event, s: Subject, o: Object, yourProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm]
+  def observe(ds: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm]
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
+  var children: Map[ExtractedValue, PpmTree]
+  override def equals(obj: scala.Any) = obj.isInstanceOf[PpmTree] && {
+    val o = obj.asInstanceOf[PpmTree]
+    o.getCount == getCount && o.children == children
+  }
 }
 case object PpmTree {
-  def apply(filter: Filter, discriminators: List[Discriminator], serialized: Option[TreeRepr] = None): PpmTree = new SymbolNode(filter, discriminators, serialized)
+  def apply(serialized: Option[TreeRepr] = None): PpmTree = new SymbolNode(serialized)
+  def prepareObservation(e: Event, s: Subject, o: Object, ds: List[Discriminator]): List[ExtractedValue] = ds.flatMap(_.apply(e, s, o))
 }
 
 
-class SymbolNode(val filter: Filter, val discriminators: List[Discriminator], repr: Option[TreeRepr] = None) extends PpmTree {
+class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
   private var counter = 0
   def getCount: Int = counter
 
@@ -95,7 +107,7 @@ class SymbolNode(val filter: Filter, val discriminators: List[Discriminator], re
     counter = thisTree.count
     children = thisTree.children.map {
       case c if c.key == "_?_" => c.key -> new QNode(children)
-      case c => c.key -> new SymbolNode(filter, discriminators.tail, Some(c))
+      case c => c.key -> new SymbolNode(/*filter,*/ /*extractedValues.tail,*/ Some(c))
     }.toMap
   }
 
@@ -104,48 +116,38 @@ class SymbolNode(val filter: Filter, val discriminators: List[Discriminator], re
   def localChildProbability(identifier: ExtractedValue): Float =
     children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-  def update(e: Event, s: Subject, o: Object, thisLocalProb: Float, parentGlobalProb: Float): Option[Alarm] = if (filter(e,s,o)) {
+  def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F) = {
     counter += 1
-    discriminators match {
+    extractedValues match {
       case Nil => None
-      case discriminator :: remainingDiscriminators =>
-        val extracted = discriminator(e, s, o)
-
-        val childExists = children.contains(extracted)  // Merge suffixes? Would have to alter existing child nodes in the case of a child key being the suffix of the incoming key.
-        // What to do about a suffix merged into a full path, followed by another full path which could have had the suffix applied to it?
-        // Perhaps suffix nodes should accumulate in their own nodes, and counted in aggregate on read. This would almost require parent counts to be computed lazily.
-        // ...or skip suffix folding entirely.
-
-        val childNode = children.getOrElse(extracted, new SymbolNode(filter, remainingDiscriminators))
+      case extracted :: remainder =>
+        val childExists = children.contains(extracted)
+        val childNode = children.getOrElse(extracted, new SymbolNode())
         val childLocalProb = localChildProbability(extracted)
         val thisGlobalProb = thisLocalProb * parentGlobalProb
-        if (childExists) childNode.update(e, s, o, childLocalProb, thisGlobalProb).map { alarmList =>
+        if (childExists) childNode.observe(remainder, childLocalProb, thisGlobalProb).map { alarmList =>
           // Append information about the child:
           (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
         } else {
           children = children + (extracted -> childNode)
-          childNode.update(e, s, o, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
+          childNode.observe(remainder, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
           // Begin reporting information about the child:
           Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
         }
     }
-  } else None
+  }
 
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
       if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
     )
-
-  override def equals(obj: scala.Any) = obj.isInstanceOf[SymbolNode] && {
-    val o = obj.asInstanceOf[SymbolNode]
-    o.filter == filter && o.discriminators == discriminators && o.getCount == getCount && o.children == children
-  }
 }
 
 
 class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
   def getCount = siblings.size - 1
-  def update(e: Event, s: Subject, o: Object, yourProb: Float, parentGlobalProb: Float): Option[Alarm] = Some(Nil)
+  var children = Map.empty[ExtractedValue, PpmTree]
+  def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm] = Some(Nil)
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
   override def equals(obj: scala.Any) = obj.isInstanceOf[QNode] && obj.asInstanceOf[QNode].getCount == getCount
@@ -189,7 +191,7 @@ class PpmActor extends Actor with ActorLogging {
     case CompleteMsg =>
       ppmList.foreach { ppm =>
         ppm.saveState()
-//        println(ppm.prettyString)
+        println(ppm.prettyString)
       }
       println("Done")
 
