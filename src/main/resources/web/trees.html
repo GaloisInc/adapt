@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore.js"></script>
+    <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
+    <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
+    <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
+    <script type="text/javascript">
+
+var treeNames = []
+
+function actOnSelectedNodes(){
+	_.map(treeNames, function(treeName){
+		var tree = $("#" + treeName)
+		var selectedElements = tree.fancytree("getTree").getSelectedNodes()
+		var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
+		var titles = _.map(selectedNodes, function(n){return n.getKeyPath()})
+		if ( ! _.isEmpty(titles)) alert(titles.join("\n"))
+	})
+}
+
+$(function(){
+
+	$.getJSON("/api/ppm/listTrees", function(names) {
+		treeNames = names
+		_.map(_.sortBy(treeNames), function(name) {
+			$("#trees").append(
+				"<table id=" + name + ">"+ 
+					"<thead><tr>"+
+					"<th></th> <th></th> <th></th> <th></th> <th></th>"+
+					"</tr></thead>"+
+				"</table>"
+			)
+			createFancyTree(name)
+		})
+	})
+
+	function createFancyTree(treeName) {
+		
+		var shouldExpandAll = false
+
+		$("#" + treeName).fancytree({
+			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
+			source: {
+				url: "/api/ppm/" + treeName,
+				cache: false
+			},
+			quicksearch: true,
+			table: {
+				indentation: 20,      // indent 20px per node level
+				nodeColumnIdx: 2,     // render the node title into the 2nd column
+				checkboxColumnIdx: 0  // render the checkboxes into the 1st column
+			},
+			renderColumns: function(event, data) {
+				var node = data.node
+				var $tdList = $(node.tr).find(">td")
+
+				// Make the title cell spans the remaining columns if it's a folder:
+				if( node.isFolder() ) {
+					var thisColumnIdx = 2
+					$tdList.eq(thisColumnIdx)
+						.prop("colspan", $tdList.length - thisColumnIdx)
+						.nextAll().remove()
+					return
+				}
+				// (Column #0 is rendered by fancytree by adding the checkbox)
+
+				// Column #1 should contain the index as plain text, e.g. '2.7.1'
+				// $tdList.eq(1).text(node.getIndexHier()).addClass("alignRight")
+
+				// (Column #2 is rendered by fancytree)
+
+				// Render remaining columns
+				// $tdList.eq(3).text("node.data")
+				$tdList.eq(4).html(
+					'<a target="_blank" href="/#g.V().hasLabel(\'AdmPathNode\').has(\'path\',\''+ node.title +'\')">Show Graph</a>'
+				)
+			},
+
+			activeVisible: true, // Make sure, active nodes are visible (expanded)
+			aria: true, // Enable WAI-ARIA support
+		    autoActivate: true, // Automatically activate a node when it is focused using keyboard
+		    autoCollapse: false, // Automatically collapse all siblings, when a node is expanded
+		    autoScroll: false, // Automatically scroll nodes into visible area
+		    clickFolderMode: 4, // 1:activate, 2:expand, 3:activate and expand, 4:activate (dblclick expands)
+		    checkbox: true, // Show checkboxes
+		    debugLevel: 4, // 0:quiet, 1:errors, 2:warnings, 3:infos, 4:debug
+		    disabled: false, // Disable control
+		    focusOnSelect: false, // Set focus when node is checked by a mouse click
+		    escapeTitles: false, // Escape `node.title` content for display
+		    generateIds: false, // Generate id attributes like <span id='fancytree-id-KEY'>
+		    idPrefix: "ft_" + treeName + "_", // Used to generate node ids like <span id='fancytree-id-<key>'>
+		    icon: true, // Display node icons
+		    keyboard: true, // Support keyboard navigation
+		    keyPathSeparator: "/", // Used by node.getKeyPath() and tree.loadKeyPath()
+		    minExpandLevel: 1, // 1: root node is not collapsible
+		    quicksearch: false, // Navigate to next node by typing the first letters
+		    selectMode: 3, // 1:single, 2:multi, 3:multi-hier
+		    tabindex: "0", // Whole tree behaves as one single control
+		    titlesTabbable: false, // Node titles can receive keyboard focus
+		    tooltip: false, // Use title as tooltip (also a callback could be specified)
+		    loadChildren: function(event, data) { 
+		    	var tree = $("#" + treeName)
+		    	var sortFunc = function(a, b) {
+					var x = a.title.toLowerCase() + (a.isFolder() ? "1" : "0")
+					var y = b.title.toLowerCase() + (b.isFolder() ? "1" : "0")
+					return x === y ? 0 : x > y ? 1 : -1
+				}
+		    	tree.fancytree("getRootNode").sortChildren(sortFunc, true) 
+		    	if (shouldExpandAll) {
+		    		tree.fancytree("getTree").visit( function(node){
+						node.setExpanded(true)// Expand all tree nodes
+					})
+		    	}
+		    }
+		})
+	}
+
+
+	
+
+	// Search function:
+	$("input[name=search]").keyup(function(e){
+		var matchCount = 0
+		var searchPattern = $(this).val()
+
+		_.map(treeNames, function(treeName){
+			var tree =  $("#" + treeName).fancytree("getTree")   //$.ui.fancytree.getTree()
+			var filterOptions = {
+				autoExpand: true, // Expand all branches that contain matches while filtered
+				// counter: true,     // Show a badge with number of matching child nodes near parent icons
+				hideExpandedCounter: true, // Hide counter badge if parent is expanded
+				hideExpanders: true,       // Hide expanders if all child nodes are hidden by filter
+				highlight: true,   // Highlight matches by wrapping inside <mark> tags
+				leavesOnly: false, // Match end nodes only
+				nodata: treeName + ": No matches.", //true,      // Display a 'no data' status node if result is empty
+				mode: "hide"       // Grayout unmatched nodes with "dimm" ("hide" to remove empty node)
+			}
+
+			if(e && e.which === $.ui.keyCode.ESCAPE || $.trim(searchPattern) === ""){
+				$("button#btnResetSearch").click()
+				return
+			}
+			if($("#isRegex").is(":checked")) {
+				// Pass function to perform match
+				matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
+					return new RegExp(searchPattern, "i").test(node.title)
+				}, filterOptions)
+			} else {
+				// Pass a string to perform case insensitive matching
+				matchCount = matchCount + tree.filterNodes.call(tree, searchPattern, filterOptions)
+			}
+		})
+		$("button#btnResetSearch").attr("disabled", false)
+		$("span#matches").text("(" + matchCount + " matches)")
+	}).focus()
+
+	$("button#btnResetSearch").click(function(e){
+		$("input[name=search]").val("");
+		$("span#matches").text("");
+		_.map(treeNames, function(treeName){
+			$("#" + treeName).fancytree("getTree").clearFilter();
+		})
+	}).attr("disabled", true)
+})
+    </script>
+</head>
+<body>
+	<div>
+		<input name="search" placeholder="Search..." autocomplete="off" />
+		<button id="btnResetSearch">&times;</button>
+		<label>RegEx:</label>
+		<input id="isRegex" name="isRegex" type="checkbox" />
+		<span id="matches"></span>
+	</div>
+	<div>
+		<input name="whitelist" type="button" value="Silence Selected Alarms" onclick="actOnSelectedNodes()" />
+	</div>
+	<div id="trees"></div>
+</body>

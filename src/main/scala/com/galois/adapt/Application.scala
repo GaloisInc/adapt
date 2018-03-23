@@ -238,6 +238,8 @@ object Application extends App {
 
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blocking, seenNodes, seenEdges)
 
+  val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
+
   val ta1 = config.getString("adapt.env.ta1")
 
   // Mutable state that gets updated during ingestion
@@ -246,7 +248,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = ProdRoutes.mainRoute(dbActor, anomalyActor, statusActor)
+    val route = Routes.mainRoute(dbActor, anomalyActor, statusActor, ppmActor)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }
@@ -430,7 +432,6 @@ object Application extends App {
         .collect{ case (_, cdm: Event) if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
         .runWith(Sink.foreach(println))
 
-
     case "fsox" =>
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty FSOX", statusActor))
@@ -438,9 +439,8 @@ object Application extends App {
         .via(FSOX.apply)
         .runWith(Sink.foreach(println))
 
-    case "novelty" | "novel" =>
+    case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
-      val noveltyActor = system.actorOf(Props(classOf[NoveltyActor]), "novelty")
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(er)
@@ -553,8 +553,9 @@ object Application extends App {
           }
         }
         .runWith(
-          Sink.actorRefWithAck(noveltyActor, InitMsg, Ack, CompleteMsg)
+          Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg)
         )
+      startWebServer()
 
     case _ =>
       println("Unknown runflow argument. Quitting.")

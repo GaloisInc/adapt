@@ -1,21 +1,25 @@
 package com.galois.adapt
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json._
+import spray.json.DefaultJsonProtocol._
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
-
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.unmarshalling.Unmarshaller
+//import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
+import akka.http.scaladsl.marshalling.PredefinedToEntityMarshallers._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.marshalling.Marshaller._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives._
 import akka.stream.Materializer
 import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
 import spray.json.{JsString, JsValue}
-//import akka.http.scaladsl.marshalling._
 import java.util.UUID
 import akka.actor.ActorRef
 import akka.util.Timeout
@@ -24,9 +28,10 @@ import scala.language.postfixOps
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.headers._
+//import ApiJsonProtocol._
 
 
-object ProdRoutes {
+object Routes {
 
   val config = ConfigFactory.load()
 
@@ -47,7 +52,13 @@ object ProdRoutes {
     .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
+  val validRating = Unmarshaller.strict[String, Int] {
+    case i if Set("0","1","2","3","4","5") contains i => i.toInt
+    case i => throw new IllegalArgumentException(s"'$i' is not a valid rating.")
+  }
+
+
+  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
@@ -57,6 +68,23 @@ object ProdRoutes {
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
             )
+          } ~
+          pathPrefix("ppm") {
+            path("listTrees") {
+              complete(
+                (ppmActor ? ListPpmTrees).mapTo[PpmTreeNames].map(_.names)
+              )
+            } ~
+            path(Segment) { treeName =>
+              parameter('query.as[String].?, 'username ? "adapt") { (queryString, username) =>
+                val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
+                import ApiJsonProtocol._
+                complete(
+                  (ppmActor ? PpmTreeQuery(treeName, query, username.toLowerCase)).mapTo[PpmTreeResult]
+                    .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+                )
+              }
+            }
           }
         } ~
         pathPrefix("query") {
@@ -100,6 +128,20 @@ object ProdRoutes {
       } ~
       post {
         pathPrefix("api") {
+          pathPrefix("ppm") {
+            path(Segment / "setRating") { treeName =>
+              parameters('query.as[String], 'rating.as(validRating), 'username ? "adapt") { (queryString, rating, username) =>
+                complete {
+                  val query = queryString.split("∫",-1).toList
+                  (ppmActor ? SetPpmRating(treeName, query, rating, username.toLowerCase)).mapTo[Option[Boolean]].map {
+                    case Some(true) => StatusCodes.Accepted -> s"Rating for $queryString set to: $rating"
+                    case Some(false) => StatusCodes.NotFound -> s"Could not find key for $queryString"
+                    case None => StatusCodes.NotFound -> s"Could not find tree: $treeName"
+                  }
+                }
+              }
+            }
+          } ~
           pathPrefix("makeTheiaQuery") {
             formFieldMap { fields =>
               complete {
