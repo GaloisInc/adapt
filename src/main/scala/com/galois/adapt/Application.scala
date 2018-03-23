@@ -29,6 +29,7 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
+import FilterFlow._
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 import org.mapdb.serializer.SerializerArrayTuple
 
@@ -381,6 +382,7 @@ object Application extends App {
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
       CDMSource.cdm18(ta1)
+        //.via(filterByUUIDs(e2MaliciousUUIDs("cadets")))
         .via(printCounter("Novelty", statusActor))
         .via(EntityResolution(uuidRemapper, synSource, seenNodes, seenEdges))
         .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
