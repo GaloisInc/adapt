@@ -395,24 +395,6 @@ object Application extends App {
           val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
             EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
 
-
-//        type NodeType = _
-//        type EdgeOpt = _
-//        val l: List[(NodeType, EdgeOpt)] = List.empty
-//        trait Direction
-//        object Forward extends Direction
-//        object Reverse extends Direction
-//
-//        class Aggregated(left: Either[ADM, Aggregated], right: ADM)
-//
-//        val leftThings = Map.empty[AdmUUID, Aggregated]
-//        val rightThings = Map.empty[AdmUUID, ADM]
-//        def foo(edge: EdgeAdm2Adm, labelFilter: String, dir: Direction = Forward) = if (edge.label == labelFilter) {
-//          val (left, right) = if (dir == Forward) edge.src -> edge.tgt else edge.tgt -> edge.src
-//          val t = (rightThings(left), rightThings(right))
-//        }
-
-
           {
             case Left(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
               .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>

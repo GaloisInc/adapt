@@ -2,7 +2,9 @@ package com.galois.adapt
 
 import java.io.{ByteArrayOutputStream, PrintWriter}
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.{Properties, UUID}
+
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
 import akka.pattern.ask
@@ -11,6 +13,7 @@ import com.typesafe.config.Config
 import org.apache.avro.io.EncoderFactory
 import org.apache.avro.specific.SpecificDatumWriter
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+
 import scala.collection.mutable.{MutableList, Map => MutableMap}
 import scala.language.postfixOps
 import scala.concurrent.duration._
@@ -18,6 +21,7 @@ import scala.util.{Failure, Random, Success, Try}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import ApiJsonProtocol._
 import spray.json._
+
 import scala.concurrent.Future
 
 
@@ -34,6 +38,10 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
 
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
+
+
+
+  var theirQueryId = new AtomicLong(Try(config.getLong("adapt.runtime.theiaqueryidstart")).getOrElse(2000000L))
 
   def makeTheiaQuery(q: MakeTheiaQuery): Future[String] = Future {
     val theia = new TheiaQuery()
@@ -58,8 +66,10 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       theia.put("endTimestamp", q.endTimestamp.get)
     }
     val bb2 = ByteBuffer.allocate(16)
-    bb2.putLong(q.queryId.getMostSignificantBits)
-    bb2.putLong(q.queryId.getLeastSignificantBits)
+    bb2.putLong(0L)
+    bb2.putLong(theirQueryId.getAndIncrement())
+//    bb2.putLong(q.queryId.getMostSignificantBits)
+//    bb2.putLong(q.queryId.getLeastSignificantBits)
     val queryID = new com.bbn.tc.schema.avro.cdm17.UUID(bb2.array())
     theia.put("queryId", queryID)
     theia.put("type", q.`type`)
