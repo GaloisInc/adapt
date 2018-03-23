@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
+import com.galois.adapt.MapDBUtils
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
@@ -127,8 +128,8 @@ object EntityResolution {
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
       broadcast ~> EventResolution(eventExpiryTime, eventExpiryCount, maxEventsMerged, activeChains) ~> merge
-      broadcast ~> SubjectResolution.apply                                         ~> merge
-      broadcast ~> OtherResolution.apply                                           ~> merge
+      broadcast ~> SubjectResolution.apply                                                           ~> merge
+      broadcast ~> OtherResolution.apply                                                             ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })
@@ -161,7 +162,6 @@ object EntityResolution {
         Some(Right(edge))
     }
 
-//    { case x => List(x) }
     {
       // Duplicate node or edge
       case Left(adm) if seenNodes.contains(adm.uuid) => Nil

@@ -92,11 +92,8 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
     val admToNodeResults: Seq[Try[Unit]] = adms map {
       case Right(edge) => Try {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
-          val source = findNode("uuid", edge.src.uuid)
-            .getOrElse(throw AdmInvariantViolation(edge))
-
-          val target = findNode("uuid", edge.tgt.uuid)
-            .getOrElse(throw AdmInvariantViolation(edge))
+          val source = findNode("uuid", edge.src.uuid).get
+          val target = findNode("uuid", edge.tgt.uuid).get
 
           source.addEdge(edge.label, target)
 

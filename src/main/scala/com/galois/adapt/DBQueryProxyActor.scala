@@ -122,8 +122,6 @@ case object CompleteMsg
 case object KillJVM
 case object InitMsg
 
-case class AdmInvariantViolation(edge: EdgeAdm2Adm) extends RuntimeException(s"Didn't find source ${edge.src} of $edge")
-
 object DBQueryProxyActor {
   import scala.collection.JavaConversions._
 

@@ -104,4 +104,18 @@ object MapDBUtils {
     def size(): Long = count
   }
 
+  // LRU cache
+  def expiringSet[V](map: java.util.LinkedHashMap[V, None.type]): AlmostSet[V] = new AlmostSet[V] {
+    private var count: Long = 0
+
+    def contains(v: V): Boolean = map.containsKey(v)
+
+    def add(v: V): Unit = {
+      val vOld = map.put(v, None)
+      if (vOld == null) count += 1
+    }
+
+    def size(): Long = count
+  }
+
 }

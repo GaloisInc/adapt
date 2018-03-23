@@ -222,17 +222,33 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
           val source = verticesInThisTX
             .get(edge.src)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .getOrElse({
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.src.rendered)
+              verticesInThisTX += (admToTuple(edge.src) -> newVertex)
+              newVertex
+            })
 
           val target = verticesInThisTX
             .get(edge.tgt)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .getOrElse({
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.tgt.rendered)
+              verticesInThisTX += (admToTuple(edge.tgt) -> newVertex)
+              newVertex
+            })
 
           source.createRelationshipTo(target, new RelationshipType() {
             def name: String = edge.label
           })
         }
+      }.recoverWith {
+        case e: ConstraintViolationException =>
+          if (shouldLogDuplicates)
+            println(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
+          Success(None)
+        case e: Throwable => Failure(e)
       }
 
       case Left(adm) => Try {
@@ -240,7 +256,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName))
           verticesInThisTX += (admToTuple(adm.uuid) -> newVertex)
           newVertex
         })

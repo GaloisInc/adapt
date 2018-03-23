@@ -2,7 +2,8 @@ package com.galois.adapt
 
 import java.io._
 import java.nio.file.Paths
-import java.util.UUID
+import java.util
+import java.util.{UUID}
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.Done
@@ -168,6 +169,19 @@ object Application extends App {
   // These are the maps/sets the async and dedup stage of ER will use
   val blocking: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
 
+  val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
+  val dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
+
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.expiringSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
+    override def removeEldestEntry(eldest: java.util.Map.Entry[AdmUUID, None.type]): Boolean = this.size > dedupNodeCacheSize
+  })
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.expiringSet(new util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
+    override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean = this.size > dedupEdgeCacheSize
+  })
+
+
+  /* Bloom filter variant
+
   implicit val hasAdmUUID: CanGenerateHashFrom[AdmUUID] = new CanGenerateHashFrom[AdmUUID] {
     override def generateHash(from: AdmUUID): Long = {
       from.uuid.getLeastSignificantBits ^ (3 * from.uuid.getMostSignificantBits) ^ (7 * from.namespace.hashCode)
@@ -178,42 +192,49 @@ object Application extends App {
       hasAdmUUID.generateHash(from.tgt) ^ (11 * hasAdmUUID.generateHash(from.tgt)) ^ (13 * from.label.hashCode)
     }
   }
-
   val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(BloomFilter[AdmUUID](300000000L, 1.0 / 3e12))
   val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(BloomFilter[EdgeAdm2Adm](300000000L, 1.0 / 3e12))
+  */
 
-//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(mutable.Set.empty)
-//  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(mutable.Set.empty)
-//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
-//    fileDb.hashSet("seenNodes")
-//      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-//      .counterEnable()
-//      .createOrOpen()
-//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-//    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
-//  )
-//  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
-//    fileDb.hashSet("seenEdges")
-//      .serializer(new SerializerArrayTuple(
-//        Serializer.STRING,
-//        Serializer.STRING,
-//        Serializer.STRING,
-//        Serializer.UUID,
-//        Serializer.UUID)
-//      )
-//      .counterEnable()
-//      .createOrOpen()
-//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-//
-//    {
-//      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
-//        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
-//    },
-//    {
-//      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
-//        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
-//    }
-//  )
+  /* Regular Scala set variant
+
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(mutable.Set.empty)
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(mutable.Set.empty)
+  */
+
+  /* MapDB set variant
+
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
+    fileDb.hashSet("seenNodes")
+      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
+  )
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
+    fileDb.hashSet("seenEdges")
+      .serializer(new SerializerArrayTuple(
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.STRING,
+        Serializer.UUID,
+        Serializer.UUID)
+      )
+      .counterEnable()
+      .createOrOpen()
+      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+
+    {
+      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
+        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
+    },
+    {
+      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
+        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
+    }
+  )
+  */
 
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blocking, seenNodes, seenEdges)
 
