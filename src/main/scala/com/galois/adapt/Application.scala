@@ -29,6 +29,8 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
+import bloomfilter.CanGenerateHashFrom
+import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
 import org.mapdb.serializer.SerializerArrayTuple
@@ -69,7 +71,8 @@ object Application extends App {
   val dbFilePath = "/tmp/map_" + Random.nextLong() + ".db"
 
 
-  val db = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+  val fileDb = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+  val memoryDb = DBMaker.memoryDirectDB().make()
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
@@ -117,12 +120,12 @@ object Application extends App {
 
   val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
-  val mapdbCdm2CdmOverflow = db.hashMap("cdm2cdmOverflow")
+  val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
     .createOrOpen()
-  val mapdbCdm2Cdm = db.hashMap("cdm2cdm")
+  val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
@@ -133,12 +136,12 @@ object Application extends App {
     .expireExecutor(Executors.newScheduledThreadPool(2))
     .createOrOpen()
 
-  val mapdbCdm2AdmOverflow = db.hashMap("cdm2admOverflow")
+  val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
     .createOrOpen()
-  val mapdbCdm2Adm = db.hashMap("cdm2adm")
+  val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
@@ -164,36 +167,53 @@ object Application extends App {
 
   // These are the maps/sets the async and dedup stage of ER will use
   val blocking: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
-    db.hashSet("seenNodes")
-      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .counterEnable()
-      .createOrOpen()
-      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
-    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
-  )
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
-    db.hashSet("seenEdges")
-      .serializer(new SerializerArrayTuple(
-        Serializer.STRING,
-        Serializer.STRING,
-        Serializer.STRING,
-        Serializer.UUID,
-        Serializer.UUID)
-      )
-      .counterEnable()
-      .createOrOpen()
-      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
 
-    {
-      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
-        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
-    },
-    {
-      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
-        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
+  implicit val hasAdmUUID: CanGenerateHashFrom[AdmUUID] = new CanGenerateHashFrom[AdmUUID] {
+    override def generateHash(from: AdmUUID): Long = {
+      from.uuid.getLeastSignificantBits ^ (3 * from.uuid.getMostSignificantBits) ^ (7 * from.namespace.hashCode)
     }
-  )
+  }
+  implicit val hasEdgeAdm2Adm: CanGenerateHashFrom[EdgeAdm2Adm] = new CanGenerateHashFrom[EdgeAdm2Adm] {
+    override def generateHash(from: EdgeAdm2Adm): Long = {
+      hasAdmUUID.generateHash(from.tgt) ^ (11 * hasAdmUUID.generateHash(from.tgt)) ^ (13 * from.label.hashCode)
+    }
+  }
+
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(BloomFilter[AdmUUID](300000000L, 1.0 / 3e12))
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(BloomFilter[EdgeAdm2Adm](300000000L, 1.0 / 3e12))
+
+//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(mutable.Set.empty)
+//  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(mutable.Set.empty)
+//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
+//    fileDb.hashSet("seenNodes")
+//      .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+//      .counterEnable()
+//      .createOrOpen()
+//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+//    { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
+//  )
+//  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
+//    fileDb.hashSet("seenEdges")
+//      .serializer(new SerializerArrayTuple(
+//        Serializer.STRING,
+//        Serializer.STRING,
+//        Serializer.STRING,
+//        Serializer.UUID,
+//        Serializer.UUID)
+//      )
+//      .counterEnable()
+//      .createOrOpen()
+//      .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
+//
+//    {
+//      case EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs)) =>
+//        Array(srcNs, tgtNs, lbl, srcUuid, tgtUuid)
+//    },
+//    {
+//      case Array(srcNs: String, tgtNs: String, lbl: String, srcUuid: UUID, tgtUuid: UUID) =>
+//        EdgeAdm2Adm(AdmUUID(srcUuid, srcNs), lbl, AdmUUID(tgtUuid, tgtNs))
+//    }
+//  )
 
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blocking, seenNodes, seenEdges)
 

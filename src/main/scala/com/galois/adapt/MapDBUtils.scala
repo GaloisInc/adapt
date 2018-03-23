@@ -2,8 +2,11 @@ package com.galois.adapt
 
 import java.util.function.BiConsumer
 
+import bloomfilter.mutable.BloomFilter
 import org.mapdb.BTreeMapJava.KeySet
 import org.mapdb.{BTreeMap, BTreeMapJava, HTreeMap}
+
+import scala.collection.mutable
 
 /* This object contains utilities for wrapping MapDB map and set types into more palatable scala ones.
  *
@@ -51,6 +54,21 @@ object MapDBUtils {
     def size(): Long = map.sizeLong()
   }
 
+  // Wrap a mutable map into an `AlmostMap`
+  def almostMap[K,V](map: mutable.Map[K,V]): AlmostMap[K,V] = new AlmostMap[K,V] {
+    def contains(k: K): Boolean = map.contains(k)
+
+    def apply(k: K): V = map.apply(k)
+
+    def update(k: K, v: V): Unit = map.update(k, v)
+
+    def get(k: K): Option[V] = map.get(k)
+
+    def foreach(func: (K, V) => Unit): Unit = map.foreach { case (k,v) => func(k,v) }
+
+    def size(): Long = map.size
+  }
+
   // Wrap a MapDB set into an `AlmostSet`
   def almostSet[V1,V2](
     set: HTreeMap.KeySet[V1],
@@ -62,6 +80,28 @@ object MapDBUtils {
     def add(v2: V2): Unit = set.add(intoValue(v2))
 
     def size(): Long = set.getMap.sizeLong()
+  }
+
+  // Wrap a mutable set into an `AlmostSet`
+  def almostSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
+    def contains(v: V): Boolean = set.contains(v)
+
+    def add(v: V): Unit = set.add(v)
+
+    def size(): Long = set.size
+  }
+
+  def almostSet[V](bf: BloomFilter[V]): AlmostSet[V] = new AlmostSet[V] {
+    private var count: Long = 0
+
+    def contains(v: V): Boolean = bf.mightContain(v)
+
+    def add(v: V): Unit = if (!bf.mightContain(v)) {
+      count += 1
+      bf.add(v)
+    }
+
+    def size(): Long = count
   }
 
 }

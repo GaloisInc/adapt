@@ -161,6 +161,7 @@ object EntityResolution {
         Some(Right(edge))
     }
 
+//    { case x => List(x) }
     {
       // Duplicate node or edge
       case Left(adm) if seenNodes.contains(adm.uuid) => Nil
