@@ -373,7 +373,7 @@ case object ProcessDirectoryTouchesAux {
   }
 
   val auxFilePath: Option[String] = Try(Application.config.getString("adapt.ppm.basedir") +
-    Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.auxfile")).toOption
+    Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.processdirectorytouchesauxfile")).toOption
   val processToDepth: Map[String, Int] = auxFilePath.map(readJsonFile).getOrElse(Map.empty[String, Int])
 
   def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
