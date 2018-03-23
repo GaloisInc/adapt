@@ -55,6 +55,7 @@ public:
 	// for online IF
 	void renewNodeSize();
 	void update(const double inst[]);
+	void getNumLeafandDepths(std::vector<int> &depths, int &numLeafs);
 	void printDepthAndNodeSize(std::ofstream &out);
 	void printPatternFreq(double inst[], int &tid, int &iid, std::ofstream &out);
 
