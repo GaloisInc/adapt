@@ -1,10 +1,16 @@
 package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging}
+import spray.json.DefaultJsonProtocol._
+import spray.json._
+
+import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
+
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 
@@ -19,6 +25,7 @@ object NoveltyDetection {
 
   type Alarm = List[(String, Float, Float, Int)]
 
+  private val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
   val ppmList = List(
     PpmDefinition( "ProcessFileTouches",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
@@ -62,6 +69,13 @@ object NoveltyDetection {
           case x => x
         }
         }.getOrElse(Nil).dropRight(1)
+      )
+    ),
+    PpmDefinition("ProcessDirectoryTouches",
+      (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirFilter(e, s, o),
+      List(
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
+        (e: Event, s: Subject, o: Object) => List(processDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path))
       )
     )
   )
@@ -170,7 +184,7 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-  def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
+    def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
 
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
@@ -299,8 +313,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
   def writeToFile(filePath: String): Unit = {
+    val settings = new CsvWriterSettings
     val pw = new PrintWriter(new File(filePath))
-    this.toFlat.foreach(f => pw.write(TreeRepr.flatToCsvString(f)+"\n"))
+    val writer = new CsvWriter(pw,settings)
+    this.toFlat.foreach(f => writer.writeRow(TreeRepr.flatToCsvArray(f)))
+    writer.close()
     pw.close()
   }
 }
@@ -326,11 +343,52 @@ case object TreeRepr {
     fromFlatRecursive(repr, 0, List.empty)._1.head
   }
 
-  def flatToCsvString(t: (Int, ExtractedValue, Float, Float, Int)): String = s"${t._1},${t._2},${t._3},${t._4},${t._5}"
-  def csvStringToFlat(s: String): (Int, ExtractedValue, Float, Float, Int) = {
-    val a = s.split(",")
+  def flatToCsvArray(t: (Int, ExtractedValue, Float, Float, Int)): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
+  def csvArrayToFlat(a: Array[String]): (Int, ExtractedValue, Float, Float, Int) = {
     (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
   }
 
-  def readFromFile(filePath: String): TreeRepr = TreeRepr.fromFlat(scala.io.Source.fromFile(filePath).getLines().map(TreeRepr.csvStringToFlat).toList)
+  def readFromFile(filePath: String): TreeRepr = {
+    val fileHandle = new File(filePath)
+    val parser = new CsvParser(new CsvParserSettings)
+    val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
+    TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
+  }
+}
+
+case object ProcessDirectoryTouchesAux {
+  def readJsonFile(filePath: String): Map[String,Int] = {
+    case class ProcessDepth(name: String, depth: Int)
+    implicit val ProcessToDepthFormat = jsonFormat2(ProcessDepth)
+
+    val bufferedSource = scala.io.Source.fromFile(filePath)
+    val jsonString = bufferedSource.getLines.mkString
+    bufferedSource.close()
+
+    val processDepthList = jsonString.parseJson.asJsObject.getFields("processes") match {
+      case Seq(processes) => processes.convertTo[List[ProcessDepth]]
+      case x => deserializationError("Do not understand how to deserialize " + x)
+    }
+    processDepthList.map(x => x.name -> x.depth).toMap
+  }
+
+  val auxFilePath: Option[String] = Try(Application.config.getString("adapt.ppm.basedir") +
+    Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.auxfile")).toOption
+  val processToDepth: Map[String, Int] = auxFilePath.map(readJsonFile).getOrElse(Map.empty[String, Int])
+
+  def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
+    o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 && // file path must exist and have length greater than 1
+      Set('/', '\\').contains(o._2.map(_.path).get.toString.head) && // file path must be absolute (or as close as we can get to forcing that)
+      s._2.map(_.path).isDefined && s._2.map(_.path).get.length > 0 // process name must exist and be a non-empty string
+  }
+
+  def dirAtDepth(process: String, path: String): String = {
+    val sepChar = if (path.head.toString=="/") "/" else "\\\\"
+    val depth = processToDepth.getOrElse(process, -1) // default depth is directory file is contained in
+    depth match {
+      case -1 => path.split(sepChar).init.mkString("", sepChar, sepChar)
+      case _ if path.count(_ == sepChar) < depth => path.split(sepChar).init.mkString("", sepChar, sepChar)
+      case _ => path.take(depth).mkString("", sepChar, sepChar)
+    }
+  }
 }
