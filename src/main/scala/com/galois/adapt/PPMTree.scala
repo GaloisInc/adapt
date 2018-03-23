@@ -47,10 +47,21 @@ object NoveltyDetection {
         (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
-    PpmDefinition("DirectoryStructure",
-      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmFileObject],
+//    PpmDefinition("DirectoryStructure",
+//      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmFileObject],
+//      List(
+//        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
+//      )
+//    ),
+    PpmDefinition( "ProcessDirectoryTouches",
+      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
+        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
+        (e: Event, s: Subject, o: Object) => o._2.map { _.path.split("/").toList match {
+          case "" :: remainder => "/" :: remainder
+          case x => x
+        }
+        }.getOrElse(Nil).dropRight(1)
       )
     )
   )
@@ -107,8 +118,8 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
     counter = thisTree.count
     children = thisTree.children.map {
       case c if c.key == "_?_" => c.key -> new QNode(children)
-      case c => c.key -> new SymbolNode(/*filter,*/ /*extractedValues.tail,*/ Some(c))
-    }.toMap
+      case c => c.key -> new SymbolNode(Some(c))
+    }.toMap + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the data.
   }
 
   def totalChildCounts = children.values.map(_.getCount).sum
@@ -132,14 +143,16 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
           children = children + (extracted -> childNode)
           childNode.observe(remainder, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
           // Begin reporting information about the child:
-          Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount /*childNode.getCount*/ )))
+          Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount)))
         }
     }
   }
 
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
-      if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{ case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)} else Set.empty
+      if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{
+        case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)
+      } else Set.empty
     )
 }
 
