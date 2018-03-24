@@ -216,7 +216,7 @@ class PpmActor extends Actor with ActorLogging {
       )
       sender() ! PpmTreeAlarmResult(resultOpt)
 
-    case PpmTreeCountQuery(treeName, queryPath) =>
+    case PpmTreeCountQuery(treeName) =>
       sender() ! PpmTreeCountResult(ppm(treeName).map(tree => tree.getAllCounts))
 
     case SetPpmRating(treeName, key, rating, namespace) =>
@@ -252,7 +252,7 @@ case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Option[Int])]])
 }
 case class SetPpmRating(treeName: String, key: List[String], rating: Int, namespace: String)
 
-case class PpmTreeCountQuery(treeName: String, queryPath: List[ExtractedValue])
+case class PpmTreeCountQuery(treeName: String)
 case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
 
 
