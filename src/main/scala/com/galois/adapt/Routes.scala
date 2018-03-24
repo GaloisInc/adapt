@@ -80,7 +80,7 @@ object Routes {
                 val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
                 import ApiJsonProtocol._
                 complete(
-                  (ppmActor ? PpmTreeQuery(treeName, query, username.toLowerCase)).mapTo[PpmTreeResult]
+                  (ppmActor ? PpmTreeAlarmQuery(treeName, query, username.toLowerCase)).mapTo[PpmTreeAlarmResult]
                     .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                 )
               }

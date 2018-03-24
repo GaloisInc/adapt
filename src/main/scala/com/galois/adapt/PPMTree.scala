@@ -3,13 +3,11 @@ package com.galois.adapt
 import akka.actor.{Actor, ActorLogging}
 import spray.json.DefaultJsonProtocol._
 import spray.json._
-
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
 import java.io.{File, PrintWriter}
-
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
@@ -25,7 +23,6 @@ object NoveltyDetection {
 
   type Alarm = List[(String, Float, Float, Int)]
 
-  private val processDirectoryTouchesAux = ProcessDirectoryTouchesAux
   val ppmList = List(
     PpmDefinition( "ProcessFileTouches",
       (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
@@ -72,10 +69,10 @@ object NoveltyDetection {
       )
     ),
     PpmDefinition("ProcessDirectoryTouches",
-      (e: Event, s: Subject, o: Object) => processDirectoryTouchesAux.dirFilter(e, s, o),
+      (e: Event, s: Subject, o: Object) => ProcessDirectoryTouchesAux.dirFilter(e, s, o),
       List(
         (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => List(processDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path))
+        (e: Event, s: Subject, o: Object) => List(ProcessDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path))
       )
     )
   )
@@ -98,6 +95,7 @@ case class PpmDefinition(name: String, filter: Filter, discriminators: List[Disc
       alarms = alarms + (key -> a.copy(_3 = a._3 - namespace))
     true
   }.getOrElse(false)
+  def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
 
   def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
   def prettyString: String = tree.getTreeRepr(key = name).toString
@@ -113,6 +111,7 @@ trait PpmTree {
     val o = obj.asInstanceOf[PpmTree]
     o.getCount == getCount && o.children == children
   }
+  def getAllCounts(accumulatedKey: List[ExtractedValue] = Nil): Map[List[ExtractedValue], Int]
 }
 case object PpmTree {
   def apply(serialized: Option[TreeRepr] = None): PpmTree = new SymbolNode(serialized)
@@ -133,7 +132,7 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
     children = thisTree.children.map {
       case c if c.key == "_?_" => c.key -> new QNode(children)
       case c => c.key -> new SymbolNode(Some(c))
-    }.toMap + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the data.
+    }.toMap + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the loaded data.
   }
 
   def totalChildCounts = children.values.map(_.getCount).sum
@@ -168,6 +167,11 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
         case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)
       } else Set.empty
     )
+
+  def getAllCounts(accumulatedKey: List[ExtractedValue]): Map[List[ExtractedValue], Int] =
+    children.foldLeft(Map(accumulatedKey -> getCount)){
+      case (acc, (childKey, child)) => acc ++ child.getAllCounts(accumulatedKey :+ childKey)
+    }
 }
 
 
@@ -178,6 +182,8 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
   override def equals(obj: scala.Any) = obj.isInstanceOf[QNode] && obj.asInstanceOf[QNode].getCount == getCount
+
+  def getAllCounts(accumulatedKey: List[ExtractedValue]): Map[List[ExtractedValue], Int] = if (getCount > 0) Map(accumulatedKey -> getCount) else Map.empty
 }
 
 
@@ -203,12 +209,15 @@ class PpmActor extends Actor with ActorLogging {
       }
       sender() ! Ack
 
-    case PpmTreeQuery(treeName, queryPath, namespace) =>
+    case PpmTreeAlarmQuery(treeName, queryPath, namespace) =>
       val resultOpt = ppm(treeName).map(tree =>
         if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_3 = a._3.get(namespace))).toList
         else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_3 = v._3.get(namespace))}.toList
       )
-      sender() ! PpmTreeResult(resultOpt)
+      sender() ! PpmTreeAlarmResult(resultOpt)
+
+    case PpmTreeCountQuery(treeName, queryPath) =>
+      sender() ! PpmTreeCountResult(ppm(treeName).map(tree => tree.getAllCounts))
 
     case SetPpmRating(treeName, key, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace))
@@ -218,7 +227,8 @@ class PpmActor extends Actor with ActorLogging {
     case CompleteMsg =>
       ppmList.foreach { ppm =>
         ppm.saveState()
-        println(ppm.prettyString)
+//        println(ppm.prettyString)
+        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name, "\n", "\n\n"))
       }
       println("Done")
 
@@ -230,19 +240,20 @@ class PpmActor extends Actor with ActorLogging {
 
 case object ListPpmTrees
 case class PpmTreeNames(names: List[String])
-case class PpmTreeQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String)
-case class PpmTreeResult(results: Option[List[(Long, Alarm, Option[Int])]]) {
+case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String)
+case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._2.map(_._1)
-
       val someUiData = UiDataContainer(b._3)
-
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
 }
 case class SetPpmRating(treeName: String, key: List[String], rating: Int, namespace: String)
+
+case class PpmTreeCountQuery(treeName: String, queryPath: List[ExtractedValue])
+case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
 
 
 
