@@ -44,7 +44,22 @@ object Application extends App {
 
   // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
   org.slf4j.LoggerFactory.getILoggerFactory
-  val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("production"))
+
+//  val akkaActorConf = ConfigFactory.parseResources("akka-actor-reference.conf")
+//  val akkaHttpConf = ConfigFactory.parseResources("akka-http-reference.conf")
+//  val akkaStreamConf = ConfigFactory.parseResources("akka-stream-reference.conf")
+//  val applicationConf = ConfigFactory.parseResources("application.conf")
+//  val config = applicationConf
+//    .withFallback(akkaStreamConf)
+//    .withFallback(akkaHttpConf)
+//    .withFallback(akkaActorConf)
+//    .resolve()
+
+  val config = ConfigFactory.load()
+//    .withFallback(ConfigFactory.load("akka-stream-reference"))
+//    .withFallback(ConfigFactory.load("akka-actor-reference"))
+//    .withFallback(ConfigFactory.load("akka-http-reference"))
+
   val runFlow = config.getString("adapt.runflow").toLowerCase
 
   val interface = config.getString("akka.http.server.interface")

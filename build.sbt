@@ -3,7 +3,7 @@ val akkaV = "2.5.6"
 val akkaHttpV = "10.0.10"
 val neoV = "3.3.0"
 
-resolvers += Resolver.jcenterRepo  // for akka persistence in memory
+//resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
 resolvers += Resolver.mavenLocal  // for BBN repositories built locally
 
