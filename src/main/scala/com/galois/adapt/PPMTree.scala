@@ -6,7 +6,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_WRITE}
+import com.galois.adapt.cdm18.{EVENT_UNLINK, EVENT_EXECUTE, EVENT_WRITE, EVENT_READ}
 import java.io.{File, PrintWriter}
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -18,37 +18,37 @@ object NoveltyDetection {
   type Object = (ADM, Option[AdmPathNode])
 
   type ExtractedValue = String
-  type Discriminator = (Event, Subject, Object) => List[ExtractedValue]
-  type Filter = (Event, Subject, Object) => Boolean
+  type Discriminator[DataShape] = DataShape => List[ExtractedValue]
+  type Filter[DataShape] = DataShape => Boolean
 
   type Alarm = List[(String, Float, Float, Int)]
 
-  val ppmList = List(
-    PpmDefinition( "ProcessFileTouches",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+  val esoTrees = List(
+    PpmDefinition[(Event, Subject, Object)]( "ProcessFileTouches",
+      d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>"))
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
-    PpmDefinition( "FilesTouchedByProcesses",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+    PpmDefinition[(Event, Subject, Object)]( "FilesTouchedByProcesses",
+      d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>"))
+        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
-    PpmDefinition( "FilesExecutedByProcesses",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_EXECUTE,
+    PpmDefinition[(Event, Subject, Object)]( "FilesExecutedByProcesses",
+      d => d._1.eventType == EVENT_EXECUTE,
       List(
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => List(o._2.map(_.path).getOrElse("<no_path_node>"))
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
-    PpmDefinition("ProcessesWithNetworkActivity",
-      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmNetFlowObject],
+    PpmDefinition[(Event, Subject, Object)]("ProcessesWithNetworkActivity",
+      d => d._3._1.isInstanceOf[AdmNetFlowObject],
       List(
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>"))
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>"))
       )
     ),
 //    PpmDefinition("DirectoryStructure",
@@ -57,36 +57,46 @@ object NoveltyDetection {
 //        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
 //      )
 //    ),
-    PpmDefinition( "ProcessDirectoryTouchesV1",
-      (e: Event, s: Subject, o: Object) => e.eventType == EVENT_READ || e.eventType == EVENT_WRITE,
+    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryTouchesV1",
+      d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => o._2.map { _.path.split("/").toList match {
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => d._3._2.map { _.path.split("/").toList match {
           case "" :: remainder => "/" :: remainder
           case x => x
-        }
-        }.getOrElse(Nil).dropRight(1)
+        }}.getOrElse(Nil).dropRight(1)
       )
     ),
-    PpmDefinition("ProcessDirectoryTouches",
-      (e: Event, s: Subject, o: Object) => ProcessDirectoryTouchesAux.dirFilter(e, s, o),
+    PpmDefinition[(Event, Subject, Object)]("ProcessDirectoryTouches",
+      (ProcessDirectoryTouchesAux.dirFilter _).tupled,
       List(
-        (e: Event, s: Subject, o: Object) => List(s._2.map(_.path).getOrElse("<no_path_node>")),
-        (e: Event, s: Subject, o: Object) => List(ProcessDirectoryTouchesAux.dirAtDepth(s._2.get.path,o._2.get.path))
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(ProcessDirectoryTouchesAux.dirAtDepth(d._2._2.get.path,d._3._2.get.path))
       )
     )
   )
+
+  val seoesTrees = List(
+    PpmDefinition[(Subject, Event, Object, Event, Subject)]("ExecuteDelete",   // TODO: This doesn't need subjects
+      d => d._2.eventType == EVENT_EXECUTE && d._4.eventType == EVENT_UNLINK && d._3._1.isInstanceOf[AdmFileObject],
+      List(
+        d => List(d._3._2.map(_.path).getOrElse(d._2.uuid + "-->FILE<--" + d._4.uuid))
+      )
+    )
+  )
+
+  val ppmList = esoTrees ++ seoesTrees
 }
 
 
-case class PpmDefinition(name: String, filter: Filter, discriminators: List[Discriminator]) {
+case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]]) {
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
   val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
-  val tree = PpmTree(inputFilePath.map{println(s"Reading tree in from file: $inputFilePath"); TreeRepr.readFromFile})
+  val tree = PpmTree(inputFilePath.map{println(s"Reading tree $name in from file: $inputFilePath"); TreeRepr.readFromFile})
   var alarms: Map[List[ExtractedValue], (Long, Alarm, Map[String, Int])] = Map.empty
 
-  def observe(observation: (Event, Subject, Object)): Option[Alarm] = if (filter(observation._1, observation._2, observation._3))
-    tree.observe(PpmTree.prepareObservation(observation._1, observation._2, observation._3, discriminators)) else None
+  def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
+    tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators)) else None
   def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = alarms + (a.map(_._1) -> (System.currentTimeMillis, a, Map.empty[String,Int])))
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).map { a =>
     if (rating.isDefined) // set the alarm rating in this namespace
@@ -115,7 +125,7 @@ trait PpmTree {
 }
 case object PpmTree {
   def apply(serialized: Option[TreeRepr] = None): PpmTree = new SymbolNode(serialized)
-  def prepareObservation(e: Event, s: Subject, o: Object, ds: List[Discriminator]): List[ExtractedValue] = ds.flatMap(_.apply(e, s, o))
+  def prepareObservation[DataShape](data: DataShape, ds: List[Discriminator[DataShape]]): List[ExtractedValue] = ds.flatMap(_.apply(data))
 }
 
 
@@ -190,7 +200,7 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
-    def ppm(name: String): Option[PpmDefinition] = ppmList.find(_.name == name)
+  def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
@@ -204,10 +214,15 @@ class PpmActor extends Actor with ActorLogging {
       Try (
         flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-        case Success(flatEvents) => ppmList.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm (ppm.observe (e) ) ) )
-        case Failure(err) => log.warning(s"Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+        case Success(flatEvents) => esoTrees.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm (ppm.observe (e) ) ) )
+        case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
       sender() ! Ack
+
+
+    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, Some(o: ADM), objPathNodes: Set[_], e2: Event, Some(s2: AdmSubject), sub2PathNodes: Set[_]) =>
+      ???
+
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace) =>
       val resultOpt = ppm(treeName).map(tree =>
@@ -228,7 +243,7 @@ class PpmActor extends Actor with ActorLogging {
       ppmList.foreach { ppm =>
         ppm.saveState()
 //        println(ppm.prettyString)
-        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name, "\n", "\n\n"))
+        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
       }
       println("Done")
 
@@ -387,7 +402,7 @@ case object ProcessDirectoryTouchesAux {
     Application.config.getString(s"adapt.ppm.ProcessDirectoryTouches.processdirectorytouchesauxfile")).toOption
   val processToDepth: Map[String, Int] = auxFilePath.map(readJsonFile).getOrElse(Map.empty[String, Int])
 
-  def dirFilter(e: Event, s: Subject, o: Object): Boolean = {
+  def dirFilter(e: NoveltyDetection.Event, s: NoveltyDetection.Subject, o: NoveltyDetection.Object): Boolean = {
     o._2.map(_.path).isDefined && o._2.map(_.path).get.length > 1 && // file path must exist and have length greater than 1
       Set('/', '\\').contains(o._2.map(_.path).get.toString.head) && // file path must be absolute (or as close as we can get to forcing that)
       s._2.map(_.path).isDefined && s._2.map(_.path).get.length > 0 // process name must exist and be a non-empty string
