@@ -172,13 +172,22 @@ object Application extends App {
   val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
   val dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
 
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.expiringSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
-    override def removeEldestEntry(eldest: java.util.Map.Entry[AdmUUID, None.type]): Boolean = this.size > dedupNodeCacheSize
-  })
+//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.expiringSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
+//    override def removeEldestEntry(eldest: java.util.Map.Entry[AdmUUID, None.type]): Boolean = this.size > dedupNodeCacheSize
+//  })
   val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.expiringSet(new util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
     override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean = this.size > dedupEdgeCacheSize
   })
 
+  val seenNodesSet: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
+    .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
+    .counterEnable()
+    .createOrOpen()
+    .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
+  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
+    seenNodesSet,
+    { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
+  )
 
   /* Bloom filter variant
 

@@ -82,6 +82,19 @@ object MapDBUtils {
     def size(): Long = set.getMap.sizeLong()
   }
 
+  // Wrap a MapDB set into an `AlmostSet`
+  def navigableSet[V1,V2](
+    set: java.util.NavigableSet[V1],
+    intoValue: V2 => V1, outValue: V1 => V2   // better be inverses
+  ): AlmostSet[V2] = new AlmostSet[V2] {
+
+    def contains(v2: V2): Boolean = set.contains(intoValue(v2))
+
+    def add(v2: V2): Unit = set.add(intoValue(v2))
+
+    def size(): Long = set.size()
+  }
+
   // Wrap a mutable set into an `AlmostSet`
   def almostSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
     def contains(v: V): Boolean = set.contains(v)
