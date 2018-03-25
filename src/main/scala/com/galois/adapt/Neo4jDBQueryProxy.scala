@@ -209,38 +209,54 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
     }
   }
 
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
+  def AdmTx(adms: Seq[Either[ADM, EdgeAdm2Adm]]): Try[Unit] = {
     val transaction = neoGraph.beginTx()
     val verticesInThisTX = MutableMap.empty[(UUID,String), NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val admToNodeResults = adms map {
-      case Left(edge) => Try {
+      case Right(edge) => Try {
 
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .getOrElse({
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.src.rendered)
+              verticesInThisTX += (admToTuple(edge.src) -> newVertex)
+              newVertex
+            })
 
           val target = verticesInThisTX
             .get(edge.tgt)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .getOrElse({
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.tgt.rendered)
+              verticesInThisTX += (admToTuple(edge.tgt) -> newVertex)
+              newVertex
+            })
 
           source.createRelationshipTo(target, new RelationshipType() {
             def name: String = edge.label
           })
         }
+      }.recoverWith {
+        case e: ConstraintViolationException =>
+          if (shouldLogDuplicates)
+            println(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
+          Success(None)
+        case e: Throwable => Failure(e)
       }
 
-      case Right(adm) => Try {
+      case Left(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
+          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName))
           verticesInThisTX += (admToTuple(adm.uuid) -> newVertex)
           newVertex
         })
@@ -307,7 +323,7 @@ object Neo4jFlowComponents {
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
-                            (implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
+                            (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)

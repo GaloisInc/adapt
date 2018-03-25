@@ -13,37 +13,33 @@ class StatusActor extends Actor {
 
   val populationLog = mutable.Map.empty[String, Long]
 
-  var admFuturesCountsObserved = 0
-  var admFuturesTotal = 0
-  var admFuturesLastObserved = 0
 
   def receive = {
     case GetStats => sender() ! StatusReport(
       currentlyIngesting,
       generalRecords.toMap.mapValues(_.toString),
-      populationLog.toMap,
-      admFuturesLastObserved,
-      Try(admFuturesTotal.toFloat / admFuturesCountsObserved.toFloat).getOrElse(0F)
+      populationLog.toMap
     )
 
-    case PopulationLog(name, position, every, counterMap, admFuturesCount, countOutOfAsyncBuffer, averageMillisecondsInAsyncBuffer, secondsThisEvery, blockEdgesCount, blockingNodes, uuidsBlocking, blockedUuidResponses, currentTime) =>
-      counterMap.foreach{ case (k,v) =>
-        val key = s"$name: $k"
+    case p: PopulationLog =>
+      p.counter.foreach{ case (k,v) =>
+        val key = s"${p.name}: $k"
         populationLog += (key -> (populationLog.getOrElse(key, 0L) + v))
       }
-      admFuturesCountsObserved += 1
-      admFuturesTotal += admFuturesCount
-      admFuturesLastObserved = admFuturesCount
 
-      generalRecords += ("every" -> every)
-      generalRecords += ("countOutOfAsyncBuffer" -> countOutOfAsyncBuffer)
-      generalRecords += ("averageMillisecondsInAsyncBuffer" -> averageMillisecondsInAsyncBuffer)
-      generalRecords += ("secondsThisEvery" -> secondsThisEvery)
-      generalRecords += ("blockEdgesCount" -> blockEdgesCount)
-      generalRecords += ("blockingNodes" -> blockingNodes)
-      generalRecords += ("uuidsBlocking" -> blockingNodes)
-      generalRecords += ("blockedUuidResponses" -> blockingNodes)
-      generalRecords += ("currentTime" -> currentTime)
+      generalRecords += ("every" -> p.every)
+      generalRecords += ("secondsThisEvery" -> p.secondsThisEvery)
+      generalRecords += ("blockEdgesCount" -> p.blockEdgesCount)
+      generalRecords += ("blockingNodes" -> p.blockingNodes)
+      generalRecords += ("uuidsBlocking" -> p.blockingNodes)
+      generalRecords += ("blockedUuidResponses" -> p.blockingNodes)
+      generalRecords += ("activeEventChains" -> p.activeEventChains)
+      generalRecords += ("cdm2cdmSize" -> p.cdm2cdmSize)
+      generalRecords += ("cdm2admSize" -> p.cdm2admSize)
+      generalRecords += ("seenNodesSize" -> p.seenNodesSize)
+      generalRecords += ("seenEdgesSize" -> p.seenEdgesSize)
+      generalRecords += ("monotonicTime" -> p.currentTime)
+      generalRecords += ("sampledTime" -> p.sampledTime)
 
     case InitMsg => currentlyIngesting = true
     case CompleteMsg => currentlyIngesting = false
@@ -57,15 +53,18 @@ case class PopulationLog(
   position: Long,
   every: Int,
   counter: Map[String,Long],
-  admFuturesCount: Int,
-  countOutOfAsyncBuffer: Int,
-  averageMillisInAsyncBuffer: Float,
   secondsThisEvery: Double,
   blockEdgesCount: Long,
   blockingNodes: Long,
   uuidsBlocking: Int,
   blockedUuidResponses: Int,
-  currentTime: Long
+  activeEventChains: Long,
+  cdm2cdmSize: Long,
+  cdm2admSize: Long,
+  seenNodesSize: Long,
+  seenEdgesSize: Long,
+  currentTime: Long,
+  sampledTime: Long
 )
 
 case class IncrementCount(name: String)
@@ -74,7 +73,5 @@ case class DecrementCount(name: String)
 case class StatusReport(
   currentlyIngesting: Boolean,
   generalRecords: Map[String,String],
-  population: Map[String, Long],
-  admFuturesSize: Int,
-  admFuturesAverageSize: Float
+  population: Map[String, Long]
 )

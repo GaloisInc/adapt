@@ -2,14 +2,19 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
+
 import akka.stream.scaladsl._
+
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import akka.actor.ActorRef
 import akka.util.ByteString
+
 import scala.collection.mutable
 import com.galois.adapt.adm.EntityResolution
+import com.galois.adapt.adm.EntityResolution.sampledTime
 import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
+
 import collection.JavaConverters._
 import scala.util.Try
 
@@ -39,38 +44,44 @@ object FlowComponents {
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
         import collection.JavaConverters._
 
-        // Async buffer stats
-        val admFuturesCount = EntityResolution.asyncTime.values().asScala.size
-        val measuredMillis = EntityResolution.totalHistoricalTimeInAsync
-        val countOutOfBuffer = EntityResolution.totalHistoricalCountInAsync
-        val averageMillisInAsyncBuffer = Try(measuredMillis.toFloat / countOutOfBuffer).getOrElse(0F)
-
         // Ordering nodes stats
-        val blockEdgesCount = EntityResolution.blockedEdgesCount.get()
+        val blockEdgesCount = EntityResolution.blockedEdgesCount
         val blockingNodes = EntityResolution.blockingNodes.size
 
-        val currentTime = EntityResolution.currentTime
+        val currentTime = EntityResolution.monotonicTime
+        val sampledTime = EntityResolution.sampledTime
 
         // UuidRemapper related stats
         val uuidsBlocking: Int = Application.blocking.size
         val blockedUuidResponses: Int = Application.blocking.values.map(_._1.length).sum
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  ADM buffer: $admFuturesCount.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
+        val activeEventChains = EntityResolution.activeChains.size
+
+        val cdm2cdmSize = Application.cdm2cdmMap.size()
+        val cdm2admSize = Application.cdm2admMap.size()
+
+        val seenNodesSize = Application.seenNodes.size()
+        val seenEdgesSize = Application.seenEdges.size()
+
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
 
         statusActor ! PopulationLog(
           counterName,
           counter,
           every,
           populationCounter.toMap,
-          admFuturesCount,
-          countOutOfBuffer,
-          averageMillisInAsyncBuffer,
           durationSeconds,
           blockEdgesCount,
           blockingNodes,
           uuidsBlocking,
           blockedUuidResponses,
-          currentTime
+          activeEventChains,
+          cdm2cdmSize,
+          cdm2admSize,
+          seenNodesSize,
+          seenEdgesSize,
+          currentTime,
+          sampledTime
         )
 
         populationCounter.clear()

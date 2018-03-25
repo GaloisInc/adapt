@@ -85,18 +85,15 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       .getOrElse(Success(()))
   }
 
-  override def AdmTx(adms: Seq[Either[adm.EdgeAdm2Adm, adm.ADM]]): Try[Unit] = {
+  override def AdmTx(adms: Seq[Either[adm.ADM, adm.EdgeAdm2Adm]]): Try[Unit] = {
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val admToNodeResults: Seq[Try[Unit]] = adms map {
-      case Left(edge) => Try {
+      case Right(edge) => Try {
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
-          val source = findNode("uuid", edge.src.uuid)
-            .getOrElse(throw AdmInvariantViolation(edge))
-
-          val target = findNode("uuid", edge.tgt.uuid)
-            .getOrElse(throw AdmInvariantViolation(edge))
+          val source = findNode("uuid", edge.src.uuid).get
+          val target = findNode("uuid", edge.tgt.uuid).get
 
           source.addEdge(edge.label, target)
 
@@ -104,7 +101,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         }
       }
 
-      case Right(adm) => Try {
+      case Left(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
 
         val props: List[Object] = ((org.apache.tinkerpop.gremlin.structure.T.label, admTypeName) +: adm.asDBKeyValues)
