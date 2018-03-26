@@ -20,8 +20,12 @@ import scala.util.{Failure, Success, Try}
 //TODO: make all the operations safe in a functional programming way
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = (Process,Float) // This is the process and anomaly/fca score
-  case class Process(name: String,uuid: String)
+  type EventTypeAlarm = (Int,String,Float,Float,Int) // This is the process and anomaly/fca score
+  case class Process(name: String,uuid: String) {
+    override def toString() = {
+      this.name + "_" + this.uuid.toString
+    }
+  }
 
   object EventTypeData {
 
@@ -30,7 +34,7 @@ object EventTypeModels {
       val timeout = Timeout(5 seconds)
       val future = ppmActor ? PpmTreeCountQuery(treeName: String)
       Await.result(future, timeout.duration).asInstanceOf[PpmTreeCountResult]
-    } 
+    }
 
     def collect(data: Map[List[ExtractedValue], Int]): Map[Process,EventTypeCounts] = {
       // This removes all but max depth of ProcessEventType tree, which is all we need
@@ -64,30 +68,19 @@ object EventTypeModels {
   }
 
   object EventTypeAlarms {
-
-    def read(filePath: String): List[Array[String]] = {
+    def readToTree(filePath: String, modelName: String,rowToAlarm: Array[String] => EventTypeAlarm): TreeRepr = {
       val fileHandle = new File(filePath)
       val parser = new CsvParser(new CsvParserSettings)
-      parser.parseAll(fileHandle).asScala.toList
+      val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
+      TreeRepr.fromFlat(List((0,modelName,0,0,1)) ++ rows.map(rowToAlarm))
     }
 
-    def handleTry(tryAlarms: Try[List[EventTypeAlarm]]): List[EventTypeAlarm] ={
-      tryAlarms match {
-        case Success(alarms) => alarms
-        case Failure(_) => List.empty[EventTypeAlarm]
-      }
+    def rowToAlarmIForest(row: Array[String]): EventTypeAlarm = {
+        (1,Process(row(0),row(1)).toString(),row.last.toFloat,0,1)
     }
 
-    object IForest {
-      def rowToAlarm(row: Array[String]): EventTypeAlarm = {
-        (Process(row(0),row(1)),row.last.toFloat)
-      }
-    }
-
-    object FCA {
-      def rowToAlarm (row: Array[String]): EventTypeAlarm = {
-        (Process("",row(0)),row(1).toFloat)
-      }
+    def rowToAlarmFCA (row: Array[String]): EventTypeAlarm = {
+        (1,Process("",row(0)).toString(),row(1).toFloat,0,1)
     }
   }
 
@@ -105,31 +98,36 @@ object EventTypeModels {
 
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
-  def evaluateModels(): Unit = {
+  def evaluateModels(): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
     val writeResult = EventTypeData.query("ProcessEventType").results match {
-      case Some(data) => Try(EventTypeData.writeToFile(data,"/a/great/place/to/put/a/file"))
+      case Some(data) => Try(EventTypeData.writeToFile(data,"/a/great/place/to/put/a/trainfile"))
       case _ => Failure(RuntimeException) //If there is no data, we want a failure (this seems hacky)
     }
 
     writeResult match {
       case Success(_) =>
-        Try(Execute.iforest("/path/to/exe/","/a/great/place/to/put/a/trainfile","/a/great/place/to/put/a/file","somewhere"))
-        Try(Execute.fca("/path/to/fca/script"))
+        Try(Execute.iforest("/path/to/exe/","/a/great/place/to/put/a/trainfile","/a/great/place/to/put/a/testfile","alarmFile"))
+        Try(Execute.fca("/path/to/fca/script")) //What if FCA takes forever?!!....we could delete the script it needs
       case Failure(_) =>
     }
 
+    /*getAlarms("alarmFile","fcaAlarmFile")*/
     evaluateModels()
 
   }
 
   // When the UI wants new alarm data, call this function
-  def getAlarms(): Map[String,List[EventTypeAlarm]] ={
-    val iforestAlarms = Try(EventTypeAlarms.read("a path").map(EventTypeAlarms.IForest.rowToAlarm))
-    val fcaAlarms = Try(EventTypeAlarms.read("another path").map(EventTypeAlarms.FCA.rowToAlarm))
+  def getAlarms(iforestAlarmFile: String,fcaAlarmFile: String): Map[String,Option[TreeRepr]] ={
+    val iforestAlarms = Try(EventTypeAlarms.readToTree(iforestAlarmFile,"iforest",EventTypeAlarms.rowToAlarmIForest)).toOption
+    val fcaAlarms = Try(EventTypeAlarms.readToTree(fcaAlarmFile,"fca",EventTypeAlarms.rowToAlarmFCA)).toOption
 
-    Map("iforest" -> EventTypeAlarms.handleTry(iforestAlarms),
-      "fca" -> EventTypeAlarms.handleTry(fcaAlarms))
+    val alarmMap = Map("iforest" -> iforestAlarms,
+      "fca" -> fcaAlarms)
 
+    new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
+    new File(fcaAlarmFile).delete()
+
+    alarmMap
   }
 
 //TODO: When the PPMTree actor gets `CompleteMsg`, call
