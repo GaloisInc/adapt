@@ -13,7 +13,7 @@ import scala.collection.SortedSet
 
 object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
 
-  implicit val statusReport = jsonFormat5(StatusReport)
+  implicit val statusReport = jsonFormat3(StatusReport)
 
   implicit def sortedSetFormat[T : JsonFormat : Ordering] = viaSeq[SortedSet[T], T](seq => SortedSet.empty)
   implicit object uiTreeElementFormat extends JsonFormat[UiTreeElement] {
@@ -25,7 +25,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       if (json.asJsObject.fields.contains("folder")) uiTreeFolderFormat.read(json)
       else uiTreeNodeFormat.read(json)
   }
-  implicit val uiDataContainerFormat = jsonFormat1(UiDataContainer.apply)
+  implicit val uiDataContainerFormat = jsonFormat2(UiDataContainer.apply)
   implicit val uiTreeNodeFormat = jsonFormat2(UiTreeNode)
   implicit val uiTreeFolderFormat = jsonFormat4(UiTreeFolder.apply)
 

@@ -20,7 +20,7 @@ object FSOX {
    *   RETURN s1.uuid, o.uuid, s2.uuid
    */
 
-  def apply: Flow[Either[EdgeAdm2Adm, ADM], Result, NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
+  def apply: Flow[Either[ADM, EdgeAdm2Adm], Result, NotUsed] = Flow[Either[ADM, EdgeAdm2Adm]]
     .statefulMapConcat[Result] { () =>
 
     val objectWrittenTo: mutable.Map[
@@ -72,15 +72,15 @@ object FSOX {
 
 
     {
-      case Right(e: AdmEvent) if e.eventType == EVENT_READ =>
+      case Left(e: AdmEvent) if e.eventType == EVENT_READ =>
         readEvents += (e.uuid -> (e.earliestTimestampNanos, None, None))
         Nil
 
-      case Right(e: AdmEvent) if e.eventType == EVENT_WRITE =>
+      case Left(e: AdmEvent) if e.eventType == EVENT_WRITE =>
         writeEvents += (e.uuid -> (e.latestTimestampNanos, None, None))
         Nil
 
-      case Left(EdgeAdm2Adm(src, "predicateObject", tgt)) =>
+      case Right(EdgeAdm2Adm(src, "predicateObject", tgt)) =>
 
         var toRet: List[Result] = Nil
 
@@ -101,7 +101,7 @@ object FSOX {
         toRet
 
 
-      case Left(EdgeAdm2Adm(src, "subject", tgt)) =>
+      case Right(EdgeAdm2Adm(src, "subject", tgt)) =>
 
         var toRet: List[Result] = Nil
 

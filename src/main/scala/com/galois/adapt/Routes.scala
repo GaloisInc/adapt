@@ -76,11 +76,11 @@ object Routes {
               )
             } ~
             path(Segment) { treeName =>
-              parameter('query.as[String].?, 'username ? "adapt") { (queryString, username) =>
+              parameter('query.as[String].?, 'namespace ? "adapt") { (queryString, namespace) =>
                 val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
                 import ApiJsonProtocol._
                 complete(
-                  (ppmActor ? PpmTreeAlarmQuery(treeName, query, username.toLowerCase)).mapTo[PpmTreeAlarmResult]
+                  (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase)).mapTo[PpmTreeAlarmResult]
                     .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                 )
               }
@@ -130,13 +130,34 @@ object Routes {
         pathPrefix("api") {
           pathPrefix("ppm") {
             path(Segment / "setRating") { treeName =>
-              parameters('query.as[String], 'rating.as(validRating), 'username ? "adapt") { (queryString, rating, username) =>
+              parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt") { (queryString, rating, namespace) =>
                 complete {
                   val query = queryString.split("∫",-1).toList
-                  (ppmActor ? SetPpmRating(treeName, query, rating, username.toLowerCase)).mapTo[Option[Boolean]].map {
-                    case Some(true) => StatusCodes.Accepted -> s"Rating for $queryString set to: $rating"
-                    case Some(false) => StatusCodes.NotFound -> s"Could not find key for $queryString"
-                    case None => StatusCodes.NotFound -> s"Could not find tree: $treeName"
+                  (ppmActor ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
+                    case Some(l) if l.forall(x => x) => StatusCodes.Created -> s"Rating for $queryString set to: $rating"
+                    case Some(l) => StatusCodes.NotFound -> s"Could not find key for $queryString"
+                    case None => StatusCodes.BadRequest -> s"Could not find tree: $treeName"
+                  }
+                }
+              }
+            } ~
+            path("setRatings") {
+              formFields('pathsPerTree.as[Map[String, List[String]]], 'rating.as(validRating), 'namespace ? "adapt") { (pathsPerTree, rating, namespace) =>
+
+                val perTreeResultFutures = pathsPerTree.map {
+                  case (treeName, paths) =>
+                    val parsedPaths = paths.map(p => p.split("∫", -1).toList)
+                    (ppmActor ? SetPpmRatings(treeName, parsedPaths, rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]]
+                      .map(v => treeName -> v)
+                }.toList
+                val perTreeResultFuture = Future.sequence(perTreeResultFutures)
+
+                complete{
+                  perTreeResultFuture.map {
+                    case l if l.forall(_._2.exists(_.forall(r => r))) => StatusCodes.Created -> s"Rating for all paths succeeded."
+                    case l if l.exists(_._2.isEmpty) => StatusCodes.BadRequest -> s"""Could not find trees: ${l.collect{ case x if x._2.isEmpty => x._1}.mkString(" & ")} Ratings for other trees might have succeeded...?  ¯\\_(ツ)_/¯"""
+                    case l if l.exists(_._2.exists(_.exists(r => ! r))) => StatusCodes.UnprocessableEntity -> s"Some ratings were not set: ${l.toMap}"
+                    case l => StatusCodes.ImATeapot -> s" ¯\\_(ツ)_/¯ \n$l"
                   }
                 }
               }
