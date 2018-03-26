@@ -7,24 +7,38 @@
     <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
     <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
+>	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+
     <script type="text/javascript">
 
 var treeNames = []
+var urlParams = new URLSearchParams(window.location.search)
 
-function actOnSelectedNodes(){
-	_.map(treeNames, function(treeName){
-		var tree = $("#" + treeName)
-		var selectedElements = tree.fancytree("getTree").getSelectedNodes()
-		var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
-		var titles = _.map(selectedNodes, function(n){return n.getKeyPath()})
-		if ( ! _.isEmpty(titles)) alert(titles.join("\n"))
-	})
-}
+
+
+var testingPrefix = "" //http://localhost:8080" // ""
+
+
+
 
 $(function(){
 
-	$.getJSON("/api/ppm/listTrees", function(names) {
-		treeNames = names
+	var namespace = localStorage.getItem("namespace")
+	if (namespace === null) { 
+		namespace = prompt("Enter your usename:")
+		if (namespace != null) {
+			localStorage.setItem("namespace", namespace.toLowerCase())
+		} else {
+			namespace = "adapt"  // temporarilly set to the shared namespace
+		}
+	}
+
+	$.getJSON(testingPrefix + "/api/ppm/listTrees", function(names) {
+		var excluded = []
+		if (urlParams.has('excludedTrees')) {
+			excluded = urlParams.get('excludedTrees').split(",")
+		}
+		treeNames = _.filter(names, function(n){ return ! _.contains(excluded, n) })
 		_.map(_.sortBy(treeNames), function(name) {
 			$("#trees").append(
 				"<table id=" + name + ">"+ 
@@ -35,7 +49,16 @@ $(function(){
 			)
 			createFancyTree(name)
 		})
+	}).fail(function(e){
+		console.log(e)
 	})
+
+	function renderStars(numberFilled) {
+		return _.reduce([1,2,3,4,5], function(acc, idx){
+			var fillStateClass = idx <= numberFilled ? "ion-ios-star" : "ion-ios-star-outline"
+			return acc + '<i class="'+ fillStateClass +'" />'
+		}, "")
+	}
 
 	function createFancyTree(treeName) {
 		
@@ -44,7 +67,7 @@ $(function(){
 		$("#" + treeName).fancytree({
 			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
 			source: {
-				url: "/api/ppm/" + treeName,
+				url: testingPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace,
 				cache: false
 			},
 			quicksearch: true,
@@ -73,7 +96,11 @@ $(function(){
 				// (Column #2 is rendered by fancytree)
 
 				// Render remaining columns
-				// $tdList.eq(3).text("node.data")
+				// $tdList.eq(3).text(JSON.stringify(node.data))
+				if (node.data.hasOwnProperty("rating")) {
+					$tdList.eq(3).html(renderStars(node.data.rating))
+				}
+
 				$tdList.eq(4).html(
 					'<a target="_blank" href="/#g.V().hasLabel(\'AdmPathNode\').has(\'path\',\''+ node.title +'\')">Show Graph</a>'
 				)
@@ -122,9 +149,9 @@ $(function(){
 	
 
 	// Search function:
-	$("input[name=search]").keyup(function(e){
+	function updateFilter(e){
 		var matchCount = 0
-		var searchPattern = $(this).val()
+		var searchPattern = $("#searchText").val() //$(this).val()
 
 		_.map(treeNames, function(treeName){
 			var tree =  $("#" + treeName).fancytree("getTree")   //$.ui.fancytree.getTree()
@@ -139,44 +166,165 @@ $(function(){
 				mode: "hide"       // Grayout unmatched nodes with "dimm" ("hide" to remove empty node)
 			}
 
-			if(e && e.which === $.ui.keyCode.ESCAPE || $.trim(searchPattern) === ""){
+			if(e && e.which === $.ui.keyCode.ESCAPE || ($.trim(searchPattern) === "" && $("#ratingComparison").val() === "none" )){
 				$("button#btnResetSearch").click()
 				return
 			}
-			if($("#isRegex").is(":checked")) {
-				// Pass function to perform match
-				matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
-					return new RegExp(searchPattern, "i").test(node.title)
-				}, filterOptions)
-			} else {
-				// Pass a string to perform case insensitive matching
-				matchCount = matchCount + tree.filterNodes.call(tree, searchPattern, filterOptions)
+
+			function matchesRatingFilter(node) { 
+				var comparison;
+				switch($("#ratingComparison").val()){
+					case ">=":
+						comparison = function(left, right) { return left >= right }
+						break
+					case "<=":
+						comparison = function(left, right) { return left <= right }
+						break
+					default:
+						comparison = function(left, right) { return left === right }
+				}
+				var result;
+				switch($("#ratingValue").val()) {
+					case "0":
+						result = ! node.data.hasOwnProperty("rating")
+						break
+					case "6":
+						result = node.data.hasOwnProperty("rating")
+						break
+					default:
+						result = (node.data.hasOwnProperty("rating") && 
+						comparison(node.data.rating, parseInt($("#ratingValue").val())))
+				}
+				return result
 			}
+
+			matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
+				if (_.isEmpty(searchPattern)) {
+					return ! node.folder && matchesRatingFilter(node)
+				} else {
+					return ! node.folder && new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node)
+				}
+			}, filterOptions)
+			// } else {
+				// Pass a string to perform case insensitive matching
+				// matchCount = matchCount + tree.filterNodes.call(tree, searchPattern, filterOptions)
+			// }
 		})
 		$("button#btnResetSearch").attr("disabled", false)
 		$("span#matches").text("(" + matchCount + " matches)")
-	}).focus()
+	}
+
+	$("#ratingComparison").change(updateFilter)
+	$("#ratingValue").change(updateFilter)
+	$("input[name=search]").keyup(updateFilter).focus()
+
 
 	$("button#btnResetSearch").click(function(e){
 		$("input[name=search]").val("");
+		$("#ratingComparison").val("none")
+		$("#ratingValue").val(0)
 		$("span#matches").text("");
 		_.map(treeNames, function(treeName){
 			$("#" + treeName).fancytree("getTree").clearFilter();
 		})
 	}).attr("disabled", true)
+
+
+
+	var stars = {
+		existing : [],
+		makeNewStar : function() {
+			var existing_so_far = stars.existing.slice()
+			var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
+
+				var all_selected_nodes = []
+				var rating_items = {}
+				_.map(treeNames, function(treeName){
+					var tree = $("#" + treeName)
+					var selectedElements = tree.fancytree("getTree").getSelectedNodes()
+					var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
+					all_selected_nodes = all_selected_nodes.concat(selectedNodes)
+					if ( ! _.isEmpty(selectedNodes)) {
+						rating_items[treeName] = _.map(selectedNodes, function(n){return n.data.key})
+					}
+				})
+
+				var rating = existing_so_far.length + 1
+				var rating_unit_label = rating === 1 ? " star" : " stars"
+
+				var count = _.reduce(rating_items, function(a, b){return a + b.length}, 0)
+				var count_unit_label = count === 1 ? " item" : " items"
+
+				if (count == 0) {
+					alert("You must select items with checkboxes to apply a rating.")
+				} else {
+					var confirmed = confirm("Apply rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?")
+					if (confirmed) {
+						var payload = {
+							"pathsPerTree" : JSON.stringify(rating_items),
+							"rating" : rating,
+							"namespace" : namespace
+						}
+						$.post(testingPrefix + "/api/ppm/setRatings", payload, function(data, textStatus, jqXHR){
+							if (textStatus === "success") {
+								_.map(all_selected_nodes, function(n){
+									n.data.rating = rating
+								})
+								_.map(treeNames, function(treeName){
+									var tree = $("#" + treeName)
+									tree.fancytree("getRootNode").render(true,true)
+								})
+							} else {
+								console.log(textStatus)
+								console.log(data)
+							}
+						}).fail(function(e){
+							console.log(e)
+						})
+					}
+				}
+			}}).hover(function(){UI.hoverStars([$(this)].concat(existing_so_far))}, function(){UI.hoverStars([$(this)].concat(existing_so_far))})
+			stars.existing.push(newStar)
+			return newStar
+		}
+	}
+
+	var starDiv = $("#stars") // $("<div>", {class: "column small-3"})
+	_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
+
+	var UI = {
+		hoverStars : function(starArray) {
+			_.map(starArray, function(star){
+				star.toggleClass("ion-ios-star-outline").toggleClass("ion-ios-star")
+			})
+		}
+	}
 })
+
     </script>
 </head>
 <body>
 	<div>
-		<input name="search" placeholder="Search..." autocomplete="off" />
-		<button id="btnResetSearch">&times;</button>
-		<label>RegEx:</label>
-		<input id="isRegex" name="isRegex" type="checkbox" />
+		<input id="searchText" name="search" placeholder="Search..." autocomplete="off" />
+		<label>Rating:</label>
+		<select id="ratingComparison">
+			<option value="none">&nbsp;</option>
+			<option value="==">==</option>
+			<option value=">=">>=</option>
+			<option value="<="><=</option>
+		</select>
+		<select id="ratingValue">
+			<option value="0">none</option>
+			<option value="1">1</option>
+			<option value="2">2</option>
+			<option value="3">3</option>
+			<option value="4">4</option>
+			<option value="5">5</option>
+			<option value="6">any</option>
+		</select>
+		<button id="btnResetSearch">CLEAR</button>
 		<span id="matches"></span>
-	</div>
-	<div>
-		<input name="whitelist" type="button" value="Silence Selected Alarms" onclick="actOnSelectedNodes()" />
+		<span style="margin-left: 5em;">Set Rating: </span><span id="stars"></span>
 	</div>
 	<div id="trees"></div>
 </body>

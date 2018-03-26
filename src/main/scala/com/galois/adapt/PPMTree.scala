@@ -234,8 +234,8 @@ class PpmActor extends Actor with ActorLogging {
     case PpmTreeCountQuery(treeName) =>
       sender() ! PpmTreeCountResult(ppm(treeName).map(tree => tree.getAllCounts))
 
-    case SetPpmRating(treeName, key, rating, namespace) =>
-      sender() ! ppm(treeName).map(tree => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace))
+    case SetPpmRatings(treeName, keys, rating, namespace) =>
+      sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
     case InitMsg => sender() ! Ack
 
@@ -260,12 +260,12 @@ case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Option[Int])]])
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._2.map(_._1)
-      val someUiData = UiDataContainer(b._3)
+      val someUiData = UiDataContainer(b._3, names.mkString("∫"))
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
 }
-case class SetPpmRating(treeName: String, key: List[String], rating: Int, namespace: String)
+case class SetPpmRatings(treeName: String, key: List[List[String]], rating: Int, namespace: String)
 
 case class PpmTreeCountQuery(treeName: String)
 case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
@@ -315,8 +315,8 @@ case class UiTreeFolder(title: String, folder: Boolean = true, data: UiDataConta
   }
 }
 
-case class UiDataContainer(rating: Option[Int])
-case object UiDataContainer { def empty = UiDataContainer(None) }
+case class UiDataContainer(rating: Option[Int], key: String)
+case object UiDataContainer { def empty = UiDataContainer(None, "") }
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
