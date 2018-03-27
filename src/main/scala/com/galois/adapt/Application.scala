@@ -77,6 +77,8 @@ object Application extends App {
   new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+  val logFile = config.getString("adapt.logfile")
+  system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
 
   // Start up the database
   val dbActor: ActorRef = runFlow match {
@@ -319,6 +321,37 @@ object Application extends App {
 //        .via(EntityResolution.annotateTime((config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos))
 //        .map((x: (String,Timed[CDM18])) => ByteString(x._2.time + "\n"))
 //        .runWith(FileIO.toPath(Paths.get("timestamps")))
+
+    case "sets" =>
+
+      val temp: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("temp")
+        .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
+        .counterEnable()
+        .createOrOpen()
+        .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
+      val uuids: AlmostSet[AdmUUID] = MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
+        temp,
+        { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
+      )
+
+      var i: Long = 0
+      while (i < 60000000) {
+        if (i % 100000 == 0)
+          println(s"${System.currentTimeMillis()}, ${i}")
+        uuids.add(AdmUUID(UUID.randomUUID(), ""))
+        i += 1
+      }
+
+    case "ignore" =>
+
+      val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
+      startWebServer()
+      statusActor ! InitMsg
+
+      CDMSource.cdm18(ta1)
+        .via(printCounter("File Input", statusActor))
+        .via(er)
+        .runWith(Sink.ignore)
 
     case "csvmaker" | "csv" =>
 

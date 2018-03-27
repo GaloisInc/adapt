@@ -223,6 +223,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
             .get(edge.src)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
             .getOrElse({
+              log.error(s"Had to synthesize the source of $edge!")
               val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
               newVertex.setProperty("uuid", edge.src.rendered)
               verticesInThisTX += (admToTuple(edge.src) -> newVertex)
@@ -233,6 +234,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
             .get(edge.tgt)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
             .getOrElse({
+              log.error(s"Had to synthesize the target of $edge!")
               val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
               newVertex.setProperty("uuid", edge.tgt.rendered)
               verticesInThisTX += (admToTuple(edge.tgt) -> newVertex)
