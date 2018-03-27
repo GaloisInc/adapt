@@ -1,6 +1,6 @@
 #!/bin/bash
 
-
+echo 'parsing parameters'
 PARAMS=()
 NB_JOBS=3
 
@@ -14,7 +14,7 @@ while (( "$#" )); do
       ;;
     -p|--port)
 		len="$#"
-		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-n") || ($2 == "--context_name") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_name" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
+		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-n") || ($2 == "--context_names") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
 			then
 		   PORT+=(8080)
 		   shift 1
@@ -22,7 +22,7 @@ while (( "$#" )); do
 			for k in `seq 2 $len`
 				do  
 					a=${!k}
-						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-n") || ($a == "--context_name") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_name" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
+						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-n") || ($a == "--context_names") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
 							then 
 								#echo 'k' $k 'a' ${!k} 'condition!!!'
 								break
@@ -36,17 +36,10 @@ while (( "$#" )); do
 			shift "$s"
 	fi
       ;; 
-      #PORT=$2
-      #shift 2
-      #;;
     -N|--no_ingest)
       INGEST=0
       shift 1
       ;;
-    #-i|--interval)
-      #INTERV=$2
-      #shift 2
-      #;;
     -seq|--sequential_ingest)
       SEQ=1
       shift 1
@@ -65,7 +58,7 @@ while (( "$#" )); do
       ;;
     -ms|--fca_minsupp)
       		len="$#"
-		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-n") || ($2 == "--context_name") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-p") || ($2 == "--port") || ($2 == "-n" ) || ($2 == "--context_name" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
+		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-n") || ($2 == "--context_names") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-p") || ($2 == "--port") || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
 			then
 		   FCA_MINSUPP+=(0)
 		   shift 1
@@ -73,7 +66,7 @@ while (( "$#" )); do
 			for k in `seq 2 $len`
 				do  
 					a=${!k}
-						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-n") || ($a == "--context_name") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-p") || ($a == "--port") || ($a == "-n" ) || ($a == "--context_name" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
+						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-n") || ($a == "--context_names") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-p") || ($a == "--port") || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
 							then 
 								#echo 'k' $k 'a' ${!k} 'condition!!!'
 								break
@@ -106,9 +99,9 @@ while (( "$#" )); do
 								CONTEXT_NAMES+=($a)
 							fi			
 			done
-			sn=${#CONTEXT_NAMES[@]}
+			s=${#CONTEXT_NAMES[@]}
 			#echo $s
-			shift "$sn"
+			shift "$s"
 	fi
       ;; 
     -rs|--fca_rule_spec_dir)
@@ -117,7 +110,7 @@ while (( "$#" )); do
       ;;
     -rn|--rule_names)
 		len="$#"
-		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-n") || ($2 == "--context_names") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_names" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
+		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_names" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
 			then
 		   RULE_NAMES+=( "implication" )
 		   shift 1
@@ -125,7 +118,7 @@ while (( "$#" )); do
 			for k in `seq 2 $len`
 				do  
 					a=${!k}
-						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-n") || ($a == "--context_names") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_names" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
+						if [[ ($a == "-nr") || ($a == "--number_rules") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_names" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
 							then 
 								#echo 'k' $k 'a' ${!k} 'condition!!!'
 								break
@@ -134,22 +127,22 @@ while (( "$#" )); do
 								RULE_NAMES+=($a)
 							fi			
 			done
-			sn=${#RULE_NAMES[@]}
+			s=${#RULE_NAMES[@]}
 			#echo $s
-			shift "$sn"
+			shift "$s"
 	fi
       ;; 
     -t|--rule_thresholds)
 		len="$#"
-		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-n") || ($a == "--context_names") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_names" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
+		 if [[  ($2 == "-nr") || ($2 == "--number_rules") || ($2 == "-n") || ($a == "--context_names") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
 			then
-		   RULE_THRESHOLDS+=( "0.95" )
+		   RULE_THRESHOLDS+=( 0.95 )
 		   shift 1
 		else
 			for k in `seq 2 $len`
 				do  
 					a=${!k}
-						if [[  ($a == "-nr") || ($a == "--number_rules") || ($a == "-n") || ($a == "--context_names") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_names" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
+						if [[  ($a == "-nr") || ($a == "--number_rules") || ($a == "-n") || ($a == "--context_names") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
 							then 
 								#echo 'k' $k 'a' ${!k} 'condition!!!'
 								break
@@ -158,14 +151,14 @@ while (( "$#" )); do
 								RULE_THRESHOLDS+=($a)
 							fi			
 			done
-			tn=${#RULE_THRESHOLDS[@]}
+			s=${#RULE_THRESHOLDS[@]}
 			#echo $s
-			shift "$tn"
+			shift "$s"
 	fi
       ;; 
     -nr|--number_rules)
 		len="$#"
-		 if [[  ($2 == "-n") || ($2 == "--context_names") || ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_names" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
+		 if [[  ($2 == "-t") || ($2 == "--rule_thresholds") || ($2 == "-rn") || ($2 == "--rule_names") || ($2 == "-p") || ($2 == "--port") || ($2 == "-r") || ($2 == "--search_repository") || ($2 == "-N") || ($2 == "--no_ingest") || ($2 == "-seq") || ($2 == "--sequential_ingest") || ($2 == "-m" ) || ($2 == "--mem" ) || ($2 == "-d") || ($2 == "--context_directory") || ($2 == "-w") || ($2 == "--fca_workflow") || ($2 == "-ms") || ($2 == "--fca_minsupp") || ($2 == "-n" ) || ($2 == "--context_names" ) || ($2 == "-rs") || ($2 == "--fca_rule_spec_dir" ) || ($2 == "-cd") || ($2 == "--csv_dir" ) || ($2 == "-oa") || ($2 == "--fca_analysis_output_dir" ) ]]
 			then
 		   NUMBER_RULES+=( "'*'" )
 		   shift 1
@@ -173,7 +166,8 @@ while (( "$#" )); do
 			for k in `seq 2 $len`
 				do  
 					a=${!k}
-						if [[  ($a == "-n") || ($a == "--context_names") || ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_names" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
+					#echo $a
+						if [[ ($a == "-t") || ($a == "--rule_thresholds") || ($a == "-rn") || ($a == "--rule_names") || ($a == "-p") || ($a == "--port") || ($a == "-r") || ($a == "--search_repository") || ($a == "-N") || ($a == "--no_ingest") || ($a == "-seq") || ($a == "--sequential_ingest") || ($a == "-m" ) || ($a == "--mem" ) || ($a == "-d") || ($a == "--context_directory") || ($a == "-w") || ($a == "--fca_workflow") || ($a == "-ms") || ($a == "--fca_minsupp") || ($a == "-n" ) || ($a == "--context_names" ) || ($a == "-rs") || ($a == "--fca_rule_spec_dir" ) || ($a == "-cd") || ($a == "--csv_dir" ) || ($a == "-oa") || ($a == "--fca_analysis_output_dir" ) ]]
 							then 
 								#echo 'k' $k 'a' ${!k} 'condition!!!'
 								break
@@ -182,9 +176,9 @@ while (( "$#" )); do
 								NUMBER_RULES+=($a)
 							fi			
 			done
-			num_r=${#NUMBER_RULES[@]}
-			#echo $s
-			shift "$num_r"
+			s=${#NUMBER_RULES[@]}
+			#echo $numr
+			shift "$s"
 	fi
       ;; 
     -cd|--csv_dir)
@@ -214,7 +208,7 @@ done
 # set positional arguments in their proper place
 eval set -- "$PARAMS"
 #echo 'PARAM' $PARAM
-
+echo 'parameters parsed'
 #mem=${PARAM[0]}
 #port=${PARAM[1]}
 #dbkeyspace=${PARAM[2]}
@@ -242,38 +236,19 @@ if [[ ${#PORT[@]} -le 1 ]];
 	let "end_port=$port+2000"
 	ports=($(shuf -i $port-$end_port -n ${#files[@]}))
  else
-	ports=${port[@]}
+	ports=("${port[@]}")
 fi
-
-
-inputargs=$(parallel echo --rule_properties {1} {2} {3} $rule_spec'/'{1}'_thresh'{2}'_numrules'{3}'.json' ::: ${rule_names[@]} ::: ${rule_thresholds[@]} ::: ${number_rules[@]} | sed " s/\(\.\{1\}\)\([0-9]\+\)\(_\)/_\2\3/g ; s/'//g; s/\*/all/g ; s/ all / '*' /g")
-
-pythonSpecGen_arg=( python3 fca/ruleSpecificationGeneration.py $inputargs )
-#echo "${pythonSpecGen_arg[@]}"
-eval "${pythonSpecGen_arg[@]}"
-
-
 #construct rule spec files
+echo 'Constructing rule specification files'
 thresh_string='_thresh'
 numrules_string='_numrules'
 json_ext='.json'
 
-#echo ${RULE_NAMES[@]}
-#echo ${#RULE_NAMES[@]}
-#echo ${RULE_NAMES[0]}
-#echo '  '
-#echo ${rule_names[@]}
-#echo ${#rule_names[@]}
-#echo ${rule_names[0]}
-#echo '  '
-#echo ${rule_thresholds[@]}
-#echo ${number_rules[@]}
-
-
-#rule_spec_files=()
-
-
-#echo ${pythonSpecGen_arg[@]}
+inputargs=$(parallel echo --rule_properties {1} {2} {3} $rule_spec'/'{1}'_thresh'{2}'_numrules'{3}'.json' ::: ${rule_names[@]} ::: ${rule_thresholds[@]} ::: ${number_rules[@]} | sed " s/\(\.\{1\}\)\([0-9]\+\)\(_\)/_\2\3/g ; s/'//g; s/\*/all/g ; s/ all / '*' /g")
+rule_spec_files=( $(parallel echo --rule_properties {1} {2} {3} $rule_spec'/'{1}'_thresh'{2}'_numrules'{3}'.json' ::: ${rule_names[@]} ::: ${rule_thresholds[@]} ::: ${number_rules[@]} | awk '{print $NF}' | sed " s/\(\.\{1\}\)\([0-9]\+\)\(_\)/_\2\3/g ; s/'//g; s/\*/all/g ; s/ all / '*' /g") )
+pythonSpecGen_arg=( python3 fca/ruleSpecificationGeneration.py $inputargs )
+#echo "${pythonSpecGen_arg[@]}"
+eval "${pythonSpecGen_arg[@]}"
 
 
 

@@ -29,14 +29,6 @@ while (( "$#" )); do
 	  FCA=1
       shift 1
       ;;
-    #-q|--query_input)
-	  #QUERY=$2
-      #shift 2
-      #;;
-    #-csv|--csv_input)
-	  #CSV=$2
-      #shift 2
-      #;; 
     -g|--generation_only)
 	  GEN=1
       shift 1
@@ -116,29 +108,27 @@ done
 
 # set positional arguments in their proper place
 eval set -- "$PARAMS"
-#echo 'PARAM' $PARAM
 
-#mem=${PARAM[0]}
-#port=${PARAM[1]}
-#dbkeyspace=${PARAM[2]}
+if ! [[ ($(basename $PWD) =~ 'adapt') ]] 
+	then 
+		new_path=$(echo $PWD | grep -Eo '.+adapt/')
+		if [[ -n "$new_path" ]]
+			then
+				cd $new_path 
+			else
+				cd $(dirname $(find $HOME -type d -wholename '*adapt/fca'))
+		fi 
+fi
+
 if [[ -z "$MEM" ]] ; then mem=8000; else mem=$MEM; fi
 if [[ -z "$PORT" ]] ; then port=8080; else port=$PORT; fi
 if [[ -z "$DB" ]] ; then dbkeyspace="neo4j"; else dbkeyspace=$DB; fi
-#mem=$MEM
-#port=$PORT
-#dbkeyspace=$DB
-#echo 'mem' $mem
-#echo 'port' $port
-#echo 'dbkeyspace' $dbkeyspace
-#echo 'loadfiles' $loadfiles
+
 gen=$GEN
 fca=$FCA
-#query=$QUERY${array[@]}
-#csv=$CSV
-#query=$QUERY
+
 default=$DEFAULT_VAL
-#port_param=' p='
-#fca_params=$FCA_PARAMS$port_param$port
+
 if ! [[ " ${FCA_PARAMS[@]} " =~ p=[0-9]+  ]]; then FCA_PARAMS+=(p=$port) ; fi
 if [[ $gen -eq 1 && $fca -eq 1 ]]
 		then
@@ -152,8 +142,8 @@ if [[ -n "$LOAD" ]]
 	    sbt -mem $mem -Dadapt.runflow=db -Dadapt.ingest.quitafteringest=yes -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=$dbkeyspace -Dadapt.ingest.loadfiles.0=$loadfiles run
 fi
 if [[ $INGEST -eq 1 && -z "$LOAD" ]] ; then echo "No files to be ingested were provided. No task to be done. Stopping here." ; fi 
-pid=$(pgrep -f "sbt -mem [0-9]+ -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=neo4j run")
-#echo 'pid' $pid
+pid=$(pgrep -f "sbt -mem [0-9]+ -Dadapt.runflow=ui -Dadapt.ingest.quitafteringest=no -Dadapt.runtime.port=$port -Dadapt.runtime.dbkeyspace=$DB run")
+
 
 conversion(){
 	#$1=$default $2=$port array=CONV
@@ -181,27 +171,27 @@ conversion(){
 	if [[ $default -eq 1 ]]
 	  then
 	      #echo "conversion with default values"
-          python3 ./fca/conversion_script.py -p $port
+          python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port
 	else
 	   if [[ -z  "$new_port" && -z "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 	       then
-				echo "python3 ./fca/conversion_script.py -p $port -n $context_name"
-				python3 ./fca/conversion_script.py -p $port -n $context_name
+				echo "python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name"
+				python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name
 	   elif [[ -z  "$new_port" && -n "$context_path" && -z "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory"
-				python3 ./fca/conversion_script.py -p $port -n $context_name -d $spec_directory
+			    echo "python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name -d $spec_directory"
+				python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name -d $spec_directory
 	   elif [[ -z  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory"
-				python3 ./fca/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory
+			    echo "python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory"
+				python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port -n $context_name -cp $context_path -d  $spec_directory
 	   elif [[ -n  "$new_port" && -n "$context_path" && -n "$spec_directory" && -n "$context_name" ]]
 			then
-			    echo "python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
-				python3 ./fca/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
+			    echo "python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path"
+				python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $new_port -n $context_name -d $spec_directory -cp $context_path
 	   else
-	        echo "python3 ./fca/conversion_script.py -p $port"
-			python3 ./fca/conversion_script.py -p $port
+	        echo "python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port"
+			python3 ./fca/FCA_Miner/python_scripts/conversion_script.py -p $port
 	   fi
 	 fi
 }
@@ -237,7 +227,7 @@ fca_pipeline(){
 	
 	if [[ -z "$new_port" ]] ; then port=8080 ; else port=$new_port; fi #the port value is set to 8080 by default if not passed as parameter in the input quoted string
 	if [[ -z "$support" ]] ; then minsupp=0; else minsupp=$support; fi
-	if [[ -z "$rule_spec" ]] ; then spec_rules="./fca/rulesSpecs/rules_implication_all.json"; else spec_rules=$rule_spec; fi
+	if [[ -z "$rule_spec" ]] ; then spec_rules="./fca/FCA_Miner/rulesSpecs/rules_implication_all.json"; else spec_rules=$rule_spec; fi
 	if [[ -z "$w" ]] ; then workflow="both"; else workflow=$w; fi
 	
 	echo 'input FCA' $input
@@ -248,22 +238,22 @@ fca_pipeline(){
 			  then
 			    if [[ -n "$concept_output" && -n "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
 				elif [[ -z "$concept_output" && -n "$analysis_output" ]]
 			      then
-			        python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules -oa $analysis_output
+			        python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules -oa $analysis_output
 			    elif [[ -n "$concept_output" && -z "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules 
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output -rs $spec_rules 
 				else 
-				    python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules 
+				    python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port -rs $spec_rules 
 				fi
 			  else
 			    if [[ -n "$concept_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output 
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port -o $concept_output 
 				  else
-				    python3 ./fca/fcascript.py --quiet -w $w -s $input -m $support --port $port 
+				    python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -s $input -m $support --port $port 
 				fi
 			  fi
 		else
@@ -271,22 +261,22 @@ fca_pipeline(){
 			  then
 			    if [[ -n "$concept_output" && -n "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules -oa $analysis_output
 				elif [[ -z "$concept_output" && -n "$analysis_output" ]]
 			      then
-			        python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules -oa $analysis_output
+			        python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules -oa $analysis_output
 			    elif [[ -n "$concept_output" && -z "$analysis_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules 
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output -rs $spec_rules 
 				else 
-				    python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules 
+				    python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port -rs $spec_rules 
 				fi
 			  else
 			    if [[ -n "$concept_output" ]]
 			      then
-					python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output 
+					python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port -o $concept_output 
 				  else
-				    python3 ./fca/fcascript.py --quiet -w $w -i $input -m $support --port $port 
+				    python3 ./fca/FCA_Miner/python_scripts/fcascript.py --quiet -w $w -i $input -m $support --port $port 
 				fi
 			  fi
 	fi

@@ -103,6 +103,17 @@ done
 eval set -- "$PARAMS"
 #echo 'PARAM' $PARAM
 
+if ! [[ ($(basename $PWD) =~ 'adapt') ]] 
+	then 
+		new_path=$(echo $PWD | grep -Eo '.+adapt/')
+		if [[ -n "$new_path" ]]
+			then
+				cd $new_path 
+			else
+				cd $(dirname $(find $HOME -type d -wholename '*adapt/fca'))
+		fi 
+fi
+
 #mem=${PARAM[0]}
 #port=${PARAM[1]}
 #dbkeyspace=${PARAM[2]}
@@ -114,8 +125,8 @@ if [[ -z "$SEQ" ]] ; then seq=0; else seq=$SEQ; fi
 if [[ -z "$FCA_WORKFLOW" ]] ; then workflow="both"; else workflow=$FCA_WORKFLOW; fi
 if [[ -z "$FCA_MINSUPP" ]] ; then minsupp=0; else minsupp=$FCA_MINSUPP; fi
 if [[ -z "$CONTEXT_DIR" ]] ; then context_dir='./fca/contextSpecFiles'; else context_dir=$CONTEXT_DIR; fi
-if [[ -z "$FCA_RULE_SPEC" ]] ; then rule_spec='./fca/rulesSpecs/rules_positive_implication.json'; else rule_spec=$FCA_RULE_SPEC; fi
-if [[ -z "$FCA_ANALYSIS_DIR" ]] ; then fca_analysis_dir='./fca/fcaAnalysis'; else fca_analysis_dir=$FCA_ANALYSIS_DIR; fi
+if [[ -z "$FCA_RULE_SPEC" ]] ; then rule_spec='./fca/FCA_Miner/rulesSpecs/rules_positive_implication.json'; else rule_spec=$FCA_RULE_SPEC; fi
+if [[ -z "$FCA_ANALYSIS_DIR" ]] ; then fca_analysis_dir='./fca/FCA_Miner/fcaAnalysis'; else fca_analysis_dir=$FCA_ANALYSIS_DIR; fi
 if [[ -z "$CSV_DIR" ]] ; then csv_dir='./fca/csvContexts'; else csv_dir=$CSV_DIR; fi
 if [[ -z "$CONTEXT_NAME" ]] ; then context_name='ProcessEvent'; else context_name=$CONTEXT_NAME; fi
 #if [[ -z "$INTERV" ]] ; then interval=10; else interval=$interv; fi
@@ -191,11 +202,11 @@ fca_run()
 	echo "running FCA"
 	if [[ -z "$loadfiles" ]]
 	  then
-	     echo "./fca/ingest_script.sh -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput"
-	     ./fca/ingest_script.sh -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput
+	     echo "./fca/FCA_Miner/bash_scripts/ingest_script.sh -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput"
+	     ./fca/bash_scripts/ingest_script.sh -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput
     else
-		echo "./fca/ingest_script.sh -i $loadfiles -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput"
-		./fca/ingest_script.sh -i $loadfiles -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput
+		echo "./fca/FCA_Miner/bash_scripts/ingest_script.sh -i $loadfiles -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput"
+		./fca/bash_scripts/ingest_script.sh -i $loadfiles -p $port -m $mem -db $dbkeyspace -c $contextName $contextSpecDir cp=$path2csv p=$port -fp $workflow i=$path2csv $minsupp $ruleSpec $analysisOutput
 	fi
 }
 
@@ -208,7 +219,7 @@ if [[ $seq -eq 1 ]]
 		    echo "running ingest"
 			for i in $fileindices
 				do
-					./fca/ingest_script.sh -m $mem -i ${files[i]} -I -p ${ports[i]} -db ${dbkeyspaces[i]} 
+					./fca/FCA_Miner/bash_scripts/ingest_script.sh -m $mem -i ${files[i]} -I -p ${ports[i]} -db ${dbkeyspaces[i]} 
 				done
 			echo "ingest done"
 		fi
