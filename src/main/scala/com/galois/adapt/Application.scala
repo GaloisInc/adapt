@@ -78,7 +78,8 @@ object Application extends App {
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
   val logFile = config.getString("adapt.logfile")
-  system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
+  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
+  system.registerOnTermination(scheduledLogging.cancel())
 
   // Start up the database
   val dbActor: ActorRef = runFlow match {
@@ -620,7 +621,9 @@ object CDMSource {
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
-      case Success(i) => Some(i)
+      case Success(i) =>
+        println(s"Starting at offset: $i")
+        Some(i)
       case _ => None
     }
     ta1.toLowerCase match {
@@ -702,7 +705,9 @@ object CDMSource {
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
-      case Success(i) => Some(i)
+      case Success(i) =>
+        println(s"Starting at offset: $i")
+        Some(i)
       case _ => None
     }
     ta1.toLowerCase match {
@@ -820,7 +825,7 @@ object CDMSource {
   def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C]): Source[C, _] =
     Consumer.plainSource(
       ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))
+      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))  // TODO: Why aren't offsets working?
     ) .map(parser)
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
 

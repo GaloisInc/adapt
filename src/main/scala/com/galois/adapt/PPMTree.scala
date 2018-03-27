@@ -6,8 +6,11 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_UNLINK, EVENT_EXECUTE, EVENT_WRITE, EVENT_READ}
+import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_UNLINK, EVENT_WRITE}
 import java.io.{File, PrintWriter}
+
+import com.galois.adapt.adm.EntityResolution.CDM
+
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
@@ -27,84 +30,157 @@ object NoveltyDetection {
     PpmDefinition[(Event, Subject, Object)]( "ProcessFileTouches",
       d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
-        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>"))
-      )
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
+      ),
+      _ => Set.empty   // TODO
     ),
     PpmDefinition[(Event, Subject, Object)]( "FilesTouchedByProcesses",
       d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>")),
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>"))
-      )
+        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
+      ),
+      _ => Set.empty   // TODO
     ),
     PpmDefinition[(Event, Subject, Object)]( "FilesExecutedByProcesses",
       d => d._1.eventType == EVENT_EXECUTE,
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
-        d => List(d._3._2.map(_.path).getOrElse("<no_path_node>"))
-      )
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
+      ),
+      _ => Set.empty   // TODO
     ),
-    PpmDefinition[(Event, Subject, Object)]("ProcessesWithNetworkActivity",
+    PpmDefinition[(Event, Subject, Object)]( "ProcessesWithNetworkActivity",
       d => d._3._1.isInstanceOf[AdmNetFlowObject],
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
           List(s"${nf.remoteAddress}:${nf.remotePort}")
         }
-      )
+      ),
+      _ => Set.empty   // TODO
     ),
-//    PpmDefinition("DirectoryStructure",
+//    PpmDefinition[(Event, Subject, Object)]("DirectoryStructure",
 //      (e: Event, s: Subject, o: Object) => o._1.isInstanceOf[AdmFileObject],
 //      List(
 //        (e: Event, s: Subject, o: Object) => o._2.map(_.path.split("/").toList).getOrElse(Nil)
-//      )
+//      ),
+//    _ => Set.empty   // TODO
 //    ),
-    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryTouchesV1",
+    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryReadWriteTouchesV1",
       d => d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => d._3._2.map { _.path.split("/").toList match {
           case "" :: remainder => "/" :: remainder
           case x => x
-        }}.getOrElse(Nil).dropRight(1)
-      )
+        }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
+      ),
+      _ => Set.empty   // TODO
     ),
-//    PpmDefinition[(Event, Subject, Object)]("ProcessDirectoryTouches",
-//      (ProcessDirectoryTouchesAux.dirFilter _).tupled,
+//    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryTouchesV2",
+//      d => true, //d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
 //      List(
-//        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
-//        d => List(ProcessDirectoryTouchesAux.dirAtDepth(d._2._2.get.path,d._3._2.get.path))
-//      )
-//    )
-    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryTouchesV2",
-      d => true, //d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
+//        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+//        d => List(d._1.eventType.toString),
+//        d => d._3._2.map { _.path.split("/").toList match {
+//          case "" :: remainder => "/" :: remainder
+//          case x => x
+//        }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
+//      ),
+//    _ => Set.empty   // TODO
+//    ),
+    PpmDefinition[(Event, Subject, Object)]( "ProcessesChangingPrincipal",
+      d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_object_path_node>"))
+      ),
+      _ => Set.empty   // TODO
+    ),
+    PpmDefinition[(Event, Subject, Object)]( "SudoIsAsSudoDoes",
+      d => d._2._2.exists(_.path == "sudo"),
+      List(
         d => List(d._1.eventType.toString),
-        d => d._3._2.map { _.path.split("/").toList match {
-          case "" :: remainder => "/" :: remainder
-          case x => x
-        }}.getOrElse(Nil).dropRight(1)
-      )
+        d => List(d._3._1.getClass.getSimpleName),
+        d => List(d._3._2.map(_.path).getOrElse("<no_object_path_node>"))
+      ),
+      _ => Set.empty   // TODO
     )
-  )
+  ).par
+
 
   val seoesTrees = List(
-    PpmDefinition[(Subject, Event, Object, Event, Subject)]("ExecuteDelete",   // TODO: This doesn't need subjects
+    PpmDefinition[(Subject, Event, Object, Event, Subject)]("FileExecuteDelete",   // TODO: This doesn't need subjects
       d => d._2.eventType == EVENT_EXECUTE && d._4.eventType == EVENT_UNLINK && d._3._1.isInstanceOf[AdmFileObject],
       List(
-        d => List(d._3._2.map(_.path).getOrElse(d._2.uuid + "-->FILE<--" + d._4.uuid))
-      )
+        d => List(d._3._2.map(_.path).getOrElse(d._2.uuid + "-->SOME_FILE<--" + d._4.uuid))
+      ),
+      _ => Set.empty   // TODO
+    ),
+    PpmDefinition[(Subject, Event, Object, Event, Subject)]("FileWrittenThenExecuted",
+      d => d._2.eventType == EVENT_WRITE && d._4.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[AdmFileObject],
+      List(
+        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
+        d => List(d._1._2.map(_.path).getOrElse("<no_writing_subject_path_node>")),
+        d => List(d._5._2.map(_.path).getOrElse("<no_executing_subject_path_node>"))
+      ),
+      _ => Set.empty   // TODO
     )
-  )
+//    ,
+//    TODO:  PpmDefinition("CommunicationPathThroughObject", ???, ???, ???)  // TODO: distinct subjects!
+  ).par
 
-  val ppmList = esoTrees ++ seoesTrees
+
+  val seoeoTrees = List(
+    PpmDefinition[(Subject, Event, Object, Event, Object)]("FilesWrittenAfterNetflowRead",
+      d => (d._2.eventType == EVENT_READ || d._2.eventType == EVENT_RECVFROM || d._2.eventType == EVENT_RECVMSG) &&
+            d._3._1.isInstanceOf[AdmNetFlowObject] && d._4.eventType == EVENT_WRITE && d._5._1.isInstanceOf[AdmFileObject],
+      List(
+        d => List(d._5._2.map(_.path).getOrElse("<no_file_path_node>")),
+        d => List(d._1._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List({
+          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
+          s"${nf.remoteAddress}:${nf.remotePort}"
+        })
+      ),
+      d => Set.empty   // TODO
+    )
+  ).par
+
+
+//  TODO: alarm filter for every tree?
+
+//  TODO: parent process tree?
+
+
+  var cdmSanityTrees = List(
+    PpmDefinition[CDM]("CDM-Event",
+      d => d.isInstanceOf[cdm18.Event],
+      List(
+        d => List(d.asInstanceOf[cdm18.Event].eventType.toString),
+        d => List({
+          val e = d.asInstanceOf[cdm18.Event]
+          e match {
+            case cdm18.Event(_,_,_,_,_,subUuid,timestampNanos, po1, pop1, po2, pop2, name,_,_,_,programPoint,_) =>
+              val march1Nanos = 1519862400000000L
+              val tests = List(subUuid.isDefined, timestampNanos > march1Nanos, po1.isDefined, pop1.isDefined, po2.isDefined, pop2.isDefined, name.isDefined, programPoint.isDefined)
+              tests.mkString(",")
+          }
+        })
+      ),
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))
+    )
+  ).par
+
+
+  val ppmList = esoTrees ++ seoesTrees ++ seoeoTrees
 }
 
 
-case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]]) {
+case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]], uuidCollector: DataShape => Set[ExtendedUuid]) {
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
   val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
   val tree = PpmTree(inputFilePath.map{println(s"Reading tree $name in from file: $inputFilePath"); TreeRepr.readFromFile})
@@ -219,7 +295,7 @@ class PpmActor extends Actor with ActorLogging {
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
-    case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name))
+    case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name).toList)
 
     case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[_], Some(o: ADM), objPathNodes: Set[_]) =>
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {

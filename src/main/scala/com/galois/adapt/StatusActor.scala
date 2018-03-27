@@ -25,7 +25,7 @@ class StatusActor extends Actor {
 
     case LogToDisk(p: String) => Try {
         val logFile = new PrintWriter(new FileOutputStream(new java.io.File(p), true))
-        logFile.append(s"$currentlyIngesting, $generalRecords\n");
+        logFile.append(s"$currentlyIngesting, $generalRecords\n")
         logFile.close()
       }
 
