@@ -1,5 +1,7 @@
 package com.galois.adapt
 
+import java.io.{FileOutputStream, PrintWriter}
+
 import akka.actor.Actor
 
 import scala.collection.mutable
@@ -20,6 +22,12 @@ class StatusActor extends Actor {
       generalRecords.toMap.mapValues(_.toString),
       populationLog.toMap
     )
+
+    case LogToDisk(p: String) => Try {
+        val logFile = new PrintWriter(new FileOutputStream(new java.io.File(p), true))
+        logFile.append(s"$currentlyIngesting, $generalRecords\n");
+        logFile.close()
+      }
 
     case p: PopulationLog =>
       p.counter.foreach{ case (k,v) =>
@@ -47,6 +55,7 @@ class StatusActor extends Actor {
 }
 
 case object GetStats
+case class LogToDisk(path: String)
 
 case class PopulationLog(
   name: String,
