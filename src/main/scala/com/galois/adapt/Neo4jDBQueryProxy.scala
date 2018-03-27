@@ -27,7 +27,7 @@ import scala.util.{Failure, Success, Try}
 
 import scala.language.postfixOps
 
-class Neo4jDBQueryProxy extends DBQueryProxyActor {
+class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   val config: Config = ConfigFactory.load()
 
@@ -209,45 +209,63 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
     }
   }
 
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit] = {
+  def AdmTx(adms: Seq[Either[ADM, EdgeAdm2Adm]]): Try[Unit] = {
     val transaction = neoGraph.beginTx()
-    val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
+    val verticesInThisTX = MutableMap.empty[(UUID,String), NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     val admToNodeResults = adms map {
-      case Left(edge) => Try {
+      case Right(edge) => Try {
 
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
-            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.uuid.toString)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
+            .getOrElse({
+              log.error(s"Had to synthesize the source of $edge!")
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.src.rendered)
+              verticesInThisTX += (admToTuple(edge.src) -> newVertex)
+              newVertex
+            })
 
           val target = verticesInThisTX
             .get(edge.tgt)
-            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.uuid.toString)))
-            .getOrElse(throw AdmInvariantViolation(edge))
+            .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
+            .getOrElse({
+              log.error(s"Had to synthesize the target of $edge!")
+              val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
+              newVertex.setProperty("uuid", edge.tgt.rendered)
+              verticesInThisTX += (admToTuple(edge.tgt) -> newVertex)
+              newVertex
+            })
 
           source.createRelationshipTo(target, new RelationshipType() {
             def name: String = edge.label
           })
         }
+      }.recoverWith {
+        case e: ConstraintViolationException =>
+          if (shouldLogDuplicates)
+            println(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
+          Success(None)
+        case e: Throwable => Failure(e)
       }
 
-      case Right(adm) => Try {
+      case Left(adm) => Try {
         val admTypeName = adm.getClass.getSimpleName
         val thisNeo4jVertex = verticesInThisTX.getOrElse(adm.uuid, {
           // IMPORTANT NOTE: The UI expects a specific format and collection of labels on each node.
           // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
-          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName)) // Throws an exception instead of creating duplicate UUIDs.
-          verticesInThisTX += (adm.uuid.uuid -> newVertex)
+          val newVertex = neoGraph.createNode(Label.label("Node"), Label.label(admTypeName))
+          verticesInThisTX += (admToTuple(adm.uuid) -> newVertex)
           newVertex
         })
 
+        thisNeo4jVertex.setProperty("uuid", adm.uuid.rendered)
         adm.asDBKeyValues.foreach {
-          case (k, v: UUID) => thisNeo4jVertex.setProperty(k, v.toString)
-          case (k, v) => thisNeo4jVertex.setProperty(k, v)
+          case (k, v) => if (k != "uuid") { thisNeo4jVertex.setProperty(k, v) }
         }
 
         Some(adm.uuid)
@@ -279,28 +297,36 @@ class Neo4jDBQueryProxy extends DBQueryProxyActor {
     result
   }
 
-  override def receive: PartialFunction[Any,Unit] = super.receive orElse {
-
+  override def receive: PartialFunction[Any,Unit] = ({
     // Cypher queries are only supported by Neo4j, and they are always streaming
-    case CypherQuery(q) =>
+    case CypherQuery(q, true) =>
       println(s"Received Cypher query: $q")
-      sender() ! Future { Try { neoGraph.execute(q).asScala.map(DBQueryProxyActor.toJson) } }
-  }
+      sender() ! Future { Try { DBQueryProxyActor.toJson(neoGraph.execute(q).asScala.toList)  } }
+
+    case InitMsg =>
+      statusActor ! InitMsg
+      super.receive(InitMsg)
+
+    case CompleteMsg =>
+      statusActor ! CompleteMsg
+      super.receive(CompleteMsg)
+
+  }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
 
 object Neo4jFlowComponents {
 
-  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[CDM18, NotUsed] = Flow[CDM18]
-    .collect { case cdm: DBNodeable[_] => cdm }
+  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
+                            (implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
+    .collect { case (_, cdm: DBNodeable[_]) => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToNeo4jDB.apply)
-    .recover{ case e: Throwable => e.printStackTrace() }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
-  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[Either[EdgeAdm2Adm, ADM], NotUsed] = Flow[Either[EdgeAdm2Adm, ADM]]
+  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
+                            (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
-    .recover{ case e: Throwable => e.printStackTrace() }
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

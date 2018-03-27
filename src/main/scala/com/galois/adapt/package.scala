@@ -2,7 +2,6 @@ package com.galois
 
 import java.util.UUID
 
-import org.neo4j.graphdb.RelationshipType
 
 package object adapt {
 
@@ -27,10 +26,8 @@ package object adapt {
     def supportNodes: List[(UUID, List[Any], List[(EdgeType, UUID)])] = List()
   }
 
-  type ProcessUUID = UUID
-  type FileUUID = UUID
-  type MemoryUUID = UUID
-  type NetFlowUUID = UUID
-  type EventUUID = UUID
-  type PredicateUUID = UUID
+
+  implicit class StringSetMethods(val set: Set[String]) extends AnyVal {
+    def suffixFold: Set[String] = set.foldLeft(Set.empty[String])((acc, p) => if ((acc ++ set.-(p)).exists(s => s.endsWith(p))) acc else acc + p)
+  }
 }

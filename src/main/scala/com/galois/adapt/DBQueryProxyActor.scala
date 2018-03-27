@@ -19,17 +19,11 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
   // Writing CDM and ADM in a transaction
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit]
-  def AdmTx(adms: Seq[Either[EdgeAdm2Adm, ADM]]): Try[Unit]
+  def AdmTx(adms: Seq[Either[ADM, EdgeAdm2Adm]]): Try[Unit]
 
 
   var streamsFlowingInToThisActor = 0
 
-  def lengthBounded[A](s: Stream[A], n: Int): String = {
-    s.take(n).length match {
-      case m if m == n => s"at least $n"
-      case m => s"exactly $m"
-    }
-  }
 
   def receive = {
 
@@ -114,22 +108,19 @@ sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
-case class CypherQuery(query: String) extends RestQuery
+case class CypherQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
 
 case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable[_]])
-case class WriteAdmToNeo4jDB(irs: Seq[Either[EdgeAdm2Adm, ADM]])
+case class WriteAdmToNeo4jDB(irs: Seq[Either[ADM,EdgeAdm2Adm]])
 
 
 case object Ack
 case object CompleteMsg
 case object KillJVM
 case object InitMsg
-
-case class AdmInvariantViolation(edge: EdgeAdm2Adm) extends RuntimeException(s"Didn't find source ${edge.src} of $edge")
-
 
 object DBQueryProxyActor {
   import scala.collection.JavaConversions._

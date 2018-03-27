@@ -21,13 +21,16 @@ case class Principal(
   def asDBKeyValues = List(
     ("uuid", uuid),
     ("userId", userId),
-    ("principalType", principalType.toString)
+    ("principalType", principalType.toString),
+    ("host", host)
   ) ++
     (if (groupIds.nonEmpty) List(("groupIds", groupIds.mkString(", "))) else List.empty) ++
     username.fold[List[(String,Any)]](List.empty)(v => List(("username", v))) ++
     DBOpt.fromKeyValMap(properties)
   
-  def asDBEdges = List((CDM18.EdgeTypes.host,host))
+  def asDBEdges = List(
+//    (CDM18.EdgeTypes.host,host)
+  )
 
   def getUuid = uuid
 

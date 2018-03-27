@@ -73,6 +73,21 @@ void Forest::writeScoreDatabase(doubleframe *dtTestNorm, doubleframe *dtTestAnom
 	}
 }
 
+void Forest::printNumLeafandDepths(){
+	std::vector<int> depths;
+	int numLeafs = 0;
+	for (std::vector<Tree*>::iterator it = this->trees.begin();
+			it != trees.end(); ++it) {
+		(*it)->getNumLeafandDepths(depths, numLeafs);
+	}
+	double sum = 0;
+	for(int i = 0; i < numLeafs; i++){
+		sum += depths[i];
+	}
+	std::cout << "Avg. # of leaf nodes: " << numLeafs/this->ntree << std::endl;
+	std::cout << "Avg. leaf depth:      " << sum/numLeafs << std::endl;
+}
+
 std::vector<double> Forest::getScore(doubleframe *df, int type){
 	std::vector<double> *pscores = new std::vector<double>[df->nrow];
 	for(int i = 0; i < df->nrow; ++i){

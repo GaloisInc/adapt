@@ -206,12 +206,22 @@ void Tree::update(const double inst[]){
 		rightChild->update(inst);
 }
 
+void Tree::getNumLeafandDepths(std::vector<int> &depths, int &numLeafs){
+	if(this->leftChild == NULL && this->rightChild == NULL){
+		depths.push_back(this->depth);
+		numLeafs++;
+	}else{
+		this->leftChild->getNumLeafandDepths(depths, numLeafs);
+		this->rightChild->getNumLeafandDepths(depths, numLeafs);
+	}
+}
+
 void Tree::printDepthAndNodeSize(std::ofstream &out){
 	for(int i = 0; i < depth; ++i)
 		out << "-";
 	out << "(" << depth
 		<< ", " << nodeSize << ", " << newNodeSize
-		<< ", " << exp(volume)
+//		<< ", " << exp(volume)
 		<< ", " << splittingAtt
 		<< ", " << minAttVal
 		<< ", " << splittingPoint

@@ -31,7 +31,8 @@ case class Subject(
     ("subjectType", subjectType.toString),
     ("cid", cid),
     ("localPrincipalUuid", localPrincipal),
-    ("startTimestampNanos", startTimestampNanos)
+    ("startTimestampNanos", startTimestampNanos),
+    ("host", host)
   ) ++
     parentSubject.fold[List[(String,Any)]](List.empty)(v => List(("parentSubjectUuid", v))) ++
     unitId.fold[List[(String,Any)]](List.empty)(v => List(("unitId", v))) ++
@@ -45,7 +46,7 @@ case class Subject(
 
   def asDBEdges =
     List((CDM18.EdgeTypes.localPrincipal,localPrincipal)) ++
-    List((CDM18.EdgeTypes.host,host)) ++
+//    List((CDM18.EdgeTypes.host,host)) ++
     parentSubject.fold[List[(CDM18.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM18.EdgeTypes.parentSubject, v)))
 
 

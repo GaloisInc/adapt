@@ -1,0 +1,164 @@
+<html>
+<head>
+	<style>
+		table {
+			/*border-collapse: collapse;*/
+		}
+
+		table, th, td {
+			border: 1px solid black;
+			padding: 5px;
+		}
+		td {
+			text-align: center;
+		}
+		pre code {
+			background-color: #eee;
+			border: 1px solid #999;
+			display: block;
+			padding: 20px;
+		}
+	</style>
+	<script type="text/javascript" src="javascripts/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore.js"></script>
+	<script type="text/javascript">
+		function updateServerStatus() {
+			$("td.server").has("a").each(function(i, elem){
+				var endpoint = $(elem).children("a")[0].href + "api/status"
+				$.getJSON(endpoint, function(results){
+					if (results.currentlyIngesting) {
+						$(elem).css("background-color", "yellow")
+					} else {
+						$(elem).css("background-color", "lightgreen")
+					}
+				}).fail(function() { $(elem).css("background-color", "red") })
+			})
+			setTimeout(updateServerStatus,30000)
+		}
+		$(function() {
+			updateServerStatus()
+		})
+	</script>
+</head>
+<body>
+	<h1>Engagement 2 Data</h1>
+	<p>Use the following port (or click the link) for each of the following to complete the URL: <br /> &nbsp;&nbsp;&nbsp;http://adapt-2.dev.galois.com:XXXX</p>
+	<table>
+		<tr>
+			<th>TA1 Team</th>
+			<th>CDM Bovia</th>
+			<th>CDM Pandex</th>
+			<th>ADM Bovia</th>
+			<th>ADM Pandex</th>
+			<th>Labeled Data</th>
+		</tr>
+		<tr>
+			<td style="text-align: left;">Clearscope</td>
+			<td class="server" id="8081"><a href="http://adapt-2.dev.galois.com:8081">8081</a></td>
+			<td class="server" id="8091"><a href="http://adapt-2.dev.galois.com:8091">8091</a></td>
+			<td class="server" id="9081"><a href="http://adapt-2.dev.galois.com:9081">9081</a></td>
+			<td class="server" id="9091"><a href="http://adapt-2.dev.galois.com:9091">9091</a></td>
+			<td><a href="clearscope.zip">.zip</a></td>
+		</tr>
+		<tr>
+			<td style="text-align: left;">Cadets</td>
+			<td class="server" id="8082"><a href="http://adapt-2.dev.galois.com:8082">8082</a></td>
+			<td class="server" id="8092"><a href="http://adapt-2.dev.galois.com:8092">8092</a></td>
+			<td class="server" id="9082"><a href="http://adapt-2.dev.galois.com:9082">9082</a></td>
+			<td class="server" id="9092"><a href="http://adapt-2.dev.galois.com:9092">9092</a></td>
+			<td><a href="cadets.zip">.zip</a></td>
+		</tr>
+		<tr>
+			<td style="text-align: left;">Trace</td>
+			<td class="server" id="8083"><a href="http://adapt-2.dev.galois.com:8083">8083</a></td>
+			<td class="server" id="8093"><a href="http://adapt-2.dev.galois.com:8093">8093</a></td>
+			<td class="server" id="9083"><a href="http://adapt-2.dev.galois.com:9083">9083</a></td>
+			<td class="server" id="9093"><a href="http://adapt-2.dev.galois.com:9093">9093</a></td>
+			<td><a href="trace.zip">.zip</a></td>
+		</tr>
+		<tr>
+			<td style="text-align: left;">Theia</td>
+			<td class="server" id="8084"><a href="http://adapt-2.dev.galois.com:8084">8084</a></td>
+			<td class="server" id="8094"><a href="http://adapt-2.dev.galois.com:8094">8094</a></td>
+			<td>Bad UUIDs</td>
+			<td>Bad UUIDs</td>
+			<td><a href="theia.zip"></a>Never</td>
+		</tr>
+		<tr>
+			<td style="text-align: left;">5-Directions</td>
+			<td class="server" id="8085"><a href="http://adapt-2.dev.galois.com:8085">8085</a></td>
+			<td class="server" id="8095"><a href="http://adapt-2.dev.galois.com:8095">8095</a></td>
+			<td class="server" id="9085"><a href="http://adapt-2.dev.galois.com:9085">9085</a></td>
+			<td class="server" id="9095"><a href="http://adapt-2.dev.galois.com:9095">9095</a></td>
+			<td><a href="fivedirections.zip">.zip</a></td>
+		</tr>
+		<tr>
+			<td style="text-align: left;">Faros</td>
+			<td>None</td>
+			<td class="server" id="8096"><a href="http://adapt-2.dev.galois.com:8096">8096</a></td>
+			<td>Never</td>
+			<td>Never</td>
+			<td>Never</td>
+		</tr>
+	</table>
+
+        <h3>If nothing is responding anymore...</h3>
+
+        The DB can stop responding (usually when asked an overly general query). In those cases, you can restart just the UIs with the following:
+
+        <pre><code>&gt; ssh adapt-2.dev.galois.com
+adapt-2:~$ cd /srv/project/adapt
+adapt-2:/srv/project/adapt$ sudo killall java
+adapt-2:/srv/project/adapt$ sudo bash /home/ryan/sbt_run_all_uis.sh</pre></code>
+
+	<h3>Information about <code>adapt-2</code></h3>
+	<ul>
+		<li>This webpage is served from <code>/home/ryan/index.html</code>. Modify that to update this page.</li>
+		<li>The project directory is <code>/srv/project</code>. There, you can find a copy of the engagement 2 data and a clone of the git repo.</li>
+		<li>In the git repo <code>/srv/project/adapt</code>, you will find folders ending in ".db" that represent the contents of the different Neo4j databases, as well as a folder <code>ui_logs</code> containing logs of the Adapt program (these logs track ingestion speed, queries received, etc.).</li>
+		<li>To stop all the running Adapt programs, run <code>sudo killall java</code>.</li>
+		<li>To start all of the UIs, print out log information, reingest data, see useful scripts (some which require <code>sudo</code>) under <code>/home/ryan</code>.</li> 
+	</ul>
+
+	<h3>Querying data from the command line</h3>
+	Note that the data in the table above can also be queried outside of a browser. Using the <a href="https://github.com/GaloisInc/adapt/blob/master/cmdline_query.py">cmdline_query.py</a> script, you can query via the command line using a variant of Gremlin (see the links below):
+
+        <pre><code>./cmdline_query.py http://adapt-2.dev.galois.com:8081 --endpoint=json
+Welcome to the query shell.
+Queries are sent to 'http://adapt-2.dev.galois.com:8081/query/json'.
+==&gt; g.V().limit(2).label()
+[
+    "Node::Principal",
+    "Node::Subject",
+]
+==&gt;</pre></code>
+
+	Alternately, you can query using <a href="https://neo4j.com/docs/developer-manual/current/cypher/">Cypher</a>:
+
+        <pre><code>./cmdline_query.py http://adapt-2.dev.galois.com:8081 --endpoint=cypher
+Welcome to the query shell.
+Queries are sent to 'http://adapt-2.dev.galois.com:8081/query/cypher'.
+==&gt; MATCH (n) RETURN labels(n) LIMIT 2
+[
+    {
+        "labels(n)": [
+            "Node",
+            "Principal"
+        ]
+    },
+    {
+        "labels(n)": [
+            "Node",
+            "Subject"
+        ]
+    }
+]
+==&gt;</pre></code>
+
+	<h3>Useful links</h3>
+	<a href="TC_Final_Report_E2.pdf">TA5 Report on Attacks</a> </br>
+	<a href="20170630_kudu_e2_data.zip">TA5 Attack Description CSVs</a> </br>
+        <a href="https://github.com/GaloisInc/adapt/blob/master/src/main/scala/com/galois/adapt/Query.scala">Gremlin-line query language parser source (helpful when queries don't parse)</a> </br>
+        <a href="https://owncloud-tng.galois.com/index.php/s/I3tOvpXsnKjopce#pdfviewer">ADM schema</a>
+</body>
+</html>

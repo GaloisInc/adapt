@@ -1,6 +1,6 @@
 package com.galois.adapt.adm
 
-import com.galois.adapt.Application
+import com.galois.adapt.adm.UuidRemapper.CdmMerge
 import com.galois.adapt.cdm18._
 
 object ERRules {
@@ -9,67 +9,61 @@ object ERRules {
 
   // Resolve a 'ProvenanceTagNode'
   object ProvenanceTagNodeEdges {
-    type TagIdEdges = Seq[Edge[ADM, CDM18]]
-    type Subject = Edge[ADM, CDM18]
-    type FlowObject = Option[Edge[ADM, CDM18]]
-    type PrevTagID = Option[Edge[ADM, CDM18]]
+    type TagIdEdges = Seq[EdgeAdm2Cdm]
+    type Subject = EdgeAdm2Cdm
+    type FlowObject = Option[EdgeAdm2Cdm]
+    type PrevTagID = Option[EdgeAdm2Cdm]
   }
-  def resolveProvenanceTagNode(p: ProvenanceTagNode):
+  def resolveProvenanceTagNode(provider: String, p: ProvenanceTagNode):
     (
       AdmProvenanceTagNode,
-      UuidRemapper.PutCdm2Adm,
       ProvenanceTagNodeEdges.FlowObject,
       ProvenanceTagNodeEdges.Subject,
       ProvenanceTagNodeEdges.PrevTagID,
       ProvenanceTagNodeEdges.TagIdEdges
     ) = {
-      val newPtn = AdmProvenanceTagNode(Seq(CdmUUID(p.getUuid)), p.programPoint)
+      val newPtn = AdmProvenanceTagNode(Seq(CdmUUID(p.getUuid, provider)), p.programPoint, provider)
       (
         newPtn,
-        UuidRemapper.PutCdm2Adm(CdmUUID(p.getUuid), newPtn.uuid),
-        p.flowObject.map(flow => EdgeAdm2Cdm(newPtn.uuid, "flowObject", CdmUUID(flow))),
-        EdgeAdm2Cdm(newPtn.uuid, "provSubject", CdmUUID(p.subjectUuid)),
-        p.prevTagId.map(tagId => EdgeAdm2Cdm(newPtn.uuid, "prevTagId", CdmUUID(tagId))),
-        p.tagIds.getOrElse(Nil).map(tagId => EdgeAdm2Cdm(newPtn.uuid, "tagId", CdmUUID(tagId)))
+        p.flowObject.map(flow => EdgeAdm2Cdm(newPtn.uuid, "flowObject", CdmUUID(flow, provider))),
+        EdgeAdm2Cdm(newPtn.uuid, "provSubject", CdmUUID(p.subjectUuid, provider)),
+        p.prevTagId.map(tagId => EdgeAdm2Cdm(newPtn.uuid, "prevTagId", CdmUUID(tagId, provider))),
+        p.tagIds.getOrElse(Nil).map(tagId => EdgeAdm2Cdm(newPtn.uuid, "tagId", CdmUUID(tagId, provider)))
       )
     }
 
   // Resolve a 'Principal'
-  def resolvePrincipal(p: Principal):
-    (
-      AdmPrincipal,
-      UuidRemapper.PutCdm2Adm
-    ) = {
-      val newP = AdmPrincipal(Seq(CdmUUID(p.getUuid)), p.userId, p.groupIds, p.principalType, p.username)
-      (
-        newP,
-        UuidRemapper.PutCdm2Adm(CdmUUID(p.getUuid), newP.uuid)
-      )
-    }
+  def resolvePrincipal(provider: String, p: Principal): AdmPrincipal
+    = AdmPrincipal(Seq(CdmUUID(p.getUuid, provider)), p.userId, p.groupIds, p.principalType, p.username, provider)
 
   // Resolve a 'SrcSinkObject'
-  def resolveSrcSink(s: SrcSinkObject):
-    (
-      AdmSrcSinkObject,
-      UuidRemapper.PutCdm2Adm
-    ) = {
-      val newSrcSink = AdmSrcSinkObject(Seq(CdmUUID(s.getUuid)), s.srcSinkType)
-      (
-        newSrcSink,
-        UuidRemapper.PutCdm2Adm(CdmUUID(s.getUuid), newSrcSink.uuid)
-      )
-    }
+  def resolveSrcSink(provider: String, s: SrcSinkObject): AdmSrcSinkObject
+    = AdmSrcSinkObject(Seq(CdmUUID(s.getUuid, provider)), s.srcSinkType, provider)
 
   // Resolve a 'NetFlowObject'
-  def resolveNetflow(n: NetFlowObject):
+  object NetflowObjectEdges {
+    type AddressEdgeNode = (EdgeAdm2Adm, AdmAddress)
+    type PortEdgeNode = Option[(EdgeAdm2Adm, AdmPort)]
+  }
+  def resolveNetflow(provider: String, n: NetFlowObject):
     (
       AdmNetFlowObject,
-      UuidRemapper.PutCdm2Adm
+      NetflowObjectEdges.AddressEdgeNode,
+      NetflowObjectEdges.AddressEdgeNode,
+      NetflowObjectEdges.PortEdgeNode,
+      NetflowObjectEdges.PortEdgeNode
     ) = {
-      val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort)
+      val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
+      val newLP = AdmPort(n.localPort)
+      val newLA = AdmAddress(n.localAddress)
+      val newRP = AdmPort(n.remotePort)
+      val newRA = AdmAddress(n.remoteAddress)
       (
         newN,
-        UuidRemapper.PutCdm2Adm(CdmUUID(n.getUuid), newN.uuid)
+        (EdgeAdm2Adm(newN.uuid, "localAddress", newLA.uuid), newLA),
+        (EdgeAdm2Adm(newN.uuid, "remoteAddress", newRA.uuid), newRA),
+        if (n.localPort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "localPort", newLP.uuid), newLP)) },
+        if (n.remotePort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "remotePort", newRP.uuid), newRP)) }
       )
     }
 
@@ -77,24 +71,21 @@ object ERRules {
   //
   // Resolve a 'FileObject'
   object FileObjectEdges {
-    type LocalPrincipalEdge = Option[Edge[ADM, CDM18]]
+    type LocalPrincipalEdge = Option[EdgeAdm2Cdm]
 
-    type FilePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
+    type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveFileObject(f: FileObject):
+  def resolveFileObject(provider: String, f: FileObject):
   (
     AdmFileObject,
-    UuidRemapper.PutCdm2Adm,
     FileObjectEdges.LocalPrincipalEdge,
     FileObjectEdges.FilePathEdgeNode
   ) = {
-    val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid)), f.fileObjectType, f.size)
+    val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, provider)
     (
       newFo,
-      UuidRemapper.PutCdm2Adm(CdmUUID(f.getUuid), newFo.uuid),
-      f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal))),
-      f.peInfo.map(path => {
-        val pathNode = AdmPathNode.normalized(path)
+      f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal, provider))),
+      f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
         (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
       })
     )
@@ -102,64 +93,43 @@ object ERRules {
 
   // Resolve a 'RegistryKeyObject'
   object RegistryKeyObjectEdges {
-    type FilePathEdgeNode = (Edge[ADM,ADM], AdmPathNode)
+    type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveRegistryKeyObject(r: RegistryKeyObject):
+  def resolveRegistryKeyObject(provider: String, r: RegistryKeyObject):
     (
       AdmFileObject,
-      UuidRemapper.PutCdm2Adm,
       RegistryKeyObjectEdges.FilePathEdgeNode
     ) = {
-      val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid)), FILE_OBJECT_FILE, None)
+      val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, provider)
       (
         newFo,
-        UuidRemapper.PutCdm2Adm(CdmUUID(r.getUuid), newFo.uuid),
-        {
-          val pathNode = AdmPathNode.normalized(r.key)
+        AdmPathNode.normalized(r.key, provider).map(pathNode =>
           (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
-        }
+        )
       )
     }
 
   // Resolve an 'UnnamedPipeObject'
   //
   // TODO: sourceUUID, sinkUUID
-  def resolveUnnamedPipeObject(u: UnnamedPipeObject):
-    (
-      AdmFileObject,
-      UuidRemapper.PutCdm2Adm
-    ) = {
-      val newFo = AdmFileObject(Seq(CdmUUID(u.getUuid)), FILE_OBJECT_NAMED_PIPE, None)
-      (
-        newFo,
-        UuidRemapper.PutCdm2Adm(CdmUUID(u.getUuid), newFo.uuid)
-      )
-    }
+  def resolveUnnamedPipeObject(provider: String, u: UnnamedPipeObject): AdmFileObject
+    = AdmFileObject(Seq(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, provider)
 
-  def resolveMemoryObject(m: MemoryObject):
-    (
-      AdmSrcSinkObject,
-      UuidRemapper.PutCdm2Adm
-    ) = {
-      val newSrcSink = AdmSrcSinkObject(Seq(CdmUUID(m.uuid)), MEMORY_SRCSINK)
-      (
-        newSrcSink,
-        UuidRemapper.PutCdm2Adm(CdmUUID(m.uuid), newSrcSink.uuid)
-      )
-    }
+  def resolveMemoryObject(provider: String, m: MemoryObject): AdmSrcSinkObject
+    = AdmSrcSinkObject(Seq(CdmUUID(m.uuid, provider)), MEMORY_SRCSINK, provider)
 
   // Resolve an 'Event'
   object EventEdges {
-    type Subject = Option[Edge[CDM18, CDM18]]
-    type PredicateObject = Option[Edge[CDM18, CDM18]]
-    type PredicateObject2 = Option[Edge[CDM18, CDM18]]
+    type Subject = Option[EdgeCdm2Cdm]
+    type PredicateObject = Option[EdgeCdm2Cdm]
+    type PredicateObject2 = Option[EdgeCdm2Cdm]
 
-    type PredicatePathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
-    type Predicate2PathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
-    type ExecSubjectPathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
-    type ExecPathEdgeNode = Option[(Edge[CDM18,ADM], AdmPathNode)]
+    type PredicatePathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
+    type Predicate2PathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
+    type ExecSubjectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
+    type ExecPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveEventAndPaths(e: Event):
+  def resolveEventAndPaths(provider: String, e: Event):
     (
       AdmEvent,
       EventEdges.Subject,
@@ -171,52 +141,47 @@ object ERRules {
       EventEdges.ExecSubjectPathEdgeNode,
       EventEdges.ExecPathEdgeNode
     ) = {
-      val newEvent = AdmEvent(Seq(CdmUUID(e.getUuid)), e.eventType, e.timestampNanos, e.timestampNanos)
+      val newEvent = AdmEvent(Seq(CdmUUID(e.getUuid, provider)), e.eventType, e.timestampNanos, e.timestampNanos, provider)
       (
         newEvent,
-        e.subjectUuid.map(subj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "subject", CdmUUID(subj))),
-        e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject", CdmUUID(obj))),
-        e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid), "predicateObject2", CdmUUID(obj))),
+        e.subjectUuid.map(subj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "subject", CdmUUID(subj, provider))),
+        e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject", CdmUUID(obj, provider))),
+        e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject2", CdmUUID(obj, provider))),
 
-        e.predicateObjectPath.flatMap(path => {
+        e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
           e.predicateObject.map(predicateObject => {
-            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-            (EdgeCdm2Adm(CdmUUID(predicateObject), label, pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(predicateObject, provider), label, pathNode.uuid), pathNode)
           })
         }),
-        e.predicateObject2Path.flatMap(path => {
+        e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
           e.predicateObject2.map(predicateObject2 => {
-            val pathNode = AdmPathNode.normalized(path)
             val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-            (EdgeCdm2Adm(CdmUUID(predicateObject2), label, pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(predicateObject2, provider), label, pathNode.uuid), pathNode)
           })
         }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(cmdLine => {
-          val pathNode = AdmPathNode.normalized(cmdLine)
+        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
           e.subjectUuid.map(subj =>
-            (EdgeCdm2Adm(CdmUUID(subj), "exec", pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(subj, provider), "exec", pathNode.uuid), pathNode)
           )
         }),
-        e.properties.getOrElse(Map()).get("exec").map(cmdLine => {
-          val pathNode = AdmPathNode.normalized(cmdLine)
-          (EdgeCdm2Adm(CdmUUID(e.getUuid), "eventExec", pathNode.uuid), pathNode)
+        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventExec", pathNode.uuid), pathNode)
         })
       )
     }
 
   // Resolve a 'Subject'
   object SubjectEdges {
-    type LocalPrincipalEdge = Edge[ADM, CDM18]
-    type ParentSubject = Option[Edge[ADM, CDM18]]
+    type LocalPrincipalEdge = EdgeAdm2Cdm
+    type ParentSubject = Option[EdgeAdm2Cdm]
 
-    type CmdLinePathEdgeNode = Option[(Edge[ADM,ADM], AdmPathNode)]
-    type CmdLineIndirectPathEdgeNode = Option[(Edge[CDM18, ADM], AdmPathNode)]
+    type CmdLinePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
+    type CmdLineIndirectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveSubject(s: Subject): Either[
+  def resolveSubject(provider: String, s: Subject): Either[
     (
       AdmSubject,
-      UuidRemapper.PutCdm2Adm,
       SubjectEdges.LocalPrincipalEdge,
       SubjectEdges.ParentSubject,
 
@@ -224,26 +189,23 @@ object ERRules {
     ),
     (
       SubjectEdges.CmdLineIndirectPathEdgeNode,  // The edge SRC will be the parent subject
-      UuidRemapper.PutCdm2Cdm                    // We remap to the parent subject
+      CdmMerge                                   // We remap to the parent subject
     )] =
     if (s.subjectType != SUBJECT_PROCESS && s.parentSubject.isDefined) {
       Right((
-        s.cmdLine.map(cdm => {
-          val pathNode = AdmPathNode.normalized(cdm)
-          (EdgeCdm2Adm(CdmUUID(s.parentSubject.get), "cmdLine", pathNode.uuid), pathNode)
+        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+          (EdgeCdm2Adm(CdmUUID(s.parentSubject.get, provider), "cmdLine", pathNode.uuid), pathNode)
         }),
-        UuidRemapper.PutCdm2Cdm(CdmUUID(s.getUuid), CdmUUID(s.parentSubject.get))
+        UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
       ))
     } else {
-      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid)), Set(s.subjectType), s.cid, s.startTimestampNanos)
+      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos, provider)
 
       Left((
         newSubj,
-        UuidRemapper.PutCdm2Adm(CdmUUID(s.getUuid), newSubj.uuid),
-        EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(s.localPrincipal)),
-        s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent))),
-        s.cmdLine.map(cdm => {
-          val pathNode = AdmPathNode.normalized(cdm)
+        EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(s.localPrincipal, provider)),
+        s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent, provider))),
+        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
           (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)
         })
       ))
@@ -252,16 +214,13 @@ object ERRules {
     // Collapse event
     //
     // TODO: better logic than just merge same successive events
-    val maxEventsMerged: Int = Application.config.getInt("adapt.adm.maxeventsmerged")
-    def collapseEvents(e1: Event, e2: AdmEvent, lastCdmUuid: CdmUUID, merged: Int): Either[(UuidRemapper.PutCdm2Cdm, CdmUUID, AdmEvent), (Event, AdmEvent)] = {
+    def collapseEvents(provider: String, e1: Event, e2: AdmEvent, merged: Int, maxEventsMerged: Int): Either[AdmEvent, (Event, AdmEvent)] = {
       if (e1.eventType == e2.eventType && merged < maxEventsMerged) {
-        val e2Updated = e2.copy(
+        Left(e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),
-          originalCdmUuids = CdmUUID(e1.getUuid) +: e2.originalCdmUuids
-        )
-        val newCdmUuid = CdmUUID(e1.getUuid)
-        Left((UuidRemapper.PutCdm2Cdm(lastCdmUuid, newCdmUuid), newCdmUuid, e2Updated))
+          originalCdmUuids = CdmUUID(e1.getUuid, provider) +: e2.originalCdmUuids
+        ))
       } else {
         Right((e1, e2))
       }

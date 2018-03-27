@@ -2,6 +2,7 @@ package com.galois.adapt
 
 //import com.thinkaurelius.titan.core.attribute.Text
 import java.util
+import java.util.function.BiPredicate
 
 import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
@@ -10,6 +11,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 import java.util.{Collections, Comparator, Iterator}
 
+import com.carrotsearch.hppc.predicates.BytePredicate
 import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
@@ -17,6 +19,7 @@ import scala.collection.immutable.Stream
 import scala.util.parsing.combinator._
 import scala.util.{Failure, Success, Try}
 import scala.language.existentials
+import scala.util.matching.Regex
 
 /*
  * A 'Traversal' represents roughly the shape of path(s) that can be used to explore a graph. This
@@ -53,7 +56,7 @@ import scala.language.existentials
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
  *                 | 'between(' literal ',' literal ')'
- *                 | 'of(' string ')'
+ *                 | 'regex(' string ')'
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -152,6 +155,9 @@ object Query {
   // Is this Neo4j or not
   val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
 
+  // Gross hack to get all of the expected UUID namespaces
+  def getNamespaces: List[String] = Application.getNamespaces
+
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {
 
@@ -185,12 +191,16 @@ object Query {
 
       def str: Parser[QueryValue[String]] =
         ( variable(strs)
-        | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
+        | stringLiteral             ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
+      // NOTE: this is no longer exactly a UUID - it is a franken-UUID supporting namespaces.
+      // For example, it should accept `cdm_cadets_123e4567-e89b-12d3-a456-426655440000`.
+      //
+      // We make one parser level exceptions around this: `has('uuid',<uuid-lit>)`
       def uuid: Parser[QueryValue[String /*java.util.UUID*/ ]] = ( variable(uids) |
-        """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
+        """([0-9a-zA-Z-]*_)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
           s => Raw(s) //java.util.UUID.fromString(s))
         }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
 
@@ -215,7 +225,7 @@ object Query {
         (   predicate(uuid)
         ||| predicate(int)
         ||| predicate(lng)
-        ||| predicate(str)
+        ||| strPredicate
         ).asInstanceOf[Parser[QueryValue[P[Any]]]]
          .withFailureMessage("predicate expected (ex: within([1,2,3]), eq(x))")
 
@@ -240,6 +250,11 @@ object Query {
         ).asInstanceOf[Parser[QueryValue[P[T]]]]
          .withFailureMessage(s"predicate of type ${ev.runtimeClass.getSimpleName()} expected")
 
+      def strPredicate: Parser[QueryValue[P[String]]] =
+        ( predicate(str)
+        | "regex(" ~ str ~ ")"                   ^^ { case _~s~_     => RawRegexPred(s) }
+        ).withFailureMessage(s"predicate of type String expected")
+
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
       //
@@ -248,8 +263,11 @@ object Query {
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
-            case _~_~_~v~_ if isNeo4j => (t: Tr) => HasValue(HasLabel(t, Raw("Node")), Raw("uuid"), v)
-            case _~_~_~v~_ => (t: Tr) => HasValue(t, Raw("uuid"), v)
+            case _~_~_~Raw(u: String)~_ if u.length == 36 => {
+              val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: getNamespaces.map(ns => Raw(ns + "_" + u))))
+              (t: Tr) => HasPredicate(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), nsPred)
+            }
+            case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)
           }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
@@ -263,7 +281,8 @@ object Query {
         | ".hasNot(" ~! str ~ ")"          ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".hasId(" ~! lng ~ ")"           ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
-        | ".where(" ~ predicate(str) ~ ")" ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where(" ~ strPredicate ~ ")"   ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where("~str~","~strPredicate~")"^^{ case _~k~_~p~_  => WhereKeyPredicate(_: Tr, k, p) }
         | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
@@ -453,6 +472,17 @@ object QueryLanguage {
   case class RawWithinPred[T](col: QueryValue[Seq[T]]) extends QueryValue[P[T]] {
     override def eval(context: Map[String,QueryValue[_]]): P[T] = P.within(col.eval(context): _*)
   }
+  case class RawRegexPred(regex: QueryValue[String]) extends QueryValue[P[String]] {
+
+    // Yep. This is grossly inefficient. This is probably why tinkerpop doesn't offer this by default. Note that this
+    // is pretty much what Titan's regex predicate is.
+    val matches: BiPredicate[String,String] = new BiPredicate[String,String] {
+      override def test(valueA: String, valueB: String): Boolean = valueA.matches(valueB)
+    }
+
+    override def eval(context: Map[String,QueryValue[_]]): P[String] =
+      P.test(matches, regex.eval(context)).asInstanceOf[P[String]]
+  }
   case class Variable[T](name: String) extends QueryValue[T] {
     override def eval(context: Map[String,QueryValue[_]]): T = context(name).eval(context).asInstanceOf[T]
   }
@@ -513,6 +543,10 @@ object QueryLanguage {
   case class WherePredicate[S,T](traversal: Traversal[S,T], where: QueryValue[P[String]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).where(where.eval(context))
+  }
+  case class WhereKeyPredicate[S,T](traversal: Traversal[S,T], k: QueryValue[String], where: QueryValue[P[String]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).where(k.eval(context), where.eval(context))
   }
   case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
