@@ -1,8 +1,0 @@
-{
-    "rules": {
-        "implication": {
-            "num_rules": "*",
-            "min_threshold": 0.9
-        }
-    }
-}
