@@ -402,10 +402,10 @@ object Application extends App {
     case "valuebytes" =>
       println("NOTE: this will run using CDM")
 
-      CDMSource.cdm17(ta1)
-        .collect{ case (_, e: cdm17.Event) if e.parameters.nonEmpty => e}
+      CDMSource.cdm18(ta1)
+        .collect{ case (_, e: cdm18.Event) if e.parameters.nonEmpty => e}
         .flatMapConcat(
-          (e: cdm17.Event) => Source.fromIterator(
+          (e: cdm18.Event) => Source.fromIterator(
             () => e.parameters.get.flatMap( v =>
               v.valueBytes.map(b =>
                 List(akka.util.ByteString(s"<<<BEGIN_LINE\t${e.uuid}\t${new String(b)}\tEND_LINE>>>\n"))
@@ -417,18 +417,24 @@ object Application extends App {
 
     case "uniqueuuids" =>
       println("Running unique UUID test")
-      CDMSource.cdm17(ta1)
+      statusActor ! InitMsg
+      CDMSource.cdm18(ta1)
+        .via(printCounter("UniqueUUIDs", statusActor))
         .statefulMapConcat[(UUID,Boolean)] { () =>
         import scala.collection.mutable.{Map => MutableMap}
-        val firstObservation = MutableMap.empty[UUID, CDM17]
+        val firstObservation = MutableMap.empty[UUID, CDM18]
         val ignoreUuid = new UUID(0L,0L);
         {
-          case c: CDM17 with DBNodeable[_] if c.getUuid == ignoreUuid => List()
-          case c: CDM17 with DBNodeable[_] if firstObservation.contains(c.getUuid) =>
+          case (name, StartMarker(sessionNumber)) =>
+            println(s"New StartMarker: $sessionNumber")
+            firstObservation.clear()
+            Nil
+          case (name, c: CDM18 with DBNodeable[_]) if c.getUuid == ignoreUuid => List()
+          case (name, c: CDM18 with DBNodeable[_]) if firstObservation.contains(c.getUuid) =>
             val comparison = firstObservation(c.getUuid) == c
             if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
             List()
-          case c: CDM17 with DBNodeable[_] =>
+          case (name, c: CDM18 with DBNodeable[_]) =>
             firstObservation += (c.getUuid -> c)
             List()
         }
@@ -450,6 +456,7 @@ object Application extends App {
 
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
+      statusActor ! InitMsg
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(er)
@@ -497,7 +504,7 @@ object Application extends App {
             case Right(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
               .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
                 val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-              val t = (e._1, e._2, Some(obj))
+                val t = (e._1, e._2, Some(obj))
                 if (t._2.isDefined) {
                   if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
                   val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)

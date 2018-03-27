@@ -7,7 +7,7 @@
     <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
     <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
->	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
 
     <script type="text/javascript">
 
@@ -16,8 +16,48 @@ var urlParams = new URLSearchParams(window.location.search)
 
 
 
-var testingPrefix = "" //http://localhost:8080" // ""
+var testingPrefix = "http://localhost:8080" // ""
 
+
+
+
+function toComparisonFunc(string) {
+	switch(string){
+		case ">=":
+			return function(left, right) { return left >= right }
+		case "<=":
+			return function(left, right) { return left <= right }
+		case "==":
+			return function(left, right) { return left === right }
+		default:
+			return function(left, right) { return true }
+	}
+}
+
+function matchesRatingFilter(node, comparison) { 
+	switch($("#ratingValue").val()) {
+		case "0":
+			return ! node.data.hasOwnProperty("rating")
+		case "6":
+			return node.data.hasOwnProperty("rating")
+		default:
+			return (node.data.hasOwnProperty("rating") && 
+			comparison(node.data.rating, parseInt($("#ratingValue").val())))
+	}
+}
+
+function matchesLocalProbFilter(node) {
+	var comparison = toComparisonFunc($("#localProbComparison").val())
+	if (node.data.localProb === null) { return false }
+	return comparison(node.data.localProb, parseFloat($("#localProbValue").val()))
+}
+
+function matchesTimeRange(node, start, stop) {
+	var first, second;
+	if (start === null) { first = true } else { first = node.data.observationTime >= start }
+	if (stop === null) { second = true } else { second = node.data.observationTime <= stop }
+	return first && second
+}
 
 
 
@@ -102,6 +142,7 @@ $(function(){
 				}
 
 				$tdList.eq(4).html(
+					'<span>'+ JSON.stringify(_.omit(node.data, "key")) +'</span>' +
 					'<a target="_blank" href="/#g.V().hasLabel(\'AdmPathNode\').has(\'path\',\''+ node.title +'\')">Show Graph</a>'
 				)
 			},
@@ -151,7 +192,12 @@ $(function(){
 	// Search function:
 	function updateFilter(e){
 		var matchCount = 0
-		var searchPattern = $("#searchText").val() //$(this).val()
+		var searchPattern = $("#searchText").val()
+
+		var timeStart = $("#timeStart").val() === "" ? null : parseInt($("#timeStart").val())
+		var timeStop  = $("#timeStop").val() === "" ? null : parseInt($("#timeStart").val())
+
+		var ratingComparison = toComparisonFunc($("#ratingComparison").val())
 
 		_.map(treeNames, function(treeName){
 			var tree =  $("#" + treeName).fancytree("getTree")   //$.ui.fancytree.getTree()
@@ -166,57 +212,54 @@ $(function(){
 				mode: "hide"       // Grayout unmatched nodes with "dimm" ("hide" to remove empty node)
 			}
 
-			if(e && e.which === $.ui.keyCode.ESCAPE || ($.trim(searchPattern) === "" && $("#ratingComparison").val() === "none" )){
+			if(e && e.which === $.ui.keyCode.ESCAPE || (
+				$.trim(searchPattern) === "" && 
+				$("#ratingComparison").val() === "none" && 
+				$("#localProbComparison").val() === "none" &&
+				$("#timeStart").val() === "" &&
+				$("#timeStop").val() === "" 
+			)){
 				$("button#btnResetSearch").click()
 				return
 			}
 
-			function matchesRatingFilter(node) { 
-				var comparison;
-				switch($("#ratingComparison").val()){
-					case ">=":
-						comparison = function(left, right) { return left >= right }
-						break
-					case "<=":
-						comparison = function(left, right) { return left <= right }
-						break
-					default:
-						comparison = function(left, right) { return left === right }
-				}
-				var result;
-				switch($("#ratingValue").val()) {
-					case "0":
-						result = ! node.data.hasOwnProperty("rating")
-						break
-					case "6":
-						result = node.data.hasOwnProperty("rating")
-						break
-					default:
-						result = (node.data.hasOwnProperty("rating") && 
-						comparison(node.data.rating, parseInt($("#ratingValue").val())))
-				}
-				return result
-			}
 
 			matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
 				if (_.isEmpty(searchPattern)) {
-					return ! node.folder && matchesRatingFilter(node)
+					// console.log(matchesRatingFilter(node))
+					// console.log(matchesLocalProbFilter(node))
+					// console.log(matchesTimeRange(node, timeStart, timeStop))
+					return ! node.folder && matchesRatingFilter(node) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				} else {
-					return ! node.folder && new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node)
+					// console.log(node)
+					// console.log(matchesRatingFilter(node))
+					// console.log(matchesLocalProbFilter(node))
+					// console.log(matchesTimeRange(node, timeStart, timeStop))
+					return ! node.folder && new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				}
 			}, filterOptions)
+
 			// } else {
 				// Pass a string to perform case insensitive matching
 				// matchCount = matchCount + tree.filterNodes.call(tree, searchPattern, filterOptions)
 			// }
 		})
+
 		$("button#btnResetSearch").attr("disabled", false)
 		$("span#matches").text("(" + matchCount + " matches)")
 	}
 
 	$("#ratingComparison").change(updateFilter)
 	$("#ratingValue").change(updateFilter)
-	$("input[name=search]").keyup(updateFilter).focus()
+	$("#localProbComparison").change(updateFilter)
+	$("#localProbValue").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+	$("#timeStart").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+	$("#timeStop").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+
+	$("input[name=search]") //.keyup(updateFilter)
+		.keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+		.focus()
+	$("#filterButton").click(updateFilter)
 
 
 	$("button#btnResetSearch").click(function(e){
@@ -266,18 +309,19 @@ $(function(){
 							"namespace" : namespace
 						}
 						$.post(testingPrefix + "/api/ppm/setRatings", payload, function(data, textStatus, jqXHR){
-							if (textStatus === "success") {
-								_.map(all_selected_nodes, function(n){
-									n.data.rating = rating
+
+							_.map(all_selected_nodes, function(n){
+								n.data.rating = rating
+								// n.selected = false
+								// console.log(n)
+							})
+							_.map(treeNames, function(treeName){
+								var tree = $("#" + treeName)
+								tree.fancytree("getRootNode").visit(function(node){
+									node.selected = false
 								})
-								_.map(treeNames, function(treeName){
-									var tree = $("#" + treeName)
-									tree.fancytree("getRootNode").render(true,true)
-								})
-							} else {
-								console.log(textStatus)
-								console.log(data)
-							}
+								tree.fancytree("getRootNode").render(true,true)
+							})
 						}).fail(function(e){
 							console.log(e)
 						})
@@ -314,7 +358,7 @@ $(function(){
 			<option value="<="><=</option>
 		</select>
 		<select id="ratingValue">
-			<option value="0">none</option>
+			<option value="0">None</option>
 			<option value="1">1</option>
 			<option value="2">2</option>
 			<option value="3">3</option>
@@ -322,6 +366,16 @@ $(function(){
 			<option value="5">5</option>
 			<option value="6">any</option>
 		</select>
+		<label>Local Prob:</label>
+		<select id="localProbComparison">
+			<option value="none">&nbsp;</option>
+			<option value=">=">>=</option>
+			<option value="<="><=</option>
+		</select>
+		<input id="localProbValue" placeholder="???" size="4" value="0.01" />
+		<label>Time range (millis):</label>
+		<input id="timeStart" placeholder="1522097891995" size="14" />&nbsp;-&nbsp;<input id="timeStop" placeholder="1522097900000" size="14" />
+		<button id="filterButton">Filter</button>
 		<button id="btnResetSearch">CLEAR</button>
 		<span id="matches"></span>
 		<span style="margin-left: 5em;">Set Rating: </span><span id="stars"></span>

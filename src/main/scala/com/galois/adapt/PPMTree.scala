@@ -48,7 +48,11 @@ object NoveltyDetection {
     PpmDefinition[(Event, Subject, Object)]("ProcessesWithNetworkActivity",
       d => d._3._1.isInstanceOf[AdmNetFlowObject],
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>"))
+        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+        d => {
+          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
+          List(s"${nf.remoteAddress}:${nf.remotePort}")
+        }
       )
     ),
 //    PpmDefinition("DirectoryStructure",
@@ -67,11 +71,22 @@ object NoveltyDetection {
         }}.getOrElse(Nil).dropRight(1)
       )
     ),
-    PpmDefinition[(Event, Subject, Object)]("ProcessDirectoryTouches",
-      (ProcessDirectoryTouchesAux.dirFilter _).tupled,
+//    PpmDefinition[(Event, Subject, Object)]("ProcessDirectoryTouches",
+//      (ProcessDirectoryTouchesAux.dirFilter _).tupled,
+//      List(
+//        d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
+//        d => List(ProcessDirectoryTouchesAux.dirAtDepth(d._2._2.get.path,d._3._2.get.path))
+//      )
+//    )
+    PpmDefinition[(Event, Subject, Object)]( "ProcessDirectoryTouchesV2",
+      d => true, //d._1.eventType == EVENT_READ || d._1.eventType == EVENT_WRITE,
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_path_node>")),
-        d => List(ProcessDirectoryTouchesAux.dirAtDepth(d._2._2.get.path,d._3._2.get.path))
+        d => List(d._1.eventType.toString),
+        d => d._3._2.map { _.path.split("/").toList match {
+          case "" :: remainder => "/" :: remainder
+          case x => x
+        }}.getOrElse(Nil).dropRight(1)
       )
     )
   )
@@ -98,13 +113,14 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
     tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators)) else None
   def recordAlarm(alarmOpt: Option[Alarm]): Unit = alarmOpt.foreach(a => alarms = alarms + (a.map(_._1) -> (System.currentTimeMillis, a, Map.empty[String,Int])))
-  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).map { a =>
-    if (rating.isDefined) // set the alarm rating in this namespace
-      alarms = alarms + (key -> a.copy(_3 = a._3 + (namespace -> rating.get)))
-    else // Unset the alarm rating.
-      alarms = alarms + (key -> a.copy(_3 = a._3 - namespace))
-    true
-  }.getOrElse(false)
+  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
+    rating match {
+      case Some(number) => // set the alarm rating in this namespace
+        alarms = alarms + (key -> a.copy (_3 = a._3 + (namespace -> number) ) ); true
+      case None => // Unset the alarm rating.
+        alarms = alarms + (key -> a.copy (_3 = a._3 - namespace) ); true
+    }
+  }
   def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
 
   def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
@@ -214,7 +230,7 @@ class PpmActor extends Actor with ActorLogging {
       Try (
         flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-        case Success(flatEvents) => esoTrees.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm (ppm.observe (e) ) ) )
+        case Success(flatEvents) => esoTrees.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm(ppm.observe(e))))
         case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
       sender() ! Ack
@@ -225,7 +241,7 @@ class PpmActor extends Actor with ActorLogging {
 
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace) =>
-      val resultOpt = ppm(treeName).map(tree =>
+      val resultOpt = ppm(treeName).map( tree =>
         if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_3 = a._3.get(namespace))).toList
         else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_3 = v._3.get(namespace))}.toList
       )
@@ -243,7 +259,7 @@ class PpmActor extends Actor with ActorLogging {
       ppmList.foreach { ppm =>
         ppm.saveState()
 //        println(ppm.prettyString)
-        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
+//        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
       }
       println("Done")
 
@@ -260,7 +276,7 @@ case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Option[Int])]])
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._2.map(_._1)
-      val someUiData = UiDataContainer(b._3, names.mkString("∫"))
+      val someUiData = UiDataContainer(b._3, names.mkString("∫"), b._1, b._2.last._2)
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
@@ -299,8 +315,7 @@ case class UiTreeNode(title: String, data: UiDataContainer) extends UiTreeElemen
 
 case class UiTreeFolder(title: String, folder: Boolean = true, data: UiDataContainer = UiDataContainer.empty, children: Set[UiTreeElement] = Set.empty) extends UiTreeElement {
   def merge(other: UiTreeElement): Set[UiTreeElement] = other match {
-    case node: UiTreeNode =>
-      Set(this, node)
+    case node: UiTreeNode => Set(this, node)
     case newFolder: UiTreeFolder =>
       if (newFolder.title == title) {
         // merge children into this child set.
@@ -315,8 +330,8 @@ case class UiTreeFolder(title: String, folder: Boolean = true, data: UiDataConta
   }
 }
 
-case class UiDataContainer(rating: Option[Int], key: String)
-case object UiDataContainer { def empty = UiDataContainer(None, "") }
+case class UiDataContainer(rating: Option[Int], key: String, observationTime: Long, localProb: Float)
+case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 1F) }
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
