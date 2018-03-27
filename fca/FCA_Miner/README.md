@@ -180,7 +180,7 @@ python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
 
 To generate analysis results based on the ProcessEvent context and positive implication rules (with standard support and confidence settings), one could launch (after ADM ingestion):
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/pcbo-amai/pcbo --parallel 3 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/pcbo-amai/pcbo --parallel 3 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
@@ -188,7 +188,7 @@ python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4js
 or 
 
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/fcbo-ins/fcbo -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/fcbo-ins/fcbo -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 (if you want to run the C version of FCbO)
 
