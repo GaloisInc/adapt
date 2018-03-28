@@ -3,7 +3,7 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util
-import java.util.{UUID}
+import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
 
 import akka.Done
@@ -32,14 +32,14 @@ import org.reactivestreams.Publisher
 import FlowComponents._
 import bloomfilter.CanGenerateHashFrom
 import bloomfilter.mutable.BloomFilter
-import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 
@@ -124,14 +124,15 @@ object Application extends App {
 
 //  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
-  val mapdbCdm2Cdm = {
+  // These are the maps that `UUIDRemapper` will use
+  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = {
     val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
 //      .counterEnable()
       .createOrOpen()
 
-    memoryDb.hashMap("cdm2cdm")
+    val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .counterEnable()
@@ -141,17 +142,21 @@ object Application extends App {
       .expireMaxSize(1000000)
       .expireExecutor(Executors.newScheduledThreadPool(2))
       .createOrOpen()
+
+    MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
+      mapdbCdm2Cdm,
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
+    )
   }
-
-
-  val mapdbCdm2Adm = {
+  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = {
     val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
 //      .counterEnable()
       .createOrOpen()
 
-    memoryDb.hashMap("cdm2adm")
+    val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .counterEnable()
@@ -161,20 +166,13 @@ object Application extends App {
       .expireMaxSize(1000000)
       .expireExecutor(Executors.newScheduledThreadPool(2))
       .createOrOpen()
+
+    MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
+      mapdbCdm2Adm,
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+      { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
+    )
   }
-
-
-  // These are the maps that `UUIDRemapper` will use
-  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
-    mapdbCdm2Cdm,
-    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
-    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
-  )
-  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapDBUtils.almostMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
-    mapdbCdm2Adm,
-    { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
-    { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
-  )
 
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
@@ -182,10 +180,10 @@ object Application extends App {
   val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
   val dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
 
-//  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.expiringSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
+//  val seenNodes: AlmostSet[AdmUUID] = MapSetUtils.lruCacheSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
 //    override def removeEldestEntry(eldest: java.util.Map.Entry[AdmUUID, None.type]): Boolean = this.size > dedupNodeCacheSize
 //  })
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.expiringSet(new util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapSetUtils.lruCacheSet(new util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
     override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean = this.size > dedupEdgeCacheSize
   })
 
@@ -196,7 +194,7 @@ object Application extends App {
       .createOrOpen()
       .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
 
-    MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
+    MapSetUtils.navigableSet[Array[AnyRef],AdmUUID](
       seenNodesSet,
       { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
     )
@@ -214,19 +212,19 @@ object Application extends App {
       hasAdmUUID.generateHash(from.tgt) ^ (11 * hasAdmUUID.generateHash(from.tgt)) ^ (13 * from.label.hashCode)
     }
   }
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(BloomFilter[AdmUUID](300000000L, 1.0 / 3e12))
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(BloomFilter[EdgeAdm2Adm](300000000L, 1.0 / 3e12))
+  val seenNodes: AlmostSet[AdmUUID] = MapSetUtils.bloomSet(BloomFilter[AdmUUID](300000000L, 1.0 / 3e12))
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapSetUtils.bloomSet(BloomFilter[EdgeAdm2Adm](300000000L, 1.0 / 3e12))
   */
 
   /* Regular Scala set variant
 
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet(mutable.Set.empty)
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(mutable.Set.empty)
+  val seenNodes: AlmostSet[AdmUUID] = MapSetUtils.scalaSet(mutable.Set.empty)
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapSetUtils.scalaSet(mutable.Set.empty)
   */
 
   /* MapDB Hash Set variant
 
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
+  val seenNodes: AlmostSet[AdmUUID] = MapSetUtils.hashSet[Array[AnyRef],AdmUUID](
     fileDb.hashSet("seenNodes")
       .serializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .counterEnable()
@@ -234,7 +232,7 @@ object Application extends App {
       .asInstanceOf[HTreeMap.KeySet[Array[AnyRef]]],
     { case AdmUUID(uuid,ns) => Array(ns,uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid,ns) }
   )
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet[Array[AnyRef],EdgeAdm2Adm](
+  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapSetUtils.hashSet[Array[AnyRef],EdgeAdm2Adm](
     fileDb.hashSet("seenEdges")
       .serializer(new SerializerArrayTuple(
         Serializer.STRING,
@@ -340,7 +338,7 @@ object Application extends App {
         .counterEnable()
         .createOrOpen()
         .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
-      val uuids: AlmostSet[AdmUUID] = MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
+      val uuids: AlmostSet[AdmUUID] = MapSetUtils.navigableSet[Array[AnyRef],AdmUUID](
         temp,
         { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
       )

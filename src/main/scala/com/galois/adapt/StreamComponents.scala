@@ -48,7 +48,7 @@ object FlowComponents {
 
         // Ordering nodes stats
         val blockEdgesCount = EntityResolution.blockedEdgesCount
-        val blockingNodes = EntityResolution.blockingNodes.size
+        val blockingNodes = Application.blockedEdges.size
 
         val currentTime = EntityResolution.monotonicTime
         val sampledTime = EntityResolution.sampledTime

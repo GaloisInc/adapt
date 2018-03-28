@@ -3,10 +3,9 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.NotUsed
-import akka.stream.FlowShape
+import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
-import com.galois.adapt.MapDBUtils
-import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
+import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
@@ -36,21 +35,30 @@ object EntityResolution {
 
 
   def apply(
-    cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                    // Map from CDM to CDM
-    cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                    // Map from CDM to ADM
+    cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                        // Map from CDM to CDM
+    cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                        // Map from CDM to ADM
     blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
 
-    seenNodesSet: AlmostSet[AdmUUID],                           // Set of nodes seen so far
-    seenEdgesSet: AlmostSet[EdgeAdm2Adm]                        // Set of edges seen so far
+    seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
+    seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
   ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
     val config: Config = ConfigFactory.load()
 
     val maxTimeJump: Long      = (config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos
-    val uuidExpiryNanos: Long  = (config.getInt("adapt.adm.cdmexpiryseconds") seconds).toNanos
-    val uuidExpiryCount: Long  = config.getLong("adapt.adm.cdmexpirycount")
-    val eventExpiryNanos: Long = (config.getInt("adapt.adm.eventexpirysecs")  seconds).toNanos
-    val eventExpiryCount: Long = config.getLong("adapt.adm.eventexpirycount")
+
+    val uuidExpiryTime: Time   = {
+      val uuidExpiryNanos: Long  = (config.getInt("adapt.adm.cdmexpiryseconds") seconds).toNanos
+      val uuidExpiryCount: Long  = config.getLong("adapt.adm.cdmexpirycount")
+      Time(uuidExpiryNanos, uuidExpiryCount)
+    }
+
+    val eventExpiryTime: Time  = {
+      val eventExpiryNanos: Long = (config.getInt("adapt.adm.eventexpirysecs")  seconds).toNanos
+      val eventExpiryCount: Long = config.getLong("adapt.adm.eventexpirycount")
+      Time(eventExpiryNanos, eventExpiryCount)
+    }
+
     val maxEventsMerged: Int   = config.getInt("adapt.adm.maxeventsmerged")
 
     val maxTimeMarker = ("", Timed(Time.max, TimeMarker(Long.MaxValue)))
@@ -59,10 +67,12 @@ object EntityResolution {
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
-      .via(erWithoutRemaps(eventExpiryNanos, eventExpiryCount, maxEventsMerged, activeChains))   // Entity resolution without remaps
+      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
-      .via(UuidRemapper(uuidExpiryNanos, uuidExpiryCount, cdm2cdmMap, cdm2admMap, blockedEdges))    // Remap UUIDs
-      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
+      .buffer(2000, OverflowStrategy.backpressure)
+      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges))// Remap UUIDs
+      .buffer(2000, OverflowStrategy.backpressure)
+      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }
 
 
@@ -71,7 +81,9 @@ object EntityResolution {
   // Since TA1s cannot be trusted to have a regularly increasing time value, we can't rely on just this for expiring
   // things. The solution is to thread thorugh a node count - we're pretty sure that will increase proportionally to the
   // number of nodes ingested ;)
-  case class Time(nanos: Long, count: Long)
+  case class Time(nanos: Long, count: Long) {
+    def plus(other: Time): Time = Time(this.nanos + other.nanos, this.count + other.count)
+  }
   object Time {
     def max: Time = Time(Long.MaxValue, Long.MaxValue)
   }
@@ -116,8 +128,7 @@ object EntityResolution {
   // Perform entity resolution on stream of CDMs to convert them into ADMs, Edges, and general information to hand off
   // to the UUID remapping stage.
   private def erWithoutRemaps(
-    eventExpiryTime: Long,
-    eventExpiryCount: Long,
+    eventExpiryTime: Time,
     maxEventsMerged: Int,
     activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState]
   ): ErFlow =
@@ -127,9 +138,9 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
-      broadcast ~> EventResolution(eventExpiryTime, eventExpiryCount, maxEventsMerged, activeChains) ~> merge
-      broadcast ~> SubjectResolution.apply                                                           ~> merge
-      broadcast ~> OtherResolution.apply                                                             ~> merge
+      broadcast ~> EventResolution(eventExpiryTime, maxEventsMerged, activeChains) ~> merge
+      broadcast ~> SubjectResolution.apply                                         ~> merge
+      broadcast ~> OtherResolution.apply                                           ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })
