@@ -536,7 +536,10 @@ package object adm {
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), "")
+    val uuid = {
+      val original = originalCdmUuids.sorted
+      AdmUUID(DeterministicUUID(original.map(_.uuid)), original.headOption.fold("")(_.namespace))
+    }
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
