@@ -8,7 +8,7 @@ import com.galois.adapt.NoveltyDetection.ExtractedValue
 import com.galois.adapt.cdm18.EventType
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.sys.process._
@@ -27,32 +27,42 @@ object EventTypeModels {
     }
   }
 
+  val modelDir = Application.config.getString("adapt.ppm.eventtypemodelsdir")
+  val trainFileIForest = "train_iforest.csv"
+  val trainFileFCA = modelDir + "train_fca.csv"
+
+  val evalFileIForest = "eval_iforest.csv"
+  val evalFileFCA = modelDir + "eval_fca.csv"
+
+  val outputFileIForest = "output_iforest.csv"
+  val outputFileFCA = modelDir + "output_fca.csv"
+
   object EventTypeData {
 
     //TODO: what if there's a timeout? What is returned?
     def query(treeName: String): PpmTreeCountResult = {
-      val timeout = Timeout(5 seconds)
+      implicit val timeout: Timeout = Timeout(60000 seconds)
       val future = ppmActor ? PpmTreeCountQuery(treeName: String)
-      Await.result(future, timeout.duration).asInstanceOf[PpmTreeCountResult]
+      Await.ready(future, timeout.duration).value.get match {
+        case Success(result) => result.asInstanceOf[PpmTreeCountResult]
+        case Failure(msg) => PpmTreeCountResult(None)
+      }
     }
 
     def collect(data: Map[List[ExtractedValue], Int]): Map[Process,EventTypeCounts] = {
-      // This removes all but max depth of ProcessEventType tree, which is all we need
-      val dataFiltered = data.filter(_._1 match {
-        case Nil => false
-        case process :: Nil => false
-        case process :: rest => true
+      // This removes all but max depth of ProcessEventType tree, which is all we need.
+      val dataFiltered = data.filter {
+        case (extractedValues, _) => extractedValues.lengthCompare(3)==0 && extractedValues.last != "_?_"
+      }
+
+      dataFiltered.groupBy(x => (x._1.head,x._1(1))).map{ case ((name, uuid), dataMap) =>
+           Process(name,uuid) ->
+        dataMap.map(e => EventType.from(e._1.last).get->e._2)
         }
-      )
-      dataFiltered.groupBy(_._1.head).map{y =>
-          val process = y._1.split(",")
-          Process(process(0),process(1)) ->
-          y._2.map(z => z._1.last.asInstanceOf[EventType] -> z._2) //TODO: what if the last ExtractedValue is not EventType?
-        }                        //Will this turn a string into an enum?
     }
 
     def collectToCSVArray(row: (Process,EventTypeCounts)): Array[String] = {
-      Array(row._1.name,row._1.uuid) ++ EventType.values.map(row._2.apply).map(toString).toArray
+      Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
     }
 
     def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String): Unit = {
@@ -72,23 +82,23 @@ object EventTypeModels {
       val fileHandle = new File(filePath)
       val parser = new CsvParser(new CsvParserSettings)
       val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
-      TreeRepr.fromFlat(List((0,modelName,0,0,1)) ++ rows.map(rowToAlarm))
+      TreeRepr.fromFlat(List((0,modelName,0F,0F,1)) ++ rows.map(rowToAlarm))
     }
 
     def rowToAlarmIForest(row: Array[String]): EventTypeAlarm = {
-        (1,Process(row(0),row(1)).toString(),row.last.toFloat,0,1)
+        (1,Process(row(0),row(1)).toString(),row.last.toFloat,0F,1)
     }
 
     def rowToAlarmFCA (row: Array[String]): EventTypeAlarm = {
-        (1,Process("",row(0)).toString(),row(1).toFloat,0,1)
+        (1,Process("",row(0)).toString(),row(1).toFloat,0F,1)
     }
   }
 
   object Execute {
 
     def iforest(iforestExecutablePath: String, trainFile: String, testFile: String, outFile: String): Int = {
-      val s = s"./"+iforestExecutablePath+"iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
-      s ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
+      val s = s"${iforestExecutablePath}iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
+      sys.process.Process(s,new File(modelDir)) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
     def fca(fcaScoringScriptPath: String): Int = {
@@ -100,14 +110,14 @@ object EventTypeModels {
   // I'd probably wait ten minutes or so to get real results
   def evaluateModels(): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
     val writeResult = EventTypeData.query("ProcessEventType").results match {
-      case Some(data) => Try(EventTypeData.writeToFile(data,"/a/great/place/to/put/a/trainfile"))
-      case _ => Failure(RuntimeException) //If there is no data, we want a failure (this seems hacky)
+      case Some(data) => Try(EventTypeData.writeToFile(data,modelDir+evalFileIForest))
+      case _ => Failure(new RuntimeException) //If there is no data, we want a failure (this seems hacky)
     }
 
     writeResult match {
       case Success(_) =>
-        Try(Execute.iforest("/path/to/exe/","/a/great/place/to/put/a/trainfile","/a/great/place/to/put/a/testfile","alarmFile"))
-        Try(Execute.fca("/path/to/fca/script")) //What if FCA takes forever?!!....we could delete the script it needs
+        Try(Execute.iforest(modelDir,trainFileIForest,evalFileIForest,outputFileIForest))
+        Try(Execute.fca("/path/to/fca/script"))
       case Failure(_) =>
     }
 
@@ -129,8 +139,5 @@ object EventTypeModels {
 
     alarmMap
   }
-
-//TODO: When the PPMTree actor gets `CompleteMsg`, call
-//  EventTypeData.writeToFile on final ProcessEventType PPMTree
 
 }

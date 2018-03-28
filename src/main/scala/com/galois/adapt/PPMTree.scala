@@ -6,10 +6,13 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_UNLINK, EVENT_EXECUTE, EVENT_WRITE, EVENT_READ}
+import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_UNLINK, EVENT_WRITE}
 import java.io.{File, PrintWriter}
+
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 object NoveltyDetection {
@@ -76,6 +79,15 @@ object NoveltyDetection {
     )
   )
 
+  val esTrees = List(
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("ProcessEventType",
+      d => d._3.nonEmpty,
+      List(d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      )
+    )
+  )
+
   val seoesTrees = List(
     PpmDefinition[(Subject, Event, Object, Event, Subject)]("ExecuteDelete",   // TODO: This doesn't need subjects
       d => d._2.eventType == EVENT_EXECUTE && d._4.eventType == EVENT_UNLINK && d._3._1.isInstanceOf[AdmFileObject],
@@ -85,7 +97,7 @@ object NoveltyDetection {
     )
   )
 
-  val ppmList = esoTrees ++ seoesTrees
+  val ppmList = esoTrees ++ seoesTrees ++ esTrees
 }
 
 
@@ -217,6 +229,14 @@ class PpmActor extends Actor with ActorLogging {
         case Success(flatEvents) => esoTrees.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm (ppm.observe (e) ) ) )
         case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
+
+      Try (
+        (e,s,subPathNodes.asInstanceOf[Set[AdmPathNode]])
+      ) match {
+      case Success(e) => esTrees.foreach (ppm => ppm.observe(e))
+      case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+      }
+
       sender() ! Ack
 
 
@@ -237,13 +257,17 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg => sender() ! Ack
+    case InitMsg => Future {Thread.sleep(60); EventTypeModels.evaluateModels()}; sender() ! Ack
 
     case CompleteMsg =>
       ppmList.foreach { ppm =>
         ppm.saveState()
 //        println(ppm.prettyString)
         println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
+      }
+      esTrees.foreach{ ppm =>
+        val eventTypeData = ppm.getAllCounts
+        EventTypeModels.EventTypeData.writeToFile(eventTypeData,EventTypeModels.modelDir + "train_iforest.csv")
       }
       println("Done")
 
