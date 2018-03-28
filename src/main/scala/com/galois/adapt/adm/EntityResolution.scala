@@ -28,9 +28,9 @@ object EntityResolution {
   var nodeCount: Long = 0
 
   // This is just for logging state held onto by the `EventResolution` branch of `erWithoutRemaps`
-  var activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
+  val activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
 
-  // This is just for logging state held onto by `asyncDeduplicate` .
+  // This is just for logging state held onto by `deduplicate` .
   var blockedEdgesCount: Long = 0
   val blockingNodes: MutableSet[UUID] = MutableSet.empty[UUID]
 
@@ -38,7 +38,7 @@ object EntityResolution {
   def apply(
     cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                    // Map from CDM to CDM
     cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                    // Map from CDM to ADM
-    blocking: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
+    blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
 
     seenNodesSet: AlmostSet[AdmUUID],                           // Set of nodes seen so far
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                        // Set of edges seen so far
@@ -54,15 +54,15 @@ object EntityResolution {
     val maxEventsMerged: Int   = config.getInt("adapt.adm.maxeventsmerged")
 
     val maxTimeMarker = ("", Timed(Time.max, TimeMarker(Long.MaxValue)))
-    lazy val maxTimeRemapper = Timed(Time.max, JustTime)
+    val maxTimeRemapper = Timed(Time.max, JustTime)
 
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
       .via(erWithoutRemaps(eventExpiryNanos, eventExpiryCount, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
-      .via(UuidRemapper(uuidExpiryNanos, uuidExpiryCount, cdm2cdmMap, cdm2admMap, blocking))    // Remap UUIDs
-      .via(asyncDeduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
+      .via(UuidRemapper(uuidExpiryNanos, uuidExpiryCount, cdm2cdmMap, cdm2admMap, blockedEdges))    // Remap UUIDs
+      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
   }
 
 
@@ -83,7 +83,7 @@ object EntityResolution {
   private def annotateTime(maxTimeJump: Long): TimeFlow = {
 
     // Map a CDM onto a possible timestamp
-    def timestampOf: CDM => Option[Long] = {
+    val timestampOf: CDM => Option[Long] = {
       case s: Subject => Some(s.startTimestampNanos)
       case e: Event => Some(e.timestampNanos)
       case t: TimeMarker => Some(t.timestampNanos)
@@ -111,10 +111,10 @@ object EntityResolution {
   }
 
 
-  private type ErFlow = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], NotUsed]
+  type ErFlow = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], NotUsed]
 
-  // Perform entity resolution on stream of CDMs to convert them into ADMs, Edges, and general information to hand of to
-  // the UUID remapping stage.
+  // Perform entity resolution on stream of CDMs to convert them into ADMs, Edges, and general information to hand off
+  // to the UUID remapping stage.
   private def erWithoutRemaps(
     eventExpiryTime: Long,
     eventExpiryCount: Long,
@@ -139,7 +139,7 @@ object EntityResolution {
 
   // Prevents nodes/edges from being emitted twice. Also prevents edges from being emitted before both of their
   // endpoints have been emitted.
-  private def asyncDeduplicate(
+  private def deduplicate(
     seenNodes: AlmostSet[AdmUUID],
     seenEdges: AlmostSet[EdgeAdm2Adm],
     blockedEdges: MutableMap[UUID, List[EdgeAdm2Adm]]     // Edges blocked by UUIDs that haven't arrived yet
@@ -147,14 +147,14 @@ object EntityResolution {
 
     // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map.
     def emitEdge(edge: EdgeAdm2Adm): Option[Either[ADM, EdgeAdm2Adm]] = edge match {
-      case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
-        blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
-        blockingNodes += src
-        None
-
       case EdgeAdm2Adm(_, _, tgt) if !seenNodes.contains(tgt) =>
         blockedEdges(tgt) = edge :: blockedEdges.getOrElse(tgt, Nil)
         blockingNodes += tgt
+        None
+
+      case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
+        blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
+        blockingNodes += src
         None
 
       case _ =>
@@ -164,8 +164,14 @@ object EntityResolution {
 
     {
       // Duplicate node or edge
-      case Left(adm) if seenNodes.contains(adm.uuid) => Nil
       case Right(edge) if seenEdges.contains(edge) => Nil
+      case Left(adm) if seenNodes.contains(adm.uuid) => Nil
+
+      // New edge
+      case Right(edge) =>
+        seenEdges.add(edge)
+        blockedEdgesCount += 1
+        emitEdge(edge).toList
 
       // New node
       case Left(adm) =>
@@ -173,12 +179,6 @@ object EntityResolution {
         blockingNodes -= adm.uuid
         val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
         Left(adm) :: emit
-
-      // New edge
-      case Right(edge) =>
-        seenEdges.add(edge)
-        blockedEdgesCount += 1
-        emitEdge(edge).toList
     }
   })
 }

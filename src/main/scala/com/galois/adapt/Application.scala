@@ -122,39 +122,46 @@ object Application extends App {
   def isWindows(ns: String): Boolean = namespaces.getOrElse(ns, false)
 
 
-  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
+//  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
-  val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
-    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .counterEnable()
-    .createOrOpen()
-  val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
-    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .counterEnable()
-    .expireOverflow(mapdbCdm2CdmOverflow)
-    .expireAfterCreate()
-    .expireAfterGet()
-    .expireMaxSize(1000000)
-    .expireExecutor(Executors.newScheduledThreadPool(2))
-    .createOrOpen()
+  val mapdbCdm2Cdm = {
+    val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+//      .counterEnable()
+      .createOrOpen()
 
-  val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
-    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .counterEnable()
-    .createOrOpen()
-  val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
-    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-    .counterEnable()
-    .expireOverflow(mapdbCdm2AdmOverflow)
-    .expireAfterCreate()
-    .expireAfterGet()
-    .expireMaxSize(1000000)
-    .expireExecutor(Executors.newScheduledThreadPool(2))
-    .createOrOpen()
+    memoryDb.hashMap("cdm2cdm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
+      .expireOverflow(mapdbCdm2CdmOverflow)
+      .expireAfterCreate()
+      .expireAfterGet()
+      .expireMaxSize(1000000)
+      .expireExecutor(Executors.newScheduledThreadPool(2))
+      .createOrOpen()
+  }
+
+
+  val mapdbCdm2Adm = {
+    val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+//      .counterEnable()
+      .createOrOpen()
+
+    memoryDb.hashMap("cdm2adm")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
+      .expireOverflow(mapdbCdm2AdmOverflow)
+      .expireAfterCreate()
+      .expireAfterGet()
+      .expireMaxSize(1000000)
+      .expireExecutor(Executors.newScheduledThreadPool(2))
+      .createOrOpen()
+  }
 
 
   // These are the maps that `UUIDRemapper` will use
@@ -169,8 +176,8 @@ object Application extends App {
     { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
   )
 
-  // These are the maps/sets the async and dedup stage of ER will use
-  val blocking: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
+  // Edges blocked waiting for a target CDM uuid to be remapped.
+  val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
 
   val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
   val dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
@@ -182,15 +189,18 @@ object Application extends App {
     override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean = this.size > dedupEdgeCacheSize
   })
 
-  val seenNodesSet: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
-    .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
-    .counterEnable()
-    .createOrOpen()
-    .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
-  val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
-    seenNodesSet,
-    { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
-  )
+  val seenNodes: AlmostSet[AdmUUID] = {
+    val seenNodesSet: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
+      .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
+      .counterEnable()
+      .createOrOpen()
+      .asInstanceOf[util.NavigableSet[Array[AnyRef]]]
+
+    MapDBUtils.navigableSet[Array[AnyRef],AdmUUID](
+      seenNodesSet,
+      { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
+    )
+  }
 
   /* Bloom filter variant
 
@@ -214,7 +224,7 @@ object Application extends App {
   val seenEdges: AlmostSet[EdgeAdm2Adm] = MapDBUtils.almostSet(mutable.Set.empty)
   */
 
-  /* MapDB set variant
+  /* MapDB Hash Set variant
 
   val seenNodes: AlmostSet[AdmUUID] = MapDBUtils.almostSet[Array[AnyRef],AdmUUID](
     fileDb.hashSet("seenNodes")
@@ -248,7 +258,7 @@ object Application extends App {
   )
   */
 
-  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blocking, seenNodes, seenEdges)
+  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, seenNodes, seenEdges)
 
   val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
 
@@ -260,7 +270,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = Routes.mainRoute(dbActor, anomalyActor, statusActor, ppmActor)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmActor)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }
@@ -628,40 +638,40 @@ object CDMSource {
     }
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("cadets" -> _)
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("clearscope" -> _)
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("faros" -> _)
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("fivedirections" -> _)
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
           .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
         Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("trace" -> _)
       case "kafkaTest"      =>
         Application.addNamespace("kafkaTest", isWindows = false)
-        val src = kafkaSource("kafkaTest", kafkaCdm17Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        val src = kafkaSource("kafkaTest", kafkaCdm17Parser)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map("kafkaTest" -> _)
       case _ =>
 
@@ -699,10 +709,11 @@ object CDMSource {
     }
   }
 
+  val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+
   // Make a CDM18 source, possibly falling back on CDM17 for files with that version
   def cdm18(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(String,CDM18), _] = {
-    println(s"Setting source for: $ta1")
-    val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    println(s"Setting source for TA1: $ta1")
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
       case Success(i) =>
@@ -712,38 +723,38 @@ object CDMSource {
     }
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser).drop(start)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "kafkaTest"      =>
         Application.addNamespace("kafkaTest", isWindows = false)
-        val src = kafkaSource("kafkaTest", kafkaCdm18Parser).drop(start) //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        val src = kafkaSource("kafkaTest", kafkaCdm18Parser)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case _ =>
         val paths: List[(Provider, String)] = getLoadfiles
@@ -826,7 +837,8 @@ object CDMSource {
     Consumer.plainSource(
       ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
       Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))  // TODO: Why aren't offsets working?
-    ) .map(parser)
+    ) .drop(start)
+      .map(parser)
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
 
   // Parse a `CDM17` from a kafka record
@@ -844,18 +856,19 @@ object CDMSource {
     CDM17.parse(cdm)
   }.flatten
 
+
+  val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm18.TCCDMDatum])  // TODO: clean this up
   // Parse a `CDM18` from a kafka record
   def kafkaCdm18Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM18] = Try {
     val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
     val offset = msg.offset()   // msg.record.offset()
-    val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm18.TCCDMDatum])
     val decoder = DecoderFactory.get.binaryDecoder(bais, null)
     val t = Try {
       val elem: com.bbn.tc.schema.avro.cdm18.TCCDMDatum = reader.read(null, decoder)
       elem
     }
     if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
-    val cdm = new RawCDM18Type(t.get.getDatum)
+    val cdm = new RawCDM18Type(t.get.getDatum)  // throw the error inside the parent Try
     CDM18.parse(cdm)
   }.flatten
 }

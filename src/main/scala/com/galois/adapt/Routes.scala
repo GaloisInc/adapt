@@ -58,7 +58,7 @@ object Routes {
   }
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
+  def mainRoute(dbActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
@@ -179,7 +179,8 @@ object Routes {
                     fields.get("endTimestamp").map(_.toLong)
                   )
                 ).map(q =>
-                  (anomalyActor ? q).mapTo[Future[String]].flatMap(identity)
+                  // TODO: Come on... fix this.
+                  (ppmActor ? q).mapTo[Future[String]].flatMap(identity)
                 )
               }
             }

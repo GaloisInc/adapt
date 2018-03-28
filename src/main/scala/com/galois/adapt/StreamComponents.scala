@@ -36,13 +36,15 @@ object FlowComponents {
         lastTimestampNanos = System.nanoTime()
       }
       counter = counter + 1
-      val className = item.getClass.getSimpleName
+      val className = item match {
+        case (_, i: AnyRef) => i.getClass.getSimpleName
+        case i => i.getClass.getSimpleName
+      }
       populationCounter += (className -> (populationCounter.getOrElse(className, 0L) + 1))
 
       if (counter % every == 0) {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
-        import collection.JavaConverters._
 
         // Ordering nodes stats
         val blockEdgesCount = EntityResolution.blockedEdgesCount
@@ -52,8 +54,8 @@ object FlowComponents {
         val sampledTime = EntityResolution.sampledTime
 
         // UuidRemapper related stats
-        val uuidsBlocking: Int = Application.blocking.size
-        val blockedUuidResponses: Int = Application.blocking.values.map(_._1.length).sum
+        val uuidsBlocking: Int = Application.blockedEdges.size
+        val blockedUuidResponses: Int = Application.blockedEdges.values.map(_._1.length).sum
 
         val activeEventChains = EntityResolution.activeChains.size
 
@@ -84,7 +86,7 @@ object FlowComponents {
           sampledTime
         )
 
-        populationCounter.clear()
+//        populationCounter.clear()
 
         lastTimestampNanos = nowNanos
       }
