@@ -259,6 +259,11 @@ object Application extends App {
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, seenNodes, seenEdges)
 
   val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
+  config.getLong("adapt.ingest.saveintervalseconds") match {
+    case i if i > 0 => system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees)
+    case _ => println("Not going to periodically save PPM trees.")
+  }
+
 
   val ta1 = config.getString("adapt.env.ta1")
 
