@@ -314,7 +314,7 @@ package object adm {
       if (segsRev.isEmpty && !absolute) return None
 
       val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
-      Some(AdmPathNode(norm, provider))
+      Some(AdmPathNode(norm, "")) // TODO: consider adding a provider back in
     }
   }
 
