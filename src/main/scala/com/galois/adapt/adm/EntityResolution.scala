@@ -11,7 +11,8 @@ import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
+import scala.collection.mutable.{ListBuffer, Map => MutableMap, Set => MutableSet}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -41,7 +42,7 @@ object EntityResolution {
 
     seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
-  ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
+  )(implicit ec: ExecutionContext): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
     val config: Config = ConfigFactory.load()
 
@@ -72,7 +73,7 @@ object EntityResolution {
       .buffer(2000, OverflowStrategy.backpressure)
       .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges))// Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
+      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty, ec))     // Order nodes/edges
   }
 
 
@@ -153,43 +154,89 @@ object EntityResolution {
   private def deduplicate(
     seenNodes: AlmostSet[AdmUUID],
     seenEdges: AlmostSet[EdgeAdm2Adm],
-    blockedEdges: MutableMap[UUID, List[EdgeAdm2Adm]]     // Edges blocked by UUIDs that haven't arrived yet
-  ): OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]](() => {
+    blockedEdges: MutableMap[UUID, List[EdgeAdm2Adm]],     // Edges blocked by UUIDs that haven't arrived yet
+    executionContext: ExecutionContext
+  ): OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm]]
+      .groupedWithin(1000, 1.seconds)
+      .statefulMapConcat[Either[ADM, EdgeAdm2Adm]](() => {
 
-    // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map.
-    def emitEdge(edge: EdgeAdm2Adm): Option[Either[ADM, EdgeAdm2Adm]] = edge match {
-      case EdgeAdm2Adm(_, _, tgt) if !seenNodes.contains(tgt) =>
-        blockedEdges(tgt) = edge :: blockedEdges.getOrElse(tgt, Nil)
-        blockingNodes += tgt
-        None
+      // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map.
+      def emitEdge(edge: EdgeAdm2Adm): Option[Either[ADM, EdgeAdm2Adm]] = edge match {
+        case EdgeAdm2Adm(_, _, tgt) if !seenNodes.contains(tgt) =>
+          blockedEdges(tgt) = edge :: blockedEdges.getOrElse(tgt, Nil)
+          blockingNodes += tgt
+          None
 
-      case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
-        blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
-        blockingNodes += src
-        None
+        case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
+          blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
+          blockingNodes += src
+          None
 
-      case _ =>
-        blockedEdgesCount -= 1
-        Some(Right(edge))
-    }
+        case _ =>
+          blockedEdgesCount -= 1
+          Some(Right(edge))
+      }
 
-    {
-      // Duplicate node or edge
-      case Right(edge) if seenEdges.contains(edge) => Nil
-      case Left(adm) if seenNodes.contains(adm.uuid) => Nil
+      implicit val _: ExecutionContext = executionContext
 
-      // New edge
-      case Right(edge) =>
-        seenEdges.add(edge)
-        blockedEdgesCount += 1
-        emitEdge(edge).toList
+      (wad: Seq[Either[ADM, EdgeAdm2Adm]]) => {
+        val (lefts: Seq[ADM], rights: Seq[EdgeAdm2Adm]) = {
+          val (l,r) = wad.partition(_.isLeft)
+          (l.map(_.left.get), r.map(_.right.get))
+        }
 
-      // New node
-      case Left(adm) =>
-        seenNodes.add(adm.uuid)
-        blockingNodes -= adm.uuid
-        val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
-        Left(adm) :: emit
-    }
+        val toReturn: ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty
+
+        // Go write in all of the nodes, then block until those writes are done
+        val asyncNodes: Seq[Future[List[Either[ADM, EdgeAdm2Adm]]]] =
+          for (adm <- lefts) yield Future {
+            if (seenNodes.add(adm.uuid)) {
+              blockingNodes -= adm.uuid
+              val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
+              Left(adm) :: emit
+            } else {
+              Nil
+            }
+          }
+        val nodes = Await.result(Future.sequence(asyncNodes), 20.seconds)
+        for (group <- nodes) {
+          toReturn ++= group
+        }
+
+        // Go write in all the edges, then block until those writes are done
+        val asyncEdges: Seq[Future[List[Either[ADM, EdgeAdm2Adm]]]] =
+          for (edge <- rights) yield Future {
+            if (seenEdges.add(edge)) {
+              blockedEdgesCount += 1
+              emitEdge(edge).toList
+            } else {
+              Nil
+            }
+          }
+        val edges = Await.result(Future.sequence(asyncEdges), 20.seconds)
+        for (group <- edges) {
+          toReturn ++= group
+        }
+
+        toReturn.toList
+      }
+//      {
+//        // Duplicate node or edge
+//        case Right(edge) if seenEdges.contains(edge) => Nil
+//        case Left(adm) if seenNodes.contains(adm.uuid) => Nil
+//
+//        // New edge
+//        case Right(edge) =>
+//          seenEdges.add(edge)
+//          blockedEdgesCount += 1
+//          emitEdge(edge).toList
+//
+//        // New node
+//        case Left(adm) =>
+//          seenNodes.add(adm.uuid)
+//          blockingNodes -= adm.uuid
+//          val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
+//          Left(adm) :: emit
+//      }
   })
 }
