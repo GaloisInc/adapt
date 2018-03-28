@@ -1,5 +1,5 @@
 #### this function takes as input a csv context and loads a data structure
-load_csv=function(csv_file_name){
+load_csv=function(csv_file){
   #csv_file_name="/home/terminator2/Documents/R_Projects/AnomalyRulesMining/contexts/Context_ProcessEvent.csv"
   Incon = file(csv_file, "r")
   if(is.null(Incon))stop("error in csv_file_name     - terminating")
