@@ -18,6 +18,7 @@ package object adm {
   trait ExtendedUuid {
     val uuid: UUID
     val namespace: String
+    def rendered: String
   }
 
   case class CdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
