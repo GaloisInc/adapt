@@ -631,9 +631,7 @@ object CDMSource {
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
-      case Success(i) =>
-        println(s"Starting at offset: $i")
-        Some(i)
+      case Success(i) => Some(i)
       case _ => None
     }
     ta1.toLowerCase match {
@@ -716,9 +714,7 @@ object CDMSource {
     println(s"Setting source for TA1: $ta1")
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
-      case Success(i) =>
-        println(s"Starting at offset: $i")
-        Some(i)
+      case Success(i) => Some(i)
       case _ => None
     }
     ta1.toLowerCase match {
