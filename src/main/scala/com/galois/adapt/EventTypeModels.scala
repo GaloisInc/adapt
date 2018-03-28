@@ -28,14 +28,17 @@ object EventTypeModels {
   }
 
   val modelDir = Application.config.getString("adapt.ppm.eventtypemodelsdir")
+  val modelDirIForest = modelDir + "iforest/"
+  val modelDirFCA = modelDir + "AR_Miner/"
+
   val trainFileIForest = "train_iforest.csv"
-  val trainFileFCA = modelDir + "train_fca.csv"
 
   val evalFileIForest = "eval_iforest.csv"
-  val evalFileFCA = modelDir + "eval_fca.csv"
+  val evalFileFCA = modelDirFCA + "eval_fca.csv"
+  val evalFileFCARCF = modelDirFCA + "eval_fca.rcf"
 
   val outputFileIForest = "output_iforest.csv"
-  val outputFileFCA = modelDir + "output_fca.csv"
+  val outputFileFCA = modelDirFCA + "output_fca.csv"
 
   object EventTypeData {
 
@@ -61,17 +64,21 @@ object EventTypeModels {
         }
     }
 
-    def collectToCSVArray(row: (Process,EventTypeCounts)): Array[String] = {
-      Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
+    def collectToCSVArray(row: (Process,EventTypeCounts),modelName: String = "iforest"): Array[String] = {
+      if (modelName=="FCA") Array(row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
+      else Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
     }
 
-    def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String): Unit = {
+
+
+    def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String, modelName: String = "iforest"): Unit = {
       val settings = new CsvWriterSettings
       val pw = new PrintWriter(new File(filePath))
       val writer = new CsvWriter(pw, settings)
-      val header = List("process_name","uuid")++EventType.values.map(e => e.toString).toList
+      val header = if (modelName=="FCA") List("uuid")++EventType.values.map(e => e.toString).toList
+                    else List("process_name","uuid")++EventType.values.map(e => e.toString).toList
       writer.writeHeaders(header.asJava)
-      EventTypeData.collect(data).foreach(f => writer.writeRow(EventTypeData.collectToCSVArray(f)))
+      EventTypeData.collect(data).foreach(f => writer.writeRow(EventTypeData.collectToCSVArray(f,modelName)))
       writer.close()
       pw.close()
     }
@@ -101,8 +108,13 @@ object EventTypeModels {
       sys.process.Process(s,new File(modelDir)) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
-    def fca(fcaScoringScriptPath: String): Int = {
-      "./"+ fcaScoringScriptPath + "Context_scoring_From_CSV.sh" ! ProcessLogger(_ => ())
+    def fca(scoringScriptPath: String,testFile: String, testFileRCF: String, outputFile: String): Int = {
+
+      val makeRCF = s"""Rscript -e "source(csv_to_rcf.r); csv_to_rcf($testFile,$testFileRCF)" """
+      sys.process.Process(makeRCF,new File(scoringScriptPath)) ! ProcessLogger(_ => ())
+
+      val s = s"Rscript context_scoring_shell.r 'ProcessEvent' $testFile $testFileRCF $outputFile '97' '97'"
+      "Rscript contexts_scoring_shell.r" ! ProcessLogger(_ => ())
     }
   }
 
@@ -110,14 +122,15 @@ object EventTypeModels {
   // I'd probably wait ten minutes or so to get real results
   def evaluateModels(): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
     val writeResult = EventTypeData.query("ProcessEventType").results match {
-      case Some(data) => Try(EventTypeData.writeToFile(data,modelDir+evalFileIForest))
+      case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
+        Try(EventTypeData.writeToFile(data,modelDirFCA+evalFileFCA,modelName = "FCA"))
       case _ => Failure(new RuntimeException) //If there is no data, we want a failure (this seems hacky)
     }
 
     writeResult match {
       case Success(_) =>
         Try(Execute.iforest(modelDir,trainFileIForest,evalFileIForest,outputFileIForest))
-        Try(Execute.fca("/path/to/fca/script"))
+        Try(Execute.fca(modelDirFCA,evalFileFCA,evalFileFCARCF,outputFileFCA))
       case Failure(_) =>
     }
 
