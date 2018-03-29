@@ -9,6 +9,8 @@ import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_EXECUTE, EVENT_READ, EVENT_UNLINK, EVENT_WRITE}
 import java.io.{File, PrintWriter}
 
+import com.galois.adapt.EventTypeModels.getAlarms
+
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -82,7 +84,8 @@ object NoveltyDetection {
   val esTrees = List(
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("ProcessEventType",
       d => d._3.nonEmpty,
-      List(d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       )
     )
@@ -267,7 +270,7 @@ class PpmActor extends Actor with ActorLogging {
       }
       esTrees.foreach{ ppm =>
         val eventTypeData = ppm.getAllCounts
-        EventTypeModels.EventTypeData.writeToFile(eventTypeData,EventTypeModels.modelDir + "train_iforest.csv")
+        EventTypeModels.EventTypeData.writeToFile(eventTypeData,EventTypeModels.modelDirIForest + "train_iforest.csv")
       }
       println("Done")
 
