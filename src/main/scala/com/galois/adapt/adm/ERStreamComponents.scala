@@ -3,11 +3,12 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.stream.scaladsl.Flow
-import com.galois.adapt.adm.EntityResolution.{CDM, Time, Timed}
+import com.galois.adapt.adm.EntityResolution.{CDM, ErFlow, Time, Timed}
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 // This object contains all of the logic for resolving individual CDM types into their corresponding ADM ones.
 object ERStreamComponents {
@@ -18,10 +19,10 @@ object ERStreamComponents {
   type TimedCdmToFutureAdm = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], _]
 
 
-  def extractPathsAndEdges(pathEdge: Option[(Edge, AdmPathNode)]): Stream[UuidRemapperInfo] =
+  def extractPathsAndEdges(pathEdge: Option[(Edge, AdmPathNode)]): List[UuidRemapperInfo] =
     pathEdge match {
-      case Some((edge, path)) => Stream(AnAdm(path), AnEdge(edge))
-      case None => Stream()
+      case Some((edge, path)) => List(AnAdm(path), AnEdge(edge))
+      case None => List.empty
     }
 
 
@@ -35,67 +36,60 @@ object ERStreamComponents {
     // This is the state we maintain per 'EventKey'
     case class EventMergeState(
       wipAdmEvent: AdmEvent,                // ADM event built up so far
-      dependent: Stream[UuidRemapperInfo],  // The path and edges that should be created with the AdmEvent
+      dependent: List[UuidRemapperInfo],  // The path and edges that should be created with the AdmEvent
       merged: Int                           // The number of CDM events that have been folded in so far
     )
 
     def apply(
-      expireInNanos: Long,   // nanoseconds to wait before expiring an event chain
-      expireInCount: Long,   // node count to wait for before expiring an event chain
+      eventExpiryTime: Time, // how long to wait before expiring an event chain
       maxEventsMerged: Int,  // maximum number of events to put into an event chain
 
       activeChains: mutable.Map[EventKey, EventMergeState]
-    ): TimedCdmToFutureAdm = Flow[(String,Timed[CDM])]
+    ): ErFlow = Flow[(String,Timed[CDM])]
 
       .statefulMapConcat { () =>
 
         // INVARIANT: the keys in the fridge should match the keys of the active chains
         val expiryTimes: Fridge[EventKey] = Fridge.empty
 
+        // Expire one single event key
+        def expireKey(keyToExpire: EventKey, currentTime: Time, expireInto: ListBuffer[Timed[UuidRemapperInfo]]): Unit = {
+          val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
+          expireInto += Timed(currentTime, AnAdm(wipAdmEvent))
+          expireInto ++= dependent.map(elem => Timed(currentTime, elem))
+        }
+
         // Expire old events based on the current time
-        def expireOldChains(currentTime: Time): Stream[Timed[UuidRemapperInfo]] = {
-          var toReturnExpired = Stream[Timed[UuidRemapperInfo]]()
+        def expireOldChains(currentTime: Time, expireInto: ListBuffer[Timed[UuidRemapperInfo]]): Unit = {
 
           // Expire based on nanosecond timestamps
-          while (expiryTimes.peekFirstNanosToExpire.exists { case (_,t) => t <= currentTime.nanos }) {
-            val (keysToExpire, _) = expiryTimes.popFirstNanosToExpire().get
-
-            for (keyToExpire <- keysToExpire) {
-              val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
-              val toReturn = Stream.concat(
-                Some(AnAdm(wipAdmEvent)),
-                dependent
-              ).map(elem => Timed(currentTime, elem))
-
-              toReturnExpired = toReturn ++ toReturnExpired
+          var keepExpiringNanos: Boolean = true
+          while (keepExpiringNanos) {
+            expiryTimes.popFirstNanosToExpireIf(_ <= currentTime.nanos) match {
+              case None => keepExpiringNanos = false
+              case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, currentTime, expireInto))
             }
           }
 
           // Expire based on node counts
-          while (expiryTimes.peekFirstCountToExpire.exists { case (_,t) => t <= currentTime.count }) {
-            val (keysToExpire, _) = expiryTimes.popFirstCountToExpire().get
-
-            for (keyToExpire <- keysToExpire) {
-              val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
-              val toReturn = Stream.concat(
-                Some(AnAdm(wipAdmEvent)),
-                dependent
-              ).map(elem => Timed(currentTime, elem))
-
-              toReturnExpired = toReturn ++ toReturnExpired
+          var keepExpiringCounts: Boolean = true
+          while (keepExpiringCounts) {
+            expiryTimes.popFirstCountToExpireIf(_ <= currentTime.count) match {
+              case None => keepExpiringCounts = false
+              case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, currentTime, expireInto))
             }
           }
-
-          toReturnExpired
         }
 
         {
           case (provider, Timed(currentTime, e: Event)) =>
 
+            val toReturn = ListBuffer.empty[Timed[UuidRemapperInfo]]
+
             val eKey = key(e, provider)
 
             // Write in the new information
-            val toReturnChain = activeChains.get(eKey) match {
+            activeChains.get(eKey) match {
 
               // We already have an active chain for this EventKey
               case Some(EventMergeState(wipAdmEvent, dependent, merged)) =>
@@ -110,36 +104,30 @@ object ERStreamComponents {
                       dependent,
                       merged + 1
                     )
-                    expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
-
-                    Stream.empty
+                    expiryTimes.updateExpiryTime(eKey, currentTime.plus(eventExpiryTime))
 
                   // Didn't merge event in
                   case Right(_) =>
 
                     val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(provider, e)
 
-                    val toReturn = Stream.concat(                            // Emit the old WIP
-                      Some(AnAdm(wipAdmEvent)),
-                      dependent
-                    ).map(elem => Timed(currentTime, elem))
+                    toReturn += Timed(currentTime, AnAdm(wipAdmEvent))
+                    toReturn ++= dependent.map(elem => Timed(currentTime, elem))
 
                     activeChains(eKey) = EventMergeState(
                       newWipAdmEvent,
-                      extractPathsAndEdges(path1) ++
-                      extractPathsAndEdges(path2) ++
-                      extractPathsAndEdges(path3) ++
-                      extractPathsAndEdges(path4) ++
-                      Stream.concat(
+                      List.concat(
+                        extractPathsAndEdges(path1),
+                        extractPathsAndEdges(path2),
+                        extractPathsAndEdges(path3),
+                        extractPathsAndEdges(path4),
                         subject.map(AnEdge(_)),
                         predicateObject.map(AnEdge(_)),
                         predicateObject2.map(AnEdge(_))
                       ),
                       1
                     )
-                    expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
-
-                    toReturn
+                    expiryTimes.updateExpiryTime(eKey, currentTime.plus(eventExpiryTime))
                 }
 
               // We don't already have an active chain for this EventKey
@@ -150,27 +138,31 @@ object ERStreamComponents {
 
                 activeChains(eKey) = EventMergeState(
                   newWipAdmEvent,
-                  extractPathsAndEdges(path1) ++
-                  extractPathsAndEdges(path2) ++
-                  extractPathsAndEdges(path3) ++
-                  extractPathsAndEdges(path4) ++
-                  Stream.concat(
+                  List.concat(
+                    extractPathsAndEdges(path1),
+                    extractPathsAndEdges(path2),
+                    extractPathsAndEdges(path3),
+                    extractPathsAndEdges(path4),
                     subject.map(AnEdge(_)),
                     predicateObject.map(AnEdge(_)),
                     predicateObject2.map(AnEdge(_))
                   ),
                   1
                 )
-                expiryTimes.updateExpiryTime(eKey, currentTime.copy(nanos = currentTime.nanos + expireInNanos, count = currentTime.count + expireInCount))
-
-                Stream.empty
+                expiryTimes.updateExpiryTime(eKey, currentTime.plus(eventExpiryTime))
             }
 
-            toReturnChain ++ expireOldChains(currentTime)
+            expireOldChains(currentTime, toReturn)
 
-          case (_, Timed(t, TimeMarker(_))) => expireOldChains(t)
+            toReturn.toList
 
-          case _ => Stream.empty
+          case (_, Timed(t, TimeMarker(_))) =>
+
+            val toReturn = ListBuffer.empty[Timed[UuidRemapperInfo]]
+            expireOldChains(t, toReturn)
+            toReturn.toList
+
+          case _ => List.empty
         }
       }
   }
@@ -188,7 +180,7 @@ object ERStreamComponents {
               // Don't merge the Subject (it isn't a UNIT)
               case Left((irSubject, localPrincipal, parentSubjectOpt, path)) =>
 
-                Stream.concat(
+                List.concat(
                   Some(AnAdm(irSubject)),
                   extractPathsAndEdges(path),
                   Some(AnEdge(localPrincipal)),
@@ -198,13 +190,13 @@ object ERStreamComponents {
               // Merge the Subject (it was a UNIT)
               case Right((path, merge)) =>
 
-                Stream.concat(
+                List.concat(
                   extractPathsAndEdges(path),
                   Some(merge)
                 ).map(elem => Timed(t, elem))
             }
 
-          case _ => Stream.empty
+          case _ => List.empty
         }
   }
 
@@ -215,14 +207,14 @@ object ERStreamComponents {
       Flow[(String,Timed[CDM])].mapConcat[Timed[UuidRemapperInfo]] {
         case (provider, Timed(t, ptn: ProvenanceTagNode)) =>
 
-          val (irPtn, flowObjectEdge, subjectEdge, prevTagIdEdge, tagIdsEgdes) = ERRules.resolveProvenanceTagNode(provider, ptn)
+          val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) = ERRules.resolveProvenanceTagNode(provider, ptn)
 
-          Stream.concat(
+          List.concat(
             Some(AnAdm(irPtn)),
-            flowObjectEdge.map(AnEdge(_)),
-            Some(AnEdge(subjectEdge)),
-            prevTagIdEdge.map(AnEdge(_)),
-            tagIdsEgdes.map(AnEdge(_))
+            flowObjEdge.map(AnEdge(_)),
+            Some(AnEdge(subjEdge)),
+            prevTagEdge.map(AnEdge(_)),
+            tagIdsEdges.map(AnEdge(_))
           ).map(elem => Timed(t, elem))
 
 
@@ -230,28 +222,28 @@ object ERStreamComponents {
 
           val irP = resolvePrincipal(provider, p)
 
-          Stream(AnAdm(irP)).map(elem => Timed(t, elem))
+          List(AnAdm(irP)).map(elem => Timed(t, elem))
 
 
         case (provider, Timed(t, s: SrcSinkObject)) =>
 
           val sP = resolveSrcSink(provider, s)
 
-          Stream(AnAdm(sP)).map(elem => Timed(t, elem))
+          List(AnAdm(sP)).map(elem => Timed(t, elem))
 
 
         case (provider, Timed(t, n: NetFlowObject)) =>
 
           val (nP, (raEdge, ra), (laEdge, la), remotePort, localPort) = resolveNetflow(provider, n)
 
-          Stream.concat(
-            Stream(AnAdm(nP)),
-            Stream(AnEdge(raEdge)),
-            Stream(AnAdm(ra)),
-            Stream(AnEdge(laEdge)),
-            Stream(AnAdm(la)),
-            remotePort.toList.flatMap { case (rpEdge, rp) => Stream(AnEdge(rpEdge), AnAdm(rp)) },
-            localPort.toList.flatMap { case (lpEdge, lp) => Stream(AnEdge(lpEdge), AnAdm(lp)) }
+          List.concat(
+            List(AnAdm(nP)),
+            List(AnEdge(raEdge)),
+            List(AnAdm(ra)),
+            List(AnEdge(laEdge)),
+            List(AnAdm(la)),
+            remotePort.toList.flatMap { case (rpEdge, rp) => List(AnEdge(rpEdge), AnAdm(rp)) },
+            localPort.toList.flatMap { case (lpEdge, lp) => List(AnEdge(lpEdge), AnAdm(lp)) }
           ).map(elem => Timed(t, elem))
 
 
@@ -259,7 +251,7 @@ object ERStreamComponents {
 
           val (irFileObject, localPrincipalOpt, path) = resolveFileObject(provider, fo)
 
-          Stream.concat(
+          List.concat(
             Some(AnAdm(irFileObject)),
             extractPathsAndEdges(path),
             localPrincipalOpt.map(AnEdge(_))
@@ -270,7 +262,7 @@ object ERStreamComponents {
 
           val (irFileObject, path) = resolveRegistryKeyObject(provider, rk)
 
-          Stream.concat(
+          List.concat(
             Some(AnAdm(irFileObject)),
             extractPathsAndEdges(path)
           ).map(elem => Timed(t, elem))
@@ -279,13 +271,13 @@ object ERStreamComponents {
 
           val irFileObject = resolveUnnamedPipeObject(provider, u)
 
-          Stream(AnAdm(irFileObject)).map(elem => Timed(t, elem))
+          List(AnAdm(irFileObject)).map(elem => Timed(t, elem))
 
         case (provider, Timed(t, m: MemoryObject)) =>
 
           val irSrcSink = resolveMemoryObject(provider, m)
 
-          Stream(AnAdm(irSrcSink)).map(elem => Timed(t, elem))
+          List(AnAdm(irSrcSink)).map(elem => Timed(t, elem))
 
         case _ => Nil
       }

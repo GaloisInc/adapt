@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.NotUsed
 import akka.actor._
 import akka.pattern.ask
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import com.galois.adapt.adm._
@@ -24,7 +25,6 @@ import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-
 import scala.language.postfixOps
 
 class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
@@ -167,7 +167,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
             thisNeo4jVertex.setProperty(k, v)
           } catch {
             case e: Exception =>
-              println(s"Tried (and failed) to set the key $k to the value $v on a Neo4j node")
+              log.warning(s"Tried (and failed) to set the key $k to the value $v on a Neo4j node")
               e.printStackTrace()
           }
         }
@@ -189,7 +189,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         Some(cdm.getUuid)
       }.recoverWith {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${cdm.getUuid}")
+          if (shouldLogDuplicates) log.info(s"Skipping duplicate creation of node: ${cdm.getUuid}")
           Success(None)
         //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
         case e =>
@@ -202,7 +202,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
       if (cdmToNodeResults.forall(_.isSuccess))
         transaction.success()
       else {
-        println(s"TRANSACTION FAILURE! CDMs:\n$cdms")
+        log.error(s"TRANSACTION FAILURE! CDMs:\n$cdms")
         transaction.failure()
       }
       transaction.close()
@@ -215,6 +215,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
+    var sawAnError = false
     val admToNodeResults = adms map {
       case Right(edge) => Try {
 
@@ -223,6 +224,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
             .get(edge.src)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.src.rendered)))
             .getOrElse({
+              log.error(s"Had to synthesize the source of $edge!")
               val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
               newVertex.setProperty("uuid", edge.src.rendered)
               verticesInThisTX += (admToTuple(edge.src) -> newVertex)
@@ -233,6 +235,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
             .get(edge.tgt)
             .orElse(Option(neoGraph.findNode(Label.label("Node"), "uuid", edge.tgt.rendered)))
             .getOrElse({
+              log.error(s"Had to synthesize the target of $edge!")
               val newVertex = neoGraph.createNode(Label.label("Node"), Label.label("AdmSynthesized"))
               newVertex.setProperty("uuid", edge.tgt.rendered)
               verticesInThisTX += (admToTuple(edge.tgt) -> newVertex)
@@ -246,9 +249,11 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
       }.recoverWith {
         case e: ConstraintViolationException =>
           if (shouldLogDuplicates)
-            println(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
+            log.warning(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
           Success(None)
-        case e: Throwable => Failure(e)
+        case e: Throwable =>
+          sawAnError = true
+          Failure(e)
       }
 
       case Left(adm) => Try {
@@ -269,17 +274,19 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         Some(adm.uuid)
       }.recoverWith {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) println(s"Skipping duplicate creation of node: ${adm.uuid}")
+          if (shouldLogDuplicates) log.warning(s"Skipping duplicate creation of node: ${adm.uuid}")
           Success(None)
-        case e: Throwable => Failure(e)
+        case e: Throwable =>
+          sawAnError = true
+          Failure(e)
       }
     }
 
     Try {
-      if (admToNodeResults.forall(_.isSuccess))
+      if ( ! sawAnError)
         transaction.success()
       else {
-        println(s"TRANSACTION FAILURE! ADMs:\n")
+        log.error(s"TRANSACTION FAILURE! ADMs:\n")
         admToNodeResults foreach { case t if t.isFailure => t.failed.get.printStackTrace() }
         transaction.failure()
       }
@@ -296,9 +303,9 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
   }
 
   override def receive: PartialFunction[Any,Unit] = ({
-    // Cypher queries are only supported by Neo4j, and they are always streaming
+    // Cypher queries are only supported by Neo4j
     case CypherQuery(q, true) =>
-      println(s"Received Cypher query: $q")
+      log.info(s"Received Cypher query: $q")
       sender() ! Future { Try { DBQueryProxyActor.toJson(neoGraph.execute(q).asScala.toList)  } }
 
     case InitMsg =>
@@ -326,5 +333,6 @@ object Neo4jFlowComponents {
                             (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
+    .buffer(4, OverflowStrategy.backpressure)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

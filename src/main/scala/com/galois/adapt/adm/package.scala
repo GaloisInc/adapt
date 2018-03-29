@@ -15,7 +15,13 @@ import scala.language.implicitConversions
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
 package object adm {
 
-  case class CdmUUID(uuid: UUID, namespace: String) extends Serializable { // extends AnyVal
+  trait ExtendedUuid {
+    val uuid: UUID
+    val namespace: String
+    def rendered: String
+  }
+
+  case class CdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { s"cdm_${uuid.toString}" } else { s"cdm_${this.namespace}_${uuid.toString}" }
   }
@@ -27,7 +33,7 @@ package object adm {
     }
   }
 
-  case class AdmUUID(uuid: UUID, namespace: String) extends Serializable { // extends AnyVal
+  case class AdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { s"${this.namespace}_${uuid.toString}" }
   }
@@ -308,7 +314,7 @@ package object adm {
       if (segsRev.isEmpty && !absolute) return None
 
       val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
-      Some(AdmPathNode(norm, provider))
+      Some(AdmPathNode(norm, "")) // TODO: consider adding a provider back in
     }
   }
 
@@ -530,7 +536,10 @@ package object adm {
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), "")
+    val uuid = {
+      val original = originalCdmUuids.sorted
+      AdmUUID(DeterministicUUID(original.map(_.uuid)), original.headOption.fold("")(_.namespace))
+    }
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,

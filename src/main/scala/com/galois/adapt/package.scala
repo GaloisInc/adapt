@@ -13,7 +13,7 @@ package object adapt {
   }
 
   // Anything that corresponds to a node in the graph
-  trait DBNodeable[EdgeType] extends DBWritable {
+  trait DBNodeable[+EdgeType] extends DBWritable {
     // All nodes in the graph have a UUID, even if our current DB (Titan) doesn't support using that
     // as the internal ID.
     def getUuid: UUID
