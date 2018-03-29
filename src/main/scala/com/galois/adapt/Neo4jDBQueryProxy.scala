@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.NotUsed
 import akka.actor._
 import akka.pattern.ask
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import com.galois.adapt.adm._
@@ -24,7 +25,6 @@ import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-
 import scala.language.postfixOps
 
 class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
@@ -333,5 +333,6 @@ object Neo4jFlowComponents {
                             (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
+    .buffer(4, OverflowStrategy.backpressure)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

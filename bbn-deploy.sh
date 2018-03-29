@@ -4,7 +4,6 @@ STAMP=$(date)
 STAMP=${STAMP// /_}
 STAMP=${STAMP//:/-}
 STAMP="packacked_on-$STAMP"
-echo $STAMP
 touch ./$STAMP
 echo "Packaging into: adapt.tar.gz"
 tar zcf ./adapt.tar.gz --exclude="legacy/" --exclude=".git/" --exclude="fca/" --exclude="target/" --exclude="neo4j.db" --exclude=".idea/" --exclude="adapt.tar.gz" --exclude=".DS_Store" ./

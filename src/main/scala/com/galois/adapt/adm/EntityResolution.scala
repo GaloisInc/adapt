@@ -3,7 +3,7 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.NotUsed
-import akka.stream.FlowShape
+import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import com.galois.adapt.MapDBUtils
 import com.galois.adapt.MapDBUtils.{AlmostMap, AlmostSet}
@@ -58,11 +58,15 @@ object EntityResolution {
 
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
+      .buffer(1000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
       .via(erWithoutRemaps(eventExpiryNanos, eventExpiryCount, maxEventsMerged, activeChains))   // Entity resolution without remaps
+      .buffer(1000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .via(UuidRemapper(uuidExpiryNanos, uuidExpiryCount, cdm2cdmMap, cdm2admMap, blockedEdges))    // Remap UUIDs
+      .buffer(1000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))    // Order nodes/edges
+      .buffer(1000, OverflowStrategy.backpressure)
   }
 
 
