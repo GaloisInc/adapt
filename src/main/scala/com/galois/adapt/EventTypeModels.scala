@@ -107,7 +107,6 @@ object EventTypeModels {
 
     def iforest(iforestDirFile: File, trainFile: String, testFile: String, outFile: String): Int = {
       val s = s"./iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
-      println(s)
       sys.process.Process(s,iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
