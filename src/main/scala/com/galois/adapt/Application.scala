@@ -264,6 +264,35 @@ object Application extends App {
     case _ => println("Not going to periodically save PPM trees.")
   }
 
+  // Coarse grain filtering of the input CDM
+  var filter: Option[Filterable => Boolean] = None
+  val filterFlow: Flow[CDM18,CDM18,_] = Flow[CDM18]
+    .map[Either[Filterable,CDM18]] {
+      case c: Event => Left(Filterable.apply(c))
+      case c: FileObject => Left(Filterable.apply(c))
+      case c: Host => Left(Filterable.apply(c))
+      case c: MemoryObject => Left(Filterable.apply(c))
+      case c: NetFlowObject => Left(Filterable.apply(c))
+      case c: PacketSocketObject => Left(Filterable.apply(c))
+      case c: Principal => Left(Filterable.apply(c))
+      case c: ProvenanceTagNode => Left(Filterable.apply(c))
+      case c: RegistryKeyObject => Left(Filterable.apply(c))
+      case c: SrcSinkObject => Left(Filterable.apply(c))
+      case c: Subject => Left(Filterable.apply(c))
+      case c: TagRunLengthTuple => Left(Filterable.apply(c))
+      case c: UnitDependency => Left(Filterable.apply(c))
+      case c: UnnamedPipeObject => Left(Filterable.apply(c))
+      case other => Right(other)
+    }
+    .filter {
+      case Left(f) => filter.fold(true)(func => func(f))
+      case right => true
+    }
+    .map[CDM18] {
+      case Left(f) => f.underlying
+      case Right(cdm) => cdm
+    }
+
 
   val ta1 = config.getString("adapt.env.ta1")
 

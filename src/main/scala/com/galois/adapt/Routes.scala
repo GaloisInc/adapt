@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTyp
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import com.galois.adapt.FilterCdm.Filter
 //import akka.http.scaladsl.marshalling._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
@@ -48,8 +49,8 @@ object Routes {
 
   implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
 
-  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = (dbActor ? query)
-    .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
+  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext): Future[JsValue] =
+    (dbActor ? query).mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
   val validRating = Unmarshaller.strict[String, Int] {
@@ -128,6 +129,20 @@ object Routes {
       } ~
       post {
         pathPrefix("api") {
+          pathPrefix("setCdmFilter") {
+            formFields('filter.as[Filter]) { (filter: Filter) =>
+              complete {
+                Future {
+                  Try { Some(FilterCdm.compile(filter)) } match {
+                    case Failure(e) => StatusCodes.BadRequest -> s"Invalid CDM filter: ${e.toString}"
+                    case Success(f) =>
+                      Application.filter = f
+                      StatusCodes.Created -> s"New CDM filter set"
+                  }
+                }
+              }
+            }
+          } ~
           pathPrefix("ppm") {
             path(Segment / "setRating") { treeName =>
               parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt") { (queryString, rating, namespace) =>
