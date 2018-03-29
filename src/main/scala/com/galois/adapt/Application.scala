@@ -30,6 +30,7 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
+import akka.event.{Logging, LoggingAdapter}
 import bloomfilter.CanGenerateHashFrom
 import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
@@ -55,6 +56,7 @@ object Application extends App {
   val interface = config.getString("akka.http.server.interface")
   val port = config.getInt("akka.http.server.port")
   implicit val system = ActorSystem("production-actor-system")
+  val log: LoggingAdapter = Logging.getLogger(system, this)
 
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
@@ -287,7 +289,7 @@ object Application extends App {
   )
   */
 
-  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, seenNodes, seenEdges)
+  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, log, seenNodes, seenEdges)
 
   val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
   Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
