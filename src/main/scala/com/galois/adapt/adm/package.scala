@@ -67,13 +67,11 @@ package object adm {
   // Edges are now first class values in the stream.
   sealed trait Edge {
     def applyRemap(cdmUuids: Seq[CdmUUID], admUUID: AdmUUID): Edge = this match {
-      case EdgeCdm2Cdm(s,l,t) if cdmUuids.contains(s) => EdgeAdm2Cdm(admUUID,l,t)
-      case EdgeCdm2Cdm(s,l,t) if cdmUuids.contains(t) => EdgeCdm2Adm(s,l,admUUID)
-      case EdgeCdm2Adm(s,l,t) if cdmUuids.contains(s) => EdgeAdm2Adm(admUUID,l,t)
-      case EdgeAdm2Cdm(s,l,t) if cdmUuids.contains(t) => EdgeAdm2Adm(s,l,admUUID)
-      case e =>
-        assert(false, "Nothing to remap in this edge")
-        e
+      case EdgeCdm2Cdm(s, l, t) if cdmUuids.contains(s) => EdgeAdm2Cdm(admUUID, l, t)
+      case EdgeCdm2Cdm(s, l, t) if cdmUuids.contains(t) => EdgeCdm2Adm(s, l, admUUID)
+      case EdgeCdm2Adm(s, l, t) if cdmUuids.contains(s) => EdgeAdm2Adm(admUUID, l, t)
+      case EdgeAdm2Cdm(s, l, t) if cdmUuids.contains(t) => EdgeAdm2Adm(s, l, admUUID)
+      case e => e
     }
   }
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge
