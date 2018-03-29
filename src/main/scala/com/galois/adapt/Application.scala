@@ -32,6 +32,7 @@ import org.reactivestreams.Publisher
 import FlowComponents._
 import bloomfilter.CanGenerateHashFrom
 import bloomfilter.mutable.BloomFilter
+import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
 import org.mapdb.serializer.SerializerArrayTuple
@@ -259,38 +260,39 @@ object Application extends App {
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, seenNodes, seenEdges)
 
   val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
-  config.getLong("adapt.ingest.saveintervalseconds") match {
+  config.getLong("adapt.ppm.saveintervalseconds") match {
     case i if i > 0 => system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees)
     case _ => println("Not going to periodically save PPM trees.")
   }
 
   // Coarse grain filtering of the input CDM
   var filter: Option[Filterable => Boolean] = None
-  val filterFlow: Flow[CDM18,CDM18,_] = Flow[CDM18]
-    .map[Either[Filterable,CDM18]] {
-      case c: Event => Left(Filterable.apply(c))
-      case c: FileObject => Left(Filterable.apply(c))
-      case c: Host => Left(Filterable.apply(c))
-      case c: MemoryObject => Left(Filterable.apply(c))
-      case c: NetFlowObject => Left(Filterable.apply(c))
-      case c: PacketSocketObject => Left(Filterable.apply(c))
-      case c: Principal => Left(Filterable.apply(c))
-      case c: ProvenanceTagNode => Left(Filterable.apply(c))
-      case c: RegistryKeyObject => Left(Filterable.apply(c))
-      case c: SrcSinkObject => Left(Filterable.apply(c))
-      case c: Subject => Left(Filterable.apply(c))
-      case c: TagRunLengthTuple => Left(Filterable.apply(c))
-      case c: UnitDependency => Left(Filterable.apply(c))
-      case c: UnnamedPipeObject => Left(Filterable.apply(c))
-      case other => Right(other)
+  var filterAst: Option[Filter] = None
+  val filterFlow: Flow[(String,CDM18),(String,CDM18),_] = Flow[(String,CDM18)]
+    .map[(String, Either[Filterable,CDM18])] {
+      case (s, c: Event) => (s, Left(Filterable.apply(c)))
+      case (s, c: FileObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: Host) => (s, Left(Filterable.apply(c)))
+      case (s, c: MemoryObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: NetFlowObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: PacketSocketObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: Principal) => (s, Left(Filterable.apply(c)))
+      case (s, c: ProvenanceTagNode) => (s, Left(Filterable.apply(c)))
+      case (s, c: RegistryKeyObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: SrcSinkObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: Subject) => (s, Left(Filterable.apply(c)))
+      case (s, c: TagRunLengthTuple) => (s, Left(Filterable.apply(c)))
+      case (s, c: UnitDependency) => (s, Left(Filterable.apply(c)))
+      case (s, c: UnnamedPipeObject) => (s, Left(Filterable.apply(c)))
+      case (s, other) => (s, Right(other))
     }
     .filter {
-      case Left(f) => filter.fold(true)(func => func(f))
-      case right => true
+      case (s, Left(f)) => filter.fold(true)(func => func(f))
+      case (s, right) => true
     }
-    .map[CDM18] {
-      case Left(f) => f.underlying
-      case Right(cdm) => cdm
+    .map[(String, CDM18)] {
+      case (s, Left(f)) => (s, f.underlying)
+      case (s, Right(cdm)) => (s, cdm)
     }
 
 
@@ -393,6 +395,7 @@ object Application extends App {
 
       CDMSource.cdm18(ta1)
         .via(printCounter("File Input", statusActor))
+        .via(filterFlow)
         .via(er)
         .runWith(Sink.ignore)
 

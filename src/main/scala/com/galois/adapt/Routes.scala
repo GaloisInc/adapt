@@ -43,6 +43,9 @@ object Routes {
     path("rank") {
       getFromResource("web/ranking.html")
     } ~
+    path("filter") {
+      getFromResource("web/cdm-filter.html")
+    } ~
     pathPrefix("") {
       getFromResourceDirectory("web")
     }
@@ -86,6 +89,11 @@ object Routes {
                 )
               }
             }
+          } ~
+          pathPrefix("getCdmFilter") {
+            complete(
+              Future.successful(Application.filterAst.toJson)
+            )
           }
         } ~
         pathPrefix("query") {
@@ -130,9 +138,10 @@ object Routes {
       post {
         pathPrefix("api") {
           pathPrefix("setCdmFilter") {
-            formFields('filter.as[Filter]) { (filter: Filter) =>
+            formField('filter.as[Filter]) { (filter: Filter) =>
               complete {
                 Future {
+                  Application.filterAst = Some(filter)
                   Try { Some(FilterCdm.compile(filter)) } match {
                     case Failure(e) => StatusCodes.BadRequest -> s"Invalid CDM filter: ${e.toString}"
                     case Success(f) =>
@@ -143,6 +152,17 @@ object Routes {
               }
             }
           } ~
+            pathPrefix("clearCdmFilter") {
+              formFields() {
+                complete {
+                  Future {
+                    Application.filterAst = None
+                    Application.filter = None
+                    StatusCodes.Created -> "CDM filter cleared"
+                  }
+                }
+              }
+            } ~
           pathPrefix("ppm") {
             path(Segment / "setRating") { treeName =>
               parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt") { (queryString, rating, namespace) =>
