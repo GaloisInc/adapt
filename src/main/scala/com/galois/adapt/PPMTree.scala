@@ -186,6 +186,51 @@ object NoveltyDetection {
         })
       ),
       d => Set(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))
+    ),
+    PpmDefinition[CDM]("CDM-Subject",
+      d => d.isInstanceOf[cdm18.Subject],
+      List(
+        d => List(d.asInstanceOf[cdm18.Subject].subjectType.toString),
+        d => List({
+          val e = d.asInstanceOf[cdm18.Subject]
+          e match {
+            case cdm18.Subject(_, _, _, _, startTimestampNanos, parentSubject, _, unitId, _, _, cmdLine, privilegeLevel, importedLibraries, exportedLibraries, _) =>
+              val march1Nanos = 1519862400000000L
+              val tests = List(startTimestampNanos > march1Nanos, parentSubject.isDefined, unitId.isDefined, cmdLine.isDefined, privilegeLevel.isDefined, importedLibraries.isDefined, exportedLibraries.isDefined)
+              tests.mkString(",")
+          }
+        })
+      ),
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1))
+    ),
+    PpmDefinition[CDM]("CDM-Netflow",
+      d => d.isInstanceOf[cdm18.NetFlowObject],
+      List(
+        d => List({
+          val e = d.asInstanceOf[cdm18.NetFlowObject]
+          e match {
+            case cdm18.NetFlowObject(_, _, localAddress, localPort, remoteAddress, remotePort, ipProtocol, fileDescriptor) =>
+              val tests = List(localAddress != "", localPort != -1, remoteAddress != "", remotePort != -1, ipProtocol.isDefined, fileDescriptor.isDefined)
+              tests.mkString(",")
+          }
+        })
+      ),
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1))
+    ),
+    PpmDefinition[CDM]("CDM-FileObject",
+      d => d.isInstanceOf[cdm18.FileObject],
+      List(
+        d => List(d.asInstanceOf[cdm18.FileObject].fileObjectType.toString),
+        d => List({
+          val e = d.asInstanceOf[cdm18.FileObject]
+          e match {
+            case cdm18.FileObject(_, _, _, fileDescriptor, localPrincipal, size, peInfo, hashes) =>
+              val tests = List(fileDescriptor.isDefined, localPrincipal.isDefined, size.isDefined, peInfo.isDefined, hashes.isDefined)
+              tests.mkString(",")
+          }
+        })
+      ),
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1))
     )
   ).par
 
@@ -345,6 +390,8 @@ class PpmActor extends Actor with ActorLogging {
 
     case InitMsg => sender() ! Ack
 
+    case SaveTrees => ppmList.foreach(_.saveState())
+
     case CompleteMsg =>
       ppmList.foreach { ppm =>
         ppm.saveState()
@@ -375,7 +422,7 @@ case class SetPpmRatings(treeName: String, key: List[List[String]], rating: Int,
 
 case class PpmTreeCountQuery(treeName: String)
 case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
-
+case object SaveTrees
 
 
 sealed trait UiTreeElement{

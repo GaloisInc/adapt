@@ -3,8 +3,7 @@ package com.galois.adapt
 import java.util.function.BiConsumer
 
 import bloomfilter.mutable.BloomFilter
-import org.mapdb.BTreeMapJava.KeySet
-import org.mapdb.{BTreeMap, BTreeMapJava, HTreeMap}
+import org.mapdb.HTreeMap
 
 import scala.collection.mutable
 
@@ -13,7 +12,7 @@ import scala.collection.mutable
  * Turn to this if you are finding that you have huge maps and you want an easy way to switch between having these on
  * disk, in memory, etc.
  */
-object MapDBUtils {
+object MapSetUtils {
 
   // Subset of the `Map` trait. I'm too lazy to implement more of it. Can be replaced with `mutable.Map` for debugging.
   trait AlmostMap[K,V] {
@@ -33,7 +32,7 @@ object MapDBUtils {
   }
 
   // Wrap a MapDB map into an `AlmostMap`
-  def almostMap[K1,K2,V1,V2](
+  def hashMap[K1,K2,V1,V2](
     map: HTreeMap[K1,V1],
     intoKey: K2 => K1, outKey: K1 => K2,      // better be inverses
     intoValue: V2 => V1, outValue: V1 => V2   // better be inverses
@@ -55,7 +54,7 @@ object MapDBUtils {
   }
 
   // Wrap a mutable map into an `AlmostMap`
-  def almostMap[K,V](map: mutable.Map[K,V]): AlmostMap[K,V] = new AlmostMap[K,V] {
+  def scalaMap[K,V](map: mutable.Map[K,V]): AlmostMap[K,V] = new AlmostMap[K,V] {
     def contains(k: K): Boolean = map.contains(k)
 
     def apply(k: K): V = map.apply(k)
@@ -70,7 +69,7 @@ object MapDBUtils {
   }
 
   // Wrap a MapDB set into an `AlmostSet`
-  def almostSet[V1,V2](
+  def hashSet[V1,V2](
     set: HTreeMap.KeySet[V1],
     intoValue: V2 => V1, outValue: V1 => V2   // better be inverses
   ): AlmostSet[V2] = new AlmostSet[V2] {
@@ -96,7 +95,7 @@ object MapDBUtils {
   }
 
   // Wrap a mutable set into an `AlmostSet`
-  def almostSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
+  def scalaSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
     def contains(v: V): Boolean = set.contains(v)
 
     def add(v: V): Unit = set.add(v)
@@ -104,7 +103,7 @@ object MapDBUtils {
     def size(): Long = set.size
   }
 
-  def almostSet[V](bf: BloomFilter[V]): AlmostSet[V] = new AlmostSet[V] {
+  def bloomSet[V](bf: BloomFilter[V]): AlmostSet[V] = new AlmostSet[V] {
     private var count: Long = 0
 
     def contains(v: V): Boolean = bf.mightContain(v)
@@ -117,8 +116,7 @@ object MapDBUtils {
     def size(): Long = count
   }
 
-  // LRU cache
-  def expiringSet[V](map: java.util.LinkedHashMap[V, None.type]): AlmostSet[V] = new AlmostSet[V] {
+  def lruCacheSet[V](map: java.util.LinkedHashMap[V, None.type]): AlmostSet[V] = new AlmostSet[V] {
     private var count: Long = 0
 
     def contains(v: V): Boolean = map.containsKey(v)
@@ -130,5 +128,4 @@ object MapDBUtils {
 
     def size(): Long = count
   }
-
 }

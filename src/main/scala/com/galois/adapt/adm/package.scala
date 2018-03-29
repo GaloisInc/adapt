@@ -314,7 +314,7 @@ package object adm {
       if (segsRev.isEmpty && !absolute) return None
 
       val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
-      Some(AdmPathNode(norm, provider))
+      Some(AdmPathNode(norm, "")) // TODO: consider adding a provider back in
     }
   }
 
@@ -536,7 +536,10 @@ package object adm {
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), "")
+    val uuid = {
+      val original = originalCdmUuids.sorted
+      AdmUUID(DeterministicUUID(original.map(_.uuid)), original.headOption.fold("")(_.namespace))
+    }
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
