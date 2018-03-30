@@ -13,8 +13,10 @@ import java.nio.file.{Files, StandardOpenOption}
 import com.galois.adapt.adm.EntityResolution.CDM
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 object NoveltyDetection {
@@ -119,6 +121,32 @@ object NoveltyDetection {
     )
   ).par
 
+  val iforestTrees = List(
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
+      d => d._3.nonEmpty,
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      ),
+      d => Set(d._2.uuid)
+    ),
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",
+      d => d._3.nonEmpty,
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      ),
+      d => Set(d._2.uuid)
+    ),
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
+      d => d._3.nonEmpty,
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      ),
+      d => Set(d._2.uuid)
+    )
+  ).par
 
   val seoesTrees = List(
 
@@ -223,7 +251,6 @@ object NoveltyDetection {
     )
   ).par
 
-
   val oeseoTrees = List(
     new PpmDefinition[(Event, Subject, Object)]("ProcessWritesFileAfterNetflowRead",
       d => true,
@@ -272,7 +299,8 @@ object NoveltyDetection {
   ).par
 
   val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
-  val ppmList = cdmSanityTrees ++ admPpmTrees
+  val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTrees
+
 }
 
 
@@ -472,6 +500,12 @@ class PpmActor extends Actor with ActorLogging {
   override def postStop(): Unit = {
     if (Application.config.getBoolean("adapt.ppm.shouldsave")) ppmList.foreach(_.saveState())
     super.postStop()
+
+    val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
+    iForestTree match {
+      case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
+      case None => println("ProcessEventType tree for iForest is not defined.")
+    }
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
@@ -496,6 +530,14 @@ class PpmActor extends Actor with ActorLogging {
           )
         case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
+
+      Try (
+        (e,s,subPathNodes.asInstanceOf[Set[AdmPathNode]])
+      ) match {
+      case Success(e) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(e))
+      case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+      }
+
       sender() ! Ack
 
 
@@ -519,7 +561,7 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg => sender() ! Ack
+    case InitMsg =>  /*Future { EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack;
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveState())
@@ -530,6 +572,11 @@ class PpmActor extends Actor with ActorLogging {
         ppm.saveState()
 //        println(ppm.prettyString)
 //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
+      }
+      val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
+      iForestTree match {
+        case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
+        case None => println("ProcessEventType tree for iForest is not defined.")
       }
       println("Done")
 
