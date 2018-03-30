@@ -18,7 +18,7 @@ object MapSetUtils {
   trait AlmostMap[K,V] {
     def contains(key: K): Boolean
     def apply(key: K): V
-    def update(key: K, value: V): Unit
+    def update(key: K, value: V): Option[V]    // return the previous value
     def get(key: K): Option[V]
     def foreach(func: (K, V) => Unit): Unit
     def size(): Long
@@ -27,7 +27,7 @@ object MapSetUtils {
   // Subset of the `Set` trait. I'm too lazy to implement more of it. Can be replaced with `mutable.Set` for debugging.
   trait AlmostSet[V] {
     def contains(value: V): Boolean
-    def add(value: V): Unit
+    def add(value: V): Boolean               // return `true` if the key wasn't previously there
     def size(): Long
   }
 
@@ -42,7 +42,7 @@ object MapSetUtils {
 
     def apply(k2: K2): V2 = outValue(map.get(intoKey(k2)))
 
-    def update(k2: K2, v2: V2): Unit = map.put(intoKey(k2), intoValue(v2))
+    def update(k2: K2, v2: V2): Option[V2] = Option(map.put(intoKey(k2), intoValue(v2))).map(outValue)
 
     def get(k2: K2): Option[V2] = Option(map.get(intoKey(k2))).map(outValue)
 
@@ -59,7 +59,7 @@ object MapSetUtils {
 
     def apply(k: K): V = map.apply(k)
 
-    def update(k: K, v: V): Unit = map.update(k, v)
+    def update(k: K, v: V): Option[V] = map.put(k, v)
 
     def get(k: K): Option[V] = map.get(k)
 
@@ -76,7 +76,7 @@ object MapSetUtils {
 
     def contains(v2: V2): Boolean = set.contains(intoValue(v2))
 
-    def add(v2: V2): Unit = set.add(intoValue(v2))
+    def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.getMap.sizeLong()
   }
@@ -89,7 +89,7 @@ object MapSetUtils {
 
     def contains(v2: V2): Boolean = set.contains(intoValue(v2))
 
-    def add(v2: V2): Unit = set.add(intoValue(v2))
+    def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.size()
   }
@@ -98,7 +98,7 @@ object MapSetUtils {
   def scalaSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
     def contains(v: V): Boolean = set.contains(v)
 
-    def add(v: V): Unit = set.add(v)
+    def add(v: V): Boolean = set.add(v)
 
     def size(): Long = set.size
   }
@@ -108,9 +108,12 @@ object MapSetUtils {
 
     def contains(v: V): Boolean = bf.mightContain(v)
 
-    def add(v: V): Unit = if (!bf.mightContain(v)) {
+    def add(v: V): Boolean = if (!bf.mightContain(v)) {
       count += 1
       bf.add(v)
+      true
+    } else {
+      false
     }
 
     def size(): Long = count
@@ -121,9 +124,10 @@ object MapSetUtils {
 
     def contains(v: V): Boolean = map.containsKey(v)
 
-    def add(v: V): Unit = {
+    def add(v: V): Boolean = {
       val vOld = map.put(v, None)
       if (vOld == null) count += 1
+      vOld == null
     }
 
     def size(): Long = count

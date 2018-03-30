@@ -8,11 +8,10 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType}
 import java.io.{File, PrintWriter}
-
 import com.galois.adapt.adm.EntityResolution.CDM
-
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -103,7 +102,7 @@ object NoveltyDetection {
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
-        d => List(d._3._2.map(_.path).getOrElse("<no_object_path_node>"))
+        d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse("<no_object_path_node>"))
       ),
       d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
     ),
@@ -111,8 +110,7 @@ object NoveltyDetection {
       d => d._2._2.exists(_.path == "sudo"),
       List(
         d => List(d._1.eventType.toString),
-        d => List(d._3._1.getClass.getSimpleName),
-        d => List(d._3._2.map(_.path).getOrElse("<no_object_path_node>"))
+        d => List(d._3._2.map(_.path).getOrElse("<no_object_path_node>") + " : " + d._3._1.getClass.getSimpleName)
       ),
       d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
     )
@@ -120,7 +118,7 @@ object NoveltyDetection {
 
   val esTrees = List(
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
-      d => d._3.nonEmpty,
+      d => d._3.nonEmpty && d._3.map(p => p.path.length > 0).foldLeft(false)(_ || _),
       List(
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
@@ -170,23 +168,6 @@ object NoveltyDetection {
         d => List(d._5._2.map(_.path).getOrElse("<no_path_node_on_subject_2>")),
         d => List(d._3._1.getClass.getSimpleName),
         d => List(d._3._2.map(_.path).getOrElse("<no_path_on_intermediate_object>"))
-      ),
-      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
-    )
-  ).par
-
-
-  val seoeoTrees = List(
-    PpmDefinition[(Subject, Event, Object, Event, Object)]("FilesWrittenAfterNetflowRead",
-      d => (d._2.eventType == EVENT_READ || d._2.eventType == EVENT_RECVFROM || d._2.eventType == EVENT_RECVMSG) &&
-            d._3._1.isInstanceOf[AdmNetFlowObject] && d._4.eventType == EVENT_WRITE && d._5._1.isInstanceOf[AdmFileObject],
-      List(
-        d => List(d._5._2.map(_.path).getOrElse("<no_file_path_node>")),
-        d => List(d._1._2.map(_.path).getOrElse("<no_subject_path_node>")),
-        d => List({
-          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          s"${nf.remoteAddress}:${nf.remotePort}"
-        })
       ),
       d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
     )
@@ -262,7 +243,55 @@ object NoveltyDetection {
     )
   ).par
 
-  val ppmList = esoTrees ++ seoesTrees ++ seoeoTrees ++ esTrees
+  val oeseoTrees = List(
+    new PpmDefinition[(Event, Subject, Object)]("ProcessWritesFileAfterNetflowRead",
+      d => true,
+      List(
+        d => {
+          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
+          List(s"${nf.remoteAddress}:${nf.remotePort}")
+        },
+        d => List(
+          d._2._2.map(_.path).getOrElse("<no_subject_path_node>"),
+          d._3._2.map(_.path).getOrElse("<no_file_path_node>") match {
+            case "" => "<empty_string_file_path>"
+            case s => s
+          }
+        )
+      ),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+    ) with PartialPpm[AdmUUID] {
+      def getJoinCondition(observation: (Event, Subject, Object)) = observation._2._2.map(_.uuid)
+      def arrangeExtracted(extracted: List[ExtractedValue]) = extracted.tail :+ extracted.head
+      val partialFilters = (
+        (eso: (Event, Subject, Object)) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
+        (eso: (Event, Subject, Object)) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
+      )
+    },
+    new PpmDefinition[(Event, Subject, Object)]("CommunicationPathThroughObject",
+      d => true,
+      List(
+        d => d._2._2.map(_.path).toList,
+        d => List(
+          d._3._2.map(_.path).getOrElse(s"??? : ${d._3._1.getClass.getSimpleName}"),
+          d._2._2.map(_.path).getOrElse("<unknown_reading_subject>")
+        )
+      ),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+    ) with PartialPpm[AdmUUID] {
+      def getJoinCondition(observation: (Event, (AdmSubject, Option[AdmPathNode]), (ADM, Option[AdmPathNode]))) = Some(observation._3._1.uuid)
+      def arrangeExtracted(extracted: List[ExtractedValue]) = List(extracted(2), extracted(0), extracted(1))
+      val partialFilters = (
+        (d: (Event, Subject, Object)) => writeTypes.contains(d._1.eventType),
+        (d: (Event, Subject, Object)) => readTypes.contains(d._1.eventType) &&
+          partialMap.contains(getJoinCondition(d).get) &&
+          d._2._2.exists(_ != partialMap(getJoinCondition(d).get).head)  // subject names are distinct
+      )
+    }
+  ).par
+
+
+  val ppmList = esoTrees ++ seoesTrees ++ oeseoTrees ++ esTrees
 }
 
 
@@ -287,6 +316,37 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
 
   def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
   def prettyString: String = tree.getTreeRepr(key = name).toString
+}
+
+trait PartialPpm[JoinType] { myself: PpmDefinition[(Event, Subject, Object)] =>
+  type PartialShape = (Event, Subject, Object)
+  val discriminators: List[Discriminator[PartialShape]]
+  require(discriminators.length == 2)
+  var partialMap = mutable.Map.empty[JoinType, List[ExtractedValue]]
+
+  def getJoinCondition(observation: PartialShape): Option[JoinType]
+  def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue]
+  val partialFilters: (PartialShape => Boolean, PartialShape => Boolean)
+
+  override def observe(observation: PartialShape): Option[Alarm] = {
+    getJoinCondition(observation).flatMap { joinValue =>
+      partialMap.get(joinValue) match {
+        case None =>
+          if (partialFilters._1(observation)) {
+            val extractedList = discriminators(0)(observation)
+            if (extractedList.nonEmpty) partialMap(joinValue) = extractedList
+          }
+          None
+        case Some(firstExtracted) =>
+          if (partialFilters._2(observation)) {
+            val newlyExtracted = discriminators(1)(observation)
+            if (newlyExtracted.nonEmpty) tree.observe(arrangeExtracted(firstExtracted ++ newlyExtracted))
+            else None
+          }
+          else None
+      }
+    }
+  }
 }
 
 
@@ -331,20 +391,18 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
   def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F) = {
     counter += 1
     extractedValues match {
+      case Nil if counter == 1 => Some(Nil)  // Start an alarm if the end is novel.
       case Nil => None
       case extracted :: remainder =>
-        val childExists = children.contains(extracted)
-        val childNode = children.getOrElse(extracted, new SymbolNode())
         val childLocalProb = localChildProbability(extracted)
         val thisGlobalProb = thisLocalProb * parentGlobalProb
-        if (childExists) childNode.observe(remainder, childLocalProb, thisGlobalProb).map { alarmList =>
-          // Append information about the child:
-          (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
-        } else {
-          children = children + (extracted -> childNode)
-          childNode.observe(remainder, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
+        val childNode = children.getOrElse(extracted, new SymbolNode())
+        if ( ! children.contains(extracted)) children = children + (extracted -> childNode)
+        childNode.observe(remainder, childLocalProb, thisGlobalProb).map {
           // Begin reporting information about the child:
-          Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount)))
+          case Nil => List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount - 1))  // Subtract 1 because we just added the child
+          // Append information about the child:
+          case alarmList => (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
         }
     }
   }
@@ -377,6 +435,7 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
+  NoveltyDetection.ppmList.foreach(_ => ())  // Reference the DelayedInit of this object just to instantiate before stream processing begins
 
   context.system.registerOnTermination {
     ppmList.foreach { ppm => ppm.saveState() }
@@ -393,7 +452,7 @@ class PpmActor extends Actor with ActorLogging {
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name).toList)
 
-    case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[_], Some(o: ADM), objPathNodes: Set[_]) =>
+    case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
         val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
         val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
@@ -402,7 +461,17 @@ class PpmActor extends Actor with ActorLogging {
       Try (
         flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-        case Success(flatEvents) => esoTrees.foreach (ppm => flatEvents.foreach (e => ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))))
+        case Success(flatEvents) =>
+          esoTrees.foreach(ppm =>
+            flatEvents.foreach(e =>
+              ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
+            )
+          )
+          oeseoTrees.foreach(ppm =>
+            flatEvents.foreach(e =>
+              ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
+            )
+          )
         case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
 
@@ -416,7 +485,7 @@ class PpmActor extends Actor with ActorLogging {
       sender() ! Ack
 
 
-    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, Some(o: ADM), objPathNodes: Set[_], e2: Event, Some(s2: AdmSubject), sub2PathNodes: Set[_]) =>
+    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, o: ADM, objPathNodes: Set[_], e2: Event, s2: AdmSubject, sub2PathNodes: Set[_]) =>
       ???
 
 
