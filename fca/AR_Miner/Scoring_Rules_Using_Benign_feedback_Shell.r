@@ -68,15 +68,24 @@ cat('\n ############### Association Rule Mining ######################## \n')
   AttributesofObject=returns_args$AttributesofObject 
   ObjectOfAttributes=returns_args$ObjectOfAttributes
   
+  if(length(List_Objects)==0)stop("\n Length of List_Objects is 0, try other configurations or databases \n")
+  if(length(List_Attributes)==0)stop("\n Length of List_Attributes is 0, try other configurations or databases \n")
+  cat("\n Nb objects is this context: \n", length(List_Objects))
+  cat("\n Nb attributes in this context \n", length(List_Attributes))
+  
+  
   DisplayFull=FALSE ## IF YES SAVES DATA TO DISK (TXT FILES)
   ContextFileRCF=rcf_context_file
   
   cat("\n reading benign association rules \n")
+  if(!file.exists(benign_input_association_rules_file))stop(" benign_input_association_rules_file does not exist")
+  
      #paste0("./contexts/",benign_database,"/data/",contextname,"/AssociationRules_Only_Conf_",contextname,"_MinConf_",MinConf,"_Sup_",MinSup,".csv",sep="")
   if (file.size(benign_input_association_rules_file) == 0)  {stop("benign file empty")}
   benign_association_rules  <- read.csv(file=benign_input_association_rules_file) 
   CondBenignRules=benign_association_rules$CondRules
   ResBenignRules=benign_association_rules$ResRules
+  if(is.null(benign_association_rules))stop("\n length of BenignRules = 0 \n")
   CondBenignRules=lapply(CondBenignRules, function(x)unlist(strsplit(as.character(x),split=',')))
   ResBenignRules=lapply(ResBenignRules, function(x)unlist(strsplit(as.character(x),split=',')))
   leftListBenign=lapply(CondBenignRules,function(x){paste(x,collapse=',')})
@@ -114,11 +123,11 @@ cat('\n ############### Association Rule Mining ######################## \n')
       #######loading attack objects
       cat("\n Reading violator objects \n")
       
-       if (file.size(violators_file) == 0)  stop("violator objects file is empty")
+       if (file.size(violators_file) == 0)  stop("\n violator objects file is empty \n")
       violators  <- read.csv(file=violators_file) 
       violatorsList=as.list(as.character(violators$Objects))
       NbViolators=as.integer(length(violatorsList))
-      if(NbViolators==0)next
+      if(NbViolators==0)stop("\n Nb Violator objects = 0\n")
       association_rules=as.character(violators$ViolatedRulesForEachObjectConfidence)
       association_rules=lapply(association_rules,function(x){strsplit(as.character(str_trim(x)),split='|' ,fixed = T)})
       association_rules=lapply(association_rules,function(x){str_trim(unlist(x))})
@@ -136,7 +145,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
       AVGScoresOfObjectsLift =""
       ########
       for(Obj in 1:length(violatorsList)){
-      cat('\n Object:  \n',Obj)
+      cat('\n including feedback to Object:  \n',Obj)
       #  match(violatorsList[1] ,List_Objects) association_rulesLift
         MixedCurrentRulesList= association_rules[Obj]
         MixedCurrentRulesList=unlist(MixedCurrentRulesList)
@@ -146,8 +155,8 @@ cat('\n ############### Association Rule Mining ######################## \n')
         CurrentScoreRules=as.vector(as.numeric(CurrentScoreRules))
         CurrentScoreRules=replace(CurrentScoreRules, CurrentScoreRules==Inf, 100)
         weightVector = as.list(CurrentListRules %in% BenignAssociationRulesList)
-        #weightVector=ifelse(weightVector=="FALSE",1,weight/length(which(weightVector==TRUE)))
-         weightVector=ifelse(weightVector=="FALSE",2^length(which(weightVector==FALSE)),0.7^length(which(weightVector==TRUE)))
+        weightVector=ifelse(weightVector=="FALSE",1,weight/length(which(weightVector==TRUE)))
+        # weightVector=ifelse(weightVector=="FALSE",2^length(which(weightVector==FALSE)),0.7^length(which(weightVector==TRUE)))
         
         
         ResultScoreVector=weightVector*CurrentScoreRules
@@ -170,7 +179,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
       AVGScoresOfObjectsLift =AVGScoresOfObjectsLift[-1]
       
       AVGScoresOfObjectsConfidence=AVGScoresOfObjectsConfidence[-1]
-      cat("\n saving results in \n",output_scoring_file)
+      #cat("\n saving results in \n",output_scoring_file)
       df.ObjectsWithScores=data.frame(matrix(ncol = 3, nrow = 0))
       
       colnames (df.ObjectsWithScores)=c("Objects","AVGScoresOfObjectsConfidence",
@@ -187,9 +196,12 @@ cat('\n ############### Association Rule Mining ######################## \n')
       
       write.csv(file=output_scoring_file, 
                 df.ObjectsWithScores)
-      cat("\n nb violator object \n",length(as.list(violatorsList)))
+      cat("\n nb processed violator object \n",length(as.list(violatorsList)))
       
       
+      
+      cat('\n New scores file saved in =======> \n',output_scoring_file)
+      write.csv(file=output_scoring_file, df.ObjectsWithScores)
       
       
       

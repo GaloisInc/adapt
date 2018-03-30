@@ -22,19 +22,26 @@ cat('\n ############### Association Rule Mining ######################## \n')
   cat('\n Parameters are: \n ')
   cat('\n CSV \n ',csv_file)
   source("load_csv.r")
+  if (file.size(csv_file) == 0)  {stop("\n csv_file file empty \n")}
+  
   returns_args=load_csv(csv_file)
+  if(is.null(returns_args))stop("\n the csv file is null \n")
   List_Objects=returns_args$List_Objects
   List_Attributes=returns_args$List_Attributes
   AttributesofObject=returns_args$AttributesofObject 
   ObjectOfAttributes=returns_args$ObjectOfAttributes
+  if(length(List_Objects)==0)stop("\n Length of List_Objects is 0, try other configurations or databases \n")
+  if(length(List_Attributes)==0)stop("\n Length of List_Attributes is 0, try other configurations or databases \n")
+   cat("\n Nb objects is this context: \n", length(List_Objects))
+   cat("\n Nb attributes in this context \n", length(List_Attributes))
    
    ContextFileRCF=rcf_context_file
-    cat('\n ################## sup \n',MinSup)
+    cat('\n ############### sup \n',MinSup)
     cat('\n ############### conf \n',MinConf)
      ##-----------------------------------------LESS DETAILS OF RULES
-    cat('\n ----> Calculating Rules \n')
-     SoftAssRulescmd=paste0("./coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
-     cat(SoftAssRulescmd)
+    cat('\n ----> Extracting the association rules \n')
+    SoftAssRulescmd=paste0("./coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
+    cat(SoftAssRulescmd)
     SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
     CoronOutPut=as.list(SoftAssRulesresult)
     CoronOutPut=lapply(CoronOutPut,function(x)x[!is.na(x)])
@@ -48,8 +55,8 @@ cat('\n ############### Association Rule Mining ######################## \n')
     CondRules=lapply(CondRules, function(x)gsub(" ", '', x, fixed = T))
     NbRules=as.integer(length(CondRules))
    
-    cat('nb Association Rules',NbRules) 
-    
+    cat('Nb association Rules',NbRules) 
+    if(NbRules==0)stop("\n The number of association rules is 0, try other configurations or databases \n")
     
     ResRules=lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
     values=lapply(strsplit(as.character(ResRules),"}"),"[",2)
@@ -77,12 +84,12 @@ cat('\n ############### Association Rule Mining ######################## \n')
       df.AssocRulesOutPut=data.frame()
      df.AssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
      write.csv(file=paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.AssocRulesOutPut)
-     cat('\n Saving Rules \n')
+     cat('\n Saving the association rules DB \n')
      cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
      
      
  
-     cat('\n Calculating Scores of the Rules \n')
+     cat('\n Calculating the scores of the rules for detecting violator objects \n')
       TopViolatedRulesForEachObjectConfidence=""
       TopViolatedRulesForEachObjectLift=""
       ViolatedRulesForEachObjectConfidence=""
@@ -105,7 +112,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
         RuleListConf=""
         RuleListLift=""
         nbViolatedRules=0
-        cat('Obj \n',Obj)
+        cat('\n object id \n',Obj)
         for(Rule in 1:length(CoronOutPut)){
           RulescoreConf=0.0
           RulescoreLift=0.0 
@@ -189,13 +196,20 @@ cat('\n ############### Association Rule Mining ######################## \n')
     #  save(TopScoreConfidence,file=paste0("./contexts/TopScoreConfidence_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".RData",sep=""))
     #  save(ViolatedRulesForEachObjectConfidence,file=paste0("./contexts/ViolatedRulesForEachObjectConfidence_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".RData",sep=""))
     
+    cat('\n Saving the scores results \n')
+      
     df.ObjectsWithScores=data.frame(matrix(ncol = 9, nrow = 0))
-    colnames (df.ObjectsWithScores)=c("Objects","ViolatedRulesForEachObjectConfidence","AVGScoresOfObjectsConfidence",
-                                      "TopViolatedRulesForEachObjectConfidence","TopScoreConfidence",
-                                      "ViolatedRulesForEachObjectLift", "AVGScoresOfObjectsLift","TopViolatedRulesForEachObjectLift",
+    colnames (df.ObjectsWithScores)=c("Objects",
+                                      "ViolatedRulesForEachObjectConfidence",
+                                      "AVGScoresOfObjectsConfidence",
+                                      "TopViolatedRulesForEachObjectConfidence",
+                                      "TopScoreConfidence",
+                                      "ViolatedRulesForEachObjectLift", 
+                                      "AVGScoresOfObjectsLift",
+                                      "TopViolatedRulesForEachObjectLift",
                                       "TopScoreLift")
     
-    
+    if(length(as.list(ViolatorObjectList))==0)stop("\n Violators List is null \n")
     df.ObjectsWithScores=do.call(rbind, Map(data.frame, 
                                             "Objects"=as.list(ViolatorObjectList), 
                                             "ViolatedRulesForEachObjectConfidence"=as.list(ViolatedRulesForEachObjectConfidence),
@@ -212,7 +226,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
     
     cat('\n Association Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
     write.csv(file=output_scoring_file, df.ObjectsWithScores)
-    cat('\n Saving Scores of the Rules in ===> :  ',output_scoring_file)
+    cat('\n Saving Scores of the Rules in ===> \n ',output_scoring_file)
     
      
 

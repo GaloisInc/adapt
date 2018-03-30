@@ -19,25 +19,33 @@ gt_file= fromJSON(as.character(args[8]),simplifyVector = TRUE)
 contextname=as.character(args[9])
 sup=as.numeric(args[10])
 conf=as.numeric(args[11])
-  
-cat("reading \n",input_scoring_file)
+cat("\n ===============\n")
+cat("\n Sup: ",sup)
+cat("\n Conf: ",conf)
+
+cat("\n reading GT file \n", as.character(args[8]))  
+
+if(!file.exists( as.character(args[8])))stop(" benign_input_association_rules_file does not exist")
+if (file.size( as.character(args[8])) == 0)   stop("input_scoring_file is null")
+
 gt_Objects=as.list(gt_file)
 gt_Objects=as.character(unlist(gt_Objects))
-  
-    cat("\n ===============\n")
-    cat("\n Sup: ",sup)
-    cat("\n Conf: ",conf)
+if(length(gt_Objects)==0)stop("\n  length(GT Objects)==0 \n")
+
+#cat("reading \n",input_scoring_file)
+
     if(!file.exists(input_scoring_file))stop(" input_scoring_file does not exist")
     if (file.size(input_scoring_file) == 0)   stop("input_scoring_file is null")
-    cat("reading feedback_input_scoring_file\n",input_scoring_file)
+    cat("\n reading feedback_input_scoring_file\n",input_scoring_file)
     
     Objects_With_Scores   <- read.csv(input_scoring_file) 
+    Objects_With_Scores =arrange(Objects_With_Scores ,desc(AVGScoresOfObjectsConfidence))#AVGScoresOfObjectsLift))#AVGScoresOfObjectsConfidence))
+    
     ObjectViolator=as.list(Objects_With_Scores$Objects)
     ObjectViolator=as.character(unlist(ObjectViolator))
-    length(ObjectViolator) 
-    if(length(ObjectViolator) ==0) stop(" The set of violator Objects is empty ")
-    Objects_With_Scores =arrange(Objects_With_Scores ,desc(AVGScoresOfObjectsConfidence))#AVGScoresOfObjectsLift))#AVGScoresOfObjectsConfidence))
-    cat("reading Original_input_scoring_file \n",Original_input_scoring_file)
+   # length(ObjectViolator) 
+    if(length(ObjectViolator) ==0) stop("\n The set of violator Objects is empty \n")
+    cat("\n reading Original_input_scoring_file \n",Original_input_scoring_file)
     
     if(!file.exists(Original_input_scoring_file))stop(" Original_input_scoring_file does not exist")
     if (file.size(Original_input_scoring_file) == 0)   stop("Original_input_scoring_file is null")
@@ -46,6 +54,7 @@ gt_Objects=as.character(unlist(gt_Objects))
     Original_Objects_With_Scores =arrange(Original_Objects_With_Scores ,desc(AVGScoresOfObjectsConfidence))#AVGScoresOfObjectsLift))#AVGScoresOfObjectsConfidence))
     Original_ObjectViolator=as.list(Original_Objects_With_Scores$Objects)
     Original_ObjectViolator=as.character(unlist(Original_ObjectViolator))
+    if(length(Original_ObjectViolator) ==0) stop("\n  The set of original violator Objects is empty \n")
     
     
     TP=   intersect(ObjectViolator,gt_Objects) 
