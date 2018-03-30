@@ -3,7 +3,7 @@ load_csv=function(csv_file){
   #csv_file_name="/home/terminator2/Documents/R_Projects/AnomalyRulesMining/contexts/Context_ProcessEvent.csv"
   Incon = file(csv_file, "r")
   if(is.null(Incon))stop("error in csv_file_name     - terminating")
-  if(!file.exists(load_csv))stop(" load_csv does not exist")
+  if(!file.exists(csv_file))stop(" csv file does not exist")
   
   if (file.size(csv_file) == 0)  {stop("\n csv_file is file empty \n")}
   
