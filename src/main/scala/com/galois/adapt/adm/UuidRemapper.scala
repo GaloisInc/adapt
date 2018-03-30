@@ -40,24 +40,30 @@ object UuidRemapper {
     // Add some 'CDM -> ADM' to the maps and notify those previously blocked
     def putCdm2Adm(source: CdmUUID, target: AdmUUID): List[Either[ADM, EdgeAdm2Adm]] = {
       // Yell loudly if we are about to overwrite something
-      if ((cdm2adm contains source) && cdm2adm(source) != target)
-        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}")
-      if (cdm2cdm contains source)
-        log.warning( s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}")
 
-      cdm2adm(source) = target
+      val otherTarget = cdm2cdm.get(source)
+      if (otherTarget.isDefined)
+        log.warning( s"UuidRemapper: $source should not map to $target (since it already maps to $otherTarget")
+
+      val prevTarget = cdm2adm.update(source, target)
+      if (prevTarget.exists(_ != target))
+        log.warning(s"UuidRemapper: $source should not map to $target (since it already maps to $prevTarget")
+
       advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
     }
 
     // Add some 'CDM -> CDM' to the maps and notify those previously blocked
     def putCdm2Cdm(source: CdmUUID, target: CdmUUID): List[Either[ADM, EdgeAdm2Adm]] = {
       // Yell loudly if we are about to overwrite something
-      if (cdm2adm contains source)
-        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}")
-      if ((cdm2cdm contains source) && cdm2cdm(source) != target)
-        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}")
 
-      cdm2cdm(source) = target
+      val otherTarget = cdm2adm.get(source)
+      if (otherTarget.isDefined)
+        log.warning( s"UuidRemapper: $source should not map to $target (since it already maps to $otherTarget")
+
+      val prevTarget = cdm2cdm.update(source, target)
+      if (prevTarget.exists(_ != target))
+        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to $prevTarget")
+
       advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
     }
 

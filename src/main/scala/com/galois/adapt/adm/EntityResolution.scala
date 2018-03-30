@@ -177,22 +177,26 @@ object EntityResolution {
     }
 
     {
-      // Duplicate node or edge
-      case Right(edge) if seenEdges.contains(edge) => Nil
-      case Left(adm) if seenNodes.contains(adm.uuid) => Nil
-
-      // New edge
       case Right(edge) =>
-        seenEdges.add(edge)
-        blockedEdgesCount += 1
-        emitEdge(edge).toList
+        if (seenEdges.add(edge)) {
+          // New edge
+          blockedEdgesCount += 1
+          emitEdge(edge).toList
+        } else {
+          // Duplicate edge
+          Nil
+        }
 
-      // New node
       case Left(adm) =>
-        seenNodes.add(adm.uuid)
-        blockingNodes -= adm.uuid
-        val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
-        Left(adm) :: emit
+        if (seenNodes.add(adm.uuid)) {
+          // New node
+          blockingNodes -= adm.uuid
+          val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
+          Left(adm) :: emit
+        } else {
+          // Duplicate node
+          Nil
+        }
     }
   })
 }
