@@ -1,6 +1,7 @@
 package com.galois.adapt.adm
 
 import akka.NotUsed
+import akka.event.LoggingAdapter
 import akka.stream.scaladsl.Flow
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
@@ -26,7 +27,9 @@ object UuidRemapper {
 
     cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
     cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
-    blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]
+    blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
+
+    log: LoggingAdapter
   ): UuidRemapperFlow = Flow[Timed[UuidRemapperInfo]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]] { () =>
 
     // Keep track of current time art the tip of the stream, along with things that will expire
@@ -37,12 +40,10 @@ object UuidRemapper {
     // Add some 'CDM -> ADM' to the maps and notify those previously blocked
     def putCdm2Adm(source: CdmUUID, target: AdmUUID): List[Either[ADM, EdgeAdm2Adm]] = {
       // Yell loudly if we are about to overwrite something
-      assert(!(cdm2adm contains source) || cdm2adm(source) == target,   // TODO: Change this to a logging statement and continue.
-        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}"
-      )
-      assert(!(cdm2cdm contains source),                                // TODO: Change this to a logging statement and continue.
-        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}"
-      )
+      if ((cdm2adm contains source) && cdm2adm(source) != target)
+        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}")
+      if (cdm2cdm contains source)
+        log.warning( s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}")
 
       cdm2adm(source) = target
       advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
@@ -51,12 +52,10 @@ object UuidRemapper {
     // Add some 'CDM -> CDM' to the maps and notify those previously blocked
     def putCdm2Cdm(source: CdmUUID, target: CdmUUID): List[Either[ADM, EdgeAdm2Adm]] = {
       // Yell loudly if we are about to overwrite something
-      assert(!(cdm2adm contains source),                                // TODO: Change this to a logging statement and continue.
-        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}"
-      )
-      assert(!(cdm2cdm contains source) || cdm2cdm(source) == target,   // TODO: Change this to a logging statement and continue.
-        s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}"
-      )
+      if (cdm2adm contains source)
+        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2adm(source)}")
+      if ((cdm2cdm contains source) && cdm2cdm(source) != target)
+        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to ${cdm2cdm(source)}")
 
       cdm2cdm(source) = target
       advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))

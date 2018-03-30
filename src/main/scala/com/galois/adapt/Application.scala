@@ -29,6 +29,7 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
+import akka.event.{Logging, LoggingAdapter}
 import bloomfilter.CanGenerateHashFrom
 import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
@@ -54,6 +55,7 @@ object Application extends App {
   val interface = config.getString("akka.http.server.interface")
   val port = config.getInt("akka.http.server.port")
   implicit val system = ActorSystem("production-actor-system")
+  val log: LoggingAdapter = Logging.getLogger(system, this)
 
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
@@ -67,13 +69,35 @@ object Application extends App {
   }
   implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
   implicit val executionContext = system.dispatcher
-//    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
-//    dbFile.delete()
-  val dbFilePath = "/tmp/map_" + Random.nextLong() + ".db"
 
-  val fileDb = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
+  
+  val fileDb = Try { config.getString("adapt.adm.mapdb") } match {
+    case Success(p) =>
+      val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
+
+      // On shutdown, close the file DB. We wait 10 seconds to give MapDB time to run the other shutdown hooks (for
+      // expiring the in-memory stuff to the disk maps)
+      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+        override def run(): Unit = {
+          println("Closing file DB in 10 seconds...")
+          Thread.sleep(10000)
+          fDB.close()
+        }
+      }))
+
+      fDB
+
+    case Failure(_) =>
+      val p = "/tmp/map_" + Random.nextLong() + ".db"
+      val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
+
+      // On shutdown delete the DB
+      new File(p).deleteOnExit()
+
+      fDB
+  }
+
   val memoryDb = DBMaker.memoryDirectDB().make()
-  new File(dbFilePath).deleteOnExit()   // TODO: consider keeping this to resume from a certain offset!
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
   val logFile = config.getString("adapt.logfile")
@@ -142,6 +166,11 @@ object Application extends App {
       .expireExecutor(Executors.newScheduledThreadPool(2))
       .createOrOpen()
 
+    // On shutdown, expire everything to the on-disk map
+    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+      override def run(): Unit = mapdbCdm2Cdm.clearWithExpire()
+    }))
+
     MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
       mapdbCdm2Cdm,
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
@@ -165,6 +194,11 @@ object Application extends App {
       .expireMaxSize(1000000)
       .expireExecutor(Executors.newScheduledThreadPool(2))
       .createOrOpen()
+
+    // On shutdown, expire everything to the on-disk map
+    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+      override def run(): Unit = mapdbCdm2Adm.clearWithExpire()
+    }))
 
     MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
       mapdbCdm2Adm,
@@ -255,7 +289,7 @@ object Application extends App {
   )
   */
 
-  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, seenNodes, seenEdges)
+  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, log, seenNodes, seenEdges)
 
   val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
   Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
