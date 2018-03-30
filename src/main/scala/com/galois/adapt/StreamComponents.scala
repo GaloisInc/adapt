@@ -37,6 +37,7 @@ object FlowComponents {
       }
       counter = counter + 1
       val className = item match {
+        case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
         case i => i.getClass.getSimpleName
       }
