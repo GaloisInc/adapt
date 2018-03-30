@@ -25,8 +25,8 @@ cat("\n Conf: ",conf)
 
 cat("\n reading GT file \n", as.character(args[8]))  
 
-if(!file.exists( as.character(args[8])))stop(" benign_input_association_rules_file does not exist")
-if (file.size( as.character(args[8])) == 0)   stop("input_scoring_file is null")
+if(!file.exists( as.character(args[8])))stop(" ground truth file does not exist")
+if (file.size( as.character(args[8])) == 0)   stop("ground truth file is null")
 
 gt_Objects=as.list(gt_file)
 gt_Objects=as.character(unlist(gt_Objects))
