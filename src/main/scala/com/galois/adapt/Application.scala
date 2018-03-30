@@ -6,7 +6,6 @@ import java.util
 import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
 
-import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
@@ -71,7 +70,6 @@ object Application extends App {
 //    val dbFile = File.createTempFile("map_" + Random.nextLong(), ".db")
 //    dbFile.delete()
   val dbFilePath = "/tmp/map_" + Random.nextLong() + ".db"
-
 
   val fileDb = DBMaker.fileDB(dbFilePath).fileMmapEnable().make()
   val memoryDb = DBMaker.memoryDirectDB().make()
@@ -362,13 +360,13 @@ object Application extends App {
       startWebServer()
       CDMSource.cdm18(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
-//    case "time" =>
-//
-//      CDMSource.cdm18(ta1)
-//        .via(printCounter("File Input", statusActor))
-//        .via(EntityResolution.annotateTime((config.getInt("adapt.adm.maxtimejumpsecs")  seconds).toNanos))
-//        .map((x: (String,Timed[CDM18])) => ByteString(x._2.time + "\n"))
-//        .runWith(FileIO.toPath(Paths.get("timestamps")))
+    case "e3-train" =>
+      CDMSource.cdm18(ta1)
+        .via(printCounter("E3 Training", statusActor))
+        .via(filterFlow)
+
+    case "e3" =>
+      ???
 
     case "sets" =>
 
@@ -542,99 +540,7 @@ object Application extends App {
       CDMSource.cdm18(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(er)
-        .statefulMapConcat[(NoveltyDetection.Event, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]{ () =>
-
-          val events = collection.mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
-          val everything = collection.mutable.Map.empty[AdmUUID, ADM]
-
-          type AdmUUIDReferencingPathNodes = AdmUUID
-          val pathNodeUses = collection.mutable.Map.empty[AdmUUIDReferencingPathNodes, Set[AdmUUID]]
-          val pathNodes = collection.mutable.Map.empty[AdmUUID, AdmPathNode]
-
-          val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
-            EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
-
-          {
-            case Right(EdgeAdm2Adm(src, "subject", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { sub =>
-                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-                val t = (e._1, Some(sub), e._3)
-                if (t._3.isDefined) {
-                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-                } else {
-                  events += (src -> t)
-                  Nil
-                }
-              }
-            case Right(EdgeAdm2Adm(src, "predicateObject", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-                val t = (e._1, e._2, Some(obj))
-                if (t._2.isDefined) {
-                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-                } else {
-                  events += (src -> t)
-                  Nil
-                }
-              }
-            case Right(EdgeAdm2Adm(src, "predicateObject2", tgt)) => everything.get(tgt)
-              .fold(List.empty[(AdmEvent, Option[ADM], Set[AdmPathNode], Option[ADM], Set[AdmPathNode])]) { obj =>
-                val e = events(src)   // EntityResolution flow step guarantees that the event nodes will arrive before the edge that references it.
-                val t = (e._1, e._2, Some(obj))
-                if (t._2.isDefined) {
-                  if ( ! eventsWithPredObj2.contains(e._1.eventType)) events -= src
-                  val subPathNodes = pathNodeUses.getOrElse(t._2.get.uuid, Set.empty).map(pathNodes.apply)
-                  val objPathNodes = pathNodeUses.getOrElse(t._3.get.uuid, Set.empty).map(pathNodes.apply)
-                  List((t._1, t._2, subPathNodes, t._3, objPathNodes))
-                } else {
-                  events += (src -> t)
-                  Nil
-                }
-              }
-            case Right(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
-              // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
-              val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
-              pathNodeUses += (subObj -> newSet)
-              Nil
-
-  //          case Left(edge) =>
-  //              edge.label match { // throw away the referenced UUIDs!
-  //                case "subject" | "flowObject" => everything -= edge.src
-  //                case "eventExec" | "cmdLine" | "(cmdLine)" | "exec" | "localPrincipal" | "principal" | "path" | "(path)" => everything -= edge.tgt
-  //                case "tagIds" | "prevTagId" => everything -= edge.src; everything -= edge.tgt
-  //                case _ => ()  // "parentSubject"
-  //              }
-  //            List()
-            case Left(adm: AdmEvent) =>
-              events += (adm.uuid -> (adm, None, None))
-              Nil
-            case Left(adm: AdmSubject) =>
-              everything += (adm.uuid -> adm)
-              Nil
-            case Left(adm: AdmFileObject) =>
-              everything += (adm.uuid -> adm)
-              Nil
-            case Left(adm: AdmNetFlowObject) =>
-              everything += (adm.uuid -> adm)
-              Nil
-            case Left(adm: AdmSrcSinkObject) =>
-              everything += (adm.uuid -> adm)
-              Nil
-            case Left(adm: AdmPathNode) =>
-              pathNodes += (adm.uuid -> adm)
-              Nil
-            case _ => Nil
-          }
-        }
-        .runWith(
-          Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg)
-        )
+        .runWith(PpmComponents.ppmSink)
       startWebServer()
 
     case _ =>

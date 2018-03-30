@@ -350,13 +350,14 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
+  NoveltyDetection.ppmList.foreach(_ => ())  // Reference the DelayedInit of this object just to instantiate before stream processing begins
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name).toList)
 
-    case msg @ (e: Event, Some(s: AdmSubject), subPathNodes: Set[_], Some(o: ADM), objPathNodes: Set[_]) =>
+    case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
         val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
         val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
@@ -371,7 +372,7 @@ class PpmActor extends Actor with ActorLogging {
       sender() ! Ack
 
 
-    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, Some(o: ADM), objPathNodes: Set[_], e2: Event, Some(s2: AdmSubject), sub2PathNodes: Set[_]) =>
+    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, o: ADM, objPathNodes: Set[_], e2: Event, s2: AdmSubject, sub2PathNodes: Set[_]) =>
       ???
 
 
