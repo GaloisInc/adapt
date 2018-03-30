@@ -170,7 +170,8 @@ The concept generation and analysis can be launched after an avro file has been 
 python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
                     [--fca_algo {python,C}] [--fcbo_path FCBO_PATH]
                     [--inputfile INPUTFILE] [--specfile SPECFILE]
-                    [--queryres QUERYRES] [--csv] [--parallel PARALLEL]
+                    [--queryres QUERYRES] [--csv] [--quiet]
+                    [--parallel PARALLEL]
                     [--min_support MIN_SUPPORT] [--disable_naming]
                     [--outputfile OUTPUTFILE]
                     [--analysis_outputfile ANALYSIS_OUTPUTFILE]
@@ -180,22 +181,23 @@ python3 fcascript.py [-h] --workflow {context,fca,analysis,both}
 
 To generate analysis results based on the ProcessEvent context and positive implication rules (with standard support and confidence settings), one could launch (after ADM ingestion):
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/pcbo-amai/pcbo --parallel 3 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py --quiet -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/pcbo-amai/pcbo --parallel 3 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 
 (if you want to run the C version of PCbO. The number provided to --parallel can be any number greater than 1, it just corresponds to the number of threads PCbO is supposed to run)
 
+(The ```--quiet``` simply suppresses the printing of intermediate results i.e concepts on the screen)
 or 
 
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/fcbo-ins/fcbo -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py --quiet -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 --fca_algo C --fcbo_path fca/FCA_Miner/fcbo-ins/fcbo -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 (if you want to run the C version of FCbO)
 
 or 
 
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py --quiet -s fca/contextSpecFiles/neo4jspec_ProcessEvent.json -w both -m 0.05 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 (if you want to run the Python version of FCbO)
 
@@ -203,7 +205,7 @@ python3 fca/FCA_Miner/python_scripts/fcascript.py -s fca/contextSpecFiles/neo4js
 Alternatively, if working with a CSV input file instead of a JSON specification file, one could use the following equivalent command line:
 
 ```
-python3 fca/FCA_Miner/python_scripts/fcascript.py -i fca/csvContexts/neo4jspec_ProcessEvent.csv -w both -m 0.05 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
+python3 fca/FCA_Miner/python_scripts/fcascript.py --quiet -i fca/csvContexts/neo4jspec_ProcessEvent.csv -w both -m 0.05 -rs fca/FCA_Miner/rulesSpecs/rules_positive_implication.json
 ```
 
 ## How to use the bash scripts
