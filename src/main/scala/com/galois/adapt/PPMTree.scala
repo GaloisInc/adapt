@@ -8,6 +8,7 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType}
 import java.io.{File, PrintWriter}
+import java.nio.charset.{Charset, StandardCharsets}
 import java.nio.file.{Files, StandardOpenOption}
 
 import com.galois.adapt.adm.EntityResolution.CDM
@@ -340,7 +341,7 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
           import spray.json._
           import ApiJsonProtocol._
 
-          val content = new String(Files.readAllBytes(new File(fp).toPath()))
+          val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
           content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int]))]].toMap
         }.toOption orElse  {
           println(s"Failed to load alarms for tree: $name")
@@ -372,7 +373,7 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
       import ApiJsonProtocol._
 
       val content = alarms.toList.toJson.prettyPrint
-      Files.write(new File(fp).toPath, content.getBytes, StandardOpenOption.TRUNCATE_EXISTING)
+      Files.write(new File(fp).toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
     })
   }
   def prettyString: String = tree.getTreeRepr(key = name).toString
