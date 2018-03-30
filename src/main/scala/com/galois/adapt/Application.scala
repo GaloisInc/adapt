@@ -70,7 +70,7 @@ object Application extends App {
   implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
   implicit val executionContext = system.dispatcher
 
-  
+
   val fileDb = Try { config.getString("adapt.adm.mapdb") } match {
     case Success(p) =>
       val fDB = DBMaker.fileDB(p).fileMmapEnable().make()

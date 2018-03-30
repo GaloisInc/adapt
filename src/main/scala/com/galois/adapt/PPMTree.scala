@@ -304,20 +304,18 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
   def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F) = {
     counter += 1
     extractedValues match {
+      case Nil if counter == 1 => Some(Nil)  // Start an alarm if the end is novel.
       case Nil => None
       case extracted :: remainder =>
-        val childExists = children.contains(extracted)
-        val childNode = children.getOrElse(extracted, new SymbolNode())
         val childLocalProb = localChildProbability(extracted)
         val thisGlobalProb = thisLocalProb * parentGlobalProb
-        if (childExists) childNode.observe(remainder, childLocalProb, thisGlobalProb).map { alarmList =>
-          // Append information about the child:
-          (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
-        } else {
-          children = children + (extracted -> childNode)
-          childNode.observe(remainder, childLocalProb, thisGlobalProb)  // This reflects a choice to throw away all sub-child alerts which occur as a result of the parent alert
+        val childNode = children.getOrElse(extracted, new SymbolNode())
+        if ( ! children.contains(extracted)) children = children + (extracted -> childNode)
+        childNode.observe(remainder, childLocalProb, thisGlobalProb).map {
           // Begin reporting information about the child:
-          Some(List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount)))
+          case Nil => List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount - 1))  // Subtract 1 because we just added the child
+          // Append information about the child:
+          case alarmList => (extracted, childLocalProb, thisGlobalProb * childLocalProb, childNode.getCount) :: alarmList
         }
     }
   }

@@ -143,7 +143,7 @@ $(function(){
 
 				var show_graph_link = _.isEmpty(node.data.uuids) ? "" : '<a target="_blank" href="/#g.V().has(\'uuid\',within(['+node.data.uuids.join(",")+']))">Show Graph</a>'
 				$tdList.eq(4).html(
-					'<span>'+ JSON.stringify(_.omit(node.data, "key")) +'</span>' + show_graph_link
+					'<span>'+ JSON.stringify(_.omit(node.data, "key", "uuids")) +'</span>' + show_graph_link
 					
 				)
 			},
