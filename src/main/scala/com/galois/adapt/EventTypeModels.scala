@@ -52,7 +52,7 @@ object EventTypeModels {
       val future = ppmActor ? PpmTreeCountQuery(treeName: String)
       Await.ready(future, timeout.duration).value.get match {
         case Success(result) => result.asInstanceOf[PpmTreeCountResult]
-        case Failure(msg) => PpmTreeCountResult(None)
+        case Failure(msg) => println(s"Unable to query ProcessEventTypeCounts: ${msg.getMessage}"); PpmTreeCountResult(None)
       }
     }
 
@@ -69,7 +69,7 @@ object EventTypeModels {
     }
 
     def collectToCSVArray(row: (Process,EventTypeCounts),modelName: String = "iforest"): Array[String] = {
-      if (modelName=="FCA") Array(row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,1)).map(_.toString)
+      if (row._1.name == "") Array("NA",row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,1)).map(_.toString)
       else Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
     }
 
@@ -136,6 +136,7 @@ object EventTypeModels {
 
     def iforest(iforestDirFile: File, trainFile: String, testFile: String, outFile: String): Int = {
       val s = s"./iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
+      println(s)
       sys.process.Process(s,iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
@@ -153,8 +154,7 @@ object EventTypeModels {
 
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
-  def evaluateModels(system: ActorSystem): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
-    Thread.sleep(600000)
+  def evaluateModels(system: ActorSystem): Unit  = {
     val writeResult = EventTypeData.query("ProcessEventType").results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
       case _ => Failure(new RuntimeException("Unable to query data for IForest.")) //If there is no data, we want a failure (this seems hacky)
@@ -173,7 +173,7 @@ object EventTypeModels {
       }
     }
 
-    system.scheduler.scheduleOnce(10 minutes)(evaluateModels(system))
+    system.scheduler.scheduleOnce(2 minutes)(evaluateModels(system))
 
   }
 

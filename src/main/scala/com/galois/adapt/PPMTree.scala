@@ -118,7 +118,7 @@ object NoveltyDetection {
 
   val esTrees = List(
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
-      d => d._3.nonEmpty && d._3.map(p => p.path.length > 0).foldLeft(false)(_ || _),
+      d => d._3.nonEmpty,
       List(
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
@@ -502,7 +502,7 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg => /*{Thread.sleep(60); EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack
+    case InitMsg =>  /*Future { EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack;
 
     case SaveTrees => ppmList.foreach(_.saveState())
 
