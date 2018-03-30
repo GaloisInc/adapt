@@ -3,8 +3,9 @@ package com.galois.adapt
 import akka.util.Timeout
 import akka.pattern.ask
 import java.io.{File, PrintWriter}
+import java.util.UUID
 
-import com.galois.adapt.NoveltyDetection.ExtractedValue
+import com.galois.adapt.NoveltyDetection.{ExtractedValue, ppmList}
 import com.galois.adapt.cdm18.EventType
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 
@@ -13,14 +14,17 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.sys.process._
 import Application.ppmActor
+import akka.actor.ActorSystem
+import com.galois.adapt.adm.{AdmUUID, ExtendedUuid}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 
 //TODO: make all the operations safe in a functional programming way
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = (Int,String,Float,Float,Int) // This is the process and anomaly/fca score
+  type EventTypeAlarm = List[(String,Float,Float,Int)] // This is the process and anomaly/fca score
   case class Process(name: String,uuid: String) {
     override def toString() = {
       this.name + "_" + this.uuid.toString
@@ -36,6 +40,9 @@ object EventTypeModels {
   val outputFileIForest = "output_iforest.csv"
   val alarmFileIForestCommon = modelDirIForest + "output_iforest_common_process_alarms.csv"
   val alarmFileIForestUnCommon = modelDirIForest + "output_iforest_uncommon_process_alarms.csv"
+
+  val alarmTreeToFile = Map("iForestCommonAlarms" -> alarmFileIForestCommon,
+    "iForestUncommonAlarms"-> alarmFileIForestUnCommon)
 
 
   object EventTypeData {
@@ -85,22 +92,44 @@ object EventTypeModels {
   }
 
   object EventTypeAlarms {
-    def readToTree(filePath: String, modelName: String,rowToAlarm: Array[String] => EventTypeAlarm): TreeRepr = {
-      val fileHandle = new File(filePath)
-      val settings = new CsvParserSettings
-      settings.setNumberOfRowsToSkip(1)
-      val parser = new CsvParser(settings)
-      val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
-      TreeRepr.fromFlat(List((0,modelName,0F,0F,1)) ++ rows.map(rowToAlarm))
+
+    def readToAlarmMap(filePath: String): Map[List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])] = {
+      val result = Try {
+        val fileHandle = new File(filePath)
+        val settings = new CsvParserSettings
+        settings.setNumberOfRowsToSkip(1)
+        val parser = new CsvParser(settings)
+        val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
+        val extractedRows = extractAndFilterAlarms(rows)
+        extractedRows.map(r => rowToAlarmIForest(r)).toMap
+      }
+      result match {
+        case Success(alarmList) => alarmList
+        case Failure(_) => Map.empty
+      }
     }
 
-    def rowToAlarmIForest(row: Array[String]): EventTypeAlarm = {
-      (1,Process(row(0),row(1)).toString(),row.last.toFloat,0F,1)
+    def extractAndFilterAlarms(rows: List[Array[String]]): List[(String,String,Float)] = {
+      rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])) = {
+      List(extractedRow._1,extractedRow._2) -> (System.currentTimeMillis,
+        List(
+        (extractedRow._1,extractedRow._3,extractedRow._3,1),
+        (extractedRow._2,extractedRow._3,extractedRow._3,1)
+        ),
+        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),Application.ta1)),
+        Map.empty[String, Int]
+      )
+    }
+
+/*
     def rowToAlarmFCA (row: Array[String]): EventTypeAlarm = {
-      (1,Process("",row(1)).toString(),row(3).toFloat,row(7).toFloat,1)
-    }
+      (Process("",row(1)).toString(),row(3).toFloat,row(7).toFloat,1)
+      }
+*/
+
   }
 
   object Execute {
@@ -124,33 +153,35 @@ object EventTypeModels {
 
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
-  def evaluateModels(): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
+  def evaluateModels(system: ActorSystem): Unit /*Map[String,List[EventTypeAlarm]]*/ = {
+    Thread.sleep(600000)
     val writeResult = EventTypeData.query("ProcessEventType").results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
-      case _ => Failure(new RuntimeException) //If there is no data, we want a failure (this seems hacky)
+      case _ => Failure(new RuntimeException("Unable to query data for IForest.")) //If there is no data, we want a failure (this seems hacky)
     }
 
     writeResult match {
       case Success(_) =>
         Try(Execute.iforest(dirIForest,trainFileIForest,evalFileIForest,outputFileIForest))
-      case Failure(_) =>
+      case Failure(ex) => println(s"Unable to query or write data for IForest: ${ex.getMessage}")
     }
 
-    /*getAlarms(Map("common" -> EventTypeModels.alarmFileIForestCommon, "uncommon" -> EventTypeModels.alarmFileIForestUnCommon)).values
-      .foreach(t => t.get.toFlat.foreach(println))
-    */
+    alarmTreeToFile.foreach {
+      case (ppmName,file) => ppmList.find(_.name == ppmName) match {
+        case Some(tree) => tree.alarms = getAlarms(file)
+        case None => println(s"Unable to find tree for use in IForest alarm display: $ppmName")
+      }
+    }
 
-    evaluateModels()
+    system.scheduler.scheduleOnce(10 minutes)(evaluateModels(system))
 
   }
 
-  // When the UI wants new alarm data, call this function
-  def getAlarms(iforestAlarmFiles: Map[String,String]/*,fcaAlarmFile: String*/): Map[String,Option[TreeRepr]] ={
-    val iforestAlarms = iforestAlarmFiles.map {
-      case (alarmType,alarmFile) => alarmType -> Try(EventTypeAlarms.readToTree(alarmFile,"iforest",EventTypeAlarms.rowToAlarmIForest)).toOption
-    }
 
-    iforestAlarmFiles.values.map(f => new File(f).delete()) //If file doesn't exist, returns false
+  def getAlarms(iforestAlarmFile: String): Map[List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])]= {
+    val iforestAlarms = EventTypeAlarms.readToAlarmMap(iforestAlarmFile)
+
+    new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
 
     iforestAlarms
   }

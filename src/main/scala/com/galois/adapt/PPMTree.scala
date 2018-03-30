@@ -119,7 +119,23 @@ object NoveltyDetection {
   ).par
 
   val esTrees = List(
-    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("ProcessEventType",
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
+      d => d._3.nonEmpty,
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      ),
+      d => Set(d._2.uuid)
+    ),
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",
+      d => d._3.nonEmpty,
+      List(
+        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
+        d => List(d._1.eventType.toString)
+      ),
+      d => Set(d._2.uuid)
+    ),
+    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
       d => d._3.nonEmpty,
       List(
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
@@ -362,6 +378,16 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
 
+  context.system.registerOnTermination {
+    ppmList.foreach { ppm => ppm.saveState() }
+    val iForestTree = esTrees.find(_.name == "iForestProcessEventType")
+    iForestTree match {
+      case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
+      case None => println("ProcessEventType tree for iForest is not defined.")
+    }
+
+  }
+
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
@@ -383,7 +409,7 @@ class PpmActor extends Actor with ActorLogging {
       Try (
         (e,s,subPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-      case Success(e) => esTrees.foreach (ppm => ppm.observe(e))
+      case Success(e) => esTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(e))
       case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
 
@@ -407,7 +433,7 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg => Future {Thread.sleep(60); EventTypeModels.evaluateModels()}; sender() ! Ack
+    case InitMsg => /*{Thread.sleep(60); EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack
 
     case SaveTrees => ppmList.foreach(_.saveState())
 
@@ -417,9 +443,10 @@ class PpmActor extends Actor with ActorLogging {
 //        println(ppm.prettyString)
 //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
       }
-      esTrees.foreach{ ppm =>
-        val eventTypeData = ppm.getAllCounts
-        EventTypeModels.EventTypeData.writeToFile(eventTypeData,EventTypeModels.modelDirIForest + "train_iforest.csv")
+      val iForestTree = esTrees.find(_.name == "iForestProcessEventType")
+      iForestTree match {
+        case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
+        case None => println("ProcessEventType tree for iForest is not defined.")
       }
       println("Done")
 
