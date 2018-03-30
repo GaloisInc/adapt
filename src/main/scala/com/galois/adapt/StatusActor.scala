@@ -3,6 +3,7 @@ package com.galois.adapt
 import java.io.{FileOutputStream, PrintWriter}
 
 import akka.actor.Actor
+import spray.json.JsObject
 
 import scala.collection.mutable
 import scala.util.Try
@@ -16,20 +17,25 @@ class StatusActor extends Actor {
   val totalPopulationLog = mutable.Map.empty[String, Long]
   var recentPopulationLog = Map.empty[String, Long]
 
+  def calculateStats(): StatusReport = StatusReport(
+    currentlyIngesting,
+    generalRecords.toMap.mapValues(_.toString),
+    totalPopulationLog.toMap,
+    recentPopulationLog
+  )
+
 
   def receive = {
-    case GetStats => sender() ! StatusReport(
-      currentlyIngesting,
-      generalRecords.toMap.mapValues(_.toString),
-      totalPopulationLog.toMap,
-      recentPopulationLog
-    )
+    case GetStats => sender() ! calculateStats()
 
     case LogToDisk(p: String) => Try {
-        val logFile = new PrintWriter(new FileOutputStream(new java.io.File(p), true))
-        logFile.append(s"$currentlyIngesting, $generalRecords\n")
-        logFile.close()
-      }
+      import ApiJsonProtocol._
+      import spray.json._
+
+      val logFile = new PrintWriter(new FileOutputStream(new java.io.File(p), true))
+      logFile.append(calculateStats().toJson.compactPrint + "\n")
+      logFile.close()
+    }
 
     case p: PopulationLog =>
       p.counter.foreach{ case (k,v) =>
