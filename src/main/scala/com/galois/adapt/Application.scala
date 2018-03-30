@@ -295,7 +295,7 @@ object Application extends App {
   Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
     case Success(i) if i > 0L =>
       println(s"Saving PPM trees every $i seconds")
-      val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees)
+      val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees())
       system.registerOnTermination(cancellable.cancel())
     case _ => println("Not going to periodically save PPM trees.")
   }
@@ -394,10 +394,18 @@ object Application extends App {
       startWebServer()
       CDMSource.cdm18(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
-    case "e3-train" =>
+    case "train" =>
+      startWebServer()
+      statusActor ! InitMsg
+
       CDMSource.cdm18(ta1)
         .via(printCounter("E3 Training", statusActor))
         .via(filterFlow)
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(er)
+        .runWith(PpmComponents.ppmSink)
+
+
 
     case "e3" =>
       ???
@@ -586,7 +594,7 @@ object Application extends App {
 
 object CDMSource {
   private val config = ConfigFactory.load()
-  val scenario = config.getString("adapt.env.scenario")
+//  val scenario = config.getString("adapt.env.scenario")
 
   type Provider = String
 

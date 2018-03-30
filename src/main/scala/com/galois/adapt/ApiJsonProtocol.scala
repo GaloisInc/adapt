@@ -1,8 +1,6 @@
 package com.galois.adapt
 
 import java.util.UUID
-
-import akka.actor.ActorRef
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.galois.adapt.adm.{ExtendedUuid,CdmUUID,AdmUUID}
