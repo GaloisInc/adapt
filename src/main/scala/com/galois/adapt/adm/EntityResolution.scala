@@ -3,6 +3,7 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.NotUsed
+import akka.event.LoggingAdapter
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -38,6 +39,7 @@ object EntityResolution {
     cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                        // Map from CDM to CDM
     cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                        // Map from CDM to ADM
     blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
+    log: LoggingAdapter,
 
     seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
@@ -71,7 +73,7 @@ object EntityResolution {
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges))// Remap UUIDs
+      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, log))// Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }

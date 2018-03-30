@@ -11,6 +11,7 @@ object FilterCdm {
   // TODO: maybe support regex property patterns?
   sealed trait Filter extends Product
   final case class HasProperty(key: String, value: Option[String]) extends Filter
+  final case class HasLabel(label: String) extends Filter
   final case class HasEdge(label: String, target: Option[java.util.UUID]) extends Filter
   final case class Or(disjuncts: List[Filter]) extends Filter
   final case class And(conjuncts: List[Filter]) extends Filter
@@ -19,10 +20,13 @@ object FilterCdm {
   // Convert the filter function AST into a Scala function
   def compile(filter: Filter): Filterable => Boolean = filter match {
     case HasProperty(key, None) =>
-        cdm => cdm.properties.contains(key)
+      cdm => cdm.properties.contains(key)
 
     case HasProperty(key, Some(value)) =>
-        cdm => cdm.properties.get(key).fold(false)(x => x.toString == value)
+      cdm => cdm.properties.get(key).fold(false)(x => x.toString == value)
+
+    case HasLabel(label) =>
+      cdm => cdm.label == label
 
     case HasEdge(label, None) =>
       cdm => cdm.edges.contains(label)
@@ -48,6 +52,7 @@ object FilterCdm {
     override def write(filter: Filter): JsValue = {
       val JsObject(payload) = filter match {
         case hasProp: HasProperty => hasPropertyFormat.write(hasProp)
+        case hasLabel: HasLabel => hasLabelFormat.write(hasLabel)
         case hasEdge: HasEdge => hasEdgeFormat.write(hasEdge)
         case or: Or => orFormat.write(or)
         case and: And => andFormat.write(and)
@@ -59,6 +64,7 @@ object FilterCdm {
     override def read(json: JsValue): Filter =
       json.asJsObject.getFields("type") match {
         case Seq(JsString("HasProperty")) => hasPropertyFormat.read(json)
+        case Seq(JsString("HasLabel")) => hasLabelFormat.read(json)
         case Seq(JsString("HasEdge")) => hasEdgeFormat.read(json)
         case Seq(JsString("Or")) => orFormat.read(json)
         case Seq(JsString("And")) => andFormat.read(json)
@@ -76,6 +82,7 @@ object FilterCdm {
   }
 
   val hasPropertyFormat: RootJsonFormat[HasProperty] = jsonFormat2(HasProperty.apply)
+  val hasLabelFormat: RootJsonFormat[HasLabel] = jsonFormat1(HasLabel.apply)
   val hasEdgeFormat: RootJsonFormat[HasEdge] = jsonFormat2(HasEdge.apply)
   val orFormat: RootJsonFormat[Or] = jsonFormat1(Or.apply)
   val andFormat: RootJsonFormat[And] = jsonFormat1(And.apply)
@@ -86,12 +93,14 @@ object FilterCdm {
 // This is the unit of thing we are filtering over - basically just something that has properties and edges
 trait Filterable {
   def underlying: CDM18
+  def label: String
   def properties: Map[String, Any]
   def edges: Map[String, java.util.UUID]
 }
 object Filterable {
   def apply(node: CDM18 with DBWritable with DBNodeable[AnyRef]): Filterable = new Filterable {
     override val underlying = node
+    override lazy val label = node.getClass.getSimpleName
     override lazy val properties = node.asDBKeyValues.toMap
     override lazy val edges = node.asDBEdges.iterator.map({ case (l,t) => (l.toString, t) }).toMap
   }
