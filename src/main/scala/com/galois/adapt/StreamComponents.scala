@@ -7,6 +7,7 @@ import akka.stream.scaladsl._
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import akka.actor.ActorRef
+import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
 
 import scala.collection.mutable
@@ -94,6 +95,17 @@ object FlowComponents {
       List(item)
     }
   }
+
+
+  def splitToSink[T](sink: Sink[T, _], bufferSize: Int = 0) = Flow.fromGraph( GraphDSL.create() { implicit b =>
+    import GraphDSL.Implicits._
+    val broadcast = b.add(Broadcast[T](2))
+    bufferSize match {
+      case x if x <= 0 => broadcast.out(0) ~> sink
+      case s => broadcast.out(0).buffer(s, OverflowStrategy.backpressure) ~> sink
+    }
+    FlowShape(broadcast.in, broadcast.out(1))
+  })
 
 
   val uuidMapToCSVPrinterSink = Flow[(UUID, mutable.Map[String,Any])]

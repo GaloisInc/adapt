@@ -21,6 +21,8 @@ object NoveltyDetection {
   type Subject = (AdmSubject, Option[AdmPathNode])
   type Object = (ADM, Option[AdmPathNode])
 
+  type DataShape = (Event, Subject, Object)
+
   type ExtractedValue = String
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
   type Filter[DataShape] = DataShape => Boolean
@@ -116,7 +118,7 @@ object NoveltyDetection {
     )
   ).par
 
-  val esTrees = List(
+  val iforestTrees = List(
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
       d => d._3.nonEmpty,
       List(
@@ -144,34 +146,37 @@ object NoveltyDetection {
   ).par
 
   val seoesTrees = List(
-    PpmDefinition[(Subject, Event, Object, Event, Subject)]("FileExecuteDelete",   // TODO: This doesn't need subjects
-      d => d._2.eventType == EVENT_EXECUTE && d._4.eventType == EVENT_UNLINK && d._3._1.isInstanceOf[AdmFileObject],
-      List(
-        d => List(d._3._2.map(_.path).getOrElse(d._2.uuid + "-->SOME_FILE<--" + d._4.uuid))
-      ),
-      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
-    ),
-    PpmDefinition[(Subject, Event, Object, Event, Subject)]("FileWrittenThenExecuted",
-      d => d._2.eventType == EVENT_WRITE && d._4.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[AdmFileObject],
-      List(
-        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
-        d => List(d._1._2.map(_.path).getOrElse("<no_writing_subject_path_node>")),
-        d => List(d._5._2.map(_.path).getOrElse("<no_executing_subject_path_node>"))
-      ),
-      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
-    ),
-    PpmDefinition[(Subject, Event, Object, Event, Subject)]("CommunicationPathThroughObject",
-      d => d._1._2.map(_.path).getOrElse("<no_path_on_subject_1>") != d._5._2.map(_.path).getOrElse("<no_path_on_subject_2>") &&  // distinct subjects!
-           writeTypes.contains(d._2.eventType) && readTypes.contains(d._4.eventType),
-      List(
-        d => List(d._1._2.map(_.path).getOrElse("<no_path_node_on_subject_1>")),
-        d => List(d._5._2.map(_.path).getOrElse("<no_path_node_on_subject_2>")),
-        d => List(d._3._1.getClass.getSimpleName),
-        d => List(d._3._2.map(_.path).getOrElse("<no_path_on_intermediate_object>"))
-      ),
-      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
-    )
+
   ).par
+  (
+//    PpmDefinition[(Event, Subject, Object)]("FileExecuteDelete",   // TODO: This doesn't need subjects
+//      d => d._2.eventType == EVENT_EXECUTE && d._4.eventType == EVENT_UNLINK && d._3._1.isInstanceOf[AdmFileObject],
+//      List(
+//        d => List(d._3._2.map(_.path).getOrElse(d._2.uuid + "-->SOME_FILE<--" + d._4.uuid))
+//      ),
+//      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
+//    ),
+//    PpmDefinition[(Event, Subject, Object)]("FileWrittenThenExecuted",
+//      d => d._2.eventType == EVENT_WRITE && d._4.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[AdmFileObject],
+//      List(
+//        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
+//        d => List(d._1._2.map(_.path).getOrElse("<no_writing_subject_path_node>")),
+//        d => List(d._5._2.map(_.path).getOrElse("<no_executing_subject_path_node>"))
+//      ),
+//      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
+//    ),
+//    PpmDefinition[(Event, Subject, Object)]("CommunicationPathThroughObject",
+//      d => d._1._2.map(_.path).getOrElse("<no_path_on_subject_1>") != d._5._2.map(_.path).getOrElse("<no_path_on_subject_2>") &&  // distinct subjects!
+//           writeTypes.contains(d._2.eventType) && readTypes.contains(d._4.eventType),
+//      List(
+//        d => List(d._1._2.map(_.path).getOrElse("<no_path_node_on_subject_1>")),
+//        d => List(d._5._2.map(_.path).getOrElse("<no_path_node_on_subject_2>")),
+//        d => List(d._3._1.getClass.getSimpleName),
+//        d => List(d._3._2.map(_.path).getOrElse("<no_path_on_intermediate_object>"))
+//      ),
+//      d => Set(d._1._1.uuid, d._2.uuid, d._3._1.uuid, d._4.uuid, d._5._1.uuid)
+//    )
+  )
 
 
 //  TODO: alarm filter for every tree?
@@ -290,15 +295,34 @@ object NoveltyDetection {
     }
   ).par
 
+  val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
+  val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTrees
 
-  val ppmList = esoTrees ++ seoesTrees ++ oeseoTrees ++ esTrees
 }
 
 
 case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]], uuidCollector: DataShape => Set[ExtendedUuid]) {
-  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
-  val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
-  val tree = PpmTree(inputFilePath.map{println(s"Reading tree $name in from file: $inputFilePath"); TreeRepr.readFromFile})
+  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + ".csv").toOption
+  val outputFilePath =
+    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
+      Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + ".csv").toOption
+    else None
+  val tree = PpmTree(
+    if (Application.config.getBoolean("adapt.ppm.shouldload"))
+      inputFilePath.flatMap { s =>
+        TreeRepr.readFromFile(s).map{ t =>
+          println(s"Reading tree $name in from file: $s")
+          t
+        } orElse {
+          println(s"Loading no data for tree: $name")
+          None
+        }
+      }
+    else {
+      println(s"Loading no data for tree: $name")
+      None
+    }
+  )
   var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] = Map.empty
 
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
@@ -437,14 +461,15 @@ class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
   NoveltyDetection.ppmList.foreach(_ => ())  // Reference the DelayedInit of this object just to instantiate before stream processing begins
 
-  context.system.registerOnTermination {
-    ppmList.foreach { ppm => ppm.saveState() }
-    val iForestTree = esTrees.find(_.name == "iForestProcessEventType")
+  override def postStop(): Unit = {
+    if (Application.config.getBoolean("adapt.ppm.shouldsave")) ppmList.foreach(_.saveState())
+    super.postStop()
+
+    val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
     iForestTree match {
       case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
       case None => println("ProcessEventType tree for iForest is not defined.")
     }
-
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
@@ -462,12 +487,7 @@ class PpmActor extends Actor with ActorLogging {
         flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
         case Success(flatEvents) =>
-          esoTrees.foreach(ppm =>
-            flatEvents.foreach(e =>
-              ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
-            )
-          )
-          oeseoTrees.foreach(ppm =>
+          admPpmTrees.foreach(ppm =>
             flatEvents.foreach(e =>
               ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
             )
@@ -478,15 +498,18 @@ class PpmActor extends Actor with ActorLogging {
       Try (
         (e,s,subPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-      case Success(e) => esTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(e))
+      case Success(e) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(e))
       case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
 
       sender() ! Ack
 
 
-    case msg @ (Some(s1: AdmSubject), sub1PathNodes: Set[_], e1: Event, o: ADM, objPathNodes: Set[_], e2: Event, s2: AdmSubject, sub2PathNodes: Set[_]) =>
-      ???
+    case (_, cdm: CDM) =>
+      cdmSanityTrees.foreach( ppm =>
+        ppm.recordAlarm(ppm.observe(cdm).map(o => o -> ppm.uuidCollector(cdm)))
+      )
+      sender() ! Ack
 
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace) =>
@@ -504,7 +527,9 @@ class PpmActor extends Actor with ActorLogging {
 
     case InitMsg =>  /*Future { EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack;
 
-    case SaveTrees => ppmList.foreach(_.saveState())
+    case SaveTrees(shouldConfirm) =>
+      ppmList.foreach(_.saveState())
+      if (shouldConfirm) sender ! Ack
 
     case CompleteMsg =>
       ppmList.foreach { ppm =>
@@ -512,7 +537,7 @@ class PpmActor extends Actor with ActorLogging {
 //        println(ppm.prettyString)
 //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
       }
-      val iForestTree = esTrees.find(_.name == "iForestProcessEventType")
+      val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
       iForestTree match {
         case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
         case None => println("ProcessEventType tree for iForest is not defined.")
@@ -520,7 +545,7 @@ class PpmActor extends Actor with ActorLogging {
       println("Done")
 
     case x =>
-      log.error(s"Received Unknown Message: $x")
+      log.error(s"PPM Actor received Unknown Message: $x")
       sender() ! Ack
   }
 }
@@ -541,7 +566,7 @@ case class SetPpmRatings(treeName: String, key: List[List[String]], rating: Int,
 
 case class PpmTreeCountQuery(treeName: String)
 case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
-case object SaveTrees
+case class SaveTrees(shouldConfirm: Boolean = false)
 
 
 sealed trait UiTreeElement{
@@ -645,12 +670,12 @@ case object TreeRepr {
     (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
   }
 
-  def readFromFile(filePath: String): TreeRepr = {
+  def readFromFile(filePath: String): Option[TreeRepr] = Try {
     val fileHandle = new File(filePath)
     val parser = new CsvParser(new CsvParserSettings)
     val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
     TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
-  }
+  }.toOption
 }
 
 case object ProcessDirectoryTouchesAux {
