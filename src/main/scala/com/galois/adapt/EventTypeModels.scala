@@ -155,7 +155,7 @@ object EventTypeModels {
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
   def evaluateModels(system: ActorSystem): Unit  = {
-    val writeResult = EventTypeData.query("ProcessEventType").results match {
+    val writeResult = EventTypeData.query("IForestProcessEventType").results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
       case _ => Failure(new RuntimeException("Unable to query data for IForest.")) //If there is no data, we want a failure (this seems hacky)
     }
