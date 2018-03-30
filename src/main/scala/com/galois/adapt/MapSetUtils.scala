@@ -27,7 +27,7 @@ object MapSetUtils {
   // Subset of the `Set` trait. I'm too lazy to implement more of it. Can be replaced with `mutable.Set` for debugging.
   trait AlmostSet[V] {
     def contains(value: V): Boolean
-    def add(value: V): Unit
+    def add(value: V): Boolean
     def size(): Long
   }
 
@@ -76,7 +76,7 @@ object MapSetUtils {
 
     def contains(v2: V2): Boolean = set.contains(intoValue(v2))
 
-    def add(v2: V2): Unit = set.add(intoValue(v2))
+    def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.getMap.sizeLong()
   }
@@ -89,7 +89,7 @@ object MapSetUtils {
 
     def contains(v2: V2): Boolean = set.contains(intoValue(v2))
 
-    def add(v2: V2): Unit = set.add(intoValue(v2))
+    def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.size()
   }
@@ -98,7 +98,7 @@ object MapSetUtils {
   def scalaSet[V](set: mutable.Set[V]): AlmostSet[V] = new AlmostSet[V] {
     def contains(v: V): Boolean = set.contains(v)
 
-    def add(v: V): Unit = set.add(v)
+    def add(v: V): Boolean = set.add(v)
 
     def size(): Long = set.size
   }
@@ -108,9 +108,12 @@ object MapSetUtils {
 
     def contains(v: V): Boolean = bf.mightContain(v)
 
-    def add(v: V): Unit = if (!bf.mightContain(v)) {
+    def add(v: V): Boolean = if (!bf.mightContain(v)) {
       count += 1
       bf.add(v)
+      true
+    } else {
+      false
     }
 
     def size(): Long = count
@@ -121,9 +124,10 @@ object MapSetUtils {
 
     def contains(v: V): Boolean = map.containsKey(v)
 
-    def add(v: V): Unit = {
+    def add(v: V): Boolean = {
       val vOld = map.put(v, None)
       if (vOld == null) count += 1
+      vOld == null
     }
 
     def size(): Long = count
