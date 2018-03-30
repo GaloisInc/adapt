@@ -86,7 +86,7 @@ object FlowComponents {
           sampledTime
         )
 
-//        populationCounter.clear()
+        populationCounter.clear()
 
         lastTimestampNanos = nowNanos
       }

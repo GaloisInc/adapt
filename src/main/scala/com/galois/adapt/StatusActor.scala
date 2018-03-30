@@ -13,14 +13,16 @@ class StatusActor extends Actor {
 
   val generalRecords = mutable.Map.empty[String,Any]
 
-  val populationLog = mutable.Map.empty[String, Long]
+  val totalPopulationLog = mutable.Map.empty[String, Long]
+  var recentPopulationLog = Map.empty[String, Long]
 
 
   def receive = {
     case GetStats => sender() ! StatusReport(
       currentlyIngesting,
       generalRecords.toMap.mapValues(_.toString),
-      populationLog.toMap
+      totalPopulationLog.toMap,
+      recentPopulationLog
     )
 
     case LogToDisk(p: String) => Try {
@@ -32,8 +34,9 @@ class StatusActor extends Actor {
     case p: PopulationLog =>
       p.counter.foreach{ case (k,v) =>
         val key = s"${p.name}: $k"
-        populationLog += (key -> (populationLog.getOrElse(key, 0L) + v))
+        totalPopulationLog += (key -> (totalPopulationLog.getOrElse(key, 0L) + v))
       }
+      recentPopulationLog = p.counter
 
       generalRecords += ("every" -> p.every)
       generalRecords += ("secondsThisEvery" -> p.secondsThisEvery)
@@ -82,5 +85,6 @@ case class DecrementCount(name: String)
 case class StatusReport(
   currentlyIngesting: Boolean,
   generalRecords: Map[String,String],
-  population: Map[String, Long]
+  totalPopulation: Map[String, Long],
+  recentPopulation: Map[String, Long]
 )
