@@ -8,7 +8,10 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType}
 import java.io.{File, PrintWriter}
+import java.nio.file.{Files, StandardOpenOption}
+
 import com.galois.adapt.adm.EntityResolution.CDM
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -272,7 +275,18 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadfile")).toOption
   val outputFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savefile")).toOption
   val tree = PpmTree(inputFilePath.map{println(s"Reading tree $name in from file: $inputFilePath"); TreeRepr.readFromFile})
-  var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] = Map.empty
+
+  val inputAlarmFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.loadalarmfile")).toOption
+  val outputAlarmFilePath = Try(Application.config.getString("adapt.ppm.basedir") + Application.config.getString(s"adapt.ppm.$name.savealarmfile")).toOption
+  var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] = inputAlarmFilePath match {
+    case None => Map.empty
+    case Some(fp) =>
+      import spray.json._
+      import ApiJsonProtocol._
+
+      val content = new String (Files.readAllBytes(new File(fp).toPath()))
+      content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int]))]].toMap
+  }
 
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
     tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators)) else None
@@ -287,7 +301,16 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
   }
   def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
 
-  def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+  def saveState(): Unit = {
+    outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+    outputAlarmFilePath.foreach((fp: String) => {
+      import spray.json._
+      import ApiJsonProtocol._
+
+      val content = alarms.toList.toJson.prettyPrint
+      Files.write(new File(fp).toPath, content.getBytes, StandardOpenOption.TRUNCATE_EXISTING)
+    })
+  }
   def prettyString: String = tree.getTreeRepr(key = name).toString
 }
 
