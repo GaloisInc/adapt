@@ -58,18 +58,19 @@ object EventTypeModels {
 
     def collect(data: Map[List[ExtractedValue], Int]): Map[Process,EventTypeCounts] = {
       // This removes all but max depth of ProcessEventType tree, which is all we need.
+      println(data.keys)
       val dataFiltered = data.filter {
-        case (extractedValues, _) => extractedValues.lengthCompare(3)==0 && extractedValues.last != "_?_"
+        case (extractedValues, _) => EventType.from(extractedValues.last).isDefined
       }
 
       dataFiltered.groupBy(x => (x._1.head,x._1(1))).map{ case ((name, uuid), dataMap) =>
         Process(name,uuid) ->
-          dataMap.map(e => EventType.from(e._1.last).get->e._2)
+          dataMap.map(e => EventType.from(e._1.last).get -> e._2)
       }
     }
 
     def collectToCSVArray(row: (Process,EventTypeCounts),modelName: String = "iforest"): Array[String] = {
-      if (row._1.name == "") Array("NA",row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,1)).map(_.toString)
+      if (row._1.name.isEmpty) Array("NA",row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,1)).map(_.toString)
       else Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
     }
 
