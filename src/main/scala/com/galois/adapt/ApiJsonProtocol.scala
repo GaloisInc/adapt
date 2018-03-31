@@ -3,16 +3,44 @@ package com.galois.adapt
 import java.util.UUID
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import com.galois.adapt.adm.{ExtendedUuid,CdmUUID,AdmUUID}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
+
 import scala.collection.JavaConverters._
 import scala.collection.SortedSet
 
 
 object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
 
+  implicit object UUIDFormat extends JsonFormat[UUID] {
+    def write(uuid: UUID) = JsString(uuid.toString)
+    def read(value: JsValue) = value match {
+      case JsString(uuid) => UUID.fromString(uuid)
+      case _              => throw new DeserializationException("Expected hexadecimal UUID string")
+    }
+  }
+
   implicit val statusReport = jsonFormat4(StatusReport)
   implicit val populationLog = jsonFormat16(PopulationLog)
+  implicit val cdmUuid = jsonFormat2(CdmUUID.apply)
+  implicit val admUuid = jsonFormat2(AdmUUID.apply)
+
+  implicit val extendedUuid: RootJsonFormat[ExtendedUuid] = new RootJsonFormat[ExtendedUuid] {
+    override def write(eUuid: ExtendedUuid): JsValue = {
+      val JsObject(payload) = eUuid match {
+        case cdm: CdmUUID => cdmUuid.write(cdm)
+        case adm: AdmUUID => admUuid.write(adm)
+      }
+      JsObject(payload + ("type" -> JsString(eUuid.productPrefix)))
+    }
+
+    override def read(json: JsValue): ExtendedUuid =
+      json.asJsObject.getFields("type") match {
+        case Seq(JsString("CdmUUID")) => cdmUuid.read(json)
+        case Seq(JsString("AdmUUID")) => admUuid.read(json)
+      }
+  }
 
   implicit def sortedSetFormat[T : JsonFormat : Ordering] = viaSeq[SortedSet[T], T](seq => SortedSet.empty)
   implicit object uiTreeElementFormat extends JsonFormat[UiTreeElement] {
@@ -30,14 +58,6 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val uiNodeFormat = jsonFormat3(UINode)
   implicit val uiEdgeFormat = jsonFormat3(UIEdge)
-
-  implicit object UUIDFormat extends JsonFormat[UUID] {
-    def write(uuid: UUID) = JsString(uuid.toString)
-    def read(value: JsValue) = value match {
-      case JsString(uuid) => UUID.fromString(uuid)
-      case _              => throw new DeserializationException("Expected hexadecimal UUID string")
-    }
-  }
 
   val vertexTypeTuple = "type" -> JsString("vertex")
   val edgeTypeTuple   = "type" -> JsString("edge")

@@ -59,6 +59,7 @@ object PpmComponents {
             }
           }
         )
+
       case Right(EdgeAdm2Adm(src, "predicateObject", tgt)) =>
         release(
           everything.get(tgt).flatMap { obj =>
@@ -73,6 +74,7 @@ object PpmComponents {
             }
           }
         )
+
       case Right(EdgeAdm2Adm(src, "predicateObject2", tgt)) =>
         release(
           everything.get(tgt).flatMap { obj =>
@@ -87,11 +89,21 @@ object PpmComponents {
             }
           }
         )
+
+      case Right(EdgeAdm2Adm(child, "parentSubject", parent)) =>
+        release(
+          everything.get(child).flatMap { c =>
+            everything.get(parent).map{ p =>
+              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, 0L, 0L, ""), c, c.uuid, p, p.uuid)
+            }
+          }
+        )
+
       case Right(EdgeAdm2Adm(subObj, label, pathNode)) if List("cmdLine", "(cmdLine)", "exec", "path", "(path)").contains(label) =>
-        // TODO: What about Events which contain a new AdmPathNode definition/edge which arrives _just_ after the edge.
         val newSet: Set[AdmUUID] = pathNodeUses.getOrElse(subObj, Set.empty[AdmUUID]).+(pathNode)
         pathNodeUses += (subObj -> newSet)
         release(None)
+
 
   //      case Left(edge) =>
   //          edge.label match { // throw away the referenced UUIDs!

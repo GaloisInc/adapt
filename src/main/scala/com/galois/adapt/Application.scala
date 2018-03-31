@@ -400,7 +400,7 @@ object Application extends App {
 
       CDMSource.cdm18(ta1)
         .via(printCounter("E3 Training", statusActor))
-        .via(filterFlow)
+//        .via(filterFlow)
         .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
