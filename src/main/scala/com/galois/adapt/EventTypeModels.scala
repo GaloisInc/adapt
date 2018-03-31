@@ -50,7 +50,7 @@ object EventTypeModels {
     def query(treeName: String): PpmTreeCountResult = {
       implicit val timeout: Timeout = Timeout(60000 seconds)
       val future = ppmActor ? PpmTreeCountQuery(treeName: String)
-      Await.ready(future, timeout.duration).value.get match {
+      Await.result(future, timeout.duration) match {
         case Success(result) => result.asInstanceOf[PpmTreeCountResult]
         case Failure(msg) => println(s"Unable to query ProcessEventTypeCounts: ${msg.getMessage}"); PpmTreeCountResult(None)
       }
@@ -62,9 +62,11 @@ object EventTypeModels {
         case (extractedValues, _) => extractedValues.lengthCompare(3)==0 && extractedValues.last != "_?_"
       }
 
-      dataFiltered.groupBy(x => (x._1.head,x._1(1))).map{ case ((name, uuid), dataMap) =>
-        Process(name,uuid) ->
-          dataMap.map(e => EventType.from(e._1.last).get->e._2)
+      dataFiltered.groupBy(x => (x._1.head,x._1(1))).map { case ((name, uuid), dataMap) =>
+        Process(name,uuid) -> dataMap.collect {
+          case (key, value) if key.lastOption.flatMap(EventType.from).isDefined =>
+            EventType.from(key.last).get -> value
+          }
       }
     }
 
