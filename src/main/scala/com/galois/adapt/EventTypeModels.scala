@@ -145,10 +145,10 @@ object EventTypeModels {
 
   object Execute {
 
-    def iforest(iforestDir: String, trainFile: String, testFile: String, outFile: String): Int = {
+    def iforest(iforestDirFile: File, trainFile: String, testFile: String, outFile: String): Int = {
       val s = s"./iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
-      println(s"Executing iforest in directory $iforestDir with command: $s")
-      sys.process.Process(s, new File(iforestDir)) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
+      println(s"Executing iforest in iforest directory with command: $s")
+      sys.process.Process(s, iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
     def fca(scoringScriptDir: File,testFile: String, testFileRCF: String, outputFile: String): Int = {
@@ -174,7 +174,7 @@ object EventTypeModels {
 
     writeResult match {
       case Success(_) =>
-        Try(Execute.iforest(modelDirIForest,trainFileIForest,evalFileIForest,outputFileIForest))
+        Try(Execute.iforest(dirIForest,trainFileIForest,evalFileIForest,outputFileIForest))
       case Failure(ex) => println(s"Unable to query or write data for IForest: ${ex.getMessage}")
     }
 
@@ -188,7 +188,7 @@ object EventTypeModels {
       }
     }
 
-    Try(system.scheduler.scheduleOnce(1 minutes)(evaluateModels(system)))
+    Try(system.scheduler.scheduleOnce(15 minutes)(evaluateModels(system)))
 
   }
 
