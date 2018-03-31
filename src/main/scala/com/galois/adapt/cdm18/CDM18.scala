@@ -221,6 +221,7 @@ case object EVENT_UPDATE extends EventType
 case object EVENT_WAIT extends EventType
 case object EVENT_WRITE extends EventType
 case object EVENT_WRITE_SOCKET_PARAMS extends EventType
+case object PSEUDO_EVENT_PARENT_SUBJECT extends EventType   // Added by us to pluck out parent/child processes
 
 // Updated
 sealed trait FileObjectType extends CDM18
