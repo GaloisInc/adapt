@@ -399,7 +399,9 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
       import ApiJsonProtocol._
 
       val content = alarms.toList.toJson.prettyPrint
-      Files.write(new File(fp).toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+      val outputFile = new File(fp)
+      if ( ! outputFile.exists) outputFile.createNewFile()
+      Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
     })
   }
   def prettyString: String = tree.getTreeRepr(key = name).toString
