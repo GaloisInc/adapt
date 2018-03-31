@@ -33,6 +33,10 @@ object EventTypeModels {
 
   val modelDirIForest = Application.config.getString("adapt.ppm.eventtypemodelsdir")
   val dirIForest = new File(modelDirIForest)
+  val baseDirFile = new File(Application.config.getString("adapt.ppm.basedir"))
+  if ( !dirIForest.exists && baseDirFile.exists && baseDirFile.canWrite && baseDirFile.isDirectory) dirIForest.mkdir()
+
+
 
   val trainFileIForest = "train_iforest.csv"
   val evalFileIForest = "eval_iforest.csv"
