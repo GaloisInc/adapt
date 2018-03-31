@@ -8,7 +8,11 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType}
 import java.io.{File, PrintWriter}
+import java.nio.charset.{Charset, StandardCharsets}
+import java.nio.file.{Files, StandardOpenOption}
+
 import com.galois.adapt.adm.EntityResolution.CDM
+
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.collection.mutable
@@ -314,6 +318,7 @@ object NoveltyDetection {
 
 
 case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]], uuidCollector: DataShape => Set[ExtendedUuid]) {
+
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + ".csv").toOption
   val outputFilePath =
     if (Application.config.getBoolean("adapt.ppm.shouldsave"))
@@ -327,7 +332,30 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
       }
     else { println(s"Loading no data for tree: $name"); None }
   )
-  var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] = Map.empty
+
+  val inputAlarmFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + "_alarm.json").toOption
+  val outputAlarmFilePath =
+    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
+      Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + "_alarm.json").toOption
+    else None
+  var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] =
+    if (Application.config.getBoolean("adapt.ppm.shouldload"))
+      inputAlarmFilePath.flatMap { fp =>
+        Try {
+          import spray.json._
+          import ApiJsonProtocol._
+
+          val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int]))]].toMap
+        }.toOption orElse  {
+          println(s"Failed to load alarms for tree: $name")
+          None
+        }
+      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])])
+    else {
+      println(s"Loading no alarms for tree: $name")
+      Map.empty
+    }
 
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
     tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators)) else None
@@ -342,7 +370,16 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
   }
   def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
 
-  def saveState(): Unit = outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+  def saveState(): Unit = {
+    outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
+    outputAlarmFilePath.foreach((fp: String) => {
+      import spray.json._
+      import ApiJsonProtocol._
+
+      val content = alarms.toList.toJson.prettyPrint
+      Files.write(new File(fp).toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+    })
+  }
   def prettyString: String = tree.getTreeRepr(key = name).toString
 }
 
