@@ -21,7 +21,6 @@ import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
 object NoveltyDetection {
   type Event = AdmEvent
   type Subject = (AdmSubject, Option[AdmPathNode])
@@ -659,7 +658,7 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg =>  /*Future { EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack;
+    case InitMsg => Future { EventTypeModels.evaluateModels(context.system)}; sender() ! Ack;
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveStateAsync())

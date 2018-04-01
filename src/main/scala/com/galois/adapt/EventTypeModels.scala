@@ -11,7 +11,7 @@ import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWr
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.sys.process._
 import Application.ppmActor
 import akka.actor.ActorSystem
@@ -52,11 +52,16 @@ object EventTypeModels {
   object EventTypeData {
 
     def query(treeName: String): PpmTreeCountResult = {
-      implicit val timeout: Timeout = Timeout(60000 seconds)
-      val future = ppmActor ? PpmTreeCountQuery(treeName: String)
-      Await.result(future, timeout.duration) match {
-        case Success(result) => result.asInstanceOf[PpmTreeCountResult]
-        case Failure(msg) => println(s"Unable to query ProcessEventTypeCounts: ${msg.getMessage}"); PpmTreeCountResult(None)
+      implicit val timeout: Timeout = Timeout(6 seconds)
+      val future: Future[Any] = ppmActor ? PpmTreeCountQuery(treeName: String)
+      val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
+        case Some(Success(result)) => result
+        case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
+        case None => println("Unable to query IForestProcessEventTypeCounts"); None
+      }
+      ppmTreeCountFutureResult match {
+        case ppmTreeCountResult: PpmTreeCountResult => ppmTreeCountResult
+        case None => PpmTreeCountResult(None)
       }
     }
 
@@ -75,7 +80,7 @@ object EventTypeModels {
     }
 
     def collectToCSVArray(row: (Process,EventTypeCounts),modelName: String = "iforest"): Array[String] = {
-      if (row._1.name == "") Array("NA",row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,1)).map(_.toString)
+      if (row._1.name.isEmpty) Array("NA",row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
       else Array(row._1.name,row._1.uuid) ++ EventType.values.map(e => row._2.getOrElse(e,0)).map(_.toString)
     }
 
@@ -127,7 +132,7 @@ object EventTypeModels {
         (extractedRow._1,extractedRow._3,extractedRow._3,1),
         (extractedRow._2,extractedRow._3,extractedRow._3,1)
         ),
-        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),Application.ta1)),
+        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),"")),
         Map.empty[String, Int]
       )
     }
@@ -144,18 +149,18 @@ object EventTypeModels {
 
     def iforest(iforestDirFile: File, trainFile: String, testFile: String, outFile: String): Int = {
       val s = s"./iforest.exe -t 100 -s 512 -m 1-3 -r 1 -n 0 -k 50 -z 1 -p 1 -i $trainFile -c $testFile -o $outFile"
-      println(s)
-      sys.process.Process(s,iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
+      println(s"Executing iforest in iforest directory with command: $s")
+      sys.process.Process(s, iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
     def fca(scoringScriptDir: File,testFile: String, testFileRCF: String, outputFile: String): Int = {
 
       val makeRCF = s"""Rscript -e "source('csv_to_rcf.r'); csv_to_rcf('$testFile','$testFileRCF')" """
-      println(makeRCF)
+      //println(makeRCF)
       sys.process.Process(makeRCF,scoringScriptDir) ! ProcessLogger(_ => ())
 
       val s = s"Rscript contexts_scoring_shell.r ProcessEvent $testFile $testFileRCF $outputFile 97 97"
-      println(s)
+      //println(s)
       sys.process.Process(s,scoringScriptDir) ! ProcessLogger(_ => ())
     }
   }
@@ -163,9 +168,10 @@ object EventTypeModels {
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
   def evaluateModels(system: ActorSystem): Unit  = {
-    val writeResult = EventTypeData.query("IForestProcessEventType").results match {
+    val writeResult = EventTypeData.query("iForestProcessEventType").results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
-      case _ => Failure(new RuntimeException("Unable to query data for IForest.")) //If there is no data, we want a failure (this seems hacky)
+      case _ => println("Query to IForestProcessEventType returned no data.")
+        Failure(new RuntimeException("Query to IForestProcessEventType returned no data.")) //If there is no data, we want a failure (this seems hacky)
     }
 
     writeResult match {
@@ -176,12 +182,15 @@ object EventTypeModels {
 
     alarmTreeToFile.foreach {
       case (ppmName,file) => ppmList.find(_.name == ppmName) match {
-        case Some(tree) => tree.alarms = getAlarms(file)
+        case Some(tree) =>  Try(getAlarms(file)) match {
+          case Success(alarms) => tree.alarms = alarms
+          case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
+        }
         case None => println(s"Unable to find tree for use in IForest alarm display: $ppmName")
       }
     }
 
-    system.scheduler.scheduleOnce(2 minutes)(evaluateModels(system))
+    Try(system.scheduler.scheduleOnce(15 minutes)(evaluateModels(system)))
 
   }
 
@@ -189,7 +198,7 @@ object EventTypeModels {
   def getAlarms(iforestAlarmFile: String): Map[List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmMap(iforestAlarmFile)
 
-    new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
+    //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
 
     iforestAlarms
   }
