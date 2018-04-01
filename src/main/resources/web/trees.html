@@ -13,6 +13,7 @@
 
 var treeNames = []
 var urlParams = new URLSearchParams(window.location.search)
+var renderedTrees;
 
 
 
@@ -59,6 +60,15 @@ function matchesTimeRange(node, start, stop) {
 	return first && second
 }
 
+function addToRendered(elem, name) {
+	var container = elem.parentNode
+	container.parentNode.removeChild(container)
+	renderedTrees = renderedTrees.concat([name])
+	localStorage.setItem("renderedTrees", renderedTrees.join(","))
+	location.reload()
+}
+
+
 
 
 $(function(){
@@ -73,13 +83,29 @@ $(function(){
 		}
 	}
 
-	$.getJSON(testingPrefix + "/api/ppm/listTrees", function(names) {
-		var excluded = []
-		if (urlParams.has('excludedTrees')) {
-			excluded = urlParams.get('excludedTrees').split(",")
+
+	var shouldLoadAllTrees = false
+	if (urlParams.has('includedTrees')) {
+		renderedTrees = urlParams.get('includedTrees').split(",")
+	} else {
+		if ( ! _.isNull(localStorage.getItem("renderedTrees"))) {
+			renderedTrees = localStorage.getItem("renderedTrees").split(",")
+		} else {
+			if (_.isNull(renderedTrees)) { renderedTrees = [] }
+			shouldLoadAllTrees = true
 		}
-		treeNames = _.filter(names, function(n){ return ! _.contains(excluded, n) })
-		_.map(_.sortBy(treeNames), function(name) {
+	}
+
+
+	$.getJSON(testingPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
+
+		var names = _.keys(namesAndCounts)
+		renderedTrees = _.filter(renderedTrees, function(t){ return _.contains(names, t) })
+		if (shouldLoadAllTrees) renderedTrees = names
+		localStorage.setItem("renderedTrees", renderedTrees.join(","))
+		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(renderedTrees, t) })
+
+		_.map(_.sortBy(renderedTrees), function(name) {
 			$("#trees").append(
 				"<table id=" + name + ">"+ 
 					"<thead><tr>"+
@@ -89,9 +115,14 @@ $(function(){
 			)
 			createFancyTree(name)
 		})
+
+		_.map(unrenderedTrees, function(treeName){
+			$("#unrendered").append('<div><a href="#" onclick="addToRendered(this,\''+treeName+'\')">'+ treeName + ' (' + namesAndCounts[treeName] + ')</a></div>')
+		})
 	}).fail(function(e){
 		console.log(e)
 	})
+
 
 	function renderStars(numberFilled) {
 		return _.reduce([1,2,3,4,5], function(acc, idx){
@@ -99,6 +130,7 @@ $(function(){
 			return acc + '<i class="'+ fillStateClass +'" />'
 		}, "")
 	}
+
 
 	function createFancyTree(treeName) {
 		
@@ -374,7 +406,7 @@ $(function(){
 			<option value="<="><=</option>
 		</select>
 		<input id="localProbValue" placeholder="???" size="4" value="0.01" />
-		<label>Time range (millis):</label>
+		<label>Time range:</label>
 		<input id="timeStart" placeholder="1522097891995" size="14" />&nbsp;-&nbsp;<input id="timeStop" placeholder="1522097900000" size="14" />
 		<button id="filterButton">Filter</button>
 		<button id="btnResetSearch">CLEAR</button>
@@ -382,4 +414,5 @@ $(function(){
 		<span style="margin-left: 5em;">Set Rating: </span><span id="stars"></span>
 	</div>
 	<div id="trees"></div>
+	<div id="unrendered"></div>
 </body>

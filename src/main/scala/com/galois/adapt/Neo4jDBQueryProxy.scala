@@ -329,8 +329,7 @@ object Neo4jFlowComponents {
     .map(WriteCdmToNeo4jDB.apply)
     .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
 
-  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
-                            (implicit timeout: Timeout): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
+  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToNeo4jDB.apply)
     .buffer(4, OverflowStrategy.backpressure)

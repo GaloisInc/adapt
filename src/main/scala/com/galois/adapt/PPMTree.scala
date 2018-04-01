@@ -65,7 +65,8 @@ object NoveltyDetection {
           }
         })
       ),
-      d => Set(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1)),
+      _.asInstanceOf[cdm18.Event].timestampNanos
     ),
     PpmDefinition[CDM]("CDM-Subject",
       d => d.isInstanceOf[cdm18.Subject],
@@ -80,7 +81,8 @@ object NoveltyDetection {
           }
         })
       ),
-      d => Set(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1))
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1)),
+      _ => 0L
     ),
     PpmDefinition[CDM]("CDM-Netflow",
       d => d.isInstanceOf[cdm18.NetFlowObject],
@@ -94,7 +96,8 @@ object NoveltyDetection {
           }
         })
       ),
-      d => Set(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1))
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1)),
+      _ => 0L
     ),
     PpmDefinition[CDM]("CDM-FileObject",
       d => d.isInstanceOf[cdm18.FileObject],
@@ -109,7 +112,8 @@ object NoveltyDetection {
           }
         })
       ),
-      d => Set(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1))
+      d => Set(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1)),
+      _ => 0L
     )
   ).par
 
@@ -121,7 +125,8 @@ object NoveltyDetection {
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(d._2.uuid)
+      d => Set(d._2.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",
       d => d._3.nonEmpty,
@@ -129,7 +134,8 @@ object NoveltyDetection {
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(d._2.uuid)
+      d => Set(d._2.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
       d => d._3.nonEmpty,
@@ -137,7 +143,8 @@ object NoveltyDetection {
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(d._2.uuid)
+      d => Set(d._2.uuid),
+      _._1.latestTimestampNanos
     )
   ).par
 
@@ -149,7 +156,8 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
       d => readAndWriteTypes.contains(d._1.eventType),
@@ -157,7 +165,8 @@ object NoveltyDetection {
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
       d => d._1.eventType == EVENT_EXECUTE,
@@ -165,7 +174,8 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
       d => d._3._1.isInstanceOf[AdmNetFlowObject],
@@ -176,7 +186,8 @@ object NoveltyDetection {
           List(nf.remoteAddress, nf.remotePort.toString)
         }
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
       d => d._3._1.isInstanceOf[AdmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
@@ -187,7 +198,8 @@ object NoveltyDetection {
           case x => x
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
@@ -195,7 +207,8 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
       d => d._2._2.exists(p => sudoOrPowershellComparison(p.path)),
@@ -203,7 +216,8 @@ object NoveltyDetection {
         d => List(d._1.eventType.toString),
         d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ParentChildProcesses",
       d => d._1.eventType == PSEUDO_EVENT_PARENT_SUBJECT && d._2._2.isDefined && d._3._2.isDefined,
@@ -211,7 +225,8 @@ object NoveltyDetection {
         d._3._2.get.path,  // Parent process first
         d._2._2.get.path   // Child process second
       )),
-      d => Set(d._2._1.uuid, d._2._2.get.uuid, d._3._1.uuid, d._3._2.get.uuid)
+      d => Set(d._2._1.uuid, d._2._2.get.uuid, d._3._1.uuid, d._3._2.get.uuid),
+      _._1.latestTimestampNanos
     )
   ).par
 
@@ -228,7 +243,8 @@ object NoveltyDetection {
           d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Deleting process name or UUID
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid]
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
+      _._1.latestTimestampNanos
     ) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -251,7 +267,8 @@ object NoveltyDetection {
           d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid]
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
+      _._1.latestTimestampNanos
     ) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -282,7 +299,8 @@ object NoveltyDetection {
           )
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
@@ -314,7 +332,8 @@ object NoveltyDetection {
           }
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      _._1.latestTimestampNanos
     ) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)
@@ -340,7 +359,7 @@ object NoveltyDetection {
 }
 
 
-case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]], uuidCollector: DataShape => Set[ExtendedUuid]) {
+case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], discriminators: List[Discriminator[DataShape]], uuidCollector: DataShape => Set[ExtendedUuid], timestampExtractor: DataShape => Long) {
 
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + ".csv").toOption
   val outputFilePath =
@@ -381,8 +400,8 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
     }
 
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
-    tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators)) else None
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid])]): Unit = alarmOpt.foreach(a => alarms = alarms + (a._1.map(_._1) -> (System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])))
+    tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators), timestampExtractor(observation)) else None
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid], Long)]): Unit = alarmOpt.foreach(a => alarms = alarms + (a._1.map(_._1) -> (a._3, a._1, a._2, Map.empty[String,Int])))
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
     rating match {
       case Some(number) => // set the alarm rating in this namespace
@@ -451,7 +470,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
         case Some(firstExtracted) =>
           if (partialFilters._2(observation)) {
             val newlyExtracted = discriminators(1)(observation)
-            if (newlyExtracted.nonEmpty) tree.observe(arrangeExtracted(firstExtracted ++ newlyExtracted))
+            if (newlyExtracted.nonEmpty) tree.observe(arrangeExtracted(firstExtracted ++ newlyExtracted), observation._1.latestTimestampNanos)
             else None
           }
           else None
@@ -463,7 +482,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
 
 trait PpmTree {
   def getCount: Int
-  def observe(ds: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm]
+  def observe(ds: List[ExtractedValue], dataTimestamp: Long, thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm]
   def getTreeRepr(yourDepth: Int = 0, key: String = "", yourProbability: Float = 1F, parentGlobalProb: Float = 1F): TreeRepr
   var children: Map[ExtractedValue, PpmTree]
   override def equals(obj: scala.Any) = obj.isInstanceOf[PpmTree] && {
@@ -499,7 +518,7 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
   def localChildProbability(identifier: ExtractedValue): Float =
     children.getOrElse(identifier, children("_?_")).getCount.toFloat / totalChildCounts
 
-  def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F) = {
+  def observe(extractedValues: List[ExtractedValue], dataTimestamp: Long, thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F) = {
     counter += 1
     extractedValues match {
       case Nil if counter == 1 => Some(Nil)  // Start an alarm if the end is novel.
@@ -509,7 +528,7 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
         val thisGlobalProb = thisLocalProb * parentGlobalProb
         val childNode = children.getOrElse(extracted, new SymbolNode())
         if ( ! children.contains(extracted)) children = children + (extracted -> childNode)
-        childNode.observe(remainder, childLocalProb, thisGlobalProb).map {
+        childNode.observe(remainder, dataTimestamp, childLocalProb, thisGlobalProb).map {
           // Begin reporting information about the child:
           case Nil => List((extracted, childLocalProb, thisGlobalProb * childLocalProb, children("_?_").getCount - 1))  // Subtract 1 because we just added the child
           // Append information about the child:
@@ -535,7 +554,7 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
 class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
   def getCount = siblings.size - 1
   var children = Map.empty[ExtractedValue, PpmTree]
-  def observe(extractedValues: List[ExtractedValue], thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm] = Some(Nil)
+  def observe(extractedValues: List[ExtractedValue], dataTimestamp: Long, thisLocalProb: Float = 1F, parentGlobalProb: Float = 1F): Option[Alarm] = Some(Nil)
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount, Set.empty)
   override def equals(obj: scala.Any) = obj.isInstanceOf[QNode] && obj.asInstanceOf[QNode].getCount == getCount
@@ -567,7 +586,7 @@ class PpmActor extends Actor with ActorLogging {
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
-    case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name).toList)
+    case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(t => t.name -> t.tree.getCount).seq.toMap)
 
     case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
 
@@ -585,7 +604,7 @@ class PpmActor extends Actor with ActorLogging {
 //            if (flatEvents.size > 20) log.warning(s"path node SIZES: ${flatEvents.size}")
             admPpmTrees.foreach(ppm =>
               flatEvents.foreach(e =>
-                ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
+                ppm.recordAlarm(ppm.observe(e).map(o => (o, ppm.uuidCollector(e), ppm.timestampExtractor(e))))
               )
             )
           }
@@ -612,16 +631,23 @@ class PpmActor extends Actor with ActorLogging {
 
     case (_, cdm: CDM) =>
       cdmSanityTrees.foreach( ppm =>
-        ppm.recordAlarm(ppm.observe(cdm).map(o => o -> ppm.uuidCollector(cdm)))
+        ppm.recordAlarm(ppm.observe(cdm).map(o => (o, ppm.uuidCollector(cdm), ppm.timestampExtractor(cdm))))
       )
       sender() ! Ack
 
 
-    case PpmTreeAlarmQuery(treeName, queryPath, namespace) =>
+    case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
         if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_4 = a._4.get(namespace))).toList
         else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_4 = v._4.get(namespace))}.toList
-      )
+      ).map { r =>
+        val filteredResults = r.filter { case (timestamp, alarm, uuids, ratingOpt) =>
+          if (forwardFromStartTime) timestamp >= startAtTime else timestamp <= startAtTime &&
+            excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
+        }
+        val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1 else Long.MaxValue - i._1)
+        resultSizeLimit.fold(sortedResults)(limit => sortedResults.take(limit))
+      }
       sender() ! PpmTreeAlarmResult(resultOpt)
 
     case PpmTreeCountQuery(treeName) =>
@@ -653,8 +679,8 @@ class PpmActor extends Actor with ActorLogging {
 }
 
 case object ListPpmTrees
-case class PpmTreeNames(names: List[String])
-case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String)
+case class PpmTreeNames(namesAndCounts: Map[String, Int])
+case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None)
 case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Set[ExtendedUuid], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>

@@ -380,13 +380,13 @@ object Application extends App {
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
         case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> er.to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout))
+        case (false, true) => "ADM" -> er.to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg))
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[(String,CDM18)](2))
 
           broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast ~> er ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> er ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)
 
           SinkShape(broadcast.in)
         })
@@ -404,7 +404,6 @@ object Application extends App {
 
       CDMSource.cdm18(ta1)
         .via(printCounter("E3 Training", statusActor))
-//        .via(filterFlow)
         .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
@@ -412,7 +411,16 @@ object Application extends App {
 
 
     case "e3" =>
-      ???
+      startWebServer()
+      statusActor ! InitMsg
+
+      CDMSource.cdm18(ta1)
+        .via(printCounter("E3", statusActor))
+        .via(filterFlow)
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(er)
+        .via(splitToSink(PpmComponents.ppmSink, 1000))
+        .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
 
     case "sets" =>
 

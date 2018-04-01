@@ -1,5 +1,7 @@
 package com.galois.adapt
 
+import java.io.File
+
 import akka.actor.ActorSystem
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -40,14 +42,12 @@ object Routes {
     path("") {
       getFromResource("web/graph.html")
     } ~
-    path("rank") {
-      getFromResource("web/ranking.html")
-    } ~
     path("filter") {
       getFromResource("web/cdm-filter.html")
     } ~
     pathPrefix("") {
-      getFromResourceDirectory("web")
+      getFromDirectory(new File("src/main/resources/web").getCanonicalPath)   // Serve dynamically from what is in the 'web' folder (changes are served aber application start)
+//      getFromResourceDirectory("web")   // Serve what is packaged (e.g. into a fat jar) from the resource directory in the jar
     }
 
   implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
@@ -76,15 +76,17 @@ object Routes {
           pathPrefix("ppm") {
             path("listTrees") {
               complete(
-                (ppmActor ? ListPpmTrees).mapTo[PpmTreeNames].map(_.names)
+                (ppmActor ? ListPpmTrees).mapTo[PpmTreeNames].map(_.namesAndCounts)
               )
             } ~
             path(Segment) { treeName =>
-              parameter('query.as[String].?, 'namespace ? "adapt") { (queryString, namespace) =>
+              parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
+                (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
                 val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
                 import ApiJsonProtocol._
                 complete(
-                  (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase)).mapTo[PpmTreeAlarmResult]
+                  (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+                    .mapTo[PpmTreeAlarmResult]
                     .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                 )
               }
