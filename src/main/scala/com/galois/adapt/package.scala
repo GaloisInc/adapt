@@ -30,4 +30,11 @@ package object adapt {
   implicit class StringSetMethods(val set: Set[String]) extends AnyVal {
     def suffixFold: Set[String] = set.foldLeft(Set.empty[String])((acc, p) => if ((acc ++ set.-(p)).exists(s => s.endsWith(p))) acc else acc + p)
   }
+
+  def time[A](name: String)(f: => A) = {
+    val t0 = System.nanoTime
+    val ans = f
+    printf(s"$name elapsed: %.6f sec\n",(System.nanoTime-t0)*1e-9)
+    ans
+  }
 }

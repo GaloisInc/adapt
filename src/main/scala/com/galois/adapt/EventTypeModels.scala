@@ -83,7 +83,9 @@ object EventTypeModels {
 
     def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String, modelName: String = "iforest"): Unit = {
       val settings = new CsvWriterSettings
-      val pw = new PrintWriter(new File(filePath))
+      val file = new File(filePath)
+      if (file.exists()) file.createNewFile()
+      val pw = new PrintWriter(file)
       val writer = new CsvWriter(pw, settings)
       val header = if (modelName=="FCA") {
         List("uuid")++EventType.values.map(e => e.toString).toList

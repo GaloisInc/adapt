@@ -26,7 +26,8 @@ object FlowComponents {
 
 
   def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    var counter = config.getLong("adapt.ingest.startatoffset")
+    val startingCount = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
     val populationCounter = MutableMap.empty[String, Long]
@@ -67,7 +68,7 @@ object FlowComponents {
         val seenNodesSize = Application.seenNodes.size()
         val seenEdgesSize = Application.seenEdges.size()
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${(counter / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
 
         statusActor ! PopulationLog(
           counterName,

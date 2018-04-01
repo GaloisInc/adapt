@@ -31,7 +31,6 @@ object PpmComponents {
       val ppmPluckingDelay = Try(Application.config.getInt("adapt.ppm.pluckingdelay")).getOrElse(20)
       val releaseQueue = mutable.Map.empty[Long, DelayedESO]
       def release(item: Option[DelayedESO]): List[CompletedESO] = {
-//        if (releaseQueue.nonEmpty) println(releaseQueue.size)
         counter += 1
         item.foreach( i =>  // Add to release queue at X items in the future
           releaseQueue(counter + ppmPluckingDelay) = i

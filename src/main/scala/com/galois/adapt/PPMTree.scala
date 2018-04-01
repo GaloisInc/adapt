@@ -10,11 +10,13 @@ import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ
 import java.io.{File, PrintWriter}
 import java.nio.charset.{Charset, StandardCharsets}
 import java.nio.file.{Files, StandardOpenOption}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import com.galois.adapt.adm.EntityResolution.CDM
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -47,7 +49,6 @@ object NoveltyDetection {
     case "faros" | "fivedirections" => (s: String) => s.contains("powershell")
     case _                          => (s: String) => s == "sudo"
   }
-  def uuidWithClassName(adm: ADM): String = s"${adm.uuid.rendered} : ${adm.getClass.getSimpleName}"
 
 
   var cdmSanityTrees = List(
@@ -192,7 +193,7 @@ object NoveltyDetection {
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
       List(
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
-        d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse(uuidWithClassName(d._3._1)))
+        d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
       d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid)
     ),
@@ -298,7 +299,7 @@ object NoveltyDetection {
 
 
   val oeseoTrees = List(
-    new PpmDefinition[DataShape]("ProcessWritesFileAfterNetflowRead",
+    new PpmDefinition[DataShape]("ProcessWritesFileSoonAfterNetflowRead",
       d => readAndWriteTypes.contains(d._1.eventType),
       List(
         d => {
@@ -392,17 +393,38 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
   }
   def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
 
-  def saveState(): Unit = {
-    outputFilePath.foreach(tree.getTreeRepr(key = name).writeToFile)
-    outputAlarmFilePath.foreach((fp: String) => {
-      import spray.json._
-      import ApiJsonProtocol._
 
-      val content = alarms.toList.toJson.prettyPrint
-      val outputFile = new File(fp)
-      if ( ! outputFile.exists) outputFile.createNewFile()
-      Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-    })
+  val saveEveryAndNoMoreThan = Try(Application.config.getLong("adapt.ppm.saveintervalseconds")).getOrElse(0L)
+  val lastSaveCompleteMillis = new AtomicLong(0L)
+  val currentlySaving = new AtomicBoolean(false)
+
+  def saveStateAsync(): Unit = {
+    val now = System.currentTimeMillis
+    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
+    if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
+      currentlySaving.set(true)
+      Future {
+        val repr = //time(s"get tree REPR for $name with count: ${tree.getCount}")(
+          tree.getTreeRepr(key = name)
+//        )
+        outputFilePath.foreach(p =>
+//          time(s"write repr to disk for $name")(
+            repr.writeToFile(p)
+//          )
+        )
+        outputAlarmFilePath.foreach((fp: String) => {
+          import spray.json._
+          import ApiJsonProtocol._
+
+          val content = alarms.toList.toJson.prettyPrint
+          val outputFile = new File(fp)
+          if ( ! outputFile.exists) outputFile.createNewFile()
+          Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+        })
+        lastSaveCompleteMillis.set(System.currentTimeMillis)
+        currentlySaving.set(false)
+      }
+    }
   }
   def prettyString: String = tree.getTreeRepr(key = name).toString
 }
@@ -498,7 +520,7 @@ class SymbolNode(repr: Option[TreeRepr] = None) extends PpmTree {
 
   def getTreeRepr(yourDepth: Int, key: String, yourProbability: Float, parentGlobalProb: Float): TreeRepr =
     TreeRepr(yourDepth, key, yourProbability, yourProbability * parentGlobalProb, getCount,
-      if (children.size > 1) children.toSet[(ExtractedValue, PpmTree)].map{
+      if (children.-("_?_").nonEmpty) children.toSet[(ExtractedValue, PpmTree)].map {
         case (k,v) => v.getTreeRepr(yourDepth + 1, k, localChildProbability(k), yourProbability * parentGlobalProb)
       } else Set.empty
     )
@@ -526,15 +548,20 @@ class PpmActor extends Actor with ActorLogging {
   import NoveltyDetection._
   NoveltyDetection.ppmList.foreach(_ => ())  // Reference the DelayedInit of this object just to instantiate before stream processing begins
 
-  override def postStop(): Unit = {
-    if (Application.config.getBoolean("adapt.ppm.shouldsave")) ppmList.foreach(_.saveState())
-    super.postStop()
-
+  def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
     iForestTree match {
       case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
       case None => println("ProcessEventType tree for iForest is not defined.")
     }
+  }
+
+  override def postStop(): Unit = {
+    if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
+      ppmList.foreach(_.saveStateAsync())
+      saveIforestModel()
+    }
+    super.postStop()
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
@@ -543,29 +570,42 @@ class PpmActor extends Actor with ActorLogging {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(_.name).toList)
 
     case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
+
       def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
         val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
         val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
         subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
       }
-      Try (
+
+      val f = Try(
         flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
         case Success(flatEvents) =>
-          admPpmTrees.foreach(ppm =>
-            flatEvents.foreach(e =>
-              ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
+          Future {
+//            if (flatEvents.size > 20) log.warning(s"path node SIZES: ${flatEvents.size}")
+            admPpmTrees.foreach(ppm =>
+              flatEvents.foreach(e =>
+                ppm.recordAlarm(ppm.observe(e).map(o => o -> ppm.uuidCollector(e)))
+              )
             )
-          )
-        case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+          }
+        case Failure(err) =>
+          log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+          Future.successful(())
       }
 
-      Try (
-        (e,s,subPathNodes.asInstanceOf[Set[AdmPathNode]])
+      Try(
+        (e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]])
       ) match {
-      case Success(e) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(e))
-      case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+        case Success(t) =>
+//          Future(
+            iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(t))
+//          )
+        case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
+      Try(
+        Await.result(f, 2 seconds)
+      ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
       sender() ! Ack
 
@@ -593,20 +633,17 @@ class PpmActor extends Actor with ActorLogging {
     case InitMsg =>  /*Future { EventTypeModels.evaluateModels(context.system)};*/ sender() ! Ack;
 
     case SaveTrees(shouldConfirm) =>
-      ppmList.foreach(_.saveState())
+      ppmList.foreach(_.saveStateAsync())
+      saveIforestModel()
       if (shouldConfirm) sender ! Ack
 
     case CompleteMsg =>
       ppmList.foreach { ppm =>
-        ppm.saveState()
+        ppm.saveStateAsync()
 //        println(ppm.prettyString)
 //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
       }
-      val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
-      iForestTree match {
-        case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
-        case None => println("ProcessEventType tree for iForest is not defined.")
-      }
+      saveIforestModel()
       println("Done")
 
     case x =>

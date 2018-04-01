@@ -104,6 +104,10 @@ object Application extends App {
   val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
   system.registerOnTermination(scheduledLogging.cancel())
 
+  val ppmBaseDirPath = config.getString("adapt.ppm.basedir")
+  val ppmBaseDirFile = new File(ppmBaseDirPath)
+  if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
+
   // Start up the database
   val dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
@@ -331,7 +335,7 @@ object Application extends App {
     }
 
 
-  val ta1 = config.getString("adapt.env.ta1")
+  var ta1 = config.getString("adapt.env.ta1")  // This gets overwritten with a single value pulled from a file--if it begins as anything other than a TA1 name from the config.  This mutability is probably a very bad idea.
 
   // Mutable state that gets updated during ingestion
   var instrumentationSource: String = "(not detected)"
@@ -604,7 +608,15 @@ object CDMSource {
     for {
       provider <- data.keySet().asScala.toList
       providerFixed = if (provider.isEmpty) { "\"\"" } else { provider }
-      path <- config.getStringList(s"adapt.ingest.data.$providerFixed").asScala
+
+      paths = config.getStringList(s"adapt.ingest.data.$providerFixed").asScala.toList
+      pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
+        new File(paths.head).listFiles().toList.collect {
+          case f if ! f.isHidden => f.getCanonicalPath
+        }
+      } else paths
+
+      path <- pathsPossiblyFromDirectory
 
       // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
       pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
@@ -697,7 +709,8 @@ object CDMSource {
 
   // Make a CDM18 source, possibly falling back on CDM17 for files with that version
   def cdm18(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(String,CDM18), _] = {
-    println(s"Setting source for TA1: $ta1")
+    println(s"Setting source for CDM 18 TA1: $ta1")
+    if (start > 0L) println(s"Throwing away the first $start statements.")
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
       case Success(i) => Some(i)
@@ -740,7 +753,11 @@ object CDMSource {
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case _ =>
         val paths: List[(Provider, String)] = getLoadfiles
-        println(s"Setting file sources to: ${paths.mkString(", ")}")
+        println(s"Setting file sources to: ${paths.mkString("\n", "\n", "")}")
+        paths.headOption.foreach { p =>
+          Application.ta1 = p._1
+          println(s"Assuming a single provider from file data: ${p._1}")
+        }
 
         val startStream = paths.foldLeft(Source.empty[Try[(String,CDM18)]])((a,b) => a.concat({
 
@@ -774,7 +791,18 @@ object CDMSource {
             }
           }).map(_.map(b._1 -> _))
           Source.fromIterator[Try[(String,CDM18)]](() => cdm18)
-        })).drop(start)
+        })).statefulMapConcat[Try[(String,CDM18)]]{ () =>  // This drops CDMs while counting live.
+            var counter = 0L
+            var stillDiscarding = start > 0L;
+            {
+              case cdm if stillDiscarding =>
+                print(s"\rSkipping past: $counter")
+                counter += 1
+                stillDiscarding = start > counter
+                Nil
+              case cdm => List(cdm)
+            }
+          }
         shouldLimit.fold(startStream)(l => startStream.take(l))
           .statefulMapConcat { () =>
             var counter = 0
@@ -818,8 +846,21 @@ object CDMSource {
   def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C]): Source[C, _] =
     Consumer.plainSource(
       ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = config.getLong("adapt.ingest.startatoffset"))  // TODO: Why aren't offsets working?
-    ) .drop(start)
+      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L))  // TODO: Why aren't offsets working?
+    )
+      .statefulMapConcat[ConsumerRecord[Array[Byte],Array[Byte]]]{ () =>  // This drops CDMs while counting live.
+      var counter = 0L
+      var stillDiscarding = start > 0L;
+      {
+        case cdm if stillDiscarding =>
+          if (counter % 10000 == 0) print(s"\rSkipping past: $counter")
+          counter += 1
+          stillDiscarding = start > counter
+          Nil
+        case cdm => List(cdm)
+      }
+    }
+//      .drop(start)
       .map(parser)
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
 
