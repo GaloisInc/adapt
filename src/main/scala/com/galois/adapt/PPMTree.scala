@@ -442,6 +442,9 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
         })
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         currentlySaving.set(false)
+      }.onFailure{ case e =>
+        println(s"Error writing to file for $name tree: ${e.getMessage}")
+        currentlySaving.set(false)
       }
     }
   }

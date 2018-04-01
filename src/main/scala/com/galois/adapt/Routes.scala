@@ -1,7 +1,6 @@
 package com.galois.adapt
 
 import java.io.File
-
 import akka.actor.ActorSystem
 import spray.json._
 import spray.json.DefaultJsonProtocol._
