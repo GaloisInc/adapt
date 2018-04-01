@@ -163,16 +163,17 @@ object EntityResolution {
     def emitEdge(edge: EdgeAdm2Adm): Option[Either[ADM, EdgeAdm2Adm]] = edge match {
       case EdgeAdm2Adm(_, _, tgt) if !seenNodes.contains(tgt) =>
         blockedEdges(tgt) = edge :: blockedEdges.getOrElse(tgt, Nil)
+        blockedEdgesCount += 1
         blockingNodes += tgt
         None
 
       case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
         blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
+        blockedEdgesCount += 1
         blockingNodes += src
         None
 
       case _ =>
-        blockedEdgesCount -= 1
         Some(Right(edge))
     }
 
@@ -180,7 +181,6 @@ object EntityResolution {
       case Right(edge) =>
         if (seenEdges.add(edge)) {
           // New edge
-          blockedEdgesCount += 1
           emitEdge(edge).toList
         } else {
           // Duplicate edge
@@ -191,7 +191,10 @@ object EntityResolution {
         if (seenNodes.add(adm.uuid)) {
           // New node
           blockingNodes -= adm.uuid
-          val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap(e => emitEdge(e).toList)
+          val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap { e =>
+            blockedEdgesCount -= 1
+            emitEdge(e).toList
+          }
           Left(adm) :: emit
         } else {
           // Duplicate node
