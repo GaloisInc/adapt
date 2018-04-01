@@ -52,7 +52,7 @@ object EventTypeModels {
   object EventTypeData {
 
     def query(treeName: String): PpmTreeCountResult = {
-      implicit val timeout: Timeout = Timeout(60000 seconds)
+      implicit val timeout: Timeout = Timeout(6 seconds)
       val future: Future[Any] = ppmActor ? PpmTreeCountQuery(treeName: String)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
@@ -154,11 +154,11 @@ object EventTypeModels {
     def fca(scoringScriptDir: File,testFile: String, testFileRCF: String, outputFile: String): Int = {
 
       val makeRCF = s"""Rscript -e "source('csv_to_rcf.r'); csv_to_rcf('$testFile','$testFileRCF')" """
-      println(makeRCF)
+      //println(makeRCF)
       sys.process.Process(makeRCF,scoringScriptDir) ! ProcessLogger(_ => ())
 
       val s = s"Rscript contexts_scoring_shell.r ProcessEvent $testFile $testFileRCF $outputFile 97 97"
-      println(s)
+      //println(s)
       sys.process.Process(s,scoringScriptDir) ! ProcessLogger(_ => ())
     }
   }
