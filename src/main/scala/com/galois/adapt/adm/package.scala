@@ -84,7 +84,7 @@ package object adm {
    *   - throwing out some structure that we don't know how to use
    *   - performing entity resolution
    */
-  sealed trait ADM extends DBWritable {
+  sealed trait ADM extends DBWritable with Product {
     val uuid: AdmUUID                  // The current UUID
     val originalCdmUuids: Seq[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
 

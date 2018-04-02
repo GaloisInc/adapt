@@ -1,9 +1,11 @@
 package com.galois.adapt
 
 import java.util.UUID
+
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import com.galois.adapt.adm.{ExtendedUuid,CdmUUID,AdmUUID}
+import com.galois.adapt.adm._
+import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
 
@@ -39,6 +41,67 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       json.asJsObject.getFields("type") match {
         case Seq(JsString("CdmUUID")) => cdmUuid.read(json)
         case Seq(JsString("AdmUUID")) => admUuid.read(json)
+      }
+  }
+
+  // All enums are JSON-friendly through their string representation
+  def jsonEnumFormat[T](enum: CustomEnum[T]): RootJsonFormat[T] = new RootJsonFormat[T]{
+    override def write(t: T): JsValue = JsString(t.toString)
+    override def read(o: JsValue): T = o match {
+      case JsString(s) => enum.from(s).get
+      case _ => throw DeserializationException("EventType: expected string")
+    }
+  }
+  implicit val eventType = jsonEnumFormat(EventType)
+  implicit val fileObjectType = jsonEnumFormat(FileObjectType)
+  implicit val srcSinkType = jsonEnumFormat(SrcSinkType)
+  implicit val subjectType = jsonEnumFormat(SubjectType)
+  implicit val principalType = jsonEnumFormat(PrincipalType)
+
+  // ADM nodes
+  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "provider")
+  implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "provider")
+  implicit val admPathNode = jsonFormat(AdmPathNode.apply, "path", "provider")
+  implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "provider")
+  implicit val admNetFlowObject = jsonFormat(AdmNetFlowObject.apply, "originalCdmUuids", "localAddress", "localPort", "remoteAddress", "remotePort", "provider")
+  implicit val admAddress = jsonFormat(AdmAddress.apply(_), "address")
+  implicit val admPort = jsonFormat(AdmPort.apply(_), "port")
+  implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "provider")
+  implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "provider")
+  implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "provider")
+  implicit val admSynthesized = jsonFormat(AdmSynthesized.apply(_), "originalCdmUuids")
+
+  implicit val adm: RootJsonFormat[ADM] = new RootJsonFormat[ADM] {
+    override def write(adm: ADM): JsValue = {
+      val JsObject(payload) = adm match {
+        case p: AdmEvent => admEvent.write(p)
+        case p: AdmSubject => admSubject.write(p)
+        case p: AdmPathNode => admPathNode.write(p)
+        case p: AdmFileObject => admFileObject.write(p)
+        case p: AdmNetFlowObject => admNetFlowObject.write(p)
+        case p: AdmAddress => admAddress.write(p)
+        case p: AdmPort => admPort.write(p)
+        case p: AdmSrcSinkObject => admSrcSinkObject.write(p)
+        case p: AdmPrincipal => admPrincipal.write(p)
+        case p: AdmProvenanceTagNode => admProvenanceTagNode.write(p)
+        case p: AdmSynthesized => admSynthesized.write(p)
+      }
+      JsObject(payload + ("type" -> JsString(adm.productPrefix)))
+    }
+
+    override def read(p: JsValue): ADM =
+      p.asJsObject.getFields("type") match {
+        case Seq(JsString("AdmEvent")) => admEvent.read(p)
+        case Seq(JsString("AdmSubject")) => admSubject.read(p)
+        case Seq(JsString("AdmPathNode")) => admPathNode.read(p)
+        case Seq(JsString("AdmFileObject")) => admFileObject.read(p)
+        case Seq(JsString("AdmNetFlowObject")) => admNetFlowObject.read(p)
+        case Seq(JsString("AdmAddress")) => admAddress.read(p)
+        case Seq(JsString("AdmPort")) => admPort.read(p)
+        case Seq(JsString("AdmSrcSinkObject")) => admSrcSinkObject.read(p)
+        case Seq(JsString("AdmPrincipal")) => admPrincipal.read(p)
+        case Seq(JsString("AdmProvenanceTagNode")) => admProvenanceTagNode.read(p)
+        case Seq(JsString("AdmSynthesized")) => admSynthesized.read(p)
       }
   }
 

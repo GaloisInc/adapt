@@ -588,6 +588,9 @@ class PpmActor extends Actor with ActorLogging {
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   def receive = {
+    case x =>
+//      log.error(s"PPM Actor received Unknown Message: $x")
+      sender() ! Ack
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(t => t.name -> t.tree.getCount).seq.toMap)
 
     case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>

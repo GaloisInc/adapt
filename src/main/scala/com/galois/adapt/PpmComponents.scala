@@ -1,13 +1,22 @@
 package com.galois.adapt
 
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, StandardOpenOption}
+
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18._
+import spray.json.{JsonReader, JsonWriter}
+
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 
 object PpmComponents {
+
+  import ApiJsonProtocol._
+  import spray.json._
 
   type SubjectPathNodeKey = AdmUUID
   type ObjectPathNodeKey = AdmUUID
@@ -15,21 +24,47 @@ object PpmComponents {
   type CompletedESO = (NoveltyDetection.Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
 
+  val config = Application.config
+
   val ppmSink = Flow[Either[ADM, EdgeAdm2Adm]]
     .statefulMapConcat[CompletedESO]{ () =>
 
-      val events = mutable.Map.empty[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])]
-      val everything = mutable.Map.empty[AdmUUID, ADM]
+      import ApiJsonProtocol._
+      import spray.json._
 
-      val pathNodeUses = mutable.Map.empty[AdmUUIDReferencingPathNode, Set[AdmUUID]]
-      val pathNodes = mutable.Map.empty[AdmUUID, AdmPathNode]
+      val eventsSavePath: String = Application.config.getString("adapt.ppm.components.events")
+      val everythingSavePath: String = Application.config.getString("adapt.ppm.components.everything")
+      val pathNodesSavePath: String = Application.config.getString("adapt.ppm.components.pathnodes")
+      val pathNodeUsesSavePath: String = Application.config.getString("adapt.ppm.components.pathnodeuses")
+      val releaseQueueSavePath: String = Application.config.getString("adapt.ppm.components.releasequeue")
+
+      // Load these maps from disk on startup
+      val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", eventsSavePath)
+
+      val everything:   mutable.Map[AdmUUID, ADM]                                  = loadMapFromDisk("everything", everythingSavePath)
+      val pathNodes:    mutable.Map[AdmUUID, AdmPathNode]                          = loadMapFromDisk("pathNodes", pathNodesSavePath)
+      val pathNodeUses: mutable.Map[AdmUUIDReferencingPathNode, Set[AdmUUID]]      = loadMapFromDisk("pathNodeUses", pathNodeUsesSavePath)
+
+      val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", releaseQueueSavePath)
+
+      // Shutdown hook to save the maps above back to disk when we shutdown
+      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+        override def run(): Unit = {
+          println(s"Saving state in PpmComponents...")
+
+          saveMapToDisk("events", events, eventsSavePath)
+          saveMapToDisk("everything", everything, everythingSavePath)
+          saveMapToDisk("pathNodes", pathNodes, pathNodesSavePath)
+          saveMapToDisk("pathNodeUses", pathNodeUses, pathNodeUsesSavePath)
+          saveMapToDisk("releaseQueue", releaseQueue, releaseQueueSavePath)
+        }
+      }))
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
 
       var counter: Long = 0L
       val ppmPluckingDelay = Try(Application.config.getInt("adapt.ppm.pluckingdelay")).getOrElse(20)
-      val releaseQueue = mutable.Map.empty[Long, DelayedESO]
       def release(item: Option[DelayedESO]): List[CompletedESO] = {
         counter += 1
         item.foreach( i =>  // Add to release queue at X items in the future
@@ -135,4 +170,30 @@ object PpmComponents {
     }
   }.to(Sink.actorRefWithAck(Application.ppmActor, InitMsg, Ack, CompleteMsg))
 
+
+  // Load a mutable map from disk
+  def loadMapFromDisk[T, U](name: String, fp: String)
+                           (implicit l: JsonReader[List[(T,U)]]): mutable.Map[T,U] = Try {
+    val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
+    val entries = content.parseJson.convertTo[List[(T, U)]]
+    println(s"Read in from disk $name at $fp: ${entries.size}")
+    mutable.Map.apply(entries: _*)
+  } match {
+    case Success(m) => m
+    case Failure(e) =>
+      println(s"Failed to read from disk $name at $fp (${e.toString})")
+      mutable.Map.empty
+  }
+
+  // Write a mutable map to disk
+  def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
+                         (implicit l: JsonWriter[List[(T,U)]]): Unit = Try {
+    val content = map.toList.toJson.prettyPrint
+    val outputFile = new File(fp)
+    if ( ! outputFile.exists) outputFile.createNewFile()
+    Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+    println(s"Saved to disk $name at $fp: ${map.size}")
+  } getOrElse {
+    println(s"Failed to save to disk $name at $fp: ${map.size}")
+  }
 }
