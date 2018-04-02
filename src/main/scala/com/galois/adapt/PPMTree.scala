@@ -645,7 +645,7 @@ class PpmActor extends Actor with ActorLogging {
         else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
       ).map { r =>
         val filteredResults = r.filter { case (dataTimestamp, observationMillis, alarm, uuids, ratingOpt) =>
-          if (forwardFromStartTime) dataTimestamp >= startAtTime else dataTimestamp <= startAtTime &&
+          (if (forwardFromStartTime) dataTimestamp >= startAtTime else dataTimestamp <= startAtTime) &&
             excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
         }
         val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1 else Long.MaxValue - i._1)

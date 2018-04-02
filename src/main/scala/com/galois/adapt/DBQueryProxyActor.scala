@@ -34,7 +34,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 //      log.info(s"Received node query: $q")
       sender() ! FutureTx {
         Query.run[Vertex](q, graph).map { vertices =>
-          log.info(s"Found: ${vertices.length} nodes")
+//          log.info(s"Found: ${vertices.length} nodes")
           if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
           else vertices
         }
@@ -45,7 +45,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 //      log.info(s"Received new edge query: $q")
       sender() ! FutureTx {
         Query.run[Edge](q, graph).map { edges =>
-          log.info(s"Found: ${edges.length} edges")
+//          log.info(s"Found: ${edges.length} edges")
           if (shouldParse)
             JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
           else
@@ -58,7 +58,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 //      log.info(s"Received string query: $q")
       sender() ! FutureTx {
         Query.run[java.lang.Object](q, graph).map { results =>
-          log.info(s"Found: ${results.length} items")
+//          log.info(s"Found: ${results.length} items")
           if (shouldParse) {
             DBQueryProxyActor.toJson(results.toList)
           } else {
