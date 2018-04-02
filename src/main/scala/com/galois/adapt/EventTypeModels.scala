@@ -191,7 +191,7 @@ object EventTypeModels {
       }
     }
 
-    val iforestRunEveryMinutes = Try(Application.config.getInt("adapt.ppm.iforestfreq")).getOrElse(15)
+    val iforestRunEveryMinutes = Try(Application.config.getInt("adapt.ppm.iforestfreqminutes")).getOrElse(15)
     Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system)))
 
   }

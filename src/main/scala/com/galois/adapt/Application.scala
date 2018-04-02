@@ -144,6 +144,8 @@ object Application extends App {
 //      .counterEnable()
     .createOrOpen()
 
+  val threadPool = Executors.newScheduledThreadPool(1)
+
   val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
@@ -151,8 +153,8 @@ object Application extends App {
     .expireOverflow(mapdbCdm2CdmOverflow)
     .expireAfterCreate()
     .expireAfterGet()
-    .expireMaxSize(1000000)
-    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .expireMaxSize(Try(config.getLong("adapt.adm.cdm2cdmlrucachesize")).getOrElse(10000000L))
+    .expireExecutor(threadPool)
     .createOrOpen()
 
   val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
@@ -174,8 +176,8 @@ object Application extends App {
     .expireOverflow(mapdbCdm2AdmOverflow)
     .expireAfterCreate()
     .expireAfterGet()
-    .expireMaxSize(1000000)
-    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .expireMaxSize(Try(config.getLong("adapt.adm.cdm2admlrucachesize")).getOrElse(30000000L))
+    .expireExecutor(threadPool)
     .createOrOpen()
 
   val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
@@ -198,7 +200,7 @@ object Application extends App {
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
 
-  val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
+//  val dedupNodeCacheSize = config.getInt("adapt.adm.dedupNodeCacheSize")
   val dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
 
 //  val seenNodes: AlmostSet[AdmUUID] = MapSetUtils.lruCacheSet(new util.LinkedHashMap[AdmUUID, None.type](dedupNodeCacheSize, 1F, true) {
