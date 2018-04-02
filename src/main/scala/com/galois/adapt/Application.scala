@@ -72,21 +72,7 @@ object Application extends App {
 
 
   val fileDb = Try { config.getString("adapt.adm.mapdb") } match {
-    case Success(p) =>
-      val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
-
-      // On shutdown, close the file DB. We wait 10 seconds to give MapDB time to run the other shutdown hooks (for
-      // expiring the in-memory stuff to the disk maps)
-      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-        override def run(): Unit = {
-          println("Closing file DB in 10 seconds...")
-          Thread.sleep(10000)
-          fDB.close()
-        }
-      }))
-
-      fDB
-
+    case Success(p) => DBMaker.fileDB(p).fileMmapEnable().make()
     case Failure(_) =>
       val p = "/tmp/map_" + Random.nextLong() + ".db"
       val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
@@ -152,64 +138,62 @@ object Application extends App {
 //  val anomalyActor = system.actorOf(Props(classOf[AnomalyManager], dbActor, config))
 
   // These are the maps that `UUIDRemapper` will use
-  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = {
-    val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+  val mapdbCdm2CdmOverflow = fileDb.hashMap("cdm2cdmOverflow")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
 //      .counterEnable()
-      .createOrOpen()
+    .createOrOpen()
 
-    val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .counterEnable()
-      .expireOverflow(mapdbCdm2CdmOverflow)
-      .expireAfterCreate()
-      .expireAfterGet()
-      .expireMaxSize(1000000)
-      .expireExecutor(Executors.newScheduledThreadPool(2))
-      .createOrOpen()
+  val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .expireOverflow(mapdbCdm2CdmOverflow)
+    .expireAfterCreate()
+    .expireAfterGet()
+    .expireMaxSize(1000000)
+    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .createOrOpen()
 
-    // On shutdown, expire everything to the on-disk map
-    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-      override def run(): Unit = mapdbCdm2Cdm.clearWithExpire()
-    }))
-
-    MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
+  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],CdmUUID](
       mapdbCdm2Cdm,
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
     )
-  }
-  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = {
-    val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+
+  val mapdbCdm2AdmOverflow = fileDb.hashMap("cdm2admOverflow")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
 //      .counterEnable()
-      .createOrOpen()
+    .createOrOpen()
 
-    val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
-      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
-      .counterEnable()
-      .expireOverflow(mapdbCdm2AdmOverflow)
-      .expireAfterCreate()
-      .expireAfterGet()
-      .expireMaxSize(1000000)
-      .expireExecutor(Executors.newScheduledThreadPool(2))
-      .createOrOpen()
+  val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
+    .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+    .counterEnable()
+    .expireOverflow(mapdbCdm2AdmOverflow)
+    .expireAfterCreate()
+    .expireAfterGet()
+    .expireMaxSize(1000000)
+    .expireExecutor(Executors.newScheduledThreadPool(2))
+    .createOrOpen()
 
-    // On shutdown, expire everything to the on-disk map
-    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-      override def run(): Unit = mapdbCdm2Adm.clearWithExpire()
-    }))
-
-    MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
+  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = MapSetUtils.hashMap[Array[AnyRef],CdmUUID,Array[AnyRef],AdmUUID](
       mapdbCdm2Adm,
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
       { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
     )
-  }
+
+  // On shutdown, expire everything to the on-disk map
+  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+    override def run(): Unit = {
+      println("Expiring MapDB contents to disk...")
+      mapdbCdm2Cdm.clearWithExpire()
+      mapdbCdm2Adm.clearWithExpire()
+      fileDb.close()
+      println("MapDB has been closed.")
+    }
+  }))
 
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
