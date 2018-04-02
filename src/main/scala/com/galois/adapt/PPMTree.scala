@@ -155,7 +155,7 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
@@ -164,7 +164,7 @@ object NoveltyDetection {
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
@@ -173,7 +173,7 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
@@ -185,7 +185,7 @@ object NoveltyDetection {
           List(nf.remoteAddress, nf.remotePort.toString)
         }
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
@@ -197,7 +197,7 @@ object NoveltyDetection {
           case x => x
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
@@ -206,7 +206,7 @@ object NoveltyDetection {
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
@@ -215,7 +215,7 @@ object NoveltyDetection {
         d => List(d._1.eventType.toString),
         d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ),
     PpmDefinition[DataShape]( "ParentChildProcesses",
@@ -224,7 +224,7 @@ object NoveltyDetection {
         d._3._2.get.path,  // Parent process first
         d._2._2.get.path   // Child process second
       )),
-      d => Set(d._2._1.uuid, d._2._2.get.uuid, d._3._1.uuid, d._3._2.get.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     )
   ).par
@@ -310,7 +310,7 @@ object NoveltyDetection {
           )
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ) with PartialPpm[AdmUUID] {
 
@@ -349,7 +349,7 @@ object NoveltyDetection {
           }
         )
       ),
-      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid),
+      d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],
       _._1.latestTimestampNanos
     ) with PartialPpm[AdmUUID] {
 
