@@ -63,8 +63,8 @@ function matchesTimeRange(node, start, stop) {
 function addToRendered(elem, name) {
 	var container = elem.parentNode
 	container.parentNode.removeChild(container)
-	renderedTrees = renderedTrees.concat([name])
-	localStorage.setItem("renderedTrees", renderedTrees.join(","))
+	treeNames = treeNames.concat([name])
+	localStorage.setItem("renderedTrees", treeNames.join(","))
 	location.reload()
 }
 
@@ -86,12 +86,12 @@ $(function(){
 
 	var shouldLoadAllTrees = false
 	if (urlParams.has('includedTrees')) {
-		renderedTrees = urlParams.get('includedTrees').split(",")
+		treeNames = urlParams.get('includedTrees').split(",")
 	} else {
 		if ( ! _.isNull(localStorage.getItem("renderedTrees"))) {
-			renderedTrees = localStorage.getItem("renderedTrees").split(",")
+			treeNames = localStorage.getItem("renderedTrees").split(",")
 		} else {
-			if (_.isNull(renderedTrees)) { renderedTrees = [] }
+			if (_.isNull(treeNames)) { treeNames = [] }
 			shouldLoadAllTrees = true
 		}
 	}
@@ -100,12 +100,12 @@ $(function(){
 	$.getJSON(testingPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
 
 		var names = _.keys(namesAndCounts)
-		renderedTrees = _.filter(renderedTrees, function(t){ return _.contains(names, t) })
-		if (shouldLoadAllTrees) renderedTrees = names
-		localStorage.setItem("renderedTrees", renderedTrees.join(","))
-		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(renderedTrees, t) })
+		treeNames = _.filter(treeNames, function(t){ return _.contains(names, t) })
+		if (shouldLoadAllTrees) treeNames = names
+		localStorage.setItem("renderedTrees", treeNames.join(","))
+		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(treeNames, t) })
 
-		_.map(_.sortBy(renderedTrees), function(name) {
+		_.map(_.sortBy(treeNames), function(name) {
 			$("#trees").append(
 				"<table id=" + name + ">"+ 
 					"<thead><tr>"+
