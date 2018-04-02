@@ -446,14 +446,8 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
     if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
       currentlySaving.set(true)
       Future {
-        val repr = //time(s"get tree REPR for $name with count: ${tree.getCount}")(
-          tree.getTreeRepr(key = name)
-//        )
-        outputFilePath.foreach(p =>
-//          time(s"write repr to disk for $name")(
-            repr.writeToFile(p)
-//          )
-        )
+        val repr = tree.getTreeRepr(key = name)
+        outputFilePath.foreach(p => repr.writeToFile(p))
         outputAlarmFilePath.foreach((fp: String) => {
           import spray.json._
           import ApiJsonProtocol._
@@ -463,9 +457,9 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
           if ( ! outputFile.exists) outputFile.createNewFile()
           Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
         })
-        this match {
-          case partial: PartialPpm[_] => partial.saveStateSync()
-        }
+
+        if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync()
+
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         currentlySaving.set(false)
       }.onFailure{ case e =>
@@ -536,9 +530,9 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
         val outputFile = new File(savePath + ".partialMap")
         if (!outputFile.exists) outputFile.createNewFile()
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-        println(s"Saved to disk $name at $savePath.partialMap: ${partialMap.size}")
+//        println(s"Saved to disk $name at $savePath.partialMap: ${partialMap.size}")
       } getOrElse {
-        println(s"Failed to save to disk $name at $savePath.partialMap: ${partialMap.size}")
+        println(s"Failed to save partial map to disk $name at $savePath.partialMap: ${partialMap.size}")
       }
     }
   }
