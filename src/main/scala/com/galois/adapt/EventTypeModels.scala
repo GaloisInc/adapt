@@ -15,6 +15,7 @@ import scala.concurrent.{Await, Future}
 import scala.sys.process._
 import Application.ppmActor
 import akka.actor.ActorSystem
+import com.galois.adapt
 import com.galois.adapt.adm.{AdmUUID, ExtendedUuid}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -38,7 +39,7 @@ object EventTypeModels {
 
 
 
-  val trainFileIForest = "train_iforest.csv"
+  val trainFileIForest = Try(Application.config.getString("adapt.ppm.iforesttrainingfile")).getOrElse("train_iforest.csv")
   val evalFileIForest = "eval_iforest.csv"
 
   val outputFileIForest = "output_iforest.csv"
@@ -106,7 +107,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmMap(filePath: String): Map[List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])] = {
+    def readToAlarmMap(filePath: String): Map[List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -126,8 +127,8 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])) = {
-      List(extractedRow._1,extractedRow._2) -> (System.currentTimeMillis,
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])) = {
+      List(extractedRow._1,extractedRow._2) -> (0L, System.currentTimeMillis,
         List(
         (extractedRow._1,extractedRow._3,extractedRow._3,1),
         (extractedRow._2,extractedRow._3,extractedRow._3,1)
@@ -190,12 +191,13 @@ object EventTypeModels {
       }
     }
 
-    Try(system.scheduler.scheduleOnce(15 minutes)(evaluateModels(system)))
+    val iforestRunEveryMinutes = Try(Application.config.getInt("adapt.ppm.iforestfreq")).getOrElse(15)
+    Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system)))
 
   }
 
 
-  def getAlarms(iforestAlarmFile: String): Map[List[ExtractedValue], (Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])]= {
+  def getAlarms(iforestAlarmFile: String): Map[List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmMap(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
