@@ -31,7 +31,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run a query that returns vertices
     case NodeQuery(q, shouldParse) =>
-      log.info(s"Received node query: $q")
+//      log.info(s"Received node query: $q")
       sender() ! FutureTx {
         Query.run[Vertex](q, graph).map { vertices =>
           log.info(s"Found: ${vertices.length} nodes")
@@ -42,7 +42,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run a query that returns edges
     case EdgeQuery(q, shouldParse) =>
-      log.info(s"Received new edge query: $q")
+//      log.info(s"Received new edge query: $q")
       sender() ! FutureTx {
         Query.run[Edge](q, graph).map { edges =>
           log.info(s"Found: ${edges.length} edges")
@@ -55,7 +55,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
-      log.info(s"Received string query: $q")
+//      log.info(s"Received string query: $q")
       sender() ! FutureTx {
         Query.run[java.lang.Object](q, graph).map { results =>
           log.info(s"Found: ${results.length} items")

@@ -115,7 +115,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       if (json.asJsObject.fields.contains("folder")) uiTreeFolderFormat.read(json)
       else uiTreeNodeFormat.read(json)
   }
-  implicit val uiDataContainerFormat = jsonFormat5(UiDataContainer.apply)
+  implicit val uiDataContainerFormat = jsonFormat6(UiDataContainer.apply)
   implicit val uiTreeNodeFormat = jsonFormat2(UiTreeNode)
   implicit val uiTreeFolderFormat = jsonFormat4(UiTreeFolder.apply)
 

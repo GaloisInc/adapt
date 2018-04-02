@@ -379,7 +379,7 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
     if (Application.config.getBoolean("adapt.ppm.shouldsave"))
       Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + "_alarm.json").toOption
     else None
-  var alarms: Map[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])] =
+  var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuid], Map[String, Int])] =
     if (Application.config.getBoolean("adapt.ppm.shouldload"))
       inputAlarmFilePath.flatMap { fp =>
         Try {
@@ -387,12 +387,12 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
           import ApiJsonProtocol._
 
           val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int]))]].toMap
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuid], Map[String, Int]))]].toMap
         }.toOption orElse  {
           println(s"Failed to load alarms for tree: $name")
           None
         }
-      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Alarm, Set[ExtendedUuid], Map[String, Int])])
+      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuid], Map[String, Int])])
     else {
       println(s"Loading no alarms for tree: $name")
       Map.empty
@@ -400,13 +400,13 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
 
   def observe(observation: DataShape): Option[Alarm] = if (filter(observation))
     tree.observe(PpmTree.prepareObservation[DataShape](observation, discriminators), timestampExtractor(observation)) else None
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid], Long)]): Unit = alarmOpt.foreach(a => alarms = alarms + (a._1.map(_._1) -> (a._3, a._1, a._2, Map.empty[String,Int])))
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid], Long)]): Unit = alarmOpt.foreach(a => alarms = alarms + (a._1.map(_._1) -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])))
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
     rating match {
       case Some(number) => // set the alarm rating in this namespace
-        alarms = alarms + (key -> a.copy (_4 = a._4 + (namespace -> number) ) ); true
+        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
       case None => // Unset the alarm rating.
-        alarms = alarms + (key -> a.copy (_4 = a._4 - namespace) ); true
+        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
     }
   }
   def getAllCounts: Map[List[ExtractedValue], Int] = tree.getAllCounts()
@@ -571,8 +571,9 @@ class PpmActor extends Actor with ActorLogging {
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
+    val iforestTrainingSaveFile = Try(Application.config.getString("adapt.ppm.iforesttrainingsavefile")).getOrElse("train_iforest-UPDATED.csv")
     iForestTree match {
-      case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + "train_iforest.csv")
+      case Some(tree) => EventTypeModels.EventTypeData.writeToFile(tree.getAllCounts, EventTypeModels.modelDirIForest + iforestTrainingSaveFile)
       case None => println("ProcessEventType tree for iForest is not defined.")
     }
   }
@@ -628,7 +629,7 @@ class PpmActor extends Actor with ActorLogging {
         case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
       }
       Try(
-        Await.result(f, 2 seconds)
+        Await.result(f, 5 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
       sender() ! Ack
@@ -643,11 +644,11 @@ class PpmActor extends Actor with ActorLogging {
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
-        if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_4 = a._4.get(namespace))).toList
-        else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_4 = v._4.get(namespace))}.toList
+        if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
+        else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
       ).map { r =>
-        val filteredResults = r.filter { case (timestamp, alarm, uuids, ratingOpt) =>
-          if (forwardFromStartTime) timestamp >= startAtTime else timestamp <= startAtTime &&
+        val filteredResults = r.filter { case (dataTimestamp, observationMillis, alarm, uuids, ratingOpt) =>
+          if (forwardFromStartTime) dataTimestamp >= startAtTime else dataTimestamp <= startAtTime &&
             excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
         }
         val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1 else Long.MaxValue - i._1)
@@ -686,11 +687,11 @@ class PpmActor extends Actor with ActorLogging {
 case object ListPpmTrees
 case class PpmTreeNames(namesAndCounts: Map[String, Int])
 case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None)
-case class PpmTreeAlarmResult(results: Option[List[(Long, Alarm, Set[ExtendedUuid], Option[Int])]]) {
+case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[ExtendedUuid], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
-      val names = b._2.map(_._1)
-      val someUiData = UiDataContainer(b._4, names.mkString("∫"), b._1, b._2.last._2, b._3.map(_.rendered))
+      val names = b._3.map(_._1)
+      val someUiData = UiDataContainer(b._5, names.mkString("∫"), b._1, b._2, b._3.last._2, b._4.map(_.rendered))
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
@@ -744,8 +745,8 @@ case class UiTreeFolder(title: String, folder: Boolean = true, data: UiDataConta
   }
 }
 
-case class UiDataContainer(rating: Option[Int], key: String, observationTime: Long, localProb: Float, uuids: Set[String])
-case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 1F, Set.empty) }
+case class UiDataContainer(rating: Option[Int], key: String, dataTime: Long, observationTime: Long, localProb: Float, uuids: Set[String])
+case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 0L, 1F, Set.empty) }
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
