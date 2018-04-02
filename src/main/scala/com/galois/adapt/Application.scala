@@ -735,7 +735,9 @@ object CDMSource {
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
+        shouldLimit.fold(src)(l => src.take(l))
+          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm18Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
+          .map("theia" -> _)
       case "trace"          =>
         val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
         Application.instrumentationSource = "trace"
