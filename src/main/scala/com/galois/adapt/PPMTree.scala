@@ -253,6 +253,12 @@ object NoveltyDetection {
         (d: DataShape) => d._1.eventType == EVENT_EXECUTE,
         (d: DataShape) => d._1.eventType == EVENT_UNLINK
       )
+
+      override def partialMapJson = {
+        import spray.json._
+        import ApiJsonProtocol._
+        implicitly[RootJsonFormat[List[(String,List[ExtractedValue])]]]
+      }
     },
 
     new PpmDefinition[DataShape]("FilesWrittenThenExecuted",
@@ -277,6 +283,12 @@ object NoveltyDetection {
         (d: DataShape) => writeTypes.contains(d._1.eventType),
         (d: DataShape) => d._1.eventType == EVENT_EXECUTE
       )
+
+      override def partialMapJson = {
+        import spray.json._
+        import ApiJsonProtocol._
+        implicitly[RootJsonFormat[List[(String,List[ExtractedValue])]]]
+      }
     },
 
     new PpmDefinition[DataShape]("CommunicationPathThroughObject",
@@ -311,6 +323,12 @@ object NoveltyDetection {
           (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK)) &&  // Any kind of event to a memory object.
           (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get).head))  // subject names are distinct
       )
+
+      override def partialMapJson = {
+        import spray.json._
+        import ApiJsonProtocol._
+        implicitly[RootJsonFormat[List[(AdmUUID,List[ExtractedValue])]]]
+      }
     }
   ).par
 
@@ -343,6 +361,12 @@ object NoveltyDetection {
         (eso: DataShape) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
         (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
       )
+
+      override def partialMapJson = {
+        import spray.json._
+        import ApiJsonProtocol._
+        implicitly[RootJsonFormat[List[(AdmUUID,List[ExtractedValue])]]]
+      }
     }
   ).par
 
@@ -439,6 +463,9 @@ case class PpmDefinition[DataShape](name: String, filter: Filter[DataShape], dis
           if ( ! outputFile.exists) outputFile.createNewFile()
           Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
         })
+        this match {
+          case partial: PartialPpm[_] => partial.saveStateSync()
+        }
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         currentlySaving.set(false)
       }.onFailure{ case e =>
@@ -454,7 +481,26 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   type PartialShape = DataShape
   val discriminators: List[Discriminator[PartialShape]]
   require(discriminators.length == 2)
-  var partialMap = mutable.Map.empty[JoinType, List[ExtractedValue]] //, Set[ExtendedUuid])]
+  implicit def partialMapJson: RootJsonFormat[List[(JoinType, List[ExtractedValue])]]
+  var partialMap: mutable.Map[JoinType, List[ExtractedValue]] = inputFilePath match {
+    case Some(fp) =>
+      val loadPath = fp + ".partialMap"
+      Try {
+        import spray.json._
+        import ApiJsonProtocol._
+
+        val content = new String(Files.readAllBytes(new File(loadPath).toPath()), StandardCharsets.UTF_8)
+        val entries = content.parseJson.convertTo[List[(JoinType, List[ExtractedValue])]]
+        println(s"Read in from disk $name at $loadPath: ${entries.size}")
+        mutable.Map.apply(entries: _*)
+      } match {
+        case Success(m) => m
+        case Failure(e) =>
+          println(s"Failed to read from disk $name at $loadPath (${e.toString})")
+          mutable.Map.empty
+      }
+    case None => mutable.Map.empty
+  }
 
   def getJoinCondition(observation: PartialShape): Option[JoinType]
   def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue] = extracted
@@ -479,6 +525,23 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
       }
     }
   } else None
+
+  def saveStateSync(): Unit = {
+    outputFilePath.foreach { savePath =>
+      Try {
+        import spray.json._
+        import ApiJsonProtocol._
+
+        val content = partialMap.toList.toJson.prettyPrint
+        val outputFile = new File(savePath + ".partialMap")
+        if (!outputFile.exists) outputFile.createNewFile()
+        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+        println(s"Saved to disk $name at $savePath.partialMap: ${partialMap.size}")
+      } getOrElse {
+        println(s"Failed to save to disk $name at $savePath.partialMap: ${partialMap.size}")
+      }
+    }
+  }
 }
 
 
