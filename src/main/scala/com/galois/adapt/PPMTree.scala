@@ -651,6 +651,9 @@ class PpmActor extends Actor with ActorLogging {
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
+  var didReceiveInit = false
+  var didReceiveComplete = false
+
   def receive = {
     case ListPpmTrees => sender() ! PpmTreeNames(ppmList.map(t => t.name -> t.tree.getCount).seq.toMap)
 
@@ -722,7 +725,12 @@ class PpmActor extends Actor with ActorLogging {
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case InitMsg => Future { EventTypeModels.evaluateModels(context.system)}; sender() ! Ack;
+    case InitMsg =>
+      if ( ! didReceiveInit) {
+        didReceiveInit = true
+        Future { EventTypeModels.evaluateModels(context.system)}
+      }
+      sender() ! Ack;
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveStateAsync())
@@ -730,13 +738,16 @@ class PpmActor extends Actor with ActorLogging {
       if (shouldConfirm) sender ! Ack
 
     case CompleteMsg =>
-      ppmList.foreach { ppm =>
-        ppm.saveStateAsync()
-//        println(ppm.prettyString)
-//        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
+      if ( ! didReceiveComplete) {
+        didReceiveComplete = true
+        ppmList.foreach { ppm =>
+          ppm.saveStateAsync()
+  //        println(ppm.prettyString)
+  //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
+        }
+        saveIforestModel()
+        println("Done")
       }
-      saveIforestModel()
-      println("Done")
 
     case x =>
       log.error(s"PPM Actor received Unknown Message: $x")
