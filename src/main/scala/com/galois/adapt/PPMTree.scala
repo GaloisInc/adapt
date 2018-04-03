@@ -457,9 +457,14 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     case PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue]) =>
       implicit val timeout = Timeout(597 seconds)
       val qNodeCountTuple = accumulatedKey ++ List(thisKey, "_?_") -> childrenPopulation
+      val thisNodeCountTuple = (accumulatedKey :+ thisKey) -> counter
       val futureResult = Future.sequence(
         children.values.map(child => (child ? PpmNodeActorGetAllCounts(accumulatedKey :+ thisKey)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity))
-      ).map(_.foldLeft(Map.empty[List[ExtractedValue], Int])((a,b) => a ++ b.results) + qNodeCountTuple)
+      ).map{sequenced =>
+        val combined = sequenced.foldLeft(Map.empty[List[ExtractedValue], Int])((a,b) => a ++ b.results + thisNodeCountTuple)
+        if (children.nonEmpty) combined + qNodeCountTuple
+        else combined
+      }
       sender() ! futureResult.map(r => PpmNodeActorGetAllCountsResult(r))
 
 
@@ -861,14 +866,14 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
     case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long) =>
       ppm(treeName).fold(
-        log.warning(s"Could find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp")
+        log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
         ppm(a.treeName)
       ).fold(
-        log.warning(s"Could find tree named: ${setOfAlarms.headOption} to record many Alarms")
+        log.warning(s"Could not find tree named: ${setOfAlarms.headOption} to record many Alarms")
       )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
         tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
       })

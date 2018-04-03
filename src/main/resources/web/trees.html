@@ -17,7 +17,11 @@ var renderedTrees;
 
 
 
-var testingPrefix = "http://localhost:8080" // ""
+if (urlParams.has('test')) {
+	var testingPrefix = "http://localhost:8080"  // urlParams.get('test')
+} else {
+	var testingPrefix = ""
+}
 
 
 
