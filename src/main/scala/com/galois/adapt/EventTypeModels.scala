@@ -181,23 +181,14 @@ object EventTypeModels {
 
     //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long)
     alarmTreeToFile.foreach {
-      case (ppmName,file) => Try(getAlarms(file)) match {
+      case (ppmName, file) => Try(getAlarms(file)) match {
         case Success(alarms) =>
-          val alarmsDetectedList = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName,alarmData,collectedUuids,0L) }
-          Try{
-            (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+          val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
+          Try {
+            ppmActor ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
-          // send alarmsDetectedList to actor
+        // send alarmsDetectedList to actor
         case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
-      }
-
-
-        ppmList.find(_.name == ppmName) match {
-        case Some(tree) =>  Try(getAlarms(file)) match {
-          case Success(alarms) => tree.alarms = alarms
-          case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
-        }
-        case None => println(s"Unable to find tree for use in IForest alarm display: $ppmName")
       }
     }
 
