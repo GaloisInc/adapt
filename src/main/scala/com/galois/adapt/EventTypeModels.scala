@@ -5,7 +5,7 @@ import akka.pattern.ask
 import java.io.{File, PrintWriter}
 import java.util.UUID
 
-import com.galois.adapt.NoveltyDetection.{ExtractedValue, ppmList}
+import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.cdm18.EventType
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 
