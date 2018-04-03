@@ -173,27 +173,33 @@ object PpmComponents {
 
   // Load a mutable map from disk
   def loadMapFromDisk[T, U](name: String, fp: String)
-                           (implicit l: JsonReader[List[(T,U)]]): mutable.Map[T,U] = Try {
-    val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-    val entries = content.parseJson.convertTo[List[(T, U)]]
-    println(s"Read in from disk $name at $fp: ${entries.size}")
-    mutable.Map.apply(entries: _*)
-  } match {
-    case Success(m) => m
-    case Failure(e) =>
-      println(s"Failed to read from disk $name at $fp (${e.toString})")
-      mutable.Map.empty
-  }
+                           (implicit l: JsonReader[List[(T,U)]]): mutable.Map[T,U] =
+    if (Application.config.getBoolean("adapt.ppm.shouldload"))
+      Try {
+        val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
+        val entries = content.parseJson.convertTo[List[(T, U)]]
+        println(s"Read in from disk $name at $fp: ${entries.size}")
+        mutable.Map.apply(entries: _*)
+      } match {
+        case Success(m) => m
+        case Failure(e) =>
+          println(s"Failed to read from disk $name at $fp (${e.toString})")
+          mutable.Map.empty
+      }
+    else mutable.Map.empty
 
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
-                         (implicit l: JsonWriter[List[(T,U)]]): Unit = Try {
-    val content = map.toList.toJson.prettyPrint
-    val outputFile = new File(fp)
-    if ( ! outputFile.exists) outputFile.createNewFile()
-    Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-    println(s"Saved to disk $name at $fp: ${map.size}")
-  } getOrElse {
-    println(s"Failed to save to disk $name at $fp: ${map.size}")
-  }
+                         (implicit l: JsonWriter[List[(T,U)]]): Unit =
+    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
+      Try {
+        val content = map.toList.toJson.prettyPrint
+        val outputFile = new File(fp)
+        if ( ! outputFile.exists) outputFile.createNewFile()
+        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+        println(s"Saved to disk $name at $fp: ${map.size}")
+      } getOrElse {
+        println(s"Failed to save to disk $name at $fp: ${map.size}")
+      }
+
 }

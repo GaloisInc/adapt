@@ -15,7 +15,6 @@ import scala.concurrent.{Await, Future}
 import scala.sys.process._
 import Application.ppmActor
 import akka.actor.ActorSystem
-import com.galois.adapt
 import com.galois.adapt.adm.{AdmUUID, ExtendedUuid}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -52,19 +51,19 @@ object EventTypeModels {
 
   object EventTypeData {
 
-    def query(treeName: String): PpmTreeCountResult = {
-      implicit val timeout: Timeout = Timeout(6 seconds)
-      val future: Future[Any] = ppmActor ? PpmTreeCountQuery(treeName: String)
+    def query(treeName: String): PpmTreeCountResult = Try {
+      implicit val timeout: Timeout = Timeout(60 seconds)
+      val future: Future[Any] = (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
-        case None => println("Unable to query IForestProcessEventTypeCounts"); None
+        case _ => println("Unable to query IForestProcessEventTypeCounts"); None
       }
       ppmTreeCountFutureResult match {
         case ppmTreeCountResult: PpmTreeCountResult => ppmTreeCountResult
-        case None => PpmTreeCountResult(None)
+        case _ => PpmTreeCountResult(None)
       }
-    }
+    }.getOrElse(PpmTreeCountResult(None))
 
     def collect(data: Map[List[ExtractedValue], Int]): Map[Process,EventTypeCounts] = {
       // This removes all but max depth of ProcessEventType tree, which is all we need.

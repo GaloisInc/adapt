@@ -75,7 +75,7 @@ object Routes {
           pathPrefix("ppm") {
             path("listTrees") {
               complete(
-                (ppmActor ? ListPpmTrees).mapTo[PpmTreeNames].map(_.namesAndCounts)
+                (ppmActor ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
               )
             } ~
             path(Segment) { treeName =>
