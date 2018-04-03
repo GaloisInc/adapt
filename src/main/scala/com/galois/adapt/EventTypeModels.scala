@@ -53,9 +53,9 @@ object EventTypeModels {
 
     def query(treeName: String): PpmTreeCountResult = Try {
       implicit val timeout: Timeout = Timeout(60 seconds)
-      val future: Future[Any] = (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity).map(println)
+      val future: Future[Any] = (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
-        case Some(Success(result)) => println(result); result
+        case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
         case _ => println("Unable to query IForestProcessEventTypeCounts"); None
       }
@@ -182,11 +182,12 @@ object EventTypeModels {
     //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long)
     alarmTreeToFile.foreach {
       case (ppmName, file) => Try(getAlarms(file)) match {
-        case Success(alarms) => println(alarms)
-          val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet; println(alarmsDetectedSet)
+        case Success(alarms) => if (alarms.nonEmpty) {
+          val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
           Try {
             ppmActor ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
+        }
         // send alarmsDetectedList to actor
         case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
       }

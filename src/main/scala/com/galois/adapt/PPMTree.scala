@@ -829,7 +829,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
 
 
-
+  val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -846,7 +846,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     if ( ! didReceiveComplete && Application.config.getBoolean("adapt.ppm.shouldsave")) {
       didReceiveComplete = true
       val ppmSaveFutures = ppmList.map(_.saveStateAsync())
-      saveIforestModel()
+      if (iforestEnabled) saveIforestModel()
       Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
     }
     super.postStop()
@@ -950,7 +950,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
-        Future { EventTypeModels.evaluateModels(context.system)}
+        if (iforestEnabled) Future { EventTypeModels.evaluateModels(context.system)}
       }
       sender() ! Ack;
 
@@ -968,7 +968,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 //          ppm.prettyString.map(println)
   //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
         }
-        saveIforestModel()
+        if (iforestEnabled) saveIforestModel()
         Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
 
         println("Done")
