@@ -842,7 +842,7 @@ object CDMSource {
   def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C]): Source[C, _] =
     Consumer.plainSource(
       ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
-      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L))  // TODO: Why aren't offsets working?
+      Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = 0) // Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L))  // TODO: Why aren't offsets working?
     )
       .statefulMapConcat[ConsumerRecord[Array[Byte],Array[Byte]]]{ () =>  // This drops CDMs while counting live.
       var counter = 0L
