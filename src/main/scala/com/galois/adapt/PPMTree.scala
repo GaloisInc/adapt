@@ -862,6 +862,15 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         log.warning(s"Could find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
 
+    case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
+      setOfAlarms.headOption.flatMap(a =>
+        ppm(a.treeName)
+      ).fold(
+        log.warning(s"Could find tree named: ${setOfAlarms.headOption} to record many Alarms")
+      )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
+        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
+      })
+
     case ListPpmTrees =>
       implicit val timeout = Timeout(591 seconds)
       sender() ! Future.sequence(
