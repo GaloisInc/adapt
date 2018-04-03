@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, PrincipalType, SrcSinkType, SubjectType}
+import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
 
@@ -57,6 +57,10 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val srcSinkType = jsonEnumFormat(SrcSinkType)
   implicit val subjectType = jsonEnumFormat(SubjectType)
   implicit val principalType = jsonEnumFormat(PrincipalType)
+  implicit val hostType = jsonEnumFormat(HostType)
+
+  implicit val cdmInterface = jsonFormat3(Interface.apply)
+  implicit val cdmHostIdentifier = jsonFormat2(HostIdentifier.apply)
 
   // ADM nodes
   implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "provider")
@@ -69,6 +73,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "provider")
   implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "provider")
   implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "provider")
+  implicit val admHost = jsonFormat(AdmHost.apply, "originalCdmUuids", "hostName", "hostIdentifiers", "osDetails", "hostType", "interfaces", "provider")
   implicit val admSynthesized = jsonFormat(AdmSynthesized.apply(_), "originalCdmUuids")
 
   implicit val adm: RootJsonFormat[ADM] = new RootJsonFormat[ADM] {
@@ -84,6 +89,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case p: AdmSrcSinkObject => admSrcSinkObject.write(p)
         case p: AdmPrincipal => admPrincipal.write(p)
         case p: AdmProvenanceTagNode => admProvenanceTagNode.write(p)
+        case p: AdmHost => admHost.write(p)
         case p: AdmSynthesized => admSynthesized.write(p)
       }
       JsObject(payload + ("type" -> JsString(adm.productPrefix)))
@@ -101,6 +107,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case Seq(JsString("AdmSrcSinkObject")) => admSrcSinkObject.read(p)
         case Seq(JsString("AdmPrincipal")) => admPrincipal.read(p)
         case Seq(JsString("AdmProvenanceTagNode")) => admProvenanceTagNode.read(p)
+        case Seq(JsString("AdmHost")) => admHost.read(p)
         case Seq(JsString("AdmSynthesized")) => admSynthesized.read(p)
       }
   }

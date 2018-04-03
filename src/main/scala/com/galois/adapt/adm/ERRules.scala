@@ -173,6 +173,18 @@ object ERRules {
       )
     }
 
+  // Resolve a 'Host'
+  def resolveHost(provider: String, h: Host): AdmHost =
+    AdmHost(
+      Seq(CdmUUID(h.uuid,provider)),
+      h.hostName,
+      h.hostIdentifiers,
+      h.osDetails,
+      h.hostType,
+      h.interfaces,
+      provider
+    )
+
   // Resolve a 'Subject'
   object SubjectEdges {
     type LocalPrincipalEdge = EdgeAdm2Cdm

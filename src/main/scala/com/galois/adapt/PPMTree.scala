@@ -457,14 +457,11 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     case PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue]) =>
       implicit val timeout = Timeout(597 seconds)
       val qNodeCountTuple = accumulatedKey ++ List(thisKey, "_?_") -> childrenPopulation
-      val thisNodeCountTuple = (accumulatedKey :+ thisKey) -> counter
+      val childNodeCountTuple = accumulatedKey ++ List(thisKey) -> counter
+      val countTuples = Map(qNodeCountTuple, childNodeCountTuple)
       val futureResult = Future.sequence(
         children.values.map(child => (child ? PpmNodeActorGetAllCounts(accumulatedKey :+ thisKey)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity))
-      ).map{sequenced =>
-        val combined = sequenced.foldLeft(Map.empty[List[ExtractedValue], Int])((a,b) => a ++ b.results + thisNodeCountTuple)
-        if (children.nonEmpty) combined + qNodeCountTuple
-        else combined
-      }
+      ).map(x => x.foldLeft(Map.empty[List[ExtractedValue], Int])((a,b) => a ++ b.results) ++ countTuples)
       sender() ! futureResult.map(r => PpmNodeActorGetAllCountsResult(r))
 
 

@@ -68,10 +68,11 @@ object EventTypeModels {
     def collect(data: Map[List[ExtractedValue], Int]): Map[Process,EventTypeCounts] = {
       // This removes all but max depth of ProcessEventType tree, which is all we need.
       val dataFiltered = data.filter {
-        case (extractedValues, _) => extractedValues.lengthCompare(3)==0 && extractedValues.last != "_?_"
+        case (extractedValues, _) => (extractedValues.length > 3) && (extractedValues.last != "_?_")
       }
 
-      dataFiltered.groupBy(x => (x._1.head,x._1(1))).map { case ((name, uuid), dataMap) =>
+      // List(treeName, process_name, uuid, event_type) -> count
+      dataFiltered.groupBy(x => (x._1(1),x._1(2))).map { case ((name, uuid), dataMap) =>
         Process(name,uuid) -> dataMap.collect {
           case (key, value) if key.lastOption.flatMap(EventType.from).isDefined =>
             EventType.from(key.last).get -> value
