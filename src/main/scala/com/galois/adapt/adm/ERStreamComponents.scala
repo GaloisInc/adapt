@@ -279,6 +279,12 @@ object ERStreamComponents {
 
           List(AnAdm(irSrcSink)).map(elem => Timed(t, elem))
 
+        case (provider, Timed(t, h: Host)) =>
+
+          val irHost = resolveHost(provider, h)
+
+          List(AnAdm(irHost)).map(elem => Timed(t, elem))
+
         case _ => Nil
       }
     }

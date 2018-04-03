@@ -529,6 +529,44 @@ package object adm {
     )
   }
 
+  final case class AdmHost(
+    originalCdmUuids: Seq[CdmUUID],          // universally unique identifier for the host
+
+    hostName: String,                        // hostname or machine name
+    hostIdentifiers: Seq[HostIdentifier],    // list of identifiers, such as serial number, IMEI number
+    osDetails: String,                       // OS level details revealed by tools such as uname -a
+    hostType: HostType,                      // host's role or device type, such as mobile, server, desktop
+    interfaces: Seq[Interface],              // names and addresses of network interfaces
+
+    provider: String
+  ) extends ADM with DBWritable {
+
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+
+    def asDBKeyValues = List(
+      "uuid" -> uuid.uuid,
+
+      "hostname" -> hostName,
+      "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
+      "osDetails" -> osDetails,
+      "hostType" -> hostType.toString,
+      "interfaces" -> interfaces.map(_.toString).mkString(";"),
+
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
+    ) ++
+      (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
+
+    def toMap = Map(
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "hostname" -> hostName,
+      "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
+      "osDetails" -> osDetails,
+      "hostType" -> hostType.toString,
+      "interfaces" -> interfaces.map(_.toString).mkString(";"),
+      "provider" -> provider
+    )
+  }
+
   // TODO: make this deterministic
   final case class AdmSynthesized(
     originalCdmUuids: Seq[CdmUUID]
