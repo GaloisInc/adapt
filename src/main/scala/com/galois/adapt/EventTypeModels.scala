@@ -106,7 +106,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmMap(filePath: String): Map[List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])] = {
+    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[ExtendedUuid])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -114,11 +114,11 @@ object EventTypeModels {
         val parser = new CsvParser(settings)
         val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
         val extractedRows = extractAndFilterAlarms(rows)
-        extractedRows.map(r => rowToAlarmIForest(r)).toMap
+        extractedRows.map(r => rowToAlarmIForest(r))
       }
       result match {
         case Success(alarmList) => alarmList
-        case Failure(_) => Map.empty
+        case Failure(_) => List.empty
       }
     }
 
@@ -126,14 +126,13 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])) = {
-      List(extractedRow._1,extractedRow._2) -> (0L, System.currentTimeMillis,
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuid]) = {
+       (
         List(
         (extractedRow._1,extractedRow._3,extractedRow._3,1),
         (extractedRow._2,extractedRow._3,extractedRow._3,1)
         ),
-        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),"")),
-        Map.empty[String, Int]
+        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),""))
       )
     }
 
@@ -180,8 +179,20 @@ object EventTypeModels {
       case Failure(ex) => println(s"Unable to query or write data for IForest: ${ex.getMessage}")
     }
 
+    //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long)
     alarmTreeToFile.foreach {
-      case (ppmName,file) => ppmList.find(_.name == ppmName) match {
+      case (ppmName,file) => Try(getAlarms(file)) match {
+        case Success(alarms) =>
+          val alarmsDetectedList = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName,alarmData,collectedUuids,0L) }
+          Try{
+            (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+          }
+          // send alarmsDetectedList to actor
+        case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
+      }
+
+
+        ppmList.find(_.name == ppmName) match {
         case Some(tree) =>  Try(getAlarms(file)) match {
           case Success(alarms) => tree.alarms = alarms
           case Failure(e) => println(s"Could not read alarm file $file: ${e.getMessage}")
@@ -196,8 +207,8 @@ object EventTypeModels {
   }
 
 
-  def getAlarms(iforestAlarmFile: String): Map[List[ExtractedValue], (Long, Long, EventTypeAlarm, Set[ExtendedUuid], Map[String, Int])]= {
-    val iforestAlarms = EventTypeAlarms.readToAlarmMap(iforestAlarmFile)
+  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[ExtendedUuid])]= {
+    val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
 
