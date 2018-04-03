@@ -135,7 +135,7 @@ case class PpmDefinition[DataShape](
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val currentlySaving = new AtomicBoolean(false)
 
-  def saveStateAsync(): Unit = {
+  def saveStateAsync(): Future[Unit] = {
     val now = System.currentTimeMillis
     val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
     if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
@@ -161,11 +161,11 @@ case class PpmDefinition[DataShape](
 
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         currentlySaving.set(false)
-      }.onFailure{ case e =>
+      }.failed.map { case e =>
         println(s"Error writing to file for $name tree: ${e.getMessage}")
         currentlySaving.set(false)
       }
-    }
+    } else Future.successful(())
   }
   def prettyString: Future[String] = {
 //    tree.getTreeRepr(key = name).toString
@@ -843,9 +843,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
   }
 
   override def postStop(): Unit = {
-    if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
-      ppmList.foreach(_.saveStateAsync())
+    if ( ! didReceiveComplete && Application.config.getBoolean("adapt.ppm.shouldsave")) {
+      didReceiveComplete = true
+      val ppmSaveFutures = ppmList.map(_.saveStateAsync())
       saveIforestModel()
+      Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
     }
     super.postStop()
   }
@@ -960,12 +962,15 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     case CompleteMsg =>
       if ( ! didReceiveComplete) {
         didReceiveComplete = true
-        ppmList.foreach { ppm =>
+
+        val ppmSaveFutures = ppmList.map{ ppm =>
           ppm.saveStateAsync()
 //          ppm.prettyString.map(println)
   //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
         }
         saveIforestModel()
+        Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
+
         println("Done")
       }
 
