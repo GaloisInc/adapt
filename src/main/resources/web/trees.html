@@ -17,8 +17,8 @@ var renderedTrees;
 
 
 
-if (urlParams.has('test')) {
-	var testingPrefix = "http://localhost:8080"  // urlParams.get('test')
+if (urlParams.has('host')) {
+	var testingPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
 } else {
 	var testingPrefix = ""
 }
@@ -143,7 +143,7 @@ $(function(){
 		$("#" + treeName).fancytree({
 			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
 			source: {
-				url: testingPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace,
+				url: testingPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
 				cache: false
 			},
 			quicksearch: true,

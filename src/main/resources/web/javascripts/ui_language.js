@@ -639,6 +639,14 @@ var predicates = [
         name : "Writing Processes",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject')"
+    }, {
+        name : "Reading Processes Names",
+        is_relevant : function(n) {return n.db_label === "AdmFileObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject').out('exec','cmdLine','(cmdLine)').hasLabel('AdmPathNode')"
+    }, {
+        name : "Writing Processes Names",
+        is_relevant : function(n) {return n.db_label === "AdmFileObject"},
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject').out('exec','cmdLine','(cmdLine)').hasLabel('AdmPathNode')"
     },
 
  // AdmNetFlowObject
