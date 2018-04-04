@@ -619,7 +619,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(nf.remoteAddress, nf.remotePort.toString)
+          List(Option(nf.remoteAddress).getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
         }
       ),
       d => Set(d._1.uuid, d._2._1.uuid, d._3._1.uuid) ++ d._2._2.map(_.uuid).toSet[ExtendedUuid] ++ d._3._2.map(_.uuid).toSet[ExtendedUuid],

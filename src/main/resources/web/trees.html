@@ -18,9 +18,9 @@ var renderedTrees;
 
 
 if (urlParams.has('host')) {
-	var testingPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
+	var hostPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
 } else {
-	var testingPrefix = ""
+	var hostPrefix = ""
 }
 
 
@@ -101,7 +101,7 @@ $(function(){
 	}
 
 
-	$.getJSON(testingPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
+	$.getJSON(hostPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
 
 		var names = _.keys(namesAndCounts)
 		treeNames = _.filter(treeNames, function(t){ return _.contains(names, t) })
@@ -143,7 +143,7 @@ $(function(){
 		$("#" + treeName).fancytree({
 			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
 			source: {
-				url: testingPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
+				url: hostPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
 				cache: false
 			},
 			quicksearch: true,
@@ -177,7 +177,9 @@ $(function(){
 					$tdList.eq(3).html(renderStars(node.data.rating))
 				}
 
-				var show_graph_link = _.isEmpty(node.data.uuids) ? "" : '<a target="_blank" href="' + testingPrefix + '/#g.V().has(\'uuid\',within(['+node.data.uuids.join(",")+']))">Show Graph</a>'
+				var linkPrefix = _.isEmpty(hostPrefix) ? "/" : ""
+				var linkSuffix = _.isEmpty(hostPrefix) ? "" : "?host=" + hostPrefix
+				var show_graph_link = _.isEmpty(node.data.uuids) ? "" : '<a target="_blank" href="' + linkPrefix + 'graph.html'+ linkSuffix +'#g.V().has(\'uuid\',within(['+node.data.uuids.join(",")+']))">Show Graph</a>'
 				$tdList.eq(4).html(
 					'<span>'+ JSON.stringify(_.omit(node.data, "key", "uuids")) +'</span>' + show_graph_link
 					
@@ -353,7 +355,7 @@ $(function(){
 							"rating" : rating,
 							"namespace" : namespace
 						}
-						$.post(testingPrefix + "/api/ppm/setRatings", payload, function(data, textStatus, jqXHR){
+						$.post(hostPrefix + "/api/ppm/setRatings", payload, function(data, textStatus, jqXHR){
 
 							_.map(all_selected_nodes, function(n){
 								n.data.rating = rating

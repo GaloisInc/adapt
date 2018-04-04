@@ -614,6 +614,10 @@ var predicates = [
         name : "Affected Objects",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2')"
+    },{
+        name : "Provenance",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('provSubject').hasLabel('AdmProvenanceTagNode')"
     },
 // AdmPathNode
     {
@@ -658,6 +662,13 @@ var predicates = [
         name : "NetFlow Principal",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
+    }, 
+
+ // AdmProvenanceTagNode
+    {
+        name : "Flow Object",
+        is_relevant : function(n) {return n.db_label === "AdmProvenanceTagNode"},
+        floating_query : ".out('flowObject')"
     }
 ]
 

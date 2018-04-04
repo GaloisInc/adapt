@@ -20,6 +20,13 @@
         var right_journal =[]
         var default_node_color = "#97c2fc"
 
+        var urlParams = new URLSearchParams(window.location.search)
+        if (urlParams.has('host')) {
+			var hostPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
+		} else {
+			var hostPrefix = ""
+		}
+
         function LabeledNodes(actor, object, action) {
             this.actor = actor
             this.object = object
@@ -93,7 +100,7 @@
                 document.getElementById('query-string').value = query_string
                 UI.loadingUIStop()
             } else {  
-                $.post("/query/nodes", {"query": query_string}, function(node_results) {
+                $.post(hostPrefix + "/query/nodes", {"query": query_string}, function(node_results) {
                     var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
                     if ( ! all_are_nodes) { UI.failHandler(); return false }
 
@@ -108,7 +115,7 @@
                         var edge_query = "new = [" + result_node_ids.join(",") + "];" +
                                          "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
                                          "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
-                        $.post("/query/edges", {"query": edge_query}, function(edge_results) {
+                        $.post(hostPrefix + "/query/edges", {"query": edge_query}, function(edge_results) {
                             UI.foundEdges(edge_results.length)
                             var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                             var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
@@ -129,7 +136,7 @@
 
         function execTextQuery(query_string) {
             UI.loadingUIStart()
-            $.post("/query/generic", {"query": query_string}, function(results) {
+            $.post(hostPrefix + "/query/generic", {"query": query_string}, function(results) {
                 UI.queryInputColor("lightgreen")
                 console.log(results)
                 setTimeout(function(){ UI.queryInputColor() }, 750)
