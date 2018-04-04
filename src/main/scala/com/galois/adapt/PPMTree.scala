@@ -557,7 +557,8 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._1.eventType.toString)
       ),
       d => Set(d._2.uuid),
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      _ => false
     )(thisActor.context, context.self),
 
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",

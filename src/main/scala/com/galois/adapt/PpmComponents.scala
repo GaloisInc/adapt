@@ -191,15 +191,16 @@ object PpmComponents {
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
                          (implicit l: JsonWriter[List[(T,U)]]): Unit =
-    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
+    if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
       Try {
         val content = map.toList.toJson.prettyPrint
         val outputFile = new File(fp)
-        if ( ! outputFile.exists) outputFile.createNewFile()
+        if (!outputFile.exists) outputFile.createNewFile()
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
         println(s"Saved to disk $name at $fp: ${map.size}")
-      } getOrElse {
+      }.getOrElse {
         println(s"Failed to save to disk $name at $fp: ${map.size}")
       }
+    }
 
 }

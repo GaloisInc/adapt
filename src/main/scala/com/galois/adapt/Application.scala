@@ -29,6 +29,7 @@ import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import org.reactivestreams.Publisher
 import FlowComponents._
+import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
 import bloomfilter.CanGenerateHashFrom
 import bloomfilter.mutable.BloomFilter
@@ -628,40 +629,40 @@ object CDMSource {
     }
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("cadets" -> _)
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("clearscope" -> _)
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("faros" -> _)
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("fivedirections" -> _)
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
-          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
+          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser)
+        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
         Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("trace" -> _)
       case "kafkaTest"      =>
         Application.addNamespace("kafkaTest", isWindows = false)
-        val src = kafkaSource("kafkaTest", kafkaCdm17Parser)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        val src = kafkaSource("kafkaTest", kafkaCdm17Parser, None)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map("kafkaTest" -> _)
       case _ =>
 
@@ -710,43 +711,43 @@ object CDMSource {
       case Success(i) => Some(i)
       case _ => None
     }
+
+    val src = config.getStringList("adapt.env.ta1kafkatopics").asScala.map{topicNameAndLimit =>
+      val (topicName, limitOpt) = topicNameAndLimit.split("∫").toList match {
+        case name :: l :: Nil if Try(l.toInt).isSuccess => (name, Some(l.toInt))
+        case name :: Nil => (name, None)
+        case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
+      }
+      kafkaSource(topicName, kafkaCdm18Parser, limitOpt)
+    }.fold(Source.empty)((earlierTopicSource, laterTopicSouce) => earlierTopicSource.concat(laterTopicSouce))
+
+    Application.instrumentationSource = ta1.toLowerCase
+
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
-          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm18Parser).via(printCounter("Theia Query Response", Application.statusActor, 1)))
+          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm18Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm18Parser)
-        Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
-      case "kafkaTest"      =>
-        Application.addNamespace("kafkaTest", isWindows = false)
-        val src = kafkaSource("kafkaTest", kafkaCdm18Parser)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
+      case "kafkatest"      =>
+        Application.addNamespace("kafkatest", isWindows = false)
+        val kafkaTestSource = kafkaSource("kafkatest", kafkaCdm18Parser, None)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        shouldLimit.fold(kafkaTestSource)(l => kafkaTestSource.take(l)).map(ta1 -> _)
       case _ =>
         val paths: List[(Provider, String)] = getLoadfiles
         println(s"Setting file sources to: ${paths.mkString("\n", "\n", "")}")
@@ -775,10 +776,9 @@ object CDMSource {
             val read = CDM17.readData(b._2, None)
             read.map(_._1) match {
               case Failure(_) => None
-              case Success(s) => {
+              case Success(s) =>
                 Application.instrumentationSource = Ta1Flows.getSourceName(s)
                 Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
-              }
             }
 
             read.map(_._2).get.flatMap {
@@ -839,26 +839,28 @@ object CDMSource {
   }
 
   // Make a CDM source from a kafka topic
-  def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C]): Source[C, _] =
-    Consumer.plainSource(
+  def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C], takeLimit: Option[Int]): Source[C, Consumer.Control] = {
+    val kafkaConsumer = Consumer.plainSource(
       ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
       Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = 0) // Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L))  // TODO: Why aren't offsets working?
     )
-      .statefulMapConcat[ConsumerRecord[Array[Byte],Array[Byte]]]{ () =>  // This drops CDMs while counting live.
+      .statefulMapConcat[ConsumerRecord[Array[Byte], Array[Byte]]] { () =>  // This drops CDMs while counting live.
       var counter = 0L
       var stillDiscarding = start > 0L;
-      {
-        case cdm if stillDiscarding =>
-          if (counter % 10000 == 0) print(s"\rSkipping past: $counter")
-          counter += 1
-          stillDiscarding = start > counter
-          Nil
-        case cdm => List(cdm)
-      }
+    {
+      case cdm if stillDiscarding =>
+        if (counter % 10000 == 0) print(s"\rSkipping past: $counter")
+        counter += 1
+        stillDiscarding = start > counter
+        Nil
+      case cdm => List(cdm)
     }
+    }
+    takeLimit.fold(kafkaConsumer)(limit => kafkaConsumer.take(limit))
 //      .drop(start)
       .map(parser)
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
+  }
 
   // Parse a `CDM17` from a kafka record
   def kafkaCdm17Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM17] = Try {
