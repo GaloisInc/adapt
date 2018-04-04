@@ -317,12 +317,20 @@ $(function(){
 			var existing_so_far = stars.existing.slice()
 			var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
 
+				var searchPattern = $("#searchText").val()
 				var all_selected_nodes = []
 				var rating_items = {}
 				_.map(treeNames, function(treeName){
 					var tree = $("#" + treeName)
 					var selectedElements = tree.fancytree("getTree").getSelectedNodes()
 					var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
+
+					if ( ! _.isEmpty(searchPattern)) {
+						selectedNodes = _.filter(selectedNodes, function(n){
+							return new RegExp(searchPattern, "i").test(n.title)
+						})
+					}
+
 					all_selected_nodes = all_selected_nodes.concat(selectedNodes)
 					if ( ! _.isEmpty(selectedNodes)) {
 						rating_items[treeName] = _.map(selectedNodes, function(n){return n.data.key})
@@ -338,7 +346,7 @@ $(function(){
 				if (count == 0) {
 					alert("You must select items with checkboxes to apply a rating.")
 				} else {
-					var confirmed = confirm("Apply rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?")
+					var confirmed = confirm("Apply rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?" + "\n\n" + JSON.stringify(rating_items, null, 2))
 					if (confirmed) {
 						var payload = {
 							"pathsPerTree" : JSON.stringify(rating_items),
