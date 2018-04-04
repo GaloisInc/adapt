@@ -19,7 +19,7 @@ sudo apt-get install libcairo2-dev
 sudo apt-get install libxt-dev
 
 
-After that, it is necessary to install some packages before executing the scripts. They are detailed in *chek_packages.r*.
+After that, it is necessary to install some packages before executing the scripts. They are detailed in *check_packages.r*.
 For example, to install a package from R, we do:
 
 $R>
@@ -30,17 +30,11 @@ install.packages("jsonlite",repos = "http://cran.us.r-project.org")
 
 install.packages("curl",repos = "http://cran.us.r-project.org")
 
-install.packages("grid",repos = "http://cran.us.r-project.org")
-
 install.packages("ggplot2",repos = "http://cran.us.r-project.org")
 
 install.packages("gridBase",repos = "http://cran.us.r-project.org")
 
 install.packages("gridExtra",repos = "http://cran.us.r-project.org")
-
-install.packages("grid",repos = "http://cran.us.r-project.org")
-
-install.packages("ggplot2",repos = "http://cran.us.r-project.org")
 
 install.packages("lattice",repos = "http://cran.us.r-project.org")
 
@@ -60,13 +54,26 @@ install.packages("stringr",repos = "http://cran.us.r-project.org")
 
 install.packages("data.table",repos = "http://cran.us.r-project.org")
 
-install.packages("RNeo4j",repos = "http://cran.us.r-project.org")
-
 install.packages("RCurl",repos = "http://cran.us.r-project.org")
 
 install.packages("plyr",repos = "http://cran.us.r-project.org")
 
+install.packages('httr',repos = "http://cran.us.r-project.org")
+
+install.packages('tm',repos = "http://cran.us.r-project.org")
+
+install.packages('SnowballC',repos = "http://cran.us.r-project.org")
+
+install.packages('wordcloud',repos = "http://cran.us.r-project.org")
 ...
+
+To install the RNeo4J package, you need to use the tar.gz archive found in the AR_Miner repository and execute the following command :
+
+```
+$R>
+install.packages("/path_to_adapt/adapt/fca/AR_Miner/RNeo4j_1.6.4.tar.gz",repos=NULL,type="source")
+
+```
  
 It is preferable to install RStudio to manage the project and execute the scripts. Although, the use of shell scripts is also possible as detailed below.
 

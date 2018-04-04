@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTyp
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import com.galois.adapt.FilterCdm.Filter
 //import akka.http.scaladsl.marshalling._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
@@ -42,14 +43,17 @@ object Routes {
     path("rank") {
       getFromResource("web/ranking.html")
     } ~
+    path("filter") {
+      getFromResource("web/cdm-filter.html")
+    } ~
     pathPrefix("") {
       getFromResourceDirectory("web")
     }
 
   implicit val timeout = Timeout(config.getInt("adapt.runtime.apitimeout") seconds)
 
-  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext) = (dbActor ? query)
-    .mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
+  def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext): Future[JsValue] =
+    (dbActor ? query).mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
 
   val validRating = Unmarshaller.strict[String, Int] {
@@ -58,7 +62,7 @@ object Routes {
   }
 
 
-  def mainRoute(dbActor: ActorRef, anomalyActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
+  def mainRoute(dbActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) =
     respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
@@ -85,6 +89,11 @@ object Routes {
                 )
               }
             }
+          } ~
+          pathPrefix("getCdmFilter") {
+            complete(
+              Future.successful(Application.filterAst.toJson)
+            )
           }
         } ~
         pathPrefix("query") {
@@ -128,6 +137,32 @@ object Routes {
       } ~
       post {
         pathPrefix("api") {
+          pathPrefix("setCdmFilter") {
+            formField('filter.as[Filter]) { (filter: Filter) =>
+              complete {
+                Future {
+                  Application.filterAst = Some(filter)
+                  Try { Some(FilterCdm.compile(filter)) } match {
+                    case Failure(e) => StatusCodes.BadRequest -> s"Invalid CDM filter: ${e.toString}"
+                    case Success(f) =>
+                      Application.filter = f
+                      StatusCodes.Created -> s"New CDM filter set"
+                  }
+                }
+              }
+            }
+          } ~
+            pathPrefix("clearCdmFilter") {
+              formFields() {
+                complete {
+                  Future {
+                    Application.filterAst = None
+                    Application.filter = None
+                    StatusCodes.Created -> "CDM filter cleared"
+                  }
+                }
+              }
+            } ~
           pathPrefix("ppm") {
             path(Segment / "setRating") { treeName =>
               parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt") { (queryString, rating, namespace) =>
@@ -179,7 +214,8 @@ object Routes {
                     fields.get("endTimestamp").map(_.toLong)
                   )
                 ).map(q =>
-                  (anomalyActor ? q).mapTo[Future[String]].flatMap(identity)
+                  // TODO: Come on... fix this.
+                  (ppmActor ? q).mapTo[Future[String]].flatMap(identity)
                 )
               }
             }

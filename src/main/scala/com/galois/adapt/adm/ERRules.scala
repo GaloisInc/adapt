@@ -82,10 +82,12 @@ object ERRules {
     FileObjectEdges.FilePathEdgeNode
   ) = {
     val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, provider)
+    val pathOpt1: Option[AdmPathNode] = f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider))
+    val pathOpt2: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("path")).flatMap(p => AdmPathNode.normalized(p, provider))
     (
       newFo,
       f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal, provider))),
-      f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+      (pathOpt1 orElse pathOpt2).map(pathNode => {
         (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
       })
     )

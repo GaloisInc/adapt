@@ -7,7 +7,11 @@ load_csv=function(csv_file){
   
   if (file.size(csv_file) == 0)  {stop("\n csv_file is file empty \n")}
   
+<<<<<<< HEAD
  # context_file=read.csv(file='./contexts/Context_ProcessEvent.csv')
+=======
+  # context_file=read.csv(file='./contexts/Context_ProcessEvent.csv')
+>>>>>>> fcastable
   cat('loading csv')
   context_file=NULL
   result = tryCatch({
