@@ -369,6 +369,7 @@ $(function(){
 							})
 						}).fail(function(e){
 							console.log(e)
+							alert("Couuld not set rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?" + "\n\n" + JSON.stringify(rating_items, null, 2))
 						})
 					}
 				}
