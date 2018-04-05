@@ -141,7 +141,7 @@ $(function(){
 		var shouldExpandAll = false
 
 		$("#" + treeName).fancytree({
-			extensions: ["filter", "table", "childcounter"/*, "multi"*/],
+			extensions: ["filter", "table", "childcounter", "multi"],
 			source: {
 				url: hostPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
 				cache: false
@@ -356,7 +356,6 @@ $(function(){
 							"namespace" : namespace
 						}
 						$.post(hostPrefix + "/api/ppm/setRatingsMap", payload, function(data, textStatus, jqXHR){
-
 							_.map(all_selected_nodes, function(n){
 								n.data.rating = rating
 							})
@@ -410,6 +409,8 @@ $(function(){
     	top: 0px;
     	left: 0px;
     	margin-bottom: 0px;
+    	background-color: white;
+    	width: 100%;
     }
     #underTopBar {
     	height: 2em;
