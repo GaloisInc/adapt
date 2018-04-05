@@ -7,7 +7,15 @@ load.csv <- function(csv.file){
   
   if (file.size(csv.file) == 0)  {stop("\n csv.file is file empty \n")}
   
+<<<<<<< HEAD
  # context.file=read.csv(file='./contexts/Context.ProcessEvent.csv')
+=======
+<<<<<<< HEAD
+ # context_file=read.csv(file='./contexts/Context_ProcessEvent.csv')
+=======
+  # context_file=read.csv(file='./contexts/Context_ProcessEvent.csv')
+>>>>>>> fcastable
+>>>>>>> 077874d4cd435ead986976b263e1e33a0c0ff993
   cat('loading csv')
   context.file <- NULL
   result = tryCatch({
