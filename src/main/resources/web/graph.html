@@ -585,7 +585,7 @@
                 prop_lines.push('startTimestamp : ' + new Date(node['properties']['startTimestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
             }
 
-            return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+            return "id : " + node['id'] + "<br />" + _.map(prop_lines, function(s){return s.replace("<","{").replace(">","}")}).join("<br />")
         }
 
 
