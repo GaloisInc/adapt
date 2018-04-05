@@ -611,9 +611,17 @@ var predicates = [
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmFileObject')"
     },{
+        name : "Affected File Names",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmFileObject').out('path', '(path)').hasLabel('AdmPathNode')"
+    },{
         name : "Affected Objects",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2')"
+    },{
+        name : "Affected Object Names",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').out('path', '(path)', 'cmdLine', '(cmdLine)', 'exec').hasLabel('AdmPathNode')"
     },{
         name : "Provenance",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},

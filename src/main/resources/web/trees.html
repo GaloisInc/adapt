@@ -355,19 +355,19 @@ $(function(){
 							"rating" : rating,
 							"namespace" : namespace
 						}
-						$.post(hostPrefix + "/api/ppm/setRatings", payload, function(data, textStatus, jqXHR){
+						$.post(hostPrefix + "/api/ppm/setRatingsMap", payload, function(data, textStatus, jqXHR){
 
 							_.map(all_selected_nodes, function(n){
 								n.data.rating = rating
-								// n.selected = false
-								// console.log(n)
 							})
-							_.map(treeNames, function(treeName){
-								var tree = $("#" + treeName)
-								tree.fancytree("getRootNode").visit(function(node){
-									node.selected = false
-								})
-								tree.fancytree("getRootNode").render(true,true)
+							_.map(rating_items, function(treeItemKey, treeName){
+								if (_.contains(treeNames, treeName)) {
+									var tree = $("#" + treeName)
+									tree.fancytree("getRootNode").visit(function(node){
+										node.selected = false
+									})
+									tree.fancytree("getRootNode").render(true,true)
+								}
 							})
 						}).fail(function(e){
 							console.log(e)
@@ -394,9 +394,34 @@ $(function(){
 })
 
     </script>
+    <style type="text/css">
+    html, body {
+        padding: 0px;
+        margin: 0px;
+    }
+    #topBar {
+    	position: fixed;
+    	height: 2em;
+    	float: left;
+    	padding: 1em;
+    	padding-bottom: 0px;
+    	background-color: white;
+    	z-index: 10;
+    	top: 0px;
+    	left: 0px;
+    	margin-bottom: 0px;
+    }
+    #underTopBar {
+    	height: 2em;
+    	position: relative;
+    	margin: 1em;
+    	margin-bottom: 0px;
+    }
+	</style>
 </head>
 <body>
-	<div>
+	<div id="underTopBar">
+	<div id="topBar">
 		<input id="searchText" name="search" placeholder="Search..." autocomplete="off" />
 		<label>Rating:</label>
 		<select id="ratingComparison">
@@ -427,6 +452,7 @@ $(function(){
 		<button id="btnResetSearch">CLEAR</button>
 		<span id="matches"></span>
 		<span style="margin-left: 5em;">Set Rating: </span><span id="stars"></span>
+	</div>
 	</div>
 	<div id="trees"></div>
 	<div id="unrendered"></div>
