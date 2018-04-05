@@ -626,6 +626,10 @@ var predicates = [
         name : "Provenance",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
         floating_query : ".in('provSubject').hasLabel('AdmProvenanceTagNode')"
+    },{
+        name : "Principal",
+        is_relevant : function(n) {return n.db_label === "AdmSubject"},
+        floating_query : ".out('localPrincipal').hasLabel('AdmPrincipal')"
     },
 // AdmPathNode
     {
