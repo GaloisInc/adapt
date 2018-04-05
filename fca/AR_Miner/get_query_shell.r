@@ -21,7 +21,7 @@ if(is.null(csv.file)) stop("error in csv.file file   - terminating")
 OutCon <- file(rcf.context.file,"w")
 OutConCsv <- file(csv.file,"w")
 
-
+cat("\n reading the Json specification file \n")
 dataspec <- fromJSON(JsonSpecFile,simplifyVector = TRUE)
 if(length(dataspec)==0) stop("neo4j json spec file incorrect - terminating")
 query <- unlist(dataspec[1])[[1]]
@@ -33,7 +33,7 @@ if(is.null(query.result))stop("neo4j server error - terminating")
 cat('\n Start querying the server \n ')
 query.result <- unique(query.result)
 names(query.result)
-if(length(query.result)<=1) stop("neo4j json spec do not contain objects nor attributes - terminating")
+if(length(query.result)<=1) stop("neo4j json specs do not contain objects nor attributes - terminating")
 cat('\n Json results successfully retrieved from the server \n ')
 #UniqueObjectList= as.list(query.result[objectsdata] %>% distinct())
 cat('\n Start creating Object and Attributes Lists From Json \n ')
@@ -53,7 +53,7 @@ for (i in 1:length(UniqueObjectList)){#for each object
   UniqueAttributeList <- unique(UniqueAttributeList)
   
 }
-cat('\n Object and Attributes Lists successfully created \n ')
+cat('\n Objects and Attributes Lists successfully created \n ')
 
 ##################################### generating the RCF file
 cat('\n Start creating RCF Context \n ')
