@@ -1,8 +1,9 @@
 package com.galois.adapt
 
-import java.io.File
+import java.io.{BufferedWriter, File, FileReader, FileWriter}
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, StandardOpenOption}
+import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.util.function.Consumer
 
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
@@ -173,13 +174,19 @@ object PpmComponents {
 
   // Load a mutable map from disk
   def loadMapFromDisk[T, U](name: String, fp: String)
-                           (implicit l: JsonReader[List[(T,U)]]): mutable.Map[T,U] =
+                           (implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
     if (Application.config.getBoolean("adapt.ppm.shouldload"))
       Try {
-        val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-        val entries = content.parseJson.convertTo[List[(T, U)]]
-        println(s"Read in from disk $name at $fp: ${entries.size}")
-        mutable.Map.apply(entries: _*)
+        val toReturn = mutable.Map.empty[T,U]
+        Files.lines(Paths.get(fp)).forEach(new Consumer[String]{
+          override def accept(line: String): Unit = {
+            val (k, v) = line.parseJson.convertTo[(T, U)]
+            toReturn.put(k,v)
+          }
+        })
+
+        println(s"Read in from disk $name at $fp: ${toReturn.size}")
+        toReturn
       } match {
         case Success(m) => m
         case Failure(e) =>
@@ -190,13 +197,18 @@ object PpmComponents {
 
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
-                         (implicit l: JsonWriter[List[(T,U)]]): Unit =
+                         (implicit l: JsonWriter[(T,U)]): Unit =
     if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
       Try {
-        val content = map.toList.toJson.prettyPrint
         val outputFile = new File(fp)
         if (!outputFile.exists) outputFile.createNewFile()
-        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+
+        val writer = new BufferedWriter(new FileWriter(outputFile))
+        for (pair <- map) {
+          writer.write(pair.toJson.compactPrint + "\n")
+        }
+        writer.close()
+
         println(s"Saved to disk $name at $fp: ${map.size}")
       }.getOrElse {
         println(s"Failed to save to disk $name at $fp: ${map.size}")
