@@ -107,7 +107,9 @@ for(Obj in 1:length(List_Objects)){
   for(Rule in 1:length(CoronOutPut)){
     RulescoreConf=0.0
     RulescoreLift=0.0
-    if(length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 & length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0        )
+    if(length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0)
+    {
+    if( length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 )
     {##Violation =============================================
       ##violation with score based on confidence
       nbViolatedRules=nbViolatedRules+1
@@ -120,7 +122,8 @@ for(Obj in 1:length(List_Objects)){
    
       
       
-    }###================================================endif violation
+    }
+    }  ###================================================endif violation
     
   }##for rules
   if(nbViolatedRules>0)

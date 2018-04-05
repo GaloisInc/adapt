@@ -4,14 +4,14 @@
 
 args <- commandArgs()
 print(args)
- currentview=as.character(args[6])
-csv_file=as.character(args[7])
-rcf_context_file=as.character(args[8])
-output_scoring_file=as.character(args[9])
-MinSup=as.numeric(args[10])
-MinConf=as.numeric(args[11])
+ currentview <- as.character(args[6])
+csv_file <- as.character(args[7])
+rcf_context_file <- as.character(args[8])
+output_scoring_file <- as.character(args[9])
+MinSup <- as.numeric(args[10])
+MinConf <- as.numeric(args[11])
 
-myWorkingDirectory=getwd()
+myWorkingDirectory <- getwd()
 options(max.print=10000000)
 
 cat('\n ############### Association Rule Mining ######################## \n')
@@ -24,18 +24,18 @@ cat('\n ############### Association Rule Mining ######################## \n')
   source("load_csv.r")
   if (file.size(csv_file) == 0)  {stop("\n csv_file file empty \n")}
   
-  returns_args=load_csv(csv_file)
+  returns_args <- load.csv(csv_file)
   if(is.null(returns_args))stop("\n the csv file is null \n")
-  List_Objects=returns_args$List_Objects
-  List_Attributes=returns_args$List_Attributes
-  AttributesofObject=returns_args$AttributesofObject 
-  ObjectOfAttributes=returns_args$ObjectOfAttributes
+  List_Objects <- returns_args$List_Objects
+  List_Attributes <- returns_args$List_Attributes
+  AttributesofObject <- returns_args$AttributesofObject 
+  ObjectOfAttributes <- returns_args$ObjectOfAttributes
   if(length(List_Objects)==0)stop("\n Length of List_Objects is 0, try other configurations or databases \n")
   if(length(List_Attributes)==0)stop("\n Length of List_Attributes is 0, try other configurations or databases \n")
    cat("\n Nb objects is this context: \n", length(List_Objects))
    cat("\n Nb attributes in this context \n", length(List_Attributes))
    
-   ContextFileRCF=rcf_context_file
+   ContextFileRCF <- rcf_context_file
     cat('\n ############### sup \n',MinSup)
     cat('\n ############### conf \n',MinConf)
      ##-----------------------------------------LESS DETAILS OF RULES
@@ -43,111 +43,111 @@ cat('\n ############### Association Rule Mining ######################## \n')
     SoftAssRulescmd=paste0("./coron-0.8/core02_assrulex.sh  ",ContextFileRCF, " ", MinSup,"% ", MinConf,"% -names -alg:zart -rule:all -full ",sep="") #>thisresults2.txt
     cat(SoftAssRulescmd)
     SoftAssRulesresult=try(system(SoftAssRulescmd, intern = TRUE,  wait = TRUE))     
-    CoronOutPut=as.list(SoftAssRulesresult)
-    CoronOutPut=lapply(CoronOutPut,function(x)x[!is.na(x)])
-    CoronOutPut=lapply(CoronOutPut,function(x)x[!x==""])
-    CoronOutPut=Filter(length,CoronOutPut)
-    CoronOutPut=CoronOutPut[14:length(CoronOutPut)-2]
-    CondRules=lapply(strsplit(as.character(CoronOutPut),">"),"[",1)
-    CondRules=lapply(CondRules, function(x)gsub("{", '', x, fixed = T))
-    CondRules=lapply(CondRules, function(x)gsub("}", '', x, fixed = T))
-    CondRules=lapply(CondRules, function(x)gsub("=", '', x, fixed = T))
-    CondRules=lapply(CondRules, function(x)gsub(" ", '', x, fixed = T))
-    NbRules=as.integer(length(CondRules))
+    CoronOutPut <- as.list(SoftAssRulesresult)
+    CoronOutPut <- lapply(CoronOutPut,function(x)x[!is.na(x)])
+    CoronOutPut <- lapply(CoronOutPut,function(x)x[!x==""])
+    CoronOutPut <- Filter(length,CoronOutPut)
+    CoronOutPut <- CoronOutPut[14:length(CoronOutPut)-2]
+    CondRules <- lapply(strsplit(as.character(CoronOutPut),">"),"[",1)
+    CondRules <- lapply(CondRules, function(x)gsub("{", '', x, fixed = T))
+    CondRules <- lapply(CondRules, function(x)gsub("}", '', x, fixed = T))
+    CondRules <- lapply(CondRules, function(x)gsub("=", '', x, fixed = T))
+    CondRules <- lapply(CondRules, function(x)gsub(" ", '', x, fixed = T))
+    NbRules <- as.integer(length(CondRules))
    
     cat('Nb association Rules',NbRules) 
     if(NbRules==0)stop("\n The number of association rules is 0, try other configurations or databases \n")
     
-    ResRules=lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
-    values=lapply(strsplit(as.character(ResRules),"}"),"[",2)
-    Support=lapply(strsplit(as.character(values),";"),"[",1)
-    Support=lapply(strsplit(as.character(Support),"\\["),"[",2)
-    Support=lapply(Support, function(x)gsub("%", '', x, fixed = T))
-    Support=lapply(Support, function(x)gsub("]", '', x, fixed = T))
-    Support=as.numeric(Support)
-    Confidence=lapply(strsplit(as.character(values),";"),"[",2)   
-    Confidence=lapply(strsplit(as.character(Confidence),"\\["),"[",2)
-    Confidence=lapply(strsplit(as.character(Confidence),"%"),"[",1)
-    Confidence=as.numeric(Confidence)
+    ResRules <- lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
+    values <- lapply(strsplit(as.character(ResRules),"}"),"[",2)
+    Support <- lapply(strsplit(as.character(values),";"),"[",1)
+    Support <- lapply(strsplit(as.character(Support),"\\["),"[",2)
+    Support <- lapply(Support, function(x)gsub("%", '', x, fixed = T))
+    Support <- lapply(Support, function(x)gsub("]", '', x, fixed = T))
+    Support <- as.numeric(Support)
+    Confidence <- lapply(strsplit(as.character(values),";"),"[",2)   
+    Confidence <- lapply(strsplit(as.character(Confidence),"\\["),"[",2)
+    Confidence <- lapply(strsplit(as.character(Confidence),"%"),"[",1)
+    Confidence <- as.numeric(Confidence)
     #Confidence=lapply(Confidence, function(x)gsub("%", '', x, fixed = T))
     #Confidence=lapply(Confidence, function(x)gsub("\\]", '', x, fixed = T))
-    ResRules=lapply(strsplit(as.character(ResRules),"}"),"[",1)
-    ResRules=lapply(ResRules, function(x)gsub("{", '', x, fixed = T))
-    ResRules=lapply(ResRules, function(x)gsub(" ", '', x, fixed = T))
+    ResRules <- lapply(strsplit(as.character(ResRules),"}"),"[",1)
+    ResRules <- lapply(ResRules, function(x)gsub("{", '', x, fixed = T))
+    ResRules <- lapply(ResRules, function(x)gsub(" ", '', x, fixed = T))
     
-    Lift=lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
-    Lift=lapply(strsplit(as.character(Lift),";"),"[",5)
-    Lift=lapply(strsplit(as.character(Lift),"="),"[",2)
-    Lift=as.numeric(Lift)
+    Lift <- lapply(strsplit(as.character(CoronOutPut),">"),"[",2)
+    Lift <- lapply(strsplit(as.character(Lift),";"),"[",5)
+    Lift <- lapply(strsplit(as.character(Lift),"="),"[",2)
+    Lift <- as.numeric(Lift)
     
     
-      df.AssocRulesOutPut=data.frame()
-     df.AssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
-     write.csv(file=paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.AssocRulesOutPut)
-     cat('\n Saving the association rules DB \n')
-     cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
+    df.AssocRulesOutPut=data.frame()
+    df.AssocRulesOutPut=do.call(rbind, Map(data.frame, "CondRules"=CondRules, "ResRules"=ResRules,"Support"=Support,"Confidence"=Confidence,"Lift"=Lift))
+    write.csv(file=paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""), df.AssocRulesOutPut)
+    cat('\n Saving the association rules DB \n')
+    cat('\n Rules file in =======> \n',paste0("./contexts/AssociationRules_Only_Conf_",currentview,"_",MinConf,"_Sup_",MinSup,".csv",sep=""))
      
      
  
      cat('\n Calculating the scores of the rules for detecting violator objects \n')
-      TopViolatedRulesForEachObjectConfidence=""
-      TopViolatedRulesForEachObjectLift=""
-      ViolatedRulesForEachObjectConfidence=""
-      ViolatedRulesForEachObjectLift=""
-      TopScoreConfidence=""
-      TopScoreLift=""
-      AVGScoresOfObjectsConfidence =""
-      AVGScoresOfObjectsLift =""
-      ViolatorObjectList=""
-      CondRules=lapply(CondRules, function(x)unlist(strsplit(as.character(x),split=',')))
-      ResRules=lapply(ResRules, function(x)unlist(strsplit(as.character(x),split=',')))
+      TopViolatedRulesForEachObjectConfidence <- ""
+      TopViolatedRulesForEachObjectLift <- ""
+      ViolatedRulesForEachObjectConfidence <- ""
+      ViolatedRulesForEachObjectLift <- ""
+      TopScoreConfidence <- ""
+      TopScoreLift <- ""
+      AVGScoresOfObjectsConfidence  <- ""
+      AVGScoresOfObjectsLift  <- ""
+      ViolatorObjectList <- ""
+      CondRules <- lapply(CondRules, function(x)unlist(strsplit(as.character(x),split=',')))
+      ResRules <- lapply(ResRules, function(x)unlist(strsplit(as.character(x),split=',')))
       
       for(Obj in 1:length(List_Objects)){
-        GlobalscoreConf=0.0
-        GlobalscoreLift=0.0
-        Max_ScoreConf=0.0
-        Max_ScoreLift=0.0
-        Max_RuleConf=""
-        Max_RuleLift=""
-        RuleListConf=""
-        RuleListLift=""
-        nbViolatedRules=0
+        GlobalscoreConf <- 0.0
+        GlobalscoreLift <- 0.0
+        Max_ScoreConf <- 0.0
+        Max_ScoreLift <- 0.0
+        Max_RuleConf <- ""
+        Max_RuleLift <- ""
+        RuleListConf <- ""
+        RuleListLift <- ""
+        nbViolatedRules <- 0
         cat('\n object id \n',Obj)
         for(Rule in 1:length(CoronOutPut)){
-          RulescoreConf=0.0
-          RulescoreLift=0.0 
+          RulescoreConf <- 0.0
+          RulescoreLift <- 0.0 
           if(length(intersect(AttributesofObject[[Obj]],as.list(unlist( ResRules[Rule]))) )==0)
           {
             if( length(intersect(AttributesofObject[[Obj]], as.list(unlist(CondRules[Rule]))))>0 )
             {##Violation =============================================  ##violation with score based on confidence
-            nbViolatedRules=nbViolatedRules+1
-            RulescoreConf=log2(1-as.double(Confidence[Rule])/100)
-            GlobalscoreConf=GlobalscoreConf+RulescoreConf
-            left= paste(CondRules[[Rule]],collapse=',' )
-            rigth= paste(ResRules[[Rule]],collapse=',' )
-            violatedrule=paste(as.character(left),as.character(rigth),sep="=>")
-            sc=paste(" Score: ",as.character(-1*RulescoreConf),sep="=")
-            violatedrule=paste(violatedrule,sc,sep="")
-            RuleListConf=paste(RuleListConf,violatedrule,sep = " | ")
+            nbViolatedRules <-  nbViolatedRules+1
+            RulescoreConf <- log2(1-as.double(Confidence[Rule])/100)
+            GlobalscoreConf <- GlobalscoreConf+RulescoreConf
+            left <-  paste(CondRules[[Rule]],collapse=',' )
+            rigth <-  paste(ResRules[[Rule]],collapse=',' )
+            violatedrule <- paste(as.character(left),as.character(rigth),sep="=>")
+            sc <- paste(" Score: ",as.character(-1*RulescoreConf),sep="=")
+            violatedrule <- paste(violatedrule,sc,sep="")
+            RuleListConf <- paste(RuleListConf,violatedrule,sep = " | ")
             
             if(-1*RulescoreConf>Max_ScoreConf){
-              Max_ScoreConf=-1*RulescoreConf
-              Max_RuleConf=violatedrule
+              Max_ScoreConf <- -1*RulescoreConf
+              Max_RuleConf <- violatedrule
             }
             
             
             ##violation with score based on lift
-            RulescoreLift= log2(1-as.double(Lift[Rule])/100) 
-            GlobalscoreLift=GlobalscoreLift+RulescoreLift
+            RulescoreLift <-  log2(1-as.double(Lift[Rule])/100) 
+            GlobalscoreLift <- GlobalscoreLift+RulescoreLift
             
-            violatedrule=paste(as.character(left),as.character(rigth),sep="=>")
+            violatedrule <- paste(as.character(left),as.character(rigth),sep="=>")
             sc=paste(" Score: ",as.character(-1*RulescoreLift),sep="=")
-            violatedrule=paste(violatedrule,sc,sep="")
-            RuleListLift=paste(RuleListLift,violatedrule,sep = " | ")
+            violatedrule <- paste(violatedrule,sc,sep="")
+            RuleListLift <- paste(RuleListLift,violatedrule,sep = " | ")
             
             if(-1*RulescoreLift>Max_ScoreLift){
-              Max_ScoreLift=-1*RulescoreLift
-              Max_RuleLift=violatedrule
+              Max_ScoreLift <- -1*RulescoreLift
+              Max_RuleLift<-violatedrule
             }
             
             
@@ -157,32 +157,32 @@ cat('\n ############### Association Rule Mining ######################## \n')
         }##for rules
         if(nbViolatedRules>0)
         {
-          GlobalscoreConf=(0-GlobalscoreConf)/nbViolatedRules
-          AVGScoresOfObjectsConfidence=c(AVGScoresOfObjectsConfidence,GlobalscoreConf)
-          TopViolatedRulesForEachObjectConfidence=c(TopViolatedRulesForEachObjectConfidence,Max_RuleConf)
-          TopScoreConfidence=c(TopScoreConfidence,Max_ScoreConf)
-          ViolatedRulesForEachObjectConfidence=c(ViolatedRulesForEachObjectConfidence,RuleListConf)
+          GlobalscoreConf <- (0-GlobalscoreConf)/nbViolatedRules
+          AVGScoresOfObjectsConfidence <- c(AVGScoresOfObjectsConfidence,GlobalscoreConf)
+          TopViolatedRulesForEachObjectConfidence <- c(TopViolatedRulesForEachObjectConfidence,Max_RuleConf)
+          TopScoreConfidence <- c(TopScoreConfidence,Max_ScoreConf)
+          ViolatedRulesForEachObjectConfidence <- c(ViolatedRulesForEachObjectConfidence,RuleListConf)
           
-          GlobalscoreLift=(0-GlobalscoreLift)/nbViolatedRules
-          AVGScoresOfObjectsLift=c(AVGScoresOfObjectsLift,GlobalscoreLift)
-          TopViolatedRulesForEachObjectLift=c(TopViolatedRulesForEachObjectLift,Max_RuleLift)
-          TopScoreLift=c(TopScoreLift,Max_ScoreLift)
-          ViolatedRulesForEachObjectLift=c(ViolatedRulesForEachObjectLift,RuleListLift)
-          ViolatorObjectList=c(ViolatorObjectList,List_Objects[[Obj]])
+          GlobalscoreLift <- (0-GlobalscoreLift)/nbViolatedRules
+          AVGScoresOfObjectsLift <- c(AVGScoresOfObjectsLift,GlobalscoreLift)
+          TopViolatedRulesForEachObjectLift <- c(TopViolatedRulesForEachObjectLift,Max_RuleLift)
+          TopScoreLift <- c(TopScoreLift,Max_ScoreLift)
+          ViolatedRulesForEachObjectLift <- c(ViolatedRulesForEachObjectLift,RuleListLift)
+          ViolatorObjectList <- c(ViolatorObjectList,List_Objects[[Obj]])
         }
         
       }#for obj
       
-      AVGScoresOfObjectsLift=AVGScoresOfObjectsLift[-1]
-      TopViolatedRulesForEachObjectLift=TopViolatedRulesForEachObjectLift[-1]
-      TopScoreLift=TopScoreLift[-1]
-      ViolatedRulesForEachObjectLift= ViolatedRulesForEachObjectLift[-1]
+      AVGScoresOfObjectsLift <- AVGScoresOfObjectsLift[-1]
+      TopViolatedRulesForEachObjectLift <- TopViolatedRulesForEachObjectLift[-1]
+      TopScoreLift <- TopScoreLift[-1]
+      ViolatedRulesForEachObjectLift <-  ViolatedRulesForEachObjectLift[-1]
       
-      AVGScoresOfObjectsConfidence=AVGScoresOfObjectsConfidence[-1]
-      TopViolatedRulesForEachObjectConfidence=TopViolatedRulesForEachObjectConfidence[-1]
-      TopScoreConfidence=TopScoreConfidence[-1]
-      ViolatedRulesForEachObjectConfidence= ViolatedRulesForEachObjectConfidence[-1]
-      ViolatorObjectList=ViolatorObjectList[-1]
+      AVGScoresOfObjectsConfidence <- AVGScoresOfObjectsConfidence[-1]
+      TopViolatedRulesForEachObjectConfidence <- TopViolatedRulesForEachObjectConfidence[-1]
+      TopScoreConfidence <- TopScoreConfidence[-1]
+      ViolatedRulesForEachObjectConfidence <-  ViolatedRulesForEachObjectConfidence[-1]
+      ViolatorObjectList <- ViolatorObjectList[-1]
       
   
     
@@ -198,8 +198,8 @@ cat('\n ############### Association Rule Mining ######################## \n')
     
     cat('\n Saving the scores results \n')
       
-    df.ObjectsWithScores=data.frame(matrix(ncol = 9, nrow = 0))
-    colnames (df.ObjectsWithScores)=c("Objects",
+    df.ObjectsWithScores <- data.frame(matrix(ncol = 9, nrow = 0))
+    colnames (df.ObjectsWithScores) <- c("Objects",
                                       "ViolatedRulesForEachObjectConfidence",
                                       "AVGScoresOfObjectsConfidence",
                                       "TopViolatedRulesForEachObjectConfidence",
@@ -210,7 +210,7 @@ cat('\n ############### Association Rule Mining ######################## \n')
                                       "TopScoreLift")
     
     if(length(as.list(ViolatorObjectList))==0)stop("\n Violators List is null \n")
-    df.ObjectsWithScores=do.call(rbind, Map(data.frame, 
+    df.ObjectsWithScores <- do.call(rbind, Map(data.frame, 
                                             "Objects"=as.list(ViolatorObjectList), 
                                             "ViolatedRulesForEachObjectConfidence"=as.list(ViolatedRulesForEachObjectConfidence),
                                             "AVGScoresOfObjectsConfidence"=as.list(AVGScoresOfObjectsConfidence),
