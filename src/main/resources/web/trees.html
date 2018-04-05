@@ -268,13 +268,13 @@ $(function(){
 					// console.log(matchesRatingFilter(node))
 					// console.log(matchesLocalProbFilter(node))
 					// console.log(matchesTimeRange(node, timeStart, timeStop))
-					return ! node.folder && matchesRatingFilter(node) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
+					return /*! node.folder &&*/ matchesRatingFilter(node) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				} else {
 					// console.log(node)
 					// console.log(matchesRatingFilter(node))
 					// console.log(matchesLocalProbFilter(node))
 					// console.log(matchesTimeRange(node, timeStart, timeStop))
-					return ! node.folder && new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
+					return /*! node.folder &&*/ new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				}
 			}, filterOptions)
 
