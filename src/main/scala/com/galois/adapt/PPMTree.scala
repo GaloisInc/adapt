@@ -7,10 +7,11 @@ import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWr
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
-import java.io.{File, PrintWriter}
+import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.{Charset, StandardCharsets}
-import java.nio.file.{Files, StandardOpenOption}
+import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.function.Consumer
 
 import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
@@ -178,7 +179,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   type PartialShape = DataShape
   val discriminators: List[Discriminator[PartialShape]]
   require(discriminators.length == 2)
-  implicit def partialMapJson: RootJsonFormat[List[(JoinType, List[ExtractedValue])]]
+  implicit def partialMapJson: RootJsonFormat[(JoinType, List[ExtractedValue])]
   var partialMap: mutable.Map[JoinType, List[ExtractedValue]] = (inputFilePath, Application.config.getBoolean("adapt.ppm.shouldload")) match {
     case (Some(fp), true) =>
       val loadPath = fp + ".partialMap"
@@ -186,10 +187,16 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
         import spray.json._
         import ApiJsonProtocol._
 
-        val content = new String(Files.readAllBytes(new File(loadPath).toPath()), StandardCharsets.UTF_8)
-        val entries = content.parseJson.convertTo[List[(JoinType, List[ExtractedValue])]]
-        println(s"Read in from disk $name at $loadPath: ${entries.size}")
-        mutable.Map.apply(entries: _*)
+        val toReturn = mutable.Map.empty[JoinType,List[ExtractedValue]]
+        Files.lines(Paths.get(loadPath)).forEach(new Consumer[String]{
+          override def accept(line: String): Unit = {
+            val (k, v) = line.parseJson.convertTo[(JoinType, List[ExtractedValue])]
+            toReturn.put(k,v)
+          }
+        })
+
+        println(s"Read in from disk $name at $loadPath: ${toReturn.size}")
+        toReturn
       } match {
         case Success(m) => m
         case Failure(e) =>
@@ -233,11 +240,16 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
         import spray.json._
         import ApiJsonProtocol._
 
-        val content = partialMap.toList.toJson.prettyPrint
         val outputFile = new File(savePath + ".partialMap")
         if (!outputFile.exists) outputFile.createNewFile()
-        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-//        println(s"Saved to disk $name at $savePath.partialMap: ${partialMap.size}")
+
+        val writer = new BufferedWriter(new FileWriter(outputFile))
+        for (pair <- this.partialMap) {
+          writer.write(pair.toJson.compactPrint + "\n")
+        }
+        writer.close()
+
+//        println(s"Saved to disk $name at outputFile: ${map.size}")
       } getOrElse {
         println(s"Failed to save partial map to disk $name at $savePath.partialMap: ${partialMap.size}")
       }
@@ -699,7 +711,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[List[(String,List[ExtractedValue])]]]
+        implicitly[RootJsonFormat[(String,List[ExtractedValue])]]
       }
     },
 
@@ -729,7 +741,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[List[(String,List[ExtractedValue])]]]
+        implicitly[RootJsonFormat[(String,List[ExtractedValue])]]
       }
     },
 
@@ -769,7 +781,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[List[(AdmUUID,List[ExtractedValue])]]]
+        implicitly[RootJsonFormat[(AdmUUID,List[ExtractedValue])]]
       }
     }
   ).par
@@ -807,7 +819,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[List[(AdmUUID,List[ExtractedValue])]]]
+        implicitly[RootJsonFormat[(AdmUUID,List[ExtractedValue])]]
       }
     }
   ).par
