@@ -73,7 +73,14 @@ object Application extends App {
 
 
   val fileDb = Try { config.getString("adapt.adm.mapdb") } match {
-    case Success(p) => DBMaker.fileDB(p).fileMmapEnable().make()
+    case Success(p) =>
+      var maker = DBMaker.fileDB(p).fileMmapEnable()
+
+      if (config.getBoolean("adapt.adm.mapdbbypasschecksum")) maker = maker.checksumHeaderBypass()
+      if (config.getBoolean("adapt.adm.mapdbtransactions")) maker = maker.transactionEnable()
+
+      maker.make()
+
     case Failure(_) =>
       val p = "/tmp/map_" + Random.nextLong() + ".db"
       val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
@@ -394,8 +401,6 @@ object Application extends App {
         .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
-
-
 
     case "e3" =>
       startWebServer()
