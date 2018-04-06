@@ -116,7 +116,7 @@ Example:
 
 ### Data Processing and scoring:
 
-\$> ./context_scoring_From_CSV.sh: in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/c./C  ontext_Scoring_From_CSV.sh.
+\$> ./Context_Scoring_From_CSV.sh: in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/./Context_Scoring_From_CSV.sh.
 It is the second main script that can be executed after *$> ./extractProcessEvent.sh*, since it takes a *context_name* as string, the previously produced *csv context*, and *rcf context files*, an *output_scoring_file* and numerical values for *MinSup* and *MinConf*.
 An output example is in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Scoring_Of_Context_ProcessEvent-cadet-pandex.csv.
  
@@ -146,19 +146,28 @@ Default example to run is \$> *./Context_scoring_From_CSV.sh* :
 
 ### Data scoring with feedback analysis:
  
- \$>  *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*: The aim with this analysis is to include the rules, which were generated with the benign DB as feedback during the scoring and ranking. It uses the previously generated scores file *Scoring_Of_Context_ProcessEvent.csv* that becomes the input of the feedback analysis as *original_scoring_file* in the shell script. It also needs a benign association rules that are generated using the same context in the benign DB (*benign_rules.csv* available for caet panedx in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/AssociationRules_Benign_ProcessEvent-Cadet-Pandex.csv). 
+ \$>  *./Scoring_Rules_Using_Benign_Feedback_Shell.sh*: The aim with this analysis is to include the rules, which were generated with the benign DB as feedback during the scoring and ranking. It uses the previously generated scores with non-benign database *Scoring_Of_Context_ProcessEvent.csv* that becomes the input of the feedback analysis as *original_scoring_file* in the shell script. It also needs a benign association rules that are generated using the same context in the benign DB (*benign_rules.csv* available for caet panedx in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/AssociationRules_Benign_ProcessEvent-Cadet-Pandex.csv). 
  
 Default example to run in \$> *./Scoring_Rules_Using_Benign_Feedback_Shell.sh* :
 
 *#!/bin/bash*
+
 *context_name='ProcessEvent'*
+
 *csv_file='./contexts/Context_ProcessEvent.csv'*
+
 *rcf_file='./contexts/Context_ProcessEvent.rcf'*
+
 *output_scoring_file='./contexts/Output_Scoring_Feedback_Of_Context_ProcessEvent.csv'*
+
 *MinSup='97'*
+
 *MinConf='97'*
+
 *Benign_file='./contexts/AssociationRules_Benign_ProcessEvent-Cadet-Pandex.csv'*
+
 *original_scoring_file='./contexts/Scoring_Of_Context_ProcessEvent-cadet-pandex.csv'*
+
 *Rscript Scoring_Rules_Using_Benign_feedback_Shell.r $context_name $csv_file $rcf_file $output_scoring_file $MinSup $MinConf $Benign_file $original_scoring_file*
  
  An output example of this script is in https://github.com/GaloisInc/adapt/blob/fcadev/fca/AR_Miner/contexts/Output_Scoring_Feedback_Of_Context_ProcessEvent.csv:
