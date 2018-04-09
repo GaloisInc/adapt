@@ -723,32 +723,38 @@ object CDMSource {
         case name :: Nil => (name, None)
         case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
       }
-      kafkaSource(topicName, kafkaCdm18Parser, limitOpt)
+
+      val isWindows = ta1.toLowerCase match {
+        case "faros" => true
+        case "fivedirections" => true
+        case "cadets" => false
+        case "clearscope" => false
+        case "theia" => false
+        case "trace" => false
+        case _ => false
+      }
+      Application.addNamespace(topicName, isWindows)
+
+      kafkaSource(topicName, kafkaCdm18Parser, limitOpt).map(topicName -> _)
     }.fold(Source.empty)((earlierTopicSource, laterTopicSouce) => earlierTopicSource.concat(laterTopicSouce))
 
     Application.instrumentationSource = ta1.toLowerCase
 
     ta1.toLowerCase match {
-      case "cadets"         =>
-        Application.addNamespace("cadets", isWindows = false)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
-      case "clearscope"     =>
-        Application.addNamespace("clearscope", isWindows = false)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
-      case "faros"          =>
-        Application.addNamespace("faros", isWindows = true)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
-      case "fivedirections" =>
-        Application.addNamespace("fivedirections", isWindows = true)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
+      case "cadets"         => shouldLimit.fold(src)(l => src.take(l))
+      case "clearscope"     => shouldLimit.fold(src)(l => src.take(l))
+      case "faros"          => shouldLimit.fold(src)(l => src.take(l))
+      case "fivedirections" => shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
-        Application.addNamespace("theia", isWindows = false)
+        val queryTopic = config.getString("adapt.env.theiaresponsetopic")
+        Application.addNamespace(queryTopic, false)
+
         shouldLimit.fold(src)(l => src.take(l))
-          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm18Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
-          .map("theia" -> _)
-      case "trace"          =>
-        Application.addNamespace("trace", isWindows = false)
-        shouldLimit.fold(src)(l => src.take(l)).map(ta1 -> _)
+          .merge(kafkaSource(queryTopic, kafkaCdm18Parser, None)
+            .via(printCounter("Theia Query Response", Application.statusActor, 1))
+            .map(queryTopic -> _))
+
+      case "trace"          => shouldLimit.fold(src)(l => src.take(l))
       case "kafkatest"      =>
         Application.addNamespace("kafkatest", isWindows = false)
         val kafkaTestSource = kafkaSource("kafkatest", kafkaCdm18Parser, None)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
