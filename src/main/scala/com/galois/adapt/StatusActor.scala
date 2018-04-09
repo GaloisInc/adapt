@@ -17,12 +17,17 @@ class StatusActor extends Actor {
   val totalPopulationLog = mutable.Map.empty[String, Long]
   var recentPopulationLog = Map.empty[String, Long]
 
-  def calculateStats(): StatusReport = StatusReport(
-    currentlyIngesting,
-    generalRecords.toMap.mapValues(_.toString),
-    totalPopulationLog.toMap,
-    recentPopulationLog
-  )
+  def calculateStats(): StatusReport = {
+    generalRecords += ("DuplicateAlarms" -> duplicateAlarmCount)
+    StatusReport(
+      currentlyIngesting,
+      generalRecords.toMap.mapValues(_.toString),
+      totalPopulationLog.toMap,
+      recentPopulationLog
+    )
+  }
+
+  var duplicateAlarmCount = 0L
 
 
   def receive = {
@@ -36,6 +41,8 @@ class StatusActor extends Actor {
       logFile.append(calculateStats().toJson.compactPrint + "\n")
       logFile.close()
     }
+
+    case IncrementAlarmDuplicateCount => duplicateAlarmCount += 1
 
     case p: PopulationLog =>
       p.counter.foreach{ case (k,v) =>
@@ -94,3 +101,5 @@ case class StatusReport(
   totalPopulation: Map[String, Long],
   recentPopulation: Map[String, Long]
 )
+
+case object IncrementAlarmDuplicateCount

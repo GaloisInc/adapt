@@ -16,6 +16,8 @@ import java.util.function.Consumer
 import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
 import akka.util.Timeout
+import com.galois.adapt
+import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
@@ -67,7 +69,7 @@ case class PpmDefinition[DataShape](
 )(
   context: ActorContext,
   alarmActor: ActorRef
-) {
+) extends LazyLogging {
 
   val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + ".csv").toOption
   val outputFilePath =
@@ -115,7 +117,11 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid], Long)]): Unit = alarmOpt.foreach(a => alarms = alarms + (a._1.map(_._1) -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])))
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuid], Long)]): Unit = alarmOpt.foreach { a =>
+    val key = a._1.map(_._1)
+    if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount // logger.info(s"Alarm already exists for key: $key  Not saving the alarm: ${(a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])}")
+    else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
+  }
 
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
     rating match {
