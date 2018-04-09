@@ -6,6 +6,7 @@
     <script type="text/javascript" src="javascripts/underscore.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
+	<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>
     <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
 	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
 
@@ -177,11 +178,21 @@ $(function(){
 					$tdList.eq(3).html(renderStars(node.data.rating))
 				}
 
+				var timeDigitOverage = node.data.dataTime.toString().length - 13
+				dataTimeSeconds = parseInt(node.data.dataTime / 1000000) //(10 * timeDigitOverage))
+				var dataTimeString = node.data.dataTime === 0 ? "0" : moment(dataTimeSeconds).format('ddd MMM Do YYYY, h:mm:ss')
+				var obsTimeSeconds = parseInt(node.data.observationTime)  // Convert from millis to seconds
+				var obsTimeString = moment(obsTimeSeconds).format('ddd MMM Do YYYY, h:mm:ss')
+
+
 				var linkPrefix = _.isEmpty(hostPrefix) ? "/" : ""
 				var linkSuffix = _.isEmpty(hostPrefix) ? "" : "?host=" + hostPrefix
 				var show_graph_link = _.isEmpty(node.data.uuids) ? "" : '<a target="_blank" href="' + linkPrefix + 'graph.html'+ linkSuffix +'#g.V().has(\'uuid\',within(['+node.data.uuids.join(",")+']))">Show Graph</a>'
 				$tdList.eq(4).html(
-					'<span>'+ JSON.stringify(_.omit(node.data, "key", "uuids")) +'</span>' + show_graph_link
+					'<span>'+ 
+					'<b>Data: </b><span title="'+node.data.dataTime+'">' + dataTimeString + '</span> <b>Obs: </b><span title="'+node.data.observationTime+'">' + obsTimeString + '</span> <b>L.Prob: </b>' + node.data.localProb +
+					// JSON.stringify(_.omit(node.data, "key", "uuids")) +
+					' </span> ' + show_graph_link
 					
 				)
 			},
@@ -268,7 +279,7 @@ $(function(){
 					// console.log(matchesRatingFilter(node))
 					// console.log(matchesLocalProbFilter(node))
 					// console.log(matchesTimeRange(node, timeStart, timeStop))
-					return /*! node.folder &&*/ matchesRatingFilter(node) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
+					return /*! node.folder &&*/ matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				} else {
 					// console.log(node)
 					// console.log(matchesRatingFilter(node))
