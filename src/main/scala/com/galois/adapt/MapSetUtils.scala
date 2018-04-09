@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import java.util.function.BiConsumer
+import java.util.function.{BiConsumer, Consumer}
 
 import bloomfilter.mutable.BloomFilter
 import org.mapdb.HTreeMap
@@ -29,6 +29,7 @@ object MapSetUtils {
     def contains(value: V): Boolean
     def add(value: V): Boolean               // return `true` if the key wasn't previously there
     def size(): Long
+    def foreach(func: V => Unit): Unit
   }
 
   // Wrap a MapDB map into an `AlmostMap`
@@ -79,6 +80,10 @@ object MapSetUtils {
     def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.getMap.sizeLong()
+
+    def foreach(func: V2 => Unit): Unit = set.forEach(new Consumer[V1] {
+      override def accept(v1: V1): Unit = func(outValue(v1))
+    })
   }
 
   // Wrap a MapDB set into an `AlmostSet`
@@ -92,6 +97,10 @@ object MapSetUtils {
     def add(v2: V2): Boolean = set.add(intoValue(v2))
 
     def size(): Long = set.size()
+
+    def foreach(func: V2 => Unit): Unit = set.forEach(new Consumer[V1] {
+      override def accept(v1: V1): Unit = func(outValue(v1))
+    })
   }
 
   // Wrap a mutable set into an `AlmostSet`
@@ -101,6 +110,8 @@ object MapSetUtils {
     def add(v: V): Boolean = set.add(v)
 
     def size(): Long = set.size
+
+    def foreach(func: V => Unit): Unit = set.foreach(func)
   }
 
   def bloomSet[V](bf: BloomFilter[V]): AlmostSet[V] = new AlmostSet[V] {
@@ -117,6 +128,8 @@ object MapSetUtils {
     }
 
     def size(): Long = count
+
+    def foreach(func: V => Unit): Unit = ???
   }
 
   def lruCacheSet[V](map: java.util.LinkedHashMap[V, None.type]): AlmostSet[V] = new AlmostSet[V] {
@@ -131,5 +144,7 @@ object MapSetUtils {
     }
 
     def size(): Long = count
+
+    def foreach(func: V => Unit): Unit = ???
   }
 }

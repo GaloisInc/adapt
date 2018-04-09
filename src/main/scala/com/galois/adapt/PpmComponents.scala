@@ -5,14 +5,16 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.function.Consumer
 
+import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18._
 import spray.json.{JsonReader, JsonWriter}
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
-
+import scala.concurrent.duration._
 
 object PpmComponents {
 
@@ -27,7 +29,7 @@ object PpmComponents {
 
   val config = Application.config
 
-  val ppmSink = Flow[Either[ADM, EdgeAdm2Adm]]
+  def ppmSink(implicit system: ActorSystem, ec: ExecutionContext) = Flow[Either[ADM, EdgeAdm2Adm]]
     .statefulMapConcat[CompletedESO]{ () =>
 
       import ApiJsonProtocol._
@@ -49,7 +51,7 @@ object PpmComponents {
       val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", releaseQueueSavePath)
 
       // Shutdown hook to save the maps above back to disk when we shutdown
-      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+      val runnable = new Runnable() {
         override def run(): Unit = {
           println(s"Saving state in PpmComponents...")
 
@@ -59,7 +61,10 @@ object PpmComponents {
           saveMapToDisk("pathNodeUses", pathNodeUses, pathNodeUsesSavePath)
           saveMapToDisk("releaseQueue", releaseQueue, releaseQueueSavePath)
         }
-      }))
+      }
+
+      Runtime.getRuntime.addShutdownHook(new Thread(runnable))
+      system.scheduler.schedule(20.minutes, 20.minutes, runnable)
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
