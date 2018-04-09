@@ -3,7 +3,7 @@ package com.galois.adapt
 import akka.actor.{Actor, ActorLogging}
 import com.galois.adapt.adm.{ADM, EdgeAdm2Adm}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
-import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue}
+import spray.json.{JsArray, JsNull, JsNumber, JsObject, JsString, JsValue}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Try}
@@ -126,6 +126,8 @@ object DBQueryProxyActor {
   import scala.collection.JavaConversions._
 
   def toJson: Any => JsValue = {
+    // Null value
+    case x if Option(x).isEmpty => JsNull
 
     // Numbers
     case n: Int => JsNumber(n)
