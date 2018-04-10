@@ -414,6 +414,12 @@ object Application extends App {
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
 
+    case "print-cdm" =>
+      var i = 0
+      CDMSource.cdm18(ta1)
+        .map(cdm => println(s"Record $i: ${cdm.toString}"))
+        .runWith(Sink.ignore)
+
     case "sets" =>
 
       val temp: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("temp")
