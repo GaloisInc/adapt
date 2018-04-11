@@ -210,7 +210,7 @@ object PpmComponents {
         if ( ! outputFile.exists) outputFile.createNewFile()
         else {
           val rotateScriptPath = Try(Application.config.getString("adapt.ppm.rotatescriptpath")).getOrElse("")
-          if (rotateScriptPath.nonEmpty) List(rotateScriptPath, fp).!
+          if (rotateScriptPath.nonEmpty) Try( List(rotateScriptPath, fp).! ).getOrElse(println(s"Could not execute rotate script: $rotateScriptPath for file: $fp"))
         }
 
         val writer = new BufferedWriter(new FileWriter(outputFile))
