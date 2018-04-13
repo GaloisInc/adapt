@@ -83,15 +83,15 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean]) { (keyboardAction, guiEventAction) =>
+            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (keyboardAction, guiEventAction, requestId, responseUri) =>
               complete {
-                answerPolicy3()
+                answerPolicy3(responseUri, requestId, dbActor)
                 StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 4) {
+            parameters('policy ! 4, 'fileName.as[String], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (fileName, requestId, responseUri) =>
               complete {
-                answerPolicy4()
+                answerPolicy4(fileName, responseUri, requestId, dbActor)
                 StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
               }
             }
@@ -219,16 +219,52 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
 
-  def answerPolicy3(): Unit = {
+  def answerPolicy3(responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
     // TODO
+    implicit val ec = system.dispatcher
+
+    def nicholesQuery(whatDoYouNeed: String): Future[Option[String]] = ???
+
+    val resultFuture = nicholesQuery("I don't know").map{
+      case Some(s) =>
+        val result: Int = ??? //400
+        returnPolicyResult(result, Some(s), responseUri)
+        result -> Some(s)
+      case None =>
+        val result: Int = ??? //200
+        val messageOpt: Option[String] = None
+        returnPolicyResult(result, messageOpt, responseUri)
+        result -> messageOpt
+    }
+
+    policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
 
-  def answerPolicy4(): Unit = {
+  def answerPolicy4(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
     // TODO
+    implicit val ec = system.dispatcher
+
+    def alecsQuery(fileName: String): Future[Option[String]] = ???
+
+    val resultFuture = alecsQuery(fileName).map{
+      case Some(s) =>
+        val result = 400
+        returnPolicyResult(result, Some(s), responseUri)
+        result -> Some(s)
+      case None =>
+        val result = 200
+        val message = s"No network source data for the file: $fileName"
+        returnPolicyResult(result, Some(message), responseUri)
+        result -> Some(message)
+    }
+
+    policyRequests = policyRequests + (requestId -> resultFuture)
   }
+
 
 
   def returnPolicyResult(responseCode: Int, message: Option[String], responseUri: String)(implicit system: ActorSystem, materializer: Materializer): Future[HttpResponse] = {
@@ -245,7 +281,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     responseF onComplete {
       case Success(r) => println(s"Result from _sending_ the response: $r")
-      case Failure(e) => e.printStackTrace()
+      case Failure(e) => println(s"Sending a response failed:"); e.printStackTrace()
     }
 
     responseF

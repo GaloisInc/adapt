@@ -583,6 +583,14 @@ var predicates = [
         name : "Host",
         is_relevant : function(node) { return node['properties'].hasOwnProperty('host') },
         floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'][0]['value'] +")" }
+    // },{
+    //     name: "Between Nodes",
+    //     is_relevant: function(clickedNode){ return network.getSelectedNodes().length === 2 },
+    //     floating_query : function(clickedNode) { 
+    //         var twoNodes = network.getSelectedNodes()
+    //         "g.V("+twoNodes[0]+").both().as('n').both()"
+    //         return asd
+    //     }
     },
 
 
