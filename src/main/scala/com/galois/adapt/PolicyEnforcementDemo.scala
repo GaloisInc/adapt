@@ -11,8 +11,10 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.json.DefaultJsonProtocol
+import spray.json.{DefaultJsonProtocol, JsArray, JsNumber, JsValue}
 import edazdarevic.commons.net.CIDRUtils
+
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -248,7 +250,106 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     // TODO
     implicit val ec = system.dispatcher
 
-    def alecsQuery(fileName: String): Future[Option[String]] = ???
+    def alecsQuery(fileName: String): Future[Option[String]] = {
+      import scala.concurrent.duration._
+
+      implicit val _: Timeout = 10.minutes
+
+      val escapedPath = fileName
+//        .replaceAll("\\", "\\\\")
+//        .replaceAll("\b", "\\b")
+//        .replaceAll("\n", "\\n")
+//        .replaceAll("\t", "\\t")
+//        .replaceAll("\r", "\\r")
+//        .replaceAll("\"", "\\\"")
+
+      // Pure utility
+      def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
+        futFutTry.flatMap(futTry => futTry.flatMap {
+          case Failure(f) => Future.failed(f)
+          case Success(a) => Future.successful(a)
+        })
+
+      def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
+          .map(arr => arr.asInstanceOf[JsArray].elements.toList)
+
+      // Files possible corresponding to the given path
+      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN DISTINCT(ID(f))""")
+        .map(arr => arr
+          .flatMap(obj => obj.asJsObject.getFields("ID(f)"))
+          .map(num => num.asInstanceOf[JsNumber].value.longValue())
+        )
+
+      type ID = Long
+      type TimestampNanos = Long
+
+
+      // I want to have a loop over the monad `Future[_]`. That's not possible with a regular `while`, so the loop is a
+      // recursive function.
+      def loop(toVisit: collection.mutable.Queue[(ID, TimestampNanos)], visited: collection.mutable.Set[ID]): Future[Option[String]] =
+        if (toVisit.isEmpty) {
+          Future.successful(None)
+        } else {
+          val (id: ID, time: TimestampNanos) = toVisit.dequeue()
+
+          val checkEnd = s"MATCH (n: AdmNetFlowObject) WHERE ID(n) = $id RETURN n.remoteAddress, n.remotePort"
+          futQuery(checkEnd).flatMap { netflows =>
+            if (netflows.nonEmpty) {
+
+              val address = netflows.head.asJsObject.getFields("n.remoteAddress").head.toString
+              val port = netflows.head.asJsObject.getFields("n.remotePort").head.toString
+
+              Future.successful(Some(address +  ":" + port))
+            } else {
+              //  AND e.earliestTimestampNanos <= $time
+              val stepWrite  = s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
+                                  |WHERE e.eventType = "EVENT_WRITE" AND ID(o1) = $id
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val stepRead   = s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
+                                  |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV") AND ID(o1) = $id
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val stepRename = s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
+                                  |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2)
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val foundFut: Future[List[(ID, TimestampNanos)]] = for {
+                writes <- futQuery(stepWrite)
+                reads <- futQuery(stepRead)
+                rename <- futQuery(stepRename)
+              } yield (writes ++ reads ++ rename).map(obj => {
+                val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
+                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").head.asInstanceOf[JsNumber].value.longValue()
+                (id, timestamp)
+              })
+
+              foundFut.flatMap { found =>
+                toVisit ++= found.filter { case (id, _) => !visited.contains(id) }
+                visited ++= found.map(_._1)
+
+                loop(toVisit, visited)
+              }
+            }
+          }
+
+
+        }
+
+      fileIdsFut.flatMap((filesIds: List[Long]) => {
+        // toVisit = the IDs of node which could have contributed to the file being sent out
+        val toVisit: scala.collection.mutable.Queue[(ID, TimestampNanos)] = collection.mutable.Queue.empty
+        val visited: scala.collection.mutable.Set[ID] = scala.collection.mutable.Set.empty
+
+        toVisit ++= filesIds.map(id => (id, Long.MaxValue))
+        visited ++= filesIds
+
+        loop(toVisit, visited)
+      })
+    }
 
     val resultFuture = alecsQuery(fileName).map{
       case Some(s) =>
