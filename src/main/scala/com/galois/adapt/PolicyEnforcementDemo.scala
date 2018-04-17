@@ -274,7 +274,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           .map(arr => arr.asInstanceOf[JsArray].elements.toList)
 
       // Files possible corresponding to the given path
-      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN DISTINCT(ID(f))""")
+      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)""")
         .map(arr => arr
           .flatMap(obj => obj.asJsObject.getFields("ID(f)"))
           .map(num => num.asInstanceOf[JsNumber].value.longValue())
@@ -301,19 +301,18 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
               Future.successful(Some(address +  ":" + port))
             } else {
-              //  AND e.earliestTimestampNanos <= $time
               val stepWrite  = s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
-                                  |WHERE e.eventType = "EVENT_WRITE" AND ID(o1) = $id
+                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
               val stepRead   = s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
-                                  |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV") AND ID(o1) = $id
+                                  |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
               val stepRename = s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
-                                  |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2)
+                                  |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
