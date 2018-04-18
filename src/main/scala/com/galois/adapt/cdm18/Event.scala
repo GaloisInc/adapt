@@ -67,7 +67,7 @@ case class Event(
       }
 
     if (decodedOption.exists(_.contains("GET "))) {
-      peParam.fold[List[(String,Any)]](List.empty){v => List("peTagIds" -> v(1).tagRunLengthTuples.get.map(_.tagId).mkString(","))}
+      peParam.fold[List[(String,Any)]](List.empty){v => List("peTagIds" -> v(1).tagRunLengthTuples.get.map(_.tagId).toSet.mkString(","))}
     } else {
       List.empty
     }
