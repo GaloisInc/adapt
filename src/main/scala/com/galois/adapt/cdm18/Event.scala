@@ -1,5 +1,7 @@
 package com.galois.adapt.cdm18
 
+import java.io
+
 import com.galois.adapt.{DBNodeable, DBWritable}
 
 import scala.util.{Failure, Try}
@@ -48,7 +50,28 @@ case class Event(
     location.fold[List[(String,Any)]](List.empty)(v => List(("location", v))) ++
     size.fold[List[(String,Any)]](List.empty)(v => List(("size", v))) ++
     programPoint.fold[List[(String,Any)]](List.empty)(v => List(("programPoint", v))) ++
-    DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
+    DBOpt.fromKeyValMap(properties) ++  // Flattens out nested "properties"
+  {
+    // For the policy enforcement demo of policy 3 with Clearscope's data
+    // we only care about parameters on EVENT_WRITEs where the second elt has valueBytes and tagRunLengthTuples
+    val peParam = parameters.filter{
+      p => eventType.toString=="EVENT_WRITE" &&
+            p.lengthCompare(1)>0 && p(1).valueBytes.isDefined &&
+            p(1).tagRunLengthTuples.isDefined
+      }
+
+
+    val decodedOption: Option[String] = peParam match {
+      case Some(params) => Some(new String(params(1).valueBytes.get))
+      case _ => None
+      }
+
+    if (decodedOption.exists(_.contains("GET "))) {
+      peParam.fold[List[(String,Any)]](List.empty){v => List("peTagIds" -> v(1).tagRunLengthTuples.get.map(_.tagId).mkString(","))}
+    } else {
+      List.empty
+    }
+  }
 
   def asDBEdges = List.concat(
     subjectUuid.map(s => (CDM18.EdgeTypes.subject,s)),
