@@ -94,7 +94,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
             parameters('policy ! 4, 'fileName.as[String], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (fileName, requestId, responseUri) =>
               complete {
                 answerPolicy4(fileName, responseUri, requestId, dbActor)
-                StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
+                StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             }
         }
