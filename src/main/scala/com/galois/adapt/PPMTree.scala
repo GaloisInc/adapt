@@ -224,20 +224,16 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
             val extractedList = discriminators(0)(observation)
             if (extractedList.nonEmpty) partialMap(joinValue) = extractedList //-> myself.uuidCollector(observation)
           }
-//          None
         case Some(firstExtracted) =>
-          if (partialFilters._2(observation)) {
+          if (partialFilters._2(observation)) /*  TODO: && (observation._1.earliestTimestampNanos > firstExtracted.timestamp)) */ {
             val newlyExtracted = discriminators(1)(observation)
             if (newlyExtracted.nonEmpty) {
-//              tree.observe(arrangeExtracted(firstExtracted ++ newlyExtracted), observation._1.latestTimestampNanos)
               tree ! PpmNodeActorBeginObservation(name, arrangeExtracted(firstExtracted ++ newlyExtracted), uuidCollector(observation), observation._1.latestTimestampNanos, myself.alarmFilter)
             }
-//            else None
           }
-//          else None
       }
     }
-  } //else None
+  }
 
 
   def saveStateSync(): Unit = {

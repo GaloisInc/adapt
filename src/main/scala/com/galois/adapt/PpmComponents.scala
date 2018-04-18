@@ -204,9 +204,14 @@ object PpmComponents {
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
                          (implicit l: JsonWriter[(T,U)]): Unit =
     if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
+      import sys.process._
       Try {
         val outputFile = new File(fp)
-        if (!outputFile.exists) outputFile.createNewFile()
+        if ( ! outputFile.exists) outputFile.createNewFile()
+        else {
+          val rotateScriptPath = Try(Application.config.getString("adapt.ppm.rotatescriptpath")).getOrElse("")
+          if (rotateScriptPath.nonEmpty) Try( List(rotateScriptPath, fp).! ).getOrElse(println(s"Could not execute rotate script: $rotateScriptPath for file: $fp"))
+        }
 
         val writer = new BufferedWriter(new FileWriter(outputFile))
         for (pair <- map) {

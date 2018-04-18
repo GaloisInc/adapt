@@ -11,8 +11,10 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.json.DefaultJsonProtocol
+import spray.json.{DefaultJsonProtocol, JsArray, JsNumber, JsValue}
 import edazdarevic.commons.net.CIDRUtils
+
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -83,15 +85,15 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean]) { (keyboardAction, guiEventAction) =>
+            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (keyboardAction, guiEventAction, requestId, responseUri) =>
               complete {
-                answerPolicy3()
+                answerPolicy3(responseUri, requestId, dbActor)
                 StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 4) {
+            parameters('policy ! 4, 'fileName.as[String], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (fileName, requestId, responseUri) =>
               complete {
-                answerPolicy4()
+                answerPolicy4(fileName, responseUri, requestId, dbActor)
                 StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
               }
             }
@@ -219,16 +221,150 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
 
-  def answerPolicy3(): Unit = {
+  def answerPolicy3(responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
     // TODO
+    implicit val ec = system.dispatcher
+
+    def nicholesQuery(whatDoYouNeed: String): Future[Option[String]] = ???
+
+    val resultFuture = nicholesQuery("I don't know").map{
+      case Some(s) =>
+        val result: Int = ??? //400
+        returnPolicyResult(result, Some(s), responseUri)
+        result -> Some(s)
+      case None =>
+        val result: Int = ??? //200
+        val messageOpt: Option[String] = None
+        returnPolicyResult(result, messageOpt, responseUri)
+        result -> messageOpt
+    }
+
+    policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
 
-  def answerPolicy4(): Unit = {
+  def answerPolicy4(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
     // TODO
+    implicit val ec = system.dispatcher
+
+    def alecsQuery(fileName: String): Future[Option[String]] = {
+      import scala.concurrent.duration._
+
+      implicit val _: Timeout = 10.minutes
+
+      val escapedPath = fileName
+//        .replaceAll("\\", "\\\\")
+//        .replaceAll("\b", "\\b")
+//        .replaceAll("\n", "\\n")
+//        .replaceAll("\t", "\\t")
+//        .replaceAll("\r", "\\r")
+//        .replaceAll("\"", "\\\"")
+
+      // Pure utility
+      def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
+        futFutTry.flatMap(futTry => futTry.flatMap {
+          case Failure(f) => Future.failed(f)
+          case Success(a) => Future.successful(a)
+        })
+
+      def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
+          .map(arr => arr.asInstanceOf[JsArray].elements.toList)
+
+      // Files possible corresponding to the given path
+      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)""")
+        .map(arr => arr
+          .flatMap(obj => obj.asJsObject.getFields("ID(f)"))
+          .map(num => num.asInstanceOf[JsNumber].value.longValue())
+        )
+
+      type ID = Long
+      type TimestampNanos = Long
+
+
+      // I want to have a loop over the monad `Future[_]`. That's not possible with a regular `while`, so the loop is a
+      // recursive function.
+      def loop(toVisit: collection.mutable.Queue[(ID, TimestampNanos)], visited: collection.mutable.Set[ID]): Future[Option[String]] =
+        if (toVisit.isEmpty) {
+          Future.successful(None)
+        } else {
+          val (id: ID, time: TimestampNanos) = toVisit.dequeue()
+
+          val checkEnd = s"MATCH (n: AdmNetFlowObject) WHERE ID(n) = $id RETURN n.remoteAddress, n.remotePort"
+          futQuery(checkEnd).flatMap { netflows =>
+            if (netflows.nonEmpty) {
+
+              val address = netflows.head.asJsObject.getFields("n.remoteAddress").head.toString
+              val port = netflows.head.asJsObject.getFields("n.remotePort").head.toString
+
+              Future.successful(Some(address +  ":" + port))
+            } else {
+              val stepWrite  = s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
+                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val stepRead   = s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
+                                  |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val stepRename = s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
+                                  |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
+                                  |RETURN ID(o2), e.latestTimestampNanos
+                                  |""".stripMargin('|')
+
+              val foundFut: Future[List[(ID, TimestampNanos)]] = for {
+                writes <- futQuery(stepWrite)
+                reads <- futQuery(stepRead)
+                rename <- futQuery(stepRename)
+              } yield (writes ++ reads ++ rename).map(obj => {
+                val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
+                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").head.asInstanceOf[JsNumber].value.longValue()
+                (id, timestamp)
+              })
+
+              foundFut.flatMap { found =>
+                toVisit ++= found.filter { case (id, _) => !visited.contains(id) }
+                visited ++= found.map(_._1)
+
+                loop(toVisit, visited)
+              }
+            }
+          }
+
+
+        }
+
+      fileIdsFut.flatMap((filesIds: List[Long]) => {
+        // toVisit = the IDs of node which could have contributed to the file being sent out
+        val toVisit: scala.collection.mutable.Queue[(ID, TimestampNanos)] = collection.mutable.Queue.empty
+        val visited: scala.collection.mutable.Set[ID] = scala.collection.mutable.Set.empty
+
+        toVisit ++= filesIds.map(id => (id, Long.MaxValue))
+        visited ++= filesIds
+
+        loop(toVisit, visited)
+      })
+    }
+
+    val resultFuture = alecsQuery(fileName).map{
+      case Some(s) =>
+        val result = 400
+        returnPolicyResult(result, Some(s), responseUri)
+        result -> Some(s)
+      case None =>
+        val result = 200
+        val message = s"No network source data for the file: $fileName"
+        returnPolicyResult(result, Some(message), responseUri)
+        result -> Some(message)
+    }
+
+    policyRequests = policyRequests + (requestId -> resultFuture)
   }
+
 
 
   def returnPolicyResult(responseCode: Int, message: Option[String], responseUri: String)(implicit system: ActorSystem, materializer: Materializer): Future[HttpResponse] = {
@@ -245,7 +381,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     responseF onComplete {
       case Success(r) => println(s"Result from _sending_ the response: $r")
-      case Failure(e) => e.printStackTrace()
+      case Failure(e) => println(s"Sending a response failed:"); e.printStackTrace()
     }
 
     responseF
