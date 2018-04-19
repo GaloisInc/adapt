@@ -306,8 +306,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
               Future.successful(Some(address +  ":" + port))
             } else {
+              //  OR e.eventType = "EVENT_CREATE_OBJECT"
               val stepWrite  = s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
-                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG" OR e.eventType = "EVENT_CREATE_OBJECT") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
@@ -321,13 +322,19 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
+              val stepParent = s"""MATCH (o1)-[:parentSubject]->(o2)
+                                  |WHERE time = $time
+                                  |RETURN ID(o2), time
+                                  |""".stripMargin('|')
+
               val foundFut: Future[List[(ID, TimestampNanos)]] = for {
                 writes <- futQuery(stepWrite)
                 reads <- futQuery(stepRead)
                 rename <- futQuery(stepRename)
-              } yield (writes ++ reads ++ rename).map(obj => {
+                parent <- futQuery(stepParent)
+              } yield (writes ++ reads ++ rename ++ parent).map(obj => {
                 val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
-                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").head.asInstanceOf[JsNumber].value.longValue()
+                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos", "time").head.asInstanceOf[JsNumber].value.longValue()
                 (id, timestamp)
               })
 
