@@ -345,12 +345,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     val resultFuture = nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long).map{
       case Some(s) =>
-        val result: Int = 400
+        val result: Int = 200
         returnPolicyResult(result, Some(s), responseUri)
         result -> Some(s)
       case None =>
-        val result: Int = 200
-        val messageOpt: Option[String] = Some("BLOCK")
+        val result: Int = 400
+        val messageOpt: Option[String] = Some("No UI provenance for the action.")
         returnPolicyResult(result, messageOpt, responseUri)
         result -> messageOpt
     }
