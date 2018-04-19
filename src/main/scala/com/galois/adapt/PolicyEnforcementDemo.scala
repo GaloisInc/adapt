@@ -323,8 +323,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                                   |""".stripMargin('|')
 
               val stepParent = s"""MATCH (o1)-[:parentSubject]->(o2)
-                                  |WHERE time = $time
-                                  |RETURN ID(o2), time
+                                  |WHERE ID(o1) = $id
+                                  |RETURN ID(o2)
                                   |""".stripMargin('|')
 
               val foundFut: Future[List[(ID, TimestampNanos)]] = for {
@@ -334,7 +334,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 parent <- futQuery(stepParent)
               } yield (writes ++ reads ++ rename ++ parent).map(obj => {
                 val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
-                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos", "time").head.asInstanceOf[JsNumber].value.longValue()
+                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").headOption.map(_.asInstanceOf[JsNumber].value.longValue())
+                    .getOrElse(time)
                 (id, timestamp)
               })
 
