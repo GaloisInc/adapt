@@ -87,11 +87,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (keyboardAction, guiEventAction, requestId, responseUri) =>
+            parameters('policy ! 3, 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (requestId, responseUri) =>
               complete {
                 println(s"Check Policy 3: $responseUri, $requestId")
-                answerPolicy3(responseUri, requestId, dbActor)
-                StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
+                answerPolicy3(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+                StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
             parameters('policy ! 4, 'fileName.as[String], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (fileName, requestId, responseUri) =>
@@ -225,21 +225,20 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
-  case class Policy3Params(localPort: Int,localAddress: String, remotePort: Int, remoteAddress: String, timestampSeconds: Long)
 
-  def answerPolicy3(policy3Params: Policy3Params, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
+  def answerPolicy3(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
-    // TODO
+
     implicit val ec = system.dispatcher
 
-    def nicholesQuery(policy3Params: Policy3Params): Future[Option[String]] = {
+    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[String]] = {
       import scala.concurrent.duration._
 
       implicit val _: Timeout = 10.minutes
 
       // Make this interval bigger?
-      val maxTimestampNanos = (policy3Params.timestampSeconds + 1) * 1000000000
-      val minTimestampNanos = policy3Params.timestampSeconds * 1000000000
+      val maxTimestampNanos = (timestampSeconds + 1) * 1000000000
+      val minTimestampNanos = timestampSeconds * 1000000000
 
       // These utility functions Alec wrote are great!
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
@@ -251,28 +250,37 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
         .map(arr => arr.asInstanceOf[JsArray].elements.toList)
 
+      def extractValue(arr: List[JsValue], key: String): Option[String] = {
+        arr
+          .flatMap(obj => obj.asJsObject.getFields(key))
+          .map(str => str.asInstanceOf[JsString].value.toString).headOption
+      }
+
 
 
       val tagIdsFromEvents  = s"""MATCH (n:NetFlowObject)<-[:predicateObject]-(e:Event)
-                          |WHERE e.eventType = "EVENT_WRITE" AND n.localAddress = ${policy3Params.localAddress}
-                          |AND n.localPort=${policy3Params.localPort} AND n.remoteAddress=${policy3Params.remoteAddress}
-                          |AND n.remotePort=${policy3Params.remotePort}
+                          |WHERE e.eventType = "EVENT_WRITE" AND n.localAddress = "${localAddress}"
+                          |AND n.localPort=${localPort} AND n.remoteAddress="${remoteAddress}"
+                          |AND n.remotePort=${remotePort}
                           |AND e.timestampNanos <= $maxTimestampNanos AND e.timestampNanos >= $minTimestampNanos
                           |RETURN e.peTagIds as peTagIds
                           |""".stripMargin('|')
 
-      def getPreviousTagsOnProvenance(tagId: String) = s"""MATCH (p:ProvenanceTagNode)
-                                                    |WHERE p.uuid = $tagId
-                                                    |RETURN p.prevTagIdUuid as prevTagIdUuid
-                                                    |""".stripMargin('|')
+      def getPreviousTagsOnProvenance(tagId: String)       = s"""MATCH (p:ProvenanceTagNode)
+                                                                |WHERE p.uuid = "$tagId"
+                                                                |AND exists(p.prevTagIdUuid)
+                                                                |RETURN p.prevTagIdUuid as prevTagIdUuid
+                                                                |""".stripMargin('|')
 
-      def getFlowObjectFromProvenance(tagId: String) = s"""MATCH (p:ProvenanceTagNode)
-                                                          |WHERE p.uuid = $tagId
-                                                          |RETURN p.flowObjectUuid as flowObjectUuid
-                                                          |""".stripMargin('|')
+      def getFlowObjectFromProvenance(tagId: String)       = s"""MATCH (p:ProvenanceTagNode)
+                                                                |WHERE p.uuid = "$tagId"
+                                                                |AND exists(p.flowObjectUuid)
+                                                                |RETURN p.flowObjectUuid as flowObjectUuid
+                                                                |""".stripMargin('|')
 
       def getFlowTypeFromSrcSinkObject(uuidString: String) = s"""MATCH (s:SrcSinkObject)
-                                                                |WHERE s.uuid = $uuidString
+                                                                |WHERE s.uuid = "$uuidString"
+                                                                |AND exists(s.srcSinkType)
                                                                 |RETURN s.srcSinkType as srcSinkType
                                                                 |""".stripMargin('|')
 
@@ -286,70 +294,63 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         )
 
       initialTagIdsFut.flatMap{
-        case tagIds => val hasUISeqFut: Seq[Future[Option[String]]] = tagIds.map {
+        tagIds => println(tagIds);
+
+          val hasUISeqFut: Seq[Future[Option[String]]] = tagIds.map {
 
           // For each provenance tag id found on the event node with the get request, we
           // look up the previous tag Ids on the provenance tag nodes.
           // Note, this node may not exist and this property may not exist on the node.
           tagId =>
-            val prevTagId: Future[Option[String]] = futQuery(getPreviousTagsOnProvenance(tagId)).map { arr =>
-              arr
-                .flatMap(obj => obj.asJsObject.getFields("prevTagIdUuid"))
-                .map(str => str.asInstanceOf[JsString].value.toString).headOption
+            val prevTagIdFut: Future[Option[String]] = futQuery(getPreviousTagsOnProvenance(tagId)).map { arr =>
+              extractValue(arr,"prevTagIdUuid")
             }
 
-            // Next, we need to get the flow object associated with the precious tag nodes.
+            // Next, we need to get the flow object associated with the previous tag nodes.
             // Note, this node may not exist and this property may not exist on the node.
-            val flowObjUuid: Future[Option[String]] = prevTagId.flatMap {
+            val flowObjUuidFut: Future[Option[String]] = prevTagIdFut.flatMap {
               case None => Future.successful(None)
               case Some(pTagId) => futQuery(getFlowObjectFromProvenance(pTagId)).map { arr =>
-                arr
-                  .flatMap(obj => obj.asJsObject.getFields("flowObjectUuid"))
-                  .map(str => str.asInstanceOf[JsString].value.toString).headOption
+                extractValue(arr,"flowObjectUuid")
               }
             }
 
             // Lastly, we look up the SrcSinkType of the flow object to see if the event
             // was generated from the UI.
             // Note, this node may not exist and this property may not exist on the node.
-            val srcSinkTypeFut: Future[Option[String]] = flowObjUuid.flatMap {
+            val srcSinkTypeFut: Future[Option[String]] = flowObjUuidFut.flatMap {
               case None => Future.successful(None)
               case Some(flowId) => futQuery(getFlowTypeFromSrcSinkObject(flowId)).map { arr =>
-                arr
-                  .flatMap(obj => obj.asJsObject.getFields("srcSinkType"))
-                  .map(str => str.asInstanceOf[JsString].value.toString).headOption
-              }
+                extractValue(arr,"srcSinkType")
+                }
             }
 
             // If we find the SRCSINK_UI type, the we know the event was generated from
             // the UI.
             srcSinkTypeFut.map {
               case None => None
-              case Some(srcSinkType) => if (srcSinkType.contains("SRCSINK_UI")) {
+              case Some(srcSinkType) => if (srcSinkType == "SRCSINK_UI") {
                 Some("PASS")
               } else {
                 None
               }
             }
           }
-
+          
           // If any of the provenance tag nodes listed on the event node (in the peTagIds field) are associated with
           // a SRCSINK_UI, then the event was generated from the UI.
-          Future.fold(hasUISeqFut)(None:Option[String])((acc,inst) => if (inst.isDefined) inst else acc)
-
-        // Sometimes, there are no peTagIds on the event node, so we handle that case.
-        case Nil => println("No data related to your query parameters found."); Future.successful(None)
+          Future.fold(hasUISeqFut)(None:Option[String]){(acc,inst) => if (inst.isDefined) inst else acc}
       }
     }
 
-    val resultFuture = nicholesQuery(policy3Params).map{
+    val resultFuture = nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long).map{
       case Some(s) =>
-        val result: Int = ??? //400
+        val result: Int = 400
         returnPolicyResult(result, Some(s), responseUri)
         result -> Some(s)
       case None =>
-        val result: Int = ??? //200
-        val messageOpt: Option[String] = None
+        val result: Int = 200
+        val messageOpt: Option[String] = Some("BLOCK")
         returnPolicyResult(result, messageOpt, responseUri)
         result -> messageOpt
     }
@@ -494,7 +495,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 //    )
 
     responseF onComplete {
-      case Success(r) => println(s"Result from _sending_ the response: $r")
+      case Success(r) => println(s"Result from _sending_ the response: $r");println(responseCode,message)
       case Failure(e) => println(s"Sending a response failed:"); e.printStackTrace()
     }
 
