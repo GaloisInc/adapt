@@ -75,24 +75,28 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
             parameters('policy ! 1, 'permissionType.as(validPermissionType) ? "USER", 'permissionList.as(CsvSeq[String]) ? collection.immutable.Seq[String]("darpa")) { (permissionType, permissionList) =>
               complete {
+                println(s"Check Policy 1: $permissionType, $permissionList, $serverIp, $serverPort, $responseUri, $requestId")
                 answerPolicy1(permissionType, permissionList, serverIp, serverPort, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
             parameters('policy ! 2, 'restrictedHost.as(validIpAddress)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
               complete {
+                println(s"Check Policy 2: $restrictedHost, $serverIp, $serverPort, $responseUri, $requestId")
                 answerPolicy2(restrictedHost, serverIp, serverPort, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
             parameters('policy ! 3, 'keyboardAction.as[Boolean], 'guiEventAction.as[Boolean], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (keyboardAction, guiEventAction, requestId, responseUri) =>
               complete {
+                println(s"Check Policy 3: $responseUri, $requestId")
                 answerPolicy3(responseUri, requestId, dbActor)
                 StatusCodes.NotImplemented -> "Not implemented" //"Started the policy check process, will respond later"
               }
             } ~
             parameters('policy ! 4, 'fileName.as[String], 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (fileName, requestId, responseUri) =>
               complete {
+                println(s"Check Policy 4: $fileName, $responseUri, $requestId")
                 answerPolicy4(fileName, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
@@ -101,11 +105,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       } ~
       path("status") {
         parameter('requestId.as[Int]) { requestId =>
-          complete(
+          complete {
+            println(s"Status Check for request ID: $requestId")
             if (policyRequests contains requestId) {
               StatusCodes.Accepted -> (if (policyRequests(requestId).isCompleted) policyRequests(requestId).value.get.toString else s"Request #$requestId is not yet complete.")
             } else StatusCodes.NotFound -> s"We do not have an active request for that Id: $requestId"
-          )
+          }
         }
       }
     } ~
