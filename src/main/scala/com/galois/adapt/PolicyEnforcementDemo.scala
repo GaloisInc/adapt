@@ -302,7 +302,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
               Future.successful(Some(address +  ":" + port))
             } else {
               val stepWrite  = s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
-                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                                  |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG" OR e.eventType = "EVENT_CREATE_OBJECT") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                                   |RETURN ID(o2), e.latestTimestampNanos
                                   |""".stripMargin('|')
 
