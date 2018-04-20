@@ -13,8 +13,6 @@ import akka.pattern.ask
 import akka.util.Timeout
 import spray.json.{DefaultJsonProtocol, JsArray, JsNumber, JsString, JsValue}
 import edazdarevic.commons.net.CIDRUtils
-
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -29,6 +27,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     case _ => None
   }
 
+  def testIpOrCidr(cidr: String): Option[String] = cidr.split("/").toList match {
+    case ip :: range :: Nil if testIpAddress(ip).isDefined && Try(range.toInt >= 0 && range.toInt <= 32).getOrElse(false) => Some(cidr)
+    case ip :: Nil if testIpAddress(ip).isDefined => Some(cidr)
+    case _ => None
+  }
+
   val validIpAddress = Unmarshaller.strict[String, String] { string =>
     testIpAddress(string) match {
       case Some(s) => s
@@ -36,8 +40,16 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
+  val validIpOrCidr = Unmarshaller.strict[String, String] { string =>
+    testIpOrCidr(string) match {
+      case Some(s) => s
+      case _ => throw new IllegalArgumentException(s"'$string' is not a valid IPv4 address or CIDR range.")
+    }
+  }
+
   val validUri = Unmarshaller.strict[String, String] {
     case uri if uri.startsWith("http://") /*|| uri.startsWith("https://")*/ => uri  // TODO: Something smarter here?!
+    case uri if uri.startsWith("https://") => throw new IllegalArgumentException(s"SSL is not currently supported. Supplied URL: $uri")
     case invalid => throw new IllegalArgumentException(s"'$invalid' is not a valid URI.")
   }
 
@@ -76,11 +88,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
             parameters('policy ! 1, 'permissionType.as(validPermissionType) ? "USER", 'permissionList.as(CsvSeq[String]) ? collection.immutable.Seq[String]("darpa")) { (permissionType, permissionList) =>
               complete {
                 println(s"Check Policy 1: $permissionType, $permissionList, $serverIp, $serverPort, $responseUri, $requestId")
-                answerPolicy1(permissionType, permissionList, serverIp, serverPort, responseUri, requestId, dbActor)
+                answerPolicy1(permissionType, permissionList, serverIp, serverPort, clientIp, clientPort, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
-            parameters('policy ! 2, 'restrictedHost.as(validIpAddress)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
+            parameters('policy ! 2, 'restrictedHost.as(validIpOrCidr)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
               complete {
                 println(s"Check Policy 2: $restrictedHost, $serverIp, $serverPort, $responseUri, $requestId")
                 answerPolicy2(restrictedHost, serverIp, serverPort, responseUri, requestId, dbActor)
@@ -106,10 +118,14 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       path("status") {
         parameter('requestId.as[Int]) { requestId =>
           complete {
-            println(s"Status Check for request ID: $requestId")
             if (policyRequests contains requestId) {
-              StatusCodes.Accepted -> (if (policyRequests(requestId).isCompleted) policyRequests(requestId).value.get.toString else s"Request #$requestId is not yet complete.")
-            } else StatusCodes.NotFound -> s"We do not have an active request for that Id: $requestId"
+              val result = if (policyRequests(requestId).isCompleted) policyRequests(requestId).value.get.toString else s"Request #$requestId is not yet complete."
+              println(s"Status Check for request ID $requestId returned: $result")
+              StatusCodes.Accepted -> result
+            } else {
+              println(s"Status Check for request ID: $requestId is not yet complete.")
+              StatusCodes.NotFound -> s"We do not have an active request for that Id: $requestId"
+            }
           }
         }
       }
@@ -130,13 +146,15 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
 
 
-  def answerPolicy1(permissionType: String, permissionList: Seq[String], serverIp: String, serverPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
+  def answerPolicy1(permissionType: String, permissionList: Seq[String], serverIp: String, serverPort: Int, clientIp: String, clientPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
     (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_User
     // BLOCK if the user originating the process that sent the HTTP requests is NOT an allowed user or in an allowed user group.
     val desiredProperty = if (permissionType.toLowerCase == "user") "username" else "groupId"
     val query =
-      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+      s"""g.V().hasLabel('AdmNetFlowObject')
+         |.has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+         |.has('localAddress','$clientIp').has('localPort',$clientPort)
          |.inE('predicateObject','predicateObject2').outV()
          |.outE('subject').inV()
          |.outE('localPrincipal').inV()
@@ -148,10 +166,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         case "user" =>
           val result = permissionList.map(_.toLowerCase) contains value
           if (result) {
+            println(s"Policy 1 Result for requestId: $requestId is: $result with message: $None")
             returnPolicyResult(200, None, responseUri)
             200 -> None
           } else {
             val message = Some(s"username used to make the request was: $value  This query was testing for: ${permissionList.mkString(",")}")
+            println(s"Policy 1 Result for requestId: $requestId is: $result with message: $message")
             returnPolicyResult(400, message, responseUri)
             400 -> message
           }
@@ -159,21 +179,24 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           val result = value.split(",").toSet[String].intersect(permissionList.toSet[String].map(_.toLowerCase)).nonEmpty
           if (result) {
             returnPolicyResult(200, None, responseUri)
+            println(s"Policy 1 Result for requestId: $requestId is: $result with message: $None")
             200 -> None
-          }
-          else {
+          } else {
             val message = Some(s"user's set of groupIds that made this request was: $value  This query was testing for: ${permissionList.mkString(",")}")
+            println(s"Policy 1 Result for requestId: $requestId is: $result with message: $message")
             returnPolicyResult(400, message, responseUri)
             400 -> message
           }
       }
       case x =>
-        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow.")
+        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow: $x")
+        println(s"Policy 2 Result for requestId: $requestId is: ERROR with message: $message")
         returnPolicyResult(500, message, responseUri)
         500 -> message
     }.recover {
       case e: Throwable =>
         val message = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        println(s"Policy 2 Result for requestId: $requestId is: ERROR2 with message: $message")
         returnPolicyResult(500, message, responseUri)
         500 -> message
     }
@@ -181,14 +204,16 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
 
-  def answerPolicy2(restrictedHost: String, serverIp: String, serverPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
+  def answerPolicy2(restrictedHost: String, clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
     (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_Communication
 
     val disallowedRange = if (restrictedHost.contains("/")) new CIDRUtils(restrictedHost) else new CIDRUtils(s"$restrictedHost/32")
 
     val query =  // Get all netflows associated with the process of the netflow in question.
-      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+      s"""g.V().hasLabel('AdmNetFlowObject')
+         |.has('remoteAddress','$serverIp').has('remotePort',$serverPort)
+         |.has('localAddress','$clientIp').has('localPort',$clientPort)
          |.in('predicateObject','predicateObject2')
          |.out('subject')
          |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject')
@@ -206,12 +231,13 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     val resultFuture: Future[(Int, Option[String])] = doesViolateF.map { results =>
       if (results.forall(t => ! t._2)) {
         val result = 200
+        println(s"Policy 2 Result for requestId: $requestId is: $result with message: $None")
         returnPolicyResult(result, None, responseUri) // should allow
         result -> None
-      }
-      else {
+      } else {
         val result = 400
         val message = Some(s"The following violating addresses were also contacted by this process: ${results.collect{case t if t._2 => t._1}.mkString(", ")}")
+        println(s"Policy 2 Result for requestId: $requestId is: $result with message: $message")
         returnPolicyResult(result, message, responseUri)
         result -> message
       }
@@ -219,6 +245,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       case e: Throwable =>
         val result = 500
         val message = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        println(s"Policy 2 Result for requestId: $requestId is: $result with message: $message")
         returnPolicyResult(result, message, responseUri)
         result -> message
     }
@@ -451,11 +478,13 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     val resultFuture = alecsQuery(fileName).map{
       case Some(s) =>
         val result = 400
+        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $s")
         returnPolicyResult(result, Some(s), responseUri)
         result -> Some(s)
       case None =>
         val result = 200
         val message = s"No network source data for the file: $fileName"
+        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $message")
         returnPolicyResult(result, Some(message), responseUri)
         result -> Some(message)
     }

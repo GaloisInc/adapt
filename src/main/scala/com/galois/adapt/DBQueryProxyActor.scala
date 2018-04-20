@@ -36,7 +36,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
         Query.run[Vertex](q, graph).map { vertices =>
 //          log.info(s"Found: ${vertices.length} nodes")
           if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
-          else vertices
+          else vertices.toList.toStream
         }
       }
 
@@ -49,7 +49,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
           if (shouldParse)
             JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
           else
-            edges
+            edges.toList.toStream
         }
       }
 
