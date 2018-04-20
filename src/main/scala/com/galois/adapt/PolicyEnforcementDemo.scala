@@ -231,7 +231,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     implicit val ec = system.dispatcher
 
-    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[String]] = {
+    trait Policy3Result
+    trait InsufficientData extends Policy3Result
+    trait Pass extends Policy3Result
+
+    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
       import scala.concurrent.duration._
 
       implicit val _: Timeout = 10.minutes
@@ -247,110 +251,81 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case Success(a) => Future.successful(a)
         })
 
-      def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
-        .map(arr => arr.asInstanceOf[JsArray].elements.toList)
+      def futQuerySplitValueToList(query: String, key: String): Future[List[String]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query))
+        .mapTo[Future[Try[JsValue]]])
+        .map(arr => arr.asInstanceOf[JsArray].elements.toList).map(arr => arr
+        .flatMap(obj => obj.asJsObject.getFields(key))
+        .flatMap(strUUIDs => strUUIDs.asInstanceOf[JsString].value.split(",")))
 
-      def extractValue(arr: List[JsValue], key: String): Option[String] = {
-        arr
-          .flatMap(obj => obj.asJsObject.getFields(key))
-          .map(str => str.asInstanceOf[JsString].value.toString).headOption
-      }
+      def futQueryGetValue(query: String, key: String): Future[Option[String]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query))
+        .mapTo[Future[Try[JsValue]]])
+        .map(arr => arr.asInstanceOf[JsArray].elements.toList).map(arr => arr
+        .flatMap(obj => obj.asJsObject.getFields(key))
+        .map(str => str.asInstanceOf[JsString].value.toString).headOption)
 
 
+      val tagIdsFromEvents = s"""MATCH (n:NetFlowObject)<-[:predicateObject]-(e:Event)
+                                 |WHERE e.eventType = "EVENT_WRITE" AND n.localAddress = "${localAddress}"
+                                 |AND n.localPort=${localPort} AND n.remoteAddress="${remoteAddress}"
+                                 |AND n.remotePort=${remotePort}
+                                 |AND e.timestampNanos <= $maxTimestampNanos AND e.timestampNanos >= $minTimestampNanos
+                                 |RETURN e.peTagIds as peTagIds
+                                 |""".stripMargin('|')
 
-      val tagIdsFromEvents  = s"""MATCH (n:NetFlowObject)<-[:predicateObject]-(e:Event)
-                          |WHERE e.eventType = "EVENT_WRITE" AND n.localAddress = "${localAddress}"
-                          |AND n.localPort=${localPort} AND n.remoteAddress="${remoteAddress}"
-                          |AND n.remotePort=${remotePort}
-                          |AND e.timestampNanos <= $maxTimestampNanos AND e.timestampNanos >= $minTimestampNanos
-                          |RETURN e.peTagIds as peTagIds
-                          |""".stripMargin('|')
-
-      def getPreviousTagsOnProvenance(tagId: String)       = s"""MATCH (p:ProvenanceTagNode)
-                                                                |WHERE p.uuid = "$tagId"
-                                                                |AND exists(p.prevTagIdUuid)
-                                                                |RETURN p.prevTagIdUuid as prevTagIdUuid
-                                                                |""".stripMargin('|')
-
-      def getFlowObjectFromProvenance(tagId: String)       = s"""MATCH (p:ProvenanceTagNode)
-                                                                |WHERE p.uuid = "$tagId"
-                                                                |AND exists(p.flowObjectUuid)
-                                                                |RETURN p.flowObjectUuid as flowObjectUuid
-                                                                |""".stripMargin('|')
-
-      def getFlowTypeFromSrcSinkObject(uuidString: String) = s"""MATCH (s:SrcSinkObject)
-                                                                |WHERE s.uuid = "$uuidString"
-                                                                |AND exists(s.srcSinkType)
-                                                                |RETURN s.srcSinkType as srcSinkType
-                                                                |""".stripMargin('|')
+      def getSrcSinkTypesAssociatedWithEvent(tagId: String) = s"""MATCH (p:ProvenanceTagNode)
+                                                                 |WHERE p.uuid="$tagId"
+                                                                 |AND EXISTS(p.prevTagIdUuid)
+                                                                 |MATCH (q:ProvenanceTagNode)
+                                                                 |WHERE q.uuid=p.prevTagIdUuid
+                                                                 |AND EXISTS(q.flowObjectUuid)
+                                                                 |MATCH (s:SrcSinkObject)
+                                                                 |WHERE s.uuid=q.flowObjectUuid
+                                                                 |RETURN s.srcSinkType as srcSinkType
+                                                                  """.stripMargin('|')
 
       // Look up the provenance tag ids on the event write node which was
       // created at 'timestampSeconds' adjacent to the NetFlowObject
       // with the local and remote addresses and ports given in the request.
-      val initialTagIdsFut: Future[List[String]] = futQuery(tagIdsFromEvents)
-        .map(arr => arr
-          .flatMap(obj => obj.asJsObject.getFields("peTagIds"))
-          .flatMap(strUUIDs => strUUIDs.asInstanceOf[JsString].value.split(","))
-        )
+      val initialTagIdsFut: Future[List[String]] = futQuerySplitValueToList(tagIdsFromEvents,"peTagIds")
 
       initialTagIdsFut.flatMap{
-        tagIds => println(tagIds);
+        case Nil => Future.successful(Some(new InsufficientData {}))
+        case tagIds =>
 
-          val hasUISeqFut: Seq[Future[Option[String]]] = tagIds.map {
+          println(tagIds)
 
-          // For each provenance tag id found on the event node with the get request, we
-          // look up the previous tag Ids on the provenance tag nodes.
-          // Note, this node may not exist and this property may not exist on the node.
-          tagId =>
-            val prevTagIdFut: Future[Option[String]] = futQuery(getPreviousTagsOnProvenance(tagId)).map { arr =>
-              extractValue(arr,"prevTagIdUuid")
-            }
+          val hasUISeqFut: Seq[Future[Option[Policy3Result]]] = tagIds.map { tagId =>
 
-            // Next, we need to get the flow object associated with the previous tag nodes.
-            // Note, this node may not exist and this property may not exist on the node.
-            val flowObjUuidFut: Future[Option[String]] = prevTagIdFut.flatMap {
-              case None => Future.successful(None)
-              case Some(pTagId) => futQuery(getFlowObjectFromProvenance(pTagId)).map { arr =>
-                extractValue(arr,"flowObjectUuid")
-              }
-            }
+            val srcSinkTypeFut = futQueryGetValue(getSrcSinkTypesAssociatedWithEvent(tagId),"srcSinkType")
 
-            // Lastly, we look up the SrcSinkType of the flow object to see if the event
-            // was generated from the UI.
-            // Note, this node may not exist and this property may not exist on the node.
-            val srcSinkTypeFut: Future[Option[String]] = flowObjUuidFut.flatMap {
-              case None => Future.successful(None)
-              case Some(flowId) => futQuery(getFlowTypeFromSrcSinkObject(flowId)).map { arr =>
-                extractValue(arr,"srcSinkType")
-                }
-            }
-
-            // If we find the SRCSINK_UI type, the we know the event was generated from
-            // the UI.
             srcSinkTypeFut.map {
-              case None => None
-              case Some(srcSinkType) => if (srcSinkType == "SRCSINK_UI") {
-                Some("PASS")
-              } else {
-                None
-              }
+              case Some("SRCSINK_UI") => Some(new Pass {})
+              case _ => None
             }
           }
           
           // If any of the provenance tag nodes listed on the event node (in the peTagIds field) are associated with
           // a SRCSINK_UI, then the event was generated from the UI.
-          Future.fold(hasUISeqFut)(None:Option[String]){(acc,inst) => if (inst.isDefined) inst else acc}
+          Future.fold(hasUISeqFut)(None:Option[Policy3Result]){(acc,inst) => if (inst.isDefined) inst else acc}
       }
     }
 
     val resultFuture = nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long).map{
-      case Some(s) =>
-        val result: Int = 200
-        returnPolicyResult(result, Some(s), responseUri)
-        result -> Some(s)
+      case Some(s) => s match {
+        case _ : Pass =>
+          val result: Int = 200
+          val messageOpt = Some("PASS")
+          returnPolicyResult(result, messageOpt, responseUri)
+          result -> messageOpt
+        case _ : InsufficientData =>
+          val result: Int = 500
+          val messageOpt = Some("Insufficient data for the given query parameters.")
+          returnPolicyResult(result, messageOpt, responseUri)
+          result -> messageOpt
+      }
       case None =>
         val result: Int = 400
-        val messageOpt: Option[String] = Some("No UI provenance for the action.")
+        val messageOpt: Option[String] = Some("No UI provenance associated with the query parameters.")
         returnPolicyResult(result, messageOpt, responseUri)
         result -> messageOpt
     }
