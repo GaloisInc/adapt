@@ -95,7 +95,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
             parameters('policy ! 2, 'restrictedHost.as(validIpOrCidr)) { restrictedHost => // `restrictedHost` is a CIDR range or maybe a single IP...?
               complete {
                 println(s"Check Policy 2: $restrictedHost, $serverIp, $serverPort, $responseUri, $requestId")
-                answerPolicy2(restrictedHost, serverIp, serverPort, responseUri, requestId, dbActor)
+                answerPolicy2(restrictedHost, clientIp, clientPort, serverIp, serverPort, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
