@@ -365,7 +365,7 @@ class QNode(siblings: => Map[ExtractedValue, PpmTree]) extends PpmTree {
 
 //case object PpmActorGetCount
 case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
-case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
+case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean,newLeafProb: Option[Float])
 case class PpmNodeActorBeginGetTreeRepr(treeName: String)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
@@ -390,7 +390,9 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
   def childrenPopulation = children.size  // + 1   // `+ 1` for the Q node
 
-  def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef = context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
+  def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef = {
+    context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
+  }
 
   def localProbOfThisObs(siblingPopulation: Int, parentCount: Int): Float =
     if (counter == 0) siblingPopulation.toFloat / (parentCount.toFloat + siblingPopulation.toFloat)
@@ -413,14 +415,15 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
             children = children + (extracted -> newChild)
             newChild
           })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter)
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, None)
           counter += 1
       }
 
 
-    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentLocalProb, alarmAcc: Alarm, alarmFilter) =>
+    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentLocalProb, alarmAcc: Alarm, alarmFilter,passNewLeafProb) =>
       val thisLocalProb = localProbOfThisObs(siblingPopulation, parentCount)
-      val thisAlarmComponent = (thisKey, thisLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter)
+      val alarmLocalProb = if (counter == 0 && passNewLeafProb.isDefined) passNewLeafProb.get else thisLocalProb
+      val thisAlarmComponent = (thisKey, alarmLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter)
       remainingExtractedValues match {
         case Nil if counter == 0 =>
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ thisAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
@@ -429,12 +432,15 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
         case Nil =>
           counter += 1
         case extracted :: remainder =>
+          val newLeafProb = if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
+            if (children.contains(extracted)) None else Some(thisLocalProb)     // if it's not defined, we capture the local probability and pass it to the leaf (eventually)
+          }                                                                       // through newly defined nodes in the tree.
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
             newChild
           })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisLocalProb, alarmAcc :+ thisAlarmComponent, alarmFilter)
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisLocalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb)
           counter += 1
       }
 
