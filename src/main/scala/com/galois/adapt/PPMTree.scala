@@ -320,7 +320,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
     case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentLocalProb, alarmAcc: Alarm, alarmFilter,passNewLeafProb) =>
       val thisLocalProb = localProbOfThisObs(siblingPopulation, parentCount)
-      val alarmLocalProb = if (counter == 0 && passNewLeafProb.isDefined) passNewLeafProb.get else thisLocalProb
+      val alarmLocalProb = if (counter == 0 && passNewLeafProb.isDefined && parentCount <= 1) passNewLeafProb.get else thisLocalProb // We use the newLeafProb if the parent node is new.
       val thisAlarmComponent = (thisKey, alarmLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter)
       remainingExtractedValues match {
         case Nil if counter == 0 =>
