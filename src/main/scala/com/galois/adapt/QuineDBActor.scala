@@ -165,7 +165,13 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 
     case Init => sender() ! Ack
 
-    case Complete => println("DONE.")
+    case Complete =>
+      println("DONE.")
+      sender() ! Ack
+      graph.getRandomContextSentences(10, 4, Timeout(1001 seconds)).onComplete{
+        case Success(c) => c.foreach(x => println(s"${x._1} ->\n${x._2.mkString("\n")}"))
+        case Failure(e) => e.printStackTrace()
+      }
 
     case _: CDM17 => sender() ! Ack
 

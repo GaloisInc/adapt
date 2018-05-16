@@ -109,7 +109,7 @@ object ProductionApp {
           refinedBranchOf[Subject]().standingFind(println)
         }
 
-        CDMSource(ta1)
+        CDMSource(ta1).concat(Source.single(Complete))
           .via(FlowComponents.printCounter("Quine", 10000))
           .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
@@ -199,6 +199,8 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor {
       val r = context.actorOf(Props[QuineDBActor])
       context watch r
       router = router.addRoutee(r)
+    case x =>
+      router.route(x, sender())
   }
 }
 
