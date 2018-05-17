@@ -732,9 +732,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
 //  TODO: consider a(n updatable?) alarm filter for every tree?
 
+  val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
 
 
   val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
+  val iforestTreesToUse = if (iforestEnabled) iforestTrees else Nil
   val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTrees
 
 
@@ -748,7 +750,6 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
 
 
-  val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -822,15 +823,18 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           Future.successful(())
       }
 
-      Try(
-        (e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]])
-      ) match {
-        case Success(t) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(t))
-        case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+      if (iforestEnabled) {
+        Try(
+          (e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]])
+        ) match {
+          case Success(t) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(t))
+          case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+        }
       }
       Try(
         Await.result(f, 15 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+
 
       sender() ! Ack
 
@@ -871,7 +875,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveStateAsync())
-      saveIforestModel()
+      if (iforestEnabled) saveIforestModel()
       if (shouldConfirm) sender ! Ack
 
     case CompleteMsg =>
