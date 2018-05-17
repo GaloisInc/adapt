@@ -1,29 +1,24 @@
 #! /usr/bin/env python3
 
-import json, re, argparse, sys, ijson
+import json, re, argparse, sys, requests
 
 if __name__ == '__main__':
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Compute ADM ground truth UUIDs')
-    parser.add_argument('adm2cdm_mapping', metavar='FILE', type=str,
-                        help="Produce this file with './cmdline_query.py server-url --endpoint=cypher --query=\"MATCH (n) RETURN n.uuid, n.originalCdmUuids\" > mapping.json'")
+    parser.add_argument('namespace', metavar='NAMESPACE', type=str,
+                        default='', help="The namespace under which data was ingested")
     parser.add_argument('ground_truth_csv', metavar='FILE', type=str,
                         help="One of the ground truth CSVs, as in the 'labeled_ground_truth'")
+    parser.add_argument('url', metavar='URL', type=str, nargs='?',
+                        default='http://localhost:8080')
     args = parser.parse_args()
 
+    # Compute post url
+    post_url = args.url + "/query/remap-uuid"
+    sys.stderr.write("Queries are sent to '{}'.\n".format(post_url))
 
-    # Some mapping JSON files are >2GB so we can't just use `json.loads`
-    mapping_file = args.adm2cdm_mapping # "/Users/atheriault/Code/adapt/cadets_bovia_adm_mapping.json"
-    cdm2adm = {}
-    with open(mapping_file, 'r') as fd:
-        parser = ijson.items(fd, 'item')
-        for node in parser:
-            adm = node["n.uuid"]
-            cdms = node["n.originalCdmUuids"].split(";")
-            for cdm in cdms:
-                cdm2adm[cdm] = adm
-
+    # Get the UUIDs in the CSV
     group_truth_csv = args.ground_truth_csv # "/Users/atheriault/Downloads/cadets/labeled_ground_truth/bovia_webshell.csv"
     ground_truth_csv_text = open(group_truth_csv).read()
     group_truth_uuids = set(re.findall(
@@ -33,8 +28,13 @@ if __name__ == '__main__':
     ))
 
     # Construct the list of final ADM uuids
-    ground_truth_adm = list({ cdm2adm[cdm] for cdm in group_truth_uuids })
-    json.dump(ground_truth_adm, sys.stdout, indent=4)
+    prefix = "cdm_" if not args.namespace else "cdm_" + args.namespace + "_"
+    ground_truth_adm = set()
+    for cdm in group_truth_uuids:
+        prefixed_cdm = prefix + cdm
+        adm = requests.get(post_url + "/" + prefixed_cdm).json()
+        ground_truth_adm.add(adm)
+    json.dump(list(ground_truth_adm), sys.stdout, indent=4)
 
 
 

@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.io.File
+
 import akka.actor.ActorSystem
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -9,6 +10,8 @@ import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import com.galois.adapt.FilterCdm.Filter
+import com.galois.adapt.MapSetUtils.AlmostMap
+import com.galois.adapt.adm.{AdmUUID, CdmUUID}
 //import akka.http.scaladsl.marshalling._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
@@ -57,14 +60,19 @@ object Routes {
   def queryResult[T <: VertexOrEdge](query: RestQuery, dbActor: ActorRef)(implicit ec: ExecutionContext): Future[JsValue] =
     (dbActor ? query).mapTo[Future[Try[JsValue]]].flatMap(identity).map(_.get)
 
-
   val validRating = Unmarshaller.strict[String, Int] {
     case i if Set("0","1","2","3","4","5") contains i => i.toInt
     case i => throw new IllegalArgumentException(s"'$i' is not a valid rating.")
   }
 
 
-  def mainRoute(dbActor: ActorRef, statusActor: ActorRef, ppmActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
+  def mainRoute(
+       dbActor: ActorRef,
+       statusActor: ActorRef,
+       ppmActor: ActorRef,
+       cdm2adm: AlmostMap[CdmUUID,AdmUUID],
+       cdm2cdm: AlmostMap[CdmUUID,CdmUUID]
+   )(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
 
     def setRatings(rating: Int, namespace: String, pathsPerTree: Map[String, List[String]]) = {
       val perTreeResultFutures = pathsPerTree.map {
@@ -82,6 +90,22 @@ object Routes {
           case l if l.exists(_._2.exists(_.exists(r => ! r))) => StatusCodes.UnprocessableEntity -> s"Some ratings were not set: ${l.toMap}"
           case l => StatusCodes.ImATeapot -> s" ¯\\_(ツ)_/¯ \n$l"
         }
+      }
+    }
+
+    def remapUuid(cdmUUID: CdmUUID)(implicit ec: ExecutionContext): Future[JsValue] = Future {
+      var noMoreCdmRemaps = false
+      var advancedCdm: CdmUUID = cdmUUID
+      while (!noMoreCdmRemaps) {
+        cdm2cdm.get(advancedCdm)  match {
+          case None => noMoreCdmRemaps = true
+          case Some(c) => advancedCdm = c
+        }
+      }
+
+      cdm2adm.get(advancedCdm) match {
+        case None => JsString(advancedCdm.rendered)
+        case Some(admUuid) => JsString(admUuid.rendered)
       }
     }
 
@@ -156,6 +180,13 @@ object Routes {
               path(RemainingPath) { queryString =>
                 complete(
                   queryResult(CypherQuery(queryString.toString), dbActor)
+                )
+              }
+            } ~
+            pathPrefix("remap-uuid") {
+              path(RemainingPath) { queryString =>
+                complete(
+                  remapUuid(CdmUUID.fromRendered(queryString.toString))
                 )
               }
             }

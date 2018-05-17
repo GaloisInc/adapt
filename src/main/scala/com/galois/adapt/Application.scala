@@ -337,7 +337,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmActor)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmActor, cdm2admMap, cdm2cdmMap)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }

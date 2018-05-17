@@ -29,7 +29,7 @@ package object adm {
     // Decode raw DB representation
     def fromRendered(s: String): CdmUUID = {
       val (provider, uuid) = s.splitAt(s.length - 36)
-      CdmUUID(UUID.fromString(uuid), provider.stripSuffix("_"))
+      CdmUUID(UUID.fromString(uuid), provider.stripPrefix("cdm_").stripSuffix("_"))
     }
   }
 
