@@ -21,7 +21,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 
-//TODO: make all the operations safe in a functional programming way
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
   type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero

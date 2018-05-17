@@ -884,7 +884,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
         val ppmSaveFutures = ppmList.map{ ppm =>
           ppm.saveStateAsync()
-          ppm.prettyString.map(println)
+  //        ppm.prettyString.map(println)
   //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
         }
         if (iforestEnabled) saveIforestModel()
