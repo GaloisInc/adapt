@@ -36,7 +36,7 @@ object NoveltyDetection {
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
   type Filter[DataShape] = DataShape => Boolean
 
-  type Alarm = List[(String, Float, Float, Int)]  // (Key, localProbability, globalProbability, count)
+  type Alarm = List[(String, Float, Float, Int, Int, Int)]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount)
 
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
@@ -321,7 +321,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentLocalProb, alarmAcc: Alarm, alarmFilter,passNewLeafProb) =>
       val thisLocalProb = localProbOfThisObs(siblingPopulation, parentCount)
       val alarmLocalProb = if (counter == 0 && passNewLeafProb.isDefined && parentCount <= 1) passNewLeafProb.get else thisLocalProb // We use the newLeafProb if the parent node is new.
-      val thisAlarmComponent = (thisKey, alarmLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter)
+      val thisAlarmComponent = (thisKey, alarmLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter, siblingPopulation, parentCount)
       remainingExtractedValues match {
         case Nil if counter == 0 =>
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ thisAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
@@ -330,7 +330,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
         case Nil =>
           counter += 1
         case extracted :: remainder =>
-          val newLeafProb = if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
+          val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
             if (children.contains(extracted)) None else Some(thisLocalProb)     // if it's not defined, we capture the local probability and pass it to the leaf (eventually)
           }                                                                       // through newly defined nodes in the tree.
           val childNode = children.getOrElse(extracted, {
@@ -880,7 +880,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
         val ppmSaveFutures = ppmList.map{ ppm =>
           ppm.saveStateAsync()
-//          ppm.prettyString.map(println)
+          ppm.prettyString.map(println)
   //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
         }
         if (iforestEnabled) saveIforestModel()
