@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero
+  type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero
   case class Process(name: String,uuid: String) {
     override def toString() = {
       this.name + "_" + this.uuid.toString
@@ -129,8 +129,8 @@ object EventTypeModels {
     def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuid]) = {
        (
         List(
-        (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0),
-        (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0)
+        (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
+        (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
         Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),""))
       )
