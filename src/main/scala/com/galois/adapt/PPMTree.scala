@@ -281,7 +281,9 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     Map.empty[ExtractedValue, ActorRef]
   } { thisTreeState =>
     counter = thisTreeState.count
-    thisTreeState.children.map { c =>
+    thisTreeState.children.filter { c =>
+      c.key != "_?_"
+    }.map { c =>
       c.key -> newSymbolNode(c.key, Some(c))
     }.toMap   // + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the loaded data.
   }
@@ -737,7 +739,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
   val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
   val iforestTreesToUse = if (iforestEnabled) iforestTrees else Nil
-  val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTrees
+  val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
 
 
