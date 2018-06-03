@@ -16,18 +16,17 @@ case class MemoryObject(
   pageNumber: Option[Long] = None,
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
-) extends FreeDomainNode[MemoryObject] with CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[MemoryObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = MemoryObject
 
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
-    label, "MemoryObject",
-    "uuid", uuid,
-    "memoryAddress", memoryAddress
+    ("uuid", uuid),
+    ("memoryAddress", memoryAddress)
   )  ++
-    pageNumber.fold[List[Any]](List.empty)(v => List("pageNumber", v)) ++
-    pageOffset.fold[List[Any]](List.empty)(v => List("pageOffset", v)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v))
+    pageNumber.fold[List[(String,Any)]](List.empty)(v => List(("pageNumber", v))) ++
+    pageOffset.fold[List[(String,Any)]](List.empty)(v => List(("pageOffset", v))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v)))
 
   def asDBEdges = Nil
 

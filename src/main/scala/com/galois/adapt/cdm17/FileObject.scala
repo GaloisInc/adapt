@@ -20,24 +20,23 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends FreeDomainNode[FileObject] with CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[FileObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = FileObject
 
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
-      label, "FileObject",
-      "uuid", uuid,
-      "fileObjectType", fileObjectType.toString
+      ("uuid", uuid),
+      ("fileObjectType", fileObjectType.toString)
     ) ++
-    fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v)) ++
-    localPrincipal.fold[List[Any]](List.empty)(v => List("localPrincipalUuid", v)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v)) ++
-    peInfo.fold[List[Any]](List.empty)(v => List("peInfo", v)) ++
-    hashes.fold[List[Any]](List.empty)(v => List("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", ")))  // TODO: Revisit how we should represent this in the DB
+    fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v))) ++
+    localPrincipal.fold[List[(String,Any)]](List.empty)(v => List(("localPrincipalUuid", v))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v))) ++
+    peInfo.fold[List[(String,Any)]](List.empty)(v => List(("peInfo", v))) ++
+    hashes.fold[List[(String,Any)]](List.empty)(v => List(("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", "))))  // TODO: Revisit how we should represent this in the DB
 
   def asDBEdges = List.concat(
-    localPrincipal.map(p => ("localPrincipal",p.target))
+    localPrincipal.map(p => (CDM17.EdgeTypes.localPrincipal,p.target))
   )
 
   def getUuid = uuid

@@ -1,0 +1,503 @@
+<html>
+  <body>
+
+    <table>
+      <caption><h3>Ingestion rate per second</h3></caption>
+      <tr>
+        <td valign="top"><div id="ingestion-rate-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="ingestion-rate" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="ingestion-rate-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="ingestion-rate-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="ingestion-rate-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="ingestion-rate-xmin">xmin</div></td>
+        <td align="right"><div id="ingestion-rate-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Unreceived UUIDs blocking (in UuidRemapper)</h3></caption>
+      <tr>
+        <td valign="top"><div id="uuids-blocking-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="uuids-blocking" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="uuids-blocking-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="uuids-blocking-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="uuids-blocking-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="uuids-blocking-xmin">xmin</div></td>
+        <td align="right"><div id="uuids-blocking-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>UUIDs blocked (in UuidRemapper)</h3></caption>
+      <tr>
+        <td valign="top"><div id="uuids-blocked-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="uuids-blocked" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="uuids-blocked-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="uuids-blocked-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="uuids-blocked-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="uuids-blocked-xmin">xmin</div></td>
+        <td align="right"><div id="uuids-blocked-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Tip of the stream time (in ER)</h3></caption>
+      <tr>
+        <td valign="top"><div id="er-time-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="er-time" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="er-time-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="er-time-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="er-time-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="er-time-xmin">xmin</div></td>
+        <td align="right"><div id="er-time-xmax">xmax</div></td>
+      </tr>
+    </table>
+   
+    <table>
+      <caption><h3>Tip of the stream time (in ER), not-monotonic</h3></caption>
+      <tr>
+        <td valign="top"><div id="sampled-time-ymax">ymax<div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="sampled-time" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="sampled-time-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="sampled-time-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="sampled-time-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="sampled-time-xmin">xmin</div></td>
+        <td align="right"><div id="sampled-time-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+
+    <table>
+      <caption><h3>Size of Cdm2Cdm Map</h3></caption>
+      <tr>
+        <td valign="top"><div id="cdm2cdm-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="cdm2cdm-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="cdm2cdm-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="cdm2cdm-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="cdm2cdm-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="cdm2cdm-size-xmin">xmin</div></td>
+        <td align="right"><div id="cdm2cdm-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+ 
+    <table>
+      <caption><h3>Number of active event chains</h3></caption>
+      <tr>
+        <td valign="top"><div id="eventchains-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="eventchains-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="eventchains-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="eventchains-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="eventchains-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="eventchains-size-xmin">xmin</div></td>
+        <td align="right"><div id="eventchains-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+
+    <table>
+      <caption><h3>Size of Cdm2Adm Map</h3></caption>
+      <tr>
+        <td valign="top"><div id="cdm2adm-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="cdm2adm-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="cdm2adm-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="cdm2adm-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="cdm2adm-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="cdm2adm-size-xmin">xmin</div></td>
+        <td align="right"><div id="cdm2adm-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Size of Seen Nodes Set</h3></caption>
+      <tr>
+        <td valign="top"><div id="seen-nodes-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="seen-nodes-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="seen-nodes-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="seen-nodes-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="seen-nodes-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="seen-nodes-size-xmin">xmin</div></td>
+        <td align="right"><div id="seen-nodes-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+    <table>
+      <caption><h3>Size of Seen Edges Set</h3></caption>
+      <tr>
+        <td valign="top"><div id="seen-edges-size-ymax">ymax</div></td>
+        <td rowspan=3 colspan=2>
+          <canvas id="seen-edges-size" width="500" height="300" style="border:1px solid #d3d3d3;"></canvas>
+        </td>
+      </tr>
+      <tr>
+        <td valign="center">
+          <div id="seen-edges-size-curr" style="color:#0000FF">ycurr</div><br/>
+          <div id="seen-edges-size-avg" style="color:#00FF00">yavg</div>
+        </td>
+      </tr>
+      <tr>
+        <td valign="bottom"><div id="seen-edges-size-ymin">ymin</div></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td align="left"><div id="seen-edges-size-xmin">xmin</div></td>
+        <td align="right"><div id="seen-edges-size-xmax">xmax</div></td>
+      </tr>
+    </table>
+
+<script>
+
+    const address = prompt("Please enter the address you want to track", "http://localhost:8080");
+    const url = address + "/api/status"
+    
+    // canvas      : Canvas on which to render
+    // getDataPoint: JSON => { x: number, y: number }
+    function Graph(canvas, minYdiv, maxYdiv, minXdiv, maxXdiv, currY, avgY, getDataPoint) {
+      this.canvas = canvas;
+      
+      this.minYdiv = minYdiv;
+      this.maxYdiv = maxYdiv;
+      this.minXdiv = minXdiv;
+      this.maxXdiv = maxXdiv;
+      this.currY   = currY;
+      this.avgY    = avgY;
+      
+      this.ctx = canvas.getContext('2d');
+      
+      this.ys = [];
+      this.avgYs = [];
+      this.xs = [];
+      
+      this.addDataPoint = function(obj) {
+        const point = getDataPoint(obj);
+       
+        if (!isNaN(point.y) && !isNaN(point.x)) {
+          this.ys.push(point.y);
+          this.xs.push(point.x);
+        
+          const last20y = this.ys.slice(-20).filter(x => !x.isNaN);
+          this.avgYs.push(last20y.reduce((a,b) => a + b, 0) / last20y.length);
+        }
+      }
+
+      this.redraw = function() {
+        // Erase everything
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // X and Y axis
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle="#000000";
+        this.ctx.moveTo(this.canvas.width, this.canvas.height);
+        this.ctx.lineTo(0,                 this.canvas.height);
+        this.ctx.lineTo(0,                 0);
+        this.ctx.stroke();
+
+        // scale the X coords from [minX, maxX] to [0, this.canvas.width]
+        const minX = Math.min(...this.xs);
+        const maxX = Math.max(...this.xs);
+        const mx = this.canvas.width / (maxX - minX);
+        const scaleX = x => (x - minX) * mx;
+        
+        // scale the Y coords from [minY, maxY] to [this.canvas.height, 0]
+        const minY = Math.min(...this.ys);
+        const maxY = Math.max(...this.ys);
+        const my = -this.canvas.height / (maxY - minY);
+        const scaleY = y => (y - minY) * my + this.canvas.height;
+
+        // X and Y axis labels
+        this.minYdiv.innerHTML = minY.toString();
+        this.maxYdiv.innerHTML = maxY.toString();
+        this.minXdiv.innerHTML = minX.toString();
+        this.maxXdiv.innerHTML = maxX.toString();
+
+        if (this.xs.length > 1) {
+
+          // Update the current & average values
+          this.currY.innerHTML = this.ys[this.ys.length - 1];
+          this.avgY.innerHTML = Math.round((this.avgYs[this.avgYs.length - 1] * 1000) / 1000);
+        
+          // plot the line graph
+          this.ctx.beginPath();
+          this.ctx.linewidth = 1;
+          this.ctx.strokeStyle="#0000FF";
+          this.ctx.moveTo(scaleX(this.xs[0]), scaleY(this.ys[0]));
+          for (let i = 1; i < this.xs.length; i++) {
+            const nextX = scaleX(this.xs[i]);
+            const nextY = scaleY(this.ys[i]);
+            if (!isNaN(nextX) && !isNaN(nextY))
+              this.ctx.lineTo(nextX, nextY);
+          }
+          this.ctx.stroke();
+
+          // plot the average line graph
+          this.ctx.beginPath();
+          this.ctx.linewidth = 1;
+          this.ctx.strokeStyle="#00FF00";
+          this.ctx.moveTo(scaleX(this.xs[0]), scaleY(this.avgYs[0]));
+          for (let i = 1; i < this.xs.length; i++) {
+
+            const nextX = scaleX(this.xs[i]);
+            const nextY = scaleY(this.avgYs[i]);
+            if (!isNaN(nextX) && !isNaN(nextY))
+              this.ctx.lineTo(nextX, nextY);
+          }
+          this.ctx.stroke();
+        }
+      }
+    }
+
+    const graphs = [
+      new Graph(
+        document.getElementById('ingestion-rate'),
+        document.getElementById('ingestion-rate-ymin'),
+        document.getElementById('ingestion-rate-ymax'),
+        document.getElementById('ingestion-rate-xmin'),
+        document.getElementById('ingestion-rate-xmax'),
+        document.getElementById('ingestion-rate-curr'),
+        document.getElementById('ingestion-rate-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Math.round(Number(obj.generalRecords.every) / Number(obj.generalRecords.secondsThisEvery)),
+        }),
+      ),
+      new Graph(
+        document.getElementById('uuids-blocking'),
+        document.getElementById('uuids-blocking-ymin'),
+        document.getElementById('uuids-blocking-ymax'),
+        document.getElementById('uuids-blocking-xmin'),
+        document.getElementById('uuids-blocking-xmax'),
+        document.getElementById('uuids-blocking-curr'),
+        document.getElementById('uuids-blocking-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.uuidsBlocking),
+        }),
+      ),
+      new Graph(
+        document.getElementById('uuids-blocked'),
+        document.getElementById('uuids-blocked-ymin'),
+        document.getElementById('uuids-blocked-ymax'),
+        document.getElementById('uuids-blocked-xmin'),
+        document.getElementById('uuids-blocked-xmax'),
+        document.getElementById('uuids-blocked-curr'),
+        document.getElementById('uuids-blocked-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.blockedUuidResponses),
+        }),
+      ),
+      new Graph(
+        document.getElementById('er-time'),
+        document.getElementById('er-time-ymin'),
+        document.getElementById('er-time-ymax'),
+        document.getElementById('er-time-xmin'),
+        document.getElementById('er-time-xmax'),
+        document.getElementById('er-time-curr'),
+        document.getElementById('er-time-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.monotonicTime),
+        }),
+      ),
+      new Graph(
+        document.getElementById('sampled-time'),
+        document.getElementById('sampled-time-ymin'),
+        document.getElementById('sampled-time-ymax'),
+        document.getElementById('sampled-time-xmin'),
+        document.getElementById('sampled-time-xmax'),
+        document.getElementById('sampled-time-curr'),
+        document.getElementById('sampled-time-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.sampledTime),
+        }),
+      ),
+
+      new Graph(
+        document.getElementById('eventchains-size'),
+        document.getElementById('eventchains-size-ymin'),
+        document.getElementById('eventchains-size-ymax'),
+        document.getElementById('eventchains-size-xmin'),
+        document.getElementById('eventchains-size-xmax'),
+        document.getElementById('eventchains-size-curr'),
+        document.getElementById('eventchains-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.activeEventChains),
+        }),
+      ),
+      new Graph(
+        document.getElementById('cdm2cdm-size'),
+        document.getElementById('cdm2cdm-size-ymin'),
+        document.getElementById('cdm2cdm-size-ymax'),
+        document.getElementById('cdm2cdm-size-xmin'),
+        document.getElementById('cdm2cdm-size-xmax'),
+        document.getElementById('cdm2cdm-size-curr'),
+        document.getElementById('cdm2cdm-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.cdm2cdmSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('cdm2adm-size'),
+        document.getElementById('cdm2adm-size-ymin'),
+        document.getElementById('cdm2adm-size-ymax'),
+        document.getElementById('cdm2adm-size-xmin'),
+        document.getElementById('cdm2adm-size-xmax'),
+        document.getElementById('cdm2adm-size-curr'),
+        document.getElementById('cdm2adm-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.cdm2admSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('seen-nodes-size'),
+        document.getElementById('seen-nodes-size-ymin'),
+        document.getElementById('seen-nodes-size-ymax'),
+        document.getElementById('seen-nodes-size-xmin'),
+        document.getElementById('seen-nodes-size-xmax'),
+        document.getElementById('seen-nodes-size-curr'),
+        document.getElementById('seen-nodes-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.seenNodesSize),
+        }),
+      ),
+      new Graph(
+        document.getElementById('seen-edges-size'),
+        document.getElementById('seen-edges-size-ymin'),
+        document.getElementById('seen-edges-size-ymax'),
+        document.getElementById('seen-edges-size-xmin'),
+        document.getElementById('seen-edges-size-xmax'),
+        document.getElementById('seen-edges-size-curr'),
+        document.getElementById('seen-edges-size-avg'),
+        obj => ({
+            x: Date.now(),
+            y: Number(obj.generalRecords.seenEdgesSize),
+        }),
+      ), 
+    ];
+
+    // Schedule every second
+    let poll = window.setInterval(function(){
+      let req = new XMLHttpRequest();
+      req.open("GET", url);
+      req.addEventListener("load", function () {
+
+        const result = JSON.parse(this.responseText);
+        if (!result.currentlyIngesting) {
+          window.clearInterval(poll);
+          return;
+        }
+
+        for (let i = 0; i < graphs.length; i++) {
+          graphs[i].addDataPoint(result);
+          graphs[i].redraw();
+        }
+      });
+      req.send();
+    }, 1000);
+  </script>
+  </body>
+</html>

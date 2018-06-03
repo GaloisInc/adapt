@@ -3,21 +3,22 @@
 ### Prerequistites
 
 You will need to have:
-  - a recent version of the Oracle [JDK](http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK.)
-  - the latest version of [SBT](http://www.scala-sbt.org/)
-  - a specific version of the Cassandra database installed: `cassandra 2.1`
+  - a recent version of the Oracle [JDK] version 8 (http://www.oracle.com/technetwork/java/javase/downloads/index.html) (Note: `openjdk` will throw strange errors; use the Oracle JDK. Not tested with JDK 9 yet.)
+  - the latest version of [SBT](http://www.scala-sbt.org/) installed and on your path
 
-Then, you will need to run
+Then, you just run
 
-    $ cassandra -f           # keep this running in a different tab, or background the process.
-    $ sbt -mem 6000 run      # choose how much RAM to use with the -mem flag, specified in megabytes
+    $ sbt run          # run from the top level of the project directory
 
 
-At this point you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
+Once the system has started, you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
 
 ### Command Line Options
+SBT will allow you to choose the maximum ram to allocate (default is 1 GB).
+Specify how much RAM to use with the `-mem` flag followed by a number in megabytes. e.g.: `sbt -mem 6000 run`
+
 The adapt system is configurable at runtime by using the following command-line flags. Each flag should be preceded 
-with `-D` and followed by a equals sign, then value; no spaces. For example: `-Dadapt.runflow=db`
+with `-D` and followed by a equals sign, then a value; no spaces. For example: `-Dadapt.runflow=db`
 
 Example:
 
@@ -27,36 +28,31 @@ Example:
 
 High-level commands about the primary operations of the system
 
-| Command Line Flag | Possible Values                      | Default Value | Description |
-| ----------------- |:------------------------------------:|:-------------:|:------------|
-| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
-| adapt.app         | `prod` `accept`                      | `prod`        | previous multiple versions have been combined into `prod`. `accept` is for the acceptance testing app. |
+| Command Line Flag | Possible Values                               | Default Value | Description |
+| ----------------- |:---------------------------------------------:|:-------------:|:------------|
+| adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` `accept` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
 
 
 #### `-Dadapt.ingest.X` Flags
-| Command Line Flag          | Possible Values             | Default Value                                                     | Description |
-| -------------------------- |:---------------------------:|:-----------------------------------------------------------------:|:------------|
-| adapt.ingest.loadfiles.0   | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
-| adapt.ingest.startatoffset | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
-| adapt.ingest.loadlimit     | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
-| adapt.ingest.parallelism   | Any Integer                 | `10`                                                               | This many parallel threads will be used to write to the database simultaneously. More is faster, but increases system load and lock contention. |
+| Command Line Flag            | Possible Values             | Default Value                                                     | Description |
+| ---------------------------- |:---------------------------:|:-----------------------------------------------------------------:|:------------|
+| adapt.ingest.loadfiles.0     | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
+| adapt.ingest.startatoffset   | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
+| adapt.ingest.loadlimit       | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
+| adapt.ingest.quitafteringest | `yes` `no`                  | `no`                                                              | If 'yes', the program will exit after ingesting all the data specified. Only applicable when ingesting from a file. |
+| adapt.ingest.produceadm      | `yes` `no`                  | `yes`                                                             | Ingested CDM data will be tranformed in ADM ("Adapt data model") and the ADM data written into the database. Note: This CAN be used together with `producecdm` |
+| adapt.ingest.producecdm      | `yes` `no`                  | `no`                                                              | Ingested CDM data will be written directly into the database structured as it is in the incoming CDM data; entity resolution will not be applied to this data. Note: This CAN be used together with `produceadm` |
 
 #### `-Dadapt.runtime.X` Flags
 | Command Line Flag                          | Possible Values               | Default Value             | Description |
 | ------------------------------------------ |:-----------------------------:|:-------------------------:|:------------|
 | adapt.runtime.apitimeout                   | Any Integer                   | `301`                     | Number of seconds before a query from the UI should be abandoned. |
 | adapt.runtime.port                         | Any valid port number         | `8080`                    | The UI will run at `localhost` on this port. |
-| adapt.runtime.titankeyspace                | Any string                    | `titan`                   | Ingested data will be written to this namespace. Changing this to other values will allow ingesting data from many TA1s into the same Cassandra database, but will keep each namespace effectively separate. Some sane choices for othe namespaces might be: `cadets-pandex`, `cadets-bovia`, `trace-experiment-1`, `trace-experiment-2`, etc. |
+| adapt.runtime.dbkeyspace                   | Any string                    | `neo4j`                   | Ingested data will be written to this namespace. Changing this to other values will allow ingesting data from many TA1s into the same database, but will keep each namespace effectively separate. Some sane choices for othe namespaces might be: `cadets-pandex`, `cadets-bovia`, `trace-experiment-1`, `trace-experiment-2`, etc. |
 | adapt.runtime.systemname                   | Any string without spaces     | `Engagement2+`            | The name of this system. |
-| adapt.runtime.notesfile                    | Path to a file on this system | `/home/darpa/notes.json`  | Path to where either an existing notes JSON file resides, or where a new one should be created. The notes file stores the human-provided scores and comments for items shown in the prioritied list of cards |
 | adapt.runtime.iforestpath                  | Path to a file on this system | `/home/darpa/iforest.exe` | Path to the iforest executable built for the system this is running on. |
 | adapt.runtime.iforestparallelism           | Any Integer                   | `4`                       | Number of parallel iforest instances to run for anomaly detection. |
 | adapt.runtime.shouldnoramlizeanomalyscores | Boolean                       | `false`                   | should rows in the CSV fed to iforest be normalized first? |
-| adapt.runtime.cleanupthreshold             |                               |                           | Don't use this. |
-| adapt.runtime.expansionqueryfreq           |                               |                           | Don't use this. |
-| adapt.runtime.basecleanupseconds           |                               |                           | Don't use this. |
-| adapt.runtime.featureextractionseconds     |                               |                           | Don't use this. |
-| adapt.runtime.throwawaythreshold           |                               |                           | Don't use this. |
 
 
 #### `-Dadapt.env.X` Flags
@@ -77,6 +73,7 @@ Due to several reasons (see below), we don't support the full Gremlin language. 
   - building on the last point, anonymous functions (including queries that use `it`) / closures aren't supported
   - to make parsing easy, anonymous graph traversals (things like `g.V().and(has('key1'),in())`) need to be made explicit using the `__` syntax (also documented [here][1]). The previous query should now look like `g.V().and(__.has('key1'),__.in())`.
   - whitespace is completely unimportant
+  - queries using regular expressions are no longer supported. (They _were_ supported under the old Titan-backed system.)
 
 The full grammar of queries supported is documented in `Query.scala` (and is updated whenever features are added). The functions of these mirror the functionality of the correspondingly named functions in the Tinkerpop [`Graph`][0], [`__`][1], and [`GraphTraversal`][2].
 
@@ -86,7 +83,7 @@ Here are some examples of valid queries:
 
     g.V().has(label,'Subject').has('anomalyScore').order().by(_.values('anomalyScore').max(),decr).limit(20)`
   
-    g.V().has(label,'Entity-File').has('url', regex('.*file:///tmp/zqxf1.*')).has('file-version',1).dedup()
+    g.V().has(label,'Entity-File').has('url', 'file:///tmp/zqxf1').has('file-version',1).dedup()
 
     g.V().as('parent').union(_.values('commandLine').as('cmd'),
                              _.until(_.in().has(label,'EDGE_EVENT_ISGENERATEDBY_SUBJECT')

@@ -19,22 +19,21 @@ case class NetFlowObject(
   remotePort: Int,
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
-) extends FreeDomainNode[NetFlowObject] with CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[NetFlowObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = NetFlowObject
 
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
       List(
-        label, "NetFlowObject",
-        "uuid", uuid,
-        "localAddress", localAddress,
-        "localPort", localPort,
-        "remoteAddress", remoteAddress,
-        "remotePort", remotePort
+        ("uuid", uuid),
+        ("localAddress", localAddress),
+        ("localPort", localPort),
+        ("remoteAddress", remoteAddress),
+        ("remotePort", remotePort)
       ) ++
-      ipProtocol.fold[List[Any]](List.empty)(v => List("ipProtocol", v)) ++
-      fileDescriptor.fold[List[Any]](List.empty)(v => List("fileDescriptor", v))
+      ipProtocol.fold[List[(String,Any)]](List.empty)(v => List(("ipProtocol", v))) ++
+      fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v)))
 
   def asDBEdges = Nil
 

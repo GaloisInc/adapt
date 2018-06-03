@@ -1,0 +1,15 @@
+# Zaki's example for Charm and Eclat
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+1 | 2 | 3 | 4 | 5 | 6 | 
+a | c | d | t | w | 
+1 1 0 1 1 
+0 1 1 0 1 
+1 1 0 1 1 
+1 1 1 0 1 
+1 1 1 1 1 
+0 1 1 1 0 
+[END Relational Context]

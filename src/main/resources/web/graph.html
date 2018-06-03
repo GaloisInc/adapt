@@ -7,19 +7,75 @@
     <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
     <script type="text/javascript" src="javascripts/ui_language.js"></script>
     <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
-    <!--<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>-->
 
     <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
     <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
 
     <script type="text/javascript">
-        var node_data_set, edge_data_set, network;
+        var node_data_set, edge_data_set, network, labels;
+        var temp_node;  // hack for pulling out the host UUID value for making queries for host edge.
         // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
         var default_node_color = "#97c2fc"
 
+        var urlParams = new URLSearchParams(window.location.search)
+        if (urlParams.has('host')) {
+			var hostPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
+		} else {
+			var hostPrefix = ""
+		}
+
+        function LabeledNodes(actor, object, action) {
+            this.actor = actor
+            this.object = object
+            this.action = action
+            this.nodes = []
+
+            if (this.actor === "" && this.object === "" && this.action === "") {
+                this.empty = true
+            } else {
+                this.empty = false
+            }
+
+            this.getLabel = function() {
+                if (this.empty) {
+                    return ""
+                } else {
+                    return this.actor + "," + this.object + "," + this.action
+                }
+            }
+
+            //expects an object in the form {subject: uuid, object: uuid, predicate: [uuid]}
+            this.addNodes = function(labeled) {
+                var found = false
+                var count = 0
+                var instance = this
+                this.nodes.forEach(function(node){
+                    if (node.subject === labeled.subject && node.object === labeled.object) {
+                        found = true
+                        instance.nodes[count].predicates.push(labeled.predicates[0])
+                    }
+                    count++
+                })
+
+                if (!found) {
+                    this.nodes.push(labeled)
+                }
+            }  
+
+            this.getRows = function() {
+                var ground_truth_label = this.getLabel().replace(/\r?\n|\r/g, "")
+                var rows = []
+                this.nodes.forEach(function(node) {
+                    var predicates = node.predicates.join(";")
+                    var row = ground_truth_label + "," + node.subject + "," + predicates + "," + node.object + "\n"
+                    rows.push(row)
+                })
+                return rows
+            }
+        }
 
         function execQuery(query_object, success_function, query_color) {
             right_journal = []
@@ -44,8 +100,9 @@
                 document.getElementById('query-string').value = query_string
                 UI.loadingUIStop()
             } else {  
-                $.post("/query/nodes", {"query": query_string}, function(node_results) {
+                $.post(hostPrefix + "/query/nodes", {"query": query_string}, function(node_results) {
                     var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
+<<<<<<< HEAD
                     if ( ! all_are_nodes) { 
                         UI.failHandler()
                         return false 
@@ -59,8 +116,23 @@
                                          "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
   
                         $.post("/query/edges", {"query": edge_query}, function(edge_results) {
+=======
+                    if ( ! all_are_nodes) { UI.failHandler(); return false }
+
+                    var node_results_count = node_results.length
+                    UI.foundNodes(node_results_count)
+
+                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to proceed?"
+                    var displayNodes = node_results_count > 0 && (node_results_count < 500 || confirm(confirm_msg))
+
+                    if (displayNodes) {
+                        var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                        var edge_query = "new = [" + result_node_ids.join(",") + "];" +
+                                         "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
+                                         "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
+                        $.post(hostPrefix + "/query/edges", {"query": edge_query}, function(edge_results) {
+>>>>>>> master
                             UI.foundEdges(edge_results.length)
-                            // var query_color = document.getElementById("query-color").jscolor.value
                             var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                             var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
                             var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
@@ -80,7 +152,7 @@
 
         function execTextQuery(query_string) {
             UI.loadingUIStart()
-            $.post("/query", {"query": query_string}, function(results) {
+            $.post(hostPrefix + "/query/generic", {"query": query_string}, function(results) {
                 UI.queryInputColor("lightgreen")
                 console.log(results)
                 setTimeout(function(){ UI.queryInputColor() }, 750)
@@ -392,6 +464,7 @@
         function formatNodes(raw_results) {
             var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
+                n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
                 n["db_label"] = n["label"]
                 n['queries'] = getRelevantQueries(n)  
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
@@ -405,9 +478,8 @@
                 }
 
                 // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
+                // translateAllEnums(n)
 
-
-                translateAllEnums(n)
                 n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
@@ -450,9 +522,14 @@
             node_queries.push(adjacent_query)
             var found_one_default = false
             return _.map(node_queries, function(q){
+            	if (_.isFunction(q.floating_query)) {
+            		var floating_q = q.floating_query(node)
+            	} else {
+            		var floating_q = q.floating_query
+            	}
                 var new_q = {
                     "name" : q.name,
-                    "floating_query" : q.floating_query,
+                    "floating_query" : floating_q,
                     "is_collapsed" : q.is_collapsed
                 }
                 if (q['is_default'] && ! found_one_default) {
@@ -524,7 +601,7 @@
                 prop_lines.push('startTimestamp : ' + new Date(node['properties']['startTimestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
             }
 
-            return "id : " + node['id'] + "<br />" + prop_lines.join("<br />")
+            return "id : " + node['id'] + "<br />" + _.map(prop_lines, function(s){return s.replace("<","{").replace(">","}")}).join("<br />")
         }
 
 
@@ -921,6 +998,18 @@
                 "positions": pinned_positions
             }]
 
+            _.map(nodes, function(n) {
+                node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
+                default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
+                if (typeof node_spec === "object") {
+                    n['icon'] = {
+                        color : getOrElse(n.icon.color, getOrElse(node_spec.color, UI.selectedColor())),
+                        code : getOrElse(n.icon.code, getOrElse(node_spec.icon_unicode, default_spec.icon_unicode)),
+                        size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
+                    }
+                }
+            })
+
             var blob = new Blob([JSON.stringify(snapshot)], {type: "application/json"})
             var a = document.createElement('a')
             a.download = "snapshot.json"
@@ -941,6 +1030,33 @@
                         right_journal = right_journal.concat(data)
                         UI.updateButtonStates()
                     }
+                    reader.onloadend = function(e) {
+                        do { $("#redo-button").click() }
+                        while ( ! $("#redo-button").hasClass("disabled"))
+                    }
+                    reader.readAsText(f)
+                } else if (f.type === "text/csv") {
+                    default_label = new LabeledNodes("", "", "")
+                    labels = [default_label]
+                    var reader = new FileReader()
+                    reader.onload = function(e) {
+                        var data = e.target.result.split('\n')
+                        data.forEach(function(line) {
+                            var values = line.split(',')
+                            label = new LabeledNodes(values[0], values[1], values[2])                             
+                            labels.push(label)
+                        })
+                        label_count = 0
+                        labels.forEach(function(label) {
+                            add = "<i class='ion-android-add add-label' title='Add label to selected nodes' label_id=" + label_count + "></i>"
+                            html = "<span>" + label.getLabel() + add + "</span>"
+                            $div = $("<div class='labelRow'>").html(html)
+                            $("#node_labels").append($div)            
+                            label_count++
+                        })
+                        $("i.add-label").bind("click", addLabel)       
+                        $("#node_labels").show()
+                    }
                     reader.readAsText(f)
                 } else {
                     UI.failHandler()
@@ -948,6 +1064,41 @@
             })
         }
 
+
+        function addLabel(event) {
+            var id = $(this).attr("label_id")
+            var label = labels[id]
+            var nodes = network.getSelectedNodes()
+            nodes.forEach(function(node) {
+                node_data_set._data[node].attack = label.getLabel()
+                old_label = node_data_set._data[node].label.split('\n')
+                new_label = old_label[0] + "\n" + old_label[1] + "\n" + label.getLabel()
+                node_data_set.update({id: node, label: new_label})
+
+                var type = node_data_set._data[node].db_label
+                if (type === "Event") {
+                    var subject = node_data_set._data[node].properties.subjectUuid[0]['value']
+                    var object = node_data_set._data[node].properties.predicateObjectUuid[0]['value']
+                    var predicates = node_data_set._data[node].properties.uuid[0]['value']
+                    label.addNodes({subject: subject, object: object, predicates: [predicates]})
+                }
+            })
+        }
+
+        function labeledNodesToCSV() {
+            var content = []
+            labels.forEach(function(label){
+                label.getRows().forEach(function(row) {
+                    content.push(row)
+                })
+            })
+            var blob = new Blob(content, {type: "text/csv"})
+            var a = document.createElement('a')
+            a.download = "labels.csv"
+            a.href = URL.createObjectURL(blob)
+            a.target = "_blank"
+            a.click()
+        }
 
         function createSavedQueries() {
             var arg_idx = 0
@@ -1130,6 +1281,21 @@
             font-size: small;
         }
 
+        div.labelRow {
+            display: block;
+        }
+
+        div.labelRow span {
+            display: inline-block;
+            font-size: 12px;
+        }
+
+        i.add-label {
+            float: left;
+            display: inline;
+            margin-right: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -1151,6 +1317,7 @@
     </div>
     <div id="loader" class="loader"></div>
     <div id="graph" onclick="$('#query-string, #query-color').blur()" oncontextmenu="event.preventDefault()"></div>
+    <div id="node_labels" style="position: absolute; top: 50px; left: 10px; display: none;"></div>
     <div class="hide" id="node-query-menu"><ul></ul></div>
     <div id="node-selection-box" style="display: none;"></div>
     <a id="download-anchor" style="display:none"></a>

@@ -12,11 +12,9 @@ case class AbstractObject(
   epoch: Option[Int] = None,
   properties: Option[Map[String,String]] = None
 ) extends CDM17 with DBWritable {
-  def asDBKeyValues = List(
-    //    label, "AbstractObject",
-  ) ++
-    permission.fold[List[Any]](List.empty)(v => List("permission", v.bytes.toString)) ++
-    epoch.fold[List[Any]](List.empty)(v => List("epoch", v)) ++
+  def asDBKeyValues: List[(String, Any)] = List() ++
+    permission.fold[List[(String, Any)]](List.empty)(v => List(("permission", v.bytes.toString))) ++
+    epoch.fold[List[(String, Any)]](List.empty)(v => List(("epoch", v))) ++
     DBOpt.fromKeyValMap(properties)
 }
 

@@ -1,25 +1,22 @@
 package com.galois.adapt.cdm17
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 
 
 case class UnitDependency(
   unit: UUID,
   dependentUnit: UUID
-) extends CDM17 with DBWritable with DBNodeable {
+) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
   def asDBKeyValues = List(
-    label, "UnitDependency",
-    "unitUuid", unit,
-    "dependentUnitUuid", dependentUnit
+    ("unitUuid", unit),
+    ("dependentUnitUuid", dependentUnit)
   )
 
-  def asDBEdges = List(("dependentUnit",dependentUnit),("unit",unit))
+  def asDBEdges = List((CDM17.EdgeTypes.dependentUnit,dependentUnit),(CDM17.EdgeTypes.unit,unit))
 
   val thisUUID = UUID.randomUUID()
 

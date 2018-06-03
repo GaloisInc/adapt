@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+
+<meta charset="utf-8">
+<head>
+    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore.js"></script>
+    <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
+    <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
+	<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>
+    <link rel="stylesheet" href="stylesheets/fancytree/skin-lion/ui.fancytree.css" />
+	<link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
+
+    <script type="text/javascript">
+
+var treeNames = []
+var urlParams = new URLSearchParams(window.location.search)
+var renderedTrees;
+
+
+
+if (urlParams.has('host')) {
+	var hostPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
+} else {
+	var hostPrefix = ""
+}
+
+
+
+
+function toComparisonFunc(string) {
+	switch(string){
+		case ">=":
+			return function(left, right) { return left >= right }
+		case "<=":
+			return function(left, right) { return left <= right }
+		case "==":
+			return function(left, right) { return left === right }
+		default:
+			return function(left, right) { return true }
+	}
+}
+
+function matchesRatingFilter(node, comparison) { 
+	switch($("#ratingValue").val()) {
+		case "0":
+			return ! node.data.hasOwnProperty("rating")
+		case "6":
+			return node.data.hasOwnProperty("rating")
+		default:
+			return (node.data.hasOwnProperty("rating") && 
+			comparison(node.data.rating, parseInt($("#ratingValue").val())))
+	}
+}
+
+function matchesLocalProbFilter(node) {
+	var comparison = toComparisonFunc($("#localProbComparison").val())
+	if (node.data.localProb === null) { return false }
+	return comparison(node.data.localProb, parseFloat($("#localProbValue").val()))
+}
+
+function matchesTimeRange(node, start, stop) {
+	var first, second;
+	if (start === null) { first = true } else { first = node.data.observationTime >= start }
+	if (stop === null) { second = true } else { second = node.data.observationTime <= stop }
+	return first && second
+}
+
+function addToRendered(elem, name) {
+	var container = elem.parentNode
+	container.parentNode.removeChild(container)
+	treeNames = treeNames.concat([name])
+	localStorage.setItem("renderedTrees", treeNames.join(","))
+	location.reload()
+}
+
+
+
+
+$(function(){
+
+	var namespace = localStorage.getItem("namespace")
+	if (namespace === null) { 
+		namespace = prompt("Enter your usename:")
+		if (namespace != null) {
+			localStorage.setItem("namespace", namespace.toLowerCase())
+		} else {
+			namespace = "adapt"  // temporarilly set to the shared namespace
+		}
+	}
+
+
+	var shouldLoadAllTrees = false
+	if (urlParams.has('includedTrees')) {
+		treeNames = urlParams.get('includedTrees').split(",")
+	} else {
+		if ( ! _.isNull(localStorage.getItem("renderedTrees"))) {
+			treeNames = localStorage.getItem("renderedTrees").split(",")
+		} else {
+			if (_.isNull(treeNames)) { treeNames = [] }
+			shouldLoadAllTrees = true
+		}
+	}
+
+
+	$.getJSON(hostPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
+
+		var names = _.keys(namesAndCounts)
+		treeNames = _.filter(treeNames, function(t){ return _.contains(names, t) })
+		if (shouldLoadAllTrees) treeNames = names
+		localStorage.setItem("renderedTrees", treeNames.join(","))
+		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(treeNames, t) })
+
+		_.map(_.sortBy(treeNames), function(name) {
+			$("#trees").append(
+				"<table id=" + name + ">"+ 
+					"<thead><tr>"+
+					"<th></th> <th></th> <th></th> <th></th> <th></th>"+
+					"</tr></thead>"+
+				"</table>"
+			)
+			createFancyTree(name)
+		})
+
+		_.map(unrenderedTrees, function(treeName){
+			$("#unrendered").append('<div><a href="#" onclick="addToRendered(this,\''+treeName+'\')">'+ treeName + ' (' + namesAndCounts[treeName] + ')</a></div>')
+		})
+	}).fail(function(e){
+		console.log(e)
+	})
+
+
+	function renderStars(numberFilled) {
+		return _.reduce([1,2,3,4,5], function(acc, idx){
+			var fillStateClass = idx <= numberFilled ? "ion-ios-star" : "ion-ios-star-outline"
+			return acc + '<i class="'+ fillStateClass +'" />'
+		}, "")
+	}
+
+
+	function createFancyTree(treeName) {
+		
+		var shouldExpandAll = false
+
+		$("#" + treeName).fancytree({
+			extensions: ["filter", "table", "childcounter", "multi"],
+			source: {
+				url: hostPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
+				cache: false
+			},
+			quicksearch: true,
+			table: {
+				indentation: 20,      // indent 20px per node level
+				nodeColumnIdx: 2,     // render the node title into the 2nd column
+				checkboxColumnIdx: 0  // render the checkboxes into the 1st column
+			},
+			renderColumns: function(event, data) {
+				var node = data.node
+				var $tdList = $(node.tr).find(">td")
+
+				// Make the title cell spans the remaining columns if it's a folder:
+				if( node.isFolder() ) {
+					var thisColumnIdx = 2
+					$tdList.eq(thisColumnIdx)
+						.prop("colspan", $tdList.length - thisColumnIdx)
+						.nextAll().remove()
+					return
+				}
+				// (Column #0 is rendered by fancytree by adding the checkbox)
+
+				// Column #1 should contain the index as plain text, e.g. '2.7.1'
+				// $tdList.eq(1).text(node.getIndexHier()).addClass("alignRight")
+
+				// (Column #2 is rendered by fancytree)
+
+				// Render remaining columns
+				// $tdList.eq(3).text(JSON.stringify(node.data))
+				if (node.data.hasOwnProperty("rating")) {
+					$tdList.eq(3).html(renderStars(node.data.rating))
+				}
+
+				var timeDigitOverage = node.data.dataTime.toString().length - 13
+				dataTimeSeconds = parseInt(node.data.dataTime / 1000000) //(10 * timeDigitOverage))
+				var dataTimeString = node.data.dataTime === 0 ? "0" : moment(dataTimeSeconds).format('ddd MMM Do YYYY, h:mm:ss')
+				var obsTimeSeconds = parseInt(node.data.observationTime)  // Convert from millis to seconds
+				var obsTimeString = moment(obsTimeSeconds).format('ddd MMM Do YYYY, h:mm:ss')
+
+
+				var linkPrefix = _.isEmpty(hostPrefix) ? "/" : ""
+				var linkSuffix = _.isEmpty(hostPrefix) ? "" : "?host=" + hostPrefix
+				var show_graph_link = _.isEmpty(node.data.uuids) ? "" : '<a target="_blank" href="' + linkPrefix + 'graph.html'+ linkSuffix +'#g.V().has(\'uuid\',within(['+node.data.uuids.join(",")+']))">Show Graph</a>'
+				$tdList.eq(4).html(
+					'<span>'+ 
+					'<b>Data: </b><span title="'+node.data.dataTime+'">' + dataTimeString + '</span> <b>Obs: </b><span title="'+node.data.observationTime+'">' + obsTimeString + '</span> <b>L.Prob: </b>' + node.data.localProb +
+					// JSON.stringify(_.omit(node.data, "key", "uuids")) +
+					' </span> ' + show_graph_link
+					
+				)
+			},
+
+			activeVisible: true, // Make sure, active nodes are visible (expanded)
+			aria: true, // Enable WAI-ARIA support
+		    autoActivate: true, // Automatically activate a node when it is focused using keyboard
+		    autoCollapse: false, // Automatically collapse all siblings, when a node is expanded
+		    autoScroll: false, // Automatically scroll nodes into visible area
+		    clickFolderMode: 4, // 1:activate, 2:expand, 3:activate and expand, 4:activate (dblclick expands)
+		    checkbox: true, // Show checkboxes
+		    debugLevel: 4, // 0:quiet, 1:errors, 2:warnings, 3:infos, 4:debug
+		    disabled: false, // Disable control
+		    focusOnSelect: false, // Set focus when node is checked by a mouse click
+		    escapeTitles: false, // Escape `node.title` content for display
+		    generateIds: false, // Generate id attributes like <span id='fancytree-id-KEY'>
+		    idPrefix: "ft_" + treeName + "_", // Used to generate node ids like <span id='fancytree-id-<key>'>
+		    icon: true, // Display node icons
+		    keyboard: true, // Support keyboard navigation
+		    keyPathSeparator: "/", // Used by node.getKeyPath() and tree.loadKeyPath()
+		    minExpandLevel: 1, // 1: root node is not collapsible
+		    quicksearch: false, // Navigate to next node by typing the first letters
+		    selectMode: 3, // 1:single, 2:multi, 3:multi-hier
+		    tabindex: "0", // Whole tree behaves as one single control
+		    titlesTabbable: false, // Node titles can receive keyboard focus
+		    tooltip: false, // Use title as tooltip (also a callback could be specified)
+		    loadChildren: function(event, data) { 
+		    	var tree = $("#" + treeName)
+		    	var sortFunc = function(a, b) {
+					var x = a.title.toLowerCase() + (a.isFolder() ? "1" : "0")
+					var y = b.title.toLowerCase() + (b.isFolder() ? "1" : "0")
+					return x === y ? 0 : x > y ? 1 : -1
+				}
+		    	tree.fancytree("getRootNode").sortChildren(sortFunc, true) 
+		    	if (shouldExpandAll) {
+		    		tree.fancytree("getTree").visit( function(node){
+						node.setExpanded(true)// Expand all tree nodes
+					})
+		    	}
+		    }
+		})
+	}
+
+
+	
+
+	// Search function:
+	function updateFilter(e){
+		var matchCount = 0
+		var searchPattern = $("#searchText").val()
+
+		var timeStart = $("#timeStart").val() === "" ? null : parseInt($("#timeStart").val())
+		var timeStop  = $("#timeStop").val() === "" ? null : parseInt($("#timeStart").val())
+
+		var ratingComparison = toComparisonFunc($("#ratingComparison").val())
+
+		_.map(treeNames, function(treeName){
+			var tree =  $("#" + treeName).fancytree("getTree")   //$.ui.fancytree.getTree()
+			var filterOptions = {
+				autoExpand: true, // Expand all branches that contain matches while filtered
+				// counter: true,     // Show a badge with number of matching child nodes near parent icons
+				hideExpandedCounter: true, // Hide counter badge if parent is expanded
+				hideExpanders: true,       // Hide expanders if all child nodes are hidden by filter
+				highlight: true,   // Highlight matches by wrapping inside <mark> tags
+				leavesOnly: false, // Match end nodes only
+				nodata: treeName + ": No matches.", //true,      // Display a 'no data' status node if result is empty
+				mode: "hide"       // Grayout unmatched nodes with "dimm" ("hide" to remove empty node)
+			}
+
+			if(e && e.which === $.ui.keyCode.ESCAPE || (
+				$.trim(searchPattern) === "" && 
+				$("#ratingComparison").val() === "none" && 
+				$("#localProbComparison").val() === "none" &&
+				$("#timeStart").val() === "" &&
+				$("#timeStop").val() === "" 
+			)){
+				$("button#btnResetSearch").click()
+				return
+			}
+
+
+			matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
+				if (_.isEmpty(searchPattern)) {
+					// console.log(matchesRatingFilter(node))
+					// console.log(matchesLocalProbFilter(node))
+					// console.log(matchesTimeRange(node, timeStart, timeStop))
+					return /*! node.folder &&*/ matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
+				} else {
+					// console.log(node)
+					// console.log(matchesRatingFilter(node))
+					// console.log(matchesLocalProbFilter(node))
+					// console.log(matchesTimeRange(node, timeStart, timeStop))
+					return /*! node.folder &&*/ new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
+				}
+			}, filterOptions)
+
+			// } else {
+				// Pass a string to perform case insensitive matching
+				// matchCount = matchCount + tree.filterNodes.call(tree, searchPattern, filterOptions)
+			// }
+		})
+
+		$("button#btnResetSearch").attr("disabled", false)
+		$("span#matches").text("(" + matchCount + " matches)")
+	}
+
+	$("#ratingComparison").change(updateFilter)
+	$("#ratingValue").change(updateFilter)
+	$("#localProbComparison").change(updateFilter)
+	$("#localProbValue").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+	$("#timeStart").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+	$("#timeStop").keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+
+	$("input[name=search]") //.keyup(updateFilter)
+		.keydown(function(e){ if (e.key === "Enter") {updateFilter()} })
+		.focus()
+	$("#filterButton").click(updateFilter)
+
+
+	$("button#btnResetSearch").click(function(e){
+		$("input[name=search]").val("");
+		$("#ratingComparison").val("none")
+		$("#ratingValue").val(0)
+		$("span#matches").text("");
+		_.map(treeNames, function(treeName){
+			$("#" + treeName).fancytree("getTree").clearFilter();
+		})
+	}).attr("disabled", true)
+
+
+
+	var stars = {
+		existing : [],
+		makeNewStar : function() {
+			var existing_so_far = stars.existing.slice()
+			var newStar = $("<i>", {class: "ion-ios-star-outline", click: function(){
+
+				var searchPattern = $("#searchText").val()
+				var all_selected_nodes = []
+				var rating_items = {}
+				_.map(treeNames, function(treeName){
+					var tree = $("#" + treeName)
+					var selectedElements = tree.fancytree("getTree").getSelectedNodes()
+					var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
+
+					if ( ! _.isEmpty(searchPattern)) {
+						selectedNodes = _.filter(selectedNodes, function(n){
+							return new RegExp(searchPattern, "i").test(n.title)
+						})
+					}
+
+					all_selected_nodes = all_selected_nodes.concat(selectedNodes)
+					if ( ! _.isEmpty(selectedNodes)) {
+						rating_items[treeName] = _.map(selectedNodes, function(n){return n.data.key})
+					}
+				})
+
+				var rating = existing_so_far.length + 1
+				var rating_unit_label = rating === 1 ? " star" : " stars"
+
+				var count = _.reduce(rating_items, function(a, b){return a + b.length}, 0)
+				var count_unit_label = count === 1 ? " item" : " items"
+
+				if (count == 0) {
+					alert("You must select items with checkboxes to apply a rating.")
+				} else {
+					var confirmed = confirm("Apply rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?" + "\n\n" + JSON.stringify(rating_items, null, 2))
+					if (confirmed) {
+						var payload = {
+							"pathsPerTree" : JSON.stringify(rating_items),
+							"rating" : rating,
+							"namespace" : namespace
+						}
+						$.post(hostPrefix + "/api/ppm/setRatingsMap", payload, function(data, textStatus, jqXHR){
+							_.map(all_selected_nodes, function(n){
+								n.data.rating = rating
+							})
+							_.map(rating_items, function(treeItemKey, treeName){
+								if (_.contains(treeNames, treeName)) {
+									var tree = $("#" + treeName)
+									tree.fancytree("getRootNode").visit(function(node){
+										node.selected = false
+									})
+									tree.fancytree("getRootNode").render(true,true)
+								}
+							})
+						}).fail(function(e){
+							console.log(e)
+							alert("ERROR: Could not set rating of " + (existing_so_far.length + 1) + rating_unit_label + " to " + count + count_unit_label + "?" + "\n\n" + JSON.stringify(rating_items, null, 2))
+						})
+					}
+				}
+			}}).hover(function(){UI.hoverStars([$(this)].concat(existing_so_far))}, function(){UI.hoverStars([$(this)].concat(existing_so_far))})
+			stars.existing.push(newStar)
+			return newStar
+		}
+	}
+
+	var starDiv = $("#stars") // $("<div>", {class: "column small-3"})
+	_.map([1,2,3,4,5], function(){starDiv.append(stars.makeNewStar())})
+
+	var UI = {
+		hoverStars : function(starArray) {
+			_.map(starArray, function(star){
+				star.toggleClass("ion-ios-star-outline").toggleClass("ion-ios-star")
+			})
+		}
+	}
+})
+
+    </script>
+    <style type="text/css">
+    html, body {
+        padding: 0px;
+        margin: 0px;
+    }
+    #topBar {
+    	position: fixed;
+    	height: 2em;
+    	float: left;
+    	padding: 1em;
+    	padding-bottom: 0px;
+    	background-color: white;
+    	z-index: 10;
+    	top: 0px;
+    	left: 0px;
+    	margin-bottom: 0px;
+    	background-color: white;
+    	width: 100%;
+    }
+    #underTopBar {
+    	height: 2em;
+    	position: relative;
+    	margin: 1em;
+    	margin-bottom: 0px;
+    }
+	</style>
+</head>
+<body>
+	<div id="underTopBar">
+	<div id="topBar">
+		<input id="searchText" name="search" placeholder="Search..." autocomplete="off" />
+		<label>Rating:</label>
+		<select id="ratingComparison">
+			<option value="none">&nbsp;</option>
+			<option value="==">==</option>
+			<option value=">=">>=</option>
+			<option value="<="><=</option>
+		</select>
+		<select id="ratingValue">
+			<option value="0">None</option>
+			<option value="1">1</option>
+			<option value="2">2</option>
+			<option value="3">3</option>
+			<option value="4">4</option>
+			<option value="5">5</option>
+			<option value="6">any</option>
+		</select>
+		<label>Local Prob:</label>
+		<select id="localProbComparison">
+			<option value="none">&nbsp;</option>
+			<option value=">=">>=</option>
+			<option value="<="><=</option>
+		</select>
+		<input id="localProbValue" placeholder="???" size="4" value="0.01" />
+		<label>Time range:</label>
+		<input id="timeStart" placeholder="1522097891995" size="14" />&nbsp;-&nbsp;<input id="timeStop" placeholder="1522097900000" size="14" />
+		<button id="filterButton">Filter</button>
+		<button id="btnResetSearch">CLEAR</button>
+		<span id="matches"></span>
+		<span style="margin-left: 5em;">Set Rating: </span><span id="stars"></span>
+	</div>
+	</div>
+	<div id="trees"></div>
+	<div id="unrendered"></div>
+</body>

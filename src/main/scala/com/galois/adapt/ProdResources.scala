@@ -2,11 +2,11 @@ package com.galois.adapt
 
 import java.io.{ByteArrayOutputStream, PrintWriter}
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.{Properties, UUID}
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
-import org.mapdb.DBMaker
 import akka.pattern.ask
 import com.bbn.tc.schema.avro.{TheiaQuery, TheiaQueryType}
 import com.typesafe.config.Config
@@ -31,25 +31,17 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
   val anomalies = MutableMap.empty[UUID, MutableMap[String, (Double, Set[UUID])]]
   var weights = MutableMap.empty[String, Double]
 
-  val notesFilePath = config.getString("adapt.runtime.notesfile")
-
-  var savedNotes = Try(scala.io.Source.fromFile(notesFilePath))
-    .map { notesSource =>
-      val notesString = try notesSource.mkString finally notesSource.close()
-      notesString.parseJson.convertTo[List[SavedNotes]]
-    } match {
-      case Success(parsedNotes) => parsedNotes
-      case Failure(e) =>
-        println("Could not load saved notes file: " + e.getMessage + " It will be created on first write.")
-        List.empty[SavedNotes]
-    }
-
   var queryQueue = List.empty[UUID]
   val freq = config.getInt("adapt.runtime.expansionqueryfreq")
-  context.system.scheduler.schedule(freq seconds, freq seconds)(context.self ! MakeExpansionQueries)
+  val cancelable = context.system.scheduler.schedule(freq seconds, freq seconds)(context.self ! MakeExpansionQueries)
+  Application.system.registerOnTermination(cancelable.cancel())
 
   def calculateWeightedScorePerView(views: MutableMap[String, (Double, Set[UUID])]) = views.map{ case (k, v) => k -> (weights.getOrElse(k, 1D) * v._1 -> v._2)}
   def calculateSuspicionScore(views: MutableMap[String, (Double, Set[UUID])]) = calculateWeightedScorePerView(views).map(_._2._1).sum
+
+
+
+  var theirQueryId = new AtomicLong(Try(config.getLong("adapt.runtime.theiaqueryidstart")).getOrElse(2000000L))
 
   def makeTheiaQuery(q: MakeTheiaQuery): Future[String] = Future {
     val theia = new TheiaQuery()
@@ -74,8 +66,10 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
       theia.put("endTimestamp", q.endTimestamp.get)
     }
     val bb2 = ByteBuffer.allocate(16)
-    bb2.putLong(q.queryId.getMostSignificantBits)
-    bb2.putLong(q.queryId.getLeastSignificantBits)
+    bb2.putLong(0L)
+    bb2.putLong(theirQueryId.getAndIncrement())
+//    bb2.putLong(q.queryId.getMostSignificantBits)
+//    bb2.putLong(q.queryId.getLeastSignificantBits)
     val queryID = new com.bbn.tc.schema.avro.cdm17.UUID(bb2.array())
     theia.put("queryId", queryID)
     theia.put("type", q.`type`)
@@ -107,20 +101,6 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
 
 
   def receive = {
-    case view: ViewScore =>
-      val existing = anomalies.getOrElse(view.keyNode, MutableMap.empty[String, (Double, Set[UUID])])
-
-      if (view.suspicionScore < threshold) existing -= view.viewName
-      else existing += (view.viewName -> (view.suspicionScore, view.subgraph))
-
-      if (existing.isEmpty) {
-        anomalies -= view.keyNode
-        if (queryQueue.contains(view.keyNode)) queryQueue = queryQueue.filterNot(_ == view.keyNode)
-      } else {
-        anomalies += (view.keyNode -> existing)
-        if ( ! queryQueue.contains(view.keyNode)) queryQueue = view.keyNode :: queryQueue
-      }
-
     case MakeExpansionQueries =>
 //          println("Q: " + queryQueue.size)
         queryQueue.lastOption.foreach { startUuid =>
@@ -132,12 +112,12 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
           implicit val timeout = Timeout(9.9 seconds)
           val provQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').union(_.in('flowObject').as('ptn').union(_.out('subject'),_).select('ptn').union(_.in('subject').has('eventType','EVENT_EXECUTE').out('predicateObject'),_.in('subject').has('eventType','EVENT_MMAP').out('predicateObject'),_).select('ptn').emit().repeat(_.out('prevTagId','tagId','subject','flowObject')).dedup().union(_,_.hasLabel('Subject').out('localPrincipal'),_.hasLabel('FileObject').out('localPrincipal'),_.hasLabel('Subject').emit().repeat(_.as('foo').out('parentSubject').where(neq('foo')))).dedup(),_,_.in('predicateObject').has('eventType').out('parameterTagId').out('flowObject'),_.in('predicateObject2').has('eventType').out('parameterTagId').out('flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
           val progQueryString = s"g.V().has('uuid',$startUuid).as('tracedObject').in('flowObject').as('ptn').out('subject').as('causal_subject').select('ptn').emit().repeat(_.in('prevTagId','tagId').out('subject','flowObject')).path().unrollPath().dedup().where(neq('tracedObject'))"
-          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+          val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Future[Try[Stream[Vertex]]]].flatMap(identity)
           provResultF.flatMap { v =>
-            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) //throws!!
-            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Try[Stream[Vertex]]]
+            context.self ! ExpansionQueryResults(Provenance, startUuid, v.get.toList) // throws!!
+            val progResultF = (dbActor ? NodeQuery(progQueryString, shouldReturnJson = false)).mapTo[Future[Try[Stream[Vertex]]]].flatMap(identity)
             progResultF.map { g =>
-              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList)
+              context.self ! ExpansionQueryResults(Progenance, startUuid, g.get.toList) // throws!!
               context.self ! MakeExpansionQueries
             }
           }.recover { case e: Throwable => println(s"Expansion query failed for $startUuid with message ${e.getMessage}") }
@@ -218,22 +198,6 @@ class AnomalyManager(dbActor: ActorRef, config: Config) extends Actor with Actor
           k -> weights.getOrElse(k, 1D)
         ).toMap
       }.fold(Map.empty[String,Double])((a,b) => a ++ b)
-
-    case msg @ SavedNotes(keyUuid, rating, notes, subgraph) =>
-      savedNotes = savedNotes :+ msg
-      sender() ! Try {
-        new PrintWriter(notesFilePath) {
-          write(savedNotes.toJson.toString)
-          close()
-        }
-      }.map(_ => ())
-
-    case GetNotes(uuids) =>
-      val revOrderNotes = savedNotes.reverse
-      val toSend =
-        if (uuids.isEmpty) revOrderNotes
-        else uuids.flatMap(u => revOrderNotes.find(_.keyUuid == u))
-      sender() ! toSend
   }
 }
 
@@ -243,9 +207,6 @@ case object GetThreshold
 case object GetWeights
 case class QueryAnomalies(uuids: Seq[UUID])
 case class GetRankedAnomalies(topK: Int = Int.MaxValue)
-case class SavedNotes(keyUuid: UUID, rating: Int, notes: String, subgraph: Set[UUID]) {
-  def toJsonString: String = s"""{"keyUuid": "$keyUuid", "rating": $rating, "notes":"$notes", "subgraph":${subgraph.map(u => s""""$u"""").mkString("[",",","]")}, "ratingTimeMillis": ${System.currentTimeMillis()} }"""
-}
 case class GetNotes(uuid: Seq[UUID])
 
 case object MakeExpansionQueries

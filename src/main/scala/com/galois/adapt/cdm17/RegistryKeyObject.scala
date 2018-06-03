@@ -5,8 +5,6 @@ import java.util.UUID
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
 import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 
 
@@ -16,18 +14,17 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends FreeDomainNode[RegistryKeyObject] with CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[RegistryKeyObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = RegistryKeyObject
 
   def asDBKeyValues = List(
-    label, "RegistryKeyObject",
-    "uuid", uuid,
-    "registryKeyOrPath", key
+    ("uuid", uuid),
+    ("registryKeyOrPath", key)
   ) ++
     baseObject.asDBKeyValues ++
-    value.fold[List[Any]](List.empty)(v => List("value", v.asDBKeyValues)) ++
-    size.fold[List[Any]](List.empty)(v => List("size", v))
+    value.fold[List[(String,Any)]](List.empty)(v => List(("value", v.toString))) ++
+    size.fold[List[(String,Any)]](List.empty)(v => List(("size", v)))
 
   def asDBEdges = Nil
 

@@ -1,18 +1,25 @@
 package com.galois.adapt
 
-import com.thinkaurelius.titan.core.attribute.Text
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex, Property => GremlinProperty, T => Token, Graph}
+//import com.thinkaurelius.titan.core.attribute.Text
+import java.util
+import java.util.function.BiPredicate
+
+import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
+import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
-
 import java.util.{Collections, Comparator, Iterator}
+
+import com.carrotsearch.hppc.predicates.BytePredicate
+import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Stream
 import scala.util.parsing.combinator._
-import scala.util.{Try, Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.language.existentials
+import scala.util.matching.Regex
 
 /*
  * A 'Traversal' represents roughly the shape of path(s) that can be used to explore a graph. This
@@ -41,8 +48,6 @@ import scala.language.existentials
  *   stringArray ::= variable | '[' string ',' ... ']'
  *   uuidArray   ::= variable | '[' uuid ',' ... ']'
  *
- *   regex       ::= 'regex(' string ')'
- *
  *   literal     ::= int | long | string | uuid | intArray | longArray | stringArray | uuidArray
  *
  *   predicate   ::= 'eq(' literal ')'
@@ -50,7 +55,8 @@ import scala.language.existentials
  *                 | 'within([' literal ',' ... '])'
  *                 | 'lte(' literal ')'
  *                 | 'gte(' literal ')'
- *                 | 'between(' literal ',' literal ')'   
+ *                 | 'between(' literal ',' literal ')'
+ *                 | 'regex(' string ')'
  *
  *   traversal   ::= 'g.V(' long ',' ... ')'
  *                 | 'g.V(' longArray ')'
@@ -60,7 +66,6 @@ import scala.language.existentials
  *                 | '_(' long ',' ... ')'                                 TODO: What is this?
  *                 | traversal '.has(' string ')'
  *                 | traversal '.has(' string ',' literal ')'
- *                 | traversal '.has(' string ',' regex ')'
  *                 | traversal '.has(' string ',' traversal ')'
  *                 | traversal '.has(' string ',' predicate ')'
  *                 | traversal '.hasLabel(' string ')'
@@ -104,19 +109,19 @@ import scala.language.existentials
  *                 | traversal '.groupCount()'
  *                 | traversal '.match(' traversal ',' ... ')'
  *                 | traversal '.both(' string ',' ... ')'
- *                 | traversal '.bothV()'
  *                 | traversal '.out(' string ',' ... ')'
- *                 | traversal '.outV()'
  *                 | traversal '.in(' string ',' ... ')'
+ *                 | traversal '.bothV()'
+ *                 | traversal '.outV()'
  *                 | traversal '.inV()'
- *                 | traversal '.bothE()'
+ *                 | traversal '.bothE(' string ',' ... ')'
  *                 | traversal '.outE(' string ',' ... ')'
- *                 | traversal '.inE()'
+ *                 | traversal '.inE(' string ',' ... ')'
  *                 | traversal '.repeat(' traversal ')'
  *                 | traversal '.union(' traversal ',' ... ')'
  *                 | traversal '.local(' traversal ')'
  *                 | traversal '.property(' string ',' literal ',' ... ')'
- *                 | traversal '.properties()'
+ *                 | traversal '.properties(' string ',' ... ')'
  *                 | traversal '.path()'
  *                 | traversal '.unrollPath()'
  *
@@ -146,6 +151,12 @@ object Query {
   def run[T](query: Query[T], graph: Graph): Try[Stream[T]] = query.run(graph)
   def run[T](query: String, graph: Graph): Try[Stream[T]] =
     Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
+
+  // Is this Neo4j or not
+  val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
+
+  // Gross hack to get all of the expected UUID namespaces
+  def getNamespaces: List[String] = Application.getNamespaces
 
   // Attempt to parse a traversal from a string
   def apply(input: String): Try[Query[_]] = {
@@ -180,17 +191,21 @@ object Query {
 
       def str: Parser[QueryValue[String]] =
         ( variable(strs)
-        | stringLiteral            ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
+        | stringLiteral             ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
 
-      def uid: Parser[QueryValue[java.util.UUID]] = ( variable(uids) |
-        """[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
-          s => Raw(java.util.UUID.fromString(s))
+      // NOTE: this is no longer exactly a UUID - it is a franken-UUID supporting namespaces.
+      // For example, it should accept `cdm_cadets_123e4567-e89b-12d3-a456-426655440000`.
+      //
+      // We make one parser level exceptions around this: `has('uuid',<uuid-lit>)`
+      def uuid: Parser[QueryValue[String /*java.util.UUID*/ ]] = ( variable(uids) |
+        """([0-9a-zA-Z-]*_)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{4}-[0-9a-fA_F]{12}""".r ^^ {
+          s => Raw(s) //java.util.UUID.fromString(s))
         }).withFailureMessage("UUID expected (ex: x, 123e4567-e89b-12d3-a456-426655440000)")
 
-      def uidArr: Parser[QueryValue[Seq[java.util.UUID]]] =
-        ( variable(arrs) | arr(uid) ).withFailureMessage("UUID array expected")
+      def uuidArr: Parser[QueryValue[Seq[String /*java.util.UUID*/ ]]] =
+        ( variable(arrs) | arr(uuid) ).withFailureMessage("UUID array expected")
 
       def lngArr: Parser[QueryValue[Seq[java.lang.Long]]] =
         ( variable(arrs) | arr(lng) ).withFailureMessage("long array expected")
@@ -202,15 +217,15 @@ object Query {
         ( variable(arrs) | arr(str) ).withFailureMessage("string array expected")
 
       def lit: Parser[QueryValue[_]] =
-        ( uid ||| int ||| lng ||| str
-        ||| intArr ||| lngArr ||| uidArr ||| strArr
+        ( uuid ||| int ||| lng ||| str
+        ||| intArr ||| lngArr ||| uuidArr ||| strArr
         ).withFailureMessage("literal expected (ex: 9, 12I, \"hello\", [1,2,3])")
 
       def pred: Parser[QueryValue[P[Any]]] =
-        (   predicate(uid)
+        (   predicate(uuid)
         ||| predicate(int)
         ||| predicate(lng)
-        ||| predicate(str)
+        ||| strPredicate
         ).asInstanceOf[Parser[QueryValue[P[Any]]]]
          .withFailureMessage("predicate expected (ex: within([1,2,3]), eq(x))")
 
@@ -224,14 +239,6 @@ object Query {
         ( "[" ~ repsep(elem,",") ~ "]" ~ ".toArray()".? ^^ { case _~e~_~_ => RawArr(e) }
         ).withFailureMessage(s"array of ${ev.runtimeClass.getSimpleName()} expected")
 
-      // Parse a regex
-      def regex[T]: Parser[Regex] = {
-         val r = ("regex(" ~! stringLiteral ~ ")" | "newP(REGEX," ~! stringLiteral ~ ")") ^^ {
-           case _~r~_ => Regex(StringContext.treatEscapes(r.stripPrefix("\"").stripSuffix("\"")))
-         }
-         r.withFailureMessage("regex expected (ex: 'regex(\"hel{2}o\")'")
-      }
-
       def predicate[T](elem: Parser[QueryValue[T]])(implicit ev: scala.reflect.ClassTag[T]): Parser[QueryValue[P[T]]] =
         ( "eq(" ~ elem ~ ")"                     ^^ { case _~l~_     => RawEqPred(l) }
         | "neq(" ~ elem ~ ")"                    ^^ { case _~l~_     => RawNeqPred(l) }
@@ -243,6 +250,11 @@ object Query {
         ).asInstanceOf[Parser[QueryValue[P[T]]]]
          .withFailureMessage(s"predicate of type ${ev.runtimeClass.getSimpleName()} expected")
 
+      def strPredicate: Parser[QueryValue[P[String]]] =
+        ( predicate(str)
+        | "regex(" ~ str ~ ")"                   ^^ { case _~s~_     => RawRegexPred(s) }
+        ).withFailureMessage(s"predicate of type String expected")
+
       // Since a traversal is recursively defined, it is convenient for parsing to think of suffixes.
       // Otherwise, we get left recursion...
       //
@@ -250,16 +262,27 @@ object Query {
       // inference is stupidly asymmetric.
       def travSuffix: Parser[Tr => Tr] =
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
+        | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
+            case _~_~_~Raw(u: String)~_ if u.length == 36 => {
+              val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: getNamespaces.map(ns => Raw(ns + "_" + u))))
+              (t: Tr) => HasPredicate(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), nsPred)
+            }
+            case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)
+          }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
-        | ".has(" ~ str ~ "," ~ regex~ ")" ^^ { case _~k~_~r~_  => HasRegex(_: Tr, k, r) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
+        | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ pred ~ ")" ^^ {
+            case _~_~_~p~_ if isNeo4j => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p)
+            case _~_~_~p~_ => (t: Tr) => HasPredicate(t, Raw("uuid"), p)
+          }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
         | ".hasLabel(" ~! str ~ ")"        ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".has(label," ~! str ~ ")"       ^^ { case _~l~_      => HasLabel(_: Tr, l) }
         | ".hasNot(" ~! str ~ ")"          ^^ { case _~s~_      => HasNot(_: Tr, s) }
         | ".hasId(" ~! lng ~ ")"           ^^ { case _~l~_      => HasId(_: Tr, l) }
         | ".where(" ~ trav ~ ")"           ^^ { case _~t~_      => Where(_: Tr, t) }
-        | ".where(" ~ predicate(str) ~ ")" ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where(" ~ strPredicate ~ ")"   ^^ { case _~p~_      => WherePredicate(_: Tr, p) }
+        | ".where("~str~","~strPredicate~")"^^{ case _~k~_~p~_  => WhereKeyPredicate(_: Tr, k, p) }
         | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
@@ -278,8 +301,8 @@ object Query {
         | ".by(" ~ trav ~ ",decr)"         ^^ { case _~t~_      => ByTraversal(_: Tr, t, false) }
         | ".as(" ~! rep1sep(str,",") ~ ")" ^^ { case _~s~_      => As(_: Tr, RawArr(s)) }
         | ".until(" ~! trav ~ ")"          ^^ { case _~t~_      => Until(_: Tr, t) }
-        | ".values(" ~! rep1sep(str,",")~")"    ^^ { case _~s~_      => Values(_: Tr, RawArr(s)) }
-        | ".valueMap(" ~! repsep(str,",")~")"   ^^ { case _~s~_      => ValueMap(_: Tr, RawArr(s)) }
+        | ".values(" ~! rep1sep(str,",")~")"    ^^ { case _~s~_     => Values(_: Tr, RawArr(s)) }
+        | ".valueMap(" ~! repsep(str,",")~")"   ^^ { case _~s~_     => ValueMap(_: Tr, RawArr(s)) }
         | ".properties(" ~! repsep(str,",")~")" ^^ { case _~s~_     => Properties(_: Tr, RawArr(s)) }
         | ".label()"                       ^^ { case _          => Label(_: Tr) }
         | ".id()"                          ^^ { case _          => Id(_: Tr) }
@@ -293,6 +316,7 @@ object Query {
         | ".fold()"                        ^^ { case _          => Fold(_: Tr) }
         | ".unfold()"                      ^^ { case _          => Unfold(_: Tr) }
         | ".count()"                       ^^ { case _          => Count(_: Tr) }
+        | ".group()"                       ^^ { case _          => Group(_: Tr) }
         | ".groupCount()"                  ^^ { case _          => GroupCount(_: Tr) }
         | ".both(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => Both(_: Traversal[_,Vertex], RawArr(s)) }
         | ".bothV()"                       ^^ { case _          => BothV(_: Traversal[_,Edge]) }
@@ -300,9 +324,9 @@ object Query {
         | ".outV()"                        ^^ { case _          => OutV(_: Traversal[_,Edge]) }
         | ".in(" ~! repsep(str,",")~ ")"   ^^ { case _~s~_      => In(_: Traversal[_,Vertex], RawArr(s)) }
         | ".inV()"                         ^^ { case _          => InV(_: Traversal[_,Edge]) }
-        | ".bothE()"                       ^^ { case _          => BothE(_: Traversal[_,Vertex]) }
+        | ".bothE("~! repsep(str,",")~ ")" ^^ { case _~s~_      => BothE(_: Traversal[_,Vertex], RawArr(s)) }
         | ".outE(" ~! repsep(str,",")~ ")" ^^ { case _~s~_      => OutE(_: Traversal[_,Vertex], RawArr(s)) }
-        | ".inE()"                         ^^ { case _          => InE(_: Traversal[_,Vertex]) }
+        | ".inE(" ~! repsep(str,",")~ ")"  ^^ { case _~s~_      => InE(_: Traversal[_,Vertex], RawArr(s)) }
         | ".repeat(" ~! trav ~ ")"         ^^ { case _~t~_      => Repeat(_: Traversal[_,Edge], t.asInstanceOf[Traversal[_,Edge]]) }
         | ".union(" ~!repsep(trav,",")~")" ^^ { case _~t~_      => Union(_: Tr, t.asInstanceOf[Seq[Traversal[_,A]] forSome { type A }]) }
         | ".local(" ~! trav ~ ")"          ^^ { case _~t~_      => Local(_: Tr, t) }
@@ -448,6 +472,17 @@ object QueryLanguage {
   case class RawWithinPred[T](col: QueryValue[Seq[T]]) extends QueryValue[P[T]] {
     override def eval(context: Map[String,QueryValue[_]]): P[T] = P.within(col.eval(context): _*)
   }
+  case class RawRegexPred(regex: QueryValue[String]) extends QueryValue[P[String]] {
+
+    // Yep. This is grossly inefficient. This is probably why tinkerpop doesn't offer this by default. Note that this
+    // is pretty much what Titan's regex predicate is.
+    val matches: BiPredicate[String,String] = new BiPredicate[String,String] {
+      override def test(valueA: String, valueB: String): Boolean = valueA.matches(valueB)
+    }
+
+    override def eval(context: Map[String,QueryValue[_]]): P[String] =
+      P.test(matches, regex.eval(context)).asInstanceOf[P[String]]
+  }
   case class Variable[T](name: String) extends QueryValue[T] {
     override def eval(context: Map[String,QueryValue[_]]): T = context(name).eval(context).asInstanceOf[T]
   }
@@ -481,10 +516,6 @@ object QueryLanguage {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context),v.eval(context))
   }
-  case class HasRegex[S,T](traversal: Traversal[S,T], k: QueryValue[String], regex: Regex) extends Traversal[S,T] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).has(k.eval(context), Text.textRegex(regex.raw))
-  }
   case class HasTraversal[S,T](traversal: Traversal[S,T], k: QueryValue[String], v: Traversal[_,_]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).has(k.eval(context), v.buildTraversal(graph, context))
@@ -495,7 +526,7 @@ object QueryLanguage {
   }
   case class HasLabel[S,T](traversal: Traversal[S,T], label: QueryValue[String]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).hasLabel(label.eval(context))
+      traversal.buildTraversal(graph,context).has(Token.label, LabelP.of(label.eval(context)))
   }
   case class HasId[S,T](traversal: Traversal[S,T], id: QueryValue[java.lang.Long]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
@@ -512,6 +543,10 @@ object QueryLanguage {
   case class WherePredicate[S,T](traversal: Traversal[S,T], where: QueryValue[P[String]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).where(where.eval(context))
+  }
+  case class WhereKeyPredicate[S,T](traversal: Traversal[S,T], k: QueryValue[String], where: QueryValue[P[String]]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).where(k.eval(context), where.eval(context))
   }
   case class And[S,T](traversal: Traversal[S,T], anded: Seq[Traversal[_,_]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
@@ -635,6 +670,10 @@ object QueryLanguage {
   case class Count[S](traversal: Traversal[S,_]) extends Traversal[S,java.lang.Long] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).count()
   }
+  case class Group[S,K,V](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[K,V]] {
+    override def buildTraversal(graph: Graph, context: Map[String, QueryValue[_]]) = traversal.buildTraversal(graph, context).group()
+  }
+
   case class GroupCount[S](traversal: Traversal[S,_]) extends Traversal[S,java.util.Map[String,java.lang.Long]] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).groupCount()
   }
@@ -672,15 +711,17 @@ object QueryLanguage {
   case class InV[S](traversal: Traversal[S,Edge]) extends Traversal[S,Vertex] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inV()
   }
-  case class BothE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).bothE()
+  case class BothE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).bothE(edgeLabels.eval(context): _*)
   }
   case class OutE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).outE(edgeLabels.eval(context): _*)
   }
-  case class InE[S](traversal: Traversal[S,Vertex]) extends Traversal[S,Edge] {
-    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).inE()
+  case class InE[S](traversal: Traversal[S,Vertex], edgeLabels: QueryValue[Seq[String]]) extends Traversal[S,Edge] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).inE(edgeLabels.eval(context): _*)
   }
   case class Repeat[S](traversal: Traversal[S,Edge], rep: Traversal[_,Edge]) extends Traversal[S,Edge]{
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
@@ -726,6 +767,4 @@ object QueryLanguage {
       )
     }
   }
-  
-  case class Regex(raw: String)
 }

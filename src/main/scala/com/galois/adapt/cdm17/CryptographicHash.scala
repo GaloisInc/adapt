@@ -12,9 +12,8 @@ case class CryptographicHash(
   hash: String
 ) extends CDM17 with DBWritable {
   def asDBKeyValues = List(
-    //    label, "CryptographicHash",
-    "type", cryptoType.toString,
-    "hash", hash
+    ("type", cryptoType.toString),
+    ("hash", hash)
   )
 }
 

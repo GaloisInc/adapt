@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Adapt Suspicion Rankings</title>
+    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <meta charset="UTF-8">
+    <title>CDM Filter</title>
+
+    <script type="text/javascript">
+        function getFilter() {
+            $.getJSON("/api/getCdmFilter", function(filter) {
+                if (filter == null) {
+                    document.getElementById("filter").value = "";
+                } else {
+                    document.getElementById("filter").value = JSON.stringify(filter);
+                }
+                alert("Fetched filter");
+            });
+        }
+
+        function putFilter() {
+            var filter = document.getElementById("filter").value;
+            if (filter == "") {
+                $.post("/api/clearCdmFilter", {}, function(reply) {
+                    alert("Response: " + reply);
+                })
+            } else {
+                var filter_json = JSON.parse(filter)
+                $.post("/api/setCdmFilter", {"filter": JSON.stringify(filter_json)}, function(reply) {
+                    alert("Response: " + reply);
+                })
+            }
+        }
+    </script>
+</head>
+<body>
+<h3> CDM filter</h3>
+This is the interface for setting a coarse-grain CDM filter. To clear any existing filter, hit "Put filter" while the
+ textbox is empty. Sample filter for getting rid of all events.
+
+<pre>
+    { "type":"Not"
+    , "negated": { "label":"Event"
+                 , "type":"HasLabel"
+                 }
+    }
+</pre>
+
+<textarea rows="4" cols="50" id="filter"></textarea> <br/>
+<button onclick="getFilter()">Get filter</button>
+<button onclick="putFilter()">Put filter</button>
+
+<h3>Filter syntax</h3>
+The Scala filter types are defined <a href="https://github.com/GaloisInc/adapt/blob/master/src/main/scala/com/galois/adapt/FilterCdm.scala">here</a>.
+From that link, here are the possible filter types, and their fields. Note this may be outdated - check out the link when in doubt.
+
+<pre>
+    sealed trait Filter extends Product
+    final case class HasProperty(key: String, value: Option[String]) extends Filter
+    final case class HasLabel(label: String) extends Filter
+    final case class HasEdge(label: String, target: Option[java.util.UUID]) extends Filter
+    final case class Or(disjuncts: List[Filter]) extends Filter
+    final case class And(conjuncts: List[Filter]) extends Filter
+    final case class Not(negated: Filter) extends Filter
+</pre>
+
+</body>
+</html>

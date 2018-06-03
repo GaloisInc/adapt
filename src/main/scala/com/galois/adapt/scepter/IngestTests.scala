@@ -2,30 +2,26 @@ package com.galois.adapt.scepter
 
 import java.util.UUID
 
-import com.galois.adapt._
-import com.galois.adapt.cdm17._
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
-import org.apache.tinkerpop.gremlin.process.traversal.P
-import akka.pattern.ask
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.util.Timeout
+import com.galois.adapt.cdm17._
+import org.apache.tinkerpop.gremlin.process.traversal.P
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
+import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.scalatest.FlatSpec
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
 import scala.language.postfixOps
-import org.scalatest.FlatSpec
+import scala.util.{Success, Try}
 
 
 class General_TA1_Tests(
-  failedStatements: Int,                    // Number of failed events
-  failedStatementsMsgs: List[String],       // First 5 failed messages TODO: use this?
+  failedStatements: List[(Int,String)],     // position, failed event
   incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
-  ta1Source: Option[InstrumentationSource],
+  ta1Source: String,
   toDisplay: scala.collection.mutable.ListBuffer[String]
 ) extends FlatSpec {
 
@@ -34,7 +30,6 @@ class General_TA1_Tests(
   val colors: Iterator[(String,String)] = Iterator.continually(Map(
     "000" -> Console.BLACK,
     "00F" -> Console.BLUE,
-    "0F0" -> Console.GREEN,
     "0FF" -> Console.CYAN,
     "F0F" -> Console.MAGENTA,
     "FF0" -> Console.YELLOW
@@ -43,26 +38,33 @@ class General_TA1_Tests(
 
   // Test that all data gets parsed
   "Parsing data in the file..." should "parse successfully" in {
-    assert(failedStatements == 0)
-    if (failedStatements != 0)
-      println(failedStatementsMsgs.mkString("\n"))
+    if (failedStatements.isEmpty)
+      assert(failedStatements.length == 0)
+    else {
+      val toShow: String = failedStatements
+        .map { case (i, msg) => s"  offset: $i, message: $msg" }
+        .mkString("\n")
+      val msg = s"The following CDM messages failed to parse:\n$toShow"
+      assert(failedStatements.length == 0, msg)
+    }
   }
 
   // Test to assert that there are no dangling edges
   "Data in this data set" should "have all incomplete edges resolved within CDM punctuation boundaries (or by the end of the file)" in {
-    val incompleteCount = incompleteEdges.size
+    val incompleteEdgesExcludingZeros = incompleteEdges.filterNot(_._1 == new UUID(0L,0L))
+    val incompleteCount = incompleteEdgesExcludingZeros.size
     if (incompleteCount == 0) assert(incompleteCount == 0)
     else {
       val (code, color) = colors.next()
-      val edgesToPrint = incompleteEdges.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
-      toDisplay += s"g.V(${incompleteEdges.flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
+      val edgesToPrint = incompleteEdgesExcludingZeros.toList.flatMap { case (u,l) => l map { case (o,s) => s"${o.value("uuid")} --> $u"}}.mkString("\n" + color) + "\n"
+      toDisplay += s"g.V(${incompleteEdgesExcludingZeros.take(20).flatMap(_._2.map(_._1.id().toString)).mkString(",")}):$code"
       val message = s"\nThe following edges (ExistingUUID --> MissingUUID) are all referenced in this data set, but nodes with these MissingUUIDs do not exist in this dataset:\n$color$edgesToPrint${Console.RED}\n"
       assert(incompleteCount == 0, message)
     }
   }
 
   // Test that events of type SEND,SENDMSG,READ,etc. have a size field on them
-  if ( ! ta1Source.contains(SOURCE_WINDOWS_FIVEDIRECTIONS)) {
+  if ( ! List("fivedirections", "faros").contains(ta1Source)) {
     it should "have a non-null size field on events of type SENDTO, SENDMSG, WRITE, READ, RECVMSG, RECVFROM" in {
       val eventsShouldHaveSize: java.util.List[Vertex] = graph.traversal().V()
         .hasLabel("Event")
@@ -75,8 +77,8 @@ class General_TA1_Tests(
         assert(eventsShouldHaveSize.length <= 1)
       } else {
         val (code, color) = colors.next()
-        toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).mkString(",")}):$code"
-        val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.take(20).map(_.value("uuid").toString).mkString("\n" + color)
+        toDisplay += s"g.V(${eventsShouldHaveSize.map(_.id().toString).take(20).mkString(",")}):$code"
+        val uuidsOfEventsShouldHaveSize = eventsShouldHaveSize.map(_.value("uuid").toString).take(20).mkString("\n" + color)
 
         assert(
           eventsShouldHaveSize.length <= 1,
@@ -89,90 +91,32 @@ class General_TA1_Tests(
   // Test uniqueness of... UUIDs
   // Some providers have suggested that they may reuse UUIDs. That would be bad.
   it should "not have any duplicate UUIDs" in {
-    val grouped: java.util.List[java.util.Map[java.util.UUID,java.lang.Long]] = graph.traversal().V()
-      .values("uuid")
-      .groupCount[java.util.UUID]()
-      .toList
-
-    val offending: List[(java.util.UUID,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
-    for ((uuid,count) <- offending) {
-      assert(
-        count <= 1,
-        s"Multiple nodes ($count nodes int this case) should not share the same UUID $uuid"
-      )
-    }
-  }
-
-  // Test deduplication of PIDs
-  // TODO: revist this once the issue of PIDs wrapping around has been clarified with TA1s
-  it should "not have duplicate PID's in process Subjects" in {
-    val pids = graph.traversal().V().hasLabel("Subject")
-      .has("subjectType","SUBJECT_PROCESS")
-      .dedup()
-      .values("pid")
-
-    while (pids.hasNext) {
-      val pid: Int = pids.next()
-
-      val processesWithPID: java.util.List[Vertex] = graph.traversal().V()
-        .has("pid", pid)
-        .hasLabel("Subject")
-        .has("subjectType","SUBJECT_PROCESS")
-        .dedup()
+    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source != "clearscope") {
+      graph.traversal().V()
+        .values("uuid")
+        .groupCount[String]()
         .toList
-      
-      if (processesWithPID.length <= 1) {
-        assert(processesWithPID.length <= 1)
-      } else {
-        val (code,color) = colors.next()
-        toDisplay += s"g.V(${processesWithPID.map(_.id().toString).mkString(",")}):$code"
-        val uuidsOfProcessesWithPID = processesWithPID.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-      
-        assert(
-          processesWithPID.length <= 1,
-          s"\nMultiple process subjects share the PID$pid:\n$color$uuidsOfProcessesWithPID${Console.RED}\n"
-        )
-      }
+    } else {
+      graph.traversal().V()
+        .not(__.hasLabel("FileObject")) // FileObjects can duplicate UUIDs
+        .values("uuid")
+        .groupCount[String]()
+        .toList
     }
+
+    val offending: List[(String,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
+    var assertMsg: String = "\n"
+    for ((uuid,count) <- offending) {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V().has('uuid',${uuid}).limit(20):$code"
+      assertMsg += s"Multiple nodes ($count nodes in this case) should not share the same UUID $color$uuid${Console.RED}\n"
+    }
+
+    assert(
+      offending.length <= 0,
+      assertMsg
+    )
   }
-
-//  // Test deduplication of Files
-//  // TODO: revist this once issue of uniqueness of file objects has been clarified with TA1s
-//  it should "not contain separate nodes (i.e. different UUIDs) that have the same file path" in {
-//    val files = graph.traversal().V().hasLabel("FileObject").dedup()
-//
-//    while (files.hasNext) {
-//      val file: Vertex = files.next()
-//
-//      val urls = file.properties("url").toList
-//      if (urls.nonEmpty) {
-//        val url: String = urls.head.value()
-//        val version: Int = file.property("version").value()
-//        val filesWithUrl: java.util.List[Vertex] =
-//          graph.traversal().V().hasLabel("FileObject")
-//           .has("url",url)
-//           .has("version",version)
-//           .dedup()
-//           .by("uuid")
-//           .toList
-//
-//
-//        if (filesWithUrl.length <= 1) {
-//          assert(filesWithUrl.length <= 1)
-//        } else {
-//          val (code,color) = colors.next()
-//          toDisplay += s"g.V(${filesWithUrl.map(_.id().toString).mkString(",")}):$code"
-//          val uuidsOfFilesWithUrlVersion = filesWithUrl.take(20).map(_.value("uuid").toString).mkString("\n" + color)
-//
-//          assert(
-//            filesWithUrl.length <= 1,
-//            s"\nMultiple files share the same url $url and version$version:\n$color$uuidsOfFilesWithUrlVersion${Console.RED}\n"
-//          )
-//        }
-//      }
-//    }
-//  }
-
 
   if (graph.traversal().V().hasLabel("UnitDependency").count().next() > 0L) {
     it should "contain UnitDependency statements which connect only SUBJECT_UNITs that have a common parent, and not as general edges" in {
@@ -207,17 +151,184 @@ class General_TA1_Tests(
       }
     }
   }
+
+  // Test that all subjects have a "parentSubject" edge
+  // TODO Alec: check that parent subject uuid != uuid
+  if (ta1Source != "cadets") {
+    "Subjects" should "have a 'parentSubject'" in {
+      val subjectsWithoutParents: java.util.List[Vertex] = graph.traversal().V()
+        .hasLabel("Subject")
+        .hasNot("parentSubjectUuid")
+        .toList
+
+      if (subjectsWithoutParents.isEmpty) {
+        assert(subjectsWithoutParents.length <= 0)
+      } else {
+        val (code, color) = colors.next()
+        toDisplay += s"g.V(${subjectsWithoutParents.map(_.id().toString).take(20).mkString(",")}):$code"
+        val uuidsOfSubjectsWithoutParent = subjectsWithoutParents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+        assert(
+          subjectsWithoutParents.length <= 0,
+          s"\nSome subjects don't have a 'parentSubject':\n$color$uuidsOfSubjectsWithoutParent${Console.RED}\n"
+        )
+      }
+    }
+  }
+
+  // Test that events have a "subjectUuid" field (unless they are EVENT_ADD_OBJECT_ATTRIBUTE)
+  "Events" should "have a 'subjectUuid' (unless they have type 'EVENT_ADD_OBJECT_ATTRIBUTE')" in {
+    val eventsWithoutSubjectUuid: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .hasNot("subjectUuid")
+      .has("eventType", P.neq("EVENT_ADD_OBJECT_ATTRIBUTE"))
+      .toList
+
+    if (eventsWithoutSubjectUuid.isEmpty) {
+      assert(eventsWithoutSubjectUuid.length <= 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${eventsWithoutSubjectUuid.map(_.id().toString).take(20).mkString(",")}):$code"
+      val uuidsOfEventsWithoutSubjectUuid = eventsWithoutSubjectUuid.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+      assert(
+        eventsWithoutSubjectUuid.length <= 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutSubjectUuid${Console.RED}\n"
+      )
+    }
+  }
+
+  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
+    }
+  }
+
+  if ( ! List("faros", "theia").contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
+    }
+  }
+
+  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+    it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
+      assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
+    }
+  }
+
+  // Test that events have a "threadId" field (unless they are EVENT_ADD_OBJECT_ATTRIBUTE or EVENT_FLOWS_TO)
+  it should "have a 'threadId' (unless they have type 'EVENT_ADD_OBJECT_ATTRIBUTE' or 'EVENT_FLOWS_TO')" in {
+    val eventsWithoutThreadId: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .hasNot("threadId")
+      .has("eventType", P.not(P.within("EVENT_ADD_OBJECT_ATTRIBUTE", "EVENT_FLOWS_TO")))
+      .toList
+
+    if (eventsWithoutThreadId.isEmpty) {
+      assert(eventsWithoutThreadId.length <= 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${eventsWithoutThreadId.map(_.id().toString).take(20).mkString(",")}):$code"
+      val uuidsOfEventsWithoutThreadId = eventsWithoutThreadId.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+      assert(
+        eventsWithoutThreadId.length <= 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that EVENT_ADD_OBJECT_ATTRIBUTE events have two predicate objects
+  // I (Alec) have been assuming the semantics of this event is that predicateObject is an updated variant of predicateObject2
+  it should "have two predicate objects that are 'NetFlowObject's when they are 'EVENT_ADD_OBJECT_ATTRIBUTE's" in {
+    val malformedAddObjectEvents: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE")
+      .where(__.not(__.and(
+        __.has("predicateObjectUuid"), __.out("predicateObject").hasLabel("NetFlowObject"),
+        __.has("predicateObject2Uuid"), __.out("predicateObject2").hasLabel("NetFlowObject")
+      )))
+      .toList
+
+    if (malformedAddObjectEvents.isEmpty) {
+      assert(malformedAddObjectEvents.length <= 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${malformedAddObjectEvents.map(_.id().toString).take(20).mkString(",")}):$code"
+      val uuidsOfMalformedAddObjectEvents = malformedAddObjectEvents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+      assert(
+        malformedAddObjectEvents.length <= 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that we have non 'EVENT_OTHER' event types (aimed at Faros)
+  it should "have at least one non-'EVENT_OTHER'" in {
+    val eventsNotOther: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .where(__.and(
+        __.has("eventType"),
+        __.not(__.has("eventType", "EVENT_OTHER"))
+      ))
+      .toList
+
+    if (eventsNotOther.nonEmpty) {
+      assert(eventsNotOther.nonEmpty)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${eventsNotOther.map(_.id().toString).take(20).mkString(",")}):$code"
+      val uuidsOfEventsNotOther = eventsNotOther.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+      assert(
+        eventsNotOther.length <= 0,
+        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsNotOther${Console.RED}\n"
+      )
+    }
+  }
+
+  // Test that EVENT_WRITE and EVENT_READ have predicate objects that are 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'
+  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'" in {
+    val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
+      .hasLabel("Event")
+      .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+      .as("e")
+      .out("predicateObject","predicateObject2")
+      .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+      .select[Vertex]("e")
+      .toList
+
+    if (malformedReadWriteEvents.isEmpty) {
+      assert(malformedReadWriteEvents.length <= 0)
+    } else {
+      val (code, color) = colors.next()
+      toDisplay += s"g.V(${malformedReadWriteEvents.map(_.id().toString).take(20).mkString(",")}):$code"
+      val uuidsOfMalformedReadWriteEvents = malformedReadWriteEvents.map(_.value("uuid").toString).take(20).mkString("\n" + color)
+
+      assert(
+        malformedReadWriteEvents.length <= 0,
+        s"\nSome 'EVENT_WRITE' or 'EVENT_READ' have unexpected predicate objects':\n$color$uuidsOfMalformedReadWriteEvents${Console.RED}\n"
+      )
+    }
+  }
+
+//  // Test that EVENT_MODIFY_FILE_ATTRIBUTES events have files as predicate objects
+//  it should "have 'FileObject' predicates when the event type is 'EVENT_MODIFY_FILE_ATTRIBUTES'" in {
+//    val
+//  }
+
 } 
 
 // Provider specific test classes:
 
 class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, Value)
+  val missing = List(AbstractObject, TagRunLengthTuple, UnnamedPipeObject, CryptographicHash, Value, UnitDependency, TimeMarker)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "TRACE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -231,11 +342,11 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value)
+  val missing = List(AbstractObject, MemoryObject, CryptographicHash, UnnamedPipeObject, TagRunLengthTuple, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value, UnitDependency, TimeMarker)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CADETS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -249,10 +360,10 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
+  val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker, SrcSinkObject)
   val minimum = 50000
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FAROS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -267,11 +378,11 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency)
+  val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency, TimeMarker, RegistryKeyObject)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "THEIA data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -285,11 +396,11 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(MemoryObject, Value, TagRunLengthTuple, UnnamedPipeObject, SrcSinkObject, UnitDependency, AbstractObject, CryptographicHash)  // This list is largely from an email Ryan got from Allen Chung: https://mail.google.com/mail/u/0/#inbox/15aa5d58c25c2a53
+  val missing = List(MemoryObject, Value, TagRunLengthTuple, UnnamedPipeObject, SrcSinkObject, UnitDependency, AbstractObject, UnnamedPipeObject, CryptographicHash, TimeMarker)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "FIVE DIRECTIONS data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 
@@ -303,11 +414,11 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   implicit val timeout = Timeout(1 second)
-  val missing = List(AbstractObject, MemoryObject, RegistryKeyObject, Value)
+  val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, MemoryObject, UnitDependency, UnnamedPipeObject, RegistryKeyObject, Value, TimeMarker)
   val minimum = 50000
 
   // Test that we have a minimum number of nodes
-  "This data set" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
+  "CLEARSCOPE data" should "contain a representative number of nodes (or else we cannot ensure that other tests behave correctly)" in {
     assert(graph.traversal().V().count().next() > minimum)
   }
 

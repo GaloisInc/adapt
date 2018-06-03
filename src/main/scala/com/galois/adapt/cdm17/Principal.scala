@@ -17,19 +17,18 @@ case class Principal(
   principalType: PrincipalType = PRINCIPAL_LOCAL,
   username: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[Principal] with CDM17 with DBWritable with DBNodeable {
+) extends FreeDomainNode[Principal] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = Principal
 
   def asDBKeyValues = List(
-    label, "Principal",
-    "uuid", uuid,
-    "userId", userId,
+    "uuid" -> uuid,
+    "userId"-> userId,
 //    "groupIds", groupIds.mkString(", "),
-    "principalType", principalType.toString
+    "principalType" -> principalType.toString
   ) ++
-    (if (groupIds.nonEmpty) List("groupIds", groupIds.mkString(", ")) else List.empty) ++
-    username.fold[List[Any]](List.empty)(v => List("username", v)) ++
+    (if (groupIds.nonEmpty) List(("groupIds", groupIds.mkString(", "))) else List.empty) ++
+    username.fold[List[(String,Any)]](List.empty)(v => List(("username", v))) ++
     DBOpt.fromKeyValMap(properties)
 
   def asDBEdges = Nil

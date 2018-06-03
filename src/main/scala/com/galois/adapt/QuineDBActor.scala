@@ -2,7 +2,8 @@ package com.galois.adapt
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
+import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.cdm17._
 import com.rrwright.quine.language._
@@ -163,9 +164,9 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
           case Failure(e) => e.printStackTrace(); s ! Ack
         }
 
-    case Init => sender() ! Ack
+    case InitMsg => sender() ! Ack
 
-    case Complete =>
+    case CompleteMsg =>
       println("DONE.")
       sender() ! Ack
       graph.getRandomContextSentences(10, 4, Timeout(1001 seconds)).onComplete{
@@ -176,13 +177,9 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
     case _: CDM17 => sender() ! Ack
 
     case msg => log.warning(s"Unknown message: $msg")
-      
+
   }
 }
-
-case object Init
-case object Ack
-case object Complete
 
 
 case class EventLookup(
@@ -208,4 +205,29 @@ case class EventLookup(
 
 case object EventLookup extends FreeNodeConstructor {
   type ClassType = EventLookup
+}
+
+
+
+class QuineRouter(count: Int, graph: GraphService) extends Actor {
+  var router = {
+    val routees = Vector.fill(count) {
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph))
+      context watch r
+      ActorRefRoutee(r)
+    }
+    Router(RoundRobinRoutingLogic(), routees)
+  }
+
+  def receive = {
+    case w: CDM17 =>
+      router.route(w, sender())
+    case Terminated(a) =>
+      router = router.removeRoutee(a)
+      val r = context.actorOf(Props[QuineDBActor])
+      context watch r
+      router = router.addRoutee(r)
+    case x =>
+      router.route(x, sender())
+  }
 }
