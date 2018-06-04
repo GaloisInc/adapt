@@ -346,6 +346,8 @@ object Application extends App {
     Await.result(httpServer, 10 seconds)
   }
 
+  var quineGraph: GraphService = _
+
   runFlow match {
 
     case "accept" =>
@@ -397,8 +399,19 @@ object Application extends App {
       CDMSource.cdm18(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
     case "quine" =>
-//        println("Running database-only flow")
       println("running Quine flow")
+
+      import ammonite.sshd._
+      import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
+      val replServer = new SshdRepl(
+        SshServerConfig(
+          address = "localhost", // or "0.0.0.0" for public-facing shells
+          port = 22222, // Any available port
+          passwordAuthenticator = Some(AcceptAllPasswordAuthenticator.INSTANCE) // Some(pwdAuth) // or publicKeyAuthenticator
+        )
+      )
+      replServer.start()   // ssh repl@localhost -p22222
+
       val graph = GraphService(system,
         inMemoryNodeLimit = None //Some(1000)
         , uiPort = 9090)(
@@ -410,6 +423,7 @@ object Application extends App {
 //          MapDbEventJsonPersistor()
 //          MapDbJournalJsonPersistor()
       )
+      quineGraph = graph
       implicit val timeout = Timeout(30.4 seconds)
       val parallelism = 16
       //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
@@ -424,13 +438,13 @@ object Application extends App {
       implicit val b = PicklerUnpickler.generate[Option[Map[String,String]]]
       //  implicit val l = PicklerUnpickler.generate[Option[UUID]]
       implicit val t = PicklerUnpickler.generate[Option[String]]
-//      implicit val y = PicklerUnpickler.generate[cdm17.RawCDM17Type]
+      //  implicit val y = PicklerUnpickler.generate[cdm17.RawCDM17Type]
       implicit val j = PicklerUnpickler.generate[cdm17.SubjectType]
       implicit val k = PicklerUnpickler.generate[Option[cdm17.PrivilegeLevel]]
       implicit val l = PicklerUnpickler.generate[Option[Seq[String]]]
       implicit val m = PicklerUnpickler.generate[Option[Int]]
       implicit val n = PicklerUnpickler.generate[Option[UUID]]
-      refinedBranchOf[cdm17.Subject]().standingFind(println)
+//      refinedBranchOf[cdm17.Subject]().standingFind(println)
     }
 
       CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))

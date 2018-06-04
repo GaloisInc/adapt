@@ -20,8 +20,8 @@ case class Subject(
   count: Option[Int] = None,
   cmdLine: Option[String] = None,
   privilegeLevel: Option[PrivilegeLevel] = None,
-  importedLibraries: Option[Seq[String]] = None,
-  exportedLibraries: Option[Seq[String]] = None,
+  importedLibraries: Option[List[String]] = None,
+  exportedLibraries: Option[List[String]] = None,
   properties: Option[Map[String,String]] = None
 ) extends FreeDomainNode[Subject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 

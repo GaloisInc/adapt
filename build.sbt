@@ -52,7 +52,9 @@ lazy val adapt = (project in file(".")).settings(
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
     "com.univocity" % "univocity-parsers" % "2.6.1",
-    "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
+    "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
+
+    "com.lihaoyi" % "ammonite-sshd" % "1.1.2" cross CrossVersion.full
   ),
 
 //  fork in run := true,
