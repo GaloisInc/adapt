@@ -36,7 +36,7 @@ object NoveltyDetection {
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
   type Filter[DataShape] = DataShape => Boolean
 
-  type Alarm = List[(String, Float, Float, Int, Int, Int)]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount)
+  type Alarm = List[(String, Float, Float, Int, Int, Int, Int)]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
 
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
@@ -263,7 +263,7 @@ case object PpmTree {
 
 
 case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
-case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean,newLeafProb: Option[Float])
+case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuid], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
 case class PpmNodeActorBeginGetTreeRepr(treeName: String)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
@@ -294,12 +294,16 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
   }
 
-  def localProbOfThisObs(siblingPopulation: Int, parentCount: Int): Float =
-    if (counter == 0) siblingPopulation.toFloat / (parentCount.toFloat + siblingPopulation.toFloat)
-    else counter.toFloat / (parentCount.toFloat + siblingPopulation.toFloat)
+  def localProbOfThisObs(parentCount: Int): Float =
+    if (parentCount == 0) 1F
+    else counter.toFloat / parentCount.toFloat
 
-  def globalProbOfThisObs(parentLocalProb: Float, siblingPopulation: Int, parentCount: Int): Float =
-    localProbOfThisObs(siblingPopulation, parentCount) * parentLocalProb
+  def qLocalProbOfThisObs(siblingPopulation: Int, parentCount: Int): Float =
+    if (parentCount == 0) 1F
+    else siblingPopulation.toFloat / parentCount.toFloat
+
+  def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
+    (counter.toFloat / parentCount.toFloat) * parentGlobalProb
 
 
   def receive = {
@@ -315,39 +319,46 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
             children = children + (extracted -> newChild)
             newChild
           })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, None)
           counter += 1
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, None, 1 )
       }
 
 
-    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentLocalProb, alarmAcc: Alarm, alarmFilter,passNewLeafProb) =>
-      val thisLocalProb = localProbOfThisObs(siblingPopulation, parentCount)
-      val alarmLocalProb = if (counter == 0 && passNewLeafProb.isDefined && parentCount <= 1) passNewLeafProb.get else thisLocalProb // We use the newLeafProb if the parent node is new.
-      val thisAlarmComponent = (thisKey, alarmLocalProb, globalProbOfThisObs(parentLocalProb, siblingPopulation, parentCount), counter, siblingPopulation, parentCount)
+    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentGlobalProb, alarmAcc: Alarm, alarmFilter, passNewLeafProb, depth) =>
+      counter += 1
+      val thisLocalProb = localProbOfThisObs(parentCount)
+      val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation,parentCount)
+      val thisGlobalProb = globalProbOfThisObs(parentGlobalProb,parentCount)
+      val thisAlarmComponent = (thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
       remainingExtractedValues match {
-        case Nil if counter == 0 =>
-          val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ thisAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
+        case Nil if counter == 1 =>
+          val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
+          val leafAlarmComponent = (thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
+          val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
           if (alarmFilter(alarm)) alarmActor ! alarm
-          counter += 1
         case Nil =>
-          counter += 1
         case extracted :: remainder =>
           val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
-            if (children.contains(extracted)) None else Some(thisLocalProb)     // if it's not defined, we capture the local probability and pass it to the leaf (eventually)
-          }                                                                       // through newly defined nodes in the tree.
+            if (children.contains(extracted)) None                                 // if it's not defined, we capture the local probability of the ?-node (and tree depth)
+            else Some(thisQLocalProb -> depth)                                     // and pass it to the leaf (eventually)
+          }                                                                        // through newly defined nodes in the tree.
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
             newChild
           })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisLocalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb)
-          counter += 1
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisGlobalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb, depth+1)
       }
 
 
     case PpmNodeActorBeginGetTreeRepr(treeName: String) =>
       implicit val timeout = Timeout(599 seconds)
-      val qNodeRepr = if (children.isEmpty) Set.empty[TreeRepr] else Set(TreeRepr(1, "_?_", childrenPopulation.toFloat / (counter.toFloat + childrenPopulation), childrenPopulation.toFloat / (counter.toFloat + childrenPopulation), childrenPopulation, Set.empty))
+      val qNodeRepr = if (children.isEmpty)
+        Set.empty[TreeRepr]
+      else {
+        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat
+        Set(TreeRepr(1, "_?_", prob, prob, childrenPopulation, Set.empty))
+      }
       val futureResult = Future.sequence(
         children.map { case (k,v) =>
           (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
@@ -360,10 +371,15 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
     case PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float) =>
       implicit val timeout = Timeout(599 seconds)
-      val thisLocalProb = localProbOfThisObs(siblingPopulation, parentCount)
+      val thisLocalProb = counter.toFloat / parentCount.toFloat
       val thisGlobalProb = thisLocalProb * parentGlobalProb
       val childPop = childrenPopulation
-      val qNodeRepr = if (children.isEmpty) Set.empty[TreeRepr] else Set(TreeRepr(yourDepth + 1, "_?_", childPop.toFloat / (counter.toFloat + childPop), thisGlobalProb, childPop, Set.empty))
+      val qNodeRepr = if (children.isEmpty)
+        Set.empty[TreeRepr]
+      else {
+        val prob = if (counter == 0) 1 else childPop.toFloat / counter.toFloat
+        Set(TreeRepr(yourDepth + 1, "_?_", prob, prob * thisGlobalProb, childPop, Set.empty))
+      }
       val futureResult = Future.sequence(
         children.map { case (k,v) =>
           (v ? PpmNodeActorGetTreeRepr(yourDepth + 1, k, childPop, counter, thisGlobalProb)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
