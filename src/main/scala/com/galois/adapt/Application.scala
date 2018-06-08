@@ -420,6 +420,60 @@ object Application extends App {
         .map(cdm => println(s"Record $i: ${cdm.toString}"))
         .runWith(Sink.ignore)
 
+    case "event-matrix" =>
+      // Produce a CSV of which fields in a CDM event are filled in
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      def getKeys(e: Event): Set[String] = List.concat(
+        if (e.sequence.isDefined) List("sequence") else Nil,
+        if (e.threadId.isDefined) List("threadId") else Nil,
+        if (e.subjectUuid.isDefined) List("subjectUuid") else Nil,
+        if (e.predicateObject.isDefined) List("predicateObject") else Nil,
+        if (e.predicateObjectPath.isDefined) List("predicateObjectPath") else Nil,
+        if (e.predicateObject2.isDefined) List("predicateObject2") else Nil,
+        if (e.predicateObject2Path.isDefined) List("predicateObject2Path") else Nil,
+        if (e.name.isDefined) List("name") else Nil,
+        if (e.parameters.isDefined) List("parameters") else Nil,
+        if (e.location.isDefined) List("location") else Nil,
+        if (e.size.isDefined) List("size") else Nil,
+        if (e.programPoint.isDefined) List("programPoint") else Nil,
+        e.properties.getOrElse(Map.empty).keys.toList
+      ).toSet
+
+      var keysSeen: Set[String] = Set.empty
+      var currentKeys: List[String] = List.empty
+
+      val tempFile = File.createTempFile("event-matrix","csv")
+      tempFile.deleteOnExit()
+      val tempPath: String = tempFile.getPath
+
+      CDMSource.cdm18(ta1)
+        .via(printCounter("CDM", statusActor))
+        .collect { case (_, e: Event) => getKeys(e) }
+        .map((keysHere: Set[String]) => {
+          val newKeys: Set[String] = keysHere.diff(keysSeen)
+          currentKeys ++= newKeys
+          keysSeen ++= newKeys
+          ByteString(currentKeys.map(k => if (keysHere.contains(k)) "1" else "").mkString(",") + "\n")
+        })
+        .runWith(FileIO.toPath(Paths.get(tempPath)))
+        .onComplete {
+          case Failure(f) =>
+            println("Failed to write out 'event-matrix.csv")
+            f.printStackTrace()
+
+          case Success(t) =>
+            t.status.map { _ =>
+              val tempFileInputStream = new FileInputStream(tempFile)
+              val eventFileOutputStream = new FileOutputStream(new File("event-matrix.csv"))
+              eventFileOutputStream.write((currentKeys.mkString(",") + "\n").getBytes)
+              org.apache.commons.io.IOUtils.copy(tempFileInputStream, eventFileOutputStream)
+              println("Done")
+            }
+        }
+
     case "sets" =>
 
       val temp: util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("temp")
