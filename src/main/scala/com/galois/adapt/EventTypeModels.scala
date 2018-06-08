@@ -21,10 +21,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 
-//TODO: make all the operations safe in a functional programming way
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = List[(String,Float,Float,Int)] // This is the process and anomaly/fca score
+  type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero
   case class Process(name: String,uuid: String) {
     override def toString() = {
       this.name + "_" + this.uuid.toString
@@ -130,19 +129,12 @@ object EventTypeModels {
     def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuid]) = {
        (
         List(
-        (extractedRow._1,extractedRow._3,extractedRow._3,1),
-        (extractedRow._2,extractedRow._3,extractedRow._3,1)
+        (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
+        (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
         Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),""))
       )
     }
-
-/*
-    def rowToAlarmFCA (row: Array[String]): EventTypeAlarm = {
-      (Process("",row(1)).toString(),row(3).toFloat,row(7).toFloat,1)
-      }
-*/
-
   }
 
   object Execute {
@@ -153,16 +145,6 @@ object EventTypeModels {
       sys.process.Process(s, iforestDirFile) ! ProcessLogger(_ => ()) //Returns the exit code and nothing else
     }
 
-    def fca(scoringScriptDir: File,testFile: String, testFileRCF: String, outputFile: String): Int = {
-
-      val makeRCF = s"""Rscript -e "source('csv_to_rcf.r'); csv_to_rcf('$testFile','$testFileRCF')" """
-      //println(makeRCF)
-      sys.process.Process(makeRCF,scoringScriptDir) ! ProcessLogger(_ => ())
-
-      val s = s"Rscript contexts_scoring_shell.r ProcessEvent $testFile $testFileRCF $outputFile 97 97"
-      //println(s)
-      sys.process.Process(s,scoringScriptDir) ! ProcessLogger(_ => ())
-    }
   }
 
   // Call this function sometime in the beginning of the flow...
