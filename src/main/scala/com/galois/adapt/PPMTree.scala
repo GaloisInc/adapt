@@ -340,7 +340,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
         case extracted :: remainder =>
           val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
             if (children.contains(extracted)) None                                 // if it's not defined, we capture the local probability of the ?-node (and tree depth)
-            else Some(thisQLocalProb -> depth)                                     // and pass it to the leaf (eventually)
+            else Some(qLocalProbOfThisObs(childrenPopulation,counter) -> (depth + 1))                                     // and pass it to the leaf (eventually)
           }                                                                        // through newly defined nodes in the tree.
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
