@@ -414,6 +414,17 @@ object Application extends App {
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
 
+    case "e3-no-DB" =>
+      startWebServer()
+      statusActor ! InitMsg
+
+      CDMSource.cdm18(ta1)
+        .via(printCounter("E3 (no DB)", statusActor))
+        .via(filterFlow)
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(er)
+        .runWith(PpmComponents.ppmSink)
+
     case "print-cdm" =>
       var i = 0
       CDMSource.cdm18(ta1)
