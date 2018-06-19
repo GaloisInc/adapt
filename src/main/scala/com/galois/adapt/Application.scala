@@ -414,7 +414,7 @@ object Application extends App {
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
 
-    case "e3-no-DB" =>
+    case "e3-no-db" =>
       startWebServer()
       statusActor ! InitMsg
 
