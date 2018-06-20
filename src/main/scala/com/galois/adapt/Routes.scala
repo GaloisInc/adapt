@@ -113,6 +113,11 @@ object Routes {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
         pathPrefix("api") {
+          path("summarize" / "process" / Segment) { pUUID =>
+              complete(
+                  Summarizer.process_uuid(pUUID)
+              )
+          } ~
           pathPrefix("status") {
             import ApiJsonProtocol.statusReport
             complete(

@@ -44,6 +44,7 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
+import scala.util.control.Breaks._
 
 
 object Application extends App {
@@ -342,6 +343,60 @@ object Application extends App {
     Await.result(httpServer, 10 seconds)
   }
 
+  def startSummarizer() = {
+/*
+    val printer_actor: ActorRef =
+        system.actorOf(Props(new PrinterActor(dbActor)), name = "PrinterActor")
+*/
+
+        //system.actorOf(PrinterActor.props(4), name = "PrinterActor")
+
+
+    implicit val timeout = Timeout(10 seconds)
+    //val queryString = s"g.V(0)"
+    //val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Future[Try[Stream[Vertex]]]].flatMap(identity)
+    //val provResultF = (dbActor ? NodeQuery(provQueryString, shouldReturnJson = false)).mapTo[Future[Try[Stream[Vertex]]]].flatMap(identity)
+
+    import scala.concurrent.Future
+    import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
+
+    // REPL: quick and dirty testing
+    breakable {
+        while(true){
+            val ip = readLine("Enter your msg: ")
+
+            if(ip != "exit"){
+              /*
+                 val provResultF = (dbActor ? StringQuery(ip, shouldReturnJson = true))
+                    .mapTo[Future[Try[Stream[Vertex]]]]
+                    .flatMap(identity)
+                 provResultF.map{
+                   x =>
+                   println(x)
+                 }
+              */
+
+             val provResultF = (dbActor ? StringQuery(ip, shouldReturnJson = true))
+             val resultF = Await.result(provResultF,
+               timeout.duration).asInstanceOf[Future[Try[Int]]]
+             val resultFF = Await.result(resultF, timeout.duration)
+             /*
+             resultFF match{
+               case Success x => println(x)
+
+             }
+             */
+            }
+            else{
+                break
+            }
+        }
+    }
+    system.terminate()
+    Runtime.getRuntime.halt(0)
+    //System.exit(0)
+  }
+
   runFlow match {
 
     case "accept" =>
@@ -413,6 +468,7 @@ object Application extends App {
         .via(er)
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
+      //startSummarizer()
 
     case "print-cdm" =>
       var i = 0
