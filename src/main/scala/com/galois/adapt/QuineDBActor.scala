@@ -59,8 +59,8 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 
   log.info(s"QuineDB actor init")
 
-  implicit class FutureAckOnComplete(f: Future[Any]) {
-    def ackOnComplete(ackTo: ActorRef) = f.onComplete{
+  implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
+    def ackOnComplete(ackTo: ActorRef, successF: =>Unit = ()): Unit = f.onComplete{
       case Success(_) => ackTo ! Ack
       case Failure(ex) => ex.printStackTrace(); ackTo ! Ack
     }
@@ -76,20 +76,13 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
   case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends FreeDomainNode[EventToObject] { val companion = EventToObject }
   case object EventToObject extends FreeNodeConstructor { type ClassType = EventToObject }
 
+  case class EventToNetFlow(eventType: EventType, timestampNanos: Long, predicateObject: NetFlowObject) extends FreeDomainNode[EventToNetFlow] { val companion = EventToNetFlow }
+  case object EventToNetFlow extends FreeNodeConstructor { type ClassType = EventToNetFlow }
 
   override def receive = {
 
-    case cdm: Principal =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: FileObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
     case cdm: Event =>
       val s = sender()
-
       cdm.create(Some(cdm.getUuid)).onComplete {
         case Failure(ex) => ex.printStackTrace(); s ! Ack
         case Success(_) =>
@@ -101,31 +94,23 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
               // NetFlowObject: Delete Node and events to the the NetFlow.  (Close is essentially like UNLINK.)
 
 //              println(s"Received EVENT_CLOSE")
-
+              s ! Ack
             case EVENT_UNLINK =>
               // A file is deleted. The file node and all its events should be deleted.
               val objectUuid: QuineId = cdm.predicateObject.get.target
               val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
-              graph.deleteFromBranch(branch).map(l => println(s"Deleted from EVENT_UNLINK branch: ${l.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)}"))
-
+              graph.deleteFromBranch(branch).ackOnComplete(s)
             case EVENT_EXIT =>
               // A process exits. The process node and all its events should be deleted.
               val objectUuid: QuineId = cdm.predicateObject.get.target
               val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
-              graph.deleteFromBranch(branch).map(l => println(s"Deleted from EVENT_EXIT branch: ${l.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)}"))
+              graph.deleteFromBranch(branch).ackOnComplete(s)
 
-    //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
+  //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
 
-            case _ => ()
+            case _ => s ! Ack
           }
-
-          s ! Ack
       }
-
-
-
-
-
 //      Event types in the Cadets Bovia CDM data:
 //        [
 //          "EVENT_READ",
@@ -158,7 +143,13 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 //          "EVENT_BIND"
 //        ]
 
+    case cdm: Principal =>
+      val s = sender()
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
+    case cdm: FileObject =>
+      val s = sender()
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: Subject =>
       val s = sender()
