@@ -10,25 +10,18 @@ import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import scala.pickling.PicklerUnpickler
 import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
 
 
-class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
-
-  implicit val graph = gr //GraphService(context.system, uiPort = 9090)(EmptyPersistor)
-  implicit val ec = context.dispatcher
-
-  log.warning(s"QuineDB actor init")
-
-
-  import scala.pickling.PicklerUnpickler
+object CDM17Implicits {
   import scala.pickling.Defaults._
-  import com.rrwright.quine.runtime.runtimePickleFormat
 
-  implicit val a = PicklerUnpickler.generate[Option[Map[String,String]]]
+  implicit val a = PicklerUnpickler.generate[Option[Map[String, String]]]
   implicit val b = PicklerUnpickler.generate[Option[String]]
   implicit val c = PicklerUnpickler.generate[AbstractObject]
 
@@ -56,99 +49,140 @@ class QuineDBActor(gr: GraphService) extends Actor with ActorLogging {
 
   implicit val v = PicklerUnpickler.generate[Option[Value]]
   implicit val w = PicklerUnpickler.generate[SrcSinkType]
+}
 
-  var isSet = false
 
-  var counter = 0
+class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 
+  implicit val implicitGraph = graph //GraphService(context.system, uiPort = 9090)(EmptyPersistor)
+  implicit val ec = context.dispatcher
+
+  log.info(s"QuineDB actor init")
+
+  implicit class FutureAckOnComplete(f: Future[Any]) {
+    def ackOnComplete(ackTo: ActorRef) = f.onComplete{
+      case Success(_) => ackTo ! Ack
+      case Failure(ex) => ex.printStackTrace(); ackTo ! Ack
+    }
+  }
+
+  import scala.pickling.Defaults._
+  import com.rrwright.quine.runtime.runtimePickleFormat
+  import CDM17Implicits._
 
   implicit val timeout = Timeout(21 seconds)
+
+
+  case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends FreeDomainNode[EventToObject] { val companion = EventToObject }
+  case object EventToObject extends FreeNodeConstructor { type ClassType = EventToObject }
 
 
   override def receive = {
 
     case cdm: Principal =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: FileObject =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: Event =>
       val s = sender()
-////        println(EventLookup(UUID.randomUUID(), Some("test_string")).toBranch)
-//        lookup[EventLookup]( 'predicateObjectPath := Some("/etc/libmap.conf") ).onComplete{
-//          case Success(list) => println(s"\nSUCCESS: $list\n")
-//          case Failure(e) => println(s"\nFAILED: $e\n")
-//        }
 
-      cdm.create(Some(cdm.getUuid)).onComplete{
-        case Success(_) => s ! Ack
-        case Failure(e) => e.printStackTrace(); s ! Ack
+      cdm.create(Some(cdm.getUuid)).onComplete {
+        case Failure(ex) => ex.printStackTrace(); s ! Ack
+        case Success(_) =>
+          // Mutations over time:
+          cdm.eventType match {
+            case EVENT_CLOSE =>
+              // FileObject: Maybe delete events with preceding sequence numbers until you get to an EVENT_OPEN
+              // SrcSinkObject: Maybe delete events with preceding sequence numbers (there is no EVENT_OPEN)
+              // NetFlowObject: Delete Node and events to the the NetFlow.  (Close is essentially like UNLINK.)
+
+//              println(s"Received EVENT_CLOSE")
+
+            case EVENT_UNLINK =>
+              // A file is deleted. The file node and all its events should be deleted.
+              val objectUuid: QuineId = cdm.predicateObject.get.target
+              val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
+              graph.deleteFromBranch(branch).map(l => println(s"Deleted from EVENT_UNLINK branch: ${l.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)}"))
+
+            case EVENT_EXIT =>
+              // A process exits. The process node and all its events should be deleted.
+              val objectUuid: QuineId = cdm.predicateObject.get.target
+              val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
+              graph.deleteFromBranch(branch).map(l => println(s"Deleted from EVENT_EXIT branch: ${l.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)}"))
+
+    //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
+
+            case _ => ()
+          }
+
+          s ! Ack
       }
+
+
+
+
+
+//      Event types in the Cadets Bovia CDM data:
+//        [
+//          "EVENT_READ",
+//          "EVENT_SENDTO",
+//          "EVENT_RECVFROM",
+//          "EVENT_OPEN",
+//          "EVENT_MMAP",
+//          "EVENT_CLOSE",
+//          "EVENT_LSEEK",
+//          "EVENT_FCNTL",
+//          "EVENT_WRITE",
+//          "EVENT_EXIT",
+//          "EVENT_RENAME",
+//          "EVENT_SIGNAL",
+//          "EVENT_FORK",
+//          "EVENT_CREATE_OBJECT",
+//          "EVENT_OTHER",
+//          "EVENT_MPROTECT",
+//          "EVENT_MODIFY_PROCESS",
+//          "EVENT_CHANGE_PRINCIPAL",
+//          "EVENT_CONNECT",
+//          "EVENT_ACCEPT",
+//          "EVENT_LOGIN",
+//          "EVENT_EXECUTE",
+//          "EVENT_UNLINK",
+//          "EVENT_MODIFY_FILE_ATTRIBUTES",
+//          "EVENT_SENDMSG",
+//          "EVENT_RECVMSG",
+//          "EVENT_LINK",
+//          "EVENT_BIND"
+//        ]
+
+
 
     case cdm: Subject =>
       val s = sender()
-
-      if (! isSet) {
-        isSet = true
-//        refinedBranchOf[Subject]().standingFind(println)
-      }
-
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: NetFlowObject =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: MemoryObject =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: ProvenanceTagNode =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: RegistryKeyObject =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: SrcSinkObject =>
       val s = sender()
-      cdm.create(Some(cdm.getUuid))
-        .onComplete{
-          case Success(_) => s ! Ack
-          case Failure(e) => e.printStackTrace(); s ! Ack
-        }
+      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
 
     case cdm: TimeMarker =>  // Don't care about these.
       sender() ! Ack

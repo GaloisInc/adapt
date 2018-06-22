@@ -102,21 +102,6 @@
             } else {  
                 $.post(hostPrefix + "/query/nodes", {"query": query_string}, function(node_results) {
                     var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
-<<<<<<< HEAD
-                    if ( ! all_are_nodes) { 
-                        UI.failHandler()
-                        return false 
-                    }
-                    
-                    UI.foundNodes(node_results.length)
-                    if ( ! _.isEmpty(node_results)) {
-                        var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                        var edge_query = "new = [" + result_node_ids.join(",") + "];" +
-                                         "all = [" + node_data_set.getIds().join(",") + "," + result_node_ids.join(",") + "];" +
-                                         "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
-  
-                        $.post("/query/edges", {"query": edge_query}, function(edge_results) {
-=======
                     if ( ! all_are_nodes) { UI.failHandler(); return false }
 
                     var node_results_count = node_results.length
@@ -131,7 +116,6 @@
                                          "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
                                          "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
                         $.post(hostPrefix + "/query/edges", {"query": edge_query}, function(edge_results) {
->>>>>>> master
                             UI.foundEdges(edge_results.length)
                             var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
                             var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
@@ -1249,6 +1233,7 @@
             position: absolute;
             pointer-events: none;
             background-color: rgba(53, 211, 236, 0.13);
+            z-index: 100;
         }
 
         i {

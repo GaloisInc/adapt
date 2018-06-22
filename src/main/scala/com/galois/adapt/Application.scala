@@ -425,7 +425,7 @@ object Application extends App {
       )
       quineGraph = graph
       implicit val timeout = Timeout(30.4 seconds)
-      val parallelism = 16
+      val parallelism = 1 // 16
       //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
