@@ -27,7 +27,8 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[Event] with CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
   val companion = Event
 
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
@@ -88,7 +89,7 @@ case class Event(
 //    foldedParameters.flatMap(t => (t.getUuid, t.asDBKeyValues, t.asDBEdges) :: t.supportNodes)
 }
 
-case object Event extends FreeNodeConstructor with CDM17Constructor[Event] {
+case object Event extends CDM17Constructor[Event] {
   type ClassType = Event
 
   type RawCDMType = cdm17.Event

@@ -4,8 +4,7 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
-import org.apache.tinkerpop.gremlin.structure.T.label
+import com.rrwright.quine.language._
 
 import scala.util.Try
 
@@ -19,7 +18,8 @@ case class NetFlowObject(
   remotePort: Int,
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
-) extends FreeDomainNode[NetFlowObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = NetFlowObject
 
@@ -52,7 +52,7 @@ case class NetFlowObject(
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
-case object NetFlowObject extends FreeNodeConstructor with CDM17Constructor[NetFlowObject] {
+case object NetFlowObject extends CDM17Constructor[NetFlowObject] {
   type ClassType = NetFlowObject
 
   type RawCDMType = cdm17.NetFlowObject

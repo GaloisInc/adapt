@@ -3,7 +3,7 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
@@ -12,7 +12,8 @@ case class SrcSinkObject(
   baseObject: AbstractObject,
   srcSinkType: SrcSinkType,
   fileDescriptor: Option[Int]
-) extends FreeDomainNode[SrcSinkObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = SrcSinkObject
 
@@ -35,7 +36,7 @@ case class SrcSinkObject(
   )
 }
 
-case object SrcSinkObject extends FreeNodeConstructor with CDM17Constructor[SrcSinkObject] {
+case object SrcSinkObject extends CDM17Constructor[SrcSinkObject] {
 
   type ClassType = SrcSinkObject
 

@@ -59,7 +59,7 @@ object Application extends App {
 
   val interface = config.getString("akka.http.server.interface")
   val port = config.getInt("akka.http.server.port")
-  implicit val system = ActorSystem("production-actor-system")
+  implicit val system = ActorSystem("adapt")
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
@@ -405,50 +405,30 @@ object Application extends App {
       import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
       val replServer = new SshdRepl(
         SshServerConfig(
-          address = "localhost", // or "0.0.0.0" for public-facing shells
-          port = 22222, // Any available port
+          address = "localhost",
+          port = 22222,
           passwordAuthenticator = Some(AcceptAllPasswordAuthenticator.INSTANCE) // Some(pwdAuth) // or publicKeyAuthenticator
         )
       )
       replServer.start()   // ssh repl@localhost -p22222
 
-      val graph = GraphService(system,
-        inMemoryNodeLimit = None //Some(1000)
+      val graph = GraphService( system,  // ActorSystem("quineSystem"),   //
+        inMemoryNodeLimit = Some(10000),
+        shardCount = 3
         , uiPort = 9090)(
-//          EmptyPersistor
         MapDBMultimap()
-//          ParallelBlockingJsonFilePersistor()
-
-//          SingleActorJsonFilePersistor(system)
-//          MapDbEventJsonPersistor()
-//          MapDbJournalJsonPersistor()
       )
       quineGraph = graph
       implicit val timeout = Timeout(30.4 seconds)
       val parallelism = 1 // 16
-      //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
+//        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
-    {
-      import scala.pickling.Pickler
-      import scala.pickling.Defaults._
-      import com.rrwright.quine.runtime.runtimePickleFormat
-      implicit val gr = graph
-      implicit val b = PicklerUnpickler.generate[Option[Map[String,String]]]
-      //  implicit val l = PicklerUnpickler.generate[Option[UUID]]
-      implicit val t = PicklerUnpickler.generate[Option[String]]
-      //  implicit val y = PicklerUnpickler.generate[cdm17.RawCDM17Type]
-      implicit val j = PicklerUnpickler.generate[cdm17.SubjectType]
-      implicit val k = PicklerUnpickler.generate[Option[cdm17.PrivilegeLevel]]
-      implicit val l = PicklerUnpickler.generate[Option[Seq[String]]]
-      implicit val m = PicklerUnpickler.generate[Option[Int]]
-      implicit val n = PicklerUnpickler.generate[Option[UUID]]
-//      refinedBranchOf[cdm17.Subject]().standingFind(println)
-    }
+      startWebServer()
 
       CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
-        .via(FlowComponents.printCounter("Quine", statusActor, 10000))
+        .via(FlowComponents.printCounter("Quine", statusActor, 1000))
         .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
         .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
         .runWith(Sink.ignore)

@@ -4,8 +4,6 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
 import scala.util.Try
 import com.rrwright.quine.language._
 import com.rrwright.quine.language.EdgeDirections._
@@ -20,7 +18,8 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends FreeDomainNode[FileObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = FileObject
 
@@ -55,7 +54,7 @@ case class FileObject(
 }
 
 
-case object FileObject extends FreeNodeConstructor with CDM17Constructor[FileObject] {
+case object FileObject extends CDM17Constructor[FileObject] {
   type ClassType = FileObject
 
   type RawCDMType = cdm17.FileObject

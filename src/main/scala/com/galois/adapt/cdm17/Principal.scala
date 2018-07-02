@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -17,7 +17,8 @@ case class Principal(
   principalType: PrincipalType = PRINCIPAL_LOCAL,
   username: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[Principal] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = Principal
 
@@ -45,7 +46,7 @@ case class Principal(
   )
 }
 
-case object Principal extends FreeNodeConstructor with CDM17Constructor[Principal] {
+case object Principal extends CDM17Constructor[Principal] {
   type ClassType = Principal
 
   type RawCDMType = cdm17.Principal

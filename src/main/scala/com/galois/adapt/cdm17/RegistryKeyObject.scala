@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
@@ -14,7 +14,8 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends FreeDomainNode[RegistryKeyObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = RegistryKeyObject
 
@@ -40,7 +41,7 @@ case class RegistryKeyObject(
   ) //++ baseObject.properties.getOrElse(Map.empty)
 }
 
-case object RegistryKeyObject extends FreeNodeConstructor with CDM17Constructor[RegistryKeyObject] {
+case object RegistryKeyObject extends CDM17Constructor[RegistryKeyObject] {
 
   type ClassType = RegistryKeyObject
 

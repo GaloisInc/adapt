@@ -3,7 +3,7 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
@@ -19,7 +19,8 @@ case class ProvenanceTagNode(
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[ProvenanceTagNode] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = ProvenanceTagNode
 
@@ -59,7 +60,7 @@ case class ProvenanceTagNode(
   )
 }
 
-case object ProvenanceTagNode extends FreeNodeConstructor with CDM17Constructor[ProvenanceTagNode] {
+case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
 
   type ClassType = ProvenanceTagNode
 

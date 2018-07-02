@@ -60,7 +60,7 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
   log.info(s"QuineDB actor init")
 
   implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
-    def ackOnComplete(ackTo: ActorRef, successF: =>Unit = ()): Unit = f.onComplete{
+    def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
       case Success(_) => ackTo ! Ack
       case Failure(ex) => ex.printStackTrace(); ackTo ! Ack
     }
@@ -73,38 +73,94 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
   implicit val timeout = Timeout(21 seconds)
 
 
-  case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends FreeDomainNode[EventToObject] { val companion = EventToObject }
-  case object EventToObject extends FreeNodeConstructor { type ClassType = EventToObject }
+  case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends NoConstantsDomainNode
+  case class EventToNetFlow(eventType: EventType, timestampNanos: Long, predicateObject: NetFlowObject) extends NoConstantsDomainNode
+  case class EventToObjectWithSubject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId], subject: -->[QuineId]) extends NoConstantsDomainNode
 
-  case class EventToNetFlow(eventType: EventType, timestampNanos: Long, predicateObject: NetFlowObject) extends FreeDomainNode[EventToNetFlow] { val companion = EventToNetFlow }
-  case object EventToNetFlow extends FreeNodeConstructor { type ClassType = EventToNetFlow }
 
   override def receive = {
 
     case cdm: Event =>
       val s = sender()
+      val now = System.currentTimeMillis
       cdm.create(Some(cdm.getUuid)).onComplete {
         case Failure(ex) => ex.printStackTrace(); s ! Ack
         case Success(_) =>
           // Mutations over time:
           cdm.eventType match {
             case EVENT_CLOSE =>
-              // FileObject: Maybe delete events with preceding sequence numbers until you get to an EVENT_OPEN
-              // SrcSinkObject: Maybe delete events with preceding sequence numbers (there is no EVENT_OPEN)
-              // NetFlowObject: Delete Node and events to the the NetFlow.  (Close is essentially like UNLINK.)
+              // FileObject: Maybe delete events with same subject and preceding sequence numbers until you get to an EVENT_OPEN
+              // SrcSinkObject: Maybe delete events with same subject and preceding sequence numbers (there is no EVENT_OPEN) Should delete the SrcSink?
+              // NetFlowObject: Delete Node and events (with same subject?) to the the NetFlow.  (Close is essentially like UNLINK.)
 
-//              println(s"Received EVENT_CLOSE")
+
+              val objectUuid: QuineId = cdm.predicateObject.get.target
+//              val b = branchOf[FileObject]()
+//              val fileObjectBranch: DomainGraphBranch = b.identifyRoot(objectUuid).refine(
+//                'predicateObject <-- branchOf[Event]().refine( 'subjectUuid --> cdm.subjectUuid.target )
+//              )
+//              val f = graph.deleteFromBranch(fileObjectBranch).flatMap[Unit]{ x =>
+//                val fileObjectIds = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
+//                if (fileObjectIds.nonEmpty) Future.successful( log.info(s"Deleted ${fileObjectIds.size} nodes from a FileObject's EVENT_CLOSE: $objectUuid") )
+//                else {
+//                  val srcSinkBranch: DomainGraphBranch = branchOf[SrcSinkObject]().identifyRoot(objectUuid).refine(
+//                    'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
+//                  )
+//                  graph.deleteFromBranch(srcSinkBranch).flatMap[Unit]{ x =>
+//                    val srcSinkIds = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
+//                    if (srcSinkIds.nonEmpty) Future.successful( log.info(s"Deleted ${srcSinkIds.size} nodes from a SrcSinkObject's EVENT_CLOSE: $objectUuid") )
+//                    else {
+//                      val netFlowBranch: DomainGraphBranch = branchOf[NetFlowObject]().identifyRoot(objectUuid).refine(
+//                        'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
+//                      )
+//                      graph.deleteFromBranch(netFlowBranch).map[Unit] { x =>
+//                        val netFlowIds = x.foldLeft(Set.empty[QuineId])((a, b) => a ++ b.allIds)
+//                        if (netFlowIds.nonEmpty) log.info(s"Deleted ${netFlowIds.size} nodes from a NetFlowObject's EVENT_CLOSE: $objectUuid")
+//                        else log.warning(s"Zero deleted from an EVENT_CLOSE after trying all three kinds")
+//                      }
+//                    }
+//                  }
+//                }
+//              }
+
+
+
+//              val branch = DomainGraphBranch.empty.identifyRoot(objectUuid).refine(
+//                'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
+//              )
+//              graph.deleteFromBranch(branch).map { x =>
+//                val ids = x.foldLeft(Set.empty[QuineId])((a, b) => a ++ b.allIds)
+//                log.info(s"Deleted ${ids.size} nodes from an EVENT_CLOSE: $objectUuid")
+//              }
+//                .ackOnComplete(s)
               s ! Ack
+
             case EVENT_UNLINK =>
               // A file is deleted. The file node and all its events should be deleted.
-              val objectUuid: QuineId = cdm.predicateObject.get.target
-              val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
-              graph.deleteFromBranch(branch).ackOnComplete(s)
+              val objectId: QuineId = cdm.predicateObject.get.target
+              val branch = branchOf[FileObject]().identifyRoot(objectId).refine( 'predicateObject <-- branchOf[Event]() )
+              graph.deleteFromBranch(branch).flatMap { x =>
+                val ids = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
+                log.info(s"Deleted ${ids.size} nodes from EVENT_UNLINK")
+//                if (ids.size == 0) log.warning(s"Zero deleted from 'predicateObject on EVENT_UNLINK ${cdm.getUuid}")
+                graph.dumbOps.deleteNode(objectId)
+              }
+                .ackOnComplete(s)
+//              s ! Ack
+
             case EVENT_EXIT =>
               // A process exits. The process node and all its events should be deleted.
-              val objectUuid: QuineId = cdm.predicateObject.get.target
-              val branch = branchOf[EventToObject]().refine('predicateObject --> objectUuid )
-              graph.deleteFromBranch(branch).ackOnComplete(s)
+              val objectId: QuineId = cdm.predicateObject.get.target
+              val branch = branchOf[Subject]().identifyRoot(objectId).refine( 'subjectUuid <-- branchOf[Event]() )
+              graph.deleteFromBranch(branch)
+                .map { x =>
+                  val size = x.foldLeft(0)((a,b) => a + b.allIds.size)
+                  log.info(s"Deleted $size nodes from EVENT_EXIT 'subjectUuid after time: $now")
+//                  if (size == 0) log.warning(s"Zero deleted from 'subjectUuid on EVENT_EXIT ${cdm.getUuid}")
+                }
+                .ackOnComplete(s)
+//              s ! Ack
+
 
   //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
 
@@ -216,17 +272,11 @@ case class EventLookup(
 //  size: Option[Long] = None,
 //  programPoint: Option[String] = None,
 //  properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[EventLookup] {
-  val companion = EventLookup
-}
-
-case object EventLookup extends FreeNodeConstructor {
-  type ClassType = EventLookup
-}
+) extends NoConstantsDomainNode
 
 
 
-class QuineRouter(count: Int, graph: GraphService) extends Actor {
+class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLogging {
   var router = {
     val routees = Vector.fill(count) {
       val r = context.actorOf(Props(classOf[QuineDBActor], graph))
@@ -239,7 +289,8 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor {
   def receive = {
     case w: CDM17 =>
       router.route(w, sender())
-    case Terminated(a) =>
+    case msg @ Terminated(a) =>
+      log.warning(s"Received $msg")
       router = router.removeRoutee(a)
       val r = context.actorOf(Props[QuineDBActor])
       context watch r

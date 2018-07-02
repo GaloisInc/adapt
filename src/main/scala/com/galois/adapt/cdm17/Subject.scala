@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
@@ -23,7 +23,8 @@ case class Subject(
   importedLibraries: Option[List[String]] = None,
   exportedLibraries: Option[List[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends FreeDomainNode[Subject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = Subject
 
@@ -68,7 +69,7 @@ case class Subject(
 }
 
 
-case object Subject extends FreeNodeConstructor with CDM17Constructor[Subject] {
+case object Subject extends CDM17Constructor[Subject] {
   type ClassType = Subject
 
   type RawCDMType = cdm17.Subject

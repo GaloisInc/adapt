@@ -254,6 +254,8 @@ var node_appearance = [
 
 
 var predicates = [
+// Each object here will have a key added for `starting_node_id` before its floating_query is executed. Do no set the `starting_node_id` field here.
+
 // ProvenanceTagNode
        {
         name: "RefObject",
@@ -581,7 +583,7 @@ var predicates = [
 // Both CDM and ADM Hosts:
     {
         name : "Host",
-        is_relevant : function(node) { return node['properties'].hasOwnProperty('host') },
+        is_relevant : function(node) { return node.hasOwnProperty('properties') && node['properties'].hasOwnProperty('host') },
         floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'][0]['value'] +")" }
     // },{
     //     name: "Between Nodes",

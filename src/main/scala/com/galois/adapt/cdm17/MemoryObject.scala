@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
 import com.galois.adapt.{DBNodeable, DBWritable}
-import com.rrwright.quine.language.{FreeDomainNode, FreeNodeConstructor}
+import com.rrwright.quine.language._
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -16,7 +16,8 @@ case class MemoryObject(
   pageNumber: Option[Long] = None,
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
-) extends FreeDomainNode[MemoryObject] with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
 
   val companion = MemoryObject
 
@@ -33,7 +34,7 @@ case class MemoryObject(
   def getUuid = uuid
 }
 
-case object MemoryObject extends FreeNodeConstructor with CDM17Constructor[MemoryObject] {
+case object MemoryObject extends CDM17Constructor[MemoryObject] {
 
   type ClassType = MemoryObject
 

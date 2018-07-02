@@ -2,80 +2,82 @@
 
 <meta charset="utf-8">
 <head>
-    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
-    <script type="text/javascript" src="javascripts/underscore.js"></script>
-    <script type="text/javascript" src="javascripts/vis.4.16.1.js"></script>
+    <script type="text/javascript" src="javascripts/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore-1.9.1.min.js"></script>
+    <script type="text/javascript" src="javascripts/vis-4.21.0.min.js"></script>
     <script type="text/javascript" src="javascripts/ui_language.js"></script>
     <script type="text/javascript" src="javascripts/jscolor-2.0.4.min.js"></script>
 
-    <link rel="stylesheet" href="stylesheets/vis.4.16.1.css" type="text/css" />
+    <link rel="stylesheet" href="stylesheets/vis-4.21.0.min.css" type="text/css" />
     <link rel="stylesheet" href="stylesheets/ionicons.2.0.1.min.css" type="text/css" />
 
     <script type="text/javascript">
+
+    	// ********* BEGIN EDITABLE VARIABLES ********* //
+    	// Editabe variables for differing contexts.
+
+    	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash)
+    	var defaultQueryBaseUrl = "http://localhost:9090/api" //"http://localhost:8080"
+
+
+
+    	// NODE PRODUCTION:
+
+    	// Node-producing API POST endpoint:  (should begin with a slash)
+    	var nodeApiPath = "/query/nodes"
+    	
+    	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
+    	var nodeApiResultTransform = function(node_results) { return _.map(node_results, function(n){ n.properties = []; return n }) }
+
+    	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language.
+    	var queryStringFromObject = function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }
+
+
+
+    	// EDGE PRODUCTION:
+
+    	// Edge-producing API POST endpoint: (should begin with a slash)
+    	var edgeApiPath = "/query/edges"
+
+    	// A query to produce edges is issued separately after a query to produce nodes returns results. This function should return a query string in the appropriate language to be issued to the DB and returning edges which will all be rendered together with the new nodes returned. (NOTE: edges to non-existant nodes cannot be rendered. Attempting to render endges multiple times will succeed, creating duplicate edges, and slowing down the renderer.)
+    	var produceEdgeQuery = function(result_node_ids, existing_nodes_data_set) { return result_node_ids.join(",") }
+
+    	// function(result_node_ids, existing_nodes_data_set) { 
+    	// 	return "new = [" + result_node_ids.join(",") + "];" +
+     //               "all = [" + existing_nodes_data_set.getIds().concat(result_node_ids).join(",") + "];" +
+     //               "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
+     //    }
+
+    	// A function called immediately after the API endpoint returns edges. This should transform data into the expected type for rendering: Array[ { id: string, from: nodeId, to: nodeId, label: string, arrows: "to"/"from"/"both"/"" } ]
+    	var edgeApiResultTransform = function(edge_results, result_node_ids) { 
+    	  var all_node_ids = node_data_set.getIds().concat(result_node_ids)
+    	  return _.filter(edge_results, function(e){ return _.contains(all_node_ids, e.to) && _.contains(all_node_ids, e.from)})
+    	}
+
+
+
+    	// Nodes will render in this color if no other color is chosen from the UI color picker.
+        var default_node_color = "#97c2fc"
+
+    	// ********** END EDITABLE VARIABLES ********** //
+
+
+    	// Global variables. Some are loaded externally.
         var node_data_set, edge_data_set, network, labels;
         var temp_node;  // hack for pulling out the host UUID value for making queries for host edge.
         // 'predicates', 'node_appearance', and 'starting_queries' are loaded externally from ui_language.js
         var execQuery_params = []
         var journal = []
         var right_journal =[]
-        var default_node_color = "#97c2fc"
 
+        // Set host for issuing DB queries; either hard-coded or read in from query parameters.
         var urlParams = new URLSearchParams(window.location.search)
-        if (urlParams.has('host')) {
-			var hostPrefix = _.isEmpty(urlParams.get('host')) ? "http://localhost:8080" : urlParams.get('host')
+        if (urlParams.has('host') && ! _.isEmpty(urlParams.get('host'))) {
+			var hostPrefix = urlParams.get('host')
 		} else {
-			var hostPrefix = ""
+			var hostPrefix = defaultQueryBaseUrl
 		}
 
-        function LabeledNodes(actor, object, action) {
-            this.actor = actor
-            this.object = object
-            this.action = action
-            this.nodes = []
-
-            if (this.actor === "" && this.object === "" && this.action === "") {
-                this.empty = true
-            } else {
-                this.empty = false
-            }
-
-            this.getLabel = function() {
-                if (this.empty) {
-                    return ""
-                } else {
-                    return this.actor + "," + this.object + "," + this.action
-                }
-            }
-
-            //expects an object in the form {subject: uuid, object: uuid, predicate: [uuid]}
-            this.addNodes = function(labeled) {
-                var found = false
-                var count = 0
-                var instance = this
-                this.nodes.forEach(function(node){
-                    if (node.subject === labeled.subject && node.object === labeled.object) {
-                        found = true
-                        instance.nodes[count].predicates.push(labeled.predicates[0])
-                    }
-                    count++
-                })
-
-                if (!found) {
-                    this.nodes.push(labeled)
-                }
-            }  
-
-            this.getRows = function() {
-                var ground_truth_label = this.getLabel().replace(/\r?\n|\r/g, "")
-                var rows = []
-                this.nodes.forEach(function(node) {
-                    var predicates = node.predicates.join(";")
-                    var row = ground_truth_label + "," + node.subject + "," + predicates + "," + node.object + "\n"
-                    rows.push(row)
-                })
-                return rows
-            }
-        }
 
         function execQuery(query_object, success_function, query_color) {
             right_journal = []
@@ -91,7 +93,7 @@
                 query_string = query_object + append_str
                 query_object = { "is_collapsed" : false }
             } else {
-                query_string = "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()"
+                query_string = queryStringFromObject(query_object)
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
             if (query_string.length == 0) { return UI.failHandler() }
@@ -100,25 +102,32 @@
                 document.getElementById('query-string').value = query_string
                 UI.loadingUIStop()
             } else {  
-                $.post(hostPrefix + "/query/nodes", {"query": query_string}, function(node_results) {
-                    var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
-                    if ( ! all_are_nodes) { UI.failHandler(); return false }
+                $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
+                	var node_results = nodeApiResultTransform(raw_node_results)
+                    // var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
+                    // if ( ! all_are_nodes) { UI.failHandler(); console.log("Not all node results have type 'vertex': " + node_results) return false }
 
                     var node_results_count = node_results.length
                     UI.foundNodes(node_results_count)
-
                     var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to proceed?"
                     var displayNodes = node_results_count > 0 && (node_results_count < 500 || confirm(confirm_msg))
 
                     if (displayNodes) {
                         var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                        var edge_query = "new = [" + result_node_ids.join(",") + "];" +
-                                         "all = [" + node_data_set.getIds().concat(result_node_ids).join(",") + "];" +
-                                         "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
-                        $.post(hostPrefix + "/query/edges", {"query": edge_query}, function(edge_results) {
+                        var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
+                        $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
+                        	edge_results = edgeApiResultTransform(raw_edge_results, result_node_ids)
+
+                        	edge_results = _.map(edge_results, function(e){ 
+                        		if ( ! e.hasOwnProperty('id')) {
+                        			e.id = e.from + "-" + e.label + "->" + e.to
+                        		}
+                        		return e 
+                        	})
+
                             UI.foundEdges(edge_results.length)
                             var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
-                            var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e})  // TODO: why doens't this work???
+                            var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't this work??
                             var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
                             if (query_object.is_collapsed) {
                                 data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
@@ -446,9 +455,9 @@
 
 
         function formatNodes(raw_results) {
-            var nodes = _.filter(raw_results, function(i) { return i['type'] == "vertex" })
+            var nodes = raw_results  // _.filter(raw_results, function(i) { return i['type'] == "vertex" })
             return _.map(nodes, function(n) {
-                n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
+                n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j-specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
                 n["db_label"] = n["label"]
                 n['queries'] = getRelevantQueries(n)  
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
@@ -460,10 +469,6 @@
                         size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
-
-                // CONSIDER: should test for 'is_relevant' in 'predicates' and 'node_appearance' refer to the raw data or to the translatedEnum data?? former = call getRelevantQueries here. latter = call after translateAllEnums
-                // translateAllEnums(n)
-
                 n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
                 n["title"] = makeNodeTitle(n)
                 n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
@@ -473,16 +478,17 @@
 
 
         function formatEdges(raw_edge_results) {
-            var edges = _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
+            var edges = raw_edge_results // _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
             return _.map(edges, function(e, i, list) {
-                var new_edge = { 
-                    "id" : e['id'],
-                    "from" : e['outV'],
-                    "to" : e['inV'],
-                    // "label" : e['label'],
-                    "arrows" : "to",
-                    "title" : e['label'] 
-                }
+                var new_edge = e
+                // { 
+                //     "id" : e['id'],
+                //     "from" : e['outV'],
+                //     "to" : e['inV'],
+                //     // "label" : e['label'],
+                //     "arrows" : "to",
+                //     "title" : e['label'] 
+                // }
                 if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
                     new_edge['label'] = e['label']
                     new_edge['title'] = e['title']
@@ -550,25 +556,6 @@
 
         function copy(object) { return $.extend(true, {}, object) }
 
-
-        function translateAllEnums(node) {  // Mutates 'node' in place.
-            // var translateEnum = function(prop_key, ordered_list) {
-            //     var keys = Object.keys(node['properties'])  // TODO: properties doesn't always exist!!!
-            //     var node_has_prop = $.inArray(prop_key, keys) >= 0
-            //     if (node_has_prop) {
-            //         var idx = node['properties'][prop_key][0]['value']
-            //         if (ordered_list.length > idx) { 
-            //             node['properties'][prop_key][0]['value'] = ordered_list[idx]
-            //         }
-            //     }
-            // }
-            // translateEnum("subjectType", ["Process","Thread","Unit","Block","Event"])
-            // translateEnum("eventType", ["EventAccept","Bind","ChangePrincipal","CheckFileAttributes","Clone","Close","Connect","CreateObject","CreateThread","Execute","Fork","Link","Unlink","Mmap","ModifyFileAttributes","Mprotect","Open","Read","RecvFrom","RecvMsg","Rename","Write","Signal","Truncate","Wait","OsUnknown","KernelUnknown","AppUnknown","UiUnknown","Unknown","Blind","Unit","Update","SendTo","SentMsg","Shm","Exit"])
-            // translateEnum("srcSinkType", ["Accelerometer","Temperature","Gyroscope","MagneticField","HeartRate","Light","Proximity","Pressure","RelativeHumidity","LinearAcceleration","Motion","StepDetector","StepCounter","TiltDetector","RotationVector","Gravity","GeomagneticRotationVector","Camera","Gps","Audio","SystemProperty","EnvVariable","SinkIpc","Unknown"])
-            // translateEnum("source", ["LINUX_AUDIT_TRACE","LINUX_PROC_TRACE","LINUX_BEEP_TRACE","FREEBSD_OPENBSM_TRACE","ANDROID_JAVA_CLEARSCOPE","ANDROID_NATIVE_CLEARSCOPE","LINUX_AUDIT_CADETS","WINDOWS_DIFT_FAROS"])
-            // translateEnum("agentType", ["Local","Remote"])
-        }
-        
 
         function makeNodeTitle(node) {
             var keys = Object.keys(node['properties'])
@@ -775,22 +762,22 @@
             },
             endDrawSelection : function(props) {
                 console.log("stopped drawing selection")
-                    network.setOptions({interaction: {
-                        dragView : true,
-                        zoomView : true
-                    }})
-                    var nps = network.getPositions()
-                    var end_canvas_point = props.pointer.canvas
-                    var xs = _.sortBy([UI.drawing.x, end_canvas_point.x])
-                    var ys = _.sortBy([UI.drawing.y, end_canvas_point.y])
-                    var selected_nodes = network.getSelectedNodes()
-                    for (var n in nps) {
-                        if (nps[n].x >= xs[0] && nps[n].x <= xs[1] && nps[n].y >= ys[0] && nps[n].y <= ys[1]) {
-                            selected_nodes.push(n)
-                        }
+                network.setOptions({interaction: {
+                    dragView : true,
+                    zoomView : true
+                }})
+                var nps = network.getPositions()
+                var end_canvas_point = props.pointer.canvas
+                var xs = _.sortBy([UI.drawing.x, end_canvas_point.x])
+                var ys = _.sortBy([UI.drawing.y, end_canvas_point.y])
+                var selected_nodes = network.getSelectedNodes()
+                for (var n in nps) {
+                    if (nps[n].x >= xs[0] && nps[n].x <= xs[1] && nps[n].y >= ys[0] && nps[n].y <= ys[1]) {
+                        selected_nodes.push(n)
                     }
-                    network.selectNodes(selected_nodes)
-                    UI.drawing = false
+                }
+                network.selectNodes(selected_nodes)
+                UI.drawing = false
                 $('#node-selection-box').hide().css({"width": 0, "height": 0})
             },
             updateSelectionBox : function(e) {
@@ -1069,6 +1056,56 @@
             })
         }
 
+        function LabeledNodes(actor, object, action) {
+            this.actor = actor
+            this.object = object
+            this.action = action
+            this.nodes = []
+
+            if (this.actor === "" && this.object === "" && this.action === "") {
+                this.empty = true
+            } else {
+                this.empty = false
+            }
+
+            this.getLabel = function() {
+                if (this.empty) {
+                    return ""
+                } else {
+                    return this.actor + "," + this.object + "," + this.action
+                }
+            }
+
+            //expects an object in the form {subject: uuid, object: uuid, predicate: [uuid]}
+            this.addNodes = function(labeled) {
+                var found = false
+                var count = 0
+                var instance = this
+                this.nodes.forEach(function(node){
+                    if (node.subject === labeled.subject && node.object === labeled.object) {
+                        found = true
+                        instance.nodes[count].predicates.push(labeled.predicates[0])
+                    }
+                    count++
+                })
+
+                if (!found) {
+                    this.nodes.push(labeled)
+                }
+            }  
+
+            this.getRows = function() {
+                var ground_truth_label = this.getLabel().replace(/\r?\n|\r/g, "")
+                var rows = []
+                this.nodes.forEach(function(node) {
+                    var predicates = node.predicates.join(";")
+                    var row = ground_truth_label + "," + node.subject + "," + predicates + "," + node.object + "\n"
+                    rows.push(row)
+                })
+                return rows
+            }
+        }
+
         function labeledNodesToCSV() {
             var content = []
             labels.forEach(function(label){
@@ -1210,7 +1247,6 @@
         .show ul { margin: 0px; padding: 0px; }
         .show li { list-style: none; padding-bottom: 1em; }
         .show ul li:last-child { padding-bottom: 0em; }
-
         .loader {
             border: .2em solid #f3f3f3;
             border-top: .2em solid #c5c5c5;
@@ -1223,19 +1259,15 @@
             right: 0px;
             display: none;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
         #node-selection-box {
             position: absolute;
             pointer-events: none;
             background-color: rgba(53, 211, 236, 0.13);
-            z-index: 100;
         }
-
         i {
             font-size: 1.5em;
             color: gray;
@@ -1265,22 +1297,18 @@
         i.right-icon span {
             font-size: small;
         }
-
         div.labelRow {
             display: block;
         }
-
         div.labelRow span {
             display: inline-block;
             font-size: 12px;
         }
-
         i.add-label {
             float: left;
             display: inline;
             margin-right: 10px;
         }
-
     </style>
 </head>
 <body>
