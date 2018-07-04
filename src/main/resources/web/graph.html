@@ -17,7 +17,7 @@
     	// Editabe variables for differing contexts.
 
     	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash)
-    	var defaultQueryBaseUrl = "http://localhost:9090/api" //"http://localhost:8080"
+    	var defaultQueryBaseUrl = "http://localhost:8080"  // "http://localhost:9090/api" //"http://localhost:8080"
 
 
 
@@ -96,7 +96,7 @@
                 query_string = queryStringFromObject(query_object)
             }
             document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
-            if (query_string.length == 0) { return UI.failHandler() }
+            // if (query_string.length == 0) { return UI.failHandler() }
  
             if (UI.alt_is_held) {
                 document.getElementById('query-string').value = query_string
@@ -861,7 +861,8 @@
                     },
                     edges: {
                         smooth: false,
-                        color: default_node_color
+                        color: default_node_color,
+                        arrows: "to"
                     }
                 }
 

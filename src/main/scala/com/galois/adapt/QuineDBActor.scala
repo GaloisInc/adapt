@@ -9,10 +9,10 @@ import com.galois.adapt.cdm17._
 import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
-
+import spray.json.{JsArray, JsValue}
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.pickling.PicklerUnpickler
 import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
@@ -86,15 +86,15 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
       cdm.create(Some(cdm.getUuid)).onComplete {
         case Failure(ex) => ex.printStackTrace(); s ! Ack
         case Success(_) =>
+
           // Mutations over time:
-          cdm.eventType match {
+          val doneF = cdm.eventType match {
             case EVENT_CLOSE =>
               // FileObject: Maybe delete events with same subject and preceding sequence numbers until you get to an EVENT_OPEN
               // SrcSinkObject: Maybe delete events with same subject and preceding sequence numbers (there is no EVENT_OPEN) Should delete the SrcSink?
               // NetFlowObject: Delete Node and events (with same subject?) to the the NetFlow.  (Close is essentially like UNLINK.)
 
-
-              val objectUuid: QuineId = cdm.predicateObject.get.target
+//              val objectUuid: QuineId = cdm.predicateObject.get.target
 //              val b = branchOf[FileObject]()
 //              val fileObjectBranch: DomainGraphBranch = b.identifyRoot(objectUuid).refine(
 //                'predicateObject <-- branchOf[Event]().refine( 'subjectUuid --> cdm.subjectUuid.target )
@@ -123,8 +123,6 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 //                }
 //              }
 
-
-
 //              val branch = DomainGraphBranch.empty.identifyRoot(objectUuid).refine(
 //                'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
 //              )
@@ -132,8 +130,7 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 //                val ids = x.foldLeft(Set.empty[QuineId])((a, b) => a ++ b.allIds)
 //                log.info(s"Deleted ${ids.size} nodes from an EVENT_CLOSE: $objectUuid")
 //              }
-//                .ackOnComplete(s)
-              s ! Ack
+              Future.successful(())
 
             case EVENT_UNLINK =>
               // A file is deleted. The file node and all its events should be deleted.
@@ -145,8 +142,6 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 //                if (ids.size == 0) log.warning(s"Zero deleted from 'predicateObject on EVENT_UNLINK ${cdm.getUuid}")
                 graph.dumbOps.deleteNode(objectId)
               }
-                .ackOnComplete(s)
-//              s ! Ack
 
             case EVENT_EXIT =>
               // A process exits. The process node and all its events should be deleted.
@@ -158,14 +153,11 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
                   log.info(s"Deleted $size nodes from EVENT_EXIT 'subjectUuid after time: $now")
 //                  if (size == 0) log.warning(s"Zero deleted from 'subjectUuid on EVENT_EXIT ${cdm.getUuid}")
                 }
-                .ackOnComplete(s)
-//              s ! Ack
-
 
   //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
-
-            case _ => s ! Ack
+            case _ => Future.successful(())
           }
+        doneF.ackOnComplete(s)
       }
 //      Event types in the Cadets Bovia CDM data:
 //        [
@@ -244,10 +236,36 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
     case CompleteMsg =>
       println("DONE.")
       sender() ! Ack
-//      graph.getRandomContextSentences(10, 4, Timeout(1001 seconds)).onComplete{
-//        case Success(c) => c.foreach(x => println(s"${x._1} ->\n${x._2.mkString("\n")}"))
-//        case Failure(e) => e.printStackTrace()
-//      }
+      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
+
+
+
+    case NodeQuery(queryString, shouldReturnJson) =>
+      def go(): Future[Try[JsValue]] = {
+        val idsOpt = if (queryString.nonEmpty) Try(queryString.split(",").map(s => UUID.fromString(s.trim)).toSet).toOption else None
+        val uiDataF = graph.getUiData(idsOpt, None, false)
+        uiDataF.map{uiData => Try {
+          JsArray( uiData._1.map{ datum =>
+            val uiNode = UINode(datum.id.toString, datum.label, datum.title)
+            ApiJsonProtocol.uiNodeFormat.write(uiNode)
+          }.toVector)
+        } }
+      }
+      sender() ! go()
+
+    case EdgeQuery(queryString, shouldReturnJson) =>
+      def go(): Future[Try[JsValue]] = {
+        val idsOpt = if (queryString.nonEmpty) Try(queryString.split(",").map(s => UUID.fromString(s.trim)).toSet).toOption else None
+        val uiDataF = graph.getUiData(idsOpt, None, false)
+        uiDataF.map{uiData => Try {
+          JsArray( uiData._2.map{ edge =>
+            val uiEdge = UIEdge(edge.from.toString, edge.to.toString, edge.label.name)
+            ApiJsonProtocol.uiEdgeFormat.write(uiEdge)
+          }.toVector)
+        } }
+      }
+      sender() ! go()
+
 
     case msg => log.warning(s"Unknown message: $msg")
 

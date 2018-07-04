@@ -339,7 +339,7 @@ object Application extends App {
   var instrumentationSource: String = "(not detected)"
   var failedStatements: List[(Int, String)] = Nil
 
-  def startWebServer(): Http.ServerBinding = {
+  def startWebServer(dbActor: ActorRef = dbActor): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
     val route = Routes.mainRoute(dbActor, statusActor, ppmActor, cdm2admMap, cdm2cdmMap)
     val httpServer = Http().bindAndHandle(route, interface, port)
@@ -412,8 +412,8 @@ object Application extends App {
       )
       replServer.start()   // ssh repl@localhost -p22222
 
-      val graph = GraphService( system,  // ActorSystem("quineSystem"),   //
-        inMemoryNodeLimit = Some(10000),
+      val graph = GraphService( system,
+        inMemoryNodeLimit = Some(1000),
         shardCount = 3
         , uiPort = 9090)(
         MapDBMultimap()
@@ -425,10 +425,11 @@ object Application extends App {
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
-      startWebServer()
+      startWebServer(quineRouter)
 
       CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
         .via(FlowComponents.printCounter("Quine", statusActor, 1000))
+        .buffer(10, OverflowStrategy.backpressure)
         .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
         .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
         .runWith(Sink.ignore)
