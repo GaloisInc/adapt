@@ -82,7 +82,7 @@ case class PpmDefinition[DataShape](
           TreeRepr.readFromFile(s).map{ t => println(s"Reading tree $name in from file: $s"); t}
             .orElse { println(s"Loading no data for tree: $name"); None }
         }
-      else { println(s"Loading no data for tree: $name"); None }
+      else { /*println(s"Loading no data for tree: $name");*/ None }
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 

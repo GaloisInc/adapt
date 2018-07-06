@@ -9,11 +9,12 @@ import com.galois.adapt.cdm17._
 import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.{EmptyPersistor, GraphService}
-import spray.json.{JsArray, JsValue}
+import spray.json.{JsArray, JsObject, JsString, JsValue}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
-import scala.pickling.PicklerUnpickler
+import scala.pickling.{PickleFormat, PicklerUnpickler}
+import scala.pickling.pickler.PrimitivePickler
 import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
 
@@ -49,6 +50,82 @@ object CDM17Implicits {
 
   implicit val v = PicklerUnpickler.generate[Option[Value]]
   implicit val w = PicklerUnpickler.generate[SrcSinkType]
+
+  private def unpicklePrimitiveToString(pickle: QuinePickleWrapper)(implicit format: PickleFormat): Try[String] = Try {
+    Try( pickle.thisPickle.unpickle[String] ).getOrElse(
+      Try( pickle.thisPickle.unpickle[Long] ).getOrElse(
+        Try( pickle.thisPickle.unpickle[Int] ).getOrElse(
+          Try( pickle.thisPickle.unpickle[Boolean] ).getOrElse(
+            Try( pickle.thisPickle.unpickle[Float] ).getOrElse(
+              Try( pickle.thisPickle.unpickle[Double] ).getOrElse(
+                Try( pickle.thisPickle.unpickle[Char] ).getOrElse(
+                  Try( pickle.thisPickle.unpickle[Short] ).getOrElse(
+                    Try( pickle.thisPickle.unpickle[Byte] ).getOrElse(
+                      Try( pickle.thisPickle.unpickle[Unit] ).getOrElse(
+                        Try( pickle.thisPickle.unpickle[Null] ).get
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  }.map(_.toString)
+
+  def unpickleToString(pickle: QuinePickleWrapper)(implicit format: PickleFormat): String = {
+    unpicklePrimitiveToString(pickle).getOrElse(
+      Try( pickle.thisPickle.unpickle[UUID] ).getOrElse(
+        Try( pickle.thisPickle.unpickle[Option[Map[String, String]]] ).getOrElse(
+          Try( pickle.thisPickle.unpickle[Option[String]] ).getOrElse(
+            Try( pickle.thisPickle.unpickle[AbstractObject] ).getOrElse(
+              Try( pickle.thisPickle.unpickle[PrincipalType] ).getOrElse(
+                Try( pickle.thisPickle.unpickle[List[String]] ).getOrElse(
+                  Try( pickle.thisPickle.unpickle[Option[Int]] ).getOrElse(
+                    Try( pickle.thisPickle.unpickle[Option[Long]] ).getOrElse(
+                      Try( pickle.thisPickle.unpickle[FileObjectType] ).getOrElse(
+                        Try( pickle.thisPickle.unpickle[CryptographicHash] ).getOrElse(
+                          Try( pickle.thisPickle.unpickle[Option[Seq[CryptographicHash]]] ).getOrElse(
+                            Try( pickle.thisPickle.unpickle[EventType] ).getOrElse(
+                              Try( pickle.thisPickle.unpickle[Option[List[Value]]] ).getOrElse(
+                                Try( pickle.thisPickle.unpickle[SubjectType] ).getOrElse(
+                                  Try( pickle.thisPickle.unpickle[Option[PrivilegeLevel]] ).getOrElse(
+                                    Try( pickle.thisPickle.unpickle[Option[List[String]]] ).getOrElse(
+                                      Try( pickle.thisPickle.unpickle[Option[UUID]] ).getOrElse(
+                                        Try( pickle.thisPickle.unpickle[Option[TagOpCode]] ).getOrElse(
+                                          Try( pickle.thisPickle.unpickle[Option[List[UUID]]] ).getOrElse(
+                                            Try( pickle.thisPickle.unpickle[Option[IntegrityTag]] ).getOrElse(
+                                              Try( pickle.thisPickle.unpickle[Option[ConfidentialityTag]] ).getOrElse(
+                                                Try( pickle.thisPickle.unpickle[Option[Value]] ).getOrElse(
+                                                  Try( pickle.thisPickle.unpickle[SrcSinkType] ).getOrElse(
+                                                    "{--unknown_serialized_type--}"
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          )
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  }.toString
 }
 
 
@@ -138,7 +215,7 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
               val branch = branchOf[FileObject]().identifyRoot(objectId).refine( 'predicateObject <-- branchOf[Event]() )
               graph.deleteFromBranch(branch).flatMap { x =>
                 val ids = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
-                log.info(s"Deleted ${ids.size} nodes from EVENT_UNLINK")
+                log.info(s"Deleted ${ids.size} nodes from EVENT_UNLINK after time: $now")
 //                if (ids.size == 0) log.warning(s"Zero deleted from 'predicateObject on EVENT_UNLINK ${cdm.getUuid}")
                 graph.dumbOps.deleteNode(objectId)
               }
@@ -233,10 +310,12 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
 
     case InitMsg => sender() ! Ack
 
+    case Ready => sender() ! Ack
+
     case CompleteMsg =>
       println("DONE.")
       sender() ! Ack
-      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
+//      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
 
 
 
@@ -247,7 +326,11 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
         uiDataF.map{uiData => Try {
           JsArray( uiData._1.map{ datum =>
             val uiNode = UINode(datum.id.toString, datum.label, datum.title)
-            ApiJsonProtocol.uiNodeFormat.write(uiNode)
+            val jso = ApiJsonProtocol.uiNodeFormat.write(uiNode).asJsObject
+            val props = datum.properties.map{ case (k,p) => k.name -> JsString(unpickleToString(p))}
+            jso.copy(jso.fields + ("properties" -> JsObject(props)) )
+//            datum.properties.mapValues(unpickleToString)
+//            com.rrwright.quine.runtime.UiJsonFormat.nodeFormat.write(datum)
           }.toVector)
         } }
       }
@@ -259,8 +342,9 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
         val uiDataF = graph.getUiData(idsOpt, None, false)
         uiDataF.map{uiData => Try {
           JsArray( uiData._2.map{ edge =>
-            val uiEdge = UIEdge(edge.from.toString, edge.to.toString, edge.label.name)
-            ApiJsonProtocol.uiEdgeFormat.write(uiEdge)
+//            val uiEdge = UIEdge(edge.from.toString, edge.to.toString, edge.label.name)
+//            ApiJsonProtocol.uiEdgeFormat.write(uiEdge)
+            com.rrwright.quine.runtime.UiJsonFormat.edgeFormat.write(edge)
           }.toVector)
         } }
       }
