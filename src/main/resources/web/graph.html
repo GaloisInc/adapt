@@ -31,12 +31,12 @@
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
     	var nodeApiResultTransform = 
     		// function(node_results) { return _.map(node_results, function(n){ n.properties = []; return n }) }   // Quine
-    		function(ns) {
-    			return _.map(ns, function(n){
-	    			var props = n.properties
-	    			n.properties = _.mapObject(props, function(v,k){ return [{value: v}] })
-	    			return n
-    			})
+    		function(ns) { return ns 
+    			// return _.map(ns, function(n){
+	    			// var props = n.properties
+	    			// n.properties = _.mapObject(props, function(v,k){ return [{value: v}] })
+	    			// return n
+    			//})
 			}  // ADAPT
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language.
@@ -115,18 +115,22 @@
                 UI.loadingUIStop()
             } else {  
                 $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
-                	console.log(raw_node_results)
                 	var node_results = nodeApiResultTransform(raw_node_results)
-                	console.log(node_results)
                     // var all_are_nodes = _.reduce(node_results, function(a,b){return a && b.type === "vertex"}, true)
                     // if ( ! all_are_nodes) { UI.failHandler(); console.log("Not all node results have type 'vertex': " + node_results) return false }
 
                     var node_results_count = node_results.length
+                    var node_result_size_limit = 50
+                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to render them all?"
                     UI.foundNodes(node_results_count)
-                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to proceed?"
-                    var displayNodes = node_results_count > 0 && (node_results_count < 500 || confirm(confirm_msg))
+                    var display_all_nodes = node_results_count <= node_result_size_limit || confirm(confirm_msg)
 
-                    if (displayNodes) {
+                    if ( ! display_all_nodes) {
+                    	node_results = _.first(node_results, node_result_size_limit)
+	                    UI.foundNodes(node_results.length)
+                    }
+
+                    if (node_results_count > 0) {
                         var result_node_ids = _.map(node_results, function(n) { return n['id'] })
                         var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
                         $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
@@ -572,18 +576,18 @@
 
 
         function makeNodeTitle(node) {
-            var keys = node.hasOwnProperty('properties') ? Object.keys(node['properties']) : []
+            var keys = /*node.hasOwnProperty('properties') ?*/  Object.keys(node['properties'])  //: []
             var prop_lines = _.map(keys, function(key) {
-                x = node['properties'][key]
-                var value_list = _.map(x, function(s){ return String(s.value) } )
-                return key + " : " + value_list.join(", ")
+                var value = node['properties'][key]
+                // var value_list = _.map(value, function(s){ return String(s.value) } )
+                return key + " : " + value  // value_list.join(", ")
             })
 
             if (_.contains(keys, "timestampNanos")) {
-                prop_lines.push('timestamp : ' + new Date(node['properties']['timestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
+                prop_lines.push('timestamp : ' + new Date(node['properties']['timestampNanos'] / 1000000).toGMTString().slice(0,-4))
             }
             if (_.contains(keys, "startTimestampNanos")) {
-                prop_lines.push('startTimestamp : ' + new Date(node['properties']['startTimestampNanos'][0].value / 1000000).toGMTString().slice(0,-4))
+                prop_lines.push('startTimestamp : ' + new Date(node['properties']['startTimestampNanos'] / 1000000).toGMTString().slice(0,-4))
             }
 
             return "id : " + node['id'] + "<br />" + _.map(prop_lines, function(s){return s.replace("<","{").replace(">","}")}).join("<br />")
@@ -1063,9 +1067,9 @@
 
                 var type = node_data_set._data[node].db_label
                 if (type === "Event") {
-                    var subject = node_data_set._data[node].properties.subjectUuid[0]['value']
-                    var object = node_data_set._data[node].properties.predicateObjectUuid[0]['value']
-                    var predicates = node_data_set._data[node].properties.uuid[0]['value']
+                    var subject = node_data_set._data[node].properties.subjectUuid
+                    var object = node_data_set._data[node].properties.predicateObjectUuid
+                    var predicates = node_data_set._data[node].properties.uuid
                     label.addNodes({subject: subject, object: object, predicates: [predicates]})
                 }
             })

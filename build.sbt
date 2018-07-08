@@ -57,6 +57,8 @@ lazy val adapt = (project in file(".")).settings(
     "com.lihaoyi" % "ammonite-sshd" % "1.1.2" cross CrossVersion.full
   ),
 
+  offline := true,
+
 //  fork in run := true,
 //  javaOptions in run ++= Seq("-Xmx6G"),
 

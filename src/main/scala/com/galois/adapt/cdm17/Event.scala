@@ -15,7 +15,7 @@ case class Event(
   sequence: Long = 0,
   eventType: EventType,
   threadId: Int,
-  subjectUuid: -->[UUID],
+  subject: -->[UUID],
   timestampNanos: Long,
   predicateObject: Option[-->[UUID]] = None,
   predicateObjectPath: Option[String] = None,
@@ -38,7 +38,7 @@ case class Event(
     ("sequence", sequence),
     ("eventType", eventType.toString),
     ("threadId", threadId),
-    ("subjectUuid", subjectUuid.target),
+    ("subjectUuid", subject.target),
     ("timestampNanos", timestampNanos)
   ) ++
     predicateObject.fold[List[(String,Any)]](List.empty)(v => List(("predicateObjectUuid", v))) ++
@@ -53,7 +53,7 @@ case class Event(
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List((CDM17.EdgeTypes.subject,subjectUuid.target)),
+    List((CDM17.EdgeTypes.subject,subject.target)),
     predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p.target)),
     predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p.target)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM17.EdgeTypes.parameterTagId, tag.tagId)))
@@ -71,7 +71,7 @@ case class Event(
     "sequence" -> sequence,
     "eventType" -> eventType.toString,
     "threadId" -> threadId,
-    "subjectUuid" -> subjectUuid,
+    "subjectUuid" -> subject.target,
     "timestampNanos" -> timestampNanos,
     "predicateObjectUuid" -> predicateObject.getOrElse(""),
     "predicateObjectPath" -> predicateObjectPath.getOrElse(""),

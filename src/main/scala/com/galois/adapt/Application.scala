@@ -36,16 +36,16 @@ import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
+import com.rrwright.quine.language.EdgeDirections.Outgoing
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
-
-import com.rrwright.quine.language.refinedBranchOf
+import com.rrwright.quine.language.{branchOf, refinedBranchOf}
 import com.rrwright.quine.runtime._
 import scala.pickling.PicklerUnpickler
 
@@ -98,9 +98,9 @@ object Application extends App {
   val memoryDb = DBMaker.memoryDirectDB().make()
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-  val logFile = config.getString("adapt.logfile")
-  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
-  system.registerOnTermination(scheduledLogging.cancel())
+//  val logFile = config.getString("adapt.logfile")
+//  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
+//  system.registerOnTermination(scheduledLogging.cancel())
 
   val ppmBaseDirPath = config.getString("adapt.ppm.basedir")
   val ppmBaseDirFile = new File(ppmBaseDirPath)
@@ -109,11 +109,12 @@ object Application extends App {
   // Start up the database
   val dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
+    case "quine" => ActorRef.noSender
     case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
-  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
-  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
+//  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
+//  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
 
   // Get namespaces if there are any
   private val namespaces: mutable.Map[String,Boolean] = mutable.Map.empty
@@ -123,7 +124,7 @@ object Application extends App {
 
   // Load up all of the namespaces, and then write them back out on shutdown
   val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
-  println(namespacesFile)
+//  println(namespacesFile)
   if (namespacesFile.exists && namespacesFile.canRead) {
     import scala.collection.JavaConverters._
 
@@ -201,11 +202,11 @@ object Application extends App {
   // On shutdown, expire everything to the on-disk map
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
     override def run(): Unit = {
-      println("Expiring MapDB contents to disk...")
+//      println("Expiring MapDB contents to disk...")
       mapdbCdm2Cdm.clearWithExpire()
       mapdbCdm2Adm.clearWithExpire()
       fileDb.close()
-      println("MapDB has been closed.")
+//      println("MapDB has been closed.")
     }
   }))
 
@@ -299,7 +300,8 @@ object Application extends App {
       println(s"Saving PPM trees every $i seconds")
       val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees())
       system.registerOnTermination(cancellable.cancel())
-    case _ => println("Not going to periodically save PPM trees.")
+    case _ =>
+//      println("Not going to periodically save PPM trees.")
   }
 
   // Coarse grain filtering of the input CDM
@@ -399,7 +401,7 @@ object Application extends App {
       CDMSource.cdm18(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
     case "quine" =>
-      println("running Quine flow")
+      println("Running provenance ingest demo with the Quine database.")
 
       import ammonite.sshd._
       import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
@@ -413,22 +415,114 @@ object Application extends App {
       replServer.start()   // ssh repl@localhost -p22222
 
       val graph = GraphService( system,
-        inMemoryNodeLimit = Some(10000),
+        inMemoryNodeLimit = Some(100000),
         shardCount = 3
         , uiPort = 9090)(
         MapDBMultimap()
       )
       quineGraph = graph
+
+      import com.rrwright.quine.runtime.runtimePickleFormat
+      import scala.pickling.Defaults._
+      import com.rrwright.quine.language._
+      import CDM17Implicits._
+      import shapeless._
+      import shapeless.syntax.singleton._
+
+//      val branch = branchOf[com.galois.adapt.cdm17.Event]( 'eventType := cdm17.EVENT_READ )
+//      println(branch)
+//      branch.standingFind(
+//        id => println(s"FOUND ONE: $id")
+//      )(graph)
+      implicit val gg = graph
       implicit val timeout = Timeout(30.4 seconds)
-      val parallelism = 1 // 16
+      val branch = branchOf[ProcessFileActivity]()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//      branch.standingFind(
+//        id => lookup[ProcessFileActivity](branch.identifyRoot(id))
+//          .map { results =>
+//          results collect { case result
+//            if result.subject.target.eventType == cdm17.EVENT_READ => println(result)
+//          }
+//        }
+//      )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//            if (reads.nonEmpty) println(s"Process Reading a File:\n${reads.mkString("\n")}")
+//            else println(s"Events found: ${results.map(r => r.subject.target.eventType -> r.subject.target.id.get).groupBy(_._1).mapValues(_.size).mkString("\n")}")
+
+//      branchOf[com.galois.adapt.cdm17.Event]( 'eventType := EVENT_EXIT ).standingFind(
+//        id => {
+//          log.info(s"FOUND $id")
+//          graph.dumbOps.getHalfEdges(id, Some('predicateObject), Some(Outgoing)).flatMap{ predObjEdges =>
+//            Future.sequence(predObjEdges.map { he =>
+//              val objectId = he.other
+//              val branch = branchOf[com.galois.adapt.cdm17.Subject]().identifyRoot(objectId).refine('subjectUuid <-- branchOf[com.galois.adapt.cdm17.Event]())
+//              val now = System.currentTimeMillis
+//              graph.deleteFromBranch(branch)(Timeout(10 seconds)).map { x =>
+//                val size = x.foldLeft(0)((a, b) => a + b.allIds.size)
+//                if (size > 0) log.info(s"Deleted $size nodes from EVENT_EXIT 'subjectUuid after time: $now")
+////              if (size == 0) log.warning(s"Zero deleted from 'subjectUuid on EVENT_EXIT ${cdm.getUuid}")
+//              }
+//            })
+//          }
+//        }
+////          .onFailure {
+////          case Success(s) =>
+////          case Failure(err) => log.error(s"Failure when deleting by standing query: ${err.getMessage}")
+////        }
+//      )(graph)
+
+
+      val parallelism = 32 // 16
 //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
       startWebServer(quineRouter)
 
+      println(s"\n\nDemo ingest ${Try(config.getLong("adapt.ingest.loadlimit")).map(s => s"for the first $s items ").getOrElse("")}begun at time: ${System.currentTimeMillis}\n")
+
       CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
-        .via(FlowComponents.printCounter("Quine", statusActor, 1000))
+        .via(FlowComponents.printCounter("Quine demo", statusActor, 100))
         .buffer(10, OverflowStrategy.backpressure)
         .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
         .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
@@ -673,7 +767,7 @@ object CDMSource {
 
   //  Make a CDM17 source
   def cdm17(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(Provider, CDM17), _] = {
-    println(s"Setting source for: $ta1")
+//    println(s"Setting source for: $ta1")
     val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
     val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
       case Success(0) => None
@@ -720,7 +814,7 @@ object CDMSource {
       case _ =>
 
         val paths: List[(Provider, String)] = getLoadfiles
-        println(s"Setting file sources to: ${paths.mkString(", ")}")
+//        println(s"Setting file sources to: ${paths.mkString(", ")}")
 
         val startStream = paths.foldLeft(Source.empty[Try[(String,CDM17)]])((a,b) => a.concat{
           Source.fromIterator[Try[(String,CDM17)]](() => {

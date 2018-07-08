@@ -68,7 +68,7 @@ object FlowComponents {
         val seenNodesSize = Application.seenNodes.size()
         val seenEdgesSize = Application.seenEdges.size()
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.") //  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
 
         statusActor ! PopulationLog(
           counterName,
