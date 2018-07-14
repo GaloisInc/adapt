@@ -66,6 +66,8 @@ object EntityResolution {
     val maxTimeMarker = ("", Timed(Time.max, TimeMarker(Long.MaxValue)))
     val maxTimeRemapper = Timed(Time.max, JustTime)
 
+    val ignoreEventUuids: Boolean = config.getBoolean("adapt.adm.ignoreeventremaps")
+
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
@@ -73,7 +75,7 @@ object EntityResolution {
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, log))// Remap UUIDs
+      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, ignoreEventUuids, log))// Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }

@@ -29,6 +29,7 @@ object UuidRemapper {
     cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
     blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
+    ignoreEvents: Boolean,
     log: LoggingAdapter
   ): UuidRemapperFlow = Flow[Timed[UuidRemapperInfo]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]] { () =>
 
@@ -164,6 +165,9 @@ object UuidRemapper {
 
 
     {
+      // Ignore events if `ignoreEvents`
+      case Timed(_, AnAdm(e: AdmEvent)) if ignoreEvents => Nil
+
       // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
       case Timed(t, AnAdm(adm)) =>
         val toReturn: ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty

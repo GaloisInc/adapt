@@ -55,8 +55,13 @@ object ERStreamComponents {
         // Expire one single event key
         def expireKey(keyToExpire: EventKey, currentTime: Time, expireInto: ListBuffer[Timed[UuidRemapperInfo]]): Unit = {
           val EventMergeState(wipAdmEvent, dependent, _) = activeChains.remove(keyToExpire).get
+          def applyEventUuidRemap: UuidRemapperInfo => UuidRemapperInfo = {
+            case AnEdge(e) => AnEdge(e.applyRemaps(wipAdmEvent.originalCdmUuids, wipAdmEvent.uuid))
+            case other => other
+          }
+
           expireInto += Timed(currentTime, AnAdm(wipAdmEvent))
-          expireInto ++= dependent.map(elem => Timed(currentTime, elem))
+          expireInto ++= dependent.map(elem => Timed(currentTime, applyEventUuidRemap(elem)))
         }
 
         // Expire old events based on the current time
@@ -109,11 +114,9 @@ object ERStreamComponents {
                   // Didn't merge event in
                   case Right(_) =>
 
+                    expireKey(eKey, currentTime, toReturn)
+
                     val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(provider, e)
-
-                    toReturn += Timed(currentTime, AnAdm(wipAdmEvent))
-                    toReturn ++= dependent.map(elem => Timed(currentTime, elem))
-
                     activeChains(eKey) = EventMergeState(
                       newWipAdmEvent,
                       List.concat(
