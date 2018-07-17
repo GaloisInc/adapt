@@ -165,8 +165,14 @@ object UuidRemapper {
 
 
     {
-      // Ignore events if `ignoreEvents`
-      case Timed(_, AnAdm(e: AdmEvent)) if ignoreEvents => Nil
+      // Don't do anything with events if `ignoreEvents`
+      case Timed(t, AnAdm(e: AdmEvent)) if ignoreEvents =>
+        val toReturn: ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty
+
+        toReturn += Left(e)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.toList
 
       // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
       case Timed(t, AnAdm(adm)) =>
