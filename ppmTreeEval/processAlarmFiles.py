@@ -6,7 +6,7 @@ import os
 import subprocess
 import pandas as pd
 from collections import defaultdict
-
+from math import floor
 
 def compactAlarmFiles(alarmDir,alarmFNames):
     alarmFilesInDir = os.listdir(alarmFileDir)
@@ -70,26 +70,34 @@ def extractFeaturesFromAlarms(alarmLines):
         ingestTimestamp = alarm[1][1]
         localProb = getLocalProb(alarm)  # alarm[1][2][-1][1]
         globalProb = alarm[1][2][-1][2]
-        alarmsExtracted.append([keywords,timestamp,localProb,globalProb,ingestTimestamp])
+        namespace_uuids = ";".join([a["namespace"]+"_"+a["uuid"] for a in alarm[-1][-2]])
+        alarmsExtracted.append([keywords,timestamp,localProb,globalProb,ingestTimestamp,namespace_uuids])
     return alarmsExtracted
 
-def attackPresentInAlarmExt(attackLine,alarmExt,matchingFunction):
-    if matchingFunction(attackLine[2],alarmExt[0]):
-        minEpochTime = toEpoch(attackLine[1])
-        maxEpochTime = toEpoch(attackLine[1]) + 86400
-        alarmTime = round(alarmExt[1]/1000000000)
-        return (alarmTime==0 or (alarmTime>=minEpochTime and alarmTime<=maxEpochTime))
-    else:
-        return False
+def alarmContainsUUID(attackLine,alarmNamespaceUUIDs): # alarmNamespaceUUIDs = namespace_uuid joined on ';'
+    attackName, uuid = attackLine # attackLine = (attackName,adm_uuid)
+    return uuid in alarmNamespaceUUIDs
 
-def alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction):
+def attackPresentInAlarmExt(attackLine,alarmExt,matchingFunction,matchOnUUID=False):
+    if matchOnUUID:
+        return matchingFunction(attackLine,alarmExt[5]) #attackLine here is (attackName,adm_uuid)
+    else:
+        if matchingFunction(attackLine[2],alarmExt[0]):
+            minEpochTime = toEpoch(attackLine[1])
+            maxEpochTime = toEpoch(attackLine[1]) + 86400
+            alarmTime = round(alarmExt[1]/1000000000)
+            return (alarmTime==0 or (alarmTime>=minEpochTime and alarmTime<=maxEpochTime))
+        else:
+            return False
+
+def alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction,matchOnUUID=False):
     alarmToAttack = []
     for alarm in alarmLinesExt:
         attackFound = False
         attacksfound = []
         newlinestart = [",".join(alarm[0])] + alarm[1:]
         for attack in attackLines:
-            if attackPresentInAlarmExt(attack,alarm,matchingFunction):
+            if attackPresentInAlarmExt(attack,alarm,matchingFunction,matchOnUUID):
                 attacksfound.append(attack[0])
                 attackFound = True
         for attackName in list(set(attacksfound)):
@@ -97,7 +105,8 @@ def alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction):
 
         if not attackFound:
             alarmToAttack.append(newlinestart + ["NA"])
-    return pd.DataFrame(alarmToAttack,columns=["keyword","time","lp","gp","ingestTimestamp","attackName"])
+    return pd.DataFrame(alarmToAttack,
+                        columns=["keyword","time","lp","gp","ingestTimestamp","namespaceUUIDs","attackName"])
 
 def attackNamesDF(alarmLinesDF):
     return alarmLinesDF.attackName.unique()
@@ -109,7 +118,7 @@ def trueAlarmRateDF(alarmLinesDF):
     mal = alarmLinesDF[alarmLinesDF["attackName"] != "NA"]
     nonMal = alarmLinesDF[alarmLinesDF["attackName"] == "NA"]
 
-    tp = mal.groupby(["keyword","time","lp","gp","ingestTimestamp"]).agg(lambda x: x.max).shape[0]
+    tp = mal.groupby(["keyword","time","lp","gp","ingestTimestamp","namespaceUUIDs"]).agg(lambda x: x.max).shape[0]
     fp = nonMal.shape[0]
 
     return (tp,fp)
@@ -135,6 +144,43 @@ def findReasonableThreasholdFromDF(alarmLinesDF, initThreshold = 0.1, stepsize =
     print(newthreshold)
     return newthreshold
 
+def filterByDataTimeSpan(alarmLines,startTime,timespan):
+    print("Starting with {} lines to filter.".format(len(alarmLines)))
+    startE3 = toEpoch('20180402')
+    startTimeEpoch = int(time.mktime(time.strptime(str(startTime), '%Y%m%d%H')))
+    startTimeHrsSinceE3 = round((startTimeEpoch - startE3)/3600)
+    endTimeHrsSinceE3 = startTimeHrsSinceE3 + timespan
+    inTimeSpan = lambda x : x >= startTimeHrsSinceE3 and x <= endTimeHrsSinceE3
+
+    passingAlarms = []
+    for alarm in alarmLines:
+        dataTimeHrsSinceStart = floor((round(alarm[1][0]/(1000000000)) - startE3)/3600)
+        if dataTimeHrsSinceStart <= 0 or dataTimeHrsSinceStart>= 288:
+            passingAlarms.append(alarm)
+        else:
+            if inTimeSpan(dataTimeHrsSinceStart):
+                passingAlarms.append(alarm)
+    print("Returning {} lines after filtering.".format(len(passingAlarms)))
+    return passingAlarms
+
+def filterByDataTime(alarmLines):
+    print("Starting with {} lines to filter.".format(len(alarmLines)))
+    isWeekend = lambda x : x >= 120 and x <= 168
+    isNight = lambda x : (x % 24) < 5 or (x % 24) > 18
+    passingAlarms = []
+    startE3 = toEpoch('20180402')
+    endE3 = toEpoch('20180414')
+    for alarm in alarmLines:
+        dataTimeHrsSinceStart = floor((round(alarm[1][0]/(1000000000)) - startE3)/3600)
+        if dataTimeHrsSinceStart <= 0 or dataTimeHrsSinceStart>= 288:
+            passingAlarms.append(alarm)
+        else:
+            if not isWeekend(dataTimeHrsSinceStart) and not isNight(dataTimeHrsSinceStart):
+                passingAlarms.append(alarm)
+    print("Returning {} lines after filtering.".format(len(passingAlarms)))
+    return passingAlarms
+
+
 def filterByThreshold(alarmLines,threshold,updateLP=False):
     passingAlarms = []
     for alarm in alarmLines:
@@ -148,22 +194,32 @@ def filterByThreshold(alarmLines,threshold,updateLP=False):
 def methodNamesToVec(methodNames,allMethodList):
     return [1 if m in methodNames else 0 for m in allMethodList]
 
-def writeAttackLinesWithDetectionMethodsAndCompCount(ta1,alarmLinesExtByFile,attackLines,matchingFunction,allMethodList):
+
+def writeAttackLinesWithDetectionMethodsAndCompCount(ta1,
+                                                     alarmLinesExtByFile,
+                                                     attackLines,
+                                                     matchingFunction,
+                                                     allMethodList,
+                                                     matchOnUUID):
     allMethodList = sorted(allMethodList)
     attackIndexToMethodMap = dict([(i,[]) for i in range(len(attackLines))])
     for f,alarmLinesExt in alarmLinesExtByFile:
         method = fileNameToTree(f)
-        listOfAlarmWords = list(set([k for a in alarmLinesExt for k in a[0]]))
         for i, attack in enumerate(attackLines):
-            if any([attackPresentExtracted(attack,alarmExt,matchingFunction) for alarmExt in alarmLinesExt]):
+            if any([attackPresentExtracted(attack,alarmExt,matchingFunction,matchOnUUID)
+                    for alarmExt in alarmLinesExt]):
                 attackIndexToMethodMap[i].append(method)
 
     fAttackDetail = "stats/" + ta1 + "_attacks_with_methods.csv"
     print("Writing {}".format(fAttackDetail))
     with open(fAttackDetail,'w') as g:
-        g.write("attack_name,date,keywords,comments,methods," + ",".join(allMethodList) + "\n")
+        if matchOnUUID:
+            g.write("attack_name,attack_uuid,methods," + ",".join(allMethodList) + "\n")
+        else:
+            g.write("attack_name,date,keywords,comments,methods," + ",".join(allMethodList) + "\n")
+
         for i,attack in enumerate(attackLines):
-            attackLineWithMethods = (attack + [";".join(attackIndexToMethodMap[i])] +
+            attackLineWithMethods = (list(attack) + [";".join(attackIndexToMethodMap[i])] +
                                      methodNamesToVec(attackIndexToMethodMap[i],allMethodList))
             g.write(",".join(["\"{}\"".format(str(a)) for a in attackLineWithMethods])+"\n")
 
@@ -187,29 +243,43 @@ def writeAttackLinesWithDetectionMethodsAndCompCount(ta1,alarmLinesExtByFile,att
             detectedComp,totalComp = attackNameToCompCountMap[attackName]
             methodsUsed = list(attackNameToMethod[attackName])
             compLine = ([attackName,detectedComp,totalComp,";".join(methodsUsed)] +
-                        [methodNamesToVec(methodsUsed,allMethodList)])
+                        methodNamesToVec(methodsUsed,allMethodList))
             g.write(",".join(["\"{}\"".format(str(elt)) for elt in compLine])+"\n")
     return "Wahoo! All done!!"
 
-def writeWhenDoAlarmsOccur(ta1,alarmLinesExtByFile,attackLines,matchingFunction,intervalInSec,useIngestTime=False):
+def writeWhenDoAlarmsOccur(ta1,
+                           alarmLinesExtByFile,
+                           attackLines,
+                           matchingFunction,
+                           intervalInSec,
+                           useIngestTime=False,
+                           isE2=False,
+                           matchOnUUID=False):
 
     if useIngestTime:
         fileSuffix = "_ingestTime"
         times = [a[-1] for f,alines in alarmLinesExtByFile for a in alines]
-        endE3 = max(times)
-        startE3 = min(times)
-        secondsInE3 = endE3 - startE3
+        endE = max(times)
+        startE = min(times)
+        secondsInE = endE - startE
         timeInBounds = lambda x: True
         timeOf = lambda xs: xs[-1]
+    elif isE2:
+        fileSuffix = "_e2"
+        secondsInE = 16*24*60*60
+        startE = toEpoch('20170508')
+        endE = toEpoch('20170524')
+        timeInBounds = lambda x: (x>=startE and x<=endE)
+        timeOf = lambda xs: round(xs[1]/1000000000) # want time in seconds
     else:
-        fileSuffix = ""
-        secondsInE3 = 12*24*60*60
-        startE3 = toEpoch('20180402')
-        endE3 = toEpoch('20180414')
-        timeInBounds = lambda x: (x>=startE3 and x<=endE3)
+        fileSuffix = "_e3"
+        secondsInE = 12*24*60*60
+        startE = toEpoch('20180402')
+        endE = toEpoch('20180414')
+        timeInBounds = lambda x: (x>=startE and x<=endE)
         timeOf = lambda xs: round(xs[1]/1000000000) # want time in seconds
 
-    fAlarmTimes = "stats/" + ta1 + "_whenDoAlarmsOccur" + fileSuffix + ".csv"
+    fAlarmTimes = "stats/" + ta1 + "_whenDoAlarmsOccur_all" + fileSuffix + ".csv"
     with open(fAlarmTimes,'w') as g:
         g.write("method,timeStep,count,isMal\n")
         for f,alarmLinesExt in alarmLinesExtByFile:
@@ -219,48 +289,54 @@ def writeWhenDoAlarmsOccur(ta1,alarmLinesExtByFile,attackLines,matchingFunction,
 
             for alarmExt in alarmLinesExt:
                 timeOfAlarm = timeOf(alarmExt)
-                timeStep = round((timeOfAlarm-startE3)/intervalInSec)
-                if (any([attackPresentExtracted(attack,alarmExt,matchingFunction) for attack in attackLines]) and
+                timeStep = round((timeOfAlarm-startE)/intervalInSec)
+                if (any([attackPresentExtracted(attack,alarmExt,matchingFunction,matchOnUUID) for attack in attackLines]) and
                     timeInBounds(timeOfAlarm)):
                     malAlarmCntByInterval[timeStep] += 1
                 else:
                     nonMalAlarmCntByInterval[timeStep] += 1
 
-            for timeStep in range(int(secondsInE3/intervalInSec)):
+            for timeStep in range(int(secondsInE/intervalInSec)):
                 g.write(",".join([method,str(timeStep),str(malAlarmCntByInterval[timeStep]),"1\n"]))
                 g.write(",".join([method,str(timeStep),str(nonMalAlarmCntByInterval[timeStep]),"0\n"]))
 
 
     return "\nWriting timeseries info {} complete!".format(fAlarmTimes)
+#def attackPresentExtractedE2(attackUUIDs,alarmExt):
 
-def attackPresentExtracted(attackLine,alarmExt,matchingFunction):
-    if matchingFunction(attackLine[2],alarmExt[0]):
-        minEpochTime = toEpoch(attackLine[1])
-        maxEpochTime = toEpoch(attackLine[1]) + 86400
-        alarmTime = round(alarmExt[1]/1000000000)
-        return (alarmTime==0 or (alarmTime>=minEpochTime and alarmTime<=maxEpochTime))
+def attackPresentExtracted(attackLine,alarmExt,matchingFunction,matchOnUUID=False):
+    if matchOnUUID:
+        return matchingFunction(attackLine,alarmExt[5]) #attackLine here is (attackName,adm_uuid)
     else:
-        return False
+        if matchingFunction(attackLine[2],alarmExt[0]):
+            minEpochTime = toEpoch(attackLine[1])
+            maxEpochTime = toEpoch(attackLine[1]) + 86400
+            alarmTime = round(alarmExt[1]/1000000000)
+            return (alarmTime==0 or (alarmTime>=minEpochTime and alarmTime<=maxEpochTime))
+        else:
+            return False
 
-def alarmExtractedAttackVec(alarmLinesExt,attackLines,matchingFunction):
+def alarmExtractedAttackVec(alarmLinesExt,attackLines,matchingFunction,matchOnUUID=False):
     attackNames = list(set([a[0] for a in attackLines]))
     attackNames.sort()
 
     for alarm in alarmLinesExt:
         attackVec = [0 for a in attackNames]
         for attack in attackLines:
-            if attackPresentExtracted(attack,alarm,matchingFunction):
+            if attackPresentExtracted(attack,alarm,matchingFunction,matchOnUUID):
                 attackVec[attackNames.index(attack[0])] = 1
         alarm.append(attackVec)
 
-    return alarmLinesExt # [keywords,time,localProb,globalProb,attackVec]
+    return alarmLinesExt # [keywords,time,localProb,globalProb,namespace_uuids,attackVec]
 
 
-def writeLocalProbDistributionCSV(ta1,attackLines,alarmFileNames,matchingFunction=containsKeyword):
+def writeLocalProbDistributionCSV(ta1,attackLines,alarmFileNames,matchingFunction=containsKeyword,matchOnUUID=False):
     linesToWrite = []
+    print("Processing {} alarm files.".format(len(alarmFileNames)))
     for fname in alarmFileNames:
         alarmLinesExt = extractFeaturesFromAlarms(getAlarmLines(fname))
-        alarmLinesExtWAttacks = alarmExtractedAttackVec(alarmLinesExt,attackLines,matchingFunction)
+        print(fname,len(alarmLinesExt))
+        alarmLinesExtWAttacks = alarmExtractedAttackVec(alarmLinesExt,attackLines,matchingFunction,matchOnUUID)
         tree = fileNameToTree(fname)
         for alarm in alarmLinesExtWAttacks:
             attackVec = alarm[-1]
@@ -275,14 +351,26 @@ def writeLocalProbDistributionCSV(ta1,attackLines,alarmFileNames,matchingFunctio
 
     return "Done!"
 
-def writeAlarmTrueFalsePositives(ta1,alarmLinesExtByFile,attackLines,matchingFunction):
+def writeAlarmTrueFalsePositives(ta1,alarmLinesExtByFile,attackLines,matchingFunction,matchOnUUID=False):
     fname = "stats/"+ta1+"_true_false_positives.csv"
     with open(fname,'w') as g:
         g.write("method,tp,fp\n")
         for f,alarmLinesExt in alarmLinesExtByFile:
-            tp,fp = trueAlarmRateDF(alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction))
+            tp,fp = trueAlarmRateDF(alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction,matchOnUUID))
             g.write(fileNameToTree(f)+",{},{}\n".format(tp,fp))
     return "Writing true and false positive counts in {} for each method complete.".format(fname)
+
+def writeAlarmTrueFalsePositivesByThreshold(ta1,alarmLinesExtByFile,attackLines,matchingFunction,matchOnUUID=False):
+    fname = "stats/"+ta1+"_true_false_positives_by_threshold.csv"
+    print("Writing to {}".format(fname))
+    with open(fname,'w') as g:
+        g.write("method,tp,fp,threshold\n")
+        for f,alarmLinesExt in alarmLinesExtByFile:
+            alarmLinesExtDF = alarmExtToAttackDF(alarmLinesExt,attackLines,matchingFunction,matchOnUUID)
+            for threshold in (0.0001 + 0.0001*n for n in range(198)):
+                tp,fp = trueAlarmRateDF(filterByThresholdDF(alarmLinesExtDF,threshold))
+                g.write(fileNameToTree(f)+",{},{},{}\n".format(tp,fp,threshold))
+    return "Writing true and false positive counts by threshold in {} for each method complete.".format(fname)
 
 
 def fullPathToTreeFile(treeList,directory,suffix):
@@ -290,6 +378,25 @@ def fullPathToTreeFile(treeList,directory,suffix):
 
 def fileNameToTree(fileName):
     return fileName.split("/")[-1].split("-")[0]
+
+def getE2AttackUUIDs(fileNames):
+    attackUUIDs = []
+    for fileName in fileNames:
+        with open(fileName,'r') as f:
+            lines = f.readlines()[-1]
+            jsonLines = json.loads(lines)
+        for elt in jsonLines:
+            attackUUIDs.append((fileName.split(".")[0].split("/")[-1],elt["uuid"]))
+    return attackUUIDs
+
+def e2attackinalarms(attackUUIDs,alarmLines):
+    true_alarms = []
+    for alarm in alarmLines:
+        alarmUUIDs = [a["uuid"] for a in alarm[-1][-2] ]
+        for attackName,uuid in attackUUIDs:
+            if uuid in alarmUUIDs:
+                true_alarms.append(alarm)
+    return true_alarms
 
 
 if __name__ == "__main__":
@@ -314,6 +421,8 @@ if __name__ == "__main__":
                         help="Provide full path to alarm file directory.")
     parser.add_argument('--attackfilesuffix', default='_attacksFR',
                         help="Examples: \"_attacks\" or \"_attacksFR\"")
+    parser.add_argument('--e2',action='store_true',default=False,
+                        help="Use Engagement 2 malicious UUIDs rather than Engagement 3 attack keyword files.")
 
     parser.add_argument('--lpdist',action='store_true',default=False,
                         help="Create a file in 'stats' directory containing data on local probability distributions.")
@@ -325,16 +434,39 @@ if __name__ == "__main__":
                         help="Used previously saved thresholds.")
     parser.add_argument('--timeseries',action='store_true',default=False,
                         help="Write out stats related to the timing of alarms. Note that it is possible to use the ingest time or the data time for these analysis.")
+    parser.add_argument('--loadfilteredalarms',action='store_true',default=False,
+                        help="Use previously saved filtered alarms with suffix '-<TA1>-filtered_alarms.json'.")
+    parser.add_argument('--savealarmsattime',action='store_true',default=False,
+                        help="Write all alarms that occurred in the (currently hard-coded) interval.")
+    parser.add_argument('--thresholdcurve',action='store_true',default=False,
+                        help="Write true positive and false positives for a range of thresholds.")
 
     args = parser.parse_args()
 
     TA1 = args.ta1
     print("\nProcessing {}".format(TA1))
     alarmFileDir = args.alarmdir
-    attackFile = "attackFiles/" + TA1 + args.attackfilesuffix + ".csv"
+    attackFileE3 = "attackFiles/" + TA1 + args.attackfilesuffix + ".csv"
+    attackFileE2List = list(map(lambda x: "attackFiles/"+x,
+                                ["cadets_bovia_webshell.json",
+                                 "cadets_pandex_drakon1.json",
+                                 "cadets_pandex_drakon2.json",
+                                 "cadets_pandex_webshell.json",
+                                 "clearscope_bovia_lobiwapp.json",
+                                 "clearscope_pandex_dynaload.json",
+                                 "clearscope_pandex_gatherapp_helloworld.json",
+                                 "clearscope_pandex_gatherapp_libhelper.json",
+                                 "fivedirections_bovia_simple.json",
+                                 "fivedirections_pandex_drakon.json",
+                                 "fivedirections_pandex_metasploit.json",
+                                 "trace_bovia_simple.json",
+                                 "trace_pandex_drakon.json",
+                                 "trace_pandex_drakon2.json",
+                                 "trace_pandex_micro.json"]))
+
 
     print("\nChecking for compact json alarm files...")
-    compactAlarmFiles(alarmFileDir,map(lambda x: x + "-{}-save_alarm.json".format(TA1),allMethods))
+    compactAlarmFiles(alarmFileDir,list(map(lambda x: x + "-{}-save_alarm.json".format(TA1),allMethods)))
 
     compactAlarmFileNames = fullPathToTreeFile(allMethods,alarmFileDir,"-{}-save_alarm.json.c".format(TA1))
 
@@ -380,10 +512,15 @@ if __name__ == "__main__":
                           (0.0001,'ProcessWritesFileSoonAfterNetflowRead-clearscope-save_alarm.json.c'),
                           (0.001,'ProcessesWithNetworkActivity-clearscope-save_alarm.json.c')]
 
+    if not args.e2:
+        attackLines = getAttackLines(attackFileE3)[1:] # remove header
+        matchingFunction = containsKeyword
+    else:
+        attackFileE2ListTA1 = [f for f in attackFileE2List if TA1 in f]
+        attackLines = getE2AttackUUIDs(attackFileE2ListTA1)
+        matchingFunction = alarmContainsUUID
 
-    attackLines = getAttackLines(attackFile)[1:] # remove header
-
-    if not args.nothresholds:
+    if not args.nothresholds and not args.loadfilteredalarms:
 
         if args.loadthresholds:
             with open("stats/"+TA1+"_thresholds.csv",'r') as thresholdfile:
@@ -397,7 +534,7 @@ if __name__ == "__main__":
                 fname = alarmFileDir + tree
                 alarmLines = getAlarmLines(fname)
                 aext = extractFeaturesFromAlarms(alarmLines)
-                df = alarmExtToAttackDF(aext,attackLines,containsKeyword)
+                df = alarmExtToAttackDF(aext,attackLines,matchingFunction,args.e2)
                 thresholdMap[fname] = findReasonableThreasholdFromDF(df,initThreshold=initT)
 
             with open("stats/"+TA1+"_thresholds.csv",'a') as ft:
@@ -405,10 +542,16 @@ if __name__ == "__main__":
                 print(",".join([str(fileNameToTree(m)) for m in methods]))
                 ft.write(TA1+","+",".join([str(thresholdMap[m]) for m in methods]) + "\n")
 
+    if args.loadfilteredalarms:
+        compactAlarmFileNames = fullPathToTreeFile(allMethods,alarmFileDir,"-{}-filtered_alarm.json".format(TA1))
+        thresholdMap = dict([(f,1) for f in compactAlarmFileNames])
+
 
     if args.savefilteredalarms:
-        alarmLinesByFile = ((f,filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True))
-                            for f in compactAlarmFileNames)
+        alarmLinesByFile = ((f,
+                             filterByDataTime(
+                                 filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True)
+                             )) for f in compactAlarmFileNames)
         print()
         for f,alarmsFiltered in alarmLinesByFile:
             filteredAlarmFileName = alarmFileDir+fileNameToTree(f)+"-"+TA1+"-filtered_alarm.json"
@@ -416,25 +559,81 @@ if __name__ == "__main__":
                 print("Writing {}".format(filteredAlarmFileName))
                 g.write(json.dumps(alarmsFiltered))
 
+    elif args.savealarmsattime:
+            starttime = 2018041108 # yyyymmddhh
+            timespan = 5 # hours
+
+            alarmLinesByFile = ((f,filterByDataTimeSpan(getAlarmLines(f),starttime,timespan))
+                                for f in compactAlarmFileNames)
+            print()
+            for f,alarmsFiltered in alarmLinesByFile:
+                filteredAlarmFileName = alarmFileDir+fileNameToTree(f)+"-"+TA1+"-"+str(starttime)+"-_alarm.json"
+                with open(filteredAlarmFileName,"w") as g:
+                    print("Writing {}".format(filteredAlarmFileName))
+                    g.write(json.dumps(alarmsFiltered))
+
+    elif args.thresholdcurve: # We are only interested in trees we want to threshold.
+        thresholdTreeNames = [f[1] for f in thresholdTrees]
+        compactAlarmFileNames = fullPathToTreeFile(thresholdTreeNames,alarmFileDir,"")
+        thresholdMap = dict([(f,0.2) for f in compactAlarmFileNames])
+
+        alarmLinesExtByFile = ((f,
+                                extractFeaturesFromAlarms(
+                                    #filterByDataTime(
+                                        filterByThreshold(getAlarmLines(f),thresholdMap[f])
+                                    #)
+                                ))
+                            for f in compactAlarmFileNames)
+
+        writeAlarmTrueFalsePositivesByThreshold(
+            TA1,alarmLinesExtByFile,attackLines,matchingFunction,matchOnUUID=args.e2
+            )
+
     else:
 
         if args.lpdist:
-            print(writeLocalProbDistributionCSV(TA1,attackLines,compactAlarmFileNames))
+            print(
+                writeLocalProbDistributionCSV(
+                    TA1,attackLines,compactAlarmFileNames,matchingFunction=matchingFunction,matchOnUUID=args.e2
+                )
+            )
 
-        elif args.timeseries:
-            alarmLinesExtByFile = [(f,extractFeaturesFromAlarms(filterByThreshold(getAlarmLines(f),thresholdMap[f])))
-                                   for f in compactAlarmFileNames]
+        elif args.timeseries: #filterByDataTime()
+            alarmLinesExtByFile=[(f,
+                                  extractFeaturesFromAlarms(
+                                      filterByThreshold(getAlarmLines(f),thresholdMap[f])
+                                  )) for f in compactAlarmFileNames]
 
-            print(writeWhenDoAlarmsOccur(TA1,alarmLinesExtByFile,attackLines,containsKeyword,1800))
-            print(writeWhenDoAlarmsOccur(TA1,alarmLinesExtByFile,attackLines,containsKeyword,1800,useIngestTime=True))
+            print(
+                writeWhenDoAlarmsOccur(
+                    TA1,alarmLinesExtByFile,attackLines,matchingFunction,3600,isE2=args.e2,matchOnUUID=args.e2
+                )
+            )
+
+            # print(
+            #     writeWhenDoAlarmsOccur(
+            #         TA1,alarmLinesExtByFile,attackLines,matchingFunction,3600,useIngestTime=True
+            #     )
+            # )
 
         else:
 
-            alarmLinesExtByFile = [(f,extractFeaturesFromAlarms(filterByThreshold(getAlarmLines(f),thresholdMap[f])))
-                                   for f in compactAlarmFileNames]
+            alarmLinesExtByFile = [(f,
+                                    extractFeaturesFromAlarms(
+                                        filterByThreshold(getAlarmLines(f),thresholdMap[f])
+                                    )) for f in compactAlarmFileNames]
 
 
-            print(writeAlarmTrueFalsePositives(TA1,alarmLinesExtByFile,attackLines,containsKeyword))
+            print(
+                writeAlarmTrueFalsePositives(
+                    TA1,alarmLinesExtByFile,attackLines,matchingFunction,matchOnUUID=args.e2
+                )
+            )
 
-            print(writeAttackLinesWithDetectionMethodsAndCompCount(TA1,alarmLinesExtByFile,attackLines,containsKeyword,allMethods))
+
+            print(
+                writeAttackLinesWithDetectionMethodsAndCompCount(
+                    TA1,alarmLinesExtByFile,attackLines,matchingFunction,allMethods,matchOnUUID=args.e2
+                )
+            )
 
