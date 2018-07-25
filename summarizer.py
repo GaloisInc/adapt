@@ -34,6 +34,54 @@ def query(post_url):
         sys.stderr.write("There was an error processing your query:\n"
                      "{}\n".format(e))
 
+    return
+
+KNOWN_CRITICAL_PROCS = (
+                       'nginx',
+                       'whoami',
+                       )
+
+KNOWN_CRITICAL_FILES = (
+                       'passwd',
+                       )
+
+def process_demo():
+
+    # Find a process
+    # Get all the FILO IO done by the process
+    # Get the files read, written, executed, deleted
+    # Get all the process ids
+    # Get adjacent __ ?
+    # Find all activities done [bounded by time duration]
+
+    # Any connection with a known critical process or a file
+
+    raise NotImplementedError
+
+
+
+def file_demo():
+    # Find a file
+    # Find all process which accessed the file
+    # Find any copies made of the file
+    # Was the file ever executed? Details.
+
+    # Any connection with a known critical process or a file
+
+    raise NotImplementedError
+
+
+# Search for specefic scenarios?
+def scenario_demos():
+    # Heavy N/W activity
+        # Multiple connections in a short duration?
+        # Data upload/download
+
+    # Process writes a file -> executes -> delete
+    raise NotImplementedError
+
+
+
 
 def repl():
     # REPL
@@ -54,8 +102,7 @@ def repl():
             sys.exit(0)
 
 
-def search(graph_element):
-    s
+
 
 if __name__ == '__main__':
     main()

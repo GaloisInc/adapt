@@ -376,9 +376,8 @@ object Application extends App {
                  }
               */
 
-             val provResultF = (dbActor ? StringQuery(ip, shouldReturnJson = true))
-             val resultF = Await.result(provResultF,
-               timeout.duration).asInstanceOf[Future[Try[Int]]]
+             val provResultF = dbActor ? StringQuery(ip, shouldReturnJson = true)
+             val resultF = Await.result(provResultF, timeout.duration).asInstanceOf[Future[Try[Int]]]
              val resultFF = Await.result(resultF, timeout.duration)
              /*
              resultFF match{
