@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().has('subjectType','SUBJECT_PROCESS').as('x').values('uuid').as('id').select('x').out('cmdLine','(cmdLine)','exec').hasLabel('AdmPathNode').values('path').as('procName').select('id','procName').dedup()",
+"objects":"id",
+"attributes":"procName"
+}
+}

@@ -34,6 +34,7 @@ def computeItemsetPairSupports(itemset1,itemset2,context,itemsets,namedentities=
 	supp_itemset2=getConceptSupport(context,itemset2,namedentities)
 	return {'supp_union':supp_union,'supp_itemset1':supp_itemset1,'supp_itemset2':supp_itemset2}
 
+
 def jaccard(supp_union,supp_itemset1,supp_itemset2): #Jaccard coefficient
 	return supp_union/(supp_itemset1+supp_itemset2-supp_union)
 
@@ -81,6 +82,19 @@ def getConcept(context,s,namedentities=False):
 def getRulesWithConfidence(concepts,supports,minconf):
 	edg = edges(concepts)
 	return {(e[0],e[1]-e[0]): supports[e[1]]/supports[e[0]] for e in edg if supports[e[0]] > 0 and supports[e[1]]/supports[e[0]] > minconf}
+	
+def getRulesWithConfidenceLift(concepts,context,minconf,namedentities=False):
+	edg = edges(concepts)
+	supports={}
+	for e in edg:
+		if e[1] not in supports.keys():
+			supports[e[1]]=getItemsetScaledSupport(context,e[1],namedentities)
+		if e[0] not in supports.keys():
+			supports[e[0]]=getItemsetScaledSupport(context,e[0],namedentities)
+		if e[1]-e[0] not in supports.keys():
+			supports[e[1]-e[0]]=getItemsetScaledSupport(context,e[1]-e[0],namedentities)
+	#print(supports.keys())
+	return {(e[0],e[1]-e[0]): (supports[e[1]]/supports[e[0]],supports[e[1]]/(supports[e[0]]*supports[e[1]-e[0]])) for e in edg if supports[e[0]] > 0 and supports[e[1]]/supports[e[0]] > minconf}
 
 # a rule X1 -> Y2 subsumes another X2 -> Y2 if X1 subseteq X2 and Y2 subseteq Y1
 # this is naive, it would be better to filter out rules that are implied
@@ -111,16 +125,27 @@ def filterSubsumedImp(rules):
 
 
 
-def findImpRules(concepts,supports,confidence):
+def findImpRules_old(concepts,supports,confidence):
 	rules = getRulesWithConfidence(concepts,supports,confidence)
+	reducedRules = filterSubsumedImp(rules)
+	return reducedRules
+	
+def findImpRules(concepts,context,confidence,namedentities=False):
+	rules = getRulesWithConfidenceLift(concepts,context,confidence,namedentities)
 	reducedRules = filterSubsumedImp(rules)
 	return reducedRules
 
 
-def violations(s,rules):
+def violations_old(s,rules):
 	setS=(frozenset({s}) if type(s)==str else frozenset(s))
 	ent = 0-sum([numpy.log2(1-rules[e]) for e in rules.keys() if e[0]<=setS and not(e[1]<=setS)])
 	return ent
+	
+def violations(s,rules):
+	setS=(frozenset({s}) if type(s)==str else frozenset(s))
+	ent = 0-sum([numpy.log2(1-rules[e][0]) for e in rules.keys() if e[0]<=setS and not(e[1]<=setS)])
+	entLift = 0-sum([numpy.log2(1-rules[e][1]) for e in rules.keys() if e[0]<=setS and not(e[1]<=setS)])
+	return (ent,entLift)
 
 def allViolations(context,rules,namedentities=False):
 	if namedentities==False:
@@ -186,6 +211,18 @@ def MutualInfoRule(concept_combis,supports,minMI):
 def getAntiImpRulesWithLowConfidence(concepts,supports,maxconf):
 	edg = edges(concepts)
 	return {(e[0],e[1]-e[0]): supports[e[1]]/supports[e[0]] for e in edg if supports[e[0]] > 0 and supports[e[1]]/supports[e[0]] < maxconf}
+	
+def getAntiImpRulesWithLowConfidenceLift(concepts,context,maxconf,namedentities=False):
+	edg = edges(concepts)
+	supports={}
+	for e in edg:
+		if e[1] not in supports.keys():
+			supports[e[1]]=getItemsetScaledSupport(context,e[1],namedentities)
+		if e[0] not in supports.keys():
+			supports[e[0]]=getItemsetScaledSupport(context,e[0],namedentities)
+		if e[1]-e[0] not in supports.keys():
+			supports[e[1]-e[0]]=getItemsetScaledSupport(context,e[1]-e[0],namedentities)
+	return {(e[0],e[1]-e[0]): (supports[e[1]]/supports[e[0]],supports[e[1]]/(supports[e[0]]*supports[e[1]-e[0]])) for e in edg if supports[e[0]] > 0 and supports[e[1]]/supports[e[0]] < maxconf}
 
 # a rule X1 -> ~Y1 subsumes another X2 -> ~Y2 if X1 subseteq X2 and Y1 subseteq Y2
 # this is naive, it would be better to filter out rules that are implied
@@ -216,15 +253,26 @@ def filterSubsumedAntiImp(rules):
 			newRules = updateAntiImpRules(newRules,rule)
 	return {newRule : rules[newRule] for newRule in newRules}
 
-def findAntiImpRules(concepts,supports,confidence):
+def findAntiImpRules_old(concepts,supports,confidence):
 	rules = getAntiImpRulesWithLowConfidence(concepts,supports,confidence)
 	reducedRules = filterSubsumedAntiImp(rules)
 	return reducedRules
+	
+def findAntiImpRules(concepts,context,confidence,namedentities):
+	rules = getAntiImpRulesWithLowConfidenceLift(concepts,context,confidence,namedentities)
+	reducedRules = filterSubsumedAntiImp(rules)
+	return reducedRules
 
-def antiImpViolations(s,rules):
+def antiImpViolations_old(s,rules):
 	setS=(frozenset({s}) if type(s)==str else frozenset(s))
 	ent = 0-sum([numpy.log2(rules[e]) for e in rules.keys() if e[0]<=setS and e[1]<=setS])
 	return ent
+	
+def antiImpViolations(s,rules):
+	setS=(frozenset({s}) if type(s)==str else frozenset(s))
+	ent = 0-sum([numpy.log2(rules[e][0]) for e in rules.keys() if e[0]<=setS and e[1]<=setS])
+	entLift = 0-sum([numpy.log2(rules[e][1]) for e in rules.keys() if e[0]<=setS and e[1]<=setS])
+	return (ent,entLift)
 
 def allAntiImpViolations(context,rules,namedentities=False):
 	if namedentities==False:
@@ -251,6 +299,8 @@ def exactRules(context,concepts,namedentities=False):
 
 
 def snd(x): return x[1]
+
+def comp(x): return (x[1][0],x[1][1])
 
 # Disjointness rules
 
@@ -371,17 +421,19 @@ def druleViolationsCtxt(context,drules,namedentities=False):
 
 
 def doImpRules(context,concepts,min_conf,num_rules,namedentities=False):
-	supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
-	rules = findImpRules(concepts,supports,min_conf)
+	#supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
+	#rules = findImpRules(concepts,supports,min_conf)
+	rules = findImpRules(concepts,context,min_conf,namedentities)
 	vios = allViolations(context,rules,namedentities)
-	violations=(sorted(vios.items(),key=snd,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=snd,reverse=True))
+	violations=(sorted(vios.items(),key=comp,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=comp,reverse=True))
 	return {'type_rule':'implication','rules':rules,'violations':violations,'namedentities':namedentities,'confidence':min_conf}
 
 def doAntiImpRules(context,concepts,max_conf,num_rules,namedentities=False):
-	supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
-	rules = findAntiImpRules(concepts,supports,max_conf)
+	#supports=dict((c,getItemsetScaledSupport(context,c,namedentities)) for c in concepts)
+	#rules = findAntiImpRules(concepts,supports,max_conf)
+	rules = findAntiImpRules(concepts,context,max_conf,namedentities)
 	vios = allAntiImpViolations(context,rules,namedentities)
-	violations=(sorted(vios.items(),key=snd,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=snd,reverse=True))
+	violations=(sorted(vios.items(),key=comp,reverse=True)[0:num_rules] if type(num_rules)==int else sorted(vios.items(),key=comp,reverse=True))
 	return {'type_rule':'anti-implication','rules':rules,'violations':violations,'namedentities':namedentities,'confidence':max_conf}
 
 #def doDisjRules(context,concepts,num_rules,namedentities=False):
@@ -492,6 +544,7 @@ def printRuleViolations(vios,context,rules,type_rule,printing_flag=True,namedent
 	printlist=[]
 	out_json = dict()
 	for v in vios:
+		#print('violation', v)
 		if v[1] > 0.0:
 			printlist+=[sep_line,str(v[0]) + ' with score ' + str(v[1]),sep_line]
 			setAtts=frozenset(context.getAttributeFromObject(v[0],namedentities))
@@ -505,6 +558,36 @@ def printRuleViolations(vios,context,rules,type_rule,printing_flag=True,namedent
 		print(printlist,file=out)
 	else:
 		return printlist
+		
+def produceScoreCSVPerRuleType(vios,context,rules,type_rule,namedentities=False):
+	csv_output=[]
+	#print('context.objects',context.objects)
+	for v in vios:
+		if v[1][0] > 0.0:
+			#print('v[0]',v[0])
+			obj=v[0]
+			avg_entconf=v[1][0]
+			avg_entlift=v[1][1]
+			setAtts=frozenset(context.getAttributeFromObject(v[0],namedentities))
+			violated_rules=dict((e,rules[e]) for e in rules.keys() if e[0] <= setAtts and not(e[1] <= setAtts))
+			max_violated_rule_conf=max(violated_rules.items(), key=(lambda x: x[1][0]))
+			max_violated_rule_lift=max(violated_rules.items(), key=(lambda x: x[1][1]))
+			#print('max_violated_rule_conf',max_violated_rule_conf,'max_violated_rule_lift',max_violated_rule_lift)
+			violated_rules_per_obj_conf=' | '.join([','.join(list(list(v[0][0])))+'=>'+','.join(list(list(v[0][1])))+' Score: ='+str(v[1][0]) for v in violated_rules.items()])
+			violated_rules_per_obj_lift=' | '.join([','.join(list(list(v[0][0])))+'=>'+','.join(list(list(v[0][1])))+' Score: ='+str(v[1][1]) for v in violated_rules.items()])
+			top_violated_rule_conf=','.join(list(list(max_violated_rule_conf[0][0])))+'=>'+','.join(list(list(max_violated_rule_conf[0][1])))+' Score: ='+str(max_violated_rule_conf[1][0])
+			top_violated_rule_lift=','.join(list(list(max_violated_rule_lift[0][0])))+'=>'+','.join(list(list(max_violated_rule_lift[0][1])))+' Score: ='+str(max_violated_rule_lift[1][1])
+			#print('top_violated_rule_conf',top_violated_rule_conf,'top_violated_rule_lift',top_violated_rule_lift)
+			line=[obj,type_rule,violated_rules_per_obj_conf,str(avg_entconf),top_violated_rule_conf,str(max_violated_rule_conf[1][0]),violated_rules_per_obj_lift,str(avg_entlift),top_violated_rule_lift,str(max_violated_rule_lift[1][0])]
+			csv_output.append(','.join(map(lambda x: """\"""" + x + """\"""", line)))
+	return '\n'.join(csv_output)
+			
+def produceScoreCSV(rule_gen_results,context,output_csv):
+	type_rule=rule_gen_results['type_rule']
+	violations=rule_gen_results['violations']
+	rules=rule_gen_results['rules']
+	named_entities=rule_gen_results['namedentities']
+	return produceScoreCSVPerRuleType(violations,context,rules,type_rule,namedentities=named_entities)
 
 
 #printing rules and violations

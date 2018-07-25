@@ -1,6 +1,6 @@
 {"context specification":{
-"query":"g.V().has('eventType').as('y').values('eventType').as('type').select('y').out().has('subjectType').as('x').select('x').out().has('path').values('path').as('filepath').select('filepath','type').dedup()",
-"objects":"filepath",
+"query":"g.V().has('eventType').as('y').values('eventType').as('type').select('y').out().has('fileObjectType').values('uuid').as('uuid').select('uuid','type').dedup()",
+"objects":"uuid",
 "attributes":"type"
 }
 }

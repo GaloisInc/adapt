@@ -1,9 +1,9 @@
 ###### this function takes as input a json spec file to interrogate the DB, then it returns an RCF context and a csv context file
 #
 get_query=function(JsonSpecFile,rcf_context_file,csv_file){
-  #rcf_context_file=paste0(myWorkingDirectory,"/contexts/Context_",currentview,".rcf",sep="")
-  #JsonSpecFile='/home/terminator1/Documents/adapt/FCA_JSON/contextSpecFiles/neo4jspec_ProcessNetflow.json'
-   
+  # rcf_context_file=paste0(myWorkingDirectory,"/contexts/Context________.rcf",sep="")
+ # JsonSpecFile='/home/terminator2/Documents/Adapt_Project/Repository/AR_Rule_Mining_Coron/adapt/fca/contextSpecFiles/neo4jspec_FileEvent.json'
+ # csv_file=paste0(myWorkingDirectory,"/contexts/Context________.csvf",sep="")
   if(is.null(JsonSpecFile))stop("error in JsonSpecFile file   - terminating")
   if(is.null(rcf_context_file))stop("error in rcf_context_file file   - terminating")
   if(is.null(csv_file))stop("error in csv_file file   - terminating")
