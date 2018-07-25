@@ -73,6 +73,16 @@ package object adm {
       case EdgeAdm2Cdm(s, l, t) if cdmUuids.contains(t) => EdgeAdm2Adm(s, l, admUUID)
       case e => e
     }
+
+    def applyRemaps(cdmUuids: Seq[CdmUUID], admUUID: AdmUUID): Edge = {
+      var curr = this
+      var next = this.applyRemap(cdmUuids, admUUID)
+      while (curr != next) {
+        curr = next
+        next = curr.applyRemap(cdmUuids, admUUID)
+      }
+      curr
+    }
   }
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge
   final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge

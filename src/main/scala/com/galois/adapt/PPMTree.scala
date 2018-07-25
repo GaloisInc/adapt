@@ -314,13 +314,22 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       extractedValues match {
         case Nil => log.warning(s"Tried to start an observation with an empty extractedValues.")
         case extracted :: remainder =>
+          /*
+          If the first extracted value is new to this tree (at this level)
+          then an alarm will be recorded. The local probability of the question
+          mark node (at this level) will be used as the local probabiity of the
+          leaf node in the alarm.
+           */
+          val newLeafProb =
+            if (children.contains(extracted)) None
+            else Some(qLocalProbOfThisObs(childrenPopulation+1,counter+1) -> 1) // We must include the new child in the children count when computing the q-LP
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
             newChild
           })
           counter += 1
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, None, 1 )
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, newLeafProb, 1 )
       }
 
 
@@ -335,13 +344,20 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
           val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
           val leafAlarmComponent = (thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
+          println(alarm)
           if (alarmFilter(alarm)) alarmActor ! alarm
         case Nil =>
         case extracted :: remainder =>
-          val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else { // If passNewLeafProb is defined, we pass it on;
-            if (children.contains(extracted)) None                                 // if it's not defined, we capture the local probability of the ?-node (and tree depth)
-            else Some(thisQLocalProb -> depth)                                     // and pass it to the leaf (eventually)
-          }                                                                        // through newly defined nodes in the tree.
+          /*
+          If passNewLeafProb is defined, we pass it on;
+          if it's not defined and the newly extracted value has not been seen before
+          (i.e., it is not contained in `children`), we capture the local probability of the ?-node
+          (and tree depth) and pass it to the leaf (eventually) through newly defined nodes in the tree.
+           */
+          val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else {
+            if (children.contains(extracted)) None
+            else Some(qLocalProbOfThisObs(childrenPopulation+1,counter) -> (depth + 1))
+          }
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
