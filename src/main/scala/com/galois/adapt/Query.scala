@@ -76,6 +76,7 @@ import scala.util.matching.Regex
  *                 | traversal '.where(' predicate ')'
  *                 | traversal '.and(' traversal ',' ... ')'
  *                 | traversal '.or(' traversal ',' ... ')'
+ *                 | traversal '.not(' traversal ')'
  *                 | traversal '.dedup()'
  *                 | traversal '.limit(' long ')'
  *                 | traversal '.is(' literal ')'
@@ -285,6 +286,7 @@ object Query {
         | ".where("~str~","~strPredicate~")"^^{ case _~k~_~p~_  => WhereKeyPredicate(_: Tr, k, p) }
         | ".and(" ~! repsep(trav,",")~ ")" ^^ { case _~ts~_     => And(_: Tr, ts) }
         | ".or(" ~! repsep(trav,",")~ ")"  ^^ { case _~ts~_     => Or(_: Tr, ts) }
+        | ".not(" ~! trav ~ ")"            ^^ { case _~t~_      => Not(_: Tr, t) }
         | ".dedup()"                       ^^ { case _          => Dedup(_: Tr) }
         | ".limit(" ~! lng ~ ")"           ^^ { case _~i~_      => Limit(_: Tr, i) }
         | ".is(" ~ pred ~ ")"              ^^ { case _~p~_      => IsPredicate(_: Tr, p) }
@@ -555,6 +557,10 @@ object QueryLanguage {
   case class Or[S,T](traversal: Traversal[S,T], ored: Seq[Traversal[_,_]]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
       traversal.buildTraversal(graph,context).or(ored.map(_.buildTraversal(graph, context)): _*)
+  }
+  case class Not[S,T](traversal: Traversal[S,T], not: Traversal[_,_]) extends Traversal[S,T] {
+    override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
+      traversal.buildTraversal(graph,context).not(not.buildTraversal(graph, context))
   }
   case class Dedup[S,T](traversal: Traversal[S,T]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) = traversal.buildTraversal(graph,context).dedup()
