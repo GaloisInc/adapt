@@ -1,0 +1,7 @@
+{"context specification":{
+     "query":"MATCH (p:AdmPathNode)<--(:AdmSubject)<--(e:AdmEvent) --> (s:AdmFileObject) RETURN DISTINCT s.uuid AS uuid, p.path AS exec",
+     "endpoint":"cypher",
+"objects":"uuid",
+"attributes":["exec"]
+}
+}
