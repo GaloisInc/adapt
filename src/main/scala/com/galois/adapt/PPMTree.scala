@@ -344,7 +344,6 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
           val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
           val leafAlarmComponent = (thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
-          println(alarm)
           if (alarmFilter(alarm)) alarmActor ! alarm
         case Nil =>
         case extracted :: remainder =>
