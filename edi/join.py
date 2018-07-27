@@ -10,11 +10,14 @@ import edi.util.context as context
 parser = argparse.ArgumentParser(description='Join two contexts')
 parser.add_argument('--left',
                     '-l',
-                    help='left input context file')
+                    help='left input context file',
+					required = True)
 parser.add_argument('--right', '-r',
-                    help='right input context file')
+                    help='right input context file',
+					required = True)
 parser.add_argument('--output', '-o',
-                    help='output file')
+                    help='output file',
+					required = True)
 
 
 

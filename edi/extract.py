@@ -16,17 +16,14 @@ parser.add_argument('--url','-u',
 					help = 'Query url. Default: http://localhost',
 					type = str,
 					default = 'http://localhost')
-parser.add_argument('--specpath','-d',
-					help = 'Path containing query specifications. '
-					+ 'Default: ./specifications',
-					type = str,
-					default = './specifications')
 parser.add_argument('--input','-i',
 					help = 'Input context specification file.',
-					type = str)
+					type = str,
+					required = True)
 parser.add_argument('--output','-o',
 					help = 'Output context filename. ',
-					type = str)
+					type = str,
+					required = True)
 parser.add_argument('--verbose','-v',
 					help = 'Print verbose output',
 					action = 'store_true')
