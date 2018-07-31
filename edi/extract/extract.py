@@ -17,8 +17,14 @@ import sys
 # The third part is generic and probably belongs in a separate module for
 # reading and writing contexts represented in different ways.
 
+def escape(attr):
+	if ',' in attr or '"' in attr:
+		return ('"' + attr.replace('"','""') + '"')
+	else:
+		return attr
+
 def convertDict2CSVFile(dictionary, filename):
-	attributes = sorted({e for val in dictionary.values() for e in val})
+	attributes = sorted({escape(e) for val in dictionary.values() for e in val})
 	with open(filename,'w') as f:
 		f.write(','.join(['Object_ID']+attributes)+'\n')
 		for obj,atts in dictionary.items():
