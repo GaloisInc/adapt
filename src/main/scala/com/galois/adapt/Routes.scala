@@ -114,21 +114,32 @@ object Routes {
         get {
           pathPrefix("api") {
             pathPrefix("summarize") {
-              path("processName" / Segment / "activity") { pName =>
+//              path("process" / Segment / "summary") { pName =>
+//                complete(
+//                  SummarizeOld.process(ProcessName(pName)).toString
+//                )
+//              } ~
+              path("processPath" / Segment / "activity") { pName =>
                 complete(
-                  Summarize.ActivitiesOfProcess(ProcessName(pName)).map(_.map(_.toString))
-                )
-              } ~
-              path("processUUID" / Segment / "activity") { pUUID =>
-                complete(
-                  Summarize.ActivitiesOfProcess(ProcessUUID(UUID.fromString(pUUID))).map(_.map(_.toString))
-                )
-              } ~
-              path("processPid" / Segment / "activity") { pPID =>
-                complete(
-                  Summarize.ActivitiesOfProcess(ProcessPID(pPID.toInt)).map(_.map(_.toString))
+                  Summarize.summarizeProcess(ProcessPath(pName)).map(_.map(_.toString))
+                  //SummarizeOld.activitiesOfProcess(ProcessName(pName)).map(_.map(_.toString))
                 )
               }
+//                path("processUUID" / Segment / "activity") { pUUID =>
+//                  complete(
+//                    SummarizeOld.activitiesOfProcess(ProcessUUID(UUID.fromString(pUUID))).map(_.map(_.toString))
+//                  )
+//                } ~
+//                path("processPid" / Segment / "activity") { pPID =>
+//                  complete(
+//                    SummarizeOld.activitiesOfProcess(ProcessPID(pPID.toInt)).map(_.map(_.toString))
+//                  )
+//                } ~
+//                path("processNameToNode" / Segment) { pName =>
+//                  complete(
+//                    SummarizeOld.processNode(ProcessName(pName))
+//                  )
+//                }
             } ~
               pathPrefix("status") {
                 import ApiJsonProtocol.statusReport
