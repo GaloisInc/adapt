@@ -29,6 +29,7 @@
     	var nodeApiPath = "/query/nodes"   // ADAPT & Quine
     	
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
+    	// Note: special handling for a few specific properties is hardcoded below in the `formatAllData` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
     	var nodeApiResultTransform = 
     		// function(node_results) { return _.map(node_results, function(n){ n.properties = []; return n }) }   // Quine
     		function(ns) { return ns 
@@ -38,6 +39,7 @@
 	    			// return n
     			//})
 			}  // ADAPT
+
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language.
     	var queryStringFromObject = function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }  // ADAPT
@@ -120,17 +122,22 @@
                     // if ( ! all_are_nodes) { UI.failHandler(); console.log("Not all node results have type 'vertex': " + node_results) return false }
 
                     var node_results_count = node_results.length
-                    var node_result_size_limit = 50
-                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n Do you want to render them all?"
-                    UI.foundNodes(node_results_count)
-                    var display_all_nodes = node_results_count <= node_result_size_limit || confirm(confirm_msg)
-
-                    if ( ! display_all_nodes) {
-                    	node_results = _.first(node_results, node_result_size_limit)
-	                    UI.foundNodes(node_results.length)
-                    }
+                    var node_result_size_limit = 10
+                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
+                    node_results_count <= node_result_size_limit || function() { 
+                    	var limit_result = prompt(confirm_msg, node_results_count)
+                    	if (limit_result == null || isNaN(parseInt(limit_result)) || parseInt(limit_result) < 0) { 
+                    		node_result_size_limit = 0
+                    		node_results_count = 0
+                    	} else {
+                    		node_result_size_limit = parseInt(limit_result)
+                    		node_results_count = node_result_size_limit
+                    	}
+                    }()
+	                UI.foundNodes(node_results_count)
 
                     if (node_results_count > 0) {
+                    	node_results = _.first(node_results, node_result_size_limit)
                         var result_node_ids = _.map(node_results, function(n) { return n['id'] })
                         var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
                         $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
@@ -291,7 +298,7 @@
 
         function persistJournal(event) {
             journal.push(event)
-            // localStorage.setItem("previous_journal", JSON.stringify(journal))
+            // localStorage.setItem("previous_journal", JSON.stringify(journal))  // Note: this can get too large for local storage under extreme cases.
         }
 
 
@@ -472,11 +479,12 @@
         }
 
 
-        function formatNodes(raw_results) {
-            var nodes = raw_results  // _.filter(raw_results, function(i) { return i['type'] == "vertex" })
+        function formatNodes(nodes) {
             return _.map(nodes, function(n) {
-                n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j-specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
-                n["db_label"] = n["label"]
+            	if (n.hasOwnProperty("label")) {
+                	n["label"] = n["label"].replace("::Node","").replace("Node::","")  // Neo4j-specific hack. Note: This will depend on which labels are set on each node!  --and assumes that a label is set for only the Node class name and the "Node" label.
+                	n["db_label"] = n["label"]
+            	}
                 n['queries'] = getRelevantQueries(n)  
                 node_spec = _.find(node_appearance, function(i){return i.is_relevant(n)})
                 default_spec = _.find(node_appearance, function(i){return i.name.toLowerCase() === "default"})
@@ -489,32 +497,21 @@
                 }
                 n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
                 n["title"] = makeNodeTitle(n)
-                n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
+                // n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n
             })
         }
 
 
         function formatEdges(raw_edge_results) {
-            var edges = raw_edge_results // _.filter(raw_edge_results, function(i) { return i['type'] == "edge" })
-            return _.map(edges, function(e, i, list) {
-                var new_edge = e
-                // { 
-                //     "id" : e['id'],
-                //     "from" : e['outV'],
-                //     "to" : e['inV'],
-                //     // "label" : e['label'],
-                //     "arrows" : "to",
-                //     "title" : e['label'] 
-                // }
-                if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
-                    new_edge['label'] = e['label']
-                    new_edge['title'] = e['title']
-                    new_edge['color'] = "green"
-                    new_edge['dashes'] = true
-                }
-                return new_edge
-            })
+            // return _.map(raw_edge_results, function(e, i, list) {
+            //     if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+            //         e['color'] = "green"
+            //         e['dashes'] = true
+            //     }
+            //     return e
+            // })
+            return raw_edge_results
         }
 
 
@@ -700,13 +697,22 @@
                 $("#node-query-menu ul").empty()
                 var node_id = network.getNodeAt({x: props.pointer.DOM.x, y: props.pointer.DOM.y})
                 if (typeof node_id !== 'undefined') {
-                    var query_list = node_data_set.get(node_id).queries
-                    if (network.getSelectedNodes().length > 1) {
-                        var collapse_query = { 
-                            name : "Collapse Nodes (selected)"
-                        }
-                        query_list = [collapse_query].concat(query_list)
-                    }
+                	var query_list = []
+                	if ( ! String(node_id).startsWith("CLUSTER-")) {
+	                	var this_node = node_data_set.get(node_id)
+	                    query_list = this_node.hasOwnProperty("queries") ? this_node.queries : [] 
+	                    // if (String(node_id).startsWith("CLUSTER-")) {
+	                    	// query_list.push({ name : "Expand Cluster" })
+	                    // }
+	                    if (network.getSelectedNodes().length > 1) {
+	                        var collapse_query = { 
+	                            name : "Collapse Nodes (selected)"
+	                        }
+	                        query_list = [collapse_query].concat(query_list)
+	                    }
+	                } else {
+	                	query_list = [ { name: "Double click the node to expand a cluster"} ]
+	                }
                     execQuery_params =  []
                     var idx = 0
                     _.map(query_list, function(q) {
@@ -720,6 +726,7 @@
                         $("#node-query-menu ul").append(list_item)
                         idx++
                     })
+
                     var query_menu = document.getElementById("node-query-menu")
                     query_menu.style.top =  props['pointer']['DOM']['y'] + 'px'
                     query_menu.style.left = props['pointer']['DOM']['x'] + 'px'
@@ -799,6 +806,7 @@
                 $('#node-selection-box').hide().css({"width": 0, "height": 0})
             },
             updateSelectionBox : function(e) {
+            	console.log("Updating…")
                 var coords = network.canvasToDOM(UI.drawing)
                 var element_bounds = document.getElementById("graph").getBoundingClientRect()
                 coords.x = coords.x + element_bounds.left  // element offset
