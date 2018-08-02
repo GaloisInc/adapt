@@ -35,6 +35,9 @@
     	var queryStringFromObject = 
     		function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }
 
+    	// Nodes will render in this color if no other color is chosen from the UI color picker.
+        var default_node_color = "#97c2fc"
+
 
 
     	// EDGE PRODUCTION:
@@ -50,16 +53,11 @@
 	                   "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
 	        }
 
-
     	// A function called immediately after the API endpoint returns edges. This should transform data into the expected type for rendering: Array[ { id: string, from: nodeId, to: nodeId, label: string, arrows: "to"/"from"/"both"/"" } ]
     	// Note: special handling for a few specific properties is hardcoded below in the `formatEdges` function. Expect strange behavior if you have custom top-level edge properties called "color" and "dashes". This function will also be applied to the synthetic edge created from queries defined in ui_language.js
     	var edgeApiResultTransform = 
     		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}
 
-
-
-    	// Nodes will render in this color if no other color is chosen from the UI color picker.
-        var default_node_color = "#97c2fc"
 
     	// ********** END EDITABLE VARIABLES ********** //
 
