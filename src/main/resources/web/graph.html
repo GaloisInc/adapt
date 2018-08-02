@@ -33,19 +33,17 @@
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language. The resulting string will be sent as a query to the 'nodeApiPath' specified above, which should return nodes.
     	var queryStringFromObject = 
-    		function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }  // ADAPT
+    		function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }
 
 
 
     	// EDGE PRODUCTION:
 
     	// Edge-producing API POST endpoint: (should begin with a slash)
-    	var edgeApiPath = "/query/edges"   // ADAPT & Quine
+    	var edgeApiPath = "/query/edges"
 
     	// A query to produce edges is issued separately after a query to produce nodes returns results. This function should return a query string in the appropriate language to be issued to the DB and returning edges which will all be rendered together with the new nodes returned. (NOTE: edges to non-existant nodes cannot be rendered. Attempting to render endges multiple times will succeed, creating duplicate edges, and slowing down the renderer.)
     	var produceEdgeQuery = 
-    		// function(result_node_ids, existing_nodes_data_set) { return result_node_ids.join(",") }  // Quine
-    		// ADAPT:
 	    	function(result_node_ids, existing_nodes_data_set) {
 	    		return "new = [" + result_node_ids.join(",") + "];" +
 	                   "all = [" + existing_nodes_data_set.getIds().concat(result_node_ids).join(",") + "];" +
@@ -56,8 +54,7 @@
     	// A function called immediately after the API endpoint returns edges. This should transform data into the expected type for rendering: Array[ { id: string, from: nodeId, to: nodeId, label: string, arrows: "to"/"from"/"both"/"" } ]
     	// Note: special handling for a few specific properties is hardcoded below in the `formatEdges` function. Expect strange behavior if you have custom top-level edge properties called "color" and "dashes". This function will also be applied to the synthetic edge created from queries defined in ui_language.js
     	var edgeApiResultTransform = 
-    		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}  // ADAPT
-	    	// function(es, ns) { console.log(es); return es }  // Quine
+    		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}
 
 
 
