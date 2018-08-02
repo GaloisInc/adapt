@@ -26,7 +26,7 @@
     	var nodeApiPath = "/query/nodes"
     	
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
-    	// Note: special handling for a few specific properties is hardcoded below in the `formatAllData` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
+    	// Note: special handling for a few specific properties is hardcoded below in the `formatNodes` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
     	var nodeApiResultTransform = 
     		function(nodes) { return nodes }
 
@@ -54,8 +54,10 @@
 
 
     	// A function called immediately after the API endpoint returns edges. This should transform data into the expected type for rendering: Array[ { id: string, from: nodeId, to: nodeId, label: string, arrows: "to"/"from"/"both"/"" } ]
+    	// Note: special handling for a few specific properties is hardcoded below in the `formatEdges` function. Expect strange behavior if you have custom top-level edge properties called "color" and "dashes". This function will also be applied to the synthetic edge created from queries defined in ui_language.js
     	var edgeApiResultTransform = 
-	    	function(es, ns) { return es }  // ADAPT & Quine
+    		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}  // ADAPT
+	    	// function(es, ns) { console.log(es); return es }  // Quine
 
 
 
@@ -244,7 +246,7 @@
         function formatAllData(node_and_edge_data) {
             var data = copy(node_and_edge_data)
             data.nodes = formatNodes(data.nodes)
-            data.edges = formatEdges(data.edges)
+            data.edges = formatEdges(data.edges, data.nodes)
             return data
         }
 
@@ -489,10 +491,11 @@
         }
 
 
-        function formatEdges(raw_edge_results) {
+        function formatEdges(raw_edge_results, formatted_nodes) {
             return _.map(raw_edge_results, function(e, i, list) {
             	// This will color/format synthetic redges resulting from queries in ui_language.js:
                 if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+                	edgeApiResultTransform([e], formatted_nodes)
                     e['color'] = "green"
                     e['dashes'] = true
                 }
@@ -761,7 +764,6 @@
                 }, 0, props)
             },
             startDrawSelection : function(props) {
-                console.log("drawing selection")
                 UI.drawing = props.pointer.canvas
                 network.setOptions({ 
                     interaction : {
@@ -772,7 +774,6 @@
                 $('#node-selection-box').show()
             },
             endDrawSelection : function(props) {
-                console.log("stopped drawing selection")
                 network.setOptions({interaction: {
                     dragView : true,
                     zoomView : true
