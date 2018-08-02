@@ -49,6 +49,9 @@ import com.rrwright.quine.language.{branchOf, refinedBranchOf}
 import com.rrwright.quine.runtime._
 import scala.pickling.PicklerUnpickler
 
+import scala.pickling.static._  // Static serialization without reflection
+import scala.pickling.shareNothing._  // Disables cyclic object graphs
+
 
 object Application extends App {
 
@@ -417,7 +420,7 @@ object Application extends App {
       val graph = GraphService( system,
         inMemoryNodeLimit = Some(100000),
         shardCount = 3
-        , uiPort = 9090)(
+        , uiPort = None /*Some(9090)*/ )(
         MapDBMultimap()
       )
       quineGraph = graph
@@ -444,16 +447,6 @@ object Application extends App {
 
 
 
-
-
-
-
-
-
-
-
-
-
 //      branch.standingFind(
 //        id => lookup[ProcessFileActivity](branch.identifyRoot(id))
 //          .map { results =>
@@ -462,22 +455,6 @@ object Application extends App {
 //          }
 //        }
 //      )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

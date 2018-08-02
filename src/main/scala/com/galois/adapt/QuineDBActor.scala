@@ -29,7 +29,7 @@ case class FileEvent(eventType: EventType, predicateObject: FileObject) extends 
 case class ProcessFileActivity(pid: Int, subject: <--[FileEvent]) extends NoConstantsDomainNode
 
 
-class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
+class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLogging {
 
   implicit val implicitGraph = graph //GraphService(context.system, uiPort = 9090)(EmptyPersistor)
   implicit val ec = context.dispatcher
@@ -213,8 +213,15 @@ class QuineDBActor(graph: GraphService) extends Actor with ActorLogging {
     case Ready => sender() ! Ack
 
     case CompleteMsg =>
-      println("Data loading complete.")
+      println(s"Data loading complete: $idx")
       sender() ! Ack
+//      if (idx == 0) {
+        println(s"Index 0 complete. Begining context aggregation in 5 seconds.")
+        context.system.scheduler.scheduleOnce(5 seconds) {
+          println(s"Begining context aggregation now.")
+          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
+        }
+//      }
 //      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
 
 
@@ -280,8 +287,8 @@ case class EventLookup(
 
 class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLogging {
   var router = {
-    val routees = Vector.fill(count) {
-      val r = context.actorOf(Props(classOf[QuineDBActor], graph))
+    val routees = (0 until count) map { idx =>
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph, idx))
       context watch r
       ActorRefRoutee(r)
     }
