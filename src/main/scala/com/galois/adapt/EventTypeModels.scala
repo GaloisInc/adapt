@@ -106,7 +106,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[ExtendedUuid])] = {
+    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[ExtendedUuidDetails])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -126,13 +126,13 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuid]) = {
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuidDetails]) = {
        (
         List(
         (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
         (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
-        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),""))
+        Set[ExtendedUuidDetails](ExtendedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
       )
     }
   }
@@ -162,7 +162,7 @@ object EventTypeModels {
       case Failure(ex) => println(s"Unable to query or write data for IForest: ${ex.getMessage}")
     }
 
-    //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long)
+    //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long)
     alarmTreeToFile.foreach {
       case (ppmName, file) => Try(getAlarms(file)) match {
         case Success(alarms) => if (alarms.nonEmpty) {
@@ -182,7 +182,7 @@ object EventTypeModels {
   }
 
 
-  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[ExtendedUuid])]= {
+  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[ExtendedUuidDetails])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false

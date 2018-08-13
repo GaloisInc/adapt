@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import com.galois.adapt.NoveltyDetection.ExtendedUuidDetails
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -25,8 +26,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val statusReport = jsonFormat4(StatusReport)
   implicit val populationLog = jsonFormat16(PopulationLog)
-  implicit val cdmUuid = jsonFormat2(CdmUUID.apply)
-  implicit val admUuid = jsonFormat2(AdmUUID.apply)
+  implicit val cdmUuid: RootJsonFormat[CdmUUID] = jsonFormat2(CdmUUID.apply)
+  implicit val admUuid: RootJsonFormat[AdmUUID] = jsonFormat2(AdmUUID.apply)
 
   implicit val extendedUuid: RootJsonFormat[ExtendedUuid] = new RootJsonFormat[ExtendedUuid] {
     override def write(eUuid: ExtendedUuid): JsValue = {
@@ -42,6 +43,22 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case Seq(JsString("CdmUUID")) => cdmUuid.read(json)
         case Seq(JsString("AdmUUID")) => admUuid.read(json)
       }
+  }
+
+  implicit val extendedUuidDetails: RootJsonFormat[ExtendedUuidDetails] = new RootJsonFormat[ExtendedUuidDetails] {
+    override def write(eUuid: ExtendedUuidDetails): JsValue = {
+      val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))))
+    }
+
+    override def read(json: JsValue): ExtendedUuidDetails = {
+      val eUuid = extendedUuid.read(json)
+      val name = json.asJsObject.getFields("name") match {
+        case Seq(JsString("")) => None
+        case Seq(JsString(jsName)) => Some(jsName)
+      }
+      ExtendedUuidDetails(eUuid, name)
+    }
   }
 
   // All enums are JSON-friendly through their string representation
