@@ -1,0 +1,7 @@
+{"context specification":{
+     "query":"MATCH (n:AdmNetFlowObject)<--(e:AdmEvent) RETURN DISTINCT n.uuid AS uuid, e.eventType AS type",
+     "endpoint":"cypher",
+"objects":"uuid",
+     "attributes":["type"]
+}
+}
