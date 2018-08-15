@@ -52,7 +52,7 @@ object EventTypeModels {
 
     def query(treeName: String): PpmTreeCountResult = Try {
       implicit val timeout: Timeout = Timeout(60 seconds)
-      val future: Future[Any] = (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+      val future: Future[Any] = (ppmActor.get ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
@@ -168,7 +168,7 @@ object EventTypeModels {
         case Success(alarms) => if (alarms.nonEmpty) {
           val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
           Try {
-            ppmActor ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
+            ppmActor.get ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
         }
         // send alarmsDetectedList to actor

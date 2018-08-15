@@ -69,7 +69,7 @@ object Routes {
   def mainRoute(
        dbActor: ActorRef,
        statusActor: ActorRef,
-       ppmActor: ActorRef,
+       ppmActor: Option[ActorRef],
        cdm2adm: AlmostMap[CdmUUID,AdmUUID],
        cdm2cdm: AlmostMap[CdmUUID,CdmUUID]
    )(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
@@ -78,7 +78,7 @@ object Routes {
       val perTreeResultFutures = pathsPerTree.map {
         case (treeName, paths) =>
           val parsedPaths = paths.map(p => p.split("∫", -1).toList)
-          (ppmActor ? SetPpmRatings(treeName, parsedPaths, rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]]
+          (ppmActor.get ? SetPpmRatings(treeName, parsedPaths, rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]]
             .map(v => treeName -> v)
       }.toList
       val perTreeResultFuture = Future.sequence(perTreeResultFutures)
@@ -122,7 +122,7 @@ object Routes {
             pathPrefix("ppm") {
               path("listTrees") {
                 complete(
-                  (ppmActor ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
+                  (ppmActor.get ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
                 )
               } ~
               path("setRatings") {
@@ -134,7 +134,7 @@ object Routes {
                     val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
                     import ApiJsonProtocol._
                     complete(
-                      (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+                      (ppmActor.get ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
                         .mapTo[PpmTreeAlarmResult]
                         .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                     )
@@ -228,7 +228,7 @@ object Routes {
               parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt") { (queryString, rating, namespace) =>
                 complete {
                   val query = queryString.split("∫", -1).toList
-                  (ppmActor ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
+                  (ppmActor.get ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
                     case Some(l) if l.forall(x => x) => StatusCodes.Created -> s"Rating for $queryString set to: $rating"
                     case Some(l) => StatusCodes.NotFound -> s"Could not find key for $queryString"
                     case None => StatusCodes.BadRequest -> s"Could not find tree: $treeName"
@@ -275,7 +275,7 @@ object Routes {
                   )
                 ).map(q =>
                   // TODO: Come on... fix this.
-                  (ppmActor ? q).mapTo[Future[String]].flatMap(identity)
+                  (ppmActor.get ? q).mapTo[Future[String]].flatMap(identity)
                 )
               }
             }

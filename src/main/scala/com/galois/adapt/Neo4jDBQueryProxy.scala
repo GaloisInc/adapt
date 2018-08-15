@@ -319,19 +319,3 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
   }: PartialFunction[Any,Unit]) orElse super.receive
 }
 
-
-object Neo4jFlowComponents {
-
-  def neo4jActorCdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg)
-                            (implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
-    .collect { case (_, cdm: DBNodeable[_]) => cdm }
-    .groupedWithin(1000, 1 second)
-    .map(WriteCdmToNeo4jDB.apply)
-    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
-
-  def neo4jActorAdmWriteSink(neoActor: ActorRef, completionMsg: Any = CompleteMsg): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
-    .groupedWithin(1000, 1 second)
-    .map(WriteAdmToNeo4jDB.apply)
-    .buffer(4, OverflowStrategy.backpressure)
-    .toMat(Sink.actorRefWithAck(neoActor, InitMsg, Ack, completionMsg))(Keep.right)
-}
