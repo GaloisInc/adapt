@@ -114,17 +114,36 @@ object Routes {
         get {
           pathPrefix("api") {
             pathPrefix("summarize") {
-//              path("process" / Segment / "summary") { pName =>
-//                complete(
-//                  SummarizeOld.process(ProcessName(pName)).toString
-//                )
-//              } ~
+
               path("processPath" / Segment / "activity") { pName =>
                 complete(
-                  Summarize.summarizeProcess(ProcessPath(pName)).map(_.map(_.toString))
-                  //SummarizeOld.activitiesOfProcess(ProcessName(pName)).map(_.map(_.toString))
+                  {
+                    //Summarize.summarize(ProcessPath(pName)).toString()
+                    Summarize.summarizeProcess(ProcessPath(pName)).map(_.map(_.toString))
+                  }
                 )
-              }
+              }~
+              path("processPath" / Segment / "summary") { pName =>
+                complete(
+                  {
+                    Summarize.summarize(ProcessPath(pName)).toString()
+                  }
+                )
+              }~
+              path("all-process-activity") {
+                complete(
+                  {
+                    Summarize.summarizeAllProcess().map(_.map(_.toString))
+                  }
+                 )
+                }~
+                path("all-process-activity" / Segment) { maxProcess =>
+                  complete(
+                    {
+                      Summarize.summarizeAllProcess(maxProcess.toInt).map(_.map(_.toString))
+                    }
+                  )
+                }
 //                path("processUUID" / Segment / "activity") { pUUID =>
 //                  complete(
 //                    SummarizeOld.activitiesOfProcess(ProcessUUID(UUID.fromString(pUUID))).map(_.map(_.toString))
