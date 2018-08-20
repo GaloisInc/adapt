@@ -126,7 +126,13 @@ object Routes {
               path("processPath" / Segment / "summary") { pName =>
                 complete(
                   {
-                    Summarize.summarize(ProcessPath(pName)).toString()
+                    val s: Future[List[ProcessActivity]] = Summarize.summarizeProcess(ProcessPath(pName))
+                      s.map(SummaryASTParser(_).toString)
+                    //Summarize.summarize(ProcessPath(pName)).map(_.toString)
+//                      .map{
+//                      case Right(r) => r.toString()
+//                      case Left(l) => "Parser Error"
+//                    }
                   }
                 )
               }~

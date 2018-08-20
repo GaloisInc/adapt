@@ -145,7 +145,7 @@ object Summarize {
            |.select('subjectNode2').values('uuid').as('uuid2')
            |.select('subjectNode2').values('cid').as('cid2')
            |.select('subjectNode2').out('exec', 'cmdLine', '(cmdLine)').values('path').as('paths2')
-           |.select('uuid1', 'cid1', 'subjectNode1', 'uuid2', 'cid2', 'subjectNode2', 'earliestTimestampNanos', 'eventType')
+           |.select('uuid1', 'cid1', 'subjectNode1', 'uuid2', 'cid2', 'subjectNode2', 'earliestTimestampNanos', 'eventType', 'paths2')
            |
        """.stripMargin
 
@@ -168,7 +168,7 @@ object Summarize {
           EventType.values.find(_.toString == m("eventType")).get,
           SubjectProcess(UUID.fromString(m("uuid1")), m("cid2").toInt, processPath),
           //TODO: Fill in the processpath for subject2.
-          SubjectProcess(UUID.fromString(m("uuid2")), m("cid2").toInt, ProcessPath("UNKNOWN")),
+          SubjectProcess(UUID.fromString(m("uuid2")), m("cid2").toInt, ProcessPath(m("paths2"))),
           TimestampNanos(m("earliestTimestampNanos").toLong))
       }
 
@@ -269,22 +269,23 @@ object Summarize {
     combineAndSortActivities(queryFileActivities(), queryNetworkActivity(), queryProcessProcessActivity(), querySrcSinkActivities())
   }
 
-  def summarize(processPath:ProcessPath) = {
-    val processActivities: Future[List[ProcessActivity]] = summarizeProcess(processPath)
-
-
-//    val x: Future[List[ProcessActivityAST]] = processActivities.map(_.map{
-//      case a: ProcessFileActivity => ProcessFileActivityAST.fromProcessFileActivity(a)
-//      case a: ProcessNWActivity => ProcessNWActivityAST.fromProcessNWActivity(a)
-//      case a: ProcessSrcSinkActivity => ProcessSrcSinkActivityAST.fromProcessSrcSinkActivity(a)
-//      case a: ProcessProcessActivity => ProcessProcessActivityAST.fromProcessProcessActivity(a)
-//    })
-    val x: Future[List[ProcessActivity]] = processActivities
-
-
-    SummaryASTParser(Await.result(x, timeout.duration))
-    //println(SummaryASTParser(Await.result(x, timeout.duration)))
-  }
+//  def summarize(processPath:ProcessPath) = {
+//    val processActivities: Future[List[ProcessActivity]] = summarizeProcess(processPath)
+//
+//
+////    val x: Future[List[ProcessActivityAST]] = processActivities.map(_.map{
+////      case a: ProcessFileActivity => ProcessFileActivityAST.fromProcessFileActivity(a)
+////      case a: ProcessNWActivity => ProcessNWActivityAST.fromProcessNWActivity(a)
+////      case a: ProcessSrcSinkActivity => ProcessSrcSinkActivityAST.fromProcessSrcSinkActivity(a)
+////      case a: ProcessProcessActivity => ProcessProcessActivityAST.fromProcessProcessActivity(a)
+////    })
+//    val x: Future[List[ProcessActivity]] = processActivities
+//
+//
+//    //SummaryASTParser(Await.result(x, timeout.duration))
+//    x.map(SummaryASTParser(_))
+//    //println(SummaryASTParser(Await.result(x, timeout.duration)))
+//  }
 }
 
 
