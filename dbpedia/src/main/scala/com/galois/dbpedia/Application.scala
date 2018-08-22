@@ -109,8 +109,10 @@ object TurtleTriple {
       
       // Report progress
       count += 1
-      if (count % 100000 == 0) {
-        println(s"Ingested from $path: $count")
+      if (count % 1000 == 0) {
+        Await.ready(fut, 30 seconds).onComplete { _ =>
+          println(s"Ingested from $path: $count")
+        }
       }
     }
 
