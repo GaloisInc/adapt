@@ -37,6 +37,7 @@ libraryDependencies ++= Seq(
 //  javaOptions in run ++= Seq("-Xmx6G"),
 
 mainClass in (Compile, run) := Some("com.galois.dbpedia.Application")
+mainClass in assembly := Some("com.galois.dbpedia.Application")
 
   // Do not buffer test output (which is the default) so that all test results are shown as they happen (helpful for async or timeout results)
 logBuffered in Test := false

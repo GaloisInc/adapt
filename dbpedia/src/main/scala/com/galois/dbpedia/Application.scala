@@ -22,7 +22,7 @@ object Application extends App {
   implicit val system = ActorSystem("test")
   implicit val graph = GraphService(system)(MapDBMultimap())
   implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30 seconds)
+  implicit val timeout = Timeout(300 seconds)
 
   // Open up for SSH ammonite shelling via `ssh repl@localhost -p22222`
   import ammonite.sshd._
