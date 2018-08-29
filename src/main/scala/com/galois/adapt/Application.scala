@@ -18,6 +18,7 @@ import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
+import com.galois.adapt.{cdm18 => cdm18types}
 import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
@@ -36,6 +37,7 @@ import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
+import com.galois.adapt.cdm19.{CDM19, Cdm18to19, RawCDM19Type}
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
@@ -359,15 +361,15 @@ object Application extends App {
 
       val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
-        val broadcast = b.add(Broadcast[(String,CDM18)](1))
+        val broadcast = b.add(Broadcast[(String,CDM19)](1))
 
-        broadcast ~> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+        broadcast ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, CdmDone)(writeTimeout)
      //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
         SinkShape(broadcast.in)
       })
 
       startWebServer()
-      CDMSource.cdm18(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
+      CDMSource.cdm19(ta1, (position, msg) => failedStatements = (position, msg.getMessage) :: failedStatements)
         .via(printCounter("CDM events", statusActor))
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
@@ -381,13 +383,13 @@ object Application extends App {
 
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
-        case (true, false) => "CDM" -> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+        case (true, false) => "CDM" -> DBQueryProxyActor.graphActorCdm18WriteSink(dbActor, completionMsg)(writeTimeout)
         case (false, true) => "ADM" -> er.to(DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg))
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[(String,CDM18)](2))
 
-          broadcast ~> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> DBQueryProxyActor.graphActorCdm18WriteSink(dbActor, completionMsg)(writeTimeout)
           broadcast ~> er ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
 
           SinkShape(broadcast.in)
@@ -906,7 +908,7 @@ object CDMSource {
     }
   }
 
-  // Make a CDM18 source from a CDM17 one
+  // Try to make a CDM18 record from a CDM17 one
   def cdm17ascdm18(c: CDM17, dummyHost: UUID): Option[CDM18] = {
     implicit val _: UUID = dummyHost
     c match {
@@ -922,6 +924,150 @@ object CDMSource {
       case t: cdm17types.TimeMarker => Some(Cdm17to18.timeMarker(t))
       case u: cdm17types.UnitDependency => Some(Cdm17to18.unitDependency(u))
       case u: cdm17types.UnnamedPipeObject => Some(Cdm17to18.unnamedPipeObject(u))
+      case other =>
+        println(s"couldn't find a way to convert $other")
+        None
+    }
+  }
+
+  // Make a CDM18 source, possibly falling back on CDM17/CDM18 for files with that version
+  def cdm19(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(String,CDM19), _] = {
+    println(s"Setting source for CDM 19 TA1: $ta1")
+    if (start > 0L) println(s"Throwing away the first $start statements.")
+    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+      case Success(0) => None
+      case Success(i) => Some(i)
+      case _ => None
+    }
+
+    val src = config.getStringList("adapt.env.ta1kafkatopics").asScala.map{topicNameAndLimit =>
+      val (topicName, limitOpt) = topicNameAndLimit.split("∫").toList match {
+        case name :: l :: Nil if Try(l.toInt).isSuccess => (name, Some(l.toInt))
+        case name :: Nil => (name, None)
+        case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
+      }
+
+      val isWindows = ta1.toLowerCase match {
+        case "faros" => true
+        case "fivedirections" => true
+        case "cadets" => false
+        case "clearscope" => false
+        case "theia" => false
+        case "trace" => false
+        case _ => false
+      }
+      Application.addNamespace(topicName, isWindows)
+
+      kafkaSource(topicName, kafkaCdm19Parser, limitOpt).map(topicName -> _)
+    }.fold(Source.empty)((earlierTopicSource, laterTopicSouce) => earlierTopicSource.concat(laterTopicSouce))
+
+    Application.instrumentationSource = ta1.toLowerCase
+
+    ta1.toLowerCase match {
+      case "cadets"         => shouldLimit.fold(src)(l => src.take(l))
+      case "clearscope"     => shouldLimit.fold(src)(l => src.take(l))
+      case "faros"          => shouldLimit.fold(src)(l => src.take(l))
+      case "fivedirections" => shouldLimit.fold(src)(l => src.take(l))
+      case "theia"          =>
+        val queryTopic = config.getString("adapt.env.theiaresponsetopic")
+        Application.addNamespace(queryTopic, false)
+
+        shouldLimit.fold(src)(l => src.take(l))
+          .merge(kafkaSource(queryTopic, kafkaCdm19Parser, None)
+            .via(printCounter("Theia Query Response", Application.statusActor, 1))
+            .map(queryTopic -> _))
+
+      case "trace"          => shouldLimit.fold(src)(l => src.take(l))
+      case "kafkatest"      =>
+        Application.addNamespace("kafkatest", isWindows = false)
+        val kafkaTestSource = kafkaSource("kafkatest", kafkaCdm19Parser, None)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
+        shouldLimit.fold(kafkaTestSource)(l => kafkaTestSource.take(l)).map(ta1 -> _)
+      case _ =>
+        val paths: List[(Provider, String)] = getLoadfiles
+        println(s"Setting file sources to: ${paths.mkString("\n", "\n", "")}")
+        paths.headOption.foreach { p =>
+          Application.ta1 = p._1
+          println(s"Assuming a single provider from file data: ${p._1}")
+        }
+
+        val startStream = paths.foldLeft(Source.empty[Try[(String,CDM19)]])((a,b) => a.concat({
+
+          val read = CDM19.readData(b._2, None)
+          read.map(_._1) match {
+            case Failure(_) => None
+            case Success(s) => {
+              Application.instrumentationSource = Ta1Flows.getSourceName(s)
+              Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
+            }
+          }
+
+          // Try to read CDM19 data. If we fail, fall back on reading CDM18 data, then convert that to CDM19
+          val cdm19: Iterator[Try[(String,CDM19)]] = read.map(_._2).get.map(_.map(b._1 -> _))
+
+            /*.getOrElse({
+            println("Failed to read file as CDM19, trying to read it as CDM18...")
+
+            val dummyHost: UUID = new java.util.UUID(0L,1L)
+
+            val read = CDM18.readData(b._2, None)
+            read.map(_._1) match {
+              case Failure(_) => None
+              case Success(s) =>
+                Application.instrumentationSource = Ta1Flows.getSourceName(s)
+                Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
+            }
+
+            read.map(_._2).get.flatMap {
+              case Failure(e) => List(Failure[CDM19](e))
+              case Success(cdm18) => cdm18ascdm19(cdm18, dummyHost).toList.map(Success(_))
+            }
+          })*/
+          Source.fromIterator[Try[(String,CDM19)]](() => cdm19)
+        })).statefulMapConcat[Try[(String,CDM19)]]{ () =>  // This drops CDMs while counting live.
+          var counter = 0L
+          var stillDiscarding = start > 0L;
+        {
+          case cdm if stillDiscarding =>
+            print(s"\rSkipping past: $counter")
+            counter += 1
+            stillDiscarding = start > counter
+            Nil
+          case cdm => List(cdm)
+        }
+        }
+        shouldLimit.fold(startStream)(l => startStream.take(l))
+          .statefulMapConcat { () =>
+            var counter = 0
+            cdmTry => {
+              counter = counter + 1
+              cdmTry match {
+                case Success(cdm) => List(cdm)
+                case Failure(err) =>
+                  println(s"Couldn't read binary data at offset: $counter")
+                  handleError(counter, err)
+                  List.empty
+              }
+            }
+          }
+    }
+  }
+
+  // Try to make a CDM19 record from a CDM18 one
+  def cdm18ascdm19(c: CDM18, dummyHost: UUID): Option[CDM19] = {
+    implicit val _: UUID = dummyHost
+    c match {
+      case e: cdm18types.Event => Some(Cdm18to19.event(e))
+      case f: cdm18types.FileObject => Some(Cdm18to19.fileObject(f))
+      case m: cdm18types.MemoryObject => Some(Cdm18to19.memoryObject(m))
+      case n: cdm18types.NetFlowObject => Some(Cdm18to19.netFlowObject(n))
+      case p: cdm18types.Principal => Some(Cdm18to19.principal(p))
+      case p: cdm18types.ProvenanceTagNode => Some(Cdm18to19.provenanceTagNode(p))
+      case r: cdm18types.RegistryKeyObject => Some(Cdm18to19.registryKeyObject(r))
+      case s: cdm18types.SrcSinkObject => Some(Cdm18to19.srcSinkObject(s))
+      case s: cdm18types.Subject => Some(Cdm18to19.subject(s))
+      case t: cdm18types.TimeMarker => Some(Cdm18to19.timeMarker(t))
+      case u: cdm18types.UnitDependency => Some(Cdm18to19.unitDependency(u))
+      case u: cdm18types.UnnamedPipeObject => Some(Cdm18to19.ipcObject(u))
       case other =>
         println(s"couldn't find a way to convert $other")
         None
@@ -952,14 +1098,17 @@ object CDMSource {
       .mapConcat(c => if (c.isSuccess) List(c.get) else List.empty)
   }
 
+  val reader17 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
+  val reader18 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm18.TCCDMDatum])
+  val reader19 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm19.TCCDMDatum])
+
   // Parse a `CDM17` from a kafka record
   def kafkaCdm17Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM17] = Try {
     val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
     val offset = msg.offset()   // msg.record.offset()
-    val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm17.TCCDMDatum])
     val decoder = DecoderFactory.get.binaryDecoder(bais, null)
     val t = Try {
-      val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader.read(null, decoder)
+      val elem: com.bbn.tc.schema.avro.cdm17.TCCDMDatum = reader17.read(null, decoder)
       elem
     }
     if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
@@ -967,20 +1116,32 @@ object CDMSource {
     CDM17.parse(cdm)
   }.flatten
 
-
-  val reader = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm18.TCCDMDatum])  // TODO: clean this up
   // Parse a `CDM18` from a kafka record
   def kafkaCdm18Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM18] = Try {
     val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
     val offset = msg.offset()   // msg.record.offset()
     val decoder = DecoderFactory.get.binaryDecoder(bais, null)
     val t = Try {
-      val elem: com.bbn.tc.schema.avro.cdm18.TCCDMDatum = reader.read(null, decoder)
+      val elem: com.bbn.tc.schema.avro.cdm18.TCCDMDatum = reader18.read(null, decoder)
       elem
     }
     if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
     val cdm = new RawCDM18Type(t.get.getDatum)  // throw the error inside the parent Try
     CDM18.parse(cdm)
+  }.flatten
+
+  // Parse a `CDM18` from a kafka record
+  def kafkaCdm19Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM19] = Try {
+    val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
+    val offset = msg.offset()   // msg.record.offset()
+    val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+    val t = Try {
+      val elem: com.bbn.tc.schema.avro.cdm19.TCCDMDatum = reader19.read(null, decoder)
+      elem
+    }
+    if (t.isFailure) println(s"Couldn't read binary data at offset: $offset")
+    val cdm = new RawCDM19Type(t.get.getDatum, Some(t.get.getHostId))  // throw the error inside the parent Try
+    CDM19.parse(cdm)
   }.flatten
 }
 

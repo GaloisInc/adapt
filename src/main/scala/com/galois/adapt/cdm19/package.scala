@@ -50,8 +50,8 @@ package object cdm19 {
 
       val cdm = tcIterator.next()
       val first: RawCDM19Type = {
-        if (cdm.getCDMVersion.toString != "18")
-          throw new Exception(s"Expected CDM19, but received CDM${cdm.CDMVersion.toString}")
+        if (cdm.getCDMVersion.toString != "19")
+          throw new Exception(s"Expected CDM19, but received CDM${cdm.getCDMVersion.toString}")
         new RawCDM19Type(cdm.getDatum, Some(cdm.getHostId))
       }
       (cdm.getSource, Iterator(first) ++ tcIterator.map(cdm => new RawCDM19Type(cdm.getDatum, Some(cdm.getHostId))))

@@ -7,6 +7,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import com.galois.adapt.adm.{ADM, EdgeAdm2Adm}
 import com.galois.adapt.cdm18.CDM18
+import com.galois.adapt.cdm19.CDM19
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import spray.json.{JsArray, JsNull, JsNumber, JsObject, JsString, JsValue}
 
@@ -163,7 +164,13 @@ object DBQueryProxyActor {
 
   }
 
-  def graphActorCdmWriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
+  def graphActorCdm18WriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
+    .collect { case (_, cdm: DBNodeable[_]) => cdm }
+    .groupedWithin(1000, 1 second)
+    .map(WriteCdmToDB.apply)
+    .toMat(Sink.actorRefWithAck(graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+
+  def graphActorCdm19WriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM19), NotUsed] = Flow[(String,CDM19)]
     .collect { case (_, cdm: DBNodeable[_]) => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToDB.apply)
