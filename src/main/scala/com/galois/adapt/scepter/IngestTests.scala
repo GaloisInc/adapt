@@ -100,18 +100,25 @@ class General_TA1_Tests(
   // Test uniqueness of... UUIDs
   // Some providers have suggested that they may reuse UUIDs. That would be bad.
   it should "not have any duplicate UUIDs" in {
-    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source != "clearscope") {
-      graph.traversal().V()
-        .values("uuid")
-        .groupCount[String]()
-        .toList
-    } else {
+    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source == "clearscope") {
       graph.traversal().V()
         .not(__.hasLabel("FileObject")) // FileObjects can duplicate UUIDs
         .values("uuid")
         .groupCount[String]()
         .toList
+    } else if (ta1Source == "theia") {
+      graph.traversal().V()
+        .not(__.hasLabel("FileObject", "NetFlowObject", "Principal")) // TODO: check structural equality
+        .values("uuid")
+        .groupCount[String]()
+        .toList
+    } else {
+      graph.traversal().V()
+        .values("uuid")
+        .groupCount[String]()
+        .toList
     }
+
 
     val offending: List[(String,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
     var assertMsg: String = "\n"

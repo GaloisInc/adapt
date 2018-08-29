@@ -1002,7 +1002,41 @@ object CDMSource {
           }
 
           // Try to read CDM19 data. If we fail, fall back on reading CDM18 data, then convert that to CDM19
-          val cdm19: Iterator[Try[(String,CDM19)]] = read.map(_._2).get.map(_.map(b._1 -> _))
+          val cdm19: Iterator[Try[(String,CDM19)]] = read.map(_._2).getOrElse({
+            println("Failed to read file as CDM19, trying to read it as CDM18...")
+
+            val dummyHost: UUID = new java.util.UUID(0L,1L)
+
+            val read = CDM18.readData(b._2, None)
+            read.map(_._1) match {
+              case Failure(_) => None
+              case Success(s) =>
+                Application.instrumentationSource = Ta1Flows.getSourceName(s)
+                Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
+            }
+
+            read.map(_._2).getOrElse({
+              println("Failed to read file as CDM18, trying to read it as CDM17...")
+
+              val dummyHost: UUID = new java.util.UUID(0L,1L)
+
+              val read = CDM17.readData(b._2, None)
+              read.map(_._1) match {
+                case Failure(_) => None
+                case Success(s) =>
+                  Application.instrumentationSource = Ta1Flows.getSourceName(s)
+                  Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
+              }
+
+              read.map(_._2).get.flatMap {
+                case Failure(e) => List(Failure[CDM18](e))
+                case Success(cdm17) => cdm17ascdm18(cdm17, dummyHost).toList.map(Success(_))
+              }
+            }).flatMap {
+              case Failure(e) => List(Failure[CDM19](e))
+              case Success(cdm18) => cdm18ascdm19(cdm18, dummyHost).toList.map(Success(_))
+            }
+          }).map(_.map(b._1 -> _))
 
             /*.getOrElse({
             println("Failed to read file as CDM19, trying to read it as CDM18...")
