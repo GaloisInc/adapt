@@ -2,8 +2,8 @@
 
 <meta charset="utf-8">
 <head>
-    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
-    <script type="text/javascript" src="javascripts/underscore.js"></script>
+    <script type="text/javascript" src="javascripts/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="javascripts/underscore-1.9.1.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree-all-deps.min.js"></script>
     <script type="text/javascript" src="javascripts/jquery.fancytree.multi.js"></script>
 	<script type="text/javascript" src="javascripts/moment-2.18.1.min.js"></script>
@@ -276,15 +276,8 @@ $(function(){
 
 			matchCount = matchCount + tree.filterNodes.call(tree, function(node) {
 				if (_.isEmpty(searchPattern)) {
-					// console.log(matchesRatingFilter(node))
-					// console.log(matchesLocalProbFilter(node))
-					// console.log(matchesTimeRange(node, timeStart, timeStop))
 					return /*! node.folder &&*/ matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				} else {
-					// console.log(node)
-					// console.log(matchesRatingFilter(node))
-					// console.log(matchesLocalProbFilter(node))
-					// console.log(matchesTimeRange(node, timeStart, timeStop))
 					return /*! node.folder &&*/ new RegExp(searchPattern, "i").test(node.title) && matchesRatingFilter(node, ratingComparison) && matchesLocalProbFilter(node) && matchesTimeRange(node, timeStart, timeStop)
 				}
 			}, filterOptions)
