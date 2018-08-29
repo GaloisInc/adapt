@@ -135,22 +135,24 @@ object Application extends App {
 
   // Load up all of the namespaces, and then write them back out on shutdown
   val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
-  if (namespacesFile.exists && namespacesFile.canRead) {
-    import scala.collection.JavaConverters._
+  if (runFlow != "accept") {
+    if (namespacesFile.exists && namespacesFile.canRead) {
+      import scala.collection.JavaConverters._
 
-    val in = new BufferedReader(new InputStreamReader(new FileInputStream(namespacesFile)))
-    for (line <- in.lines().iterator().asScala)
-      addNamespace(line, false)
-    in.close()
-  }
-  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-    override def run(): Unit = {
-      val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(namespacesFile)))
-      for (namespace <- namespaces.toList)
-        out.write(namespace+"\n")
-      out.close()
+      val in = new BufferedReader(new InputStreamReader(new FileInputStream(namespacesFile)))
+      for (line <- in.lines().iterator().asScala)
+        addNamespace(line, false)
+      in.close()
     }
-  }))
+    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+      override def run(): Unit = {
+        val out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(namespacesFile)))
+        for (namespace <- namespaces.toList)
+          out.write(namespace + "\n")
+        out.close()
+      }
+    }))
+  }
 
   def getNamespaces: List[String] = List("cdm") ++ namespaces.keySet.toList.flatMap(ns => List("cdm_" + ns, ns))
 
