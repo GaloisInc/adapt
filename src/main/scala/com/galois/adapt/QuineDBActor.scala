@@ -51,7 +51,7 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
 
 
 //  case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends NoConstantsDomainNode
-//  case class EventToNetFlow(eventType: EventType, timestampNanos: Long, predicateObject: NetFlowObject) extends NoConstantsDomainNode
+  case class EventToFile(eventType: EventType, timestampNanos: Long, predicateObject: FileObject) extends NoConstantsDomainNode
 //  case class EventToObjectWithSubject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId], subject: -->[QuineId]) extends NoConstantsDomainNode
 //
 
@@ -219,7 +219,8 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
         println(s"Index 0 complete. Begining context aggregation in 5 seconds.")
         context.system.scheduler.scheduleOnce(5 seconds) {
           println(s"Begining context aggregation now.")
-          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
+          graph.saveStratifiedContexts("/Users/ryan/Desktop/adapt-contexts.tsv", 2, 3, 1, Set(knowledgeOf[EventToFile]()), 8, 10 minutes)
+//          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
         }
 //      }
 //      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
@@ -234,7 +235,7 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
           JsArray( uiData._1.map{ datum =>
             val uiNode = UINode(datum.id.toString, datum.label, datum.title)
             val jso = ApiJsonProtocol.uiNodeFormat.write(uiNode).asJsObject
-            val props = datum.properties.map{ case (k,p) => k.name -> JsString(unpickleToString(p))}
+            val props = datum.properties.map{ case (k,p) => k.name -> JsString(unpickleToString(p)) }
             jso.copy(jso.fields + ("properties" -> JsObject(props)) )
 //            datum.properties.mapValues(unpickleToString)
 //            com.rrwright.quine.runtime.UiJsonFormat.nodeFormat.write(datum)
