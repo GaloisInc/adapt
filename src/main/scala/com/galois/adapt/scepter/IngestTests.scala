@@ -306,14 +306,26 @@ class General_TA1_Tests(
 
   // Test that EVENT_WRITE and EVENT_READ have predicate objects that are 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'
   "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'" in {
-    val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
-      .hasLabel("Event")
-      .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
-      .as("e")
-      .out("predicateObject","predicateObject2")
-      .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
-      .select[Vertex]("e")
-      .toList
+    val malformedReadWriteEvents: java.util.List[Vertex] = if ( ! List("clearscope").contains(ta1Source) ) {
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+        .select[Vertex]("e")
+        .toList
+    } else {
+      // Clearscope represents getuid and such with a read event that has predicate object and subject that are the same node
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+        .select[Vertex]("e")
+        .toList
+    }
 
     if (malformedReadWriteEvents.isEmpty) {
       assert(malformedReadWriteEvents.length <= 0)
