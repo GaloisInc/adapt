@@ -12,8 +12,8 @@ case class Subject(
   uuid: UUID,
   subjectType: SubjectType,
   cid: Int,
-  localPrincipal: UUID,
-  startTimestampNanos: Long,
+  localPrincipal: Option[UUID],
+  startTimestampNanos: Option[Long],
   parentSubject: Option[UUID] = None,
   host: UUID, // Host where subject is executing
   unitId: Option[Int] = None,
@@ -30,11 +30,11 @@ case class Subject(
     ("uuid", uuid),
     ("subjectType", subjectType.toString),
     ("cid", cid),
-    ("localPrincipalUuid", localPrincipal),
-    ("startTimestampNanos", startTimestampNanos),
     ("host", host)
   ) ++
+    startTimestampNanos.fold[List[(String,Any)]](List.empty)(v => List(("startTimestampNanos", v))) ++
     parentSubject.fold[List[(String,Any)]](List.empty)(v => List(("parentSubjectUuid", v))) ++
+    localPrincipal.fold[List[(String,Any)]](List.empty)(v => List(("localPrincipalUuid", v))) ++
     unitId.fold[List[(String,Any)]](List.empty)(v => List(("unitId", v))) ++
     iteration.fold[List[(String,Any)]](List.empty)(v => List(("iteration", v))) ++
     count.fold[List[(String,Any)]](List.empty)(v => List(("count", v))) ++
@@ -45,7 +45,7 @@ case class Subject(
     DBOpt.fromKeyValMap(properties)
 
   def asDBEdges =
-    List((CDM19.EdgeTypes.localPrincipal,localPrincipal)) ++
+    localPrincipal.fold[List[(CDM19.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM19.EdgeTypes.localPrincipal, v)))
 //    List((CDM19.EdgeTypes.host,host)) ++
     parentSubject.fold[List[(CDM19.EdgeTypes.EdgeTypes,UUID)]](Nil)(v => List((CDM19.EdgeTypes.parentSubject, v)))
 
@@ -58,8 +58,8 @@ case class Subject(
     "uuid" -> uuid,
     "subjectType" -> subjectType.toString,
     "cid" -> cid,
-    "localPrincipalUuid" -> localPrincipal,
-    "startTimestampNanos" -> startTimestampNanos,
+    "localPrincipalUuid" -> localPrincipal.getOrElse(""),
+    "startTimestampNanos" -> startTimestampNanos.getOrElse(""),
     "parentSubjectUuid" -> parentSubject.getOrElse(""),
     "host" -> host,
     "unitId" -> unitId.getOrElse(""),
@@ -82,8 +82,8 @@ case object Subject extends CDM19Constructor[Subject] {
       cdm.getUuid,
       cdm.getType,
       cdm.getCid,
-      cdm.getLocalPrincipal,
-      cdm.getStartTimestampNanos,
+      AvroOpt.uuid(cdm.getLocalPrincipal),
+      AvroOpt.long(cdm.getStartTimestampNanos),
       AvroOpt.uuid(cdm.getParentSubject),
       cdm.getHostId.get,
       AvroOpt.int(cdm.getUnitId),

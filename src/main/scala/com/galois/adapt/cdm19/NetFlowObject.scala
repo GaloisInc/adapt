@@ -11,23 +11,21 @@ case class NetFlowObject(
   uuid: UUID,
   host: UUID,
   baseObject: AbstractObject,
-  localAddress: String,
-  localPort: Int,
-  remoteAddress: String,
-  remotePort: Int,
+  localAddress: Option[String],
+  localPort: Option[Int],
+  remoteAddress: Option[String],
+  remotePort: Option[Int],
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
 ) extends CDM19 with DBWritable with DBNodeable[CDM19.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] =
-    baseObject.asDBKeyValues ++
-      List(
-        ("uuid", uuid),
-        ("localAddress", localAddress),
-        ("localPort", localPort),
-        ("remoteAddress", remoteAddress),
-        ("remotePort", remotePort)
-      ) ++
+      baseObject.asDBKeyValues ++
+      List(("uuid", uuid)) ++
+      localAddress.fold[List[(String,Any)]](List.empty)(v => List(("localAddress", v))) ++
+      localPort.fold[List[(String,Any)]](List.empty)(v => List(("localPort", v))) ++
+      remoteAddress.fold[List[(String,Any)]](List.empty)(v => List(("remoteAddress", v))) ++
+      remotePort.fold[List[(String,Any)]](List.empty)(v => List(("remotePort", v))) ++
       ipProtocol.fold[List[(String,Any)]](List.empty)(v => List(("ipProtocol", v))) ++
       fileDescriptor.fold[List[(String,Any)]](List.empty)(v => List(("fileDescriptor", v)))
 
@@ -57,10 +55,10 @@ case object NetFlowObject extends CDM19Constructor[NetFlowObject] {
       cdm.getUuid,
       cdm.getHostId.get,
       cdm.getBaseObject,
-      cdm.getLocalAddress,
-      cdm.getLocalPort,
-      cdm.getRemoteAddress,
-      cdm.getRemotePort,
+      AvroOpt.str(cdm.getLocalAddress),
+      AvroOpt.int(cdm.getLocalPort),
+      AvroOpt.str(cdm.getRemoteAddress),
+      AvroOpt.int(cdm.getRemotePort),
       AvroOpt.int(cdm.getIpProtocol),
       AvroOpt.int(cdm.getFileDescriptor)
     )

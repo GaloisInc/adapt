@@ -54,7 +54,7 @@ case object Principal extends CDM19Constructor[Principal] {
     Principal(
       cdm.getUuid,
       cdm.getUserId,
-      cdm.getGroupIds,
+      AvroOpt.listStr(cdm.getGroupIds).getOrElse(Seq.empty),
       cdm.getType,
       cdm.getHostId.get,
       AvroOpt.str(cdm.getUsername),
