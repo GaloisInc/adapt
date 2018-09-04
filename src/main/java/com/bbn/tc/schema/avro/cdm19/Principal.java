@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * A principal is a local user
@@ -17,6 +20,41 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
   private static final long serialVersionUID = -5503428491115792477L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Principal\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* A principal is a local user\\n     * TODO: extend to include remote principals\\n     * TODO: what happens when the user information changes (are we tracking versions?)\\n     * TODO: Authentication mechanisms: are TA1s providing that information and how?\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"A unique id for the principal\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"PrincipalType\",\"doc\":\"* PrincipalType identifies the type of user: either local to the\\n     * host, or remote users/systems.\",\"symbols\":[\"PRINCIPAL_LOCAL\",\"PRINCIPAL_REMOTE\"]},\"doc\":\"The type of the principal, local by default\",\"default\":\"PRINCIPAL_LOCAL\"},{\"name\":\"userId\",\"type\":\"string\",\"doc\":\"The operating system identifier associated with the user\"},{\"name\":\"username\",\"type\":[\"null\",\"string\"],\"doc\":\"Human-readable string identifier, such as username (Optional)\",\"default\":null},{\"name\":\"groupIds\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"The ids of the groups which this user is part of\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<Principal> ENCODER =
+      new BinaryMessageEncoder<Principal>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<Principal> DECODER =
+      new BinaryMessageDecoder<Principal>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<Principal> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<Principal> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<Principal>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this Principal to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a Principal from a ByteBuffer. */
+  public static Principal fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** A unique id for the principal */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** The type of the principal, local by default */
@@ -576,6 +614,7 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Principal build() {
       try {
         Principal record = new Principal();
@@ -586,22 +625,24 @@ public class Principal extends org.apache.avro.specific.SpecificRecordBase imple
         record.groupIds = fieldSetFlags()[4] ? this.groupIds : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[4]);
         record.properties = fieldSetFlags()[5] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[5]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<Principal>
+    WRITER$ = (org.apache.avro.io.DatumWriter<Principal>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<Principal>
+    READER$ = (org.apache.avro.io.DatumReader<Principal>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Hosts represent a host/machine/node in a network. */
@@ -14,6 +17,41 @@ public class Host extends org.apache.avro.specific.SpecificRecordBase implements
   private static final long serialVersionUID = -7260594700989052027L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Host\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Hosts represent a host/machine/node in a network.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"universally unique identifier for the host\"},{\"name\":\"hostName\",\"type\":\"string\",\"doc\":\"hostname or machine name\"},{\"name\":\"hostIdentifiers\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"HostIdentifier\",\"doc\":\"Host identifier, such as serial number, IMEI number\",\"fields\":[{\"name\":\"idType\",\"type\":\"string\"},{\"name\":\"idValue\",\"type\":\"string\"}]}}],\"doc\":\"list of identifiers, such as serial number, IMEI number\",\"default\":null},{\"name\":\"osDetails\",\"type\":[\"null\",\"string\"],\"doc\":\"OS level details revealed by tools such as uname -a\",\"default\":null},{\"name\":\"hostType\",\"type\":{\"type\":\"enum\",\"name\":\"HostType\",\"doc\":\"* HostType enumerates the host roles or device types\",\"symbols\":[\"HOST_MOBILE\",\"HOST_SERVER\",\"HOST_DESKTOP\"]},\"doc\":\"host's role or device type, such as mobile, server, desktop\"},{\"name\":\"interfaces\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"Interface\",\"doc\":\"Interface name and addresses\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"macAddress\",\"type\":\"string\"},{\"name\":\"ipAddresses\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"default\":null}]}}],\"doc\":\"names and addresses of network interfaces\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<Host> ENCODER =
+      new BinaryMessageEncoder<Host>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<Host> DECODER =
+      new BinaryMessageDecoder<Host>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<Host> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<Host> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<Host>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this Host to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a Host from a ByteBuffer. */
+  public static Host fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** universally unique identifier for the host */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** hostname or machine name */
@@ -555,6 +593,7 @@ public class Host extends org.apache.avro.specific.SpecificRecordBase implements
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Host build() {
       try {
         Host record = new Host();
@@ -565,22 +604,24 @@ public class Host extends org.apache.avro.specific.SpecificRecordBase implements
         record.hostType = fieldSetFlags()[4] ? this.hostType : (com.bbn.tc.schema.avro.cdm19.HostType) defaultValue(fields()[4]);
         record.interfaces = fieldSetFlags()[5] ? this.interfaces : (java.util.List<com.bbn.tc.schema.avro.cdm19.Interface>) defaultValue(fields()[5]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<Host>
+    WRITER$ = (org.apache.avro.io.DatumWriter<Host>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<Host>
+    READER$ = (org.apache.avro.io.DatumReader<Host>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

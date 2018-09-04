@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Represents a packet socket. Instantiates an AbstractObject. */
@@ -14,6 +17,41 @@ public class PacketSocketObject extends org.apache.avro.specific.SpecificRecordB
   private static final long serialVersionUID = 6212142434351508305L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"PacketSocketObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Represents a packet socket. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]},\"doc\":\"The base object attributes\"},{\"name\":\"proto\",\"type\":\"SHORT\",\"doc\":\"Physical-layer protocol\"},{\"name\":\"ifIndex\",\"type\":\"int\",\"doc\":\"Interface number\"},{\"name\":\"haType\",\"type\":\"SHORT\",\"doc\":\"ARP hardware type\"},{\"name\":\"pktType\",\"type\":{\"type\":\"fixed\",\"name\":\"BYTE\",\"size\":1},\"doc\":\"Packet type\"},{\"name\":\"addr\",\"type\":\"bytes\",\"doc\":\"Physical-layer address\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<PacketSocketObject> ENCODER =
+      new BinaryMessageEncoder<PacketSocketObject>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<PacketSocketObject> DECODER =
+      new BinaryMessageDecoder<PacketSocketObject>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<PacketSocketObject> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<PacketSocketObject> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<PacketSocketObject>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this PacketSocketObject to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a PacketSocketObject from a ByteBuffer. */
+  public static PacketSocketObject fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Universally unique identifier for the object */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** The base object attributes */
@@ -673,6 +711,7 @@ public class PacketSocketObject extends org.apache.avro.specific.SpecificRecordB
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public PacketSocketObject build() {
       try {
         PacketSocketObject record = new PacketSocketObject();
@@ -688,22 +727,24 @@ public class PacketSocketObject extends org.apache.avro.specific.SpecificRecordB
         record.pktType = fieldSetFlags()[5] ? this.pktType : (com.bbn.tc.schema.avro.cdm19.BYTE) defaultValue(fields()[5]);
         record.addr = fieldSetFlags()[6] ? this.addr : (java.nio.ByteBuffer) defaultValue(fields()[6]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<PacketSocketObject>
+    WRITER$ = (org.apache.avro.io.DatumWriter<PacketSocketObject>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<PacketSocketObject>
+    READER$ = (org.apache.avro.io.DatumReader<PacketSocketObject>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

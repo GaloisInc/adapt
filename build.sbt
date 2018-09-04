@@ -19,7 +19,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe" % "config" % "1.3.1",
     "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
-    "org.apache.avro" % "avro" % "1.8.1",
+    "org.apache.avro" % "avro" % "1.8.2",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
@@ -53,11 +53,11 @@ lazy val adapt = (project in file(".")).settings(
   {
   // Compile Avro schema at the command line with `sbt avroCompile`
     lazy val avroCompile = taskKey[Unit]("Compile Avro sources from the schema")
-    val avroToolsJarPath = "lib/avro-tools-1.8.1.jar"
+    val avroToolsJarPath = "lib/avro-tools-1.8.2.jar"
     val avroSpecPath = "src/main/avro/TCCDMDatum14.avdl"
     // TODO Now takes two commands to compile schema, check with Ryan on how to change build file...
-    // java -jar lib/avro-tools-1.8.1.jar idl src/main/avro/CDM14.avdl src/main/avro/CDM14.avpr
-    // java -jar lib/avro-tools-1.8.1.jar compile protocol src/main/avro/CDM14.avpr src/main/java/
+    // java -jar lib/avro-tools-1.8.2.jar idl src/main/avro/CDM14.avdl src/main/avro/CDM14.avpr
+    // java -jar lib/avro-tools-1.8.2.jar compile protocol src/main/avro/CDM14.avpr src/main/java/
     avroCompile := s"java -jar $avroToolsJarPath compile schema $avroSpecPath target/scala-2.11/src_managed/main/".!
   },
 

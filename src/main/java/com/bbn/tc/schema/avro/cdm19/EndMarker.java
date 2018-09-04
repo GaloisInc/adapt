@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * EndMarker records marks the end of a data stream. */
@@ -14,6 +17,41 @@ public class EndMarker extends org.apache.avro.specific.SpecificRecordBase imple
   private static final long serialVersionUID = -420327677504583496L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"EndMarker\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* EndMarker records marks the end of a data stream.\",\"fields\":[{\"name\":\"sessionNumber\",\"type\":\"int\",\"doc\":\"session number in the corresponding StartMarker\"},{\"name\":\"recordCounts\",\"type\":{\"type\":\"map\",\"values\":\"string\"},\"doc\":\"* Reports countc of each record type that has been published\\n         * since the the start of the data stream.\",\"order\":\"ignore\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<EndMarker> ENCODER =
+      new BinaryMessageEncoder<EndMarker>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<EndMarker> DECODER =
+      new BinaryMessageDecoder<EndMarker>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<EndMarker> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<EndMarker> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<EndMarker>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this EndMarker to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a EndMarker from a ByteBuffer. */
+  public static EndMarker fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** session number in the corresponding StartMarker */
   @Deprecated public int sessionNumber;
   /** * Reports countc of each record type that has been published
@@ -259,28 +297,31 @@ public class EndMarker extends org.apache.avro.specific.SpecificRecordBase imple
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public EndMarker build() {
       try {
         EndMarker record = new EndMarker();
         record.sessionNumber = fieldSetFlags()[0] ? this.sessionNumber : (java.lang.Integer) defaultValue(fields()[0]);
         record.recordCounts = fieldSetFlags()[1] ? this.recordCounts : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[1]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<EndMarker>
+    WRITER$ = (org.apache.avro.io.DatumWriter<EndMarker>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<EndMarker>
+    READER$ = (org.apache.avro.io.DatumReader<EndMarker>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

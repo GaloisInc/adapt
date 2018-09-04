@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Subjects represent execution contexts and include mainly threads and processes. They can be more granular and
@@ -15,6 +18,41 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
   private static final long serialVersionUID = -2682937314608903006L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Subject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Subjects represent execution contexts and include mainly threads and processes. They can be more granular and\\n     * can represent other execution boundaries such as units and blocks if needed.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"universally unique identifier for the subject\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SubjectType\",\"doc\":\"* SubjectType enumerates the types of execution contexts supported.\\n     *\\n     * SUBJECT_PROCESS,    process\\n     * SUBJECT_THREAD,     thread within a process\\n     * SUBJECT_UNIT        so far we only know of TRACE BEEP using this\",\"symbols\":[\"SUBJECT_PROCESS\",\"SUBJECT_THREAD\",\"SUBJECT_UNIT\",\"SUBJECT_BASIC_BLOCK\"]},\"doc\":\"the subject type\"},{\"name\":\"cid\",\"type\":\"int\",\"doc\":\"Context ID: OS process id for type process, thread id for threads\"},{\"name\":\"parentSubject\",\"type\":[\"null\",\"UUID\"],\"doc\":\"* parent subject's UUID. For a process, this is a parent\\n         * process. For a thread, this is the process that created the\\n         * thread. Only optional because in some cases the parent may not\\n         * be known; null value indicates that the parent is unknown.\",\"default\":null},{\"name\":\"localPrincipal\",\"type\":[\"null\",\"UUID\"],\"doc\":\"* UUID of local principal that owns this subject This\\n         * attribute is optional because there are times when\\n         * the owner of the subject may not be known at the time the file\\n         * object is reported (e.g., missed open call). Otherwise,\\n         * the local principal SHOULD be included.\",\"default\":null},{\"name\":\"startTimestampNanos\",\"type\":[\"null\",\"long\"],\"doc\":\"* The start time of the subject\\n         * A timestamp stores the number of nanoseconds from the unix epoch, 1 January 1970 00:00:00.000000 UTC.\\n         *\\n         * This attribute is optional because there are times when the\\n         * subject's start time may not be known. This happens when\\n         * the subject was started before TC instrumentation software\\n         * was started. Otherwise, the timestamp SHOULD be included.\",\"default\":null},{\"name\":\"unitId\",\"type\":[\"null\",\"int\"],\"doc\":\"unit id for unit based instrumentation (Optional)\",\"default\":null},{\"name\":\"iteration\",\"type\":[\"null\",\"int\"],\"doc\":\"iteration and count are used for distinguishing individual \\\"units\\\" of execution (Optional)\",\"default\":null},{\"name\":\"count\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"cmdLine\",\"type\":[\"null\",\"string\"],\"doc\":\"Process command line arguments including process name (Optional)\",\"default\":null},{\"name\":\"privilegeLevel\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"PrivilegeLevel\",\"doc\":\"* Windows allows Subjects (processes) to have the following\\n     * enumerated privilege levels.\",\"symbols\":[\"LIMITED\",\"ELEVATED\",\"FULL\"]}],\"doc\":\"Windows allows processes to have different privilege levels (Optional)\",\"default\":null},{\"name\":\"importedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"* imported libraries. (Optional). Lists the libraries that\\n         * are expected to be loaded, but may not necessarily\\n         * correspond 1-to-1 with actual load library events because\\n         * some libraries may already be loaded when this event\\n         * occurs.\",\"default\":null},{\"name\":\"exportedLibraries\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"doc\":\"exported libraries. (Optional)\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<Subject> ENCODER =
+      new BinaryMessageEncoder<Subject>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<Subject> DECODER =
+      new BinaryMessageDecoder<Subject>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<Subject> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<Subject> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<Subject>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this Subject to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a Subject from a ByteBuffer. */
+  public static Subject fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** universally unique identifier for the subject */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** the subject type */
@@ -1327,6 +1365,7 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Subject build() {
       try {
         Subject record = new Subject();
@@ -1345,22 +1384,24 @@ public class Subject extends org.apache.avro.specific.SpecificRecordBase impleme
         record.exportedLibraries = fieldSetFlags()[12] ? this.exportedLibraries : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[12]);
         record.properties = fieldSetFlags()[13] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[13]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<Subject>
+    WRITER$ = (org.apache.avro.io.DatumWriter<Subject>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<Subject>
+    READER$ = (org.apache.avro.io.DatumReader<Subject>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

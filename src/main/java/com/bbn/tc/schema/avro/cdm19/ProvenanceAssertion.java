@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * An assertion about the provenance of information */
@@ -14,6 +17,41 @@ public class ProvenanceAssertion extends org.apache.avro.specific.SpecificRecord
   private static final long serialVersionUID = 7448805031495271978L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceAssertion\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* An assertion about the provenance of information\",\"fields\":[{\"name\":\"asserter\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"Which Subject is making this assertion?\"},{\"name\":\"sources\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"UUID\"}],\"doc\":\"Object(s) that this Value's data came from.\",\"default\":null},{\"name\":\"provenance\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"ProvenanceAssertion\"}],\"doc\":\"* Further provenance assertions within this assertion.\\n\\t * For example, to describe a situation in which X asserts that\\n\\t * Y asserts that Z asserts that V came from {p,q}:\\n\\t *\\n\\t * ```\\n\\t * Event {\\n\\t *   subject = X,\\n\\t *   parameters = [\\n\\t *     Value (V) {\\n\\t *       provenance = [\\n\\t *         ProvenanceAssertion {\\n\\t *           asserter = UUID of X,\\n\\t *           sources = [ UUID of p, UUID of q ],\\n\\t *           provenance = [\\n\\t *             ProvenanceAssertion {\\n\\t *               asserter = UUID of Y,\\n\\t *               provenance = [\\n\\t *                 ProvenanceAssertion {\\n\\t *                   asserter = UUID of Z,\\n\\t *                 },\\n\\t *               ],\\n\\t *             },\\n\\t *           ],\\n\\t *         },\\n\\t *       ],\\n\\t *     },\\n\\t *   ],\\n\\t * }\\n\\t * ```\\n\\t * Z should have a provenance assertion\\n\\t * e.g.,\\n         * \\\"X asserts that Y asserts that Z comes from {p,q}\\\".\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<ProvenanceAssertion> ENCODER =
+      new BinaryMessageEncoder<ProvenanceAssertion>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<ProvenanceAssertion> DECODER =
+      new BinaryMessageDecoder<ProvenanceAssertion>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<ProvenanceAssertion> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<ProvenanceAssertion> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<ProvenanceAssertion>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this ProvenanceAssertion to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a ProvenanceAssertion from a ByteBuffer. */
+  public static ProvenanceAssertion fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Which Subject is making this assertion? */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID asserter;
   /** Object(s) that this Value's data came from. */
@@ -606,6 +644,7 @@ public class ProvenanceAssertion extends org.apache.avro.specific.SpecificRecord
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public ProvenanceAssertion build() {
       try {
         ProvenanceAssertion record = new ProvenanceAssertion();
@@ -613,22 +652,24 @@ public class ProvenanceAssertion extends org.apache.avro.specific.SpecificRecord
         record.sources = fieldSetFlags()[1] ? this.sources : (java.util.List<com.bbn.tc.schema.avro.cdm19.UUID>) defaultValue(fields()[1]);
         record.provenance = fieldSetFlags()[2] ? this.provenance : (java.util.List<com.bbn.tc.schema.avro.cdm19.ProvenanceAssertion>) defaultValue(fields()[2]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<ProvenanceAssertion>
+    WRITER$ = (org.apache.avro.io.DatumWriter<ProvenanceAssertion>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<ProvenanceAssertion>
+    READER$ = (org.apache.avro.io.DatumReader<ProvenanceAssertion>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

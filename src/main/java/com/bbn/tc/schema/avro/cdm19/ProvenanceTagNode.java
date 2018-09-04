@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * A provenance tag defines source dependence on specific data sources (inputs).
@@ -21,6 +24,41 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
   private static final long serialVersionUID = 8062299397384295221L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"ProvenanceTagNode\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* A provenance tag defines source dependence on specific data sources (inputs).\\n     * A tag identifier is typically bound to a source and used by the tracking system to\\n     * capture dependence on this source input.\\n     *\\n     * ProvenanceTagNode defines one step of provenance for a value\\n     * (i.e., one read from a source or write to a sink), a reference\\n     * to the previous provenance of the value (if any), and the tag\\n     * operation that resulted the tagId of this ProvenanceTagNode\",\"fields\":[{\"name\":\"tagId\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"Tag ID for this node *\"},{\"name\":\"flowObject\",\"type\":[\"null\",\"UUID\"],\"doc\":\"* The UUID of the source or sink object associated with this\\n         * tag. (Optional)\\n         *\\n         * This attribute is optional because if the\\n         * ProvenanceTagNode is simply joining two existing\\n         * provenances (e.g., when two values are added together), there\\n         * is no flow object associated with that definition.\\n         *\",\"default\":null},{\"name\":\"subject\",\"type\":\"UUID\",\"doc\":\"Subject that is performing the src/sink action *\"},{\"name\":\"systemCall\",\"type\":[\"null\",\"string\"],\"doc\":\"System call that read/wrote the data *\",\"default\":null},{\"name\":\"programPoint\",\"type\":[\"null\",\"string\"],\"doc\":\"The program point where the event was triggered (e.g., executable and line number), (Optional)\",\"default\":null},{\"name\":\"prevTagId\",\"type\":[\"null\",\"UUID\"],\"doc\":\"The previous tag for this value *\",\"default\":null},{\"name\":\"opcode\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"TagOpCode\",\"doc\":\"* The tag opcode describes the provenance relation i.e., how multiple sources are combined to\\n     * produce the output. We identify the following provenance relations\",\"symbols\":[\"TAG_OP_UNION\",\"TAG_OP_ENCODE\",\"TAG_OP_STRONG\",\"TAG_OP_MEDIUM\",\"TAG_OP_WEAK\"]}],\"doc\":\"Tag operation that resulted in the tagId of this ProvenanceTagNode *\",\"default\":null},{\"name\":\"tagIds\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"UUID\"}],\"default\":null},{\"name\":\"itag\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"IntegrityTag\",\"doc\":\"* The integrity tag may be used to specify the initial integrity of an entity,\\n     * or to endorse its content after performing appropriate checking/sanitization.\",\"symbols\":[\"INTEGRITY_UNTRUSTED\",\"INTEGRITY_BENIGN\",\"INTEGRITY_INVULNERABLE\"]}],\"doc\":\"The integrity tag may be used to specify the intial\\n         *  integrity of an entity, or to endorse it content after\\n         *  performing appropriate checking/sanitization.\",\"default\":null},{\"name\":\"ctag\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"ConfidentialityTag\",\"doc\":\"* The confidentiality tag may be used to specify the initial confidentiality of an entity,\\n     * or to declassify its content after performing appropriate checking/sanitization.\",\"symbols\":[\"CONFIDENTIALITY_SECRET\",\"CONFIDENTIALITY_SENSITIVE\",\"CONFIDENTIALITY_PRIVATE\",\"CONFIDENTIALITY_PUBLIC\"]}],\"doc\":\"* The confidentiality tag may be used to specify the initial\\n         * confidentiality of an entity, or to declassify its content\\n         * after performing appropriate checking/sanitization.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<ProvenanceTagNode> ENCODER =
+      new BinaryMessageEncoder<ProvenanceTagNode>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<ProvenanceTagNode> DECODER =
+      new BinaryMessageDecoder<ProvenanceTagNode>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<ProvenanceTagNode> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<ProvenanceTagNode> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<ProvenanceTagNode>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this ProvenanceTagNode to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a ProvenanceTagNode from a ByteBuffer. */
+  public static ProvenanceTagNode fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Tag ID for this node * */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID tagId;
   /** * The UUID of the source or sink object associated with this
@@ -1052,6 +1090,7 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public ProvenanceTagNode build() {
       try {
         ProvenanceTagNode record = new ProvenanceTagNode();
@@ -1067,22 +1106,24 @@ public class ProvenanceTagNode extends org.apache.avro.specific.SpecificRecordBa
         record.ctag = fieldSetFlags()[9] ? this.ctag : (com.bbn.tc.schema.avro.cdm19.ConfidentialityTag) defaultValue(fields()[9]);
         record.properties = fieldSetFlags()[10] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[10]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<ProvenanceTagNode>
+    WRITER$ = (org.apache.avro.io.DatumWriter<ProvenanceTagNode>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<ProvenanceTagNode>
+    READER$ = (org.apache.avro.io.DatumReader<ProvenanceTagNode>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {
