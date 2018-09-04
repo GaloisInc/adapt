@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import com.galois.adapt
+import com.galois.adapt.Parser.isEventAccept
 import com.galois.adapt.cdm18.{EVENT_ACCEPT, EVENT_CLOSE, EVENT_EXIT, EVENT_LSEEK, EVENT_MMAP, EVENT_OPEN, EVENT_OTHER, EVENT_READ, EVENT_RECVFROM, EVENT_WRITE, EventType, FileObjectType, SrcSinkType}
 
 import scala.reflect.ClassTag
@@ -32,17 +33,14 @@ case object ProcessActivityAST{
 
 }
 
-case class ProcessFileActivityAST(p: ProcessPath,
-                                  eventType: EventType,
+case class ProcessFileActivityAST(eventType: EventType,
                                   subject: SubjectProcess,
-                                  fot: FileObjectType,
                                   filePath: FilePath,
                                   earliestTimestampNanos: TimestampNanos
                                  )extends ProcessActivityAST{
 }
 
-case class ProcessNWActivityAST(processPath: ProcessPath,
-                                eventType: EventType,
+case class ProcessNWActivityAST(eventType: EventType,
                                 subject: SubjectProcess,
                                 neLocal: NWEndpointLocal,
                                 neRemote: NWEndpointRemote,
@@ -57,16 +55,14 @@ case class ProcessNWActivityAST(processPath: ProcessPath,
 
 
 
-case class ProcessProcessActivityAST(processPath: ProcessPath,
-                                     eventType: EventType,
+case class ProcessProcessActivityAST(eventType: EventType,
                                      subject: SubjectProcess,
                                      subject2: SubjectProcess,
                                      earliestTimestampNanos: TimestampNanos
                                     ) extends ProcessActivityAST{
 }
 
-case class ProcessSrcSinkActivityAST(processPath: ProcessPath,
-                                     eventType: EventType,
+case class ProcessSrcSinkActivityAST(eventType: EventType,
                                      subject: SubjectProcess,
                                      srcSinkType: SrcSinkType,
                                      earliestTimestampNanos: TimestampNanos
@@ -109,7 +105,7 @@ case class ProcessNWReadAndNWWriteAST(pna1: ProcessNWActivityAST, pna2: ProcessN
 
   override def toString: String = {
     "ProcessNWReadAndNWWriteAST(" +
-      pna1.processPath.toString +
+      pna1.subject.processPath.toString +
       pna1.subject.toString +
       pna1.neLocal.toString +
       pna1.neRemote.toString +
@@ -126,21 +122,27 @@ object ProcessNWReadAndNWWriteAST {
       case default => ???
     }
   }
+
+  def isApplicable(a1: ProcessNWActivityAST, a2: ProcessNWActivityAST): Boolean =
+    a1.subject == a2.subject && // same process
+      a1.neLocal == a2.neLocal && a1.neRemote == a2.neRemote && // same n/w endpoint
+      a1.eventType == EVENT_RECVFROM && a2.eventType == EVENT_WRITE // Read followed by a write
+
 }
 
 
 object ProcessFileActivityAST {
-  def fromProcessFileActivity(a: ProcessFileActivity) = ProcessFileActivityAST(a.processPath, a.eventType, a.subject, a.fot, a.filePath, a.earliestTimestampNanos)
+  def fromProcessFileActivity(a: ProcessFileActivity) = ProcessFileActivityAST(a.event, a.subject, a.filePath, a.earliestTimestampNanos)
 }
 
 object ProcessNWActivityAST {
-  def fromProcessNWActivity(a: ProcessNWActivity) = ProcessNWActivityAST(a.processPath, a.eventType, a.subject, a.neLocal, a.neRemote, a.earliestTimestampNanos)
+  def fromProcessNWActivity(a: ProcessNWActivity) = ProcessNWActivityAST(a.event, a.subject, a.neLocal, a.neRemote, a.earliestTimestampNanos)
 }
 object ProcessProcessActivityAST {
-  def fromProcessProcessActivity(a: ProcessProcessActivity) = ProcessProcessActivityAST(a.processPath, a.eventType, a.subject, a.subject2, a.earliestTimestampNanos)
+  def fromProcessProcessActivity(a: ProcessProcessActivity) = ProcessProcessActivityAST(a.event, a.subject, a.subject2, a.earliestTimestampNanos)
 }
 object ProcessSrcSinkActivityAST {
-  def fromProcessSrcSinkActivity(a: ProcessSrcSinkActivity) = ProcessSrcSinkActivityAST(a.processPath, a.eventType, a.subject, a.srcSinkType, a.earliestTimestampNanos)
+  def fromProcessSrcSinkActivity(a: ProcessSrcSinkActivity) = ProcessSrcSinkActivityAST(a.event, a.subject, a.srcSinkType, a.earliestTimestampNanos)
 }
 
 case class ProcessActivityListAST(activities: List[ProcessActivitiesSetOfUptoTwoAST]) extends AST
@@ -214,15 +216,6 @@ case class PSA(a: ProcessSrcSinkActivity) extends elementary
 
 
 
-
-
-
-
-
-
-
-
-
 object SummaryASTParser {
   //def apply(code: List[AST]): Either[CompilationError, AST] = {
   def apply(code: List[AST]): AST = {
@@ -259,25 +252,33 @@ object Parser extends Parsers {
 
   def block: Parser[AST] = positioned {
 
-    def hasProcessAndNE(a1: ProcessNWActivityAST, a2: ProcessNWActivityAST): Boolean = a1.subject == a2.subject && a1.neLocal == a2.neLocal && a1.neRemote == a2.neRemote
-
+    def f: (ProcessNWActivityAST, ProcessNWActivityAST) => Boolean = ProcessNWReadAndNWWriteAST.isApplicable
 
     def rule1 = {
       val list = rep(activity) ^^ { l =>
 
-        val res = l.filter(!isEventOpen(_))
+        val res = l
+          /*
+          .filter(!isEventOpen(_))
           .filter(!isEventAccept(_))
           .filter(!isEventOther(_))
           .filter(!isEventClose(_))
           .filter(!isEventExit(_))
           .filter(!isEventLseek(_))
+        */
+          .filter(i => !(isEventOpen(i) || isEventAccept(i) || isEventOther(i) || isEventClose(i) || isEventExit(i) || isEventLseek(i)))
+
           .foldRight(List.empty[ProcessActivityAST])(mergeConsecutiveActivities(_ similar _, _, _))
+
           .foldRight(List.empty[ProcessActivitiesSetOfUptoTwoAST])(mergeConsecutiveSimpleActivitiesIntoNew(readFromNWFollowedByWriteToFile, _, _))
+
           //.foldRight(List.empty[AST])(genericMerge(readFromNWFollowedByWriteToNW, _, _))
 
           //.foldRight(List.empty[AST])(genericMerge(readFromNWFollowedByWriteToNW, ProcessNWReadAndNWWriteAST.apply, _, _))
-          .foldRight(List.empty[AST])(genericMerge(checkTypesAndCond[ProcessNWActivityAST,ProcessNWActivityAST](hasProcessAndNE, _, _), ProcessNWReadAndNWWriteAST.apply, _, _))
-          //if (a1 hasProcessAndNE
+          //.foldRight(List.empty[AST])(genericMerge(checkTypesAndCond(hasSameProcessAndNE, _, _), ProcessNWReadAndNWWriteAST.apply, _, _))
+          //.foldRight(List.empty[AST])(genericMerge(checkTypesAndCond[ProcessNWActivityAST,ProcessNWActivityAST](hasSameProcessAndNE, _, _), ProcessNWReadAndNWWriteAST.apply, _, _))
+          .foldRight(List.empty[AST])(genericMerge(checkTypesAndCond(ProcessNWReadAndNWWriteAST.isApplicable, _, _), ProcessNWReadAndNWWriteAST.apply, _, _))
+          //if (a1 hasSameProcessAndNE
 
           .foldRight(List.empty[AST])(genericMerge(mergeFileReads,FileReadAST.fromA1A2, _, _))
           .foldRight(List.empty[AST])(genericMerge(mergeSimilarProcessNWReadAndNWWriteAST, (x1,x2)=>x1, _, _))
@@ -326,10 +327,12 @@ object Parser extends Parsers {
       case default => false
     }
   }
+  //def checkTypesAndCond[A1<:AST,A2<:AST](cond: (A1, A2)=>Boolean, a1:A1, a2:A2)(implicit tag1: ClassTag[A1], tag2: ClassTag[A2])= cond(a1,a2)
+
 
   def checkTypesAndCond[A1<:AST,A2<:AST](cond: (A1, A2)=>Boolean, a1:AST, a2:AST)(implicit tag1: ClassTag[A1], tag2: ClassTag[A2])= (a1,a2) match{
     case (a1: A1, a2:A2) if cond(a1, a2) => true
-    case default => false
+    case _ => false
   }
 
   //TODO: delete
@@ -386,22 +389,6 @@ object Parser extends Parsers {
     }
   }
 
-  // TODO: delete
-  //  def readFromNWFollowedByWriteToNW(a1:AST, a2:AST): Option[ProcessNWReadAndNWWriteAST] = {
-  //
-  //    (a1, a2) match {
-  //      case (a1: ProcessNWActivityAST, a2: ProcessNWActivityAST) if (a1 hasProcessAndNE a2) => Some(ProcessNWReadAndNWWriteAST(a1, a2))
-  //      case default => None
-  //    }
-  //  }
-
-  def readFromNWFollowedByWriteToNW(a1:AST, a2:AST): Boolean = {
-
-    (a1, a2) match {
-      case (a1: ProcessNWActivityAST, a2: ProcessNWActivityAST) if (a1 hasProcessAndNE a2) => true
-      case default => false
-    }
-  }
 
   def mergeConsecutiveSimpleActivitiesIntoNew(binaryMergeRule: (ProcessActivityAST, ProcessActivityAST) => Option[ProcessActivitiesSetOfUptoTwoAST], a1:ProcessActivityAST, paList:List[ProcessActivitiesSetOfUptoTwoAST]): List[ProcessActivitiesSetOfUptoTwoAST] = {
     paList match
@@ -474,10 +461,10 @@ object Parser extends Parsers {
 
   def activity: Parser[ProcessActivityAST] = positioned {
     accept("ProcessActivity", {
-      case ProcessFileActivity(p,et,s,fot,fp,t) => ProcessFileActivityAST(p,et,s,fot,fp,t)
-      case ProcessNWActivity(p,et,s,neL,neR,t) => ProcessNWActivityAST(p,et,s,neL,neR,t)
-      case ProcessProcessActivity(p,et,s1,s2,t) => ProcessProcessActivityAST(p,et,s1,s2,t)
-      case ProcessSrcSinkActivity(p,et,s,st,t) => ProcessSrcSinkActivityAST(p,et,s,st,t)
+      case ProcessFileActivity(et,s,fp,t) => ProcessFileActivityAST(et,s,fp,t)
+      case ProcessNWActivity(et,s,neL,neR,t) => ProcessNWActivityAST(et,s,neL,neR,t)
+      case ProcessProcessActivity(et,s1,s2,t) => ProcessProcessActivityAST(et,s1,s2,t)
+      case ProcessSrcSinkActivity(et,s,st,t) => ProcessSrcSinkActivityAST(et,s,st,t)
     }
     )
   }
@@ -497,16 +484,16 @@ object Parser extends Parsers {
 
 
   def pfa: Parser[ProcessFileActivityAST] = positioned{
-    accept("process file activity", {case ProcessFileActivity(p,et,s,fot,fp,t) => ProcessFileActivityAST(p,et,s,fot,fp,t)})
+    accept("process file activity", {case ProcessFileActivity(et,s,fp,t) => ProcessFileActivityAST(et,s,fp,t)})
   }
   def pssa: Parser[ProcessSrcSinkActivityAST] = positioned{
-    accept("process src/sink activity", {case ProcessSrcSinkActivity(p,et,s,st,t) => ProcessSrcSinkActivityAST(p,et,s,st,t)})
+    accept("process src/sink activity", {case ProcessSrcSinkActivity(et,s,st,t) => ProcessSrcSinkActivityAST(et,s,st,t)})
   }
   def ppa: Parser[ProcessProcessActivityAST] = positioned{
-    accept("process process activity", {case ProcessProcessActivity(p,et,s1,s2,t) => ProcessProcessActivityAST(p,et,s1,s2,t)})
+    accept("process process activity", {case ProcessProcessActivity(et,s1,s2,t) => ProcessProcessActivityAST(et,s1,s2,t)})
   }
   def pnwa: Parser[ProcessNWActivityAST] = positioned{
-    accept("process nw activity", {case ProcessNWActivity(p,et,s,neL,neR,t) => ProcessNWActivityAST(p,et,s,neL,neR,t)})
+    accept("process nw activity", {case ProcessNWActivity(et,s,neL,neR,t) => ProcessNWActivityAST(et,s,neL,neR,t)})
   }
 
 

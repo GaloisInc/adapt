@@ -1,3 +1,4 @@
+/*
 package com.galois.adapt
 
 import java.util.UUID
@@ -68,3 +69,4 @@ case class NWEndpointLocal(a: NWAddress, p: NWPort) //extends Positional
 case class NWEndpointRemote(a: NWAddress, p: NWPort) //extends Positional
 
 /********************************************************/
+*/

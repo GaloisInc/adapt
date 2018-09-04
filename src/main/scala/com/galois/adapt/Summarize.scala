@@ -20,6 +20,10 @@ import scala.concurrent.duration._
 import scala.util.Try
 import spray.json._
 
+import com.galois.adapt.cdm18.{EVENT_ACCEPT, EVENT_CLOSE, EVENT_EXIT, EVENT_LSEEK, EVENT_MMAP, EVENT_OPEN, EVENT_OTHER, EVENT_READ, EVENT_RECVFROM, EVENT_WRITE, EventType, FileObjectType, SrcSinkType}
+
+
+import scala.collection.mutable.HashMap
 
 object JsonParser{
   def cleanupJson(s: String): String = remove(s, List("\"", "\\{", "\\}"))
@@ -41,7 +45,7 @@ object JsonParser{
 
 
 object Summarize {
-  implicit val timeout: Timeout = Timeout(10 seconds)
+  implicit val timeout: Timeout = Timeout(1000 seconds)
   implicit val executionContext: ExecutionContextExecutor = Application.system.dispatcher
 
   def sendQueryAndTypeResultAsJsonArray(query: String): Future[Try[JsArray]] = {
@@ -52,21 +56,22 @@ object Summarize {
     result.mapTo[Future[Try[JsArray]]].flatMap(identity)
   }
 
-  def getAllProcesses(): Future[List[String]] = {
+  def getAllProcesses(maxProcs:Int) = {
     val query =
-    s"""g.V().hasLabel('AdmSubject').has('subjectType', 'SUBJECT_PROCESS').out('exec', 'cmdLine', '(cmdLine)').hasLabel('AdmPathNode').values('path').dedup().limit(2)"""
-    sendQueryAndTypeResultAsJsonArray(query).map(_.get.elements.toList.map(_.toString))
+    s"""g.V().hasLabel('AdmSubject').has('subjectType', 'SUBJECT_PROCESS').out('exec', 'cmdLine', '(cmdLine)').hasLabel('AdmPathNode').values('path').dedup().limit($maxProcs)"""
+    sendQueryAndTypeResultAsJsonArray(query).map(_.get.elements.toList.map(i=>ProcessPath(i.toString.slice(1, i.toString.length-1))))
   }
 
-  def summarizeAllProcess(maxProcess:Int = 2) = {
-    val allProcesses: List[String] = Await.result(getAllProcesses(), Timeout(10 seconds).duration).map(i => i.slice(1, i.length-1))
-    println(allProcesses)
+  def getActivitiesOfAllProcesses(maxProcs:Int = 2) = {
+    //val allProcesses = Await.result(getAllProcesses(), Timeout(10 seconds).duration).map(i => i.slice(1, i.length-1))
+    val allProcesses = Await.result(getAllProcesses(maxProcs), Timeout(10 seconds).duration)
+    //println(allProcesses)
 
-   val allProcessActivities: Future[List[List[ProcessActivity]]] = Future.sequence(allProcesses.map(p => summarizeProcess(ProcessPath(p))))
-    allProcessActivities.map(_.flatMap(identity))
+    val allProcessActivities = Future.sequence(allProcesses.map(p => (getProcessActivities(p))))
+    allProcessActivities//.map(_.flatten)
   }
 
-  def summarizeProcess(processPath: ProcessPath): Future[List[ProcessActivity]] = {
+  def getProcessActivities(processPath: ProcessPath): Future[List[ProcessActivity]] = {
 
     def queryFileActivities(): Future[List[ProcessFileActivity]] = {
 
@@ -79,10 +84,9 @@ object Summarize {
 
         val m = JsonParser.toMap(s)
         ProcessFileActivity(
-          processPath,
           EventType.values.find(_.toString == m("eventType")).get,
           SubjectProcess(UUID.fromString(m("uuid")), m("cid").toInt, processPath),
-          FileObjectType.values.find(_.toString == m("fot")).get, //file object type
+          /*FileObjectType.values.find(_.toString == m("fot")).get, //file object type*/
           FilePath(m("filePath")),
           TimestampNanos(m("earliestTimestampNanos").toLong))
       }
@@ -121,7 +125,6 @@ object Summarize {
       def srcSinkActivityFromJason(s: String) = {
         val m = JsonParser.toMap(s)
         ProcessSrcSinkActivity(
-          processPath,
           EventType.values.find(_.toString == m("eventType")).get,
           SubjectProcess(UUID.fromString(m("uuid1")), m("cid2").toInt, processPath),
           SrcSinkType.values.find(_.toString == m("eventType")).get,
@@ -164,7 +167,6 @@ object Summarize {
       def processProcessActivityFromJason(s: String) = {
         val m = JsonParser.toMap(s)
         ProcessProcessActivity(
-          processPath,
           EventType.values.find(_.toString == m("eventType")).get,
           SubjectProcess(UUID.fromString(m("uuid1")), m("cid2").toInt, processPath),
           //TODO: Fill in the processpath for subject2.
@@ -229,7 +231,6 @@ object Summarize {
       def processNWActivityFromJason(s: String) = {
         val m = JsonParser.toMap(s)
         ProcessNWActivity(
-          processPath,
           EventType.values.find(_.toString == m("eventType")).get,
           SubjectProcess(UUID.fromString(m("uuid")), m("cid").toInt, processPath),
           NWEndpointLocal(
@@ -286,7 +287,100 @@ object Summarize {
 //    x.map(SummaryASTParser(_))
 //    //println(SummaryASTParser(Await.result(x, timeout.duration)))
 //  }
+
+  def summarizeProcessFileActivities(p:ProcessPath): List[ProcessFileActivity] = {
+    val activities: Future[List[ProcessActivity]] = getProcessActivities(p)
+
+    def isEventAccept(a: ProcessActivity): Boolean = a.event == EVENT_ACCEPT
+    def isEventOpen(a: ProcessActivity): Boolean = a.event == EVENT_OPEN
+    def isEventOther(a: ProcessActivity): Boolean = a.event == EVENT_OTHER
+    def isEventClose(a: ProcessActivity): Boolean = a.event == EVENT_CLOSE
+    def isEventExit(a: ProcessActivity): Boolean = a.event == EVENT_EXIT
+    def isEventLseek(a: ProcessActivity): Boolean = a.event == EVENT_LSEEK
+
+    val a1: Future[List[ProcessActivity]] = activities.map(_.filter(i => !(isEventOpen(i) || isEventAccept(i) || isEventOther(i) || isEventClose(i) || isEventExit(i) || isEventLseek(i))))
+
+    val a2: Future[List[ProcessFileActivity]] = a1.map(_.collect { case pfa: ProcessFileActivity => pfa})
+
+    val m = HashMap.empty[EventType, List[ProcessFileActivity]]
+
+    val a3 = Await.result(a2, timeout.duration)
+    map1(m, a3)
+    //m
+    a3
+
+
+    //this.subject.uuid, this.subject.processPath, this.filePath, this.earliestTimestampNanos
+
+  }
+  def getCollapsibleSummary(p:ProcessPath): String = {
+    val activities: Future[List[ProcessActivity]] = getProcessActivities(p)
+
+    def isEventAccept(a: ProcessActivity): Boolean = a.event == EVENT_ACCEPT
+    def isEventOpen(a: ProcessActivity): Boolean = a.event == EVENT_OPEN
+    def isEventOther(a: ProcessActivity): Boolean = a.event == EVENT_OTHER
+    def isEventClose(a: ProcessActivity): Boolean = a.event == EVENT_CLOSE
+    def isEventExit(a: ProcessActivity): Boolean = a.event == EVENT_EXIT
+    def isEventLseek(a: ProcessActivity): Boolean = a.event == EVENT_LSEEK
+
+    val a1: Future[List[ProcessActivity]] = activities.map(_.filter(i => !(isEventOpen(i) || isEventAccept(i) || isEventOther(i) || isEventClose(i) || isEventExit(i) || isEventLseek(i))))
+    val a2: Future[List[ProcessFileActivity]] = a1.map(_.collect { case pfa: ProcessFileActivity => pfa})
+    val a3 = Await.result(a2, timeout.duration)
+
+    val t = Trie("ProcessFileActivity")
+    a3.foreach(i=> t.add(i.toString.split(",").toList))
+
+    val header = """<!DOCTYPE html>
+                   |
+                   |<style media="screen" type="text/css">
+                   |    ul>li>ul {
+                   |        display: none;
+                   |    }
+                   |</style>
+                   |
+                   |<html>
+                   |
+                   |<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+                   |<script>
+                   |
+                   |$(document).ready(function(){
+                   |    $('li').click(function(e){
+                   |        e.stopPropagation();
+                   |        if(this.getElementsByTagName("ul")[0].style.display =="block")
+                   |                $(this).find("ul").slideUp();
+                   |        else
+                   |                $(this).children(":first").slideDown();
+                   |    });
+                   |});
+                   |</script>
+                   |
+                   |<ul id="expList">
+                   |""".stripMargin
+    val footer = """</ul> </html>"""
+    header + t.pretty_print_html() + footer
+  }
+
+
+  def map1(m: HashMap[EventType, List[ProcessFileActivity]], aList: List[ProcessFileActivity]):Unit = {
+    aList match{
+      case head::tail => {m += (head.event -> (head::m.getOrElse(head.event, List.empty[ProcessFileActivity]))); map1(m, tail)}
+      case Nil => ()
+    }
+  }
+
+
+
+  def map2(m: HashMap[UUID, List[ProcessFileActivity]], aList: List[ProcessFileActivity]):Unit = {
+    aList match{
+      case head::tail => {m += (head.subject.uuid -> (head::m.getOrElse(head.subject.uuid, List.empty[ProcessFileActivity]))); map2(m, tail)}
+      case Nil => ()
+    }
+  }
+
+
+  def groupFileActivities(activities: Future[List[ProcessActivity]]) = {
+    ???
+  }
+
+
 }
-
-
-

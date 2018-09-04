@@ -32,17 +32,14 @@ case object ProcessActivityAST2{
 
 }
 
-case class ProcessFileActivityAST2(p: ProcessPath,
-                                  eventType: EventType,
+case class ProcessFileActivityAST2(eventType: EventType,
                                   subject: SubjectProcess,
-                                  fot: FileObjectType,
                                   filePath: FilePath,
                                   earliestTimestampNanos: TimestampNanos
                                  )extends ProcessActivityAST2{
 }
 
-case class ProcessNWActivityAST2(processPath: ProcessPath,
-                                eventType: EventType,
+case class ProcessNWActivityAST2(eventType: EventType,
                                 subject: SubjectProcess,
                                 neLocal: NWEndpointLocal,
                                 neRemote: NWEndpointRemote,
@@ -57,16 +54,14 @@ case class ProcessNWActivityAST2(processPath: ProcessPath,
 
 
 
-case class ProcessProcessActivityAST2(processPath: ProcessPath,
-                                     eventType: EventType,
+case class ProcessProcessActivityAST2(eventType: EventType,
                                      subject: SubjectProcess,
                                      subject2: SubjectProcess,
                                      earliestTimestampNanos: TimestampNanos
                                     ) extends ProcessActivityAST2{
 }
 
-case class ProcessSrcSinkActivityAST2(processPath: ProcessPath,
-                                     eventType: EventType,
+case class ProcessSrcSinkActivityAST2(eventType: EventType,
                                      subject: SubjectProcess,
                                      srcSinkType: SrcSinkType,
                                      earliestTimestampNanos: TimestampNanos
@@ -109,7 +104,7 @@ case class ProcessNWReadAndNWWriteAST2(pna1: ProcessNWActivityAST2, pna2: Proces
 
   override def toString: String = {
     "ProcessNWReadAndNWWriteAST2(" +
-      pna1.processPath.toString +
+      pna1.subject.processPath.toString +
       pna1.subject.toString +
       pna1.neLocal.toString +
       pna1.neRemote.toString +
@@ -130,17 +125,17 @@ object ProcessNWReadAndNWWriteAST2 {
 
 
 object ProcessFileActivityAST2 {
-  def fromProcessFileActivity(a: ProcessFileActivity) = ProcessFileActivityAST2(a.processPath, a.eventType, a.subject, a.fot, a.filePath, a.earliestTimestampNanos)
+  def fromProcessFileActivity(a: ProcessFileActivity) = ProcessFileActivityAST2(a.event, a.subject, a.filePath, a.earliestTimestampNanos)
 }
 
 object ProcessNWActivityAST2 {
-  def fromProcessNWActivity(a: ProcessNWActivity) = ProcessNWActivityAST2(a.processPath, a.eventType, a.subject, a.neLocal, a.neRemote, a.earliestTimestampNanos)
+  def fromProcessNWActivity(a: ProcessNWActivity) = ProcessNWActivityAST2(a.event, a.subject, a.neLocal, a.neRemote, a.earliestTimestampNanos)
 }
 object ProcessProcessActivityAST2 {
-  def fromProcessProcessActivity(a: ProcessProcessActivity) = ProcessProcessActivityAST2(a.processPath, a.eventType, a.subject, a.subject2, a.earliestTimestampNanos)
+  def fromProcessProcessActivity(a: ProcessProcessActivity) = ProcessProcessActivityAST2(a.event, a.subject, a.subject2, a.earliestTimestampNanos)
 }
 object ProcessSrcSinkActivityAST2 {
-  def fromProcessSrcSinkActivity(a: ProcessSrcSinkActivity) = ProcessSrcSinkActivityAST2(a.processPath, a.eventType, a.subject, a.srcSinkType, a.earliestTimestampNanos)
+  def fromProcessSrcSinkActivity(a: ProcessSrcSinkActivity) = ProcessSrcSinkActivityAST2(a.event, a.subject, a.srcSinkType, a.earliestTimestampNanos)
 }
 
 case class ProcessActivityListAST2(activities: List[ProcessActivitiesSetOfUptoTwoAST2]) extends AST2
@@ -405,10 +400,10 @@ object Parser2 extends Parsers {
 
   def activity: Parser[ProcessActivityAST2] = positioned {
     accept("ProcessActivity", {
-      case ProcessFileActivity(p,et,s,fot,fp,t) => ProcessFileActivityAST2(p,et,s,fot,fp,t)
-      case ProcessNWActivity(p,et,s,neL,neR,t) => ProcessNWActivityAST2(p,et,s,neL,neR,t)
-      case ProcessProcessActivity(p,et,s1,s2,t) => ProcessProcessActivityAST2(p,et,s1,s2,t)
-      case ProcessSrcSinkActivity(p,et,s,st,t) => ProcessSrcSinkActivityAST2(p,et,s,st,t)
+      case ProcessFileActivity(et,s,fp,t) => ProcessFileActivityAST2(et,s,fp,t)
+      case ProcessNWActivity(et,s,neL,neR,t) => ProcessNWActivityAST2(et,s,neL,neR,t)
+      case ProcessProcessActivity(et,s1,s2,t) => ProcessProcessActivityAST2(et,s1,s2,t)
+      case ProcessSrcSinkActivity(et,s,st,t) => ProcessSrcSinkActivityAST2(et,s,st,t)
     }
     )
   }
@@ -428,16 +423,16 @@ object Parser2 extends Parsers {
 
 
   def pfa: Parser[ProcessFileActivityAST2] = positioned{
-    accept("process file activity", {case ProcessFileActivity(p,et,s,fot,fp,t) => ProcessFileActivityAST2(p,et,s,fot,fp,t)})
+    accept("process file activity", {case ProcessFileActivity(et,s,fp,t) => ProcessFileActivityAST2(et,s,fp,t)})
   }
   def pssa: Parser[ProcessSrcSinkActivityAST2] = positioned{
-    accept("process src/sink activity", {case ProcessSrcSinkActivity(p,et,s,st,t) => ProcessSrcSinkActivityAST2(p,et,s,st,t)})
+    accept("process src/sink activity", {case ProcessSrcSinkActivity(et,s,st,t) => ProcessSrcSinkActivityAST2(et,s,st,t)})
   }
   def ppa: Parser[ProcessProcessActivityAST2] = positioned{
-    accept("process process activity", {case ProcessProcessActivity(p,et,s1,s2,t) => ProcessProcessActivityAST2(p,et,s1,s2,t)})
+    accept("process process activity", {case ProcessProcessActivity(et,s1,s2,t) => ProcessProcessActivityAST2(et,s1,s2,t)})
   }
   def pnwa: Parser[ProcessNWActivityAST2] = positioned{
-    accept("process nw activity", {case ProcessNWActivity(p,et,s,neL,neR,t) => ProcessNWActivityAST2(p,et,s,neL,neR,t)})
+    accept("process nw activity", {case ProcessNWActivity(et,s,neL,neR,t) => ProcessNWActivityAST2(et,s,neL,neR,t)})
   }
 
 

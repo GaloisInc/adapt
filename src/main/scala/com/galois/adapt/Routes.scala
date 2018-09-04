@@ -119,52 +119,78 @@ object Routes {
                 complete(
                   {
                     //Summarize.summarize(ProcessPath(pName)).toString()
-                    Summarize.summarizeProcess(ProcessPath(pName)).map(_.map(_.toString))
+                    Summarize.getProcessActivities(ProcessPath(pName)).map(_.map(_.toString))
                   }
                 )
               }~
-              path("processPath" / Segment / "summary") { pName =>
-                complete(
-                  {
-                    val s: Future[List[ProcessActivity]] = Summarize.summarizeProcess(ProcessPath(pName))
-                      s.map(SummaryASTParser(_).toString)
-                    //Summarize.summarize(ProcessPath(pName)).map(_.toString)
-//                      .map{
-//                      case Right(r) => r.toString()
-//                      case Left(l) => "Parser Error"
-//                    }
-                  }
-                )
-              }~
-              path("all-process-activity") {
-                complete(
-                  {
-                    Summarize.summarizeAllProcess().map(_.map(_.toString))
-                  }
-                 )
+                path("processPath" / Segment / "fileSummary") { pName =>
+                  complete(
+                    {
+                      //Summarize.summarizeProcess(ProcessPath(pName)).map(_.toString)
+                      (Summarize.summarizeProcessFileActivities(ProcessPath(pName))).fold(""){ (x, y) => x+y.toString+"\n"}.toString
+                    }
+                  )
+                }~
+                path("processPath" / Segment / "collapsedFileSummary") { pName =>
+                  complete(
+                    HttpEntity(ContentTypes.`text/html(UTF-8)`, Summarize.getCollapsibleSummary(ProcessPath(pName)))
+                  )
+                }~
+                //TODO: optional parameter
+                path("processPath" / Segment / "readableSummary") { pName =>
+                  val p = ProcessPath(pName)
+                  complete(Summarize.getProcessActivities(p).map(SummaryParser.readableSummary))
+                }~
+                path("processPath" / "readableSummaryOfAll") {
+                  complete(Summarize.getActivitiesOfAllProcesses().map(_.map(SummaryParser.readableSummary).reduce(_+_)))
+                }~
+                path("processPath" / "readableSummaryOfAll" / Segment) { maxProcs =>
+                  complete(Summarize.getActivitiesOfAllProcesses(maxProcs.toInt).map(_.map(SummaryParser.readableSummary).reduce(_+_)))
+                }~
+                path("processPath" / Segment / "summaryOLD") { pName =>
+                  complete(
+                    {
+                      val s: Future[List[ProcessActivity]] = Summarize.getProcessActivities(ProcessPath(pName))
+                      //                      s.map(SummaryASTParser(_).toString)
+                      s.map(SummaryParser.compress(_).toString)
+                      //Summarize.summarize(ProcessPath(pName)).map(_.toString)
+                      //                      .map{
+                      //                      case Right(r) => r.toString()
+                      //                      case Left(l) => "Parser Error"
+                      //                    }
+                    }
+                  )
+                }~
+                //TODO: optional parameter
+                path("all-process-activity") {
+                  complete(
+                    {
+                      Summarize.getActivitiesOfAllProcesses().map(_.map(_.toString))
+                    }
+                  )
                 }~
                 path("all-process-activity" / Segment) { maxProcess =>
                   complete(
                     {
-                      Summarize.summarizeAllProcess(maxProcess.toInt).map(_.map(_.toString))
+                      Summarize.getActivitiesOfAllProcesses(maxProcess.toInt).map(_.map(_.toString))
                     }
                   )
                 }
-//                path("processUUID" / Segment / "activity") { pUUID =>
-//                  complete(
-//                    SummarizeOld.activitiesOfProcess(ProcessUUID(UUID.fromString(pUUID))).map(_.map(_.toString))
-//                  )
-//                } ~
-//                path("processPid" / Segment / "activity") { pPID =>
-//                  complete(
-//                    SummarizeOld.activitiesOfProcess(ProcessPID(pPID.toInt)).map(_.map(_.toString))
-//                  )
-//                } ~
-//                path("processNameToNode" / Segment) { pName =>
-//                  complete(
-//                    SummarizeOld.processNode(ProcessName(pName))
-//                  )
-//                }
+              //                path("processUUID" / Segment / "activity") { pUUID =>
+              //                  complete(
+              //                    SummarizeOld.activitiesOfProcess(ProcessUUID(UUID.fromString(pUUID))).map(_.map(_.toString))
+              //                  )
+              //                } ~
+              //                path("processPid" / Segment / "activity") { pPID =>
+              //                  complete(
+              //                    SummarizeOld.activitiesOfProcess(ProcessPID(pPID.toInt)).map(_.map(_.toString))
+              //                  )
+              //                } ~
+              //                path("processNameToNode" / Segment) { pName =>
+              //                  complete(
+              //                    SummarizeOld.processNode(ProcessName(pName))
+              //                  )
+              //                }
             } ~
               pathPrefix("status") {
                 import ApiJsonProtocol.statusReport
