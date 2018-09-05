@@ -1,8 +1,11 @@
 package com.galois.adapt.adm
 
+import java.util.UUID
+
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.scaladsl.Flow
+import akka.stream.FlowShape
+import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, Partition}
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
 
@@ -21,6 +24,85 @@ object UuidRemapper {
 
 
   type UuidRemapperFlow = Flow[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed]
+
+  def sharded(
+      expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
+
+      cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
+      cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
+      blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
+
+      ignoreEvents: Boolean,
+      log: LoggingAdapter,
+
+      numShards: Int
+  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() { implicit b =>
+    import GraphDSL.Implicits._
+
+    def remapped: UuidRemapperInfo => Boolean = {
+      case _: AnAdm => true
+      case AnEdge(e: EdgeAdm2Adm) => true
+      case AnEdge(e) => false
+      case _: CdmMerge => false
+      case JustTime => true
+    }
+
+    def extract: UuidRemapperInfo => List[Either[ADM, EdgeAdm2Adm]] = {
+      case AnAdm(a) => List(Left(a))
+      case AnEdge(e: EdgeAdm2Adm) => List(Right(e))
+      case JustTime => List.empty
+      case _: CdmMerge => List.empty
+      case AnEdge(e) => throw new Exception(s"Edge $e was not done being remapped!")
+    }
+
+    /*
+      *                              ,------<-------------<------------- --<---.
+      *                           1 |                                           | 1
+      *                             \                                           /
+      * Timed[UuidRemapperInfo]  -0- loopBack ->- sharded                -->- decider --->-- 0 ret
+      *
+      *
+      *
+      *
+      */
+
+    val loopBack = b.add(Merge[Timed[UuidRemapperInfo]](2))
+    val decider = b.add(Partition[Timed[UuidRemapperInfo]](2, info => if (remapped(info.unwrap)) 0 else 1))
+    val ret = b.add(Flow[Either[ADM, EdgeAdm2Adm]])
+    val sharded = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
+
+    decider.out(1) ~> loopBack.in(1)
+    decider.out(0).mapConcat[Either[ADM, EdgeAdm2Adm]]((t: Timed[UuidRemapperInfo]) => extract(t.unwrap)) ~> ret.in
+
+    loopBack.out(0) ~> sharded.in
+
+    val broadcastTime = b.add(Broadcast[Time](numShards))
+
+    def filterDone: FlowOps
+    def partitioner: UuidRemapperInfo => Int = {
+      case AnAdm(adm) => uuidPartition(uuidPartition(adm.uuid.uuid))
+    }
+
+    def filterShard(shardIndex: Int)(t: Timed[UuidRemapperInfo]): Timed[UuidRemapperInfo] =
+      if (partitioner(t.unwrap) == shardIndex) { t } else { t.copy(unwrap = JustTime) }
+
+
+    def uuidPartition(u: UUID): Int = (u.getLeastSignificantBits % numShards).intValue()
+
+    val partitionContent = b.add(Partition[UuidRemapperInfo](numShards, partitioner))
+
+    duplicate.out(0) ~> Flow.fromFunction { case Timed(t, _) => t } ~> broadcastTime.in
+    duplicate.out(1) ~> Flow.fromFunction { case Timed(_, i) => i } ~> partitionContent.in
+
+
+
+//    broadcast ~> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+//    //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
+//    SinkShape(broadcast.in)
+
+    FlowShape(loopBack.in(0), ret.out)
+  })
+
 
   def apply(
     expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
