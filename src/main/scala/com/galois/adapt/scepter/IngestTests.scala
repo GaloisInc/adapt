@@ -249,7 +249,7 @@ class General_TA1_Tests(
 
       assert(
         eventsWithoutThreadId.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
+        s"\nSome (non 'EVENT_ADD_OBJECT_ATTRIBUTE'/'EVENT_FLOWS_TO') events don't have a 'threadId':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
       )
     }
   }
@@ -275,7 +275,7 @@ class General_TA1_Tests(
 
       assert(
         malformedAddObjectEvents.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
+        s"\nSome 'EVENT_ADD_OBJECT_ATTRIBUTE' events don't have two predicate objects that are 'NetFlowObject's:\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
       )
     }
   }
@@ -293,13 +293,9 @@ class General_TA1_Tests(
     if (eventsNotOther.nonEmpty) {
       assert(eventsNotOther.nonEmpty)
     } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${eventsNotOther.map(_.id().toString).take(20).mkString(",")}):$code"
-      val uuidsOfEventsNotOther = eventsNotOther.map(_.value("uuid").toString).take(20).mkString("\n" + color)
-
       assert(
         eventsNotOther.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsNotOther${Console.RED}\n"
+        s"\nDidn't find any events with type not 'EVENT_UPDATE'\n"
       )
     }
   }
