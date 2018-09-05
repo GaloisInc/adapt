@@ -3,6 +3,8 @@ package com.galois.adapt
 
 import java.util.UUID
 
+import scala.concurrent.{ExecutionContextExecutor, Future, Await}
+
 import com.galois.adapt.cdm18.{EVENT_ACCEPT, EVENT_CLOSE, EVENT_EXECUTE, EVENT_EXIT, EVENT_FORK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_PROCESS, EVENT_OPEN, EVENT_OTHER, EVENT_READ, EVENT_RECVFROM, EVENT_WRITE, EventType, FileObjectType, SrcSinkType}
 
 import scala.reflect.ClassTag
@@ -13,7 +15,7 @@ trait ComposedActivity
 object SummaryParser {
 
   // Count
-  def countActivities[A<:Element](l:List[Element], f:A=>Boolean = (_:A)=>true)(implicit tag: ClassTag[A]): Int = l.count{case a:A if f(a)=> true; case _ => false}
+  def countActivities[A<:Element](l:Seq[Element], f:A=>Boolean = (_:A)=>true)(implicit tag: ClassTag[A]): Int = l.count{case a:A if f(a)=> true; case _ => false}
   def filter[A<:Element](l:List[Element], f:A=>Boolean = (_:A)=>true)(implicit tag: ClassTag[A]): List[A] = l.collect{case a:A if f(a)=> a}
 
   def isFileActivity(a:ProcessActivity):Boolean = a match {case a:ProcessFileActivity => true; case _ => false}
@@ -77,8 +79,6 @@ object SummaryParser {
   def getProcessModified(l:List[Element]): Set[ProcessPath] = getProcessModifyActivities(l).map(_.subject2.processPath).toSet
 
 
-
-
   /*
   def FRA(f:FilePath) = (i:ProcessFileActivity) => i.filePath == f && i.event == EVENT_READ
   def sortedFileReads(l:List[Element]) = {
@@ -88,7 +88,7 @@ object SummaryParser {
     sorted_frs
   }
 */
-  def getNumActivities[A<:Element, B, C<:A:ClassTag](l:List[A], s:Set[B], f:(C, B)=>Boolean): List[(B, Int)] = {
+  def getNumActivities[A<:Element, B, C<:A:ClassTag](l:Seq[A], s:Set[B], f:(C, B)=>Boolean): List[(B, Int)] = {
     s.map(file=>(file, countActivities(l, (a:C) => f(a, file)))).toList.sortBy(_._2)
   }
 
@@ -170,6 +170,12 @@ def readableSummary(l:List[ProcessActivity]): String = {
   if (l.isEmpty) "" else{
     val p = l.head.subject.processPath
 
+    //val uniqueUuids = l.view.map(_.subject.uuid).toSet
+    val uniqueUuids_count: Map[UUID, Int] = l.groupBy{ a => a.subject.uuid}.map {case(num, occ) => (num, occ.length)}
+    val uniqueUuids = uniqueUuids_count.keySet
+
+    println("start")
+    //TODO: How to parameterize groupby?
     val groupedActivities = l.view.groupBy{
       case a if isFileActivity(a) => "FileActivity"
       case a if isNWActivity(a) => "NWActivity"
@@ -177,62 +183,100 @@ def readableSummary(l:List[ProcessActivity]): String = {
       case a if isSrcSinkActivity(a) => "SrcSinkActivity"
     }
 
-    //TODO: Better solution?
-    val allFileActivities = groupedActivities("FileActivity").map{case a:ProcessFileActivity => a}
-    val allNWActivities = groupedActivities("NWActivity").map{case a:ProcessNWActivity=> a}
-    val allProcessActivities = groupedActivities("ProcessActivity").map{case a:ProcessProcessActivity => a}
-    val allSrcSinkActivities = groupedActivities("SrcSinkActivity").map{case a:ProcessSrcSinkActivity => a}
+    println("first group")
+
+    //TODO: Better solution for typecasting?
+    val allFileActivities = groupedActivities.getOrElse("FileActivity", Seq.empty).map{case a:ProcessFileActivity => a}
+    val allNWActivities = groupedActivities.getOrElse("NWActivity", Seq.empty).map{case a:ProcessNWActivity=> a}
+    val allProcessActivities = groupedActivities.getOrElse("ProcessActivity", Seq.empty).map{case a:ProcessProcessActivity => a}
+    val allSrcSinkActivities = groupedActivities.getOrElse("SrcSinkActivity", Seq.empty).map{case a:ProcessSrcSinkActivity => a}
+
 
     val groupedFileActivities = allFileActivities.groupBy{
       case a if isFileRead(a) => "FileRead"
       case a if isFileWrite(a) => "FileWrite"
       case a if isFileExec(a) => "FileExec"
+      case default => "FileMisc"
     }
+
+    println("second group")
+    //TODO: How to parameterize groupby and do all groupings in one traversal?
+    val allFileReads = groupedFileActivities.getOrElse("FileRead", Seq.empty)
+    println("done`")
+    val allFileWrites = groupedFileActivities.getOrElse("FileWrite", Seq.empty)
+    println("done1")
+    val allFileExecs = groupedFileActivities.getOrElse("FileExec", Seq.empty)
+    println("done3")
+
+    val uniqueFilesRead = allFileReads.map(_.filePath).toSet
+    println("setop1")
+    val uniqueFilesWritten = allFileWrites.map(_.filePath).toSet
+    println("setop2")
+    val uniqueFilesExecuted = allFileExecs.map(_.filePath).toSet
+    println("setop3")
 
     val groupedNWActivities = allNWActivities.groupBy{
       case a if isNWRead(a) => "NWRead"
       case a if isNWWrite(a) => "NWWrite"
+      case default => "NWMisc"
     }
+    println("sub NW group")
+
+    val allNWReads = groupedNWActivities.getOrElse("NWRead", Seq.empty)
+    val allNWWrites = groupedNWActivities.getOrElse("NWWrite", Seq.empty)
+
+    val uniqueNWReads = allNWReads.map(_.neRemote).toSet
+    val uniqueNWWrites = allNWWrites.map(_.neRemote).toSet
+
+    println("sub NW group setop")
 
     val groupedProcessActivities = allProcessActivities.groupBy{
       case a if isProcessFork(a) => "ProcessFork"
       case a if isProcessModify(a) => "ProcessModify"
+      case default => "ProcessMisc"
     }
+    println("sub process group")
 
+    val allProcessForks = groupedProcessActivities.getOrElse("ProcessFork", Seq.empty)
+    val allProcessModifications = groupedProcessActivities.getOrElse("ProcessModify", Seq.empty)
+
+
+    val uniqueProcessForks = allProcessForks.map(_.subject2.processPath).toSet
+    val uniqueProcessModifications = allProcessModifications.map(_.subject2.processPath).toSet
+
+    println("sub process setop")
 
 
     s"""
        |==================================================
        |======= Process Path: ${p.path}
        |==================================================
-       |Number of File Activities: ${countFileActivities(l)} (Reads: ${countFileReads(l)}, Writes: ${countFileWrites(l)}, Execs: ${countFileExecs(l)})
-       |Number of NW Activities: ${countNWActivities(l)}(Reads: ${countNWReads(l)}, Writes: ${countNWWrites(l)})
-       |Number of Process Activities: ${countProcessActivities(l)}(Reads: ${countProcessForks(l)}, Modifications: ${countProcessModifications(l)})
+       |Number of File Activities: ${allFileActivities.length} (Reads: ${allFileReads.length}, Writes: ${allFileWrites.length}, Execs: ${allFileExecs.length})
+       |Number of NW Activities: ${allNWActivities.length}(Reads: ${allNWReads.length}, Writes: ${allNWWrites.length})
+       |Number of Process Activities: ${allProcessActivities.length}(Reads: ${allProcessForks.length}, Modifications: ${allProcessModifications.length})
+       |Number of Src/Sink Activities: ${allSrcSinkActivities.length}
+       |Number of UUIDS: ${uniqueUuids.size}
+       |UUIDS (# of activities): ${uniqueUuids_count.toList.view.sortBy(_._2).map(prettyPrintSorted)}
 
-       |Number of UUIDS: ${countUniqueUuids(l)}
-       |UUIDS (# of activities): ${getNumActivities(l,getUuids(l), (a:ProcessActivity, f:UUID)=>a.subject.uuid == f).map(prettyPrintSorted)}
-
-       |Files Read (# of activities): ${getNumActivities(l,getFilesRead(l), (a:ProcessFileActivity, f:FilePath)=>a.filePath == f && isFileRead(a)).map(prettyPrintSorted)}
-
-       |Files Written (# of activities): ${getNumActivities(l, getFilesWritten(l), (a: ProcessFileActivity, f: FilePath) => a.filePath == f && isFileWrite(a)).map(prettyPrintSorted)}
-
-       |Files Executed (# of activities): ${getNumActivities(l, getFilesExecuted(l), (a: ProcessFileActivity, f: FilePath) => a.filePath == f && isFileExec(a)).map(prettyPrintSorted)}
-
-       |NW Reads (# of activities): ${getNumActivities(l, getNWReads(l), (a: ProcessNWActivity, nr: NWEndpointRemote) => a.neRemote == nr && isNWRead(a)).map(prettyPrintSorted)}
-
-       |NW Writes (# of activities): ${getNumActivities(l, getNWWrites(l), (a: ProcessNWActivity, nr: NWEndpointRemote) => a.neRemote == nr && isNWWrite(a)).map(prettyPrintSorted)}
-
-       |Process Forked (# of activities): ${getNumActivities(l, getProcessForks(l), (a: ProcessProcessActivity, p: ProcessPath) => a.subject2.processPath == p && isProcessFork(a)).map(prettyPrintSorted)}
-       |Process Modified(# of activities): ${getNumActivities(l, getProcessModified(l), (a: ProcessProcessActivity, p: ProcessPath) => a.subject2.processPath == p && isProcessModify(a)).map(prettyPrintSorted)}
+       |Files Read (# of activities): ${getNumActivities(allFileReads, uniqueFilesRead, (a: ProcessFileActivity, f: FilePath) => a.filePath == f).map(prettyPrintSorted)}
+       |Files Written (# of activities): ${getNumActivities(allFileWrites, uniqueFilesWritten, (a: ProcessFileActivity, f: FilePath) => a.filePath == f).map(prettyPrintSorted)}
+       |Files Executed (# of activities): ${getNumActivities(allFileExecs, uniqueFilesExecuted, (a: ProcessFileActivity, f: FilePath) => a.filePath == f).map(prettyPrintSorted)}
+       |NW Reads (# of activities): ${getNumActivities(allNWReads, uniqueNWReads, (a: ProcessNWActivity, nr: NWEndpointRemote) => a.neRemote == nr).map(prettyPrintSorted)}
+       |NW Writes (# of activities): ${getNumActivities(allNWWrites, uniqueNWWrites, (a: ProcessNWActivity, nr: NWEndpointRemote) => a.neRemote == nr).map(prettyPrintSorted)}
+       |Process Forked (# of activities): ${getNumActivities(allProcessForks, uniqueProcessForks, (a: ProcessProcessActivity, p: ProcessPath) => a.subject2.processPath == p).map(prettyPrintSorted)}
+       |Process Modified(# of activities): ${getNumActivities(allProcessModifications, uniqueProcessModifications, (a: ProcessProcessActivity, p: ProcessPath) => a.subject2.processPath == p).map(prettyPrintSorted)}
 
        |NW Reads followed by File Writes (downloads?): ${collectConsecutive(l, isNWRead, isFileWrite).map(formatActPairs)}
-
        |File Writes followed by File Executes (malicious?): ${collectConsecutive(l, isFileWrite, isFileExec, areTwoFilesSame).map(formatActPairs)}
+
+
     """.stripMargin
   }
 }
-  //NW Reads followed by File Writes (downloads?): ${listOfPairs(collectConsecutive__(l,isNWRead,isFileWrite)).map { case (a1, a2) => s"\n ${a1.toStr} => ${a2.toStr}"; case _ => "" }}
 
+
+  // NW Reads followed by File Writes (downloads?): ${listOfPairs(collectConsecutive__(l,isNWRead,isFileWrite)).map { case (a1, a2) => s"\n ${a1.toStr} => ${a2.toStr}"; case _ => "" }}
+//  UUIDS (# of activities): ${getNumActivities(l,uniqueUuids, (a:ProcessActivity, f:UUID)=>a.subject.uuid == f).map(prettyPrintSorted)}
 
   def f: (ProcessNWActivity, ProcessNWActivity) => Boolean = ProcessNWReadAndNWWrite.isApplicable
   def isEventAccept(a: ProcessActivity): Boolean = a.event == EVENT_ACCEPT
