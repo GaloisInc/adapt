@@ -103,7 +103,7 @@ object UuidRemapper {
     loopBack.out ~> splitShards.in
 
     for (i <- 0 until numShards) {
-      val thisRemapper: Flow[Timed[UuidRemapperInfo], Timed[UuidRemapperInfo], NotUsed] = ??? // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
+      val thisRemapper = oneShard(i, thisPartitioner, expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log) // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
       splitShards.out(i) ~> Flow.fromFunction(filterShard(i)) ~> thisRemapper ~> mergeShards.in(i)
     }
 
@@ -180,7 +180,7 @@ object UuidRemapper {
 
     // Expire old UUIDs based on the current time. Note all this does is create a new node and call out to `putCdm2Adm`.
     def updateTimeAndExpireOldUuids(time: Time, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
-      var toReturn: mutable.ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty
+      var toReturn: mutable.ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
       if (time.nanos > currentTime.nanos) {
         // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
