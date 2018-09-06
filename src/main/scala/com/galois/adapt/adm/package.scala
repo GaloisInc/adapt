@@ -83,6 +83,14 @@ package object adm {
       }
       curr
     }
+
+    // Get the next CdmUUID in the edge (if there is one)
+    def nextCdmUUID: Option[CdmUUID] = this match {
+      case EdgeCdm2Cdm(cdm, _, _) => Some(cdm)
+      case EdgeCdm2Adm(cdm, _, _) => Some(cdm)
+      case EdgeAdm2Cdm(_, _, cdm) => Some(cdm)
+      case EdgeAdm2Adm(_, _, _) => None
+    }
   }
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge
   final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge
