@@ -137,15 +137,20 @@ object Routes {
                   )
                 }~
                 //TODO: optional parameter
-                path("processPath" / Segment / "readableSummary") { pName =>
+                path("processPath" / Segment / "readableSummary2") { pName =>
                   val p = ProcessPath(pName)
-                  complete(Summarize.getProcessActivities(p).map(SummaryParser.readableSummary))
+                  complete(Summarize.getProcessActivities(p).map(SummaryParser.readableSummary2))
+                }~
+                //TODO: Remove old fun
+                path("processPath" / Segment / "readableSummary1") { pName =>
+                  val p = ProcessPath(pName)
+                  complete(Summarize.getProcessActivities(p).map(SummaryParser.readableSummary1))
                 }~
                 path("processPath" / "readableSummaryOfAll") {
-                  complete(Summarize.getActivitiesOfAllProcesses().map(_.map(SummaryParser.readableSummary).reduce(_+_)))
+                  complete(Summarize.getActivitiesOfAllProcesses().map(_.map(SummaryParser.readableSummary1).reduce(_+_)))
                 }~
                 path("processPath" / "readableSummaryOfAll" / Segment) { maxProcs =>
-                  complete(Summarize.getActivitiesOfAllProcesses(maxProcs.toInt).map(_.map(SummaryParser.readableSummary).reduce(_+_)))
+                  complete(Summarize.getActivitiesOfAllProcesses(maxProcs.toInt).map(_.map(SummaryParser.readableSummary1).reduce(_+_)))
                 }~
                 path("processPath" / Segment / "summaryOLD") { pName =>
                   complete(

@@ -3,10 +3,10 @@ package com.galois.adapt
 
 import java.util.UUID
 
-import scala.concurrent.{ExecutionContextExecutor, Future, Await}
-
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import com.galois.adapt.cdm18.{EVENT_ACCEPT, EVENT_CLOSE, EVENT_EXECUTE, EVENT_EXIT, EVENT_FORK, EVENT_LSEEK, EVENT_MMAP, EVENT_MODIFY_PROCESS, EVENT_OPEN, EVENT_OTHER, EVENT_READ, EVENT_RECVFROM, EVENT_WRITE, EventType, FileObjectType, SrcSinkType}
 
+import scala.collection.immutable.HashMap
 import scala.reflect.ClassTag
 
 trait Element
@@ -165,14 +165,18 @@ object SummaryParser {
   def getDirReads = ???
   def get = ???
 
-//Files Read (# of times): ${sortedFileReads(l).map(i=>s"\n\t${i._1.path}(${i._2})").toString.replace(",","")}\n
-def readableSummary(l:List[ProcessActivity]): String = {
+
+  //Files Read (# of times): ${sortedFileReads(l).map(i=>s"\n\t${i._1.path}(${i._2})").toString.replace(",","")}\n
+  def readableSummary1(l:List[ProcessActivity]): String = {
   if (l.isEmpty) "" else{
     val p = l.head.subject.processPath
 
     //val uniqueUuids = l.view.map(_.subject.uuid).toSet
     val uniqueUuids_count: Map[UUID, Int] = l.groupBy{ a => a.subject.uuid}.map {case(num, occ) => (num, occ.length)}
     val uniqueUuids = uniqueUuids_count.keySet
+    println("uuids done")
+    val uniqueUuids_countSorted = uniqueUuids_count.toList.sortBy(_._2)
+    println("uuids sorted")
 
     println("start")
     //TODO: How to parameterize groupby?
@@ -246,7 +250,6 @@ def readableSummary(l:List[ProcessActivity]): String = {
 
     println("sub process setop")
 
-
     s"""
        |==================================================
        |======= Process Path: ${p.path}
@@ -256,7 +259,7 @@ def readableSummary(l:List[ProcessActivity]): String = {
        |Number of Process Activities: ${allProcessActivities.length}(Reads: ${allProcessForks.length}, Modifications: ${allProcessModifications.length})
        |Number of Src/Sink Activities: ${allSrcSinkActivities.length}
        |Number of UUIDS: ${uniqueUuids.size}
-       |UUIDS (# of activities): ${uniqueUuids_count.toList.view.sortBy(_._2).map(prettyPrintSorted)}
+       |UUIDS (# of activities): ${uniqueUuids_countSorted.map(prettyPrintSorted)}
 
        |Files Read (# of activities): ${getNumActivities(allFileReads, uniqueFilesRead, (a: ProcessFileActivity, f: FilePath) => a.filePath == f).map(prettyPrintSorted)}
        |Files Written (# of activities): ${getNumActivities(allFileWrites, uniqueFilesWritten, (a: ProcessFileActivity, f: FilePath) => a.filePath == f).map(prettyPrintSorted)}
@@ -274,6 +277,117 @@ def readableSummary(l:List[ProcessActivity]): String = {
   }
 }
 
+  def readableSummary2(l:List[ProcessActivity]): String = {
+    if (l.isEmpty) "" else{
+      val p = l.head.subject.processPath
+
+      def checkTypesAndCond1[A<:Element](a:Element, cond: A=>Boolean = (_:A) => true)(implicit tag: ClassTag[A]): Boolean = a match{
+        case a: A => cond(a)
+        case _ => false
+      }
+      def checkTypesAndCond2[A1<:Element,A2<:Element](cond: (A1, A2)=>Boolean, a1:Element, a2:Element)(implicit tag1: ClassTag[A1], tag2: ClassTag[A2])= (a1,a2) match{
+        case (a1: A1, a2:A2) => cond(a1, a2)
+        case _ => false
+      }
+
+      /*
+      def count = ???
+
+      // simple reducers e.g. counters
+      def r0: List[ProcessActivity] => Int = ??? //count(isNWWrite)
+
+      //separators: groupBy -> generalizes filtering
+      def r1[K, V]: List[V] => Map[K, List[V]] = ???
+
+      //
+      def r2[A,B]:List[A] => List [B]= ???
+
+
+      def applyLevel0 = ???
+      def applyLevel1 = ???
+      def applyLevel2 = ???
+
+      val data0 = ???
+*/
+
+/*
+      val data1 = applyLevel0(r0, data0)
+
+      val data2 = applyLevel1(r1, data0)
+      val data3 = applyLevel2(r2, data2)
+      val summary = data3
+*/
+
+      /*Group 1
+      *
+      * Rules and Data
+       */
+
+      //def f(f1:ProcessActivity => Boolean):
+
+      //def isFileActivity = checkTypesAndCond(isFileActivity)
+
+
+      /************
+        * Group 1
+      *************/
+      val g1Rules = List(
+        GRProcessActivities.isFileActivity3,
+        GRProcessActivities.isNWActivity3,
+        GRProcessActivities.isProcessActivity3,
+        GRProcessActivities.isSrcSinkActivity3
+      )
+
+      //TODO: Useless for now
+      val group1TotalFun = g1Rules.reduce(_ orElse _)
+      // Separate into groups
+
+      val group1_ = l.groupBy(GRProcessActivities.typeOfActivity1)
+
+      // Type them properly
+      //TODO: Does not work
+      //val group1__ = group1_.map{case(k,v) => (k, v.map(GR1.typeCast(k)))}
+      val group1 = group1_
+
+      /************
+        * Group 2
+        *************/
+      val groupedFileActivities = GR.applyGR(GRFileActivities, group1)
+
+      val groupedNWActivities = GR.applyGR(GRNWActivities, group1)
+
+      val groupedProcessActivities = GR.applyGR(GRProcessProcessActivities, group1)
+
+
+
+      /************
+        * Group 3
+        *************/
+
+      //leaf node: no grouping but display instead
+      val readFileActivities = GR.applyGRLeaf(GRFileReads,groupedFileActivities)
+      val writeFileActivities = GR.applyGRLeaf(GRFileWrites,groupedFileActivities)
+      val execFileActivities = GR.applyGRLeaf(GRFileExecs,groupedFileActivities)
+
+      /*
+      scala> val x = l.groupBy{(x:Int)=> (x>=5, x<=5) }
+      x: scala.collection.immutable.Map[(Boolean, Boolean),List[Int]] = Map((true,true) -> List(5), (true,false) -> List(6, 7, 8, 9, 10), (false,true) -> List(1, 2, 3, 4))
+      x.keys.toList.unzip.productIterator.toList(0)
+      */
+      s"""
+         |==================================================
+         |======= Process Path: ${p.path}
+         |==================================================
+         |
+         |$readFileActivities
+         |$writeFileActivities
+         |$execFileActivities
+
+
+
+    """.stripMargin
+    }
+  }
 
   // NW Reads followed by File Writes (downloads?): ${listOfPairs(collectConsecutive__(l,isNWRead,isFileWrite)).map { case (a1, a2) => s"\n ${a1.toStr} => ${a2.toStr}"; case _ => "" }}
 //  UUIDS (# of activities): ${getNumActivities(l,uniqueUuids, (a:ProcessActivity, f:UUID)=>a.subject.uuid == f).map(prettyPrintSorted)}
@@ -445,6 +559,210 @@ object NWReadFileWrite{
 
 case class ProcessActivityList(activities: List[ProcessActivity]) extends Element
 
+
+trait GR
+
+trait GRNonTerminal[A,B] extends GR{
+  def key:String
+  def forceType: PartialFunction[A,B]
+  def typeOfActivity1(b:B):String
+  //def typeOfActivity2(b1:B, b2:B):String
+}
+
+trait GRTerminal[A,B] extends GR{
+  def key:String
+  def transform(a:List[A]):List[B]
+  def format(a:List[B]):String
+}
+
+object GRProcessActivities extends GRNonTerminal[Element,ProcessActivity]{
+
+  val key = "ProcessActivity"
+  def forceType: PartialFunction[Element,ProcessActivity] = {case a:ProcessActivity => a}
+
+  def isFileActivity(a:ProcessActivity):Boolean = a match {case a:ProcessFileActivity => true; case _ => false}
+  def isNWActivity(a:ProcessActivity):Boolean = a match {case a:ProcessNWActivity => true; case _ => false}
+  def isProcessActivity(a:ProcessActivity):Boolean = a match {case a:ProcessProcessActivity => true; case _ => false}
+  def isSrcSinkActivity(a:ProcessActivity):Boolean = a match {case a:ProcessSrcSinkActivity => true; case _ => false}
+
+  def isFileActivity2(a:ProcessActivity): Option[ProcessFileActivity] = a match {case a:ProcessFileActivity => Some(a); case _ => None}
+  def isNWActivity2(a:ProcessActivity): Option[ProcessNWActivity] = a match {case a:ProcessNWActivity => Some(a); case _ => None}
+  def isProcessActivity2(a:ProcessActivity): Option[ProcessProcessActivity] = a match {case a:ProcessProcessActivity => Some(a); case _ => None}
+  def isSrcSinkActivity2(a:ProcessActivity): Option[ProcessSrcSinkActivity] = a match {case a:ProcessSrcSinkActivity => Some(a); case _ => None}
+
+  def isFileActivity3: PartialFunction[ProcessActivity,ProcessFileActivity] = {case a:ProcessFileActivity => a}
+  def isNWActivity3: PartialFunction[ProcessActivity,ProcessNWActivity] = {case a:ProcessNWActivity => a}
+  def isProcessActivity3: PartialFunction[ProcessActivity,ProcessProcessActivity] = {case a:ProcessProcessActivity => a}
+  def isSrcSinkActivity3: PartialFunction[ProcessActivity,ProcessSrcSinkActivity] = {case a:ProcessSrcSinkActivity => a}
+
+  def typeOfActivity1(a:ProcessActivity): String = a match{
+    case _: ProcessFileActivity => "ProcessFileActivity"
+    case _: ProcessNWActivity => "ProcessNWActivity"
+    case _: ProcessProcessActivity => "ProcessProcessActivity"
+    case _: ProcessSrcSinkActivity => "ProcessSrcSinkActivity"
+  }
+
+  def typeCast(a:String): PartialFunction[ProcessActivity, ProcessActivity] = a match{
+    case "ProcessFileActivity" => isFileActivity3
+    case "ProcessNWActivity" => isNWActivity3
+    case "ProcessProcessActivity" => isProcessActivity3
+    case "ProcessSrcSinkActivity" => isSrcSinkActivity3
+  }
+}
+
+object GRFileActivities extends GRNonTerminal[ProcessActivity,ProcessFileActivity]{
+  // elementary activities
+
+  val key = "ProcessFileActivity"
+  def forceType: PartialFunction[ProcessActivity,ProcessFileActivity] = {case a:ProcessFileActivity => a}
+
+  def isFileWrite(a:ProcessFileActivity): Boolean = a.event == EVENT_WRITE
+  def isFileRead(a:ProcessFileActivity): Boolean = a.event == EVENT_READ || a.event == EVENT_MMAP
+  def isFileExec(a:ProcessFileActivity): Boolean = a.event == EVENT_EXECUTE
+
+  def isFileWrite1: PartialFunction[ProcessFileActivity, Boolean] = {case a if isFileWrite(a) => true}
+  def isFileRead1: PartialFunction[ProcessFileActivity, Boolean] = {case a if isFileRead(a) => true}
+  def isFileExec1: PartialFunction[ProcessFileActivity, Boolean] = {case a if isFileExec(a) => true}
+
+  /*TODO: Create the below function automatically from a list of above functions*/
+  def typeOfActivity1(a:ProcessFileActivity):String = a match {
+    case x if isFileWrite(x) => "FileWrite"
+    case x if isFileRead(x) => "FileRead"
+    case x if isFileExec(x) => "FileExec"
+    case _ => "FileEventMisc"
+  }
+
+  def typeOfActivity2(a1:ProcessFileActivity, a2:ProcessFileActivity):String = (a1,a2) match {
+    case (x1, x2) if isFileWrite(x1) && isFileExec(x2) && x1.filePath == x2.filePath => "FileWriteExec"
+    case _ => "FileEventMisc2"
+  }
+
+  def transform(a:ProcessFileActivity) = a.filePath
+}
+
+object GRNWActivities extends GRNonTerminal[ProcessActivity,ProcessNWActivity]{
+  val key = "ProcessNWActivity"
+  def forceType: PartialFunction[ProcessActivity,ProcessNWActivity] = {case a:ProcessNWActivity => a}
+
+  def isNWRead(a:ProcessNWActivity): Boolean = a.event == EVENT_RECVFROM
+  def isNWWrite(a:ProcessNWActivity): Boolean = a.event == EVENT_WRITE
+
+  def typeOfActivity1(a:ProcessNWActivity):String = a match {
+    case x if isNWRead(x) => "NWRead"
+    case x if isNWWrite(x) => "NWWrite"
+    case _ => "NWEventMisc"
+  }
+
+  def transform(a:ProcessNWActivity) = a.neRemote
+}
+
+object GRProcessProcessActivities extends GRNonTerminal[ProcessActivity,ProcessProcessActivity]{
+  val key = "ProcessProcessActivity"
+  def forceType: PartialFunction[ProcessActivity,ProcessProcessActivity] = {case a:ProcessProcessActivity => a}
+
+  def isProcessFork(a:ProcessProcessActivity): Boolean = a.event == EVENT_FORK
+  def isProcessModify(a:ProcessProcessActivity): Boolean = a.event == EVENT_MODIFY_PROCESS
+
+  def typeOfActivity1(a:ProcessProcessActivity):String = a match {
+    case x if isProcessFork(x) => "ProcessFork"
+    case x if isProcessModify(x) => "ProcessModify"
+    case _ => "ProcessEventMisc"
+  }
+
+  def transform(a:ProcessProcessActivity) = a.subject2.processPath
+
+}
+
+object GRMISC extends GR{
+  // elementary activities
+  def areTwoFilesSame(a1:ProcessFileActivity,a2:ProcessFileActivity): Boolean = a1.filePath == a2.filePath
+
+}
+
+
+object GRFileReads extends GRTerminal[ProcessFileActivity, FilePath]{
+  val key = "FileRead"
+
+  val line = "\n------------"
+  val header = "\n"+key+line
+
+  def transform(a:List[ProcessFileActivity]): List[FilePath] = a.map(_.filePath).distinct
+  def format(a:List[FilePath]): String = a.foldLeft(header){case (x1,x2) => x1+"\n"+x2.toString}
+}
+
+object GRFileWrites extends GRTerminal[ProcessFileActivity, FilePath]{
+  val key = "FileWrite"
+
+  val line = "\n------------"
+  val header = "\n"+key+line
+
+  def transform(a:List[ProcessFileActivity]): List[FilePath] = a.map(_.filePath).distinct
+  def format(a:List[FilePath]): String = a.foldLeft(header){case (x1,x2) => x1+"\n"+x2.toString}
+}
+
+object GRFileExecs extends GRTerminal[ProcessFileActivity, FilePath]{
+  val key = "FileExec"
+
+  val line = "\n------------"
+  val header = "\n"+key+line
+
+  def transform(a:List[ProcessFileActivity]): List[FilePath] = a.map(_.filePath).distinct
+  def format(a:List[FilePath]): String = a.foldLeft(header){case (x1,x2) => x1+"\n"+x2.toString}
+}
+
+
+object GR{
+  def applyGR[A,B](rule:GRNonTerminal[A,B], data: Map[String, List[A]]) = {
+    data(rule.key)
+      .map(rule.forceType) //TODO: apply a list of transformations?
+      .groupBy(rule.typeOfActivity1)
+  }
+
+  def applyGRLeaf[A,B](rule:GRTerminal[A,B], data: Map[String, List[A]]): String = {
+  rule.format(rule.transform(data(rule.key)))
+  }
+}
+
+
+//TODO: Finish up
+/*
+case class RuleTree(rule:GR, subRules:HashMap[String,RuleTree]=HashMap.empty){
+  def isEmpty = subRules.isEmpty
+
+  // depth first traversal
+  def applyRules() = {
+    if (this.isEmpty){
+      applyGRLeaf(this.rule, data)
+    }
+    else{
+      applyGR(this.rule, data).map{case (k,v) => }
+    }
+
+  }
+}
+*/
+
+/*
+object RuleTree{
+  def leaf(rule:GR) = new RuleTree(rule, HashMap.empty)
+}
+
+object Rules{
+  val rules = RuleTree(
+    GRProcessActivities,
+    HashMap(
+      GRFileActivities.key -> RuleTree(
+        GRFileActivities,
+        HashMap(
+          GRFileReads.key -> RuleTree.leaf(GRFileReads),
+          GRFileWrites.key -> RuleTree.leaf(GRFileWrites),
+          GRFileExecs.key -> RuleTree.leaf(GRFileExecs)
+        )
+      )
+    )
+  )
+}
+*/
 
 
 
