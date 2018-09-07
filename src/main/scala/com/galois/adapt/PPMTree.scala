@@ -299,7 +299,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
   def qLocalProbOfThisObs(siblingPopulation: Int, parentCount: Int): Float =
     if (parentCount == 0) 1F
-    else siblingPopulation.toFloat / parentCount.toFloat
+    else siblingPopulation.toFloat / (siblingPopulation.toFloat + parentCount.toFloat)
 
   def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
     (counter.toFloat / parentCount.toFloat) * parentGlobalProb
@@ -321,7 +321,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
            */
           val newLeafProb =
             if (children.contains(extracted)) None
-            else Some(qLocalProbOfThisObs(childrenPopulation + 1, counter + 1) -> 1) // We must include the new child in the children count when computing the q-LP
+            else Some(qLocalProbOfThisObs(childrenPopulation, counter) -> 1)
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
