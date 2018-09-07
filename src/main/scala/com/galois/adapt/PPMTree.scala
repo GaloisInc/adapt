@@ -49,8 +49,8 @@ object NoveltyDetection {
     case _                          => ("""/""" ,   "/")
   }
   val sudoOrPowershellComparison: String => Boolean = Application.ta1 match {
-    case "faros" | "fivedirections" => (s: String) => s.contains("powershell")
-    case _                          => (s: String) => s == "sudo"
+    case "faros" | "fivedirections" => (s: String) => s.toLowerCase.contains("powershell")
+    case _                          => (s: String) => s.toLowerCase == "sudo"
   }
 
   case class ExtendedUuidDetails(extendedUuid: ExtendedUuid, name: Option[String] = None)
@@ -290,9 +290,8 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
   def childrenPopulation = children.size  // + 1   // `+ 1` for the Q node
 
-  def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef = {
+  def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef =
     context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
-  }
 
   def localProbOfThisObs(parentCount: Int): Float =
     if (parentCount == 0) 1F
@@ -317,12 +316,12 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
           /*
           If the first extracted value is new to this tree (at this level)
           then an alarm will be recorded. The local probability of the question
-          mark node (at this level) will be used as the local probabiity of the
+          mark node (at this level) will be used as the local probability of the
           leaf node in the alarm.
            */
           val newLeafProb =
             if (children.contains(extracted)) None
-            else Some(qLocalProbOfThisObs(childrenPopulation+1,counter+1) -> 1) // We must include the new child in the children count when computing the q-LP
+            else Some(qLocalProbOfThisObs(childrenPopulation + 1, counter + 1) -> 1) // We must include the new child in the children count when computing the q-LP
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
@@ -336,8 +335,8 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentGlobalProb, alarmAcc: Alarm, alarmFilter, passNewLeafProb, depth) =>
       counter += 1
       val thisLocalProb = localProbOfThisObs(parentCount)
-      val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation,parentCount)
-      val thisGlobalProb = globalProbOfThisObs(parentGlobalProb,parentCount)
+      val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation, parentCount)
+      val thisGlobalProb = globalProbOfThisObs(parentGlobalProb, parentCount)
       val thisAlarmComponent = (thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
       remainingExtractedValues match {
         case Nil if counter == 1 =>
@@ -355,14 +354,14 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
            */
           val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else {
             if (children.contains(extracted)) None
-            else Some(qLocalProbOfThisObs(childrenPopulation+1,counter) -> (depth + 1))
+            else Some(qLocalProbOfThisObs(childrenPopulation + 1, counter) -> (depth + 1))
           }
           val childNode = children.getOrElse(extracted, {
             val newChild = newSymbolNode(extracted)
             children = children + (extracted -> newChild)
             newChild
           })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisGlobalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb, depth+1)
+          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisGlobalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb, depth + 1)
       }
 
 
@@ -424,9 +423,6 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
 class PpmActor extends Actor with ActorLogging { thisActor =>
   import NoveltyDetection._
-
-
-
 
   var cdmSanityTrees = List(
     PpmDefinition[CDM]("CDM-Event",
@@ -738,7 +734,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
               case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
               case _ => ""
             }
-            )
+          )
         )
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),

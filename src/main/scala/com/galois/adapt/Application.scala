@@ -73,15 +73,29 @@ object Application extends App {
 
 
   val fileDb = Try { config.getString("adapt.adm.mapdb") } match {
-    case Success(p) =>
+    case Success(p) if runFlow != "accept" =>
       var maker = DBMaker.fileDB(p).fileMmapEnable()
 
       if (config.getBoolean("adapt.adm.mapdbbypasschecksum")) maker = maker.checksumHeaderBypass()
       if (config.getBoolean("adapt.adm.mapdbtransactions")) maker = maker.transactionEnable()
 
-      maker.make()
+      val db = maker.make()
 
-    case Failure(_) =>
+      // On shutdown, expire everything to the on-disk map
+      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+        override def run(): Unit = {
+          println("Expiring MapDB contents to disk...")
+          mapdbCdm2Cdm.clearWithExpire()
+          mapdbCdm2Adm.clearWithExpire()
+          db.close()
+          println("MapDB has been closed.")
+        }
+      }))
+
+      db
+
+
+    case _ =>
       val p = "/tmp/map_" + Random.nextLong() + ".db"
       val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
 
@@ -89,7 +103,7 @@ object Application extends App {
       new File(p).deleteOnExit()
 
       fDB
-  }
+  } 
 
   val memoryDb = DBMaker.memoryDirectDB().make()
 
@@ -119,7 +133,6 @@ object Application extends App {
 
   // Load up all of the namespaces, and then write them back out on shutdown
   val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
-  println(namespacesFile)
   if (namespacesFile.exists && namespacesFile.canRead) {
     import scala.collection.JavaConverters._
 
@@ -154,7 +167,7 @@ object Application extends App {
 
   val threadPool = Executors.newScheduledThreadPool(1)
 
-  val mapdbCdm2Cdm = memoryDb.hashMap("cdm2cdm")
+  val mapdbCdm2Cdm: HTreeMap[Array[AnyRef],Array[AnyRef]] = memoryDb.hashMap("cdm2cdm")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
@@ -177,7 +190,7 @@ object Application extends App {
 //      .counterEnable()
     .createOrOpen()
 
-  val mapdbCdm2Adm = memoryDb.hashMap("cdm2adm")
+  val mapdbCdm2Adm: HTreeMap[Array[AnyRef],Array[AnyRef]] = memoryDb.hashMap("cdm2adm")
     .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
     .counterEnable()
@@ -194,17 +207,7 @@ object Application extends App {
       { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
     )
 
-  // On shutdown, expire everything to the on-disk map
-  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-    override def run(): Unit = {
-      println("Expiring MapDB contents to disk...")
-      mapdbCdm2Cdm.clearWithExpire()
-      mapdbCdm2Adm.clearWithExpire()
-      fileDb.close()
-      println("MapDB has been closed.")
-    }
-  }))
-
+  
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
 
@@ -289,13 +292,18 @@ object Application extends App {
 
   val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, log, seenNodes, seenEdges)
 
-  val ppmActor = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
-  Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
-    case Success(i) if i > 0L =>
-      println(s"Saving PPM trees every $i seconds")
-      val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ppmActor, SaveTrees())
-      system.registerOnTermination(cancellable.cancel())
-    case _ => println("Not going to periodically save PPM trees.")
+  val ppmActor: Option[ActorRef] = runFlow match {
+    case "accept" => None
+    case _ =>
+      val ref = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
+      Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
+        case Success(i) if i > 0L =>
+          println(s"Saving PPM trees every $i seconds")
+          val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
+          system.registerOnTermination(cancellable.cancel())
+        case _ => println("Not going to periodically save PPM trees.")
+      }
+      Some(ref)
   }
 
   // Coarse grain filtering of the input CDM
@@ -353,7 +361,7 @@ object Application extends App {
         import GraphDSL.Implicits._
         val broadcast = b.add(Broadcast[(String,CDM18)](1))
 
-        broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
+        broadcast ~> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, CdmDone)(writeTimeout)
      //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
         SinkShape(broadcast.in)
       })
@@ -373,14 +381,14 @@ object Application extends App {
 
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
-        case (true, false) => "CDM" -> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-        case (false, true) => "ADM" -> er.to(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg))
+        case (true, false) => "CDM" -> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+        case (false, true) => "ADM" -> er.to(DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg))
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
           val broadcast = b.add(Broadcast[(String,CDM18)](2))
 
-          broadcast ~> Neo4jFlowComponents.neo4jActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast ~> er ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, completionMsg)
+          broadcast ~> DBQueryProxyActor.graphActorCdmWriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> er ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
 
           SinkShape(broadcast.in)
         })
@@ -398,7 +406,7 @@ object Application extends App {
 
       CDMSource.cdm18(ta1)
         .via(printCounter("E3 Training", statusActor))
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 
@@ -409,10 +417,10 @@ object Application extends App {
       CDMSource.cdm18(ta1)
         .via(printCounter("E3", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .via(splitToSink(PpmComponents.ppmSink, 1000))
-        .runWith(Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor))
+        .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
 
     case "e3-no-db" =>
       startWebServer()
@@ -421,7 +429,7 @@ object Application extends App {
       CDMSource.cdm18(ta1)
         .via(printCounter("E3 (no DB)", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 

@@ -16,8 +16,8 @@
     	// ********* BEGIN EDITABLE VARIABLES ********* //
     	// Editabe variables for differing contexts.
 
-    	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash)
-    	var defaultQueryBaseUrl = "http://localhost:8080"
+    	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash). Empty will issue all node/edge queries to the same host that is serving the page.
+    	var defaultQueryBaseUrl = ""  // e.g. http://localhost:8080
 
 
     	// NODE PRODUCTION:
@@ -72,7 +72,7 @@
 
         // Set host for issuing DB queries; either hard-coded or read in from query parameters.
         var urlParams = new URLSearchParams(window.location.search)
-        if (urlParams.has('host') && ! _.isEmpty(urlParams.get('host'))) {
+        if (urlParams.has('host')) {
 			var hostPrefix = urlParams.get('host')
 		} else {
 			var hostPrefix = defaultQueryBaseUrl

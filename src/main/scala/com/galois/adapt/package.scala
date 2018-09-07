@@ -18,6 +18,9 @@ package object adapt {
     // as the internal ID.
     def getUuid: UUID
 
+    // Find the host ID
+    def getHostId: Option[UUID] = None
+
     // Outgoing edges coming off the node. The key is the label on the edge, the UUID the node
     // (which should be 'DBNodeable' too) the edge goes to.
     def asDBEdges: List[(EdgeType, UUID)]

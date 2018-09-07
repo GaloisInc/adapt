@@ -1,0 +1,7 @@
+{"context specification":{
+     "query":"MATCH (e:AdmEvent)-->(n:AdmSubject) MATCH (e:AdmEvent)-->(f:AdmNetFlowObject) RETURN DISTINCT n.uuid AS id, f.remotePort AS po, f.remoteAddress AS ip",
+     "endpoint":"cypher",
+"objects":"id",
+"attributes":["ip","po"]
+}
+}

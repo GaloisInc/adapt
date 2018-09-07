@@ -22,7 +22,7 @@ object Application extends App {
   implicit val system = ActorSystem("test")
   implicit val graph = GraphService(system)(MapDBMultimap())
   implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30 seconds)
+  implicit val timeout = Timeout(300 seconds)
 
   // Open up for SSH ammonite shelling via `ssh repl@localhost -p22222`
   import ammonite.sshd._
@@ -109,8 +109,10 @@ object TurtleTriple {
       
       // Report progress
       count += 1
-      if (count % 100000 == 0) {
-        println(s"Ingested from $path: $count")
+      if (count % 1000 == 0) {
+        Await.ready(fut, 30 seconds).onComplete { _ =>
+          println(s"Ingested from $path: $count")
+        }
       }
     }
 

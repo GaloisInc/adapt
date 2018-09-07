@@ -16,14 +16,23 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Success, Try}
 
+trait SignalledTests {
+  val signalStatus: Boolean => Unit
+
+  def assert(b: Boolean, msg: String = ""): Unit = {
+    signalStatus(b)
+    if (msg.isEmpty) Predef.assert(b) else Predef.assert(b,msg)
+  }
+}
 
 class General_TA1_Tests(
   failedStatements: List[(Int,String)],     // position, failed event
   incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
   ta1Source: String,
-  toDisplay: scala.collection.mutable.ListBuffer[String]
-) extends FlatSpec {
+  toDisplay: scala.collection.mutable.ListBuffer[String],
+  override val signalStatus: Boolean => Unit
+) extends FlatSpec with SignalledTests {
 
   implicit val timeout = Timeout(30 second)
   
@@ -322,7 +331,7 @@ class General_TA1_Tests(
 
 // Provider specific test classes:
 
-class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class TRACE_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, UnnamedPipeObject, CryptographicHash, Value, UnitDependency, TimeMarker)
   val minimum = 50000
@@ -340,7 +349,7 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class CADETS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, CryptographicHash, UnnamedPipeObject, TagRunLengthTuple, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value, UnitDependency, TimeMarker)
   val minimum = 50000
@@ -358,7 +367,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class FAROS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker, SrcSinkObject)
   val minimum = 50000
@@ -376,7 +385,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 }
 
-class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class THEIA_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency, TimeMarker, RegistryKeyObject)
   val minimum = 50000
@@ -394,7 +403,7 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }  
 
-class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(MemoryObject, Value, TagRunLengthTuple, UnnamedPipeObject, SrcSinkObject, UnitDependency, AbstractObject, UnnamedPipeObject, CryptographicHash, TimeMarker)
   val minimum = 50000
@@ -412,7 +421,7 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, MemoryObject, UnitDependency, UnnamedPipeObject, RegistryKeyObject, Value, TimeMarker)
   val minimum = 50000

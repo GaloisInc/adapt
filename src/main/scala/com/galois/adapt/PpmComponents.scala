@@ -133,8 +133,11 @@ object PpmComponents {
       case Right(EdgeAdm2Adm(child, "parentSubject", parent)) =>
         release(
           everything.get(child).flatMap { c =>
-            everything.get(parent).map{ p =>
-              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, 0L, 0L, ""), c, c.uuid, p, p.uuid)
+            everything.get(parent).map { p =>
+              val provider = Try(p.asInstanceOf[AdmSubject].provider).getOrElse("")
+              val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
+              val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
+              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, provider), c, c.uuid, p, p.uuid)
             }
           }
         )
@@ -174,31 +177,29 @@ object PpmComponents {
       case _ =>
         release(None)
     }
-  }.to(Sink.actorRefWithAck(Application.ppmActor, InitMsg, Ack, CompleteMsg))
+  }.to(Sink.actorRefWithAck(Application.ppmActor.get, InitMsg, Ack, CompleteMsg))
 
 
   // Load a mutable map from disk
   def loadMapFromDisk[T, U](name: String, fp: String)
                            (implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
-    if (Application.config.getBoolean("adapt.ppm.shouldload"))
+    if (Application.config.getBoolean("adapt.ppm.shouldload")) {
+      val toReturn = mutable.Map.empty[T, U]
       Try {
-        val toReturn = mutable.Map.empty[T,U]
-        Files.lines(Paths.get(fp)).forEach(new Consumer[String]{
+        Files.lines(Paths.get(fp)).forEach(new Consumer[String] {
           override def accept(line: String): Unit = {
             val (k, v) = line.parseJson.convertTo[(T, U)]
-            toReturn.put(k,v)
+            toReturn.put(k, v)
           }
         })
-
-        println(s"Read in from disk $name at $fp: ${toReturn.size}")
-        toReturn
       } match {
-        case Success(m) => m
         case Failure(e) =>
-          println(s"Failed to read from disk $name at $fp (${e.toString})")
-          mutable.Map.empty
+          println(s"Failed to read from disk $name at $fp (${e.toString}) - only got to ${toReturn.size}")
+        case _ =>
+          println(s"Read in from disk $name at $fp: ${toReturn.size}")
       }
-    else mutable.Map.empty
+      toReturn
+    } else mutable.Map.empty
 
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
