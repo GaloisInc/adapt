@@ -133,8 +133,11 @@ object PpmComponents {
       case Right(EdgeAdm2Adm(child, "parentSubject", parent)) =>
         release(
           everything.get(child).flatMap { c =>
-            everything.get(parent).map{ p =>
-              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, 0L, 0L, ""), c, c.uuid, p, p.uuid)
+            everything.get(parent).map { p =>
+              val provider = Try(p.asInstanceOf[AdmSubject].provider).getOrElse("")
+              val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
+              val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
+              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, provider), c, c.uuid, p, p.uuid)
             }
           }
         )
