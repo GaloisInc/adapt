@@ -1,4 +1,3 @@
-// what is difference b/w process forks and execute
 package com.galois.adapt
 
 import java.util.UUID
@@ -277,6 +276,13 @@ object SummaryParser {
   }
 }
 
+/*
+* TODO:
+*   - typeOfActivityi -> how to generalize? Shove them in a list, etc?
+*   - Each group should be plugged in a rule downstream instead
+*   - Leaf nodes should only have a prettyFormatting function?
+*   - Each typeOfActivityi involves an additional groupBy => Additional traversal. Can they be combined?
+* */
   def readableSummary2(l:List[ProcessActivity]): String = {
     if (l.isEmpty) "" else{
       val p = l.head.subject.processPath
@@ -368,6 +374,8 @@ object SummaryParser {
       val readFileActivities = GR.applyGRLeaf(GRFileReads,groupedFileActivities)
       val writeFileActivities = GR.applyGRLeaf(GRFileWrites,groupedFileActivities)
       val execFileActivities = GR.applyGRLeaf(GRFileExecs,groupedFileActivities)
+
+
 
       /*
       scala> val x = l.groupBy{(x:Int)=> (x>=5, x<=5) }
@@ -601,6 +609,11 @@ object GRProcessActivities extends GRNonTerminal[Element,ProcessActivity]{
     case _: ProcessProcessActivity => "ProcessProcessActivity"
     case _: ProcessSrcSinkActivity => "ProcessSrcSinkActivity"
   }
+  def typeOfActivity2(a1:ProcessActivity, a2:ProcessActivity): String = (a1,a2) match{
+    case (a1: ProcessNWActivity, a2:ProcessFileActivity) => "ProcessNWActivity,ProcessFileActivity"
+    case (a1: ProcessFileActivity, a2:ProcessFileActivity) => "ProcessFileActivity,ProcessFileActivity"
+  }
+
 
   def typeCast(a:String): PartialFunction[ProcessActivity, ProcessActivity] = a match{
     case "ProcessFileActivity" => isFileActivity3
@@ -690,6 +703,8 @@ object GRFileReads extends GRTerminal[ProcessFileActivity, FilePath]{
   def format(a:List[FilePath]): String = a.foldLeft(header){case (x1,x2) => x1+"\n"+x2.toString}
 }
 
+
+
 object GRFileWrites extends GRTerminal[ProcessFileActivity, FilePath]{
   val key = "FileWrite"
 
@@ -725,24 +740,26 @@ object GR{
 
 
 //TODO: Finish up
-/*
+
 case class RuleTree(rule:GR, subRules:HashMap[String,RuleTree]=HashMap.empty){
   def isEmpty = subRules.isEmpty
 
   // depth first traversal
   def applyRules() = {
     if (this.isEmpty){
-      applyGRLeaf(this.rule, data)
+      ???
+      //applyGRLeaf(this.rule, data)
     }
     else{
-      applyGR(this.rule, data).map{case (k,v) => }
+      ???
+      //applyGR(this.rule, data).map{case (k,v) => }
     }
 
   }
 }
-*/
 
-/*
+
+
 object RuleTree{
   def leaf(rule:GR) = new RuleTree(rule, HashMap.empty)
 }
@@ -762,7 +779,7 @@ object Rules{
     )
   )
 }
-*/
+
 
 
 
