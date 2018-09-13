@@ -7,6 +7,13 @@ resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
 resolvers += Resolver.mavenLocal  // for BBN repositories built locally
 
+// for Splunk
+resolvers ++= Seq(
+  "splunk-releases" at "http://splunk.jfrog.io/splunk/ext-releases-local"
+)
+
+
+
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
   version := "0.6.2",
@@ -15,6 +22,8 @@ lazy val adapt = (project in file(".")).settings(
 
   autoScalaLibrary := false,
   libraryDependencies ++= Seq(
+
+    "com.splunk.logging" % "splunk-library-javalogging" % "1.5.2",//splunk
     "org.scala-lang" % "scala-library" % scalaV,
     "com.typesafe" % "config" % "1.3.1",
     "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
@@ -46,6 +55,17 @@ lazy val adapt = (project in file(".")).settings(
     "com.univocity" % "univocity-parsers" % "2.6.1",
     "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
   ),
+
+
+  /*
+    "org.slf4j" % "slf4j-api" % "1.7.5",//splunk
+    "ch.qos.logback" % "logback-classic" % "1.0.13",//splunk
+    "ch.qos.logback" % "logback-core" % "1.0.13",//splunk
+    "org.apache.logging.log4j" % "log4j-core" % "2.0-beta9",//splunk
+    "com.googlecode.json-simple" % "json-simple" % "1.1.1",//splunk
+    "org.apache.httpcomponents" % "httpcore" % "4.4.10",//splunk
+    "org.apache.httpcomponents" % "httpclient" % "4.5.6",//splun
+  * */
 
 //  fork in run := true,
 //  javaOptions in run ++= Seq("-Xmx6G"),

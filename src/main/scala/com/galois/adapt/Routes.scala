@@ -113,6 +113,9 @@ object Routes {
       PolicyEnforcementDemo.route(dbActor) ~
       get {
         pathPrefix("api") {
+          pathPrefix("hec") {
+            complete{Hec.sendEvent("testMessage"); "done"}
+          } ~
           pathPrefix("status") {
             import ApiJsonProtocol.statusReport
             complete(
