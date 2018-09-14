@@ -219,7 +219,9 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
         println(s"Index 0 complete. Begining context aggregation in 5 seconds.")
         context.system.scheduler.scheduleOnce(5 seconds) {
           println(s"Begining context aggregation now.")
-          graph.saveStratifiedContexts("/Users/ryan/Desktop/adapt-contexts.tsv", 2, 3, 1, Set(knowledgeOf[EventToFile]()), 8, 10 minutes)
+//          graph.saveStratifiedContexts("/Users/ryan/Desktop/adapt-contexts.tsv", 2, 3, 1, Set(knowledgeOf[EventToFile]()), 8, 10 minutes)
+//          graph.saveBiasedContextSentences2("/Users/ryan/Desktop/adapt-contexts.tsv", List(1 -> branchOf[EventToFile]()), 8, 10 minutes)
+          graph.saveStratifiedContexts2("/Users/ryan/Desktop/adapt-contexts.tsv", 5, 5, 1, "testColumn", Set(knowledgeOf[EventToFile]()), 8, 30 minutes)
 //          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
         }
 //      }
