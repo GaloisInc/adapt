@@ -103,7 +103,8 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 
 }
 
-object splunkHecClient {
+case class splunkHecClient(token: String, host:String, port:Int = 8088) {
+
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
   // needed for the future flatMap/onComplete in the end
@@ -111,20 +112,17 @@ object splunkHecClient {
 
   val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
 
+  //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
+  val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
   def sendEvent(event:JsValue) = {
     val time = System.currentTimeMillis
-    val event = JsObject(
-      "alarm_type" -> JsString("testAlarm"),
-      "file" -> JsString("testFile")
-    )
     sendEventHttp(EventMsg(event, time))
   }
 
   def sendEventHttp(event:EventMsg) = {
 
-    val token: String = "58288208-9db4-4f42-99e2-f5fdcdf19d24"
-    val homeUri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
+
     val data = ByteString(event.toJson.toString)
 
     // customize every detail of HTTP request

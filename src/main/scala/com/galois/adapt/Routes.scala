@@ -115,7 +115,14 @@ object Routes {
         pathPrefix("api") {
           pathPrefix("hec") {
             //complete{splunkHecClientLogger.sendEvent("testMessage"); "done"}
-            complete{splunkHecClient.sendEvent("".toJson); "done"}
+            val event = JsObject(
+              "alarm_type" -> JsString("testAlarm2"),
+              "file" -> JsString("testFile2")
+            )
+            complete{
+              splunkHecClient(token = "58288208-9db4-4f42-99e2-f5fdcdf19d24", host = "127.0.0.1", port= 8088).sendEvent(event);
+              "done"
+            }
           } ~
           pathPrefix("status") {
             import ApiJsonProtocol.statusReport
