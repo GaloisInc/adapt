@@ -114,7 +114,8 @@ object Routes {
       get {
         pathPrefix("api") {
           pathPrefix("hec") {
-            complete{Hec.sendEvent("testMessage"); "done"}
+            //complete{splunkHecClientLogger.sendEvent("testMessage"); "done"}
+            complete{splunkHecClient.sendEvent("".toJson); "done"}
           } ~
           pathPrefix("status") {
             import ApiJsonProtocol.statusReport
