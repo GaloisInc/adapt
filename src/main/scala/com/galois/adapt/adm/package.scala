@@ -401,7 +401,7 @@ package object adm {
   }
 
   // Represents a local and/or remote address of netflows
-  final case class AdmAddress(
+  final case class AdmIPAddress(
     address: String
   ) extends ADM with DBWritable {
 

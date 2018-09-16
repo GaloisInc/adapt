@@ -42,7 +42,7 @@ object ERRules {
 
   // Resolve a 'NetFlowObject'
   object NetflowObjectEdges {
-    type AddressEdgeNode = (EdgeAdm2Adm, AdmAddress)
+    type AddressEdgeNode = (EdgeAdm2Adm, AdmIPAddress)
     type PortEdgeNode = Option[(EdgeAdm2Adm, AdmPort)]
   }
   def resolveNetflow(provider: String, n: NetFlowObject):
@@ -55,9 +55,9 @@ object ERRules {
     ) = {
       val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
       val newLP = AdmPort(n.localPort)
-      val newLA = AdmAddress(n.localAddress)
+      val newLA = AdmIPAddress(n.localAddress)
       val newRP = AdmPort(n.remotePort)
-      val newRA = AdmAddress(n.remoteAddress)
+      val newRA = AdmIPAddress(n.remoteAddress)
       (
         newN,
         (EdgeAdm2Adm(newN.uuid, "localAddress", newLA.uuid), newLA),

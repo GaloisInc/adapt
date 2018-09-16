@@ -5,7 +5,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
+import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT, SUBJECT_PROCESS}
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -45,16 +45,15 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
   val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.ta1 match {
-    case "faros" | "fivedirections" => ("""\\""", """\""")
-    case _                          => ("""/""" ,   "/")
+    case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
+    case _                                     => ("""/""" ,   "/")
   }
   val sudoOrPowershellComparison: String => Boolean = Application.ta1 match {
-    case "faros" | "fivedirections" => (s: String) => s.toLowerCase.contains("powershell")
-    case _                          => (s: String) => s.toLowerCase == "sudo"
+    case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
+    case _                                                    => (s: String) => s.toLowerCase == "sudo"
   }
 
   case class ExtendedUuidDetails(extendedUuid: ExtendedUuid, name: Option[String] = None)
-
 }
 
 
@@ -136,13 +135,15 @@ case class PpmDefinition[DataShape](
 
   val saveEveryAndNoMoreThan = Try(Application.config.getLong("adapt.ppm.saveintervalseconds")).getOrElse(0L)
   val lastSaveCompleteMillis = new AtomicLong(0L)
-  val currentlySaving = new AtomicBoolean(false)
+  val isCurrentlySaving = new AtomicBoolean(false)
+
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
 
   def saveStateAsync(): Future[Unit] = {
     val now = System.currentTimeMillis
     val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
-    if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
-      currentlySaving.set(true)
+    if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
+      isCurrentlySaving.set(true)
 
       implicit val timeout = Timeout(593 seconds)
       (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ reprResult =>
@@ -161,10 +162,10 @@ case class PpmDefinition[DataShape](
         if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync()
 
         lastSaveCompleteMillis.set(System.currentTimeMillis)
-        currentlySaving.set(false)
+        isCurrentlySaving.set(false)
       }.failed.map { case e =>
         println(s"Error writing to file for $name tree: ${e.getMessage}")
-        currentlySaving.set(false)
+        isCurrentlySaving.set(false)
       }
     } else Future.successful(())
   }
@@ -264,7 +265,7 @@ case object PpmTree {
 
 case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
 case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
-case class PpmNodeActorBeginGetTreeRepr(treeName: String)
+case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
 case class PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue])
@@ -365,21 +366,34 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       }
 
 
-    case PpmNodeActorBeginGetTreeRepr(treeName: String) =>
+    case PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey) =>
       implicit val timeout = Timeout(599 seconds)
       val qNodeRepr = if (children.isEmpty)
         Set.empty[TreeRepr]
       else {
-        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat
+        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat   // TODO: This should reference another probability calculation instead of being hardcoded as a one-off!!!!!!!
         Set(TreeRepr(1, "_?_", prob, prob, childrenPopulation, Set.empty))
       }
-      val futureResult = Future.sequence(
-        children.map { case (k,v) =>
-          (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-        }
-      ).map { resolvedChildren =>
-        PpmNodeActorGetTreeReprResult(TreeRepr(0, treeName, 1F, 1F, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
+      val futureResult = startingKey match {
+        case Nil =>
+          val futureRepr = Future.sequence(
+            children.map { case (k,v) =>
+              (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+            }
+          ).map { resolvedChildren =>
+            PpmNodeActorGetTreeReprResult(TreeRepr(0, treeName, 1F, 1F, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
+          }
+          futureRepr
+        case childKey :: remainder =>
+//          children.get(childKey) match {
+//            case Some(childRef) => (childRef ? PpmNodeActorBeginGetTreeRepr(treeName, remainder)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+//            case None =>
+//              Future.failed(new IndexOutOfBoundsException(s"No child element for key $childKey"))
+//              // Or some empty Repr?
+//          }
+          ???  // TODO: finish thinking about what the right behavior is for this.
       }
+
       sender() ! futureResult
 
 
@@ -645,6 +659,32 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
+    )(thisActor.context, context.self),
+
+    PpmDefinition[DataShape]("SummarizedProcessActivity",
+      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS)  // is a process
+           && d._2._2.isDefined,                           // has a name
+      List(d => List(                // 1.) Process name
+          d._2._2.map(_.path).getOrElse("unnamed_processes_should_have_been_filtered_out"),
+          d._2._1.cid.toString,      // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
+          d._1.eventType.toString    // 3.) Event type
+        ), _._3 match {              // 4.) identifier(s) for the object, based on its type
+          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+            case "" :: remainder => pathDelimiterChar :: remainder
+            case x => x
+          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
+          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.sorted.mkString(",")}}:${adm.cid}"))
+          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
+        }
+      ),
+      d => Set(ExtendedUuidDetails(d._1.uuid),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
+        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      _._1.latestTimestampNanos
     )(thisActor.context, context.self)
   ).par
 
@@ -814,7 +854,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
 
 
-//  TODO: consider a(n updatable?) alarm filter for every tree?
+//  TODO: consider an (updatable?) alarm filter for every tree?
 
   val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
 
@@ -830,6 +870,47 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
 
 
+  type SummaryLine
+
+  def summarize(treeName: String, subtreeKey: List[ExtractedValue], summaryLimit: Int): Future[List[SummaryLine]] = {
+    ppm(treeName).get.getAllCounts.map{ allCounts =>
+      val subtreeCounts = allCounts.collect{ case (key, count) if key.startsWith(subtreeKey) => key -> count }
+
+
+    }
+    ppm(treeName).get.getRepr(Timeout(100 seconds)).map { repr =>
+      val subtree = subtreeKey.foldLeft(Option(repr)){ case (rOpt,k) => rOpt.flatMap(_.children.find(_.key == k)) }.get
+      val rankedNovelties = subtree.leafNodes().sortBy(_._3)
+      sub
+      ???
+    }
+
+    // Consider: overall strategy => systematically remove items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
+
+    /*
+     * Interesting things:
+     *   - Long path lengths from a leaf upward where each hop has a count = 1  (or identical counts)
+     *   - Comparatively low local probability
+     *   - Common sub-trees in different branches. (suggests pivoting the tree)
+     *   - Common subset trees in different branches. (suggests collapsing?)
+     *   - Alarms that were produced...?
+     */
+
+    /*
+     * Reduction categories:
+     *   - paths into common parent directories
+     *   - known process names into "purposes"...?  (e.g. web browsing, email)
+     *   - Events into "higher-level" notions:
+     *     - READ / WRITE => "File IO"
+     *     - SEND / RCV / ACCEPT / BIND => "Network Communication"
+     *     - ...
+     *     - everything else => Discard
+     *
+     */
+
+//    def renormalize(repr: TreeRepr, siblingPopulation: Int = 1, parentCount: Int = 0): TreeRepr =
+//      TreeRepr(0, repr.key, if (siblingPopulation == ), newGProb.getOrElse(repr.globalProb), repr.count, repr.children.map(c => renormalize(c)))
+  }
 
 
 
