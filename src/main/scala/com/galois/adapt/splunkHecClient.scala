@@ -28,6 +28,7 @@ import akka.event.{Logging, LoggingAdapter}
 
 import spray.json.JsValue
 
+//[REF: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html https://doc.akka.io/docs/akka-http/current/common/uri-model.html]
 
 /*
 * Reference: Message format [http://dev.splunk.com/view/event-collector/SP-CAAAE6P]
