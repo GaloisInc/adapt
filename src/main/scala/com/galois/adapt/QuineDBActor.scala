@@ -221,7 +221,8 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
           println(s"Begining context aggregation now.")
 //          graph.saveStratifiedContexts("/Users/ryan/Desktop/adapt-contexts.tsv", 2, 3, 1, Set(knowledgeOf[EventToFile]()), 8, 10 minutes)
 //          graph.saveBiasedContextSentences2("/Users/ryan/Desktop/adapt-contexts.tsv", List(1 -> branchOf[EventToFile]()), 8, 10 minutes)
-          graph.saveStratifiedContexts2("/Users/ryan/Desktop/adapt-contexts.tsv", 5, 5, 1, "testColumn", Set(knowledgeOf[EventToFile]()), 8, 30 minutes)
+          graph.saveStratifiedContexts2("/Users/ryan/Desktop/adapt-contexts.tsv", 1, 5, 1, "testColumn", Set(knowledgeOf[EventToFile]()), 12, 300 minutes)
+            .recover{ case e => e.printStackTrace() }
 //          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
         }
 //      }
@@ -298,13 +299,16 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
     Router(RoundRobinRoutingLogic(), routees)
   }
 
+  var nextIdx: Int = count
+
   def receive = {
     case w: CDM17 =>
       router.route(w, sender())
     case msg @ Terminated(a) =>
       log.warning(s"Received $msg")
       router = router.removeRoutee(a)
-      val r = context.actorOf(Props[QuineDBActor])
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph, nextIdx))
+      nextIdx += 1
       context watch r
       router = router.addRoutee(r)
     case x =>
@@ -317,36 +321,34 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
 object CDM17Implicits {
   import scala.pickling.Defaults._
 
-  implicit val a = PicklerUnpickler.generate[Option[Map[String, String]]]
-  implicit val b = PicklerUnpickler.generate[Option[String]]
-  implicit val c = PicklerUnpickler.generate[AbstractObject]
+  implicit val aaa = PicklerUnpickler.generate[Option[Map[String, String]]]
+  implicit val bbb = PicklerUnpickler.generate[Option[String]]
+  implicit val ccc = PicklerUnpickler.generate[AbstractObject]
 
-  implicit val d = PicklerUnpickler.generate[PrincipalType]
-  implicit val e = PicklerUnpickler.generate[List[String]]  // canNOT also have this in scope: scala.pickling.Defaults.stringPickler
+  implicit val ddd = PicklerUnpickler.generate[PrincipalType]
+  implicit val eee = PicklerUnpickler.generate[List[String]]  // canNOT also have this in scope: scala.pickling.Defaults.stringPickler
 
-  implicit val f = PicklerUnpickler.generate[Option[Int]]
-  implicit val g = PicklerUnpickler.generate[Option[Long]]
-  implicit val h = PicklerUnpickler.generate[FileObjectType]
-  implicit val i = PicklerUnpickler.generate[CryptographicHash]
-  implicit val j = PicklerUnpickler.generate[Option[Seq[CryptographicHash]]]
+  implicit val fff = PicklerUnpickler.generate[Option[Int]]
+  implicit val ggg = PicklerUnpickler.generate[Option[Long]]
+  implicit val hhh = PicklerUnpickler.generate[FileObjectType]
+  implicit val iii = PicklerUnpickler.generate[CryptographicHash]
+  implicit val jjj = PicklerUnpickler.generate[Option[Seq[CryptographicHash]]]
 
-  implicit val k = PicklerUnpickler.generate[EventType]
-  implicit val l = PicklerUnpickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
+  implicit val kkk = PicklerUnpickler.generate[EventType]
+  implicit val lll = PicklerUnpickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
 
-  implicit val m = PicklerUnpickler.generate[SubjectType]
-  implicit val n = PicklerUnpickler.generate[Option[PrivilegeLevel]]
-  implicit val o = PicklerUnpickler.generate[Option[List[String]]]
-  implicit val p = PicklerUnpickler.generate[Option[UUID]]
+  implicit val mmm = PicklerUnpickler.generate[SubjectType]
+  implicit val nnn = PicklerUnpickler.generate[Option[PrivilegeLevel]]
+  implicit val ooo = PicklerUnpickler.generate[Option[List[String]]]
+  implicit val ppp = PicklerUnpickler.generate[Option[UUID]]
 
-  implicit val q = PicklerUnpickler.generate[Option[TagOpCode]]
-  implicit val r = PicklerUnpickler.generate[Option[List[UUID]]]
-  implicit val t = PicklerUnpickler.generate[Option[IntegrityTag]]
-  implicit val u = PicklerUnpickler.generate[Option[ConfidentialityTag]]
+  implicit val qqq = PicklerUnpickler.generate[Option[TagOpCode]]
+  implicit val rrr = PicklerUnpickler.generate[Option[List[UUID]]]
+  implicit val ttt = PicklerUnpickler.generate[Option[IntegrityTag]]
+  implicit val uuu = PicklerUnpickler.generate[Option[ConfidentialityTag]]
 
-  implicit val v = PicklerUnpickler.generate[Option[Value]]
-  implicit val w = PicklerUnpickler.generate[SrcSinkType]
-
-//  implicit val aa = PicklerUnpickler.generate[EVENT_READ.type]
+  implicit val vvv = PicklerUnpickler.generate[Option[Value]]
+  implicit val www = PicklerUnpickler.generate[SrcSinkType]
 
   private def unpicklePrimitiveToString(pickle: QuinePickleWrapper)(implicit format: PickleFormat): Try[String] = Try {
     Try( pickle.thisPickle.unpickle[String] ).getOrElse(

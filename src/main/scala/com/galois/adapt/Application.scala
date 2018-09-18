@@ -418,7 +418,7 @@ object Application extends App {
       replServer.start()   // ssh repl@localhost -p22222
 
       val graph = GraphService( system,
-        inMemoryNodeLimit = Some(100000),
+        inMemoryNodeLimit = Some(10000),
         shardCount = 3
         , uiPort = None /*Some(9090)*/ )(
         MapDBMultimap()
