@@ -1,11 +1,5 @@
 package com.galois.adapt
 
-//import com.galois.adapt.Application.system
-//
-//import scala.concurrent.Future
-//import com.splunk.logging
-import java.util.logging.Logger
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
@@ -54,17 +48,6 @@ import spray.json.JsValue
 *         will not be indexed. For more information, see Indexed field extractions.
 * */
 
-object splunkHecClientLogger {
-
-  private val logger = Logger.getLogger("splunkLogger")
-
-  //curl http://127.0.0.1:8088/services/collector/event/1.0 -H "Authorization: Splunk 58288208-9db4-4f42-99e2-f5fdcdf19d24" -d '{"event": "diff event"}{"event": "diff event2"}'
-  //sudo tcpflow -p -c -i lo port 8088
-  def sendEvent(eventMsg: String) = {
-    logger.info(eventMsg)
-  }
-}
-
 case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", source: String="localhost", sourcetype:String="json", index:String="default") {
 
   //example:
@@ -104,6 +87,18 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 
 }
 
+/*
+* Example Usage:
+*
+*     val event = JsObject(
+*      "alarm_type" -> JsString("testAlarm2"),
+*      "file" -> JsString("testFile2")
+*    )
+*    splunkHecClient(token = "58288208-9db4-4f42-99e2-f5fdcdf19d24", host = "127.0.0.1", port= 8088).sendEvent(event);*
+*
+*
+*/
+
 case class splunkHecClient(token: String, host:String, port:Int = 8088) {
 
   implicit val system = ActorSystem()
@@ -122,7 +117,6 @@ case class splunkHecClient(token: String, host:String, port:Int = 8088) {
   }
 
   def sendEventHttp(event:EventMsg) = {
-
 
     val data = ByteString(event.toJson.toString)
 
