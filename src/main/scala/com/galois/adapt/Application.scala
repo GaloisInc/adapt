@@ -18,8 +18,8 @@ import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
+import com.galois.adapt.cdm18.{CDM18, RawCDM18Type, Cdm17to18}
 import com.galois.adapt.{cdm18 => cdm18types}
-import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
@@ -37,7 +37,7 @@ import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
-import com.galois.adapt.cdm19.{CDM19, Cdm18to19, RawCDM19Type}
+import com.galois.adapt.cdm19._
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
@@ -313,8 +313,8 @@ object Application extends App {
   // Coarse grain filtering of the input CDM
   var filter: Option[Filterable => Boolean] = None
   var filterAst: Option[Filter] = None
-  val filterFlow: Flow[(String,CDM18),(String,CDM18),_] = Flow[(String,CDM18)]
-    .map[(String, Either[Filterable,CDM18])] {
+  val filterFlow: Flow[(String,CDM19),(String,CDM19),_] = Flow[(String,CDM19)]
+    .map[(String, Either[Filterable,CDM19])] {
       case (s, c: Event) => (s, Left(Filterable.apply(c)))
       case (s, c: FileObject) => (s, Left(Filterable.apply(c)))
       case (s, c: Host) => (s, Left(Filterable.apply(c)))
@@ -328,14 +328,14 @@ object Application extends App {
       case (s, c: Subject) => (s, Left(Filterable.apply(c)))
       case (s, c: TagRunLengthTuple) => (s, Left(Filterable.apply(c)))
       case (s, c: UnitDependency) => (s, Left(Filterable.apply(c)))
-      case (s, c: UnnamedPipeObject) => (s, Left(Filterable.apply(c)))
+      case (s, c: IpcObject) => (s, Left(Filterable.apply(c)))
       case (s, other) => (s, Right(other))
     }
     .filter {
       case (s, Left(f)) => filter.fold(true)(func => func(f))
       case (s, right) => true
     }
-    .map[(String, CDM18)] {
+    .map[(String, CDM19)] {
       case (s, Left(f)) => (s, f.underlying)
       case (s, Right(cdm)) => (s, cdm)
     }
@@ -385,13 +385,13 @@ object Application extends App {
 
       val (name, sink) = (ingestCdm, ingestAdm) match {
         case (false, false) => println("\n\nA database ingest flow which ingest neither CDM nor ADM data ingests nothing at all.\n\nExiting, so that you can ponder the emptiness of existence for a while...\n\n"); Runtime.getRuntime.halt(42); throw new RuntimeException("TreeFallsInTheWoodsException")
-        case (true, false) => "CDM" -> DBQueryProxyActor.graphActorCdm18WriteSink(dbActor, completionMsg)(writeTimeout)
+        case (true, false) => "CDM" -> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
         case (false, true) => "ADM" -> er.to(DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg))
         case (true, true) => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
           import GraphDSL.Implicits._
-          val broadcast = b.add(Broadcast[(String,CDM18)](2))
+          val broadcast = b.add(Broadcast[(String,CDM19)](2))
 
-          broadcast ~> DBQueryProxyActor.graphActorCdm18WriteSink(dbActor, completionMsg)(writeTimeout)
+          broadcast ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
           broadcast ~> er ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
 
           SinkShape(broadcast.in)
@@ -402,15 +402,15 @@ object Application extends App {
       if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
 
       startWebServer()
-      CDMSource.cdm18(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
+      CDMSource.cdm19(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
     case "train" =>
       startWebServer()
       statusActor ! InitMsg
 
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("E3 Training", statusActor))
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 
@@ -418,10 +418,10 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("E3", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
@@ -430,16 +430,16 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("E3 (no DB)", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM18)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 
     case "print-cdm" =>
       var i = 0
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .map(cdm => println(s"Record $i: ${cdm.toString}"))
         .runWith(Sink.ignore)
 
@@ -457,7 +457,7 @@ object Application extends App {
         if (e.predicateObjectPath.isDefined) List("predicateObjectPath") else Nil,
         if (e.predicateObject2.isDefined) List("predicateObject2") else Nil,
         if (e.predicateObject2Path.isDefined) List("predicateObject2Path") else Nil,
-        if (e.name.isDefined) List("name") else Nil,
+        if (e.names.nonEmpty) List("name") else Nil,
         if (e.parameters.isDefined) List("parameters") else Nil,
         if (e.location.isDefined) List("location") else Nil,
         if (e.size.isDefined) List("size") else Nil,
@@ -523,7 +523,7 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("File Input", statusActor))
         .via(filterFlow)
         .via(er)
@@ -538,70 +538,36 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      // CSV generation
-      //
-      // TODO: Alec find a way to have this exit on completion
-      (forCdm, forAdm) match {
-        case (true, false) =>
-          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-            import GraphDSL.Implicits._
+      if (forCdm) {
+        println("Producing CSVs from CDM is no longer supported")
+      } else if (!forAdm) {
+        println("Generating CSVs for neither CDM not ADM - so... generating nothing!")
+      } else {
+        RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
+          import GraphDSL.Implicits._
 
-            val broadcast = graph.add(Broadcast[CDM18](8))
+          val broadcast = graph.add(Broadcast[Any](9))
 
-            CDMSource.cdm18(ta1).via(printCounter("File Input", statusActor)).map(_._2) ~> broadcast.in
+          CDMSource.cdm19(ta1)
+            .via(printCounter("DB Writer", statusActor, 10000))
+            .via(er)
+            .via(Flow.fromFunction {
+              case Left(e) => e
+              case Right(ir) => ir
+            }) ~> broadcast.in
 
-            broadcast.out(0).collect{ case c: cdm17.NetFlowObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "NetFlowObjects.csv")
-            broadcast.out(1).collect{ case c: cdm17.Event => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Events.csv")
-            broadcast.out(2).collect{ case c: cdm17.FileObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "FileObjects.csv")
-            broadcast.out(3).collect{ case c: cdm17.RegistryKeyObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "RegistryKeyObjects.csv")
-            broadcast.out(4).collect{ case c: cdm17.ProvenanceTagNode => c.tagIdUuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "ProvenanceTagNodes.csv")
-            broadcast.out(5).collect{ case c: cdm17.Subject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Subjects.csv")
-            broadcast.out(6).collect{ case c: cdm17.Principal => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "Principals.csv")
-            broadcast.out(7).collect{ case c: cdm17.SrcSinkObject => c.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "SrcSinkObjects.csv")
+          broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src,n), lbl, tgt) =>  src -> Map("src-name" -> n, "label" -> lbl, "target" -> tgt.rendered) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
+          broadcast.out(1).collect{ case c: AdmNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
+          broadcast.out(2).collect{ case c: AdmEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
+          broadcast.out(3).collect{ case c: AdmFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
+          broadcast.out(4).collect{ case c: AdmProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
+          broadcast.out(5).collect{ case c: AdmSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
+          broadcast.out(6).collect{ case c: AdmPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
+          broadcast.out(7).collect{ case c: AdmSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
+          broadcast.out(8).collect{ case c: AdmPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
 
-            ClosedShape
-          }).run()
-
-        case (false, true) =>
-
-          // TODO: Alec find a better way to get the "blocked" CSV information
-//          system.scheduler.schedule(0 seconds, 1 minutes, uuidRemapper, GetStillBlocked)
-
-          RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
-            import GraphDSL.Implicits._
-
-            val broadcast = graph.add(Broadcast[Any](9))
-
-            CDMSource.cdm18(ta1)
-              .via(printCounter("DB Writer", statusActor, 10000))
-              .via(er)
-              .via(Flow.fromFunction {
-                case Left(e) => e
-                case Right(ir) => ir
-              }) ~> broadcast.in
-
-            broadcast.out(0).collect{ case EdgeAdm2Adm(AdmUUID(src,n), lbl, tgt) =>  src -> Map("src-name" -> n, "label" -> lbl, "target" -> tgt.rendered) } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEdges.csv")
-            broadcast.out(1).collect{ case c: AdmNetFlowObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmNetFlowObjects.csv")
-            broadcast.out(2).collect{ case c: AdmEvent => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmEvents.csv")
-            broadcast.out(3).collect{ case c: AdmFileObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmFileObjects.csv")
-            broadcast.out(4).collect{ case c: AdmProvenanceTagNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmProvenanceTagNodes.csv")
-            broadcast.out(5).collect{ case c: AdmSubject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSubjects.csv")
-            broadcast.out(6).collect{ case c: AdmPrincipal => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPrincipals.csv")
-            broadcast.out(7).collect{ case c: AdmSrcSinkObject => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmSrcSinkObjects.csv")
-            broadcast.out(8).collect{ case c: AdmPathNode => c.uuid.uuid -> c.toMap } ~> FlowComponents.csvFileSink(odir + File.separator + "AdmPathNodes.csv")
-
-            ClosedShape
-          }).run()
-
-
-        case (false, false) =>
-          println("Generating CSVs for neither CDM not ADM - so... generating nothing!")
-          Source.empty
-
-        case (true, true) =>
-          println("This isn't implemented yet. TODO: Alec")
-          ???
-
+          ClosedShape
+        }).run()
       }
 
     case "ui" | "uionly" =>
@@ -631,21 +597,18 @@ object Application extends App {
         .via(printCounter("UniqueUUIDs", statusActor))
         .statefulMapConcat[(UUID,Boolean)] { () =>
         import scala.collection.mutable.{Map => MutableMap}
-        val firstObservation = MutableMap.empty[UUID, CDM18]
+        val firstObservation = MutableMap.empty[UUID, CDM19]
         val ignoreUuid = new UUID(0L,0L);
         {
-          case (name, StartMarker(sessionNumber)) =>
-            println(s"New StartMarker: $sessionNumber")
-            firstObservation.clear()
-            Nil
-          case (name, c: CDM18 with DBNodeable[_]) if c.getUuid == ignoreUuid => List()
-          case (name, c: CDM18 with DBNodeable[_]) if firstObservation.contains(c.getUuid) =>
+          case (name, c: CDM19 with DBNodeable[_]) if c.getUuid == ignoreUuid => List()
+          case (name, c: CDM19 with DBNodeable[_]) if firstObservation.contains(c.getUuid) =>
             val comparison = firstObservation(c.getUuid) == c
             if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
             List()
-          case (name, c: CDM18 with DBNodeable[_]) =>
+          case (name, c: CDM19 with DBNodeable[_]) =>
             firstObservation += (c.getUuid -> c)
             List()
+          case _ => List.empty
         }
       }.runWith(Sink.ignore)
 
@@ -657,7 +620,7 @@ object Application extends App {
         .runWith(Sink.foreach(println))
 
     case "fsox" =>
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("Novelty FSOX", statusActor))
         .via(er)
         .via(FSOX.apply)
@@ -666,7 +629,7 @@ object Application extends App {
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
       statusActor ! InitMsg
-      CDMSource.cdm18(ta1)
+      CDMSource.cdm19(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(er)
         .runWith(PpmComponents.ppmSink)
@@ -699,7 +662,7 @@ object CDMSource {
         }
       } else paths
 
-      path <- pathsPossiblyFromDirectory
+      path <- pathsPossiblyFromDirectory.sorted
 
       // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
       pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
