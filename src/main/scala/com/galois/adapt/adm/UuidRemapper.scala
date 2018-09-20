@@ -66,9 +66,9 @@ object UuidRemapper {
   def sharded(
       expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
 
-      cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
-      cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
-      blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
+      cdm2cdms: Array[AlmostMap[CdmUUID, CdmUUID]],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
+      cdm2adms: Array[AlmostMap[CdmUUID, AdmUUID]],  // Mapping for CDM uuids that have been mapped onto ADM uuids
+      _unused: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter,
@@ -102,8 +102,9 @@ object UuidRemapper {
 
     loopBack.out ~> splitShards.in
 
+    val blockedEdges = Array.fill(numShards)(mutable.Map.empty[CdmUUID, (List[Edge], Set[CdmUUID])])
     for (i <- 0 until numShards) {
-      val thisRemapper = oneShard(i, thisPartitioner, expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log) // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
+      val thisRemapper = oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), ignoreEvents, log) // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
       splitShards.out(i) ~> Flow.fromFunction(filterShard(i)) ~> thisRemapper ~> mergeShards.in(i)
     }
 

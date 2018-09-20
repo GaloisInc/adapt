@@ -114,6 +114,71 @@ class MapProxy(
   )
 
   /***************************************************************************************
+   * Sharded UUID Remapper maps                                                          *
+   ***************************************************************************************/
+  val numShards = 4
+
+
+  private val mapdbCdm2CdmOverflowShards = Array.tabulate(numShards) { shardId =>
+    fileDb.hashMap(s"cdm2cdmOverflowShard$shardId")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      //      .counterEnable()
+      .createOrOpen()
+  }
+
+  private val mapdbCdm2CdmShards: Array[HTreeMap[Array[AnyRef],Array[AnyRef]]] = Array.tabulate(numShards) { shardId =>
+    memoryDb.hashMap(s"cdm2cdmShard$shardId")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
+      .expireOverflow(mapdbCdm2CdmOverflowShards(shardId))
+      .expireAfterCreate()
+      .expireAfterGet()
+      .expireMaxSize(cdm2cdmLruCacheSize)
+      .expireExecutor(threadPool)
+      .createOrOpen()
+  }
+
+  val cdm2cdmMapShards: Array[AlmostMap[CdmUUID,CdmUUID]] = Array.tabulate(numShards) { shardId =>
+    MapSetUtils.hashMap[Array[AnyRef], CdmUUID, Array[AnyRef], CdmUUID](
+      mapdbCdm2CdmShards(shardId),
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
+    )
+  }
+
+
+  private val mapdbCdm2AdmOverflowShards = Array.tabulate(numShards) { shardId =>
+    fileDb.hashMap(s"cdm2admOverflowShard$shardId")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      //      .counterEnable()
+      .createOrOpen()
+  }
+
+  private val mapdbCdm2AdmShards: Array[HTreeMap[Array[AnyRef],Array[AnyRef]]] = Array.tabulate(numShards) { shardId =>
+    memoryDb.hashMap(s"cdm2admShard$shardId")
+      .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
+      .counterEnable()
+      .expireOverflow(mapdbCdm2AdmOverflowShards(shardId))
+      .expireAfterCreate()
+      .expireAfterGet()
+      .expireMaxSize(cdm2admLruCacheSize)
+      .expireExecutor(threadPool)
+      .createOrOpen()
+  }
+
+  val cdm2admMapShards: Array[AlmostMap[CdmUUID,AdmUUID]] = Array.tabulate(numShards) { shardId =>
+    MapSetUtils.hashMap[Array[AnyRef], CdmUUID, Array[AnyRef], AdmUUID](
+      mapdbCdm2CdmShards(shardId),
+      { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
+      { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
+    )
+  }
+
+  /***************************************************************************************
    * Seen nodes and seen edges                                                           *
    ***************************************************************************************/
 
