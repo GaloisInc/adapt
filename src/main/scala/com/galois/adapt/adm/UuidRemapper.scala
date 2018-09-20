@@ -68,7 +68,6 @@ object UuidRemapper {
 
       cdm2cdms: Array[AlmostMap[CdmUUID, CdmUUID]],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
       cdm2adms: Array[AlmostMap[CdmUUID, AdmUUID]],  // Mapping for CDM uuids that have been mapped onto ADM uuids
-      _unused: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter,
@@ -102,7 +101,7 @@ object UuidRemapper {
 
     loopBack.out ~> splitShards.in
 
-    val blockedEdges = Array.fill(numShards)(mutable.Map.empty[CdmUUID, (List[Edge], Set[CdmUUID])])
+    val blockedEdges = Array.fill(numShards)(mutable.Map.empty[CdmUUID, List[Edge]])
     for (i <- 0 until numShards) {
       val thisRemapper = oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), ignoreEvents, log) // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
       splitShards.out(i) ~> Flow.fromFunction(filterShard(i)) ~> thisRemapper ~> mergeShards.in(i)
@@ -124,7 +123,7 @@ object UuidRemapper {
 
       cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
       cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
-      blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
+      blockedEdges: mutable.Map[CdmUUID, List[Edge]],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter
@@ -133,10 +132,10 @@ object UuidRemapper {
     // Keep track of current time art the tip of the stream, along with things that will expire
     var currentTime: Time = Time(0,0)
     var expiryTimes: Fridge[CdmUUID] = Fridge.empty
-
+    var allStateEmitted: Boolean = false
 
     // Add some 'CDM -> ADM' to the maps and notify those previously blocked
-    def putCdm2Adm(source: CdmUUID, target: AdmUUID): List[UuidRemapperInfo] = {
+    def putCdm2Adm(source: CdmUUID, target: AdmUUID, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
       // Yell loudly if we are about to overwrite something
 
       val otherTarget = cdm2cdm.get(source)
@@ -147,11 +146,13 @@ object UuidRemapper {
       if (prevTarget.exists(_ != target))
         log.warning(s"UuidRemapper: $source should not map to $target (since it already maps to $prevTarget")
 
-      advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
+      for (e <- blockedEdges.remove(source).getOrElse(Nil)) {
+        expireInto += AnEdge(e.applyAdmRemap(source, target))
+      }
     }
 
     // Add some 'CDM -> CDM' to the maps and notify those previously blocked
-    def putCdm2Cdm(source: CdmUUID, target: CdmUUID): List[UuidRemapperInfo] = {
+    def putCdm2Cdm(source: CdmUUID, target: CdmUUID, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
       // Yell loudly if we are about to overwrite something
 
       val otherTarget = cdm2adm.get(source)
@@ -162,26 +163,24 @@ object UuidRemapper {
       if (prevTarget.exists(_ != target))
         log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to $prevTarget")
 
-      advanceAndNotify(source, blockedEdges.remove(source).getOrElse((Nil, Set.empty[CdmUUID])))
+      for (e <- blockedEdges.remove(source).getOrElse(Nil)) {
+        expireInto += AnEdge(e.applyCdmRemap(source, target))
+      }
     }
 
     def expireKey(cdmUuid: CdmUUID, cause: String, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
-      for ((edges, originalCdmUuids) <- blockedEdges.get(cdmUuid).toList) {
-        val originalCdms = originalCdmUuids.toList
-        val synthesizedAdm = AdmSynthesized(originalCdms)
+      for (edges <- blockedEdges.get(cdmUuid)) {
+        val synthesizedAdm = AdmSynthesized(Seq(cdmUuid))
 
         println(s"Expired ${synthesizedAdm.uuid} ($cause)")
 
         expireInto += AnAdm(synthesizedAdm)
-        for (originalCdm <- originalCdms) {
-          expireInto ++= putCdm2Adm(cdmUuid, synthesizedAdm.uuid)
-        }
+        putCdm2Adm(cdmUuid, synthesizedAdm.uuid, expireInto)
       }
     }
 
     // Expire old UUIDs based on the current time. Note all this does is create a new node and call out to `putCdm2Adm`.
     def updateTimeAndExpireOldUuids(time: Time, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
-      var toReturn: mutable.ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
       if (time.nanos > currentTime.nanos) {
         // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
@@ -193,7 +192,7 @@ object UuidRemapper {
         while (keepExpiringNanos) {
           expiryTimes.popFirstNanosToExpireIf(_ <= currentTime.nanos) match {
             case None => keepExpiringNanos = false
-            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "time based", toReturn))
+            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "time based", expireInto))
           }
         }
       }
@@ -209,108 +208,90 @@ object UuidRemapper {
         while (keepExpiringCounts) {
           expiryTimes.popFirstCountToExpireIf(_ <= currentTime.count) match {
             case None => keepExpiringCounts = false
-            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "count based", toReturn))
+            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "count based", expireInto))
           }
         }
       }
-
-      toReturn.toList
     }
 
-    // Apply as many CDM remaps as possible
-    @tailrec
-    def advanceCdm(cdmUuid: CdmUUID, visited: Set[CdmUUID]): (CdmUUID, Set[CdmUUID]) = {  // This makes recursive calls to the map (maybe on disk)
-      if (cdm2cdm contains cdmUuid)
-        advanceCdm(cdm2cdm(cdmUuid), visited + cdmUuid)
-      else
-        (cdmUuid, visited)
-    }
+    {
+      // Don't do anything with events if `ignoreEvents`
+      case Timed(t, a @ AnAdm(_: AdmEvent)) if ignoreEvents =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
-    // Apply as many CDM remaps as possible, then try to apply an ADM remap. If that succeeds, update all of the
-    // dependent/blocked edges. Otherwise, add those edges back into the blocked map under the final CDM we had
-    // advanced to.
-    def advanceAndNotify(keyCdm: CdmUUID, previous: (List[Edge], Set[CdmUUID])): List[UuidRemapperInfo] = {
+        toReturn += a
+        updateTimeAndExpireOldUuids(t, toReturn)
 
-      // TODO: (lower priority) Reconsider how to make this more performent in cases of data arriving wildly out of order very often.
+        toReturn.map(Timed(t,_)).toList
 
-      val (dependent: List[Edge], prevOriginals: Set[CdmUUID]) = previous
-      val (advancedCdm: CdmUUID, originals: Set[CdmUUID]) = advanceCdm(keyCdm, prevOriginals)
+      // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
+      case Timed(t, a @ AnAdm(adm)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
-      cdm2adm.get(advancedCdm) match {
-        case None =>
-          val (prevBlocked, prevOriginals1: Set[CdmUUID]) = blockedEdges.getOrElse(advancedCdm, (Nil, Set.empty[CdmUUID]))
-          blockedEdges(advancedCdm) = (dependent ++ prevBlocked, originals | prevOriginals1 + advancedCdm)
+        toReturn += a
+        for (cdmUuid <- adm.originalCdmUuids) {
+          if (!cdm2cdm.contains(cdmUuid))
+            putCdm2Adm(cdmUuid, adm.uuid, toReturn)
+        }
+        updateTimeAndExpireOldUuids(t, toReturn)
 
-          // Set an expiry time, but only if there isn't one already
-          if (!(expiryTimes.keySet contains advancedCdm)) {
-            expiryTimes.updateExpiryTime(advancedCdm, currentTime.plus(expiryTime))
+        toReturn.map(Timed(t,_)).toList
+
+      // Add an edge
+      case Timed(t, AnEdge(edge)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        def processEdge(): Unit = {
+          val cdmUuid = edge.nextCdmUUID.getOrElse {
+            // No remap needed!
+            toReturn += AnEdge(edge)
+            return
           }
 
+          for (admUuid <- cdm2adm.get(cdmUuid)) {
+            // Remapped a CDM to ADM endpoint
+            toReturn += AnEdge(edge.applyAdmRemap(cdmUuid, admUuid))
+            return
+          }
+          for (cdmUuidNew <- cdm2cdm.get(cdmUuid)) {
+            // Remapped a CDM to CDM endpoint
+            toReturn += AnEdge(edge.applyCdmRemap(cdmUuid, cdmUuidNew))
+            return
+          }
+
+          // Blocked
+          blockedEdges(cdmUuid) = edge :: blockedEdges.getOrElse(cdmUuid, List.empty)
+        }
+        processEdge()
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Add information about a CDM to CDM mapping
+      case Timed(t, CdmMerge(merged, into)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        putCdm2Cdm(merged, into, toReturn)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Update just the time
+      case Timed(t, JustTime) =>
+        if (!allStateEmitted) {
+          val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+          if (t == Time.max) {
+            println(s"UUID remapping stage (shard $thisShardId) is emitting all its state...")
+            allStateEmitted = true
+          }
+          updateTimeAndExpireOldUuids(t, toReturn)
+
+          toReturn.map(Timed(t, _)).toList
+        } else {
           List.empty
-
-        case Some(adm) => dependent.flatMap(e => addEdge(e.applyRemap(Seq(keyCdm), adm)))
-      }
+        }
     }
-
-    // Advance an edge as far as possible
-    def addEdge(edge: Edge): List[UuidRemapperInfo] = edge match {
-      case e: EdgeAdm2Adm => List(AnEdge(e))
-      case e @ EdgeAdm2Cdm(src, lbl, tgt) => advanceAndNotify(tgt, (List(e), Set(tgt)))
-      case e @ EdgeCdm2Adm(src, lbl, tgt) => advanceAndNotify(src, (List(e), Set(src)))
-      case e @ EdgeCdm2Cdm(src, lbl, tgt) => advanceAndNotify(src, (List(e), Set(src)))
-    }
-
-
-  {
-    // Don't do anything with events if `ignoreEvents`
-    case Timed(t, a @ AnAdm(_: AdmEvent)) if ignoreEvents =>
-      val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-      toReturn += a
-      updateTimeAndExpireOldUuids(t, toReturn)
-
-      toReturn.map(Timed(t,_)).toList
-
-    // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
-    case Timed(t, a @ AnAdm(adm)) =>
-      val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-      toReturn += a
-      for (cdmUuid <- adm.originalCdmUuids) {
-        if (!cdm2cdm.contains(cdmUuid))
-          toReturn ++= putCdm2Adm(cdmUuid, adm.uuid)
-      }
-      updateTimeAndExpireOldUuids(t, toReturn)
-
-      toReturn.map(Timed(t,_)).toList
-
-    // Add an edge
-    case Timed(t, AnEdge(edge)) =>
-      val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-      toReturn ++= addEdge(edge)
-      updateTimeAndExpireOldUuids(t, toReturn)
-
-      toReturn.map(Timed(t,_)).toList
-
-    // Add information about a CDM to CDM mapping
-    case Timed(t, CdmMerge(merged, into)) =>
-      val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-      toReturn ++= putCdm2Cdm(merged, into)
-      updateTimeAndExpireOldUuids(t, toReturn)
-
-      toReturn.map(Timed(t,_)).toList
-
-    // Update just the time
-    case Timed(t, JustTime) =>
-      val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-      if (t == Time.max) { println("UUID remapping stage is emitting all its state...") }
-      updateTimeAndExpireOldUuids(t, toReturn)
-
-      toReturn.map(Timed(t,_)).toList
-  }
   }
 
 

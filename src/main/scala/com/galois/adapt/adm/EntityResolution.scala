@@ -6,6 +6,7 @@ import akka.NotUsed
 import akka.event.LoggingAdapter
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
+import com.galois.adapt.Application
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
@@ -75,7 +76,8 @@ object EntityResolution {
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, ignoreEventUuids, log))// Remap UUIDs
+      .via(UuidRemapper.sharded(uuidExpiryTime, Application.mapProxy.cdm2cdmMapShards, Application.mapProxy.cdm2admMapShards, ignoreEventUuids, log, Application.mapProxy.numShards))
+//      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, ignoreEventUuids, log))// Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }
