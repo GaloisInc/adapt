@@ -44,6 +44,13 @@ object UuidRemapper {
   case object JustTime extends UuidRemapperInfo
   case class Cdm2Adm(merged: CdmUUID, into: AdmUUID) extends UuidRemapperInfo
 
+  type UuidRemapperFlow = Flow[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed]
+
+
+  /***************************************************************************************
+   * Sharded variant                                                                     *
+   ***************************************************************************************/
+
   // Figure out which shard a piece of info should be routed to
   def partitioner(numShards: Int): UuidRemapperInfo => Int = {
     def uuidPartition(u: UUID): Int = (u.getLeastSignificantBits % numShards).intValue()
@@ -59,9 +66,6 @@ object UuidRemapper {
       case JustTime => 0 // doesn't matter what this is
     }
   }
-
-
-  type UuidRemapperFlow = Flow[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed]
 
   def sharded(
       expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
@@ -294,6 +298,10 @@ object UuidRemapper {
     }
   }
 
+
+  /***************************************************************************************
+   * Unsharded variant                                                                   *
+   ***************************************************************************************/
 
   def apply(
     expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it

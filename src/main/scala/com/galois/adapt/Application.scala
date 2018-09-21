@@ -57,6 +57,7 @@ object Application extends App {
   val port = config.getInt("akka.http.server.port")
   implicit val system = ActorSystem("production-actor-system")
   val log: LoggingAdapter = Logging.getLogger(system, this)
+  val uuidRemapperShards = config.getInt("adapt.adm.uuidRemapperShards")
 
   // All large maps should be store in `MapProxy`
   val mapProxy: MapProxy = new MapProxy(
@@ -64,6 +65,7 @@ object Application extends App {
     fileDbBypassChecksum = config.getBoolean("adapt.adm.mapdbbypasschecksum"),
     fileDbTransactions = config.getBoolean("adapt.adm.mapdbtransactions"),
 
+    uuidRemapperShards,
     cdm2cdmLruCacheSize = Try(config.getLong("adapt.adm.cdm2cdmlrucachesize")).getOrElse(10000000L),
     cdm2admLruCacheSize = Try(config.getLong("adapt.adm.cdm2admlrucachesize")).getOrElse(30000000L),
     dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
@@ -131,8 +133,8 @@ object Application extends App {
   def isWindows(ns: String): Boolean = namespaces.getOrElse(ns, false)
 
   // These are the maps that `UUIDRemapper` will use
-  val cdm2cdmMap: AlmostMap[CdmUUID,CdmUUID] = mapProxy.cdm2cdmMap
-  val cdm2admMap: AlmostMap[CdmUUID,AdmUUID] = mapProxy.cdm2admMap
+  val cdm2cdmMaps: Array[AlmostMap[CdmUUID,CdmUUID]] = mapProxy.cdm2cdmMapShards
+  val cdm2admMaps: Array[AlmostMap[CdmUUID,AdmUUID]] = mapProxy.cdm2admMapShards
 
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
@@ -140,9 +142,7 @@ object Application extends App {
   val seenEdges: AlmostSet[EdgeAdm2Adm] = mapProxy.seenEdges
   val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
 
-
-
-  val er = EntityResolution(cdm2cdmMap, cdm2admMap, blockedEdges, log, seenNodes, seenEdges)
+  val er = EntityResolution(uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdges, log, seenNodes, seenEdges)
 
   val ppmActor: Option[ActorRef] = runFlow match {
     case "accept" => None
@@ -197,7 +197,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmActor, cdm2admMap, cdm2cdmMap)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmActor, cdm2admMaps, cdm2cdmMaps)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }

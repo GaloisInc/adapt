@@ -70,8 +70,8 @@ object Routes {
        dbActor: ActorRef,
        statusActor: ActorRef,
        ppmActor: Option[ActorRef],
-       cdm2adm: AlmostMap[CdmUUID,AdmUUID],
-       cdm2cdm: AlmostMap[CdmUUID,CdmUUID]
+       cdm2adms: Array[AlmostMap[CdmUUID,AdmUUID]],
+       cdm2cdms: Array[AlmostMap[CdmUUID,CdmUUID]]
    )(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
 
     def setRatings(rating: Int, namespace: String, pathsPerTree: Map[String, List[String]]) = {
@@ -97,13 +97,13 @@ object Routes {
       var noMoreCdmRemaps = false
       var advancedCdm: CdmUUID = cdmUUID
       while (!noMoreCdmRemaps) {
-        cdm2cdm.get(advancedCdm)  match {
+        cdm2cdms.foldLeft[Option[CdmUUID]](None)((acc, cdm2cdm) => acc.orElse(cdm2cdm.get(advancedCdm))) match {
           case None => noMoreCdmRemaps = true
           case Some(c) => advancedCdm = c
         }
       }
 
-      cdm2adm.get(advancedCdm) match {
+      cdm2adms.foldLeft[Option[AdmUUID]](None)((acc, cdm2adm) => acc.orElse(cdm2adm.get(advancedCdm))) match {
         case None => JsString(advancedCdm.rendered)
         case Some(admUuid) => JsString(admUuid.rendered)
       }

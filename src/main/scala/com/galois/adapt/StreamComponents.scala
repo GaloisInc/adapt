@@ -62,8 +62,8 @@ object FlowComponents {
 
         val activeEventChains = EntityResolution.activeChains.size
 
-        val cdm2cdmSize = Application.cdm2cdmMap.size()
-        val cdm2admSize = Application.cdm2admMap.size()
+        val cdm2cdmSize = Application.cdm2cdmMaps.map(_.size()).sum
+        val cdm2admSize = Application.cdm2admMaps.map(_.size()).sum
 
         val seenNodesSize = Application.seenNodes.size()
         val seenEdgesSize = Application.seenEdges.size()

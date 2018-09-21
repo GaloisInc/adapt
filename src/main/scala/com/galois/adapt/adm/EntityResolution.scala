@@ -37,14 +37,20 @@ object EntityResolution {
 
 
   def apply(
-    cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                        // Map from CDM to CDM
-    cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                        // Map from CDM to ADM
+    numUuidRemapperShards: Int,                                     // 0 means use the old remapper
+
+    cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
+    cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
     blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
     log: LoggingAdapter,
 
     seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
   ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
+
+    assert(numUuidRemapperShards >= 0, "Negative number of shards!")
+    assert(cdm2cdmMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2cdm maps")
+    assert(cdm2admMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2adm maps")
 
     val config: Config = ConfigFactory.load()
 
@@ -69,6 +75,12 @@ object EntityResolution {
 
     val ignoreEventUuids: Boolean = config.getBoolean("adapt.adm.ignoreeventremaps")
 
+    val remapper: UuidRemapper.UuidRemapperFlow = if (numUuidRemapperShards == 0) {
+      UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges, ignoreEventUuids, log)
+    } else {
+      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, ignoreEventUuids, log, numUuidRemapperShards)
+    }
+
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
@@ -76,8 +88,7 @@ object EntityResolution {
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(UuidRemapper.sharded(uuidExpiryTime, Application.mapProxy.cdm2cdmMapShards, Application.mapProxy.cdm2admMapShards, ignoreEventUuids, log, Application.mapProxy.numShards))
-//      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, ignoreEventUuids, log))// Remap UUIDs
+      .via(remapper)                                                          // Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }
