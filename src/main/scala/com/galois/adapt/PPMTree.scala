@@ -885,31 +885,76 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       ???
     }
 
-    // Consider: overall strategy => systematically remove items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
+    def glossSize(repr: TreeRepr): Int = ???
+
+    // Consider: overall strategy => systematically remove/collapse items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
 
     /*
      * Interesting things:
      *   - Long path lengths from a leaf upward where each hop has a count = 1  (or identical counts)
      *   - Comparatively low local probability
+     *   - Low global probability after renormalizing to only the branch under consideration.
      *   - Common sub-trees in different branches. (suggests pivoting the tree)
      *   - Common subset trees in different branches. (suggests collapsing?)
      *   - Alarms that were produced...?
+     *   - Consider keeping timestamps.
      */
 
     /*
      * Reduction categories:
-     *   - paths into common parent directories
+     *   - paths into common parent directories. Need to distinguish types for each level of the tree => unify strings iff types are all directories/path components.
      *   - known process names into "purposes"...?  (e.g. web browsing, email)
      *   - Events into "higher-level" notions:
      *     - READ / WRITE => "File IO"
      *     - SEND / RCV / ACCEPT / BIND => "Network Communication"
+     *     - LOADLIBRARY / MMAP / MPROTECT => "Memory Load"
      *     - ...
      *     - everything else => Discard
-     *
+     *   - Events that signal information flow:
+     *     - READ / RCV / ACCEPT / LOADLIBRARY / MMAP / etc. => "incoming data"
+     *     - WRITE / SEND / etc. => "outgoing data"
+     *   - Shape (distribution types) of local prob. among sibling nodes. e.g. uniform dist., uniform w/ outlier, single item, power law, 2-clear-categories, 3-clear-categories.
      */
+
+    /**
+      * Types:
+      *   - Event = IO | Net Comm | ...
+      *   - Process = web browser | email client | server | document editing | control (shells / interpreters)  =  client program | system program
+      *   - Path = directory | filename | file extension
+      *   - URLs …?
+      */
+
+    /**
+      * Clustering considerations:
+      *   - One dimension for each level of the tree. Would need to ensure there is only one variable length discriminator and it is last. Would need to handle null values for the variable length discriminator values.
+      *   - One dimension for each type of discriminator. Would need to encode types together with discriminator values.
+      *   - Clustering exclusively at a single level of a tree. e.g. apply clustering to only the children of a single node at a time; probably for divining shape.
+      *
+      *   Consider: Mean-shift clustering (to discover centroid counts & approximate centers) + gaussian mixture models (to learn model params and cluster membership)
+      */
+
+    trait Child
+    trait Shape { def assessScore(children: Set[Child]): Float } //  = PowerLaw,
+    val shapes: List[Shape] = ???
+    def assessShapeScores(children: Set[Child]): List[(Shape, Float)] = shapes.map(s => s -> s.assessScore(children))
+    def bestFitShape(children: Set[Child]): Shape = assessShapeScores(children).sortBy(_._2).reverse.head._1
+
 
 //    def renormalize(repr: TreeRepr, siblingPopulation: Int = 1, parentCount: Int = 0): TreeRepr =
 //      TreeRepr(0, repr.key, if (siblingPopulation == ), newGProb.getOrElse(repr.globalProb), repr.count, repr.children.map(c => renormalize(c)))
+
+
+    // TODO: Next steps:
+    //  - implement tree collapse function (reduces all nodes which have only one child)
+    //  - implement renormalize function
+    //  - implement extraction of single item from TreeRepr (the most novel)
+    //  - implement subtree-collapse/summarization by the "Types" mentioned above.
+    //    - Simple version: assume subtree can be summarized in a single output line.
+    //    - Complex version: allow for one subtree to summarized with multiple lines.. perhaps recursively.
+    //  - implement a chooser which extracts N particular items, then summarizes the remainder to fit into the X total summary parameter constraint.
+
+
+
   }
 
 
