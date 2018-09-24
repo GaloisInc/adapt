@@ -4,7 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import com.galois.adapt.NoveltyDetection.ExtendedUuidDetails
+import com.galois.adapt.NoveltyDetection.NamespacedUuidDetails
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -29,8 +29,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val cdmUuid: RootJsonFormat[CdmUUID] = jsonFormat2(CdmUUID.apply)
   implicit val admUuid: RootJsonFormat[AdmUUID] = jsonFormat2(AdmUUID.apply)
 
-  implicit val extendedUuid: RootJsonFormat[ExtendedUuid] = new RootJsonFormat[ExtendedUuid] {
-    override def write(eUuid: ExtendedUuid): JsValue = {
+  implicit val extendedUuid: RootJsonFormat[NamespacedUuid] = new RootJsonFormat[NamespacedUuid] {
+    override def write(eUuid: NamespacedUuid): JsValue = {
       val JsObject(payload) = eUuid match {
         case cdm: CdmUUID => cdmUuid.write(cdm)
         case adm: AdmUUID => admUuid.write(adm)
@@ -38,26 +38,26 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       JsObject(payload + ("type" -> JsString(eUuid.productPrefix)))
     }
 
-    override def read(json: JsValue): ExtendedUuid =
+    override def read(json: JsValue): NamespacedUuid =
       json.asJsObject.getFields("type") match {
         case Seq(JsString("CdmUUID")) => cdmUuid.read(json)
         case Seq(JsString("AdmUUID")) => admUuid.read(json)
       }
   }
 
-  implicit val extendedUuidDetails: RootJsonFormat[ExtendedUuidDetails] = new RootJsonFormat[ExtendedUuidDetails] {
-    override def write(eUuid: ExtendedUuidDetails): JsValue = {
+  implicit val extendedUuidDetails: RootJsonFormat[NamespacedUuidDetails] = new RootJsonFormat[NamespacedUuidDetails] {
+    override def write(eUuid: NamespacedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
       JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))))
     }
 
-    override def read(json: JsValue): ExtendedUuidDetails = {
+    override def read(json: JsValue): NamespacedUuidDetails = {
       val eUuid = extendedUuid.read(json)
       val name = json.asJsObject.getFields("name") match {
         case Seq(JsString("")) => None
         case Seq(JsString(jsName)) => Some(jsName)
       }
-      ExtendedUuidDetails(eUuid, name)
+      NamespacedUuidDetails(eUuid, name)
     }
   }
 
