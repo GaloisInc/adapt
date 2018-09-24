@@ -305,6 +305,67 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
   def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
     (counter.toFloat / parentCount.toFloat) * parentGlobalProb
 
+  /* Alternate methods of calculating local probability of a standard node and a question mark node.
+  (Based on the email Anthony Williams sent on September 14, 2018)
+
+  1. Simple Good-Turing
+    def qSimpleGoodTuringLP(qNodeVal: Int, parentCount: Int): Float = {
+      // qNodeVal is the number of sibling nodes with a count of 1
+      if (parentCount == 0) 1F
+      else qNodeVal.toFloat / parentCount.toFloat
+    }
+
+    def simpleGoodTuringLP(parentCount: Int): Float = localProbOfThisObs(parentCount)
+
+  2. Additive Smoothing
+    def qAdditiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
+      1F / (parentCount.toFloat + siblingCount + 1) // +1 to count ?-node
+    }
+
+    def additiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
+      (counter.toFloat + 1) / (parentCount.toFloat + siblingCount + 1)
+      }
+
+  3. Cleary and Witten's Method A
+    def qClearyWittenMethodALP(parentCount: Int): Float = {
+      1F / (parentCount.toFloat + 1)
+    }
+
+    def clearyWittenMethodALP(parentCount: Int): Float = {
+      (counter.toFloat) / (parentCount.toFloat + 1)
+      }
+
+  4. Cleary and Witten's Method B
+    def qClearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else siblingCount.toFloat / parentCount.toFloat
+    }
+
+    def clearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else (counter.toFloat - 1) / parentCount.toFloat
+      }
+
+  5. Cleary and Witten's Method C
+    def qClearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
+      siblingCount.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
+    }
+
+    def clearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
+      counter.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
+      }
+
+  6. GoodTuringInspired
+    def qGoodTuringInspiredLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else siblingCount.toFloat / parentCount.toFloat
+    }
+
+    def goodTuringInspiredLP(parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else counter.toFloat / parentCount.toFloat
+      }
+ */
 
   def receive = {
 
