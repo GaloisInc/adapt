@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** *  Objects, in general, represent data sources and sinks which
@@ -21,6 +24,41 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
   private static final long serialVersionUID = 7028189008191247092L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"AbstractObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<AbstractObject> ENCODER =
+      new BinaryMessageEncoder<AbstractObject>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<AbstractObject> DECODER =
+      new BinaryMessageDecoder<AbstractObject>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<AbstractObject> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<AbstractObject> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<AbstractObject>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this AbstractObject to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a AbstractObject from a ByteBuffer. */
+  public static AbstractObject fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Permission bits defined over the object (Optional) */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.SHORT permission;
   /** * Used to track when an object is deleted and a new one is
@@ -379,6 +417,7 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public AbstractObject build() {
       try {
         AbstractObject record = new AbstractObject();
@@ -386,22 +425,24 @@ public class AbstractObject extends org.apache.avro.specific.SpecificRecordBase 
         record.epoch = fieldSetFlags()[1] ? this.epoch : (java.lang.Integer) defaultValue(fields()[1]);
         record.properties = fieldSetFlags()[2] ? this.properties : (java.util.Map<java.lang.CharSequence,java.lang.CharSequence>) defaultValue(fields()[2]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<AbstractObject>
+    WRITER$ = (org.apache.avro.io.DatumWriter<AbstractObject>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<AbstractObject>
+    READER$ = (org.apache.avro.io.DatumReader<AbstractObject>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

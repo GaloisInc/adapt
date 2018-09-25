@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * TimeMarker records are used to delineate time periods in a data
@@ -16,6 +19,41 @@ public class TimeMarker extends org.apache.avro.specific.SpecificRecordBase impl
   private static final long serialVersionUID = -835589664169212373L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"TimeMarker\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* TimeMarker records are used to delineate time periods in a data\\n     * stream to help consumers know their current read position in the\\n     * data stream.\",\"fields\":[{\"name\":\"tsNanos\",\"type\":\"long\",\"doc\":\"Timestamp in nanoseconds\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<TimeMarker> ENCODER =
+      new BinaryMessageEncoder<TimeMarker>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<TimeMarker> DECODER =
+      new BinaryMessageDecoder<TimeMarker>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<TimeMarker> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<TimeMarker> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<TimeMarker>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this TimeMarker to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a TimeMarker from a ByteBuffer. */
+  public static TimeMarker fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Timestamp in nanoseconds */
   @Deprecated public long tsNanos;
 
@@ -176,27 +214,30 @@ public class TimeMarker extends org.apache.avro.specific.SpecificRecordBase impl
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public TimeMarker build() {
       try {
         TimeMarker record = new TimeMarker();
         record.tsNanos = fieldSetFlags()[0] ? this.tsNanos : (java.lang.Long) defaultValue(fields()[0]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<TimeMarker>
+    WRITER$ = (org.apache.avro.io.DatumWriter<TimeMarker>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<TimeMarker>
+    READER$ = (org.apache.avro.io.DatumReader<TimeMarker>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {
