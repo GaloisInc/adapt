@@ -1149,7 +1149,7 @@ case object TreeRepr {
         case Some(d) if d == atDepth => // resuming after the decent case
           fromFlatRecursive(remainder, atDepth, accAtThisDepth ++ thisDepthList)
         case Some(d) if d < atDepth  => // returning to parent case
-          (thisDepthList.dropRight(1) ++ thisDepthList.lastOption.map(_.copy(children = accAtThisDepth.toSet))).toSet -> remainder
+          (accAtThisDepth ++ thisDepthList).toSet -> remainder
         case Some(d) if d > atDepth  => // descending into the child case
           val (childSet, nextRemainder) = fromFlatRecursive(remainder, atDepth + 1, List.empty)
           val updatedThisDepthList = accAtThisDepth ++ thisDepthList.dropRight(1) :+ thisDepthList.last.copy(children = childSet)
