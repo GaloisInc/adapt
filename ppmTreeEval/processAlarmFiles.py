@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import argparse
 import time
 import json
@@ -7,6 +9,8 @@ import subprocess
 import pandas as pd
 from collections import defaultdict
 from math import floor
+from numpy import percentile
+
 
 def compactAlarmFiles(alarmDir,alarmFNames):
     alarmFilesInDir = os.listdir(alarmFileDir)
@@ -51,7 +55,7 @@ def toEpoch(date):
     pattern = '%Y%m%d'
     return int(time.mktime(time.strptime(date, pattern)))
 
-def getLocalProb(alarmLine):
+def getLocalProbOld(alarmLine):
     nodes = alarmLine[1][2]
     numNodes = len(nodes)
     lp = nodes[-1][1]
@@ -59,6 +63,17 @@ def getLocalProb(alarmLine):
     for idx, node in enumerate(nodes):
         if node[3] == 1 and (idx + 1) < numNodes:
             lp = node[4]/node[5]
+            break
+    return lp
+
+def getLocalProb(alarmLine):
+    nodes = alarmLine[1][2]
+    numNodes = len(nodes)
+    lp = nodes[-1][1]
+
+    for idx, node in enumerate(nodes):
+        if node[3] == 1 and (idx + 1) < numNodes:
+            lp = node[4]/(node[4] + node[5])
             break
     return lp
 
@@ -130,6 +145,7 @@ def findReasonableThreasholdFromDF(alarmLinesDF, initThreshold = 0.1, stepsize =
     newDF = filterByThresholdDF(alarmLinesDF,initThreshold)
     tp,fp = trueAlarmRateDF(newDF)
     attacks = attackNamesDF(newDF)
+    print("TP and FP after initial thresholding: ",tp,fp)
     newthreshold = initThreshold
     print(newthreshold,tp,fp,attacks)
     for step in range(maxsteps):
@@ -252,12 +268,13 @@ def writeWhenDoAlarmsOccur(ta1,
                            attackLines,
                            matchingFunction,
                            intervalInSec,
+                           filterSuffix="",
                            useIngestTime=False,
                            isE2=False,
                            matchOnUUID=False):
 
     if useIngestTime:
-        fileSuffix = "_ingestTime"
+        fileSuffix = "_ingestTime"+filterSuffix
         times = [a[-1] for f,alines in alarmLinesExtByFile for a in alines]
         endE = max(times)
         startE = min(times)
@@ -265,21 +282,21 @@ def writeWhenDoAlarmsOccur(ta1,
         timeInBounds = lambda x: True
         timeOf = lambda xs: xs[-1]
     elif isE2:
-        fileSuffix = "_e2"
+        fileSuffix = "_e2"+filterSuffix
         secondsInE = 16*24*60*60
         startE = toEpoch('20170508')
         endE = toEpoch('20170524')
         timeInBounds = lambda x: (x>=startE and x<=endE)
         timeOf = lambda xs: round(xs[1]/1000000000) # want time in seconds
     else:
-        fileSuffix = "_e3"
+        fileSuffix = "_e3"+filterSuffix
         secondsInE = 12*24*60*60
         startE = toEpoch('20180402')
         endE = toEpoch('20180414')
         timeInBounds = lambda x: (x>=startE and x<=endE)
         timeOf = lambda xs: round(xs[1]/1000000000) # want time in seconds
 
-    fAlarmTimes = "stats/" + ta1 + "_whenDoAlarmsOccur_all" + fileSuffix + ".csv"
+    fAlarmTimes = "stats/" + ta1 + "_whenDoAlarmsOccur" + fileSuffix + ".csv"
     with open(fAlarmTimes,'w') as g:
         g.write("method,timeStep,count,isMal\n")
         for f,alarmLinesExt in alarmLinesExtByFile:
@@ -302,7 +319,7 @@ def writeWhenDoAlarmsOccur(ta1,
 
 
     return "\nWriting timeseries info {} complete!".format(fAlarmTimes)
-#def attackPresentExtractedE2(attackUUIDs,alarmExt):
+
 
 def attackPresentExtracted(attackLine,alarmExt,matchingFunction,matchOnUUID=False):
     if matchOnUUID:
@@ -372,6 +389,12 @@ def writeAlarmTrueFalsePositivesByThreshold(ta1,alarmLinesExtByFile,attackLines,
                 g.write(fileNameToTree(f)+",{},{},{}\n".format(tp,fp,threshold))
     return "Writing true and false positive counts by threshold in {} for each method complete.".format(fname)
 
+def trainThresholdByPercent(alarmLines,pct=1):
+    if pct > 100 or pct < 0:
+        return 1
+    else:
+        lps = [getLocalProb(a) for a in alarmLines]
+        return percentile(lps,pct)
 
 def fullPathToTreeFile(treeList,directory,suffix):
     return list(map(lambda tree: directory+tree+suffix,treeList))
@@ -397,6 +420,24 @@ def e2attackinalarms(attackUUIDs,alarmLines):
             if uuid in alarmUUIDs:
                 true_alarms.append(alarm)
     return true_alarms
+
+def replaceDataTimeInTree(refTree,objTree,rewriteTree=False):
+    refLines = getAlarmLines(refTree)
+    objLines = getAlarmLines(objTree)
+    newObjLines = []
+    for line in objLines:
+        obsTimeMin = round((line[1][1]/1000)/60)
+        for refLine in refLines:
+            refObsTimeMin = round((refLine[1][1]/1000)/60)
+            if abs(obsTimeMin - refObsTimeMin) < 2:
+                newDataTime = refLine[1][0]
+        line[1][0] = newDataTime
+        newObjLines.append(line)
+    if rewriteTree:
+        print("Writing to {}".format(objTree))
+        with open(objTree,'w') as f:
+            f.write(json.dumps(newObjLines))
+    return newObjLines
 
 
 if __name__ == "__main__":
@@ -428,6 +469,8 @@ if __name__ == "__main__":
                         help="Create a file in 'stats' directory containing data on local probability distributions.")
     parser.add_argument('--savefilteredalarms',action='store_true',default=False,
                         help="Filter alarm files and save the results in the alarm file directory.")
+    parser.add_argument('--trainbypercent',action='store_true',default=False,
+                        help="Use the first week of E3 data to determine LP thresholds.")
     parser.add_argument('--nothresholds',action='store_true',default=False,
                         help="Analyze the set of unfiltered alarms.")
     parser.add_argument('--loadthresholds',action='store_true',default=False,
@@ -512,6 +555,16 @@ if __name__ == "__main__":
                           (0.0001,'ProcessWritesFileSoonAfterNetflowRead-clearscope-save_alarm.json.c'),
                           (0.001,'ProcessesWithNetworkActivity-clearscope-save_alarm.json.c')]
 
+    if TA1 == "trace":
+        thresholdTrees = [(0.1,'CommunicationPathThroughObject-trace-save_alarm.json.c'),
+                          (0.0003,'FilesTouchedByProcesses-trace-save_alarm.json.c'),
+                          (0.0006,'ProcessDirectoryReadWriteTouches-trace-save_alarm.json.c'),
+                          (0.0002,'ProcessFileTouches-trace-save_alarm.json.c'),
+                          (0.0003,'ProcessWritesFileSoonAfterNetflowRead-trace-save_alarm.json.c'),
+                          (0.0004,'ProcessesWithNetworkActivity-trace-save_alarm.json.c'),
+                          (0.3,'SudoIsAsSudoDoes-trace-save_alarm.json.c'),
+                          (0.15,'ProcessesChangingPrincipal-trace-save_alarm.json.c')]
+
     if not args.e2:
         attackLines = getAttackLines(attackFileE3)[1:] # remove header
         matchingFunction = containsKeyword
@@ -528,6 +581,21 @@ if __name__ == "__main__":
                 thresholds = thresholdfile.readlines()[-1].split(",")
                 for idx,key in enumerate(methodKeys):
                     thresholdMap[key] = float(thresholds[idx+1]) # First column is the TA1 name
+
+        elif args.trainbypercent:
+            starttime = 2018040200 # yyyymmddhh
+            timespan = 120 # hours
+            for initT, tree in thresholdTrees:
+                fname = alarmFileDir + tree
+                alarmLines = getAlarmLines(fname)
+                trainingAlarms = filterByDataTimeSpan(alarmLines,starttime,timespan)
+                thresholdMap[fname] = trainThresholdByPercent(trainingAlarms,pct=1)
+
+            with open("stats/"+TA1+"_thresholds.csv",'a') as ft:
+                methods = sorted(list(thresholdMap.keys()))
+                print(",".join([str(fileNameToTree(m)) for m in methods]))
+                ft.write(TA1+","+",".join([str(thresholdMap[m]) for m in methods]) + "\n")
+
 
         else:
             for initT, tree in thresholdTrees:
@@ -548,10 +616,13 @@ if __name__ == "__main__":
 
 
     if args.savefilteredalarms:
-        alarmLinesByFile = ((f,
-                             filterByDataTime(
-                                 filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True)
-                             )) for f in compactAlarmFileNames)
+        removeNightAlarms = False
+        filterFunc = lambda f: filterByDataTime(filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True)) \
+            if removeNightAlarms \
+            else filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True)
+
+        alarmLinesByFile = ((f,filterFunc(f)) for f in compactAlarmFileNames)
+
         print()
         for f,alarmsFiltered in alarmLinesByFile:
             filteredAlarmFileName = alarmFileDir+fileNameToTree(f)+"-"+TA1+"-filtered_alarm.json"
@@ -560,17 +631,22 @@ if __name__ == "__main__":
                 g.write(json.dumps(alarmsFiltered))
 
     elif args.savealarmsattime:
-            starttime = 2018041108 # yyyymmddhh
-            timespan = 5 # hours
+        useThresholdFiltering = True
+        starttime = 2018041300 # yyyymmddhh
+        timespan = 24 # hours
 
-            alarmLinesByFile = ((f,filterByDataTimeSpan(getAlarmLines(f),starttime,timespan))
-                                for f in compactAlarmFileNames)
-            print()
-            for f,alarmsFiltered in alarmLinesByFile:
-                filteredAlarmFileName = alarmFileDir+fileNameToTree(f)+"-"+TA1+"-"+str(starttime)+"-_alarm.json"
-                with open(filteredAlarmFileName,"w") as g:
-                    print("Writing {}".format(filteredAlarmFileName))
-                    g.write(json.dumps(alarmsFiltered))
+        filterFunc = lambda f: filterByThreshold(getAlarmLines(f),thresholdMap[f],updateLP=True) if useThresholdFiltering \
+            else getAlarmLines(f)
+
+        alarmLinesByFile = ((f,filterByDataTimeSpan(filterFunc(f),starttime,timespan))
+                            for f in compactAlarmFileNames)
+        print()
+        for f,alarmsFiltered in alarmLinesByFile:
+            fstr = "-filtered" if useThresholdFiltering else ""
+            filteredAlarmFileName = alarmFileDir+fileNameToTree(f)+"-"+TA1+"-"+str(starttime)+fstr+"_alarm.json"
+            with open(filteredAlarmFileName,"w") as g:
+                print("Writing {}".format(filteredAlarmFileName))
+                g.write(json.dumps(alarmsFiltered))
 
     elif args.thresholdcurve: # We are only interested in trees we want to threshold.
         thresholdTreeNames = [f[1] for f in thresholdTrees]
@@ -598,23 +674,27 @@ if __name__ == "__main__":
                 )
             )
 
-        elif args.timeseries: #filterByDataTime()
+        elif args.timeseries:
+            excludeNightsWeekends = True
+
+            if excludeNightsWeekends:
+                filterFunc = lambda f: filterByDataTime(filterByThreshold(getAlarmLines(f),thresholdMap[f]))
+                fileSuffix = ""
+            else:
+                filterFunc = lambda f: filterByThreshold(getAlarmLines(f),thresholdMap[f])
+                fileSuffix = "_all"
+
             alarmLinesExtByFile=[(f,
                                   extractFeaturesFromAlarms(
-                                      filterByThreshold(getAlarmLines(f),thresholdMap[f])
+                                      filterFunc(f)
                                   )) for f in compactAlarmFileNames]
 
             print(
                 writeWhenDoAlarmsOccur(
-                    TA1,alarmLinesExtByFile,attackLines,matchingFunction,3600,isE2=args.e2,matchOnUUID=args.e2
+                    TA1,alarmLinesExtByFile,attackLines,matchingFunction,3600,
+                    filterSuffix=fileSuffix,isE2=args.e2,matchOnUUID=args.e2
                 )
             )
-
-            # print(
-            #     writeWhenDoAlarmsOccur(
-            #         TA1,alarmLinesExtByFile,attackLines,matchingFunction,3600,useIngestTime=True
-            #     )
-            # )
 
         else:
 
