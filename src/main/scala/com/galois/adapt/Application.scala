@@ -283,6 +283,7 @@ object Application extends App {
       statusActor ! InitMsg
 
       CDMSource.cdm19(ta1)
+      // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
         .via(printCounter("E3 (no DB)", statusActor))
         .via(filterFlow)
         .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
