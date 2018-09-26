@@ -941,7 +941,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     }
     ppm(treeName).get.getRepr(Timeout(100 seconds)).map { repr =>
       val subtree = subtreeKey.foldLeft(Option(repr)){ case (rOpt,k) => rOpt.flatMap(_.children.find(_.key == k)) }.get
-      val rankedNovelties = subtree.leafNodes().sortBy(_._3)
+      val rankedNovelties = subtree.leafNodes.sortBy(_._3)
       ???
     }
 
@@ -1000,17 +1000,55 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     def bestFitShape(children: Set[Child]): Shape = assessShapeScores(children).sortBy(_._2).reverse.head._1
 
 
-//    def renormalize(repr: TreeRepr, siblingPopulation: Int = 1, parentCount: Int = 0): TreeRepr =
-//      TreeRepr(0, repr.key, if (siblingPopulation == ), newGProb.getOrElse(repr.globalProb), repr.count, repr.children.map(c => renormalize(c)))
+    // Not tail recursive!
+    def removeQNodes(repr: TreeRepr): TreeRepr = repr.copy(children = repr.children.collect{ case c if c.key != "_?_" => removeQNodes(c) } )
 
-    def treeCollapse(repr: TreeRepr, delimiter: String = "§"): TreeRepr = {
+    def treeCollapse(repr: TreeRepr, delimiter: String = " § ", shouldRequireMatchingCounts: Boolean = true): TreeRepr = {
       if (repr.children.isEmpty) repr
-      else if (repr.children.size == 1) treeCollapse(repr.children.head.copy(key = repr.key + delimiter + repr.children.head.key))
+      else if (repr.children.size == 1 && ( ! shouldRequireMatchingCounts || repr.count == repr.children.head.count))
+        treeCollapse(repr.children.head.copy(depth = repr.depth, key = repr.key + delimiter + repr.children.head.key))
       else repr.copy(children = repr.children.map(c => treeCollapse(c)))
     }
 
+    def renormalizeGlobalProb(repr: TreeRepr, totalCount: Option[Float] = None): TreeRepr = repr.copy(
+      globalProb = repr.count / totalCount.getOrElse(repr.count.toFloat),
+      children = repr.children.map(renormalizeGlobalProb(_, totalCount.orElse(Some(repr.count.toFloat))))
+    )
+
+    type PpmElement = (List[ExtractedValue], Float, Float, Int)
+
+    def extractMostNovel(repr: TreeRepr): (PpmElement, TreeRepr) = {
+      def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
+      def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
+        case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
+          require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+          require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
+          repr.copy(count = repr.count - decrement, children = repr.children.collect {
+            case c if c.key != childKey => c
+            case c if c.key == childKey && c.count != decrement => subtractMostNovel(c, childKey :: remainderKeys, decrement)
+          })
+        case thisKey :: Nil if repr.key == thisKey =>
+          require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+          require(repr.children.isEmpty, s"Should only decrement counts on leaf nodes!")
+          repr.copy(count = repr.count - decrement)
+        case k :: _ => throw new IllegalArgumentException(s"Key not found: $k")
+        case Nil => throw new IllegalArgumentException(s"Cannot decrement a tree when given an empty key.")
+      }
+      val mostNovel = findMostNovel(repr)
+      mostNovel -> renormalizeGlobalProb(subtractMostNovel(repr, mostNovel._1, mostNovel._4))
+    }
+
+//    def treeCollapse2(repr: TreeRepr, delimiter: String = "§"): TreeRepr = {
+//      if (repr.children.isEmpty || (repr.children.size == 1 && repr.children.exists(_.key == "_?_"))) repr.copy(children = Set.empty)
+//      else if (repr.children.size == 2 && repr.children.exists(_.key == "_?_")) {
+//        val onlyChild = repr.children.find(_.key != "_?_").get
+//        treeCollapse2(onlyChild.copy(key = repr.key + delimiter + onlyChild.key))
+//      } else repr.copy(children = repr.children.map(c => treeCollapse2(c)))
+//    }
+
 
     // TODO: Next steps:
+    //  - implement removal of _?_ nodes
     //  - implement tree collapse function (reduces all nodes which have only one child)
     //  - implement renormalize function
     //  - implement extraction of single item from TreeRepr (the most novel)
@@ -1241,21 +1279,37 @@ case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 0L, 1F, 
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
-  override def toString = {
-    val indent = (0 until (4 * depth)).map(_ => " ").mkString("")
+  def get(keys: ExtractedValue*): Option[TreeRepr] = keys.toList match {
+    case Nil => Some(this)
+    case x :: Nil => this.children.find(_.key == x)
+    case x :: xs => this.children.find(_.key == x).flatMap(_.get(xs:_*))
+  }
+
+  def apply(keys: ExtractedValue*): TreeRepr = get(keys:_*).get
+
+  def nodeCount: Int = if (children.isEmpty) 1 else children.foldLeft(1)((a,b) => a + b.nodeCount)
+
+  def leafCount: Int = if (children.isEmpty) 1 else children.foldLeft(0)((a,b) => a + b.leafCount)
+
+  override def toString = toString(0)
+  def toString(passedDepth: Int): String = {
+    val indent = (0 until (4 * passedDepth)).map(_ => " ").mkString("")
     val depthString = if (depth < 10) s" $depth" else depth.toString
     val localProbString = localProb.toString + (0 until (13 - localProb.toString.length)).map(_ => " ").mkString("")
     val globalProbString = globalProb.toString + (0 until (13 - globalProb.toString.length)).map(_ => " ").mkString("")
     val countString = (0 until (9 - count.toString.length)).map(_ => " ").mkString("") + count.toString
     s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
-      children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString).mkString("\n", "", "")
+      children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString(passedDepth + 1)).mkString("\n", "", "")
   }
 
-  def leafNodes(nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
-    children.toList.flatMap {
-      case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc ++ List(key, nextKey), lp, gp, cnt))
-      case next => next.leafNodes(nameAcc :+ key)
-    }
+  def leafNodes = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
+      children.toList.flatMap {
+        case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
+        case next => leafNodesRec(next.children, nameAcc :+ next.key)
+      }
+    leafNodesRec(children, List(key))
+  }
 
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
@@ -1269,31 +1323,35 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
   }
 }
 case object TreeRepr {
-  def fromFlat(repr: List[(Int,ExtractedValue,Float,Float,Int)]): TreeRepr = {
-    def fromFlatRecursive(repr: List[(Int,ExtractedValue,Float,Float,Int)], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[(Int,ExtractedValue,Float,Float,Int)]) = {
-      val thisDepthList = repr.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
-      val remainder = repr.drop(thisDepthList.size)
-      val nextDepth = remainder.headOption.map(_._1)
+  type Depth = Int
+  type LocalProb = Float
+  type GlobalProb = Float
+  type ObservationCount = Int
+  type CSVRow = (Depth, ExtractedValue, LocalProb, GlobalProb, ObservationCount)
+
+  def fromFlat(repr: List[CSVRow]): TreeRepr = {
+    def fromFlatRecursive(rows: List[CSVRow], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[CSVRow]) = {
+      val thisDepthSiblings = rows.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
+      val remainingRows = rows.drop(thisDepthSiblings.size)
+      val nextDepth = remainingRows.headOption.map(_._1)
       nextDepth match {
         case None =>  // this is the last item in the list
-          (accAtThisDepth ++ thisDepthList).toSet -> remainder
-        case Some(d) if d == atDepth => // resuming after the decent case
-          fromFlatRecursive(remainder, atDepth, accAtThisDepth ++ thisDepthList)
+          (accAtThisDepth ++ thisDepthSiblings).toSet -> remainingRows
+        case Some(d) if d == atDepth => // There should never be a `nextDepth` equal to `atDepth` because of the `takeWhile(_._1 == atDepth)` above
+          throw new RuntimeException("THIS SHOULD NEVER HAPPEN! (because of `takeWhile(_._1 == atDepth)` above)")    // fromFlatRecursive(remainingRows, atDepth, accAtThisDepth ++ thisDepthSiblings)
         case Some(d) if d < atDepth  => // returning to parent case
-          (thisDepthList.dropRight(1) ++ thisDepthList.lastOption.map(_.copy(children = accAtThisDepth.toSet))).toSet -> remainder
+          (accAtThisDepth ++ thisDepthSiblings).toSet -> remainingRows
         case Some(d) if d > atDepth  => // descending into the child case
-          val (childSet, nextRemainder) = fromFlatRecursive(remainder, atDepth + 1, List.empty)
-          val updatedThisDepthList = accAtThisDepth ++ thisDepthList.dropRight(1) :+ thisDepthList.last.copy(children = childSet)
+          val (childSet, nextRemainder) = fromFlatRecursive(remainingRows, atDepth + 1, List.empty)
+          val updatedThisDepthList = accAtThisDepth ++ thisDepthSiblings.dropRight(1) :+ thisDepthSiblings.last.copy(children = childSet)
           fromFlatRecursive(nextRemainder, atDepth, updatedThisDepthList)
       }
     }
     fromFlatRecursive(repr, 0, List.empty)._1.head
   }
 
-  def flatToCsvArray(t: (Int, ExtractedValue, Float, Float, Int)): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
-  def csvArrayToFlat(a: Array[String]): (Int, ExtractedValue, Float, Float, Int) = {
-    (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
-  }
+  def flatToCsvArray(t: CSVRow): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
+  def csvArrayToFlat(a: Array[String]): CSVRow = (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
 
   def readFromFile(filePath: String): Option[TreeRepr] = Try {
     val fileHandle = new File(filePath)
