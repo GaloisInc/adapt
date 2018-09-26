@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * This record is a single tuple in a run length encoding of tags */
@@ -14,6 +17,41 @@ public class TagRunLengthTuple extends org.apache.avro.specific.SpecificRecordBa
   private static final long serialVersionUID = 6446669984707962749L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"TagRunLengthTuple\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* This record is a single tuple in a run length encoding of tags\",\"fields\":[{\"name\":\"numValueElements\",\"type\":\"int\",\"default\":0},{\"name\":\"tagId\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16}}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<TagRunLengthTuple> ENCODER =
+      new BinaryMessageEncoder<TagRunLengthTuple>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<TagRunLengthTuple> DECODER =
+      new BinaryMessageDecoder<TagRunLengthTuple>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<TagRunLengthTuple> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<TagRunLengthTuple> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<TagRunLengthTuple>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this TagRunLengthTuple to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a TagRunLengthTuple from a ByteBuffer. */
+  public static TagRunLengthTuple fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   @Deprecated public int numValueElements;
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID tagId;
 
@@ -236,28 +274,31 @@ public class TagRunLengthTuple extends org.apache.avro.specific.SpecificRecordBa
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public TagRunLengthTuple build() {
       try {
         TagRunLengthTuple record = new TagRunLengthTuple();
         record.numValueElements = fieldSetFlags()[0] ? this.numValueElements : (java.lang.Integer) defaultValue(fields()[0]);
         record.tagId = fieldSetFlags()[1] ? this.tagId : (com.bbn.tc.schema.avro.cdm19.UUID) defaultValue(fields()[1]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<TagRunLengthTuple>
+    WRITER$ = (org.apache.avro.io.DatumWriter<TagRunLengthTuple>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<TagRunLengthTuple>
+    READER$ = (org.apache.avro.io.DatumReader<TagRunLengthTuple>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Represents a network flow object. Instantiates an AbstractObject. */
@@ -14,6 +17,41 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
   private static final long serialVersionUID = -1334676187134153255L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"NetFlowObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Represents a network flow object. Instantiates an AbstractObject.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]},\"doc\":\"The base object attributes\"},{\"name\":\"localAddress\",\"type\":[\"null\",\"string\"],\"doc\":\"* The local IP address for this flow. Optional for when not\\n         * obtained initially.\",\"default\":null},{\"name\":\"localPort\",\"type\":[\"null\",\"int\"],\"doc\":\"* The local network port for this flow. Optional for AF_UNIX\\n         * sockets (unnamed and abstract), or for when not obtained\\n         * initially.\",\"default\":null},{\"name\":\"remoteAddress\",\"type\":[\"null\",\"string\"],\"doc\":\"* The remote IP address for this flow. Optional for binds\\n         * that are a listening action and not a full connection, or\\n         * for when not obtained initially.\",\"default\":null},{\"name\":\"remotePort\",\"type\":[\"null\",\"int\"],\"doc\":\"* The remote network port for this flow. Optional for binds\\n         * that are a listening action and not a full connection. Also\\n         * optional for AF_UNIX sockets (unnamed and abstract) and for\\n         * when not obtained intially.\",\"default\":null},{\"name\":\"ipProtocol\",\"type\":[\"null\",\"int\"],\"doc\":\"The IP protocol number e.g., TCP=6\",\"default\":null},{\"name\":\"fileDescriptor\",\"type\":[\"null\",\"int\"],\"doc\":\"The file descriptor (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<NetFlowObject> ENCODER =
+      new BinaryMessageEncoder<NetFlowObject>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<NetFlowObject> DECODER =
+      new BinaryMessageDecoder<NetFlowObject>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<NetFlowObject> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<NetFlowObject> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<NetFlowObject>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this NetFlowObject to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a NetFlowObject from a ByteBuffer. */
+  public static NetFlowObject fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Universally unique identifier for the object */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** The base object attributes */
@@ -822,6 +860,7 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public NetFlowObject build() {
       try {
         NetFlowObject record = new NetFlowObject();
@@ -838,22 +877,24 @@ public class NetFlowObject extends org.apache.avro.specific.SpecificRecordBase i
         record.ipProtocol = fieldSetFlags()[6] ? this.ipProtocol : (java.lang.Integer) defaultValue(fields()[6]);
         record.fileDescriptor = fieldSetFlags()[7] ? this.fileDescriptor : (java.lang.Integer) defaultValue(fields()[7]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<NetFlowObject>
+    WRITER$ = (org.apache.avro.io.DatumWriter<NetFlowObject>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<NetFlowObject>
+    READER$ = (org.apache.avro.io.DatumReader<NetFlowObject>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

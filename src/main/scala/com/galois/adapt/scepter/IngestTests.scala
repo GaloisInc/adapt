@@ -100,18 +100,25 @@ class General_TA1_Tests(
   // Test uniqueness of... UUIDs
   // Some providers have suggested that they may reuse UUIDs. That would be bad.
   it should "not have any duplicate UUIDs" in {
-    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source != "clearscope") {
-      graph.traversal().V()
-        .values("uuid")
-        .groupCount[String]()
-        .toList
-    } else {
+    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source == "clearscope") {
       graph.traversal().V()
         .not(__.hasLabel("FileObject")) // FileObjects can duplicate UUIDs
         .values("uuid")
         .groupCount[String]()
         .toList
+    } else if (ta1Source == "theia") {
+      graph.traversal().V()
+        .not(__.hasLabel("FileObject", "NetFlowObject", "Principal")) // TODO: check structural equality
+        .values("uuid")
+        .groupCount[String]()
+        .toList
+    } else {
+      graph.traversal().V()
+        .values("uuid")
+        .groupCount[String]()
+        .toList
     }
+
 
     val offending: List[(String,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
     var assertMsg: String = "\n"
@@ -242,7 +249,7 @@ class General_TA1_Tests(
 
       assert(
         eventsWithoutThreadId.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
+        s"\nSome (non 'EVENT_ADD_OBJECT_ATTRIBUTE'/'EVENT_FLOWS_TO') events don't have a 'threadId':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
       )
     }
   }
@@ -268,7 +275,7 @@ class General_TA1_Tests(
 
       assert(
         malformedAddObjectEvents.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
+        s"\nSome 'EVENT_ADD_OBJECT_ATTRIBUTE' events don't have two predicate objects that are 'NetFlowObject's:\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
       )
     }
   }
@@ -286,27 +293,35 @@ class General_TA1_Tests(
     if (eventsNotOther.nonEmpty) {
       assert(eventsNotOther.nonEmpty)
     } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${eventsNotOther.map(_.id().toString).take(20).mkString(",")}):$code"
-      val uuidsOfEventsNotOther = eventsNotOther.map(_.value("uuid").toString).take(20).mkString("\n" + color)
-
       assert(
         eventsNotOther.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsNotOther${Console.RED}\n"
+        s"\nDidn't find any events with type not 'EVENT_UPDATE'\n"
       )
     }
   }
 
   // Test that EVENT_WRITE and EVENT_READ have predicate objects that are 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'
-  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'" in {
-    val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
-      .hasLabel("Event")
-      .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
-      .as("e")
-      .out("predicateObject","predicateObject2")
-      .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
-      .select[Vertex]("e")
-      .toList
+  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'IpcObject', 'NetFlowObject'" in {
+    val malformedReadWriteEvents: java.util.List[Vertex] = if ( ! List("clearscope").contains(ta1Source) ) {
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject")))
+        .select[Vertex]("e")
+        .toList
+    } else {
+      // Clearscope represents getuid and such with a read event that has predicate object and subject that are the same node
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+        .select[Vertex]("e")
+        .toList
+    }
 
     if (malformedReadWriteEvents.isEmpty) {
       assert(malformedReadWriteEvents.length <= 0)

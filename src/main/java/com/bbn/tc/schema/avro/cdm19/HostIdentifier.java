@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** Host identifier, such as serial number, IMEI number */
@@ -14,6 +17,41 @@ public class HostIdentifier extends org.apache.avro.specific.SpecificRecordBase 
   private static final long serialVersionUID = 550752739964642632L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"HostIdentifier\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"Host identifier, such as serial number, IMEI number\",\"fields\":[{\"name\":\"idType\",\"type\":\"string\"},{\"name\":\"idValue\",\"type\":\"string\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<HostIdentifier> ENCODER =
+      new BinaryMessageEncoder<HostIdentifier>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<HostIdentifier> DECODER =
+      new BinaryMessageDecoder<HostIdentifier>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<HostIdentifier> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<HostIdentifier> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<HostIdentifier>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this HostIdentifier to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a HostIdentifier from a ByteBuffer. */
+  public static HostIdentifier fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   @Deprecated public java.lang.CharSequence idType;
   @Deprecated public java.lang.CharSequence idValue;
 
@@ -237,28 +275,31 @@ public class HostIdentifier extends org.apache.avro.specific.SpecificRecordBase 
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public HostIdentifier build() {
       try {
         HostIdentifier record = new HostIdentifier();
         record.idType = fieldSetFlags()[0] ? this.idType : (java.lang.CharSequence) defaultValue(fields()[0]);
         record.idValue = fieldSetFlags()[1] ? this.idValue : (java.lang.CharSequence) defaultValue(fields()[1]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<HostIdentifier>
+    WRITER$ = (org.apache.avro.io.DatumWriter<HostIdentifier>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<HostIdentifier>
+    READER$ = (org.apache.avro.io.DatumReader<HostIdentifier>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * This record captures a relationship edge between two units, one
@@ -16,6 +19,41 @@ public class UnitDependency extends org.apache.avro.specific.SpecificRecordBase 
   private static final long serialVersionUID = 7172960062743217479L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"UnitDependency\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* This record captures a relationship edge between two units, one\\n     * dependent on the other. This relationship is inferred from a\\n     * combination of underlying events.\",\"fields\":[{\"name\":\"unit\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16}},{\"name\":\"dependentUnit\",\"type\":\"UUID\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<UnitDependency> ENCODER =
+      new BinaryMessageEncoder<UnitDependency>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<UnitDependency> DECODER =
+      new BinaryMessageDecoder<UnitDependency>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<UnitDependency> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<UnitDependency> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<UnitDependency>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this UnitDependency to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a UnitDependency from a ByteBuffer. */
+  public static UnitDependency fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID unit;
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID dependentUnit;
 
@@ -239,28 +277,31 @@ public class UnitDependency extends org.apache.avro.specific.SpecificRecordBase 
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public UnitDependency build() {
       try {
         UnitDependency record = new UnitDependency();
         record.unit = fieldSetFlags()[0] ? this.unit : (com.bbn.tc.schema.avro.cdm19.UUID) defaultValue(fields()[0]);
         record.dependentUnit = fieldSetFlags()[1] ? this.dependentUnit : (com.bbn.tc.schema.avro.cdm19.UUID) defaultValue(fields()[1]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<UnitDependency>
+    WRITER$ = (org.apache.avro.io.DatumWriter<UnitDependency>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<UnitDependency>
+    READER$ = (org.apache.avro.io.DatumReader<UnitDependency>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

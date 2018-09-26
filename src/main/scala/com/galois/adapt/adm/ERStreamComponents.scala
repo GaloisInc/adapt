@@ -3,7 +3,7 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.stream.scaladsl.Flow
-import com.galois.adapt.adm.EntityResolution.{CDM, ErFlow, Time, Timed}
+import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm18._
 
@@ -159,7 +159,7 @@ object ERStreamComponents {
 
             toReturn.toList
 
-          case (_, Timed(t, TimeMarker(_))) =>
+          case (_, Timed(t, EndOfStream)) =>
 
             val toReturn = ListBuffer.empty[Timed[UuidRemapperInfo]]
             expireOldChains(t, toReturn)

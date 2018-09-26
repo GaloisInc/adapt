@@ -128,6 +128,8 @@ object Wrapper extends App {
         )
         val file = new File(adaptJarPath)
         if (file.exists) file.deleteOnExit()
+
+        adaptJarPath
       }
 
       // Run the tests

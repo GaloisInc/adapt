@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Global constants
-ASSEMBLED_ADAPT="./target/scala-2.11/adapt-assembly-0.5.jar"
+ASSEMBLED_ADAPT="./target/scala-2.11/adapt-assembly-0.6.2.jar"
 ASSEMBLED_SCEPTER="./scepter/target/scala-2.11/scepter-assembly-0.1.jar"
 
 REMOTE="alfred:/srv/www/adapt.galois.com/public_html/acceptance_tests" #"adapt.galois.com~acceptance_tests"
