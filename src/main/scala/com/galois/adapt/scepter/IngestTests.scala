@@ -318,7 +318,7 @@ class General_TA1_Tests(
         .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
         .as("e")
         .out("predicateObject","predicateObject2")
-        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject")))
+        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject", "PacketSocketObject")))
         .select[Vertex]("e")
         .toList
     }
