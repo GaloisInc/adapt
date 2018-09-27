@@ -1042,7 +1042,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       import cdm18._
 
       val readEvents = List(
-        g,
+        EVENT_READ,
         EVENT_RECVFROM, EVENT_RECVMSG,
 //        EVENT_MMAP
       )
