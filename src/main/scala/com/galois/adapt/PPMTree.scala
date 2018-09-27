@@ -1038,20 +1038,88 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       mostNovel -> renormalizeGlobalProb(subtractMostNovel(repr, mostNovel._1, mostNovel._4))
     }
 
-//    def treeCollapse2(repr: TreeRepr, delimiter: String = "§"): TreeRepr = {
-//      if (repr.children.isEmpty || (repr.children.size == 1 && repr.children.exists(_.key == "_?_"))) repr.copy(children = Set.empty)
-//      else if (repr.children.size == 2 && repr.children.exists(_.key == "_?_")) {
-//        val onlyChild = repr.children.find(_.key != "_?_").get
-//        treeCollapse2(onlyChild.copy(key = repr.key + delimiter + onlyChild.key))
-//      } else repr.copy(children = repr.children.map(c => treeCollapse2(c)))
-//    }
+    {
+      import cdm18._
+
+      val readEvents = List(
+        g,
+        EVENT_RECVFROM, EVENT_RECVMSG,
+//        EVENT_MMAP
+      )
+      val writeEvents = List(
+        EVENT_WRITE,
+        EVENT_SENDTO, EVENT_SENDMSG,
+        EVENT_TRUNCATE,
+//        EVENT_MMAP
+      )
+      val processTreeEvents = List(
+        EVENT_FORK,
+        EVENT_MODIFY_PROCESS,
+        EVENT_EXIT,
+        EVENT_CLONE,
+        EVENT_CREATE_THREAD,
+        EVENT_STARTSERVICE,
+      )
+      val singularEvents = List(
+        EVENT_MMAP,
+        EVENT_EXECUTE, EVENT_LOADLIBRARY,
+        EVENT_UNLINK,
+        EVENT_ADD_OBJECT_ATTRIBUTE,
+        EVENT_CREATE_OBJECT,
+        EVENT_FLOWS_TO,
+        EVENT_UPDATE,
+      )
+      val fileSystemEvents = List(
+        EVENT_MOUNT,
+        EVENT_UMOUNT,
+        EVENT_CHECK_FILE_ATTRIBUTES,
+        EVENT_MODIFY_FILE_ATTRIBUTES,
+        EVENT_RENAME,
+        EVENT_OPEN,
+        EVENT_CLOSE,
+        EVENT_LINK,
+        EVENT_FCNTL, EVENT_DUP,
+      )
+      val networkManagementEvents = List(
+        EVENT_ACCEPT,
+        EVENT_CONNECT,
+        EVENT_BIND,
+        EVENT_READ_SOCKET_PARAMS,
+        EVENT_WRITE_SOCKET_PARAMS
+      )
+      val systemManagementEvents = List(
+        EVENT_BOOT,
+        EVENT_MPROTECT,  // val memoryManagementEvents = List()
+        EVENT_SHM,
+        EVENT_LOGCLEAR,
+        EVENT_SERVICEINSTALL,
+      )
+      val userEvents = List(
+        EVENT_CHANGE_PRINCIPAL,
+        EVENT_LOGIN,
+        EVENT_LOGOUT,
+      )
+      val otherEvents = List(
+        EVENT_BLIND,
+        EVENT_OTHER,
+      )
+      val discardedEvents = List(
+        EVENT_LSEEK,
+        EVENT_WAIT,
+        EVENT_UNIT,
+        EVENT_SIGNAL,
+//        EVENT_CORRELATION,
+      )
+
+
+    }
 
 
     // TODO: Next steps:
-    //  - implement removal of _?_ nodes
-    //  - implement tree collapse function (reduces all nodes which have only one child)
-    //  - implement renormalize function
-    //  - implement extraction of single item from TreeRepr (the most novel)
+    //  X- implement removal of _?_ nodes
+    //  X- implement tree collapse function (reduces all nodes which have only one child)
+    //  X- implement renormalize function
+    //  X- implement extraction of single item from TreeRepr (the most novel)
     //  - implement subtree-collapse/summarization by the "Types" mentioned above.
     //    - Simple version: assume subtree can be summarized in a single output line.
     //    - Complex version: allow for one subtree to summarized with multiple lines.. perhaps recursively.
