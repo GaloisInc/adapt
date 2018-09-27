@@ -8,7 +8,7 @@ import java.util.function.Consumer
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 import spray.json.{JsonReader, JsonWriter}
 
 import scala.collection.mutable

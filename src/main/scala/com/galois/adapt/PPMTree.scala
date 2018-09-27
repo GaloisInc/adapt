@@ -5,7 +5,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
+import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -638,12 +638,12 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(Option(nf.remoteAddress).getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
+          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
         }
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
         ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
-        ExtendedUuidDetails(d._3._1.uuid,Some(Option(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress).getOrElse("NULL_value_from_CDM")))) ++
+        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("NULL_value_from_CDM")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos

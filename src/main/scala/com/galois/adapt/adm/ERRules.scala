@@ -1,7 +1,7 @@
 package com.galois.adapt.adm
 
 import com.galois.adapt.adm.UuidRemapper.CdmMerge
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 
 object ERRules {
 
@@ -42,7 +42,7 @@ object ERRules {
 
   // Resolve a 'NetFlowObject'
   object NetflowObjectEdges {
-    type AddressEdgeNode = (EdgeAdm2Adm, AdmAddress)
+    type AddressEdgeNode = Option[(EdgeAdm2Adm, AdmAddress)]
     type PortEdgeNode = Option[(EdgeAdm2Adm, AdmPort)]
   }
   def resolveNetflow(provider: String, n: NetFlowObject):
@@ -54,16 +54,16 @@ object ERRules {
       NetflowObjectEdges.PortEdgeNode
     ) = {
       val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
-      val newLP = AdmPort(n.localPort)
-      val newLA = AdmAddress(n.localAddress)
-      val newRP = AdmPort(n.remotePort)
-      val newRA = AdmAddress(n.remoteAddress)
+      val newLP = n.localPort.map(AdmPort)
+      val newLA = n.localAddress.map(AdmAddress)
+      val newRP = n.remotePort.map(AdmPort)
+      val newRA = n.remoteAddress.map(AdmAddress)
       (
         newN,
-        (EdgeAdm2Adm(newN.uuid, "localAddress", newLA.uuid), newLA),
-        (EdgeAdm2Adm(newN.uuid, "remoteAddress", newRA.uuid), newRA),
-        if (n.localPort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "localPort", newLP.uuid), newLP)) },
-        if (n.remotePort == -1) { None } else { Some((EdgeAdm2Adm(newN.uuid, "remotePort", newRP.uuid), newRP)) }
+        newLA.map(la => (EdgeAdm2Adm(newN.uuid, "localAddress", la.uuid), la)),
+        newRA.map(ra => (EdgeAdm2Adm(newN.uuid, "remoteAddress", ra.uuid), ra)),
+        newLP.filterNot(_.port == -1).map(lp => (EdgeAdm2Adm(newN.uuid, "localPort", lp.uuid), lp)),
+        newRP.filterNot(_.port == -1).map(rp => (EdgeAdm2Adm(newN.uuid, "remotePort", rp.uuid), rp))
       )
     }
 
@@ -115,7 +115,7 @@ object ERRules {
   // Resolve an 'UnnamedPipeObject'
   //
   // TODO: sourceUUID, sinkUUID
-  def resolveUnnamedPipeObject(provider: String, u: UnnamedPipeObject): AdmFileObject
+  def resolveUnnamedPipeObject(provider: String, u: IpcObject): AdmFileObject
     = AdmFileObject(Seq(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, provider)
 
   def resolveMemoryObject(provider: String, m: MemoryObject): AdmSrcSinkObject
@@ -188,7 +188,7 @@ object ERRules {
 
   // Resolve a 'Subject'
   object SubjectEdges {
-    type LocalPrincipalEdge = EdgeAdm2Cdm
+    type LocalPrincipalEdge = Option[EdgeAdm2Cdm]
     type ParentSubject = Option[EdgeAdm2Cdm]
 
     type CmdLinePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
@@ -214,11 +214,11 @@ object ERRules {
         UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
       ))
     } else {
-      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos, provider)
+      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos.getOrElse(0), provider)
 
       Left((
         newSubj,
-        EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(s.localPrincipal, provider)),
+        s.localPrincipal.map(principal => EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(principal, provider))),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent, provider))),
         s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
           (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)

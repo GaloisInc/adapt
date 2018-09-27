@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.util
 import java.util.{Arrays, Comparator, UUID}
 
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
@@ -370,24 +370,24 @@ package object adm {
   final case class AdmNetFlowObject(
     originalCdmUuids: Seq[CdmUUID],
 
-    localAddress: String,
-    localPort: Int,
-    remoteAddress: String,
-    remotePort: Int,
+    localAddress: Option[String],
+    localPort: Option[Int],
+    remoteAddress: Option[String],
+    remotePort: Option[Int],
 
     provider: String
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(localAddress + localPort + remoteAddress + remotePort), provider)
+    val uuid = AdmUUID(DeterministicUUID(localAddress.toString + localPort.toString + remoteAddress.toString + remotePort.toString), provider)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
-      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "localAddress" -> localAddress,
-      "localPort" -> localPort,
-      "remoteAddress" -> remoteAddress,
-      "remotePort" -> remotePort
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
     ) ++
+      localAddress.fold[List[(String,Any)]](Nil)(v => List("localAddress" -> v)) ++
+      localPort.fold[List[(String,Any)]](Nil)(v => List("localPort" -> v)) ++
+      remoteAddress.fold[List[(String,Any)]](Nil)(v => List("remoteAddress" -> v)) ++
+      remotePort.fold[List[(String,Any)]](Nil)(v => List("remotePort" -> v)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
@@ -544,7 +544,7 @@ package object adm {
 
     hostName: String,                        // hostname or machine name
     hostIdentifiers: Seq[HostIdentifier],    // list of identifiers, such as serial number, IMEI number
-    osDetails: String,                       // OS level details revealed by tools such as uname -a
+    osDetails: Option[String],               // OS level details revealed by tools such as uname -a
     hostType: HostType,                      // host's role or device type, such as mobile, server, desktop
     interfaces: Seq[Interface],              // names and addresses of network interfaces
 
@@ -558,12 +558,12 @@ package object adm {
 
       "hostname" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
-      "osDetails" -> osDetails,
       "hostType" -> hostType.toString,
       "interfaces" -> interfaces.map(_.toString).mkString(";"),
 
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
     ) ++
+      osDetails.fold[List[(String,Any)]](Nil)(p => List("osDetails" -> p)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
