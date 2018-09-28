@@ -46,8 +46,8 @@ var node_appearance = [
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
-           var fd = (node.hasOwnProperty('fileDescriptor') ? node['fileDescriptor'][0]['value'] : "")
-            var fp = (node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "none")
+           var fd = (node.hasOwnProperty('fileDescriptor') ? node['fileDescriptor'] : "")
+            var fp = (node['properties'].hasOwnProperty('path') ? node['properties']['path'] : "none")
             return fp + " fd " + fd
         }
     }, {
@@ -56,8 +56,8 @@ var node_appearance = [
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
-            var addr = (node['properties'].hasOwnProperty('memoryAddress') ? node['properties']['memoryAddress'][0]['value'] : "None")
-            var size = (node['properties'].hasOwnProperty('size') ? node['properties']['size'][0]['value'] : "None")
+            var addr = (node['properties'].hasOwnProperty('memoryAddress') ? node['properties']['memoryAddress'] : "None")
+            var size = (node['properties'].hasOwnProperty('size') ? node['properties']['size'] : "None")
             return addr + "\nsize: " + size
         }
     }, {
@@ -66,8 +66,8 @@ var node_appearance = [
         icon_unicode : "\uf2c0",
         size: 40,
         make_node_label : function(node) {
-            var source = (node['properties'].hasOwnProperty('sourceFileDescriptor') ? node['properties']['sourceFileDescriptor'][0]['value'] : "None")
-            var sink = (node['properties'].hasOwnProperty('sinkFileDescriptor') ? node['properties']['sinkFileDescriptor'][0]['value'] : "None")
+            var source = (node['properties'].hasOwnProperty('sourceFileDescriptor') ? node['properties']['sourceFileDescriptor'] : "None")
+            var sink = (node['properties'].hasOwnProperty('sinkFileDescriptor') ? node['properties']['sinkFileDescriptor'] : "None")
             return "src: " + source + "\nsink: " + sink
         }
     }, {
@@ -76,7 +76,7 @@ var node_appearance = [
         icon_unicode : "\uf419",
         size: 50,
         make_node_label : function(node) {
-            var at = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'][0]['value'] : "None")
+            var at = (node['properties'].hasOwnProperty('userId') ? node['properties']['userId'] : "None")
             return "userId: " + at
         }
     }, {
@@ -84,10 +84,10 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "NetFlowObject" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
-            var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None")
-            var localP = (node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None")
-            var remoteA = (node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None")
-            var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None")
+            var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'] : "None")
+            var localP = (node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'] : "None")
+            var remoteA = (node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'] : "None")
+            var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'] : "None")
             return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
         }
     }, {
@@ -95,8 +95,8 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "RegistryKeyObject" },
         icon_unicode : "\uf296",
         make_node_label : function(node) {
-            var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'][0]['value'] : "None")
-            var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'][0]['value'] : "None")
+            var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'] : "None")
+            var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'] : "None")
             return key + " : " + value
         }
     }, {
@@ -104,10 +104,10 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "Event" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-            var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'][0]['value'] : "None")
-            var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None")
-            // var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "None")
-            // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'][0]['value'] : "None")
+            var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'] : "None")
+            var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'] : "None")
+            // var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "None")
+            // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'] : "None")
             return type + "\n# " + sequence
         }
     }, {
@@ -115,8 +115,8 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "SrcSinkObject" },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
-            // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'][0]['value'] : "None")
-            var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "None")
+            // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'] : "None")
+            var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'] : "None")
             return type
         }
     }, {
@@ -124,10 +124,10 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "ProvenanceTagNode" },
         icon_unicode : "\uf48e",
         make_node_label : function(node) {
-            // var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'][0]['value'] : "None")
-            var opcode = (node['properties'].hasOwnProperty('opcode') ? node['properties']['opcode'][0]['value'] : "None")
-            var itag = (node['properties'].hasOwnProperty('itag') ? node['properties']['itag'][0]['value'] : "None")
-            var ctag = (node['properties'].hasOwnProperty('ctag') ? node['properties']['ctag'][0]['value'] : "None")
+            // var systemCall = (node['properties'].hasOwnProperty('systemCall') ? node['properties']['systemCall'] : "None")
+            var opcode = (node['properties'].hasOwnProperty('opcode') ? node['properties']['opcode'] : "None")
+            var itag = (node['properties'].hasOwnProperty('itag') ? node['properties']['itag'] : "None")
+            var ctag = (node['properties'].hasOwnProperty('ctag') ? node['properties']['ctag'] : "None")
             return "OpCode: " + opcode +  /* ", call:" + systemCall +  */ " \nItag: " + itag + "\nCtag: " + ctag
         }
     }, {
@@ -135,10 +135,10 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "Subject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-            var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None")
-            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'][0]['value'] : "None")
-            var cmd = (node['properties'].hasOwnProperty('cmdLine') ? node['properties']['cmdLine'][0]['value'] : "no cmd line")
-            // var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? new Date(node['properties']['startTimestampNanos'][0]['value']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos'][0]['value']%1000 : "no timestamp")
+            var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None")
+            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'] : "None")
+            var cmd = (node['properties'].hasOwnProperty('cmdLine') ? node['properties']['cmdLine'] : "no cmd line")
+            // var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? new Date(node['properties']['startTimestampNanos']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos']%1000 : "no timestamp")
             switch(t) {
                 case "SUBJECT_PROCESS":
                     return "Process: " + cid
@@ -160,8 +160,8 @@ var node_appearance = [
         icon_unicode: "\uf390",
         size: 40,
         make_node_label: function(node) {
-            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'][0]['value']+"\n" : "no_host_name"+"\n"
-            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'][0]['value'] : "(unknown_type)"
+            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName']+"\n" : "no_host_name"+"\n"
+            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(unknown_type)"
             return hostName + "(" + hostType + ")"
         }
     }, {
@@ -170,15 +170,15 @@ var node_appearance = [
         icon_unicode : "\uf3fb",
         size: 40,
         make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('path') ? node['properties']['path'][0]['value'] : "???"
+            return node['properties'].hasOwnProperty('path') ? node['properties']['path'] : "???"
         }
     }, {
        name : "ADM Subject",
         is_relevant : function(n) { return n.db_label === "AdmSubject" },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
-            var cid = node['properties'].hasOwnProperty('cid') ? node['properties']['cid'][0]['value'] : "None"
-            var timestamp = node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos'][0]['value']/1000000).toGMTString().replace(" GMT","")) : ""
+            var cid = node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None"
+            var timestamp = node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos']/1000000).toGMTString().replace(" GMT","")) : ""
             return "Process: " + cid + timestamp
         }
     }, {
@@ -187,16 +187,16 @@ var node_appearance = [
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'][0]['value'] : "UNKNOWN TYPE"
+            return node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'] : "UNKNOWN TYPE"
         }
     }, {
         name : "ADM Event",
         is_relevant : function(n) { return n.db_label === "AdmEvent" },
         icon_unicode : "\uf29a",
         make_node_label : function(node) {
-            var firstTime = node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos'][0]['value']/1000000).toGMTString() : "???"
-            // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos'][0]['value']/1000000).toGMTString() : "???")
-            var type = node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'][0]['value'] : "None"
+            var firstTime = node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos']/1000000).toGMTString() : "???"
+            // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos']/1000000).toGMTString() : "???")
+            var type = node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'] : "None"
             return type + "\n" + firstTime //+ " - " + lastTime
         }
     }, {
@@ -205,8 +205,8 @@ var node_appearance = [
         icon_unicode : "\uf419",
         size : 50,
         make_node_label : function(node) {
-            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'][0]['value'] : "")
-            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'][0]['value'] : "")
+            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'] : "")
+            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'] : "")
             return username + userId
         }
     }, {
@@ -214,10 +214,10 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "AdmNetFlowObject" },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
-            var localA = node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'][0]['value'] : "None"
-            var localP = node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'][0]['value'] : "None"
-            var remoteA = node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'][0]['value'] : "None"
-            var remoteP = node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'][0]['value'] : "None"
+            var localA = node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'] : "None"
+            var localP = node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'] : "None"
+            var remoteA = node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'] : "None"
+            var remoteP = node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'] : "None"
             return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
         }
     }, {
@@ -225,14 +225,14 @@ var node_appearance = [
         is_relevant : function(n) { return n.db_label === "AdmSrcSinkObject" },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'][0]['value'] : "??"
+            return node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'] : "??"
         }
     }, {
         name : "ADM Provenance Tag Node",
         is_relevant : function(n) { return n.db_label === "AdmProvenanceTagNode" },
         icon_unicode : "\uf48e",
         make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'][0]['value'] : "??"
+            return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "??"
         }
     },
 
@@ -374,7 +374,7 @@ var predicates = [
 // Subject
        {
         name : "Events Caused",
-        is_relevant : function(n) {return n.db_label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'][0]['value'] === 'SUBJECT_PROCESS'},
+        is_relevant : function(n) {return n.db_label === "Subject" && n['properties'].hasOwnProperty('subjectType') && n['properties']['subjectType'] === 'SUBJECT_PROCESS'},
         floating_query : ".in('subject').hasLabel('Event')",
         is_default : true
     }, {
@@ -416,7 +416,7 @@ var predicates = [
         floating_query : ".out('parentSubject')"
     }, {
         name : "Child Processes",
-        is_relevant : function(n) {return n.db_label === "Subject" && n['properties']['subjectType'][0]['value'] == 'SUBJECT_PROCESS'},
+        is_relevant : function(n) {return n.db_label === "Subject" && n['properties']['subjectType'] == 'SUBJECT_PROCESS'},
         floating_query : ".in('parentSubject')"
     }, 
 // Unnamed Pipe Object
@@ -582,7 +582,7 @@ var predicates = [
     {
         name : "Host",
         is_relevant : function(node) { return node['properties'].hasOwnProperty('host') },
-        floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'][0]['value'] +")" }
+        floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'] +")" }
     // },{
     //     name: "Between Nodes",
     //     is_relevant: function(clickedNode){ return network.getSelectedNodes().length === 2 },
