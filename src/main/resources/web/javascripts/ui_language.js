@@ -32,7 +32,7 @@ var starting_queries = [
 ]
 
 var node_appearance = [
-    {   // Icon codes:  http://ionicons.com/cheatsheet.html
+    {   // Icon codes:  https://ionicons.com/v2/cheatsheet.html
         // NOTE: the insertion of 'u' is required to make code prefixes of '\uf...' as below; because javascript.
         name : "Cluster",
         is_relevant : function(n) { return node_data_set.get(n.id) && network.isCluster(n.id) },
@@ -233,6 +233,20 @@ var node_appearance = [
         icon_unicode : "\uf48e",
         make_node_label : function(node) {
             return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "??"
+        }
+    }, {
+        name : "ADM Address",
+        is_relevant : function(n) { return n.db_label === "AdmAddress" },
+        icon_unicode : "\uf448",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('address') ? node['properties']['address'] : "??"
+        }
+    }, {
+        name : "ADM Port",
+        is_relevant : function(n) { return n.db_label === "AdmPort" },
+        icon_unicode : "\uf447",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('port') ? node['properties']['port'] : "??"
         }
     },
 
@@ -682,6 +696,10 @@ var predicates = [
         name : "NetFlow Principal",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
+    // }, {   // TODO:
+    //     name : "Client Connected NetFlows",
+    //     is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+    //     floating_query : ""
     }, 
 
  // AdmProvenanceTagNode

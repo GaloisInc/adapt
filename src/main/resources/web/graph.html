@@ -491,7 +491,7 @@
                         size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
-                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
+                n["label"] = String(getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n))
                 n["title"] = makeNodeTitle(n)
                 // n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n
