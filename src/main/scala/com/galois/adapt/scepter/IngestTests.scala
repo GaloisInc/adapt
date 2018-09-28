@@ -214,19 +214,19 @@ class General_TA1_Tests(
     }
   }
 
-  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia", "clearscope").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
     }
   }
 
-  if ( ! List("faros", "theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("faros", "theia", "clearscope").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
     }
   }
 
-  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia", "clearscope", "cadets").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
     }
@@ -318,7 +318,7 @@ class General_TA1_Tests(
         .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
         .as("e")
         .out("predicateObject","predicateObject2")
-        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
+        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject", "PacketSocketObject")))
         .select[Vertex]("e")
         .toList
     }

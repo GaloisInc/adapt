@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.galois.adapt.NoveltyDetection.NamespacedUuidDetails
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
+import com.galois.adapt.cdm19.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
 
@@ -85,7 +85,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val admPathNode = jsonFormat(AdmPathNode.apply, "path", "provider")
   implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "provider")
   implicit val admNetFlowObject = jsonFormat(AdmNetFlowObject.apply, "originalCdmUuids", "localAddress", "localPort", "remoteAddress", "remotePort", "provider")
-  implicit val admAddress = jsonFormat(AdmIPAddress.apply(_), "address")
+  implicit val admAddress = jsonFormat(AdmAddress.apply(_), "address")
   implicit val admPort = jsonFormat(AdmPort.apply(_), "port")
   implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "provider")
   implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "provider")
@@ -101,7 +101,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case p: AdmPathNode => admPathNode.write(p)
         case p: AdmFileObject => admFileObject.write(p)
         case p: AdmNetFlowObject => admNetFlowObject.write(p)
-        case p: AdmIPAddress => admAddress.write(p)
+        case p: AdmAddress => admAddress.write(p)
         case p: AdmPort => admPort.write(p)
         case p: AdmSrcSinkObject => admSrcSinkObject.write(p)
         case p: AdmPrincipal => admPrincipal.write(p)

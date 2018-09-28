@@ -28,7 +28,20 @@
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
     	// Note: special handling for a few specific properties is hardcoded below in the `formatNodes` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
     	var nodeApiResultTransform = 
-    		function(nodes) { return nodes }
+        // ADAPT: This removes the `[0]['value']` from each element in `properties`:
+    		function(nodes) { 
+                return _.map(nodes, function(n){
+                    return _.mapObject(n, function(val, key){ 
+                        if (key != "properties") { 
+                            return val 
+                        } else {
+                            return _.mapObject(val, function(propArray, k){
+                                return propArray[0]['value']
+                            })
+                        }
+                    })
+                })
+            }
 
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language. The resulting string will be sent as a query to the 'nodeApiPath' specified above, which should return nodes.
@@ -478,7 +491,7 @@
                         size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
-                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
+                n["label"] = String(getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n))
                 n["title"] = makeNodeTitle(n)
                 // n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n

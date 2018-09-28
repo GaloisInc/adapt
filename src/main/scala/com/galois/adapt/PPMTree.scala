@@ -5,7 +5,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT, SUBJECT_PROCESS}
+import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT, SUBJECT_PROCESS}
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -652,12 +652,12 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(Option(nf.remoteAddress).getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
+          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
         NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
-        NamespacedUuidDetails(d._3._1.uuid,Some(Option(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress).getOrElse("NULL_value_from_CDM")))) ++
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
@@ -1039,17 +1039,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     }
 
     {
-      import cdm18._
+      import cdm19._
 
       val readEvents = List(
         EVENT_READ,
-        EVENT_RECVFROM, EVENT_RECVMSG,
+        EVENT_RECVFROM, EVENT_RECVMSG
 //        EVENT_MMAP
       )
       val writeEvents = List(
         EVENT_WRITE,
         EVENT_SENDTO, EVENT_SENDMSG,
-        EVENT_TRUNCATE,
+        EVENT_TRUNCATE
 //        EVENT_MMAP
       )
       val processTreeEvents = List(
@@ -1058,7 +1058,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         EVENT_EXIT,
         EVENT_CLONE,
         EVENT_CREATE_THREAD,
-        EVENT_STARTSERVICE,
+        EVENT_STARTSERVICE
       )
       val singularEvents = List(
         EVENT_MMAP,
@@ -1067,7 +1067,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         EVENT_ADD_OBJECT_ATTRIBUTE,
         EVENT_CREATE_OBJECT,
         EVENT_FLOWS_TO,
-        EVENT_UPDATE,
+        EVENT_UPDATE
       )
       val fileSystemEvents = List(
         EVENT_MOUNT,
@@ -1078,7 +1078,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         EVENT_OPEN,
         EVENT_CLOSE,
         EVENT_LINK,
-        EVENT_FCNTL, EVENT_DUP,
+        EVENT_FCNTL, EVENT_DUP
       )
       val networkManagementEvents = List(
         EVENT_ACCEPT,
@@ -1092,23 +1092,23 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         EVENT_MPROTECT,  // val memoryManagementEvents = List()
         EVENT_SHM,
         EVENT_LOGCLEAR,
-        EVENT_SERVICEINSTALL,
+        EVENT_SERVICEINSTALL
       )
       val userEvents = List(
         EVENT_CHANGE_PRINCIPAL,
         EVENT_LOGIN,
-        EVENT_LOGOUT,
+        EVENT_LOGOUT
       )
       val otherEvents = List(
         EVENT_BLIND,
-        EVENT_OTHER,
+        EVENT_OTHER
       )
       val discardedEvents = List(
         EVENT_LSEEK,
         EVENT_WAIT,
         EVENT_UNIT,
         EVENT_SIGNAL,
-//        EVENT_CORRELATION,
+        EVENT_CORRELATION
       )
 
 
