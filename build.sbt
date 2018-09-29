@@ -1,7 +1,7 @@
-val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.6"
-val akkaHttpV = "10.0.10"
-val neoV = "3.3.0"
+val scalaV = "2.12.7"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val akkaV = "2.5.17"
+val akkaHttpV = "10.1.5"
+val neoV = "3.3.3"
 
 resolvers += Resolver.jcenterRepo  // for akka persistence in memory
 
@@ -12,6 +12,8 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.6.2",
   organization := "com.galois",
   scalaVersion := scalaV,
+
+  scalacOptions += "-target:jvm-1.8",
 
   autoScalaLibrary := false,
   libraryDependencies ++= Seq(
@@ -25,14 +27,14 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "0.16",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
-    "org.mapdb" % "mapdb" % "3.0.5",
+    "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.neo4j" % "neo4j-community" % neoV,
     "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
     "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
-    "org.neo4j" % "neo4j-lucene-index" % neoV,
+//    "org.neo4j" % "neo4j-lucene-index" % neoV,
 //    "org.neo4j" % "neo4j-lucene-upgrade" % neoV,
     "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
