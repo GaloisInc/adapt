@@ -13,7 +13,7 @@ case class Host (
   uuid: UUID, // universally unique identifier for the host
   hostName: String, // hostname or machine name
   hostIdentifiers: Seq[HostIdentifier], // list of identifiers, such as serial number, IMEI number
-  osDetails: String, // OS level details revealed by tools such as uname -a
+  osDetails: Option[String], // OS level details revealed by tools such as uname -a
   hostType: HostType, // host's role or device type, such as mobile, server, desktop
   interfaces: Seq[Interface] // names and addresses of network interfaces
 ) extends CDM19 with DBWritable with DBNodeable[CDM19.EdgeTypes.EdgeTypes] {
@@ -21,7 +21,7 @@ case class Host (
     ("uuid", uuid.toString),
     ("hostName", hostName),
     ("hostIdentifiers", hostIdentifiers.map(_.toString).mkString(":")),
-    ("osDetails", osDetails),
+    ("osDetails", osDetails.getOrElse("")),
     ("hostType", hostType.toString),
     ("interfaces", interfaces.map(_.toString).mkString(":"))
   )
@@ -43,7 +43,7 @@ case object Host extends CDM19Constructor[Host] {
       cdm.getUuid,
       cdm.getHostName,
       AvroOpt.listHostIdentifier(cdm.getHostIdentifiers).getOrElse(Seq()),
-      cdm.getOsDetails,
+      AvroOpt.str(cdm.getOsDetails),
       cdm.getHostType,
       AvroOpt.listInterfaces(cdm.getInterfaces).getOrElse(Seq())
     )

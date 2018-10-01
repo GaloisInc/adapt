@@ -3,9 +3,9 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.stream.scaladsl.Flow
-import com.galois.adapt.adm.EntityResolution.{CDM, ErFlow, Time, Timed}
+import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -159,7 +159,7 @@ object ERStreamComponents {
 
             toReturn.toList
 
-          case (_, Timed(t, TimeMarker(_))) =>
+          case (_, Timed(t, EndOfStream)) =>
 
             val toReturn = ListBuffer.empty[Timed[UuidRemapperInfo]]
             expireOldChains(t, toReturn)
@@ -186,7 +186,7 @@ object ERStreamComponents {
                 List.concat(
                   Some(AnAdm(irSubject)),
                   extractPathsAndEdges(path),
-                  Some(AnEdge(localPrincipal)),
+                  localPrincipal.map(AnEdge(_)),
                   parentSubjectOpt.map(AnEdge(_))
                 ).map(elem => Timed(t, elem))
 
@@ -237,14 +237,12 @@ object ERStreamComponents {
 
         case (provider, Timed(t, n: NetFlowObject)) =>
 
-          val (nP, (raEdge, ra), (laEdge, la), remotePort, localPort) = resolveNetflow(provider, n)
+          val (nP, remoteAddress, localAddress, remotePort, localPort) = resolveNetflow(provider, n)
 
           List.concat(
             List(AnAdm(nP)),
-            List(AnEdge(raEdge)),
-            List(AnAdm(ra)),
-            List(AnEdge(laEdge)),
-            List(AnAdm(la)),
+            remoteAddress.toList.flatMap { case (raEdge, ra) => List(AnEdge(raEdge), AnAdm(ra)) },
+            localAddress.toList.flatMap { case (laEdge, la) => List(AnEdge(laEdge), AnAdm(la)) },
             remotePort.toList.flatMap { case (rpEdge, rp) => List(AnEdge(rpEdge), AnAdm(rp)) },
             localPort.toList.flatMap { case (lpEdge, lp) => List(AnEdge(lpEdge), AnAdm(lp)) }
           ).map(elem => Timed(t, elem))
@@ -270,7 +268,7 @@ object ERStreamComponents {
             extractPathsAndEdges(path)
           ).map(elem => Timed(t, elem))
 
-        case (provider, Timed(t, u: UnnamedPipeObject)) =>
+        case (provider, Timed(t, u: IpcObject)) =>
 
           val irFileObject = resolveUnnamedPipeObject(provider, u)
 

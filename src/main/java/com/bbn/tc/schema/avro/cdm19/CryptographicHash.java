@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Cryptographic hash records represent one or more cryptographic hashes for
@@ -15,6 +18,41 @@ public class CryptographicHash extends org.apache.avro.specific.SpecificRecordBa
   private static final long serialVersionUID = -7472474638667235173L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"CryptographicHash\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Cryptographic hash records represent one or more cryptographic hashes for\\n     * an object, typically, a FileObject.\",\"fields\":[{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"CryptoHashType\",\"doc\":\"Cryptographich hash types\",\"symbols\":[\"MD5\",\"SHA1\",\"SHA256\",\"SHA512\",\"AUTHENTIHASH\",\"SSDEEP\",\"IMPHASH\"]},\"doc\":\"The type of hash used\"},{\"name\":\"hash\",\"type\":\"string\",\"doc\":\"The base64 encoded hash value\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<CryptographicHash> ENCODER =
+      new BinaryMessageEncoder<CryptographicHash>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<CryptographicHash> DECODER =
+      new BinaryMessageDecoder<CryptographicHash>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<CryptographicHash> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<CryptographicHash> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<CryptographicHash>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this CryptographicHash to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a CryptographicHash from a ByteBuffer. */
+  public static CryptographicHash fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** The type of hash used */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.CryptoHashType type;
   /** The base64 encoded hash value */
@@ -252,28 +290,31 @@ public class CryptographicHash extends org.apache.avro.specific.SpecificRecordBa
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public CryptographicHash build() {
       try {
         CryptographicHash record = new CryptographicHash();
         record.type = fieldSetFlags()[0] ? this.type : (com.bbn.tc.schema.avro.cdm19.CryptoHashType) defaultValue(fields()[0]);
         record.hash = fieldSetFlags()[1] ? this.hash : (java.lang.CharSequence) defaultValue(fields()[1]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<CryptographicHash>
+    WRITER$ = (org.apache.avro.io.DatumWriter<CryptographicHash>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<CryptographicHash>
+    READER$ = (org.apache.avro.io.DatumReader<CryptographicHash>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

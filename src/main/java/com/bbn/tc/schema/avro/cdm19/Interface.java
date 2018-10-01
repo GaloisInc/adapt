@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** Interface name and addresses */
@@ -14,6 +17,41 @@ public class Interface extends org.apache.avro.specific.SpecificRecordBase imple
   private static final long serialVersionUID = 1774841784080413569L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Interface\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"Interface name and addresses\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"macAddress\",\"type\":\"string\"},{\"name\":\"ipAddresses\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<Interface> ENCODER =
+      new BinaryMessageEncoder<Interface>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<Interface> DECODER =
+      new BinaryMessageDecoder<Interface>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<Interface> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<Interface> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<Interface>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this Interface to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a Interface from a ByteBuffer. */
+  public static Interface fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   @Deprecated public java.lang.CharSequence name;
   @Deprecated public java.lang.CharSequence macAddress;
   @Deprecated public java.util.List<java.lang.CharSequence> ipAddresses;
@@ -306,6 +344,7 @@ public class Interface extends org.apache.avro.specific.SpecificRecordBase imple
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Interface build() {
       try {
         Interface record = new Interface();
@@ -313,22 +352,24 @@ public class Interface extends org.apache.avro.specific.SpecificRecordBase imple
         record.macAddress = fieldSetFlags()[1] ? this.macAddress : (java.lang.CharSequence) defaultValue(fields()[1]);
         record.ipAddresses = fieldSetFlags()[2] ? this.ipAddresses : (java.util.List<java.lang.CharSequence>) defaultValue(fields()[2]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<Interface>
+    WRITER$ = (org.apache.avro.io.DatumWriter<Interface>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<Interface>
+    READER$ = (org.apache.avro.io.DatumReader<Interface>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {

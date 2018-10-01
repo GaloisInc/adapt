@@ -4,13 +4,12 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
-import com.galois.adapt.Application
+import akka.stream.{FlowShape, OverflowStrategy}
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
@@ -20,7 +19,8 @@ import scala.language.postfixOps
 
 object EntityResolution {
 
-  type CDM = CDM18
+  type CDM = CDM19
+  case object EndOfStream extends CDM19 // marker used for in-bound signalling
 
   // We keep these as local variables in the object (as opposed to state closed over in `annotateTime`) because we want
   // easy access to them for logging/debugging purposes.
@@ -71,7 +71,7 @@ object EntityResolution {
 
     val maxEventsMerged: Int   = config.getInt("adapt.adm.maxeventsmerged")
 
-    val maxTimeMarker = ("", Timed(Time.max, TimeMarker(Long.MaxValue)))
+    val maxTimeMarker = ("", Timed(Time.max, EndOfStream))
     val maxTimeRemapper = Timed(Time.max, JustTime)
 
     val ignoreEventUuids: Boolean = config.getBoolean("adapt.adm.ignoreeventremaps")
@@ -115,7 +115,7 @@ object EntityResolution {
 
     // Map a CDM onto a possible timestamp
     val timestampOf: CDM => Option[Long] = {
-      case s: Subject => Some(s.startTimestampNanos)
+      case s: Subject => s.startTimestampNanos
       case e: Event => Some(e.timestampNanos)
       case t: TimeMarker => Some(t.timestampNanos)
       case _ => None

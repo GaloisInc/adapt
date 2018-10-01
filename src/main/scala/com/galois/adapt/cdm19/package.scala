@@ -50,8 +50,8 @@ package object cdm19 {
 
       val cdm = tcIterator.next()
       val first: RawCDM19Type = {
-        if (cdm.getCDMVersion.toString != "18")
-          throw new Exception(s"Expected CDM19, but received CDM${cdm.CDMVersion.toString}")
+        if (cdm.getCDMVersion.toString != "19")
+          throw new Exception(s"Expected CDM19, but received CDM${cdm.getCDMVersion.toString}")
         new RawCDM19Type(cdm.getDatum, Some(cdm.getHostId))
       }
       (cdm.getSource, Iterator(first) ++ tcIterator.map(cdm => new RawCDM19Type(cdm.getDatum, Some(cdm.getHostId))))
@@ -133,21 +133,21 @@ package object cdm19 {
       _.asScala.toList.map(x => ProvenanceAssertion.from(new RawCDM19Type(x, None)).getOrElse(throw new RuntimeException("listProvenanceAssertion: None.getOrElse"))))
   }
 
-  implicit def makeHostType(s: bbnCdm19.HostType): HostType = HostType.from(s.toString).getOrElse(throw new RuntimeException("makeHostType: None.getOrElse"))
-  implicit def makeSubjectType(s: bbnCdm19.SubjectType): SubjectType = SubjectType.from(s.toString).getOrElse(throw new RuntimeException("makeSubjectType: None.getOrElse"))
-  implicit def makePrivilegeLevel(s: bbnCdm19.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).getOrElse(throw new RuntimeException("makePrivilegeLevel: None.getOrElse"))
-  implicit def makeSrcSinkType(s: bbnCdm19.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).getOrElse(throw new RuntimeException("makeSrcSinkType: None.getOrElse"))
-  implicit def makeSource(s: bbnCdm19.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).getOrElse(throw new RuntimeException("makeSource: None.getOrElse"))  // TODO: Use ordinals for faster performance!
-  implicit def makePrincipalType(t: bbnCdm19.PrincipalType): PrincipalType = PrincipalType.from(t.toString).getOrElse(throw new RuntimeException("makePrincipalType: None.getOrElse"))
-  implicit def makeEventType(e: bbnCdm19.EventType): EventType = EventType.from(e.toString).getOrElse(throw new RuntimeException("makeEventType: None.getOrElse"))
-  implicit def makeFileObjectTime(s: bbnCdm19.FileObjectType): FileObjectType = FileObjectType.from(s.toString).getOrElse(throw new RuntimeException("makeFileObjectTime: None.getOrElse"))
-  implicit def makeValueType(v: bbnCdm19.ValueType): ValueType = ValueType.from(v.toString).getOrElse(throw new RuntimeException("makeValueType: None.getOrElse"))
-  implicit def makeValDataType(d: bbnCdm19.ValueDataType): ValueDataType = ValueDataType.from(d.toString).getOrElse(throw new RuntimeException("makeValDataType: None.getOrElse"))
-  implicit def makeTagOpCode(t: bbnCdm19.TagOpCode): TagOpCode = TagOpCode.from(t.toString).getOrElse(throw new RuntimeException("makeTagOpCode: None.getOrElse"))
-  implicit def makeIntegrityTag(i: bbnCdm19.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).getOrElse(throw new RuntimeException("makeIntegrityTag: None.getOrElse"))
-  implicit def makeConfidentialityTag(c: bbnCdm19.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).getOrElse(throw new RuntimeException("makeConfidentialityTag: None.getOrElse"))
-  implicit def makeCryptoHashType(c: bbnCdm19.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).getOrElse(throw new RuntimeException("makeCryptoHashType: None.getOrElse"))
-  implicit def makeIpcObjectType(s: bbnCdm19.IpcObjectType): IpcObjectType = IpcObjectType.from(s.toString).getOrElse(throw new RuntimeException("makeIpcObjectType: None.getOrElse"))
+  implicit def makeHostType(s: bbnCdm19.HostType): HostType = HostType.from(s.toString).getOrElse(throw new RuntimeException(s"makeHostType: $s"))
+  implicit def makeSubjectType(s: bbnCdm19.SubjectType): SubjectType = SubjectType.from(s.toString).getOrElse(throw new RuntimeException(s"makeSubjectType: $s"))
+  implicit def makePrivilegeLevel(s: bbnCdm19.PrivilegeLevel): PrivilegeLevel = PrivilegeLevel.from(s.toString).getOrElse(throw new RuntimeException(s"makePrivilegeLevel: $s"))
+  implicit def makeSrcSinkType(s: bbnCdm19.SrcSinkType): SrcSinkType = SrcSinkType.from(s.toString).getOrElse(throw new RuntimeException(s"makeSrcSinkType: $s"))
+  implicit def makeSource(s: bbnCdm19.InstrumentationSource): InstrumentationSource = InstrumentationSource.from(s.toString).getOrElse(throw new RuntimeException(s"makeSource: $s"))  // TODO: Use ordinals for faster performance!
+  implicit def makePrincipalType(t: bbnCdm19.PrincipalType): PrincipalType = PrincipalType.from(t.toString).getOrElse(throw new RuntimeException(s"makePrincipalType: $t"))
+  implicit def makeEventType(e: bbnCdm19.EventType): EventType = EventType.from(e.toString).getOrElse(throw new RuntimeException(s"makeEventType: $e"))
+  implicit def makeFileObjectTime(s: bbnCdm19.FileObjectType): FileObjectType = FileObjectType.from(s.toString).getOrElse(throw new RuntimeException(s"makeFileObjectTime: $s"))
+  implicit def makeValueType(v: bbnCdm19.ValueType): ValueType = ValueType.from(v.toString).getOrElse(throw new RuntimeException(s"makeValueType: $v"))
+  implicit def makeValDataType(d: bbnCdm19.ValueDataType): ValueDataType = ValueDataType.from(d.toString).getOrElse(throw new RuntimeException(s"makeValDataType: $d"))
+  implicit def makeTagOpCode(t: bbnCdm19.TagOpCode): TagOpCode = TagOpCode.from(t.toString).getOrElse(throw new RuntimeException(s"makeTagOpCode: $t"))
+  implicit def makeIntegrityTag(i: bbnCdm19.IntegrityTag): IntegrityTag = IntegrityTag.from(i.toString).getOrElse(throw new RuntimeException(s"makeIntegrityTag: $i"))
+  implicit def makeConfidentialityTag(c: bbnCdm19.ConfidentialityTag): ConfidentialityTag = ConfidentialityTag.from(c.toString).getOrElse(throw new RuntimeException(s"makeConfidentialityTag: $c"))
+  implicit def makeCryptoHashType(c: bbnCdm19.CryptoHashType): CryptoHashType = CryptoHashType.from(c.toString).getOrElse(throw new RuntimeException(s"makeCryptoHashType: $c"))
+  implicit def makeIpcObjectType(s: bbnCdm19.IpcObjectType): IpcObjectType = IpcObjectType.from(s.toString).getOrElse(throw new RuntimeException(s"makeIpcObjectType: $s"))
 
   implicit def makeJavaUUID(u: bbnCdm19.UUID): UUID = {
     val bb = ByteBuffer.wrap(u.bytes)

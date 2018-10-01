@@ -4,27 +4,27 @@
 
 You will need to have Python 3 installed to run `processAlarmFiles.py` as well as several libraries. I recommend using the Anaconda distribution of Python which comes with all of the necessary libraries.
 
-Check out the command line options by running `python processAlarmFiles.py --help`.
+Check out the command line options by running `./processAlarmFiles.py --help`.
 
 ### Examples
 
 To find reasonable local probability thresholds for Cadet's alarm files and save them, run 
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --savefilteredalarms`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --savefilteredalarms`.
 
 To generate a CSV of local probability distributions for each tree, run
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --lpdist --nothresholds`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --lpdist --nothresholds`.
 
 Details on attacks and the methods that detected them as well as true/false positives on our methods can be found by running
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/`.
 
 You can see how well our unfiltered alarms did at detecting attacks by running
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --nothresholds`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --nothresholds`.
 
 To use previously generated local probability thresholds, rather than finding new ones, run 
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --loadthresholds`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --loadthresholds`.
 
 To learn when alarms occur overtime (using previously saved local probability thresholds), try running 
-`python processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --loadthresholds --timeseries`.
+`./processAlarmFiles.py --ta1 cadets --alarmdir /path/to/alarm/dir/ --loadthresholds --timeseries`.
 
 ### Notes
 

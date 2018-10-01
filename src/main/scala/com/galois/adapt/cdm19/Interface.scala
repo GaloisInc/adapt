@@ -27,7 +27,7 @@ case object Interface extends CDM19Constructor[Interface] {
     Interface(
       cdm.getName,
       cdm.getMacAddress,
-      cdm.getIpAddresses.asScala.toList.map(makeString)
+      AvroOpt.listStr(cdm.getIpAddresses).getOrElse(List.empty)
     )
   }
 }

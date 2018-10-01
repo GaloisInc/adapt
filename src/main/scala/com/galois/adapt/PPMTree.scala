@@ -5,7 +5,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
+import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -304,6 +304,67 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
   def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
     (counter.toFloat / parentCount.toFloat) * parentGlobalProb
 
+  /* Alternate methods of calculating local probability of a standard node and a question mark node.
+  (Based on the email Anthony Williams sent on September 14, 2018)
+
+  1. Simple Good-Turing
+    def qSimpleGoodTuringLP(qNodeVal: Int, parentCount: Int): Float = {
+      // qNodeVal is the number of sibling nodes with a count of 1
+      if (parentCount == 0) 1F
+      else qNodeVal.toFloat / parentCount.toFloat
+    }
+
+    def simpleGoodTuringLP(parentCount: Int): Float = localProbOfThisObs(parentCount)
+
+  2. Additive Smoothing
+    def qAdditiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
+      1F / (parentCount.toFloat + siblingCount + 1) // +1 to count ?-node
+    }
+
+    def additiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
+      (counter.toFloat + 1) / (parentCount.toFloat + siblingCount + 1)
+      }
+
+  3. Cleary and Witten's Method A
+    def qClearyWittenMethodALP(parentCount: Int): Float = {
+      1F / (parentCount.toFloat + 1)
+    }
+
+    def clearyWittenMethodALP(parentCount: Int): Float = {
+      (counter.toFloat) / (parentCount.toFloat + 1)
+      }
+
+  4. Cleary and Witten's Method B
+    def qClearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else siblingCount.toFloat / parentCount.toFloat
+    }
+
+    def clearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else (counter.toFloat - 1) / parentCount.toFloat
+      }
+
+  5. Cleary and Witten's Method C
+    def qClearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
+      siblingCount.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
+    }
+
+    def clearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
+      counter.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
+      }
+
+  6. GoodTuringInspired
+    def qGoodTuringInspiredLP(siblingCount: Int, parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else siblingCount.toFloat / parentCount.toFloat
+    }
+
+    def goodTuringInspiredLP(parentCount: Int): Float = {
+      if (parentCount == 0) 1F
+      else counter.toFloat / parentCount.toFloat
+      }
+ */
 
   def receive = {
 
@@ -577,12 +638,12 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(Option(nf.remoteAddress).getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
+          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
         }
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
         ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
-        ExtendedUuidDetails(d._3._1.uuid,Some(Option(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress).getOrElse("NULL_value_from_CDM")))) ++
+        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("NULL_value_from_CDM")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
@@ -1088,7 +1149,7 @@ case object TreeRepr {
         case Some(d) if d == atDepth => // resuming after the decent case
           fromFlatRecursive(remainder, atDepth, accAtThisDepth ++ thisDepthList)
         case Some(d) if d < atDepth  => // returning to parent case
-          (thisDepthList.dropRight(1) ++ thisDepthList.lastOption.map(_.copy(children = accAtThisDepth.toSet))).toSet -> remainder
+          (accAtThisDepth ++ thisDepthList).toSet -> remainder
         case Some(d) if d > atDepth  => // descending into the child case
           val (childSet, nextRemainder) = fromFlatRecursive(remainder, atDepth + 1, List.empty)
           val updatedThisDepthList = accAtThisDepth ++ thisDepthList.dropRight(1) :+ thisDepthList.last.copy(children = childSet)

@@ -28,7 +28,20 @@
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
     	// Note: special handling for a few specific properties is hardcoded below in the `formatNodes` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
     	var nodeApiResultTransform = 
-    		function(nodes) { return nodes }
+        // ADAPT: This removes the `[0]['value']` from each element in `properties`:
+    		function(nodes) { 
+                return _.map(nodes, function(n){
+                    return _.mapObject(n, function(val, key){ 
+                        if (key != "properties") { 
+                            return val 
+                        } else {
+                            return _.mapObject(val, function(propArray, k){
+                                return propArray[0]['value']
+                            })
+                        }
+                    })
+                })
+            }
 
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language. The resulting string will be sent as a query to the 'nodeApiPath' specified above, which should return nodes.
@@ -95,59 +108,60 @@
             } else {
                 query_string = queryStringFromObject(query_object)
             }
-            document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
-            // if (query_string.length == 0) { return UI.failHandler() }
+            var visible_query_string = query_string.replace(/\.dedup\(\)$/, "")
+            document.getElementById('query-string').value = visible_query_string
+            if (query_string.length == 0) { return UI.failHandler() }
  
-            if (UI.alt_is_held) {
-                document.getElementById('query-string').value = query_string
-                UI.loadingUIStop()
-            } else {  
-                $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
-                	var node_results = nodeApiResultTransform(raw_node_results)
-                    var node_results_count = node_results.length
-                    var node_result_size_limit = 50
-                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
-                    node_results_count <= node_result_size_limit || function() { 
-                    	var limit_result = prompt(confirm_msg, node_results_count)
-                    	if (limit_result == null || isNaN(parseInt(limit_result)) || parseInt(limit_result) < 0) { 
-                    		node_result_size_limit = 0
-                    		node_results_count = 0
-                    	} else {
-                    		node_result_size_limit = parseInt(limit_result)
-                    		node_results_count = node_result_size_limit
-                    	}
-                    }()
-	                UI.foundNodes(node_results_count)
+            // if (UI.alt_is_held) {
+                // document.getElementById('query-string').value = query_string
+                // UI.loadingUIStop()
+            // } else {  
+            $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
+            	var node_results = nodeApiResultTransform(raw_node_results)
+                var node_results_count = node_results.length
+                var node_result_size_limit = 50
+                var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
+                node_results_count <= node_result_size_limit || function() { 
+                	var limit_result = prompt(confirm_msg, node_results_count)
+                	if (limit_result == null || isNaN(parseInt(limit_result)) || parseInt(limit_result) < 0) { 
+                		node_result_size_limit = 0
+                		node_results_count = 0
+                	} else {
+                		node_result_size_limit = parseInt(limit_result)
+                		node_results_count = node_result_size_limit
+                	}
+                }()
+                UI.foundNodes(node_results_count)
 
-                    if (node_results_count > 0) {
-                    	node_results = _.first(node_results, node_result_size_limit)
-                        var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                        var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
-                        $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
-                        	edge_results = edgeApiResultTransform(raw_edge_results, result_node_ids)
-                        	// Ensure edges all have IDs:
-                        	edge_results = _.map(edge_results, function(e) {
-                        		if ( ! e.hasOwnProperty('id')) {
-                        			e.id = e.from + "-" + e.label + "->" + e.to
-                        		}
-                        		return e 
-                        	})
+                if (node_results_count > 0) {
+                	node_results = _.first(node_results, node_result_size_limit)
+                    var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                    var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
+                    $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
+                    	edge_results = edgeApiResultTransform(raw_edge_results, result_node_ids)
+                    	// Ensure edges all have IDs:
+                    	edge_results = _.map(edge_results, function(e) {
+                    		if ( ! e.hasOwnProperty('id')) {
+                    			e.id = e.from + "-" + e.label + "->" + e.to
+                    		}
+                    		return e 
+                    	})
 
-                            UI.foundEdges(edge_results.length)
-                            var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
-                            var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't edge coloring work?  Answer: https://github.com/almende/vis/issues/1706
-                            var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
-                            if (query_object.is_collapsed) {
-                                data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
-                            }
-                            success_function(data)
-                            UI.loadingUIStop()
-                        }).fail(UI.handler)
-                    } else {
+                        UI.foundEdges(edge_results.length)
+                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't edge coloring work?  Answer: https://github.com/almende/vis/issues/1706
+                        var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
+                        if (query_object.is_collapsed) {
+                            data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
+                        }
+                        success_function(data)
                         UI.loadingUIStop()
-                    }
-                }).fail(UI.failHandler)
-            }
+                    }).fail(UI.handler)
+                } else {
+                    UI.loadingUIStop()
+                }
+            }).fail(UI.failHandler)
+            // }
         }
 
 
@@ -478,7 +492,7 @@
                         size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
-                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
+                n["label"] = String(getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n))
                 n["title"] = makeNodeTitle(n)
                 // n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n
@@ -587,7 +601,7 @@
                 }
             },
             shift_is_held : false,
-            alt_is_held : false,
+            // alt_is_held : false,
             failHandler : function(response) {
                 UI.queryInputColor("pink")
                 UI.loadingUIStop()
@@ -1178,11 +1192,11 @@
         })
         $(document).bind("keyup", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = false }
-            if (event.keyCode == 18) { UI.alt_is_held = false }
+            // if (event.keyCode == 18) { UI.alt_is_held = false }
         })
         $(document).bind("keydown", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = true }
-            if (event.keyCode == 18) { UI.alt_is_held = true }
+            // if (event.keyCode == 18) { UI.alt_is_held = true }
             if ($("#query-string").is(":focus")) { UI.queryInputColor() }
             if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()

@@ -6,6 +6,9 @@
 package com.bbn.tc.schema.avro.cdm19;
 
 import org.apache.avro.specific.SpecificData;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
 
 @SuppressWarnings("all")
 /** * Represents a generic source or sink on the host device that is can be a file, memory, or netflow.
@@ -15,6 +18,41 @@ public class SrcSinkObject extends org.apache.avro.specific.SpecificRecordBase i
   private static final long serialVersionUID = 5340019786162657038L;
   public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"SrcSinkObject\",\"namespace\":\"com.bbn.tc.schema.avro.cdm19\",\"doc\":\"* Represents a generic source or sink on the host device that is can be a file, memory, or netflow.\\n     * This is the most basic representation of a source or sink, basically specifying its type only.\",\"fields\":[{\"name\":\"uuid\",\"type\":{\"type\":\"fixed\",\"name\":\"UUID\",\"doc\":\"* A host MUST NOT reuse UUIDs at all within their system, even\\n     * across restarts, and definitely not for 2 distinct objects\",\"size\":16},\"doc\":\"Universally unique identifier for the object\"},{\"name\":\"baseObject\",\"type\":{\"type\":\"record\",\"name\":\"AbstractObject\",\"doc\":\"*  Objects, in general, represent data sources and sinks which\\n     *  could include sockets, files, memory, and any data in general\\n     *  that can be an input and/or output to an event.  This record\\n     *  is intended to be abstract i.e., one should not instantiate an\\n     *  Object but rather instantiate one of its sub types (ie,\\n     *  encapsulating records) FileObject, UnnamedPipeObject,\\n     *  RegistryKeyObject, NetFlowObject, MemoryObject, or\\n     *  SrcSinkObject.\",\"fields\":[{\"name\":\"permission\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"SHORT\",\"size\":2}],\"doc\":\"Permission bits defined over the object (Optional)\",\"default\":null},{\"name\":\"epoch\",\"type\":[\"null\",\"int\"],\"doc\":\"* Used to track when an object is deleted and a new one is\\n         * created with the same identifier. This is useful for when\\n         * UUIDs are based on something not likely to be unique, such\\n         * as file path.\",\"default\":null},{\"name\":\"properties\",\"type\":[\"null\",{\"type\":\"map\",\"values\":\"string\"}],\"doc\":\"* Arbitrary key, value pairs describing the entity.\\n         * NOTE: This attribute is meant as a temporary place holder for items that\\n         * will become first-class attributes in the next CDM version.\",\"default\":null,\"order\":\"ignore\"}]},\"doc\":\"The base object attributes\"},{\"name\":\"type\",\"type\":{\"type\":\"enum\",\"name\":\"SrcSinkType\",\"doc\":\"* There are many types of sources such as sensors.  The type of a\\n     * sensor could be base (close to hardware) or composite.  This is\\n     * mostly (only?) applicable to the Android platform.  See\\n     * https://source.android.com/devices/sensors/index.html for\\n     * details.\",\"symbols\":[\"SRCSINK_ACCELEROMETER\",\"SRCSINK_TEMPERATURE\",\"SRCSINK_GYROSCOPE\",\"SRCSINK_MAGNETIC_FIELD\",\"SRCSINK_HEART_RATE\",\"SRCSINK_LIGHT\",\"SRCSINK_PROXIMITY\",\"SRCSINK_PRESSURE\",\"SRCSINK_RELATIVE_HUMIDITY\",\"SRCSINK_LINEAR_ACCELERATION\",\"SRCSINK_MOTION\",\"SRCSINK_STEP_DETECTOR\",\"SRCSINK_STEP_COUNTER\",\"SRCSINK_TILT_DETECTOR\",\"SRCSINK_ROTATION_VECTOR\",\"SRCSINK_GRAVITY\",\"SRCSINK_GEOMAGNETIC_ROTATION_VECTOR\",\"SRCSINK_GPS\",\"SRCSINK_AUDIO\",\"SRCSINK_SYSTEM_PROPERTY\",\"SRCSINK_ENV_VARIABLE\",\"SRCSINK_ACCESSIBILITY_SERVICE\",\"SRCSINK_ACTIVITY_MANAGEMENT\",\"SRCSINK_ALARM_SERVICE\",\"SRCSINK_ANDROID_AUTO\",\"SRCSINK_ANDROID_RADIO\",\"SRCSINK_ANDROID_TV\",\"SRCSINK_ANDROID_VR\",\"SRCSINK_AUDIO_IO\",\"SRCSINK_AUTOFILL\",\"SRCSINK_BACKUP_MANAGER\",\"SRCSINK_BINDER\",\"SRCSINK_BLUETOOTH\",\"SRCSINK_BOOT_EVENT\",\"SRCSINK_BROADCAST_RECEIVER_MANAGEMENT\",\"SRCSINK_CAMERA\",\"SRCSINK_CLIPBOARD\",\"SRCSINK_COMPANION_DEVICE\",\"SRCSINK_COMPONENT_MANAGEMENT\",\"SRCSINK_CONTENT_PROVIDER\",\"SRCSINK_CONTENT_PROVIDER_MANAGEMENT\",\"SRCSINK_DATABASE\",\"SRCSINK_DEVICE_ADMIN\",\"SRCSINK_DEVICE_SEARCH\",\"SRCSINK_DEVICE_USER\",\"SRCSINK_DISPLAY\",\"SRCSINK_DROPBOX\",\"SRCSINK_EMAIL\",\"SRCSINK_EXPERIMENTAL\",\"SRCSINK_FILE\",\"SRCSINK_FILE_SYSTEM\",\"SRCSINK_FILE_SYSTEM_MANAGEMENT\",\"SRCSINK_FINGERPRINT\",\"SRCSINK_FLASHLIGHT\",\"SRCSINK_GATEKEEPER\",\"SRCSINK_HDMI\",\"SRCSINK_IDLE_DOCK_SCREEN\",\"SRCSINK_IMS\",\"SRCSINK_INFRARED\",\"SRCSINK_INSTALLED_PACKAGES\",\"SRCSINK_JSSE_TRUST_MANAGER\",\"SRCSINK_KEYCHAIN\",\"SRCSINK_KEYGUARD\",\"SRCSINK_LOCATION\",\"SRCSINK_LOWPAN\",\"SRCSINK_MACHINE_LEARNING\",\"SRCSINK_MBMS\",\"SRCSINK_MEDIA\",\"SRCSINK_MEDIA_CAPTURE\",\"SRCSINK_MEDIA_LOCAL_MANAGEMENT\",\"SRCSINK_MEDIA_LOCAL_PLAYBACK\",\"SRCSINK_MEDIA_NETWORK_CONNECTION\",\"SRCSINK_MEDIA_REMOTE_PLAYBACK\",\"SRCSINK_MIDI\",\"SRCSINK_NATIVE\",\"SRCSINK_NETWORK\",\"SRCSINK_NETWORK_MANAGEMENT\",\"SRCSINK_NFC\",\"SRCSINK_NOTIFICATION\",\"SRCSINK_OVERLAY_MANAGER\",\"SRCSINK_PAC_PROXY\",\"SRCSINK_PERMISSIONS\",\"SRCSINK_PERSISTANT_DATA\",\"SRCSINK_POSIX\",\"SRCSINK_POWER_MANAGEMENT\",\"SRCSINK_PRINT_SERVICE\",\"SRCSINK_PROCESS_MANAGEMENT\",\"SRCSINK_QUICK_SETTINGS\",\"SRCSINK_RECEIVER_MANAGEMENT\",\"SRCSINK_RCS\",\"SRCSINK_RPC\",\"SRCSINK_SCREEN_AUDIO_CAPTURE\",\"SRCSINK_SERIAL_PORT\",\"SRCSINK_SERVICE_CONNECTION\",\"SRCSINK_SERVICE_MANAGEMENT\",\"SRCSINK_SHORTCUTS\",\"SRCSINK_SMS_MMS\",\"SRCSINK_SPEECH_INTERACTION\",\"SRCSINK_STATUS_BAR\",\"SRCSINK_SYNC_FRAMEWORK\",\"SRCSINK_SYSTEM_UPDATE\",\"SRCSINK_TASK_STACK\",\"SRCSINK_TELEPHONY\",\"SRCSINK_TEST\",\"SRCSINK_TEXT_SERVICES\",\"SRCSINK_THREADING\",\"SRCSINK_TIME_EVENT\",\"SRCSINK_UI\",\"SRCSINK_UID_EVENT\",\"SRCSINK_UI_AUTOMATION\",\"SRCSINK_UI_MODE\",\"SRCSINK_UI_RPC\",\"SRCSINK_USAGE_STATS\",\"SRCSINK_USB\",\"SRCSINK_USER_ACCOUNTS_MANAGEMENT\",\"SRCSINK_USER_INPUT\",\"SRCSINK_VIBRATOR\",\"SRCSINK_WAKE_LOCK\",\"SRCSINK_WALLPAPER_MANAGER\",\"SRCSINK_WAP\",\"SRCSINK_WEB_BROWSER\",\"SRCSINK_WIDGETS\",\"SRCSINK_IPC\",\"SRCSINK_UNKNOWN\"]},\"doc\":\"The type of the object\"},{\"name\":\"fileDescriptor\",\"type\":[\"null\",\"int\"],\"doc\":\"The file descriptor (Optional)\",\"default\":null}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
+
+  private static SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<SrcSinkObject> ENCODER =
+      new BinaryMessageEncoder<SrcSinkObject>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<SrcSinkObject> DECODER =
+      new BinaryMessageDecoder<SrcSinkObject>(MODEL$, SCHEMA$);
+
+  /**
+   * Return the BinaryMessageDecoder instance used by this class.
+   */
+  public static BinaryMessageDecoder<SrcSinkObject> getDecoder() {
+    return DECODER;
+  }
+
+  /**
+   * Create a new BinaryMessageDecoder instance for this class that uses the specified {@link SchemaStore}.
+   * @param resolver a {@link SchemaStore} used to find schemas by fingerprint
+   */
+  public static BinaryMessageDecoder<SrcSinkObject> createDecoder(SchemaStore resolver) {
+    return new BinaryMessageDecoder<SrcSinkObject>(MODEL$, SCHEMA$, resolver);
+  }
+
+  /** Serializes this SrcSinkObject to a ByteBuffer. */
+  public java.nio.ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  /** Deserializes a SrcSinkObject from a ByteBuffer. */
+  public static SrcSinkObject fromByteBuffer(
+      java.nio.ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
   /** Universally unique identifier for the object */
   @Deprecated public com.bbn.tc.schema.avro.cdm19.UUID uuid;
   /** The base object attributes */
@@ -447,6 +485,7 @@ public class SrcSinkObject extends org.apache.avro.specific.SpecificRecordBase i
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public SrcSinkObject build() {
       try {
         SrcSinkObject record = new SrcSinkObject();
@@ -459,22 +498,24 @@ public class SrcSinkObject extends org.apache.avro.specific.SpecificRecordBase i
         record.type = fieldSetFlags()[2] ? this.type : (com.bbn.tc.schema.avro.cdm19.SrcSinkType) defaultValue(fields()[2]);
         record.fileDescriptor = fieldSetFlags()[3] ? this.fileDescriptor : (java.lang.Integer) defaultValue(fields()[3]);
         return record;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
       }
     }
   }
 
-  private static final org.apache.avro.io.DatumWriter
-    WRITER$ = new org.apache.avro.specific.SpecificDatumWriter(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumWriter<SrcSinkObject>
+    WRITER$ = (org.apache.avro.io.DatumWriter<SrcSinkObject>)MODEL$.createDatumWriter(SCHEMA$);
 
   @Override public void writeExternal(java.io.ObjectOutput out)
     throws java.io.IOException {
     WRITER$.write(this, SpecificData.getEncoder(out));
   }
 
-  private static final org.apache.avro.io.DatumReader
-    READER$ = new org.apache.avro.specific.SpecificDatumReader(SCHEMA$);
+  @SuppressWarnings("unchecked")
+  private static final org.apache.avro.io.DatumReader<SrcSinkObject>
+    READER$ = (org.apache.avro.io.DatumReader<SrcSinkObject>)MODEL$.createDatumReader(SCHEMA$);
 
   @Override public void readExternal(java.io.ObjectInput in)
     throws java.io.IOException {
