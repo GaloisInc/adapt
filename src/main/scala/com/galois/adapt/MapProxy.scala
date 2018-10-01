@@ -121,7 +121,7 @@ class MapProxy(
 
   val cdm2admMapShards: Array[AlmostMap[CdmUUID,AdmUUID]] = Array.tabulate(numShards) { shardId =>
     MapSetUtils.hashMap[Array[AnyRef], CdmUUID, Array[AnyRef], AdmUUID](
-      mapdbCdm2CdmShards(shardId),
+      mapdbCdm2AdmShards(shardId),
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
       { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
     )
