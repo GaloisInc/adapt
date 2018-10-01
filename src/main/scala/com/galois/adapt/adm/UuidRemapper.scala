@@ -83,6 +83,22 @@ object UuidRemapper {
   ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() { implicit b =>
     import GraphDSL.Implicits._
 
+    /*
+     *
+     *           +---------------------------------------------<--------------------------------------------+
+     *           |                                                                                          |
+     *           |                                                                                          |
+     *           |                                                                                          |
+     *           |                      +----> filterShard(0) +-> oneShard(0, ...) +---+                    |
+     *           |                      |                                              |                    |
+     *           v                      +----> filterShard(1) +-> oneShard(1, ...) +---+                    +
+     * +---> loopBack +---> splitShards |                                              | mergeShards +-> decider +--->
+     *                                  |          ...                                 |
+     *                                  |                                              |
+     *                                  +----> filterShard(n) +-> oneShard(n, ...) +---+
+     *
+     */
+
     def thisPartitioner = partitioner(numShards)
 
     def filterShard(shardIndex: Int)(t: Timed[UuidRemapperInfo]): Timed[UuidRemapperInfo] = {
@@ -94,18 +110,6 @@ object UuidRemapper {
           t.copy(unwrap = JustTime)
         }
       }
-
-
-    /*
-      *                              ,------<-------------<------------- --<---.
-      *                           1 |                                           | 1
-      *                             \                                           /
-      * Timed[UuidRemapperInfo]  -0- loopBack ->- sharded                -->- decider --->-- 0 ret
-      *
-      *
-      *
-      *
-      */
 
     val loopBack = b.add(Merge[Timed[UuidRemapperInfo]](2))
     val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
