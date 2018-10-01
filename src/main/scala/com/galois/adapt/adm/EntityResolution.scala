@@ -41,7 +41,8 @@ object EntityResolution {
 
     cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
     cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
-    blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
+    blockedEdges: Array[MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])]], // Map of things blocked
+    shardCount: Array[Int],
     log: LoggingAdapter,
 
     seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
@@ -76,9 +77,9 @@ object EntityResolution {
     val ignoreEventUuids: Boolean = config.getBoolean("adapt.adm.ignoreeventremaps")
 
     val remapper: UuidRemapper.UuidRemapperFlow = if (numUuidRemapperShards == 0) {
-      UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges, ignoreEventUuids, log)
+      UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges(0), ignoreEventUuids, log)
     } else {
-      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, ignoreEventUuids, log, numUuidRemapperShards)
+      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, shardCount, ignoreEventUuids, log, numUuidRemapperShards)
     }
 
     Flow[(String, CDM)]

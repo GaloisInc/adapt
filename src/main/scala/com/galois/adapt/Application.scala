@@ -137,12 +137,13 @@ object Application extends App {
   val cdm2admMaps: Array[AlmostMap[CdmUUID,AdmUUID]] = mapProxy.cdm2admMapShards
 
   // Edges blocked waiting for a target CDM uuid to be remapped.
-  val blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])] = mutable.Map.empty
+  val blockedEdgesMaps: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]] = mapProxy.blockedEdgesShards
 
   val seenEdges: AlmostSet[EdgeAdm2Adm] = mapProxy.seenEdges
   val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
+  val shardCount: Array[Int] = Array.fill(uuidRemapperShards)(0)
 
-  val er = EntityResolution(uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdges, log, seenNodes, seenEdges)
+  val er = EntityResolution(uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdgesMaps, shardCount, log, seenNodes, seenEdges)
 
   val ppmActor: Option[ActorRef] = runFlow match {
     case "accept" => None

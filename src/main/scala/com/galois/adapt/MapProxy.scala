@@ -5,10 +5,11 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
-import com.galois.adapt.adm.{AdmUUID, CdmUUID, EdgeAdm2Adm}
+import com.galois.adapt.adm.{AdmUUID, CdmUUID, Edge, EdgeAdm2Adm}
 import org.mapdb.serializer.SerializerArrayTuple
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
+import scala.collection.mutable
 import scala.util.Random
 
 /// Manages all of the detail of large internal maps, exposing interfaces from `MapSetUtils`. If the logic requires
@@ -126,6 +127,9 @@ class MapProxy(
       { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
     )
   }
+
+  val blockedEdgesShards: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]] =
+    Array.fill(numShards)(mutable.Map.empty)
 
   /***************************************************************************************
    * Seen nodes and seen edges                                                           *

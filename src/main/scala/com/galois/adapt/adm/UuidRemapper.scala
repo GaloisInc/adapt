@@ -53,7 +53,8 @@ object UuidRemapper {
 
   // Figure out which shard a piece of info should be routed to
   def partitioner(numShards: Int): UuidRemapperInfo => Int = {
-    def uuidPartition(u: UUID): Int = (u.getLeastSignificantBits % numShards).intValue()
+    def uuidPartition(u: UUID): Int =
+      (Math.abs(u.getLeastSignificantBits * 7 + u.getMostSignificantBits * 31) % numShards).intValue()
 
     {
       case AnAdm(adm) => uuidPartition(adm.uuid.uuid)
@@ -68,10 +69,12 @@ object UuidRemapper {
   }
 
   def sharded(
-      expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
+      expiryTime: Time,                              // How long to hold on to a CdmUUID until we expire it
 
       cdm2cdms: Array[AlmostMap[CdmUUID, CdmUUID]],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
       cdm2adms: Array[AlmostMap[CdmUUID, AdmUUID]],  // Mapping for CDM uuids that have been mapped onto ADM uuids
+      blockedEdges: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]],
+      shardCount: Array[Int],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter,
@@ -82,8 +85,15 @@ object UuidRemapper {
 
     def thisPartitioner = partitioner(numShards)
 
-    def filterShard(shardIndex: Int)(t: Timed[UuidRemapperInfo]): Timed[UuidRemapperInfo] =
-      if (thisPartitioner(t.unwrap) == shardIndex) { t } else { t.copy(unwrap = JustTime) }
+    def filterShard(shardIndex: Int)(t: Timed[UuidRemapperInfo]): Timed[UuidRemapperInfo] = {
+        val shard = thisPartitioner(t.unwrap)
+        if (shard == shardIndex) {
+          shardCount(shard) += 1
+          t
+        } else {
+          t.copy(unwrap = JustTime)
+        }
+      }
 
 
     /*
@@ -105,10 +115,11 @@ object UuidRemapper {
 
     loopBack.out ~> splitShards.in
 
-    val blockedEdges = Array.fill(numShards)(mutable.Map.empty[CdmUUID, List[Edge]])
     for (i <- 0 until numShards) {
-      val thisRemapper = oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), ignoreEvents, log) // UuidRemapper.apply(expiryTime, cdm2cdm, cdm2adm, blockedEdges, ignoreEvents, log)
-      splitShards.out(i) ~> Flow.fromFunction(filterShard(i)) ~> thisRemapper ~> mergeShards.in(i)
+      splitShards.out(i) ~>
+        Flow.fromFunction(filterShard(i)) ~>
+        oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), ignoreEvents, log) ~>
+        mergeShards.in(i)
     }
 
     mergeShards.out ~> decider.in
@@ -127,7 +138,7 @@ object UuidRemapper {
 
       cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
       cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
-      blockedEdges: mutable.Map[CdmUUID, List[Edge]],
+      blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter
@@ -150,7 +161,7 @@ object UuidRemapper {
       if (prevTarget.exists(_ != target))
         log.warning(s"UuidRemapper: $source should not map to $target (since it already maps to $prevTarget")
 
-      for (e <- blockedEdges.remove(source).getOrElse(Nil)) {
+      for (e <- blockedEdges.remove(source).map(_._1).getOrElse(Nil)) {
         expireInto += AnEdge(e.applyAdmRemap(source, target))
       }
     }
@@ -167,7 +178,7 @@ object UuidRemapper {
       if (prevTarget.exists(_ != target))
         log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to $prevTarget")
 
-      for (e <- blockedEdges.remove(source).getOrElse(Nil)) {
+      for (e <- blockedEdges.remove(source).map(_._1).getOrElse(Nil)) {
         expireInto += AnEdge(e.applyCdmRemap(source, target))
       }
     }
@@ -264,7 +275,7 @@ object UuidRemapper {
           }
 
           // Blocked
-          blockedEdges(cdmUuid) = edge :: blockedEdges.getOrElse(cdmUuid, List.empty)
+          blockedEdges(cdmUuid) = (edge :: blockedEdges.get(cdmUuid).map(_._1).getOrElse(List.empty), Set.empty)
         }
         processEdge()
         updateTimeAndExpireOldUuids(t, toReturn)
