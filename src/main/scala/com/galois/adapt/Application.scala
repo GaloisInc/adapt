@@ -418,14 +418,14 @@ object Application extends App {
       replServer.start()   // ssh repl@localhost -p22222
 
       val graph = GraphService( system,
-        inMemoryNodeLimit = Some(10000),
+        inMemoryNodeLimit = Some(1000),
         shardCount = 3
         , uiPort = None /*Some(9090)*/ )(
         MapDBMultimap()
       )
       quineGraph = graph
 
-      import com.rrwright.quine.runtime.runtimePickleFormat
+//      import com.rrwright.quine.runtime.runtimePickleFormat
       import scala.pickling.Defaults._
       import com.rrwright.quine.language._
       import CDM17Implicits._
@@ -439,7 +439,7 @@ object Application extends App {
 //      )(graph)
       implicit val gg = graph
       implicit val timeout = Timeout(30.4 seconds)
-      val branch = branchOf[ProcessFileActivity]()
+//      val branch = branchOf[ProcessFileActivity]()
 
 
 

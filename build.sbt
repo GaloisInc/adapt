@@ -1,4 +1,4 @@
-val scalaV = "2.11.11"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val scalaV = "2.11.12"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
 val akkaV = "2.4.19" //"2.5.6"
 val akkaHttpV = "10.0.10"
 val neoV = "3.3.0"
@@ -13,6 +13,8 @@ lazy val adapt = (project in file(".")).settings(
   version := "0.6.2",
   organization := "com.galois",
   scalaVersion := scalaV,
+
+  scalacOptions += "-target:jvm-1.8",
 
   autoScalaLibrary := false,
   libraryDependencies ++= Seq(

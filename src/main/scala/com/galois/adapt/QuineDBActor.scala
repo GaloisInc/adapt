@@ -43,8 +43,10 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
     }
   }
 
+  import com.rrwright.quine.language._
+  import ScalaPicklingScheme._
   import scala.pickling.Defaults._
-  import com.rrwright.quine.runtime.runtimePickleFormat
+//  import com.rrwright.quine.runtime.runtimePickleFormat
   import CDM17Implicits._
 
   implicit val timeout = Timeout(21 seconds)
@@ -319,6 +321,7 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
 
 
 object CDM17Implicits {
+  import ScalaPicklingScheme._
   import scala.pickling.Defaults._
 
   implicit val aaa = PicklerUnpickler.generate[Option[Map[String, String]]]
@@ -350,7 +353,7 @@ object CDM17Implicits {
   implicit val vvv = PicklerUnpickler.generate[Option[Value]]
   implicit val www = PicklerUnpickler.generate[SrcSinkType]
 
-  private def unpicklePrimitiveToString(pickle: QuinePickleWrapper)(implicit format: PickleFormat): Try[String] = Try {
+  private def unpicklePrimitiveToString(pickle: QuinePickleWrapper)/*(implicit scheme: PickleScheme[String])*/: Try[String] = Try {
     Try( pickle.thisPickle.unpickle[String] ).getOrElse(
       Try( pickle.thisPickle.unpickle[Long] ).getOrElse(
         Try( pickle.thisPickle.unpickle[Int] ).get //OrElse(
@@ -374,7 +377,7 @@ object CDM17Implicits {
     )
   }.map(_.toString)
 
-  def unpickleToString(pickle: QuinePickleWrapper)(implicit format: PickleFormat): String = {
+  def unpickleToString(pickle: QuinePickleWrapper)/*(implicit scheme: PickleScheme[String])*/: String = {
 //    Try( pickle.thisPickle.unpickle[AbstractObject] ).getOrElse(
     unpicklePrimitiveToString(pickle).getOrElse(
       Try( pickle.thisPickle.unpickle[Option[Map[String, String]]] ).getOrElse(
