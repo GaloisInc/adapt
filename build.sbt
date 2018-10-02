@@ -32,6 +32,7 @@ lazy val adapt = (project in file(".")).settings(
     "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.neo4j" % "neo4j-community" % neoV,
+    "org.neo4j" % "neo4j-cypher" % neoV,
     "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
     "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
 //    "org.neo4j" % "neo4j-lucene-index" % neoV,
