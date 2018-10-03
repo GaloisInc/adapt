@@ -512,11 +512,25 @@ object CDMSource {
 */
 
     val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
-    val data = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
+    val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
 
-    println(data)
-    ???
+    for {
+      e: (Provider, List[String]) <- data
+      provider:String <- e._1
+      providerFixed = if (provider == "") { "\"\"" } else { provider }
 
+      paths: List[String] = e._2
+      pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
+        new File(paths.head).listFiles().toList.collect {
+          case f if ! f.isHidden => f.getCanonicalPath
+        }
+      } else paths
+
+      path <- pathsPossiblyFromDirectory.sorted
+
+      // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
+      pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
+    } yield (provider, pathFixed)
   }
 
   //  Make a CDM17 source
