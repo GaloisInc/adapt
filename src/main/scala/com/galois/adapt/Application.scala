@@ -481,43 +481,19 @@ object CDMSource {
 
   type Provider = String
 
-  def getLoadfilesOld: List[(Provider, String)] = {
-    val data = config.getObject("adapt.ingest.data")
+  /*
+  Usage example:
+    load files
+    - files p1f1 by provider p1
+    - and files (p2f1, p2f2) by provider p2
 
-    for {
-      provider <- data.keySet().asScala.toList
-      providerFixed = if (provider.isEmpty) { "\"\"" } else { provider }
-
-      paths = config.getStringList(s"adapt.ingest.data.$providerFixed").asScala.toList
-      pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
-        new File(paths.head).listFiles().toList.collect {
-          case f if ! f.isHidden => f.getCanonicalPath
-        }
-      } else paths
-
-      path <- pathsPossiblyFromDirectory.sorted
-
-      // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
-      pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
-    } yield (provider, pathFixed)
-  }
-
-/*
-Dadapt.ingest.quitafteringest=no -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=f1 -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=f2 -Dadapt.ingest.data.1.files.1=f3
-*/
+  -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=p1f1
+  -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=p2f1 -Dadapt.ingest.data.1.files.1=p2f2
+  */
   def getLoadfiles: List[(Provider, String)] = {
-
-/*
-    val data = config.getObjectList("adapt.ingest.data").asScala.toList.map(_.asScala.toMap)
-    val data2 = data.map(_.map{
-	case (key, value) if key == "provider" => (key, value.unwrapped.toString)
-	case (key, value) if key == "files" => (key, value.asInstanceOf[java.util.List[com.typesafe.config.ConfigValue]].asScala.toList.map(_.unwrapped.toString))
-      })
-*/
-
+    //convert to scala
     val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
     val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
-println(data)
 
     for {
       (provider,paths) <- data
