@@ -481,7 +481,7 @@ object CDMSource {
 
   type Provider = String
 
-  def getLoadfiles: List[(Provider, String)] = {
+  def getLoadfilesOld: List[(Provider, String)] = {
     val data = config.getObject("adapt.ingest.data")
 
     for {
@@ -500,6 +500,17 @@ object CDMSource {
       // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
       pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
     } yield (provider, pathFixed)
+  }
+  def getLoadfiles: List[(Provider, String)] = {
+    val data = config.getObjectList("adapt.ingest.data").asScala.toList.map(_.asScala.toMap)
+    val data2 = data.map(_.map{
+	case (key, value) if key == "provider" => (key, value.unwrapped.toString)
+	case (key, value) if key == "files" => (key, value.asInstanceOf[java.util.List[com.typesafe.config.ConfigValue]].asScala.toList.map(_.unwrapped.toString))
+      })
+
+    println(data3)
+    ???
+
   }
 
   //  Make a CDM17 source
