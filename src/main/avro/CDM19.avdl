@@ -520,7 +520,8 @@ protocol TCCDMDataProtocol { // protocol here means a wrapper
         IPC_OBJECT_SOCKET_PATHNAME,
         IPC_OBJECT_SOCKET_UNNAMED,
         IPC_OBJECT_WINDOWS_ALPC,
-        IPC_OBJECT_WINDOWS_MAILSLOT
+        IPC_OBJECT_WINDOWS_MAILSLOT,
+        IPC_OBJECT_SOCKET_NETLINK
     }
 
     /**
