@@ -501,6 +501,10 @@ object CDMSource {
       pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
     } yield (provider, pathFixed)
   }
+
+/*
+Dadapt.ingest.quitafteringest=no -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=f1 -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=f2 -Dadapt.ingest.data.1.files.1=f3
+*/
   def getLoadfiles: List[(Provider, String)] = {
 
 /*
@@ -513,13 +517,10 @@ object CDMSource {
 
     val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
     val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
+println(data)
 
     for {
-      e: (Provider, List[String]) <- data
-      provider:String = e._1
-      providerFixed = if (provider == "") { "\"\"" } else { provider }
-
-      paths: List[String] = e._2
+      (provider,paths) <- data
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
           case f if ! f.isHidden => f.getCanonicalPath
