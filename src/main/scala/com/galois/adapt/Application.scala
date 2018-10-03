@@ -502,13 +502,19 @@ object CDMSource {
     } yield (provider, pathFixed)
   }
   def getLoadfiles: List[(Provider, String)] = {
+
+/*
     val data = config.getObjectList("adapt.ingest.data").asScala.toList.map(_.asScala.toMap)
     val data2 = data.map(_.map{
 	case (key, value) if key == "provider" => (key, value.unwrapped.toString)
 	case (key, value) if key == "files" => (key, value.asInstanceOf[java.util.List[com.typesafe.config.ConfigValue]].asScala.toList.map(_.unwrapped.toString))
       })
+*/
 
-    println(data3)
+    val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
+    val data = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
+
+    println(data)
     ???
 
   }
