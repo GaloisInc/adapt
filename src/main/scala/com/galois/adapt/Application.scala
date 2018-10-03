@@ -516,7 +516,7 @@ object CDMSource {
 
     for {
       e: (Provider, List[String]) <- data
-      provider:String <- e._1
+      provider:String = e._1
       providerFixed = if (provider == "") { "\"\"" } else { provider }
 
       paths: List[String] = e._2
