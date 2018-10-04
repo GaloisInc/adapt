@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
 
 import com.galois.adapt.adm.EntityResolution.CDM
-import akka.pattern.ask
+import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
@@ -138,13 +138,13 @@ case class PpmDefinition[DataShape](
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val currentlySaving = new AtomicBoolean(false)
 
-  def saveStateAsync(): Future[Unit] = {
+  def saveStateAsync(shutdown: Boolean = false): Future[Unit] = {
     val now = System.currentTimeMillis
     val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
     if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
       currentlySaving.set(true)
 
-      implicit val timeout = Timeout(593 seconds)
+      implicit val timeout = if(shutdown) Timeout(593 seconds) else Timeout(Long.MaxValue seconds)
       (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ reprResult =>
         val repr = reprResult.repr
         outputFilePath.foreach(p => repr.writeToFile(p))
@@ -162,11 +162,16 @@ case class PpmDefinition[DataShape](
 
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         currentlySaving.set(false)
-      }.failed.map { case e =>
-        println(s"Error writing to file for $name tree: ${e.getMessage}")
+      }.failed.map {
+        //adi:todo
+        //case timedOut:AskTimeoutException => println(s"Error writing to file for $name tree: ${e.getMessage}")
+        case e => println(s"Error writing to file for $name tree: ${e.getMessage}")
         currentlySaving.set(false)
       }
-    } else Future.successful(())
+    } else {
+      println(s"Write successful for tree: $name ")
+      Future.successful(())
+    }
   }
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
@@ -910,7 +915,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
   override def postStop(): Unit = {
     if ( ! didReceiveComplete && Application.config.getBoolean("adapt.ppm.shouldsave")) {
       didReceiveComplete = true
-      val ppmSaveFutures = ppmList.map(_.saveStateAsync())
+      val ppmSaveFutures = ppmList.map(_.saveStateAsync(true))
       if (iforestEnabled) saveIforestModel()
       Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
     }
