@@ -723,17 +723,38 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     )(thisActor.context, context.self),
 
     PpmDefinition[DataShape]("SummarizedProcessActivity",
-      d => {
-        val a = d._2._1.subjectTypes.contains(SUBJECT_PROCESS)
-//        val b = d._2._2.isDefined
-//        if (a || b) println(s"SummarizedProcessActivity: $a $b")
-        a
-      },            // is a process               // has a name
+      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
       List(d => List(                // 1.) Process name
-          d._2._2.map(_.path).getOrElse("unnamed_process"), //es_should_have_been_filtered_out"),
+          d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
           d._2._1.cid.toString,      // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
           d._1.eventType.toString    // 3.) Event type
         ), _._3 match {              // 4.) identifier(s) for the object, based on its type
+          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+            case "" :: remainder => pathDelimiterChar :: remainder
+            case x => x
+          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
+          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
+          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
+        }
+      ),
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path)),
+        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+      _._1.latestTimestampNanos
+    )(thisActor.context, context.self),
+
+    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
+      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
+      List(d => List(                         // 1.) Process name
+        d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
+        d._2._1.cid.toString,                 // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
+        d._1.earliestTimestampNanos.toString, // 3.) timestamp
+        d._1.eventType.toString               // 4.) Event type
+        ), _._3 match {                       // 5.) identifier(s) for the object, based on its type
           case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
             case "" :: remainder => pathDelimiterChar :: remainder
             case x => x

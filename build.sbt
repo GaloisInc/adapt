@@ -1,4 +1,4 @@
-val scalaV = "2.12.7"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val scalaV = "2.11.12"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
 val akkaV = "2.5.17"
 val akkaHttpV = "10.1.5"
 val neoV = "3.3.3"
