@@ -38,6 +38,7 @@ lazy val adapt = (project in file(".")).settings(
     "org.apache.cassandra" % "cassandra-all" % "2.1"  excludeAll ExclusionRule(organization = "org.slf4j"),
 
     "com.rrwright" %% "quine" % "0.1-SNAPSHOT",
+    "com.rrwright" %% "quine-scala-pickling" % "0.1-SNAPSHOT",
 
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.neo4j" % "neo4j-community" % neoV,

@@ -36,7 +36,6 @@ import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.EntityResolution.Timed
-import com.rrwright.quine.language.EdgeDirections.Outgoing
 import org.mapdb.serializer.SerializerArrayTuple
 
 import scala.collection.JavaConverters._
@@ -45,7 +44,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
-import com.rrwright.quine.language.{branchOf, refinedBranchOf}
 import com.rrwright.quine.runtime._
 import scala.pickling.PicklerUnpickler
 
@@ -417,20 +415,24 @@ object Application extends App {
       )
       replServer.start()   // ssh repl@localhost -p22222
 
-      val graph = GraphService( system,
-        inMemoryNodeLimit = Some(1000),
-        shardCount = 3
-        , uiPort = None /*Some(9090)*/ )(
-        MapDBMultimap()
-      )
-      quineGraph = graph
-
-//      import com.rrwright.quine.runtime.runtimePickleFormat
-      import scala.pickling.Defaults._
       import com.rrwright.quine.language._
       import CDM17Implicits._
       import shapeless._
       import shapeless.syntax.singleton._
+
+      val asdasd = implicitly[PickleScheme[String]]
+
+      val graph = GraphService( system,
+        inMemoryNodeLimit = Some(1000),
+        shardCount = 3,
+        uiPort = None /*Some(9090)*/ )(
+        MapDBMultimap()
+      )
+
+      quineGraph = graph
+
+//      import com.rrwright.quine.runtime.runtimePickleFormat
+//      import scala.pickling.Defaults._
 
 //      val branch = branchOf[com.galois.adapt.cdm17.Event]( 'eventType := cdm17.EVENT_READ )
 //      println(branch)

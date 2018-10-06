@@ -1,7 +1,6 @@
 package com.galois.adapt
 
 import java.util.UUID
-
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
@@ -13,10 +12,10 @@ import spray.json.{JsArray, JsObject, JsString, JsValue}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
-import scala.pickling.{PickleFormat, PicklerUnpickler}
-import scala.pickling.shareNothing._
 import shapeless._
 import shapeless.syntax.singleton._
+import scala.pickling.{PickleFormat, PicklerUnpickler}
+//import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
 
 
@@ -44,9 +43,6 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
   }
 
   import com.rrwright.quine.language._
-  import ScalaPicklingScheme._
-  import scala.pickling.Defaults._
-//  import com.rrwright.quine.runtime.runtimePickleFormat
   import CDM17Implicits._
 
   implicit val timeout = Timeout(21 seconds)
@@ -320,9 +316,7 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
 
 
 
-object CDM17Implicits {
-  import ScalaPicklingScheme._
-  import scala.pickling.Defaults._
+object CDM17Implicits extends ScalaPicklingScheme {
 
   implicit val aaa = PicklerUnpickler.generate[Option[Map[String, String]]]
   implicit val bbb = PicklerUnpickler.generate[Option[String]]
