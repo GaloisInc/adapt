@@ -262,6 +262,14 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     trait InsufficientData extends Policy3Result
     trait Pass extends Policy3Result
 
+    def traceTA1PolicyCheck(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
+      import scala.concurrent.duration._
+
+      implicit val _: Timeout = 10.minutes
+
+      ???
+    }
+
     def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
       import scala.concurrent.duration._
 
@@ -336,6 +344,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           Future.fold(hasUISeqFut)(None:Option[Policy3Result]){(acc,inst) => if (inst.isDefined) inst else acc}
       }
     }
+
 
     val resultFuture = nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long).map{
       case Some(s) => s match {
