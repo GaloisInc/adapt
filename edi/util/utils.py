@@ -69,12 +69,15 @@ class StreamProcessor:
 		m = self.mk_model(header)
 
 		score_file.write(score_header)
+		totalscore = 0.0
 
 		for row in reader:
 			(uuid,record) = readRecord(header,row)
 			score = m.score(record)
+			totalscore = totalscore + score
 			m.update(record)
 			score_file.write("%s, %f\n" % (uuid,score))
+		print("Total score: %f  Entropy: %f" % (totalscore, totalscore/m.n))
 
 	def process(self):
 		if self.input_file.endswith('.gz'):

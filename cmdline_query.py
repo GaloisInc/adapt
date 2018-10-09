@@ -45,7 +45,9 @@ if __name__ == '__main__':
     while True:
         try:
             query = input("==> ")
-            if query[-1] == '?':
+            if not(query):
+                continue
+            elif query[-1] == '?':
                 webbrowser.open_new_tab(args.url + "/#" + query[0:-1] + ":F00")
             else:
                 try:

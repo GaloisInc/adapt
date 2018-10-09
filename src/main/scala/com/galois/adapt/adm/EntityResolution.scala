@@ -4,10 +4,8 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
-import com.galois.adapt.Application.statusActor
-import com.galois.adapt.FlowComponents.printCounter
+import akka.stream.{FlowShape, OverflowStrategy}
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
@@ -39,14 +37,21 @@ object EntityResolution {
 
 
   def apply(
-    cdm2cdmMap: AlmostMap[CdmUUID, CdmUUID],                        // Map from CDM to CDM
-    cdm2admMap: AlmostMap[CdmUUID, AdmUUID],                        // Map from CDM to ADM
-    blockedEdges: MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])],  // Map of things blocked
+    numUuidRemapperShards: Int,                                     // 0 means use the old remapper
+
+    cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
+    cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
+    blockedEdges: Array[MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])]], // Map of things blocked
+    shardCount: Array[Int],
     log: LoggingAdapter,
 
     seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
   ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
+
+    assert(numUuidRemapperShards >= 0, "Negative number of shards!")
+    assert(cdm2cdmMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2cdm maps")
+    assert(cdm2admMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2adm maps")
 
     val config: Config = ConfigFactory.load()
 
@@ -71,6 +76,12 @@ object EntityResolution {
 
     val ignoreEventUuids: Boolean = config.getBoolean("adapt.adm.ignoreeventremaps")
 
+    val remapper: UuidRemapper.UuidRemapperFlow = if (numUuidRemapperShards == 0) {
+      UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges(0), ignoreEventUuids, log)
+    } else {
+      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, shardCount, ignoreEventUuids, log, numUuidRemapperShards)
+    }
+
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
@@ -78,7 +89,7 @@ object EntityResolution {
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(UuidRemapper(uuidExpiryTime, cdm2cdmMap, cdm2admMap, blockedEdges, ignoreEventUuids, log))// Remap UUIDs
+      .via(remapper)                                                          // Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
       .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
   }
