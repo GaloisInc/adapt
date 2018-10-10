@@ -407,7 +407,6 @@ var predicates = [
         name : "Principal",
         is_relevant : function(n) {return n.db_label === "Subject" },
         floating_query : ".out('localPrincipal')",
-        is_default : true
     }, {
         name : "Provenance",
         is_relevant : function(n) {return n.db_label === "Subject"},
@@ -699,7 +698,7 @@ var predicates = [
     }, {
         name : "Other Host Connection",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
-        floating_query : ".as('start').out('localPort').in('remotePort').as('other').out('localAddress').in('remoteAddress').as('end').where('start',eq('end')).out('remotePort').in('localPort').as('other2').out('remoteAddress').in('localAddress').as('end2').where('start',eq('end2')).where('other', eq('other2')).select('other')"
+        floating_query : ".as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend').where('start',eq('portend')).out('remoteAddress').in('localAddress').as('addyother').out('remoteAddress').in('localAddress').as('addyend').where('start',eq('addyend')).where('portother', eq('addyother')).select('portother')"
     }, 
 
  // AdmProvenanceTagNode
