@@ -585,7 +585,7 @@ var predicates = [
 // Principal
     {
         name : "Processes Owned",
-        is_relevant : function(n) { return n.db_label === "Principal"},
+        is_relevant : function(n) {return n.db_label === "Principal"},
         floating_query : ".in('localPrincipal').hasLabel('Subject')",
         is_default : true
     },
@@ -689,17 +689,17 @@ var predicates = [
 
  // AdmNetFlowObject
     {
-        name : "NetFlow Subject",
+        name : "Subject",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".in('predicateObject','predicateObject2').out('subject').hasLabel('AdmSubject')"
     }, {
-        name : "NetFlow Principal",
+        name : "Principal",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
-    // }, {   // TODO:
-    //     name : "Client Connected NetFlows",
-    //     is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
-    //     floating_query : ""
+    }, {
+        name : "Other Host Connection",
+        is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+        floating_query : ".as('start').out('localPort').in('remotePort').as('other').out('localAddress').in('remoteAddress').as('end').where('start',eq('end')).out('remotePort').in('localPort').as('other2').out('remoteAddress').in('localAddress').as('end2').where('start',eq('end2')).where('other', eq('other2')).select('other')"
     }, 
 
  // AdmProvenanceTagNode
