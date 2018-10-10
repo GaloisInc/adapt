@@ -144,6 +144,11 @@ package object adm {
     earliestTimestampNanos: Long,
     latestTimestampNanos: Long,
 
+    // 5D specific
+    // See <https://git.tc.bbn.com/tc-all/cdm-docs/blob/master/ta1-fivedirections/operations/user_interaction.md>
+    deviceType: Option[String],
+    inputType: Option[String],
+
     provider: String
   ) extends ADM with DBWritable {
 
