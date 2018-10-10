@@ -83,6 +83,30 @@ package object adm {
       }
       curr
     }
+
+    // Get the next CdmUUID in the edge (if there is one)
+    def nextCdmUUID: Option[CdmUUID] = this match {
+      case EdgeCdm2Cdm(cdm, _, _) => Some(cdm)
+      case EdgeCdm2Adm(cdm, _, _) => Some(cdm)
+      case EdgeAdm2Cdm(_, _, cdm) => Some(cdm)
+      case EdgeAdm2Adm(_, _, _) => None
+    }
+
+    def applyCdmRemap(cdmUuidOld: CdmUUID, cdmUuidNew: CdmUUID): Edge = this match {
+      case EdgeCdm2Cdm(s, l, t) if cdmUuidOld == s => EdgeCdm2Cdm(cdmUuidNew, l, t)
+      case EdgeCdm2Cdm(s, l, t) if cdmUuidOld == t => EdgeCdm2Cdm(s, l, cdmUuidNew)
+      case EdgeCdm2Adm(s, l, t) if cdmUuidOld == s => EdgeCdm2Adm(cdmUuidNew, l, t)
+      case EdgeAdm2Cdm(s, l, t) if cdmUuidOld == t => EdgeAdm2Cdm(s, l, cdmUuidNew)
+      case e => e
+    }
+
+    def applyAdmRemap(cdmUuid: CdmUUID, admUuid: AdmUUID): Edge = this match {
+      case EdgeCdm2Cdm(s, l, t) if cdmUuid == s => EdgeAdm2Cdm(admUuid, l, t)
+      case EdgeCdm2Cdm(s, l, t) if cdmUuid == t => EdgeCdm2Adm(s, l, admUuid)
+      case EdgeCdm2Adm(s, l, t) if cdmUuid == s => EdgeAdm2Adm(admUuid, l, t)
+      case EdgeAdm2Cdm(s, l, t) if cdmUuid == t => EdgeAdm2Adm(s, l, admUuid)
+      case e => e
+    }
   }
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge
   final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge
@@ -119,6 +143,11 @@ package object adm {
     eventType: EventType,
     earliestTimestampNanos: Long,
     latestTimestampNanos: Long,
+
+    // 5D specific
+    // See <https://git.tc.bbn.com/tc-all/cdm-docs/blob/master/ta1-fivedirections/operations/user_interaction.md>
+    deviceType: Option[String],
+    inputType: Option[String],
 
     provider: String
   ) extends ADM with DBWritable {

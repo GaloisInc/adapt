@@ -25,56 +25,56 @@ class KLMeans:
 		self.cost = self.n*self.l
 		self.models = [model.AVCOnlineModel(self.attrs)
 					   for i in range(0,self.k)]
+		self.assignment  = [None for i in range(0, self.n)]
 		for i in range(0,self.n):
 			r = random.randint(0,k-1)
+			self.assignment[i] = r
 			self.models[r].update(data[i])
 
 
-	# Step 2: Calculate distribution of each class.
-	def calculate_distributions(self):
-		self.models = [model.AVCOnlineModel(self.attrs) for i in range(0,self.k)]
-		for i in range(0,self.k):
-			for rec in self.classes[i]:
-				self.models[i].update(rec)
 
 
-	# Step 3: Reclassify each record to the class that compresses it best.
+	# Step 2: Reclassify each record to the class that compresses it best.
 	def reclassify(self):
-		self.classes = [[] for i in range(0,self.k)]
+		self.assignment  = [None for i in range(0, self.n)]
 		for i in range(0,self.n):
 			costs = [self.models[j].score(self.data[i])
 					 for j in range(0,self.k)]
 			mincost = min(costs)
 			for j in range(0,self.k):
 				if costs[j] == mincost:
-					self.classes[j].append(self.data[i])
+					self.assignment[i] = j
 					break
 
-	# Step 4: Calculate new cost and see if it is smaller than old cost
+	# Step 3: Calculate new cost and see if it is smaller than old cost
 	def recost(self):
 		newcost = 0.0
-		for i in range(0,self.k):
-			cl = self.classes[i]
-			classcode = 0.0-numpy.log2(len(cl)/self.n)
-			for rec in cl:
-				newcost = newcost + classcode + self.models[i].score(rec)
+		for i in range(0,self.n):
+			j = self.assignment[i]
+			classcode = 0.0-numpy.log2((self.models[j].n+1)/(self.n+self.k))
+			newcost = newcost + classcode + self.models[j].score(self.data[i])
 		self.cost = newcost
 
+	# Step 4: Calculate distribution of each class.
+	def calculate_distributions(self):
+		self.models = [model.AVCOnlineModel(self.attrs) for i in range(0,self.k)]
+		for i in range(0,self.n):
+			self.models[self.assignment[i]].update(self.data[i])
+
 	def score(self,rec):
-		return (min( [(self.models[i].score(rec)
-					   - numpy.log2(self.models[i].n/self.n))
+		return (min( [self.models[i].score(rec) - numpy.log2((self.models[i].n+1)/(self.n+self.k))
 					   for i in range(0,self.k)]))
 
 	def score_class(self,rec):
 		min_score = None
 		min_class = None
 		for i in range(0,self.k):
-			score = self.models[i].score(rec) - numpy.log2(self.models[i].n/self.n)
+			score = self.models[i].score(rec) - numpy.log2((self.models[i].n+1)/(self.n+self.k))
 			if min_score == None or score < min_score:
 				min_score = score
 				min_class = i
 		return (min_score, min_class)
-	
+
 	def iterate(self):
 		self.reclassify()
 		self.recost()
@@ -128,7 +128,7 @@ def test(k,n):
 
 # TODO: Unify this framing code with that in ad.py
 
-def run(inputfile,outputfile,k,n):
+def run(inputfile,outputfile,k,n,modelfile=None):
 	print(inputfile)
 	print(outputfile)
 	print(k)
@@ -142,9 +142,11 @@ def run(inputfile,outputfile,k,n):
 			(uuid,record) = utils.readRecord(header,row)
 			data.append(record)
 		m = KLMeans(header,data,k)
+		print(m.cost)
 		for i in range(0,n):
-			print(m.cost)
 			m.iterate()
+			print(m.cost)
+		m.recost()
 		print(m.cost)
 
 		return m
@@ -154,14 +156,32 @@ def run(inputfile,outputfile,k,n):
 		reader = csv.reader(csvfile)
 		header = next(reader)[1:]
 		scorefile.write(scoreheader)
+		totalscore = 0.0
 
 		for row in reader:
 			(uuid,record) = utils.readRecord(header,row)
 			(score,cl) = m.score_class(record)
+			totalscore = totalscore + score
 			scorefile.write("%s, %f, %d\n" % (uuid,score,cl))
+		modelcost = m.k*m.l*numpy.log2(m.n)
+
+		print('Score: %f Model Cost: %f Total Cost: %f Entropy: %f' % (totalscore, modelcost, totalscore+modelcost, (totalscore+modelcost)/ m.n))
+
+	def writemodels(modelfile,m):
+		attrs = sorted(m.attrs)
+		modelfile.write('Size,' + ','.join(attrs) + '\n')
+		for i in range(m.k):
+			n = len(m.classes[i])
+			modelfile.write(str(n) + ','
+							+ ','.join([str((m.models[i].freqs[att]+1)/(n+2))
+										for att in attrs])
+							+ '\n')
 
 	with open(inputfile,'rt') as csvfile:
 		m = buildmodel(csvfile)
 	with open(inputfile,'rt') as csvfile, open(outputfile,'w') as scorefile:
 		writescores(csvfile,scorefile,m,'UUID,Score,Class\n')
+	if modelfile != None:
+		with open(modelfile,'w') as modelfile:
+			writemodels(modelfile,m)
 

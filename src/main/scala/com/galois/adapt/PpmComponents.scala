@@ -137,7 +137,7 @@ object PpmComponents {
               val provider = Try(p.asInstanceOf[AdmSubject].provider).getOrElse("")
               val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
               val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
-              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, provider), c, c.uuid, p, p.uuid)
+              (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, provider), c, c.uuid, p, p.uuid)
             }
           }
         )
