@@ -514,7 +514,10 @@ package object adm {
     provider: String
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(
+      DeterministicUUID(userId + groupIds.sorted.mkString("") + principalType.toString + username + provider),
+      provider
+    )
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
