@@ -3,16 +3,11 @@
 import requests, readline, atexit, os, sys, json, subprocess, tempfile, argparse, webbrowser
 
 def pager(text):
-    with open(tempfile.mkstemp()[1], "w") as tf:
-        tf.write(text)
-        tf.flush()
-        subprocess.call(["less", "-FX", tf.name])
-
-        save = input('dump contents to file?(provide a filename): ')
-        if save:
-            with open(save, 'w') as f:
-                f.write(text)
-
+    tf = open(tempfile.mkstemp()[1], "w")
+    tf.write(text)
+    tf.flush()
+    subprocess.call(["less", "-FX", tf.name])
+    tf.close()
 
 if __name__ == '__main__':
 
