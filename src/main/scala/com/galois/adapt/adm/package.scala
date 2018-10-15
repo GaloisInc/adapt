@@ -157,6 +157,7 @@ package object adm {
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "eventType" -> eventType.toString,
       "earliestTimestampNanos" -> earliestTimestampNanos,
       "latestTimestampNanos" -> latestTimestampNanos
     ) ++ (if (provider.isEmpty) Nil else List("provider" -> provider)) ++ {if (deviceType == None) Nil else List("deviceType" -> deviceType.get)} ++ (if (inputType == None) Nil else List("inputType" -> inputType.get))

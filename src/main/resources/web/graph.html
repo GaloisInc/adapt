@@ -1008,6 +1008,7 @@
             a.download = "snapshot.json"
             a.href = URL.createObjectURL(blob)
             a.target = "_blank"
+            document.body.appendChild(a);//to make it work in firefox
             a.click()
         }
 
