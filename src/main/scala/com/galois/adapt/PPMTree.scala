@@ -53,7 +53,7 @@ object NoveltyDetection {
     case _                          => (s: String) => s.toLowerCase == "sudo"
   }
 
-  case class ExtendedUuidDetails(extendedUuid: ExtendedUuid, name: Option[String] = None)
+  case class ExtendedUuidDetails(extendedUuid: ExtendedUuid, name: Option[String] = None, pid: Option[String] = None)
 
 }
 
@@ -597,7 +597,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-               ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+               ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
                ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -611,7 +611,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -625,7 +625,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -642,7 +642,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         }
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("NULL_value_from_CDM")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -659,7 +659,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -673,7 +673,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -701,8 +701,8 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d._2._2.get.path   // Child process second
       )),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
+        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++ // TODO: Need to get child process PID (cid) from here
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
@@ -723,7 +723,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -757,7 +757,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
@@ -799,7 +799,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
           d._3._1 match {
             case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
@@ -849,7 +849,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
         ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,

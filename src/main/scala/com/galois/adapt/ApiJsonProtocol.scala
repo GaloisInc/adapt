@@ -48,7 +48,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val extendedUuidDetails: RootJsonFormat[ExtendedUuidDetails] = new RootJsonFormat[ExtendedUuidDetails] {
     override def write(eUuid: ExtendedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
-      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))))
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.getOrElse(""))))
     }
 
     override def read(json: JsValue): ExtendedUuidDetails = {
@@ -57,9 +57,14 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case Seq(JsString("")) => None
         case Seq(JsString(jsName)) => Some(jsName)
       }
-      ExtendedUuidDetails(eUuid, name)
+      val pid = json.asJsObject.getFields("pid") match {
+        case Seq(JsString("")) => None
+        case Seq(JsString(jsPID)) => Some(jsPID)
+      }
+      ExtendedUuidDetails(eUuid, name, pid)
     }
   }
+
 
   // All enums are JSON-friendly through their string representation
   def jsonEnumFormat[T](enum: CustomEnum[T]): RootJsonFormat[T] = new RootJsonFormat[T]{
