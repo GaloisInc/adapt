@@ -1161,7 +1161,7 @@ case object TreeRepr {
 
   def flatToCsvArray(t: (Int, ExtractedValue, Float, Float, Int)): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
   def csvArrayToFlat(a: Array[String]): (Int, ExtractedValue, Float, Float, Int) = {
-    (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
+    (a(0).toInt, Option(a(1)).getOrElse(""), a(2).toFloat, a(3).toFloat, a(4).toInt)
   }
 
   def readFromFile(filePath: String): Option[TreeRepr] = Try {
