@@ -482,14 +482,22 @@ object CDMSource {
 
   type Provider = String
 
+  /*
+  Usage example:
+    load files
+    - files p1f1 by provider p1
+    - and files (p2f1, p2f2) by provider p2
+
+  -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=p1f1
+  -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=p2f1 -Dadapt.ingest.data.1.files.1=p2f2
+  */
   def getLoadfiles: List[(Provider, String)] = {
-    val data = config.getObject("adapt.ingest.data")
+    //convert to scala
+    val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
+    val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
 
     for {
-      provider <- data.keySet().asScala.toList
-      providerFixed = if (provider.isEmpty) { "\"\"" } else { provider }
-
-      paths = config.getStringList(s"adapt.ingest.data.$providerFixed").asScala.toList
+      (provider,paths) <- data
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
           case f if ! f.isHidden => f.getCanonicalPath
