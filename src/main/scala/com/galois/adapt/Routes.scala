@@ -119,79 +119,94 @@ object Routes {
               (statusActor ? GetStats).mapTo[StatusReport]
             )
           } ~
-            pathPrefix("ppm") {
-              path("listTrees") {
-                complete(
-                  (ppmActor.get ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
-                )
-              } ~
-              path("setRatings") {
-                parameter('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
-              } ~
-              path(Segment) { treeName =>
-                parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
-                  (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
-                    val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
-                    import ApiJsonProtocol._
-                    complete(
-                      (ppmActor.get ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-                        .mapTo[PpmTreeAlarmResult]
-                        .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
-                    )
-                }
-              }
-            } ~
-            pathPrefix("getCdmFilter") {
+          pathPrefix("summarize") {
+            path(Segment / IntNumber) { (processName, pid) =>
               complete(
-                Future.successful(Application.filterAst.toJson)
+                PpmSummarizer.summarize(processName, Some(pid)).map(_.toString)
               )
-            }
-        } ~
-          pathPrefix("query") {
-            pathPrefix("nodes") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  queryResult(NodeQuery(queryString.toString), dbActor)
-                )
-              }
             } ~
-            pathPrefix("edges") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  queryResult(EdgeQuery(queryString.toString), dbActor)
-                )
-              }
+            path(Segment) { processName =>
+              complete(
+                PpmSummarizer.summarize(processName, None).map(_.toString)
+              )
             } ~
-            pathPrefix("generic") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  queryResult(StringQuery(queryString.toString), dbActor)
-                )
-              }
+            complete(
+              PpmSummarizer.summarizableProcesses.map(_.toString)
+            )
+          } ~
+          pathPrefix("ppm") {
+            path("listTrees") {
+              complete(
+                (ppmActor.get ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
+              )
             } ~
-            pathPrefix("json") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  queryResult(StringQuery(queryString.toString, true), dbActor)
-                )
-              }
+            path("setRatings") {
+              parameter('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
             } ~
-            pathPrefix("cypher") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  queryResult(CypherQuery(queryString.toString), dbActor)
-                )
-              }
-            } ~
-            pathPrefix("remap-uuid") {
-              path(RemainingPath) { queryString =>
-                complete(
-                  remapUuid(CdmUUID.fromRendered(queryString.toString))
-                )
+            path(Segment) { treeName =>
+              parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
+                (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
+                  val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
+                  import ApiJsonProtocol._
+                  complete(
+                    (ppmActor.get ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+                      .mapTo[PpmTreeAlarmResult]
+                      .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+                  )
               }
             }
           } ~
-          serveStaticFilesRoute
+          pathPrefix("getCdmFilter") {
+            complete(
+              Future.successful(Application.filterAst.toJson)
+            )
+          }
+        } ~
+        pathPrefix("query") {
+          pathPrefix("nodes") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(NodeQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("edges") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(EdgeQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("generic") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(StringQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("json") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(StringQuery(queryString.toString, true), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("cypher") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(CypherQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("remap-uuid") {
+            path(RemainingPath) { queryString =>
+              complete(
+                remapUuid(CdmUUID.fromRendered(queryString.toString))
+              )
+            }
+          }
+        } ~
+        serveStaticFilesRoute
       } ~
       post {
         pathPrefix("api") {
@@ -213,14 +228,10 @@ object Routes {
             }
           } ~
           pathPrefix("clearCdmFilter") {
-            formFields() {
-              complete {
-                Future {
-                  Application.filterAst = None
-                  Application.filter = None
-                  StatusCodes.Created -> "CDM filter cleared"
-                }
-              }
+            complete {
+              Application.filterAst = None
+              Application.filter = None
+              StatusCodes.Created -> "CDM filter cleared"
             }
           } ~
           pathPrefix("ppm") {
@@ -240,9 +251,9 @@ object Routes {
               formFields('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
             } ~
             path("setRatingsMap") {
-              formFieldMap { (params: Map[String, String]) =>
+              formFieldMap { params: Map[String, String] =>
                 params.get("rating") match {
-                  case Some(x @ ("0" | "1" | "2" | "3" | "4" | "5")) => {
+                  case Some(x @ ("0" | "1" | "2" | "3" | "4" | "5")) =>
                     val rating = x.toInt
                     val namespace: String = params.getOrElse("namespace", "adapt")
                     Try {
@@ -252,7 +263,6 @@ object Routes {
                         case Failure(e) => complete { StatusCodes.ImATeapot -> s"No pathsPerTree ${e.getMessage}" }
                         case Success(pathsPerTree: Map[String,List[String]]) => setRatings(rating, namespace, pathsPerTree)
                     }
-                  }
                   case r => complete { StatusCodes.ImATeapot -> s"Invalid rating $r" }
                 }
               }

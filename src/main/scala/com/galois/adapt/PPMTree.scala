@@ -435,7 +435,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
         val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat   // TODO: This should reference another probability calculation instead of being hardcoded as a one-off!!!!!!!
         Set(TreeRepr(1, "_?_", prob, prob, childrenPopulation, Set.empty))
       }
-      val futureResult = startingKey match {
+      val futureResult: Future[PpmNodeActorGetTreeReprResult] = startingKey match {
         case Nil =>
           val futureRepr = Future.sequence(
             children.map { case (k,v) =>
@@ -446,13 +446,12 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
           }
           futureRepr
         case childKey :: remainder =>
-//          children.get(childKey) match {
-//            case Some(childRef) => (childRef ? PpmNodeActorBeginGetTreeRepr(treeName, remainder)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-//            case None =>
+          children.get(childKey) match {
+            case Some(childRef) => (childRef ? PpmNodeActorBeginGetTreeRepr(childKey, remainder)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+            case None =>
 //              Future.failed(new IndexOutOfBoundsException(s"No child element for key $childKey"))
-//              // Or some empty Repr?
-//          }
-          ???  // TODO: finish thinking about what the right behavior is for this.
+              Future.successful(PpmNodeActorGetTreeReprResult(TreeRepr.empty))
+          }
       }
 
       sender() ! futureResult
@@ -496,7 +495,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmActor extends Actor with ActorLogging { thisActor =>
+class PpmManager extends Actor with ActorLogging { thisActor =>
   import NoveltyDetection._
 
   var cdmSanityTrees = List(
@@ -745,33 +744,34 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
-
-    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
-      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
-      List(d => List(                         // 1.) Process name
-        d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
-        d._2._1.cid.toString,                 // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
-        d._1.earliestTimestampNanos.toString, // 3.) timestamp
-        d._1.eventType.toString               // 4.) Event type
-        ), _._3 match {                       // 5.) identifier(s) for the object, based on its type
-          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
-            case "" :: remainder => pathDelimiterChar :: remainder
-            case x => x
-          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
-          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
-          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
-          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
-          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
-        }
-      ),
-      d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path), Some(d._2._1.cid.toString)),
-        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++ // TODO: Need to get child process PID (cid) from here
-        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
     )(thisActor.context, context.self)
+
+//    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
+//      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
+//      List(d => List(                         // 1.) Process name
+//        d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
+//        d._2._1.cid.toString,                 // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
+//        d._1.earliestTimestampNanos.toString, // 3.) timestamp
+//        d._1.eventType.toString               // 4.) Event type
+//        ), _._3 match {                       // 5.) identifier(s) for the object, based on its type
+//          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+//            case "" :: remainder => pathDelimiterChar :: remainder
+//            case x => x
+//          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
+//          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
+//          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+//          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+//          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
+//        }
+//      ),
+//      d => Set(NamespacedUuidDetails(d._1.uuid),
+//        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+//        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++ // TODO: Need to get child process PID (cid) from here
+//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//      _._1.latestTimestampNanos
+//    )(thisActor.context, context.self)
+
   ).par
 
 
@@ -1068,12 +1068,19 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
+    case msg @ PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
+      implicit val timeout = Timeout(30 seconds)
+      val reprFut = ppm(treeName)
+        .map(d => (d.tree ? msg).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+        .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
+      sender() ! reprFut
+
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
         if (iforestEnabled) Future { EventTypeModels.evaluateModels(context.system)}
       }
-      sender() ! Ack;
+      sender() ! Ack
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveStateAsync())
@@ -1236,14 +1243,14 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def renormalizeProbs: TreeRepr = {
     def renormalizeProbabilities(repr: TreeRepr, totalCount: Option[Float] = None): TreeRepr = {
-      val normalizedChildren = this.children.map(c => renormalizeProbabilities(c, totalCount.orElse(Some(this.count.toFloat))))
-      this.copy(
+      val normalizedChildren = repr.children.map(c => renormalizeProbabilities(c, totalCount.orElse(Some(repr.count.toFloat))))
+      repr.copy(
 //      localProb = ???,   // TODO!!!!!!!!!!!!!!!!!
-        globalProb = this.count / totalCount.getOrElse(this.count.toFloat),
+        globalProb = repr.count / totalCount.getOrElse(repr.count.toFloat),
         children = normalizedChildren
       )
     }
-    this.renormalizeProbs()
+    renormalizeProbabilities(this)
   }
 
   type PpmElement = (List[ExtractedValue], Float, Float, Int)
@@ -1443,14 +1450,16 @@ object PpmSummarizer {
           val merged = ts.foldLeft(Set.empty[ExtractedValue] -> TreeRepr.empty){ case (a,b) => (a._1 + b.key) -> b.merge(a._2, ignoreKeys = true)}
           val mergedKey =
             if (merged._1.size == 1) merged._1.head
-            else if (merged._1.size < 10) Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
-              println(s"\n\nWeird failing case with null value?!? => $merged\n\n")
-              "<weird_null_value!>"
+            else if (merged._1.size < 10)
+              Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
+                println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
+              }
+            else {
+              val items = merged._1.toList.sorted
+              s"${items.size} items like: ${Try(items.take(3).:+("...").++(items.reverse.take(3)).mkString("[",", ","]")).getOrElse{
+                println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
+              }}"
             }
-            else s"${merged._1.size} items like: ${Try(merged._1.toList.sorted.take(5).:+("...").mkString("[",", ","]")).getOrElse{
-              println(s"\n\nWeird failing case with null value?!? => $merged\n\n")
-              "<weird_null_value!>"
-            }}"
           mergedKey -> merged._2
         }.toSet[(ExtractedValue, TreeRepr)].map(c => c._2.copy(key = c._1))
       )
@@ -1458,9 +1467,20 @@ object PpmSummarizer {
   }
 
   def summarize(tree: TreeRepr): TreeRepr =
-    reduceBySameCounts(reduceByAbstraction(tree.withoutQNodes).collapseUnitaryPaths()).renormalizeProbs
+    reduceBySameCounts(reduceByAbstraction(tree.withoutQNodes).collapseUnitaryPaths()).collapseUnitaryPaths().renormalizeProbs
   // Consider: repeatedly call `reduceTreeBySameCounts` and `mergeChildrenByAbstraction` until no change
 
+  def summarize(processName: String, pid: Option[Int]): Future[TreeRepr] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
+  }
+
+  def summarizableProcesses: Future[TreeRepr] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr.truncate(1) }
+  }
 
 
   // Overall strategy: systematically remove/collapse items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
