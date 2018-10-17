@@ -238,7 +238,7 @@ case object FILE_OBJECT_UNIX_SOCKET extends FileObjectType
 
 // New
 sealed trait IpcObjectType extends CDM19
-case object IpcObjectType extends CustomEnum[IpcObjectType] { val values = Seq(IPC_OBJECT_PIPE_NAMED, IPC_OBJECT_PIPE_UNNAMED, IPC_OBJECT_SOCKET_ABSTRACT, IPC_OBJECT_SOCKET_PAIR, IPC_OBJECT_SOCKET_PATHNAME, IPC_OBJECT_SOCKET_UNNAMED, IPC_OBJECT_WINDOWS_ALPC, IPC_OBJECT_WINDOWS_MAILSLOT) }
+case object IpcObjectType extends CustomEnum[IpcObjectType] { val values = Seq(IPC_OBJECT_PIPE_NAMED, IPC_OBJECT_PIPE_UNNAMED, IPC_OBJECT_SOCKET_ABSTRACT, IPC_OBJECT_SOCKET_PAIR, IPC_OBJECT_SOCKET_PATHNAME, IPC_OBJECT_SOCKET_UNNAMED, IPC_OBJECT_WINDOWS_ALPC, IPC_OBJECT_WINDOWS_MAILSLOT, IPC_OBJECT_SOCKET_NETLINK) }
 case object IPC_OBJECT_PIPE_NAMED extends IpcObjectType
 case object IPC_OBJECT_PIPE_UNNAMED extends IpcObjectType
 case object IPC_OBJECT_SOCKET_ABSTRACT extends IpcObjectType
@@ -247,6 +247,7 @@ case object IPC_OBJECT_SOCKET_PATHNAME extends IpcObjectType
 case object IPC_OBJECT_SOCKET_UNNAMED extends IpcObjectType
 case object IPC_OBJECT_WINDOWS_ALPC extends IpcObjectType
 case object IPC_OBJECT_WINDOWS_MAILSLOT extends IpcObjectType
+case object IPC_OBJECT_SOCKET_NETLINK extends IpcObjectType
 
 // No change
 sealed trait ValueType extends CDM19

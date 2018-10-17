@@ -145,7 +145,16 @@ object ERRules {
       EventEdges.ExecSubjectPathEdgeNode,
       EventEdges.ExecPathEdgeNode
     ) = {
-      val newEvent = AdmEvent(Seq(CdmUUID(e.getUuid, provider)), e.eventType, e.timestampNanos, e.timestampNanos, provider)
+      val newEvent = AdmEvent(
+        originalCdmUuids = Seq(CdmUUID(e.getUuid, provider)),
+        eventType = e.eventType,
+        earliestTimestampNanos = e.timestampNanos,
+        latestTimestampNanos = e.timestampNanos,
+        deviceType = e.properties.flatMap(_.get("deviceType")),
+        inputType = e.properties.flatMap(_.get("inputType")),
+        provider
+      )
+
       (
         newEvent,
         e.subjectUuid.map(subj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "subject", CdmUUID(subj, provider))),

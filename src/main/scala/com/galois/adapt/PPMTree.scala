@@ -53,7 +53,7 @@ object NoveltyDetection {
     case _                                                    => (s: String) => s.toLowerCase == "sudo"
   }
 
-  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None)
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
 
 
@@ -611,10 +611,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//               ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
+//               ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -625,10 +632,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -639,10 +653,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -656,10 +677,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("NULL_value_from_CDM")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -673,10 +701,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -687,10 +722,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -714,6 +756,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d._3._2.map(_.path).getOrElse("<no_path>"),  // Parent process first
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
+//<<<<<<< HEAD
       d => Set(NamespacedUuidDetails(d._1.uuid),
         NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
@@ -766,10 +809,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path)),
-        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
+        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++ // TODO: Need to get child process PID (cid) from here
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++ // TODO: Need to get child process PID (cid) from here
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self)
   ).par
@@ -788,10 +838,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[String] {
 
@@ -822,10 +879,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[String] {
 
@@ -864,8 +928,13 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//>>>>>>> master
           d._3._1 match {
             case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
             case o: AdmFileObject => s" : ${o.fileObjectType}"
@@ -914,10 +983,17 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered))),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//=======
+//      d => Set(ExtendedUuidDetails(d._1.uuid),
+//        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
+//        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
+//        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+//>>>>>>> master
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[AdmUUID] {
 
@@ -1262,7 +1338,7 @@ case object TreeRepr {
   }
 
   def flatToCsvArray(t: CSVRow): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
-  def csvArrayToFlat(a: Array[String]): CSVRow = (a(0).toInt, a(1), a(2).toFloat, a(3).toFloat, a(4).toInt)
+  def csvArrayToFlat(a: Array[String]): CSVRow = (a(0).toInt, Option(a(1)).getOrElse(""), a(2).toFloat, a(3).toFloat, a(4).toInt)
 
   def readFromFile(filePath: String): Option[TreeRepr] = Try {
     val fileHandle = new File(filePath)

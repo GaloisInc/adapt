@@ -51,24 +51,29 @@ object FlowComponents {
 
         // Ordering nodes stats
         val blockEdgesCount = EntityResolution.blockedEdgesCount
-        val blockingNodes = Application.blockedEdges.size
+        val blockingNodes = EntityResolution.blockingNodes.size
 
         val currentTime = EntityResolution.monotonicTime
         val sampledTime = EntityResolution.sampledTime
 
         // UuidRemapper related stats
-        val uuidsBlocking: Int = Application.blockedEdges.size
-        val blockedUuidResponses: Int = Application.blockedEdges.values.map(_._1.length).sum
+        val uuidsBlocking: Int = Application.blockedEdgesMaps.map(_.size).sum
+        val blockedUuidResponses: Int = Application.blockedEdgesMaps.map(_.values.map(x => x._1.length).sum).sum
 
         val activeEventChains = EntityResolution.activeChains.size
 
-        val cdm2cdmSize = Application.cdm2cdmMap.size()
-        val cdm2admSize = Application.cdm2admMap.size()
+        val cdm2cdmSize = Application.cdm2cdmMaps.map(_.size()).sum
+        val cdm2admSize = Application.cdm2admMaps.map(_.size()).sum
 
         val seenNodesSize = Application.seenNodes.size()
         val seenEdgesSize = Application.seenEdges.size()
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
+        val shardDistribution: Array[Long] = {
+          val totalCount = Application.shardCount.sum
+          Application.shardCount.map(i => Math.round(i.toDouble * 100 / totalCount.toDouble))
+        }
+
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes. Shard distribution: ${shardDistribution.mkString("(",",",")")}")
 
         statusActor ! PopulationLog(
           counterName,

@@ -48,7 +48,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val extendedUuidDetails: RootJsonFormat[NamespacedUuidDetails] = new RootJsonFormat[NamespacedUuidDetails] {
     override def write(eUuid: NamespacedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
-      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))))
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.getOrElse(""))))
     }
 
     override def read(json: JsValue): NamespacedUuidDetails = {
@@ -57,9 +57,14 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
         case Seq(JsString("")) => None
         case Seq(JsString(jsName)) => Some(jsName)
       }
-      NamespacedUuidDetails(eUuid, name)
+      val pidOpt = json.asJsObject.getFields("pid") match {
+        case Seq(JsString("")) => None
+        case Seq(JsString(jsPID)) => Some(jsPID)
+      }
+      NamespacedUuidDetails(eUuid, name, pidOpt)
     }
   }
+
 
   // All enums are JSON-friendly through their string representation
   def jsonEnumFormat[T](enum: CustomEnum[T]): RootJsonFormat[T] = new RootJsonFormat[T]{
@@ -80,7 +85,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val cdmHostIdentifier = jsonFormat2(HostIdentifier.apply)
 
   // ADM nodes
-  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "provider")
+  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "deviceType", "inputType", "provider")
   implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "provider")
   implicit val admPathNode = jsonFormat(AdmPathNode.apply, "path", "provider")
   implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "provider")

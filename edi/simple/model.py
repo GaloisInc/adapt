@@ -131,7 +131,7 @@ class RaspOnlineModel(Model):
 			total = total + (self.freqs[att])
 		for att in x.keys():
 			if att in self.attrs:
-				p = (self.freqs[att]) / total
+				p = (self.freqs[att]+1) / (total+2)
 				score = score - x[att] * numpy.log2(p)
 			else:
 				p = 1/total

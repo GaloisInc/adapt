@@ -18,6 +18,7 @@ raspbatch: $(foreach context,$(contexts), results/$(context).rasp.batch.scored.c
 raspstream: $(foreach context,$(contexts), results/$(context).rasp.stream.scored.csv)
 
 klmeansbatch: $(foreach context,$(contexts), results/$(context).klmeans.batch.scored.csv)
+klmeansstream: $(foreach context,$(contexts), results/$(context).klmeans.stream.scored.csv)
 
 contexts/%.csv: specifications/%.json
 	python3 extract.py -i specifications/$*.json -o contexts/$*.csv
@@ -42,6 +43,9 @@ results/%.avc.stream.scored.csv: contexts/%.csv
 
 results/%.rasp.stream.scored.csv: contexts/%.csv
 	python3 ad.py -i contexts/$*.csv -o results/$*.rasp.stream.scored.csv -s rasp -m stream
+
+results/%.klmeans.stream.scored.csv: contexts/%.csv
+	python3 klmeans.py -m stream -i contexts/$*.csv -o results/$*.klmeans.stream.scored.csv
 
 
 clean:

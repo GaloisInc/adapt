@@ -139,10 +139,43 @@ usage: ad.py [-h] -i INPUT -o OUTPUT [-s {avf,avc,rasp}]
 
 The default scoring algorithm and mode are AVF/batch.
 
+## KL-means
+
+The file `klmeans.py` contains an experimental (meta-)algorithm based
+on an information-theoretic variant of k-means clustering.  (The name "KL-means"
+is a weak pun on "k-means" and "Kullback-Leilber (KL) divergence", a
+distance-like function on probability distributions in information
+theory.)
+
+There are two versions, a batch version and a stream version:
+
+* The batch version takes two parameters, K and N.  The K parameter sets the 
+  number of clusters to try to find, and the N parameter sets the number of 
+  iterations to run for.  The end result is a score file which also includes
+  the final assignment of objects to clusters 0..K-1.  This makes N+1 passes
+  over the data so it can take a while, but usually small values of N (<5) work.
+* The stream version does not take any additional parameters.  It starts with 
+  one cluster and compresses using that as in AVC until there is evidence that
+  another cluster is needed.  This is based on a heuristic: if we see objects
+  compress very badly (i.e. worse than simply encoding the attributes in binary)
+  then we spawn a new model for a new cluster.  Again, the output includes 
+  score (= compressed size) and final cluster assignment of each object.
+
+The intention is that the scores can be used (as with AVC and AVF) as anomaly 
+scores.  The cluster assignment information is (at this point) ostly for 
+debugging purposes, but might have other uses.
+
+The script's options are as follows.
+
+```
+usage: klmeans.py [-h] -i INPUT -o OUTPUT [-k K] [-n N]
+             [-m {batch,stream}]
+```
+
 ## Checking scores against ground truth
 
-The script `check.py` takes a score file (produced by `ad.py`), a
-ground truth CSV file, and some additional options and produces a
+The script `check.py` takes a score file (produced by `ad.py` or `klmeans.py`), 
+a ground truth CSV file, and some additional options and produces a
 ranking file, which is a CSV file listing just those object IDs found
 in the ground truth with their ranks (= how anomalous the object
 was).  The checker also prints out the "normalized discounted
@@ -172,13 +205,4 @@ default behavior is to sort in increasing order, which is appropriate
 for AVF (small score = more anomalous).  For AVC and RASP (and
 KL-means), the scores are "compressed sizes" so larger scores are more
 anomalous and the `-r` flag should be used.
-
-## KL-means
-
-The file `klmeans.py` contains an experimental (meta-)algorithm based
-on an information-theoretic variant of k-means.  (The name "KL-means"
-is a weak pun on "k-means" and "Kullback-Leilber (KL) divergence", a
-distance-like function on probability distributions in information
-theory.)  This is experimental and needs some cleaning up and
-reorganizing to reduce code duplication with `ad.py`.  Safe to ignore for now.
 
