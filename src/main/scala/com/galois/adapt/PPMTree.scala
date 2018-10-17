@@ -1263,7 +1263,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def leafCount: Int = if (children.isEmpty) 1 else children.foldLeft(0)((a,b) => a + b.leafCount)
 
-  override def toString = toString(0)
+  override def toString: String = toString(0)
   def toString(passedDepth: Int): String = {
     val indent = (0 until (4 * passedDepth)).map(_ => " ").mkString("")
     val depthString = if (depth < 10) s" $depth" else depth.toString
@@ -1272,27 +1272,6 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     val countString = (0 until (9 - count.toString.length)).map(_ => " ").mkString("") + count.toString
     s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
       children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString(passedDepth + 1)).mkString("\n", "", "")
-  }
-
-  def leafNodes = {
-    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
-      children.toList.flatMap {
-        case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
-        case next => leafNodesRec(next.children, nameAcc :+ next.key)
-      }
-    leafNodesRec(children, List(key))
-  }
-
-  def truncate(depth: Int): TreeRepr = depth match {
-    case 0 => this.copy(children = Set.empty)
-    case x => this.copy(children = children.map(_.truncate(depth - 1)))
-  }
-
-  def merge(other: TreeRepr, ignoreKeys: Boolean = false): TreeRepr = {
-    if (!ignoreKeys) require(other.key == key, s"Keys much match to merge Trees. Tried to merge other tree with key: ${other.key} into this tree with key: $key")
-    val newChildren = other.children.foldLeft( children ){
-      case (childAcc, newChild) => childAcc.find(_.key == newChild.key).fold(childAcc + newChild){ case existingChild => (childAcc - existingChild) + existingChild.merge(newChild)} }
-    this.copy(count = count + other.count, children = newChildren)
   }
 
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
@@ -1304,6 +1283,74 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     this.toFlat.foreach(f => writer.writeRow(TreeRepr.flatToCsvArray(f)))
     writer.close()
     pw.close()
+  }
+
+
+  // Combinators for summarization:
+
+  def leafNodes: List[(List[ExtractedValue], Float, Float, Int)] = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
+      children.toList.flatMap {
+        case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
+        case next => leafNodesRec(next.children, nameAcc :+ next.key)
+      }
+    leafNodesRec(children, List(key))
+  }
+
+  def truncate(depth: Int): TreeRepr = depth match {
+    case 0 => this.copy(children = Set.empty)
+    case _ => this.copy(children = children.map(_.truncate(depth - 1)))
+  }
+
+  def merge(other: TreeRepr, ignoreKeys: Boolean = false): TreeRepr = {
+    if (!ignoreKeys) require(other.key == key, s"Keys much match to merge Trees. Tried to merge other tree with key: ${other.key} into this tree with key: $key")
+    val newChildren = other.children.foldLeft( children ){
+      case (childAcc, newChild) => childAcc.find(_.key == newChild.key).fold(childAcc + newChild){ case existingChild => (childAcc - existingChild) + existingChild.merge(newChild)} }
+    this.copy(count = count + other.count, children = newChildren)
+  }
+
+  def withoutQNodes: TreeRepr = this.copy(children = this.children.collect{ case c if c.key != "_?_" => c.withoutQNodes } )
+
+  def collapseUnitaryPaths(delimiter: String = " ∫ ", childMergeCondition: TreeRepr => Boolean = r => r.count == r.children.head.count): TreeRepr = {
+    if (this.children.isEmpty) this
+    else if (this.children.size == 1 && childMergeCondition(this))
+      this.children.head.copy(depth = this.depth, key = this.key + delimiter + this.children.head.key).collapseUnitaryPaths(delimiter, childMergeCondition)
+    else this.copy(children = this.children.map(c => c.collapseUnitaryPaths(delimiter, childMergeCondition)))
+  }
+
+  def renormalizeProbs: TreeRepr = {
+    def renormalizeProbabilities(repr: TreeRepr, totalCount: Option[Float] = None): TreeRepr = {
+      val normalizedChildren = this.children.map(c => renormalizeProbabilities(c, totalCount.orElse(Some(this.count.toFloat))))
+      this.copy(
+//      localProb = ???,   // TODO!!!!!!!!!!!!!!!!!
+        globalProb = this.count / totalCount.getOrElse(this.count.toFloat),
+        children = normalizedChildren
+      )
+    }
+    this.renormalizeProbs()
+  }
+
+  type PpmElement = (List[ExtractedValue], Float, Float, Int)
+
+  def extractMostNovel: (PpmElement, TreeRepr) = {
+    def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
+    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
+      case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
+        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+        require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
+        repr.copy(count = repr.count - decrement, children = repr.children.collect {
+          case c if c.key != childKey => c
+          case c if c.key == childKey && c.count != decrement => subtractMostNovel(c, childKey :: remainderKeys, decrement)
+        })
+      case thisKey :: Nil if repr.key == thisKey =>
+        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+        require(repr.children.isEmpty, s"Should only decrement counts on leaf nodes!")
+        repr.copy(count = repr.count - decrement)
+      case k :: _ => throw new IllegalArgumentException(s"Key not found: $k")
+      case Nil => throw new IllegalArgumentException(s"Cannot decrement a tree when given an empty key.")
+    }
+    val mostNovel = findMostNovel(this)
+    mostNovel -> subtractMostNovel(this, mostNovel._1, mostNovel._4).renormalizeProbs()
   }
 }
 
@@ -1351,102 +1398,6 @@ case object TreeRepr {
 
 
 object PpmSummarizer {
-
-  // Consider: overall strategy => systematically remove/collapse items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
-
-  /*
-   * Interesting things:
-   *   - Long path lengths from a leaf upward where each hop has a count = 1  (or identical counts)
-   *   - Comparatively low local probability
-   *   - Low global probability after renormalizing to only the branch under consideration.
-   *   - Common sub-trees in different branches. (suggests pivoting the tree)
-   *   - Common subset trees in different branches. (suggests collapsing?)
-   *   - Alarms that were produced...?
-   *   - Consider keeping timestamps.
-   */
-
-  /*
-   * Reduction categories:
-   *   - paths into common parent directories. Need to distinguish types for each level of the tree => unify strings iff types are all directories/path components.
-   *   - known process names into "purposes"...?  (e.g. web browsing, email)
-   *   - Events into "higher-level" notions:
-   *     - READ / WRITE => "File IO"
-   *     - SEND / RCV / ACCEPT / BIND => "Network Communication"
-   *     - LOADLIBRARY / MMAP / MPROTECT => "Memory Load"
-   *     - ...
-   *     - everything else => Discard
-   *   - Events that signal information flow:
-   *     - READ / RCV / ACCEPT / LOADLIBRARY / MMAP / etc. => "incoming data"
-   *     - WRITE / SEND / etc. => "outgoing data"
-   *   - Shape (distribution types) of local prob. among sibling nodes. e.g. uniform dist., uniform w/ outlier, single item, power law, 2-clear-categories, 3-clear-categories.
-   */
-
-  /**
-    * Types:
-    *   - Event = IO | Net Comm | ...
-    *   - Process = web browser | email client | server | document editing | control (shells / interpreters)  =  client program | system program
-    *   - Path = directory | filename | file extension
-    *   - URLs …?
-    */
-
-  /**
-    * Clustering considerations:
-    *   - One dimension for each level of the tree. Would need to ensure there is only one variable length discriminator and it is last. Would need to handle null values for the variable length discriminator values.
-    *   - One dimension for each type of discriminator. Would need to encode types together with discriminator values.
-    *   - Clustering exclusively at a single level of a tree. e.g. apply clustering to only the children of a single node at a time; probably for divining shape.
-    *
-    *   Consider: Mean-shift clustering (to discover centroid counts & approximate centers) + gaussian mixture models (to learn model params and cluster membership)
-    */
-
-//  trait Child
-//  trait Shape { def assessScore(children: Set[Child]): Float } //  = PowerLaw,
-//  val shapes: List[Shape] = ???
-//  def assessShapeScores(children: Set[Child]): List[(Shape, Float)] = shapes.map(s => s -> s.assessScore(children))
-//  def bestFitShape(children: Set[Child]): Shape = assessShapeScores(children).sortBy(_._2).reverse.head._1
-
-
-  def removeQNodes(repr: TreeRepr): TreeRepr = repr.copy(children = repr.children.collect{ case c if c.key != "_?_" => removeQNodes(c) } )
-
-  def treeCollapse(repr: TreeRepr, delimiter: String = " ∫ ", shouldRequireMatchingCounts: Boolean = true): TreeRepr = {
-    if (repr.children.isEmpty) repr
-    else if (repr.children.size == 1 && ( ! shouldRequireMatchingCounts || repr.count == repr.children.head.count))
-      treeCollapse(repr.children.head.copy(depth = repr.depth, key = repr.key + delimiter + repr.children.head.key))
-    else repr.copy(children = repr.children.map(c => treeCollapse(c)))
-  }
-
-  def renormalizeProbs(repr: TreeRepr, totalCount: Option[Float] = None): TreeRepr = {
-    val normalizedChildren = repr.children.map(renormalizeProbs(_, totalCount.orElse(Some(repr.count.toFloat))))
-    repr.copy(
-//      localProb = ???,   // TODO!!!!!!!!!!!!!!!!!
-      globalProb = repr.count / totalCount.getOrElse(repr.count.toFloat),
-      children = normalizedChildren
-    )
-  }
-
-  type PpmElement = (List[ExtractedValue], Float, Float, Int)
-
-  def extractMostNovel(repr: TreeRepr): (PpmElement, TreeRepr) = {
-    def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
-    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
-      case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
-        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
-        require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
-        repr.copy(count = repr.count - decrement, children = repr.children.collect {
-          case c if c.key != childKey => c
-          case c if c.key == childKey && c.count != decrement => subtractMostNovel(c, childKey :: remainderKeys, decrement)
-        })
-      case thisKey :: Nil if repr.key == thisKey =>
-        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
-        require(repr.children.isEmpty, s"Should only decrement counts on leaf nodes!")
-        repr.copy(count = repr.count - decrement)
-      case k :: _ => throw new IllegalArgumentException(s"Key not found: $k")
-      case Nil => throw new IllegalArgumentException(s"Cannot decrement a tree when given an empty key.")
-    }
-    val mostNovel = findMostNovel(repr)
-    mostNovel -> renormalizeProbs(subtractMostNovel(repr, mostNovel._1, mostNovel._4))
-  }
-
-
   import cdm19._
   sealed trait AbstractionOne {
     val events: Set[EventType]
@@ -1454,7 +1405,7 @@ object PpmSummarizer {
     def doAbstraction(eventType: String): Option[AbstractionOne] = if (events.exists(_.toString == eventType)) Some(this) else None
   }
   case object AbstractionOne {
-    val abstractions = List(ReadEvents, WriteEvents, ProcessTreeEvents, SingularEvents, FileSystemEvents, NetworkManagementEvents, SystemManagementEvents, UserEvents, NonspecificEvents, DiscardedEvents)
+    val abstractions = List(ReadEvents, WriteEvents, ProcessTreeEvents, ExecutionEvents, MemoryMap, Unlink, AddObjectAttribute, CreateObject, FlowsTo, Update, FileSystemEvents, FileSystemEvents, NetworkManagementEvents, SystemManagementEvents, UserEvents, NonspecificEvents, DiscardedEvents)
     def go(eventType: EventType): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
     def go(eventType: String): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
   }
@@ -1483,17 +1434,26 @@ object PpmSummarizer {
       EVENT_STARTSERVICE
     )
   }
-  case object SingularEvents extends AbstractionOne {
-    //        case class SingularEvent(events: Set[EventType]) extends AbstractionOne
-    val events: Set[EventType] = Set(
-      EVENT_MMAP,        // Needs further thought about the implications.
-      EVENT_EXECUTE, EVENT_LOADLIBRARY,
-      EVENT_UNLINK,
-      EVENT_ADD_OBJECT_ATTRIBUTE,
-      EVENT_CREATE_OBJECT,
-      EVENT_FLOWS_TO,    // Needs further thought about the implications.
-      EVENT_UPDATE
-    )
+  case object ExecutionEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_EXECUTE, EVENT_LOADLIBRARY)
+  }
+  case object MemoryMap extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_MMAP)        // Needs further thought about the implications.)
+  }
+  case object Unlink extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_UNLINK)
+  }
+  case object AddObjectAttribute extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_ADD_OBJECT_ATTRIBUTE)
+  }
+  case object CreateObject extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_CREATE_OBJECT)
+  }
+  case object FlowsTo extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_FLOWS_TO)    // Needs further thought about the implications.
+  }
+  case object Update extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_UPDATE)
   }
   case object FileSystemEvents extends AbstractionOne {
     val events: Set[EventType] = Set(
@@ -1550,38 +1510,94 @@ object PpmSummarizer {
     )
   }
 
-  def mergeChildrenByAbstraction(tree: TreeRepr): TreeRepr =
-    tree.copy(children = tree.children.foldLeft(Set.empty[TreeRepr]){ case (acc, child) =>
-      AbstractionOne.go(child.key).fold(acc + child){ abs => acc.find(_.key == abs.toString).fold(acc + child.copy(key = abs.toString)){ foundAbsTree =>
-        (acc - foundAbsTree) + foundAbsTree.merge(child.copy(key = abs.toString)) } }
-    })
 
-  def reduceByAbstraction(tree: TreeRepr): TreeRepr =
+  def reduceByAbstraction(tree: TreeRepr): TreeRepr = {
+    def mergeChildrenByAbstraction(tree: TreeRepr): TreeRepr =
+      tree.copy(children = tree.children.foldLeft(Set.empty[TreeRepr]){ case (acc, child) =>
+        AbstractionOne.go(child.key).fold(acc + child){ abs => acc.find(_.key == abs.toString).fold(acc + child.copy(key = abs.toString)){ foundAbsTree =>
+          (acc - foundAbsTree) + foundAbsTree.merge(child.copy(key = abs.toString)) } }
+      })
     mergeChildrenByAbstraction(tree.copy(children = tree.children.map(t => reduceByAbstraction(t))))
+  }
 
-  def mergeSameCountChildren(tree: TreeRepr): TreeRepr =
-    tree.copy(children = tree.children.groupBy(_.count).map{
-      case (_, ts) =>
-        val merged = ts.foldLeft(Set.empty[ExtractedValue] -> TreeRepr.empty){ case (a,b) => (a._1 + b.key) -> b.merge(a._2, ignoreKeys = true)}
-        val mergedKey =
-          if (merged._1.size == 1) merged._1.head
-          else if (merged._1.size < 10) Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
-            println(s"\n\nWeird failing case with null value?!? => ${merged}\n\n")
-            "<weird null value!>"
-          }
-          else s"${merged._1.size} items like: ${Try(merged._1.toList.sorted.take(5).:+("...").mkString("[",", ","]")).getOrElse{
-            println(s"\n\nWeird failing case with null value?!? => ${merged}\n\n")
-            "<weird null value!>"
-          }}"
-        mergedKey -> merged._2
-      }.toSet[(ExtractedValue, TreeRepr)].map(c => c._2.copy(key = c._1))
-    )
-  def reduceBySameCounts(tree: TreeRepr): TreeRepr =
+  def reduceBySameCounts(tree: TreeRepr): TreeRepr = {
+    def mergeSameCountChildren(tree: TreeRepr): TreeRepr =
+      tree.copy(children = tree.children.groupBy(_.count).map{
+        case (_, ts) =>
+          val merged = ts.foldLeft(Set.empty[ExtractedValue] -> TreeRepr.empty){ case (a,b) => (a._1 + b.key) -> b.merge(a._2, ignoreKeys = true)}
+          val mergedKey =
+            if (merged._1.size == 1) merged._1.head
+            else if (merged._1.size < 10) Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
+              println(s"\n\nWeird failing case with null value?!? => $merged\n\n")
+              "<weird_null_value!>"
+            }
+            else s"${merged._1.size} items like: ${Try(merged._1.toList.sorted.take(5).:+("...").mkString("[",", ","]")).getOrElse{
+              println(s"\n\nWeird failing case with null value?!? => $merged\n\n")
+              "<weird_null_value!>"
+            }}"
+          mergedKey -> merged._2
+        }.toSet[(ExtractedValue, TreeRepr)].map(c => c._2.copy(key = c._1))
+      )
     mergeSameCountChildren(tree.copy(children = tree.children.map(t => reduceBySameCounts(t))))
+  }
 
   def summarize(tree: TreeRepr): TreeRepr =
-    renormalizeProbs(reduceBySameCounts(treeCollapse(reduceByAbstraction(removeQNodes(tree)))))
+    reduceBySameCounts(reduceByAbstraction(tree.withoutQNodes).collapseUnitaryPaths()).renormalizeProbs
   // Consider: repeatedly call `reduceTreeBySameCounts` and `mergeChildrenByAbstraction` until no change
+
+
+
+  // Overall strategy: systematically remove/collapse items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
+
+  /*
+   * Interesting things:
+   *   - Long path lengths from a leaf upward where each hop has a count = 1  (or identical counts)
+   *   - Comparatively low local probability
+   *   - Low global probability after renormalizing to only the branch under consideration.
+   *   - Common sub-trees in different branches. (suggests pivoting the tree)
+   *   - Common subset trees in different branches. (suggests collapsing?)
+   *   - Alarms that were produced...?
+   *   - Consider keeping timestamps.
+   */
+
+  /*
+   * Reduction categories:
+   *   - paths into common parent directories. Need to distinguish types for each level of the tree => unify strings iff types are all directories/path components.
+   *   - known process names into "purposes"...?  (e.g. web browsing, email)
+   *   - Events into "higher-level" notions:
+   *     - READ / WRITE => "File IO"
+   *     - SEND / RCV / ACCEPT / BIND => "Network Communication"
+   *     - LOADLIBRARY / MMAP / MPROTECT => "Memory Load"
+   *     - ...
+   *     - everything else => Discard
+   *   - Events that signal information flow:
+   *     - READ / RCV / ACCEPT / LOADLIBRARY / MMAP / etc. => "incoming data"
+   *     - WRITE / SEND / etc. => "outgoing data"
+   *   - Shape (distribution types) of local prob. among sibling nodes. e.g. uniform dist., uniform w/ outlier, single item, power law, 2-clear-categories, 3-clear-categories.
+   */
+
+  /**
+    * Types:
+    *   - Event = IO | Net Comm | ...
+    *   - Process = web browser | email client | server | document editing | control (shells / interpreters)  =  client program | system program
+    *   - Path = directory | filename | file extension
+    *   - URLs …?
+    */
+
+  /**
+    * Clustering considerations:
+    *   - One dimension for each level of the tree. Would need to ensure there is only one variable length discriminator and it is last. Would need to handle null values for the variable length discriminator values.
+    *   - One dimension for each type of discriminator. Would need to encode types together with discriminator values.
+    *   - Clustering exclusively at a single level of a tree. e.g. apply clustering to only the children of a single node at a time; probably for divining shape.
+    *
+    *   Consider: Mean-shift clustering (to discover centroid counts & approximate centers) + gaussian mixture models (to learn model params and cluster membership)
+    */
+
+//  trait Child
+//  trait Shape { def assessScore(children: Set[Child]): Float } //  = PowerLaw,
+//  val shapes: List[Shape] = ???
+//  def assessShapeScores(children: Set[Child]): List[(Shape, Float)] = shapes.map(s => s -> s.assessScore(children))
+//  def bestFitShape(children: Set[Child]): Shape = assessShapeScores(children).sortBy(_._2).reverse.head._1
 
 
   // TODO: Next steps:
@@ -1593,6 +1609,4 @@ object PpmSummarizer {
   //    X- Simple version: assume subtree can be summarized in a single output line.
   //    - Complex version: allow for one subtree to summarized with multiple lines.. perhaps recursively.
   //  - implement a chooser which extracts N particular items, then summarizes the remainder to fit into the X total summary parameter constraint.
-
-
 }
