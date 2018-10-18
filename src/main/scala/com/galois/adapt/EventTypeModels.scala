@@ -13,9 +13,9 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.sys.process._
-import Application.ppmActor
+import Application.ppmManagerActor
 import akka.actor.ActorSystem
-import com.galois.adapt.adm.{AdmUUID, ExtendedUuid}
+import com.galois.adapt.adm.{AdmUUID, NamespacedUuid}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
@@ -52,7 +52,7 @@ object EventTypeModels {
 
     def query(treeName: String): PpmTreeCountResult = Try {
       implicit val timeout: Timeout = Timeout(60 seconds)
-      val future: Future[Any] = (ppmActor.get ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+      val future: Future[Any] = (ppmManagerActor.get ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
@@ -106,7 +106,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[ExtendedUuidDetails])] = {
+    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[NamespacedUuidDetails])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -126,13 +126,13 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuidDetails]) = {
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[NamespacedUuidDetails]) = {
        (
         List(
         (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
         (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
-        Set[ExtendedUuidDetails](ExtendedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
+        Set[NamespacedUuidDetails](NamespacedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
       )
     }
   }
@@ -168,7 +168,7 @@ object EventTypeModels {
         case Success(alarms) => if (alarms.nonEmpty) {
           val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
           Try {
-            ppmActor.get ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
+            ppmManagerActor.get ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
         }
         // send alarmsDetectedList to actor
@@ -182,7 +182,7 @@ object EventTypeModels {
   }
 
 
-  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[ExtendedUuidDetails])]= {
+  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[NamespacedUuidDetails])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false

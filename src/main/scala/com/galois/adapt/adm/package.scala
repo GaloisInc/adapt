@@ -15,13 +15,13 @@ import scala.language.implicitConversions
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
 package object adm {
 
-  sealed trait ExtendedUuid extends Product {
+  sealed trait NamespacedUuid extends Product {
     val uuid: UUID
     val namespace: String
     def rendered: String
   }
 
-  final case class CdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
+  final case class CdmUUID(uuid: UUID, namespace: String) extends NamespacedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { s"cdm_${uuid.toString}" } else { s"cdm_${this.namespace}_${uuid.toString}" }
   }
@@ -33,7 +33,7 @@ package object adm {
     }
   }
 
-  final case class AdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
+  final case class AdmUUID(uuid: UUID, namespace: String) extends NamespacedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { s"${this.namespace}_${uuid.toString}" }
   }

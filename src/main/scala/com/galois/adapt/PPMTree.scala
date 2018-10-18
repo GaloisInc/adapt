@@ -5,7 +5,7 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT}
+import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT, SUBJECT_PROCESS}
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -45,16 +45,15 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
   val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.ta1 match {
-    case "faros" | "fivedirections" => ("""\\""", """\""")
-    case _                          => ("""/""" ,   "/")
+    case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
+    case _                                     => ("""/""" ,   "/")
   }
   val sudoOrPowershellComparison: String => Boolean = Application.ta1 match {
-    case "faros" | "fivedirections" => (s: String) => s.toLowerCase.contains("powershell")
-    case _                          => (s: String) => s.toLowerCase == "sudo"
+    case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
+    case _                                                    => (s: String) => s.toLowerCase == "sudo"
   }
 
-  case class ExtendedUuidDetails(extendedUuid: ExtendedUuid, name: Option[String] = None, pid: Option[String] = None)
-
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
 
 
@@ -62,7 +61,7 @@ case class PpmDefinition[DataShape](
   name: String,
   filter: Filter[DataShape],
   discriminators: List[Discriminator[DataShape]],
-  uuidCollector: DataShape => Set[ExtendedUuidDetails],
+  uuidCollector: DataShape => Set[NamespacedUuidDetails],
   timestampExtractor: DataShape => Long,
   alarmFilter: PpmNodeActorAlarmDetected => Boolean = _ => true
 )(
@@ -91,7 +90,7 @@ case class PpmDefinition[DataShape](
     if (Application.config.getBoolean("adapt.ppm.shouldsave"))
       Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + "_alarm.json").toOption
     else None
-  var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuidDetails], Map[String, Int])] =
+  var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (Application.config.getBoolean("adapt.ppm.shouldload"))
       inputAlarmFilePath.flatMap { fp =>
         Try {
@@ -99,12 +98,12 @@ case class PpmDefinition[DataShape](
           import ApiJsonProtocol._
 
           val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuidDetails], Map[String, Int]))]].toMap
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
         }.toOption orElse  {
           println(s"Did not load alarms for tree: $name. Starting with empty tree state.")
           None
         }
-      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[ExtendedUuidDetails], Map[String, Int])])
+      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])])
     else {
       println(s"Loading no alarms for tree: $name")
       Map.empty
@@ -114,7 +113,7 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[ExtendedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
     val key = a._1.map(_._1)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
@@ -136,13 +135,15 @@ case class PpmDefinition[DataShape](
 
   val saveEveryAndNoMoreThan = Try(Application.config.getLong("adapt.ppm.saveintervalseconds")).getOrElse(0L)
   val lastSaveCompleteMillis = new AtomicLong(0L)
-  val currentlySaving = new AtomicBoolean(false)
+  val isCurrentlySaving = new AtomicBoolean(false)
+
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
 
   def saveStateAsync(): Future[Unit] = {
     val now = System.currentTimeMillis
     val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
-    if ( ! currentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
-      currentlySaving.set(true)
+    if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
+      isCurrentlySaving.set(true)
 
       implicit val timeout = Timeout(593 seconds)
       (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ reprResult =>
@@ -161,10 +162,10 @@ case class PpmDefinition[DataShape](
         if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync()
 
         lastSaveCompleteMillis.set(System.currentTimeMillis)
-        currentlySaving.set(false)
+        isCurrentlySaving.set(false)
       }.failed.map { case e =>
         println(s"Error writing to file for $name tree: ${e.getMessage}")
-        currentlySaving.set(false)
+        isCurrentlySaving.set(false)
       }
     } else Future.successful(())
   }
@@ -178,18 +179,18 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   type PartialShape = DataShape
   val discriminators: List[Discriminator[PartialShape]]
   require(discriminators.length == 2)
-  implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[ExtendedUuidDetails]))]
-  var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[ExtendedUuidDetails])] = (inputFilePath, Application.config.getBoolean("adapt.ppm.shouldload")) match {
+  implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))]
+  var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, Application.config.getBoolean("adapt.ppm.shouldload")) match {
     case (Some(fp), true) =>
       val loadPath = fp + ".partialMap"
       Try {
         import spray.json._
         import ApiJsonProtocol._
 
-        val toReturn = mutable.Map.empty[JoinType,(List[ExtractedValue],Set[ExtendedUuidDetails])]
+        val toReturn = mutable.Map.empty[JoinType,(List[ExtractedValue],Set[NamespacedUuidDetails])]
         Files.lines(Paths.get(loadPath)).forEach(new Consumer[String]{
           override def accept(line: String): Unit = {
-            val (k, (v1,v2)) = line.parseJson.convertTo[(JoinType, (List[ExtractedValue],Set[ExtendedUuidDetails]))]
+            val (k, (v1,v2)) = line.parseJson.convertTo[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))]
             toReturn.put(k,(v1,v2))
           }
         })
@@ -262,16 +263,16 @@ case object PpmTree {
 
 
 
-case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
-case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
-case class PpmNodeActorBeginGetTreeRepr(treeName: String)
+case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
+case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
+case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
 case class PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue])
 case class PpmNodeActorGetAllCountsResult(results: Map[List[ExtractedValue], Int])
 case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int)
-case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long)
+case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long)
 case class PpmNodeActorManyAlarmsDetected(alarms: Set[PpmNodeActorAlarmDetected])
 
 class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState: Option[TreeRepr]) extends Actor with ActorLogging {
@@ -370,7 +371,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
     case PpmNodeActorGetTopLevelCount => sender() ! PpmNodeActorGetTopLevelCountResult(counter)
 
-    case PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long, alarmFilter) =>
+    case PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter) =>
       extractedValues match {
         case Nil => log.warning(s"Tried to start an observation with an empty extractedValues.")
         case extracted :: remainder =>
@@ -426,21 +427,33 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       }
 
 
-    case PpmNodeActorBeginGetTreeRepr(treeName: String) =>
+    case PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey) =>
       implicit val timeout = Timeout(599 seconds)
       val qNodeRepr = if (children.isEmpty)
         Set.empty[TreeRepr]
       else {
-        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat
+        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat   // TODO: This should reference another probability calculation instead of being hardcoded as a one-off!!!!!!!
         Set(TreeRepr(1, "_?_", prob, prob, childrenPopulation, Set.empty))
       }
-      val futureResult = Future.sequence(
-        children.map { case (k,v) =>
-          (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-        }
-      ).map { resolvedChildren =>
-        PpmNodeActorGetTreeReprResult(TreeRepr(0, treeName, 1F, 1F, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
+      val futureResult: Future[PpmNodeActorGetTreeReprResult] = startingKey match {
+        case Nil =>
+          val futureRepr = Future.sequence(
+            children.map { case (k,v) =>
+              (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+            }
+          ).map { resolvedChildren =>
+            PpmNodeActorGetTreeReprResult(TreeRepr(0, treeName, 1F, 1F, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
+          }
+          futureRepr
+        case childKey :: remainder =>
+          children.get(childKey) match {
+            case Some(childRef) => (childRef ? PpmNodeActorBeginGetTreeRepr(childKey, remainder)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+            case None =>
+//              Future.failed(new IndexOutOfBoundsException(s"No child element for key $childKey"))
+              Future.successful(PpmNodeActorGetTreeReprResult(TreeRepr.empty))
+          }
       }
+
       sender() ! futureResult
 
 
@@ -482,7 +495,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmActor extends Actor with ActorLogging { thisActor =>
+class PpmManager extends Actor with ActorLogging { thisActor =>
   import NoveltyDetection._
 
   var cdmSanityTrees = List(
@@ -499,7 +512,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(ExtendedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))),
       _.asInstanceOf[cdm18.Event].timestampNanos
     )(thisActor.context, context.self),
 
@@ -516,7 +529,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(ExtendedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1))),
       _ => 0L
     )(thisActor.context, context.self),
 
@@ -532,7 +545,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(ExtendedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1))),
       _ => 0L
     )(thisActor.context, context.self)
     ,
@@ -549,7 +562,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(ExtendedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1))),
       _ => 0L
     )(thisActor.context, context.self)
   ).par
@@ -562,7 +575,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(ExtendedUuidDetails(d._2.uuid)),
+      d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos,
       _ => false
     )(thisActor.context, context.self),
@@ -573,7 +586,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(ExtendedUuidDetails(d._2.uuid)),
+      d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -583,7 +596,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
         d => List(d._1.eventType.toString)
       ),
-      d => Set(ExtendedUuidDetails(d._2.uuid)),
+      d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos
     )(thisActor.context, context.self)
   ).par
@@ -596,11 +609,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-               ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
-               ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+               NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -610,11 +623,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -624,11 +637,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -641,11 +654,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
         }
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("NULL_value_from_CDM")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -658,11 +671,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           case x => x
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -672,11 +685,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
@@ -686,27 +699,79 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
         d => List(d._1.eventType.toString),
         d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        ExtendedUuidDetails(d._2._1.uuid),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+        NamespacedUuidDetails(d._2._1.uuid),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
       d => d._1.eventType == PSEUDO_EVENT_PARENT_SUBJECT && d._2._2.isDefined && d._3._2.isDefined,
       List(d => List(
-        d._3._2.get.path,  // Parent process first
-        d._2._2.get.path   // Child process second
+        d._3._2.map(_.path).getOrElse("<no_path>"),  // Parent process first
+        d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++ // TODO: Need to get child process PID (cid) from here
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+      _._1.latestTimestampNanos
+    )(thisActor.context, context.self),
+
+    PpmDefinition[DataShape]("SummarizedProcessActivity",
+      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
+      List(d => List(                // 1.) Process name
+          d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
+          d._2._1.cid.toString,      // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
+          d._1.eventType.toString    // 3.) Event type
+        ), _._3 match {              // 4.) identifier(s) for the object, based on its type
+          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+            case "" :: remainder => pathDelimiterChar :: remainder
+            case x => x
+          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
+          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
+          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
+        }
+      ),
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path)),
+        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self)
+
+//    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
+//      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
+//      List(d => List(                         // 1.) Process name
+//        d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
+//        d._2._1.cid.toString,                 // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
+//        d._1.earliestTimestampNanos.toString, // 3.) timestamp
+//        d._1.eventType.toString               // 4.) Event type
+//        ), _._3 match {                       // 5.) identifier(s) for the object, based on its type
+//          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+//            case "" :: remainder => pathDelimiterChar :: remainder
+//            case x => x
+//          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
+//          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
+//          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+//          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+//          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
+//        }
+//      ),
+//      d => Set(NamespacedUuidDetails(d._1.uuid),
+//        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+//        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++ // TODO: Need to get child process PID (cid) from here
+//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//      _._1.latestTimestampNanos
+//    )(thisActor.context, context.self)
+
   ).par
 
 
@@ -722,11 +787,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Deleting process name or UUID
         )
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[String] {
 
@@ -741,7 +806,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[ExtendedUuidDetails]))]]
+        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
       }
     },
 
@@ -756,11 +821,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
         )
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[String] {
 
@@ -775,7 +840,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[ExtendedUuidDetails]))]]
+        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
       }
     },
 
@@ -798,9 +863,9 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           )
         )
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
           d._3._1 match {
             case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
             case o: AdmFileObject => s" : ${o.fileObjectType}"
@@ -808,8 +873,8 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
             case _ => ""
           }
           )))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[AdmUUID] {
 
@@ -826,7 +891,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[ExtendedUuidDetails]))]]
+        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
       }
     }
   ).par
@@ -848,11 +913,11 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
           }
         )
       ),
-      d => Set(ExtendedUuidDetails(d._1.uuid),
-        ExtendedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),Some(d._2._1.cid.toString)),
-        ExtendedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
-        d._2._2.map(a => ExtendedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => ExtendedUuidDetails(a.uuid)).toSet,
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
     )(thisActor.context, context.self) with PartialPpm[AdmUUID] {
 
@@ -868,14 +933,14 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
       override def partialMapJson = {
         import spray.json._
         import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[ExtendedUuidDetails]))]]
+        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
       }
     }
   ).par
 
 
 
-//  TODO: consider a(n updatable?) alarm filter for every tree?
+//  TODO: consider an (updatable?) alarm filter for every tree?
 
   val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
 
@@ -883,14 +948,6 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
   val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
   val iforestTreesToUse = if (iforestEnabled) iforestTrees else Nil
   val ppmList = cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
-
-
-
-
-
-
-
-
 
 
 
@@ -924,7 +981,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 
   def receive = {
 
-    case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long) =>
+    case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
@@ -1011,12 +1068,19 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
+    case msg @ PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
+      implicit val timeout = Timeout(30 seconds)
+      val reprFut = ppm(treeName)
+        .map(d => (d.tree ? msg).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+        .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
+      sender() ! reprFut
+
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
         if (iforestEnabled) Future { EventTypeModels.evaluateModels(context.system)}
       }
-      sender() ! Ack;
+      sender() ! Ack
 
     case SaveTrees(shouldConfirm) =>
       ppmList.foreach(_.saveStateAsync())
@@ -1047,7 +1111,7 @@ class PpmActor extends Actor with ActorLogging { thisActor =>
 case object ListPpmTrees
 case class PpmTreeNames(namesAndCounts: Map[String, Int])
 case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None)
-case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[ExtendedUuidDetails], Option[Int])]]) {
+case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[NamespacedUuidDetails], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._3.map(_._1)
@@ -1110,21 +1174,28 @@ case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 0L, 1F, 
 
 
 case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
-  override def toString = {
-    val indent = (0 until (4 * depth)).map(_ => " ").mkString("")
+  def get(keys: ExtractedValue*): Option[TreeRepr] = keys.toList match {
+    case Nil => Some(this)
+    case x :: Nil => this.children.find(_.key == x)
+    case x :: xs => this.children.find(_.key == x).flatMap(_.get(xs:_*))
+  }
+
+  def apply(keys: ExtractedValue*): TreeRepr = get(keys:_*).get
+
+  def nodeCount: Int = if (children.isEmpty) 1 else children.foldLeft(1)((a,b) => a + b.nodeCount)
+
+  def leafCount: Int = if (children.isEmpty) 1 else children.foldLeft(0)((a,b) => a + b.leafCount)
+
+  override def toString: String = toString(0)
+  def toString(passedDepth: Int): String = {
+    val indent = (0 until (4 * passedDepth)).map(_ => " ").mkString("")
     val depthString = if (depth < 10) s" $depth" else depth.toString
     val localProbString = localProb.toString + (0 until (13 - localProb.toString.length)).map(_ => " ").mkString("")
     val globalProbString = globalProb.toString + (0 until (13 - globalProb.toString.length)).map(_ => " ").mkString("")
     val countString = (0 until (9 - count.toString.length)).map(_ => " ").mkString("") + count.toString
     s"$indent### Depth: $depthString  Local Prob: $localProbString  Global Prob: $globalProbString  Counter: $countString  Key: $key" +
-      children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString).mkString("\n", "", "")
+      children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString(passedDepth + 1)).mkString("\n", "", "")
   }
-
-  def leafNodes(nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
-    children.toList.flatMap {
-      case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc ++ List(key, nextKey), lp, gp, cnt))
-      case next => next.leafNodes(nameAcc :+ key)
-    }
 
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
@@ -1136,33 +1207,108 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     writer.close()
     pw.close()
   }
+
+
+  // Combinators for summarization:
+
+  def leafNodes: List[(List[ExtractedValue], Float, Float, Int)] = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
+      children.toList.flatMap {
+        case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
+        case next => leafNodesRec(next.children, nameAcc :+ next.key)
+      }
+    leafNodesRec(children, List(key))
+  }
+
+  def truncate(depth: Int): TreeRepr = depth match {
+    case 0 => this.copy(children = Set.empty)
+    case _ => this.copy(children = children.map(_.truncate(depth - 1)))
+  }
+
+  def merge(other: TreeRepr, ignoreKeys: Boolean = false): TreeRepr = {
+    if (!ignoreKeys) require(other.key == key, s"Keys much match to merge Trees. Tried to merge other tree with key: ${other.key} into this tree with key: $key")
+    val newChildren = other.children.foldLeft( children ){
+      case (childAcc, newChild) => childAcc.find(_.key == newChild.key).fold(childAcc + newChild){ case existingChild => (childAcc - existingChild) + existingChild.merge(newChild)} }
+    this.copy(count = count + other.count, children = newChildren)
+  }
+
+  def withoutQNodes: TreeRepr = this.copy(children = this.children.collect{ case c if c.key != "_?_" => c.withoutQNodes } )
+
+  def collapseUnitaryPaths(delimiter: String = " ∫ ", childMergeCondition: TreeRepr => Boolean = r => r.count == r.children.head.count): TreeRepr = {
+    if (this.children.isEmpty) this
+    else if (this.children.size == 1 && childMergeCondition(this))
+      this.children.head.copy(depth = this.depth, key = this.key + delimiter + this.children.head.key).collapseUnitaryPaths(delimiter, childMergeCondition)
+    else this.copy(children = this.children.map(c => c.collapseUnitaryPaths(delimiter, childMergeCondition)))
+  }
+
+  def renormalizeProbs: TreeRepr = {
+    def renormalizeProbabilities(repr: TreeRepr, totalCount: Option[Float] = None): TreeRepr = {
+      val normalizedChildren = repr.children.map(c => renormalizeProbabilities(c, totalCount.orElse(Some(repr.count.toFloat))))
+      repr.copy(
+//      localProb = ???,   // TODO!!!!!!!!!!!!!!!!!
+        globalProb = repr.count / totalCount.getOrElse(repr.count.toFloat),
+        children = normalizedChildren
+      )
+    }
+    renormalizeProbabilities(this)
+  }
+
+  type PpmElement = (List[ExtractedValue], Float, Float, Int)
+
+  def extractMostNovel: (PpmElement, TreeRepr) = {
+    def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
+    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
+      case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
+        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+        require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
+        repr.copy(count = repr.count - decrement, children = repr.children.collect {
+          case c if c.key != childKey => c
+          case c if c.key == childKey && c.count != decrement => subtractMostNovel(c, childKey :: remainderKeys, decrement)
+        })
+      case thisKey :: Nil if repr.key == thisKey =>
+        require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
+        require(repr.children.isEmpty, s"Should only decrement counts on leaf nodes!")
+        repr.copy(count = repr.count - decrement)
+      case k :: _ => throw new IllegalArgumentException(s"Key not found: $k")
+      case Nil => throw new IllegalArgumentException(s"Cannot decrement a tree when given an empty key.")
+    }
+    val mostNovel = findMostNovel(this)
+    mostNovel -> subtractMostNovel(this, mostNovel._1, mostNovel._4).renormalizeProbs()
+  }
 }
+
 case object TreeRepr {
-  def fromFlat(repr: List[(Int,ExtractedValue,Float,Float,Int)]): TreeRepr = {
-    def fromFlatRecursive(repr: List[(Int,ExtractedValue,Float,Float,Int)], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[(Int,ExtractedValue,Float,Float,Int)]) = {
-      val thisDepthList = repr.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
-      val remainder = repr.drop(thisDepthList.size)
-      val nextDepth = remainder.headOption.map(_._1)
+  val empty: TreeRepr = TreeRepr(0, "", 0F, 0F, 0, Set.empty)
+
+  type Depth = Int
+  type LocalProb = Float
+  type GlobalProb = Float
+  type ObservationCount = Int
+  type CSVRow = (Depth, ExtractedValue, LocalProb, GlobalProb, ObservationCount)
+
+  def fromFlat(repr: List[CSVRow]): TreeRepr = {
+    def fromFlatRecursive(rows: List[CSVRow], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[CSVRow]) = {
+      val thisDepthSiblings = rows.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
+      val remainingRows = rows.drop(thisDepthSiblings.size)
+      val nextDepth = remainingRows.headOption.map(_._1)
       nextDepth match {
         case None =>  // this is the last item in the list
-          (accAtThisDepth ++ thisDepthList).toSet -> remainder
-        case Some(d) if d == atDepth => // resuming after the decent case
-          fromFlatRecursive(remainder, atDepth, accAtThisDepth ++ thisDepthList)
+          (accAtThisDepth ++ thisDepthSiblings).toSet -> remainingRows
+        case Some(d) if d == atDepth => // There should never be a `nextDepth` equal to `atDepth` because of the `takeWhile(_._1 == atDepth)` above
+          throw new RuntimeException("THIS SHOULD NEVER HAPPEN! (because of `takeWhile(_._1 == atDepth)` above)")    // fromFlatRecursive(remainingRows, atDepth, accAtThisDepth ++ thisDepthSiblings)
         case Some(d) if d < atDepth  => // returning to parent case
-          (accAtThisDepth ++ thisDepthList).toSet -> remainder
+          (accAtThisDepth ++ thisDepthSiblings).toSet -> remainingRows
         case Some(d) if d > atDepth  => // descending into the child case
-          val (childSet, nextRemainder) = fromFlatRecursive(remainder, atDepth + 1, List.empty)
-          val updatedThisDepthList = accAtThisDepth ++ thisDepthList.dropRight(1) :+ thisDepthList.last.copy(children = childSet)
+          val (childSet, nextRemainder) = fromFlatRecursive(remainingRows, atDepth + 1, List.empty)
+          val updatedThisDepthList = accAtThisDepth ++ thisDepthSiblings.dropRight(1) :+ thisDepthSiblings.last.copy(children = childSet)
           fromFlatRecursive(nextRemainder, atDepth, updatedThisDepthList)
       }
     }
     fromFlatRecursive(repr, 0, List.empty)._1.head
   }
 
-  def flatToCsvArray(t: (Int, ExtractedValue, Float, Float, Int)): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
-  def csvArrayToFlat(a: Array[String]): (Int, ExtractedValue, Float, Float, Int) = {
-    (a(0).toInt, Option(a(1)).getOrElse(""), a(2).toFloat, a(3).toFloat, a(4).toInt)
-  }
+  def flatToCsvArray(t: CSVRow): Array[String] = Array(t._1.toString,t._2,t._3.toString,t._4.toString,t._5.toString)
+  def csvArrayToFlat(a: Array[String]): CSVRow = (a(0).toInt, Option(a(1)).getOrElse(""), a(2).toFloat, a(3).toFloat, a(4).toInt)
 
   def readFromFile(filePath: String): Option[TreeRepr] = Try {
     val fileHandle = new File(filePath)
@@ -1172,3 +1318,231 @@ case object TreeRepr {
   }.toOption
 }
 
+
+
+object PpmSummarizer {
+  import cdm19._
+  sealed trait AbstractionOne {
+    val events: Set[EventType]
+    def doAbstraction(eventType: EventType): Option[AbstractionOne] = if (events.contains(eventType)) Some(this) else None
+    def doAbstraction(eventType: String): Option[AbstractionOne] = if (events.exists(_.toString == eventType)) Some(this) else None
+  }
+  case object AbstractionOne {
+    val abstractions = List(ReadEvents, WriteEvents, ProcessTreeEvents, ExecutionEvents, MemoryMap, Unlink, AddObjectAttribute, CreateObject, FlowsTo, Update, FileSystemEvents, FileSystemEvents, NetworkManagementEvents, SystemManagementEvents, UserEvents, NonspecificEvents, DiscardedEvents)
+    def go(eventType: EventType): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
+    def go(eventType: String): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
+  }
+  case object ReadEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_READ,
+      EVENT_RECVFROM, EVENT_RECVMSG
+//        EVENT_MMAP
+    )
+  }
+  case object WriteEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_WRITE,
+      EVENT_SENDTO, EVENT_SENDMSG,
+      EVENT_TRUNCATE
+//        EVENT_MMAP
+    )
+  }
+  case object ProcessTreeEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_FORK,
+      EVENT_MODIFY_PROCESS,
+      EVENT_EXIT,
+      EVENT_CLONE,
+      EVENT_CREATE_THREAD,
+      EVENT_STARTSERVICE
+    )
+  }
+  case object ExecutionEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_EXECUTE, EVENT_LOADLIBRARY)
+  }
+  case object MemoryMap extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_MMAP)        // Needs further thought about the implications.)
+  }
+  case object Unlink extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_UNLINK)
+  }
+  case object AddObjectAttribute extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_ADD_OBJECT_ATTRIBUTE)
+  }
+  case object CreateObject extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_CREATE_OBJECT)
+  }
+  case object FlowsTo extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_FLOWS_TO)    // Needs further thought about the implications.
+  }
+  case object Update extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_UPDATE)
+  }
+  case object FileSystemEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_MOUNT,
+      EVENT_UMOUNT,
+      EVENT_CHECK_FILE_ATTRIBUTES,
+      EVENT_MODIFY_FILE_ATTRIBUTES,    // Needs further thought about the implications.
+      EVENT_RENAME,
+      EVENT_OPEN,
+      EVENT_CLOSE,
+      EVENT_LINK,
+      EVENT_FCNTL, EVENT_DUP
+    )
+  }
+  case object NetworkManagementEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_ACCEPT,
+      EVENT_CONNECT,
+      EVENT_BIND,
+      EVENT_READ_SOCKET_PARAMS,
+      EVENT_WRITE_SOCKET_PARAMS
+    )
+  }
+  case object SystemManagementEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_BOOT,
+      EVENT_MPROTECT,    // Needs further thought about the implications.
+      EVENT_SHM,         // Needs further thought about the implications.
+      EVENT_LOGCLEAR,
+      EVENT_SERVICEINSTALL
+    )
+  }
+  case object UserEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_CHANGE_PRINCIPAL,
+      EVENT_LOGIN,
+      EVENT_LOGOUT
+    )
+  }
+  case object NonspecificEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_BLIND,
+      EVENT_OTHER
+    )
+  }
+  case object DiscardedEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(
+      EVENT_LSEEK,
+      EVENT_WAIT,
+      EVENT_UNIT,
+      EVENT_SIGNAL,
+      EVENT_CORRELATION,
+      PSEUDO_EVENT_PARENT_SUBJECT
+    )
+  }
+
+
+  def reduceByAbstraction(tree: TreeRepr): TreeRepr = {
+    def mergeChildrenByAbstraction(tree: TreeRepr): TreeRepr =
+      tree.copy(children = tree.children.foldLeft(Set.empty[TreeRepr]){ case (acc, child) =>
+        AbstractionOne.go(child.key).fold(acc + child){ abs => acc.find(_.key == abs.toString).fold(acc + child.copy(key = abs.toString)){ foundAbsTree =>
+          (acc - foundAbsTree) + foundAbsTree.merge(child.copy(key = abs.toString)) } }
+      })
+    mergeChildrenByAbstraction(tree.copy(children = tree.children.map(t => reduceByAbstraction(t))))
+  }
+
+  def reduceBySameCounts(tree: TreeRepr): TreeRepr = {
+    def mergeSameCountChildren(tree: TreeRepr): TreeRepr =
+      tree.copy(children = tree.children.groupBy(_.count).map{
+        case (_, ts) =>
+          val merged = ts.foldLeft(Set.empty[ExtractedValue] -> TreeRepr.empty){ case (a,b) => (a._1 + b.key) -> b.merge(a._2, ignoreKeys = true)}
+          val mergedKey =
+            if (merged._1.size == 1) merged._1.head
+            else if (merged._1.size <= 5)
+              Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
+                println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
+              }
+            else {
+              val items = merged._1.toList.sorted
+              s"${items.size} items like: ${Try(items.take(2).:+("...").++(items.reverse.take(2)).mkString("[",", ","]")).getOrElse{
+                println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
+              }}"
+            }
+          mergedKey -> merged._2
+        }.toSet[(ExtractedValue, TreeRepr)].map(c => c._2.copy(key = c._1))
+      )
+    mergeSameCountChildren(tree.copy(children = tree.children.map(t => reduceBySameCounts(t))))
+  }
+
+  def summarize(tree: TreeRepr): TreeRepr =
+    reduceBySameCounts(reduceByAbstraction(tree.withoutQNodes).collapseUnitaryPaths()).collapseUnitaryPaths().renormalizeProbs
+  // Consider: repeatedly call `reduceTreeBySameCounts` and `mergeChildrenByAbstraction` until no change
+
+  def summarize(processName: String, pid: Option[Int]): Future[TreeRepr] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
+  }
+
+  def summarizableProcesses: Future[TreeRepr] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr.truncate(1).withoutQNodes }
+  }
+
+
+  // Overall strategy: systematically remove/collapse items from a TreeRepr into single lines until the the limit is reached, and gloss the remainder.
+
+  /*
+   * Interesting things:
+   *   - Long path lengths from a leaf upward where each hop has a count = 1  (or identical counts)
+   *   - Comparatively low local probability
+   *   - Low global probability after renormalizing to only the branch under consideration.
+   *   - Common sub-trees in different branches. (suggests pivoting the tree)
+   *   - Common subset trees in different branches. (suggests collapsing?)
+   *   - Alarms that were produced...?
+   *   - Consider keeping timestamps.
+   */
+
+  /*
+   * Reduction categories:
+   *   - paths into common parent directories. Need to distinguish types for each level of the tree => unify strings iff types are all directories/path components.
+   *   - known process names into "purposes"...?  (e.g. web browsing, email)
+   *   - Events into "higher-level" notions:
+   *     - READ / WRITE => "File IO"
+   *     - SEND / RCV / ACCEPT / BIND => "Network Communication"
+   *     - LOADLIBRARY / MMAP / MPROTECT => "Memory Load"
+   *     - ...
+   *     - everything else => Discard
+   *   - Events that signal information flow:
+   *     - READ / RCV / ACCEPT / LOADLIBRARY / MMAP / etc. => "incoming data"
+   *     - WRITE / SEND / etc. => "outgoing data"
+   *   - Shape (distribution types) of local prob. among sibling nodes. e.g. uniform dist., uniform w/ outlier, single item, power law, 2-clear-categories, 3-clear-categories.
+   */
+
+  /**
+    * Types:
+    *   - Event = IO | Net Comm | ...
+    *   - Process = web browser | email client | server | document editing | control (shells / interpreters)  =  client program | system program
+    *   - Path = directory | filename | file extension
+    *   - URLs …?
+    */
+
+  /**
+    * Clustering considerations:
+    *   - One dimension for each level of the tree. Would need to ensure there is only one variable length discriminator and it is last. Would need to handle null values for the variable length discriminator values.
+    *   - One dimension for each type of discriminator. Would need to encode types together with discriminator values.
+    *   - Clustering exclusively at a single level of a tree. e.g. apply clustering to only the children of a single node at a time; probably for divining shape.
+    *
+    *   Consider: Mean-shift clustering (to discover centroid counts & approximate centers) + gaussian mixture models (to learn model params and cluster membership)
+    */
+
+//  trait Child
+//  trait Shape { def assessScore(children: Set[Child]): Float } //  = PowerLaw,
+//  val shapes: List[Shape] = ???
+//  def assessShapeScores(children: Set[Child]): List[(Shape, Float)] = shapes.map(s => s -> s.assessScore(children))
+//  def bestFitShape(children: Set[Child]): Shape = assessShapeScores(children).sortBy(_._2).reverse.head._1
+
+
+  // TODO: Next steps:
+  //  X- implement removal of _?_ nodes
+  //  X- implement tree collapse function (reduces all nodes which have only one child)
+  //  X- implement renormalize function
+  //  X- implement extraction of single item from TreeRepr (the most novel)
+  //  X- implement subtree-collapse/summarization by the "Types" mentioned above.
+  //    X- Simple version: assume subtree can be summarized in a single output line.
+  //    - Complex version: allow for one subtree to summarized with multiple lines.. perhaps recursively.
+  //  - implement a chooser which extracts N particular items, then summarizes the remainder to fit into the X total summary parameter constraint.
+}
