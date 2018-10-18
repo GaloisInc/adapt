@@ -149,10 +149,10 @@ object Application extends App {
 
   val er = EntityResolution(uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdgesMaps, shardCount, log, seenNodes, seenEdges)
 
-  val ppmActor: Option[ActorRef] = runFlow match {
+  val ppmManagerActor: Option[ActorRef] = runFlow match {
     case "accept" => None
     case _ =>
-      val ref = system.actorOf(Props(classOf[PpmActor]), "ppm-actor")
+      val ref = system.actorOf(Props(classOf[PpmManager]), "ppm-actor")
       Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
         case Success(i) if i > 0L =>
           println(s"Saving PPM trees every $i seconds")
@@ -202,7 +202,7 @@ object Application extends App {
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://$interface:$port")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmActor, cdm2admMaps, cdm2cdmMaps)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActor, cdm2admMaps, cdm2cdmMaps)
     val httpServer = Http().bindAndHandle(route, interface, port)
     Await.result(httpServer, 10 seconds)
   }
@@ -263,7 +263,7 @@ object Application extends App {
 
       CDMSource.cdm19(ta1)
         .via(printCounter("E3 Training", statusActor))
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 
@@ -274,7 +274,7 @@ object Application extends App {
       CDMSource.cdm19(ta1)
         .via(printCounter("E3", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .via(splitToSink(PpmComponents.ppmSink, 1000))
         .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
@@ -287,7 +287,7 @@ object Application extends App {
       // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
         .via(printCounter("E3 (no DB)", statusActor))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
         .runWith(PpmComponents.ppmSink)
 

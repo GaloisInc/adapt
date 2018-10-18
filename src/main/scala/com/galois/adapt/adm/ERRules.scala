@@ -54,6 +54,7 @@ object ERRules {
       NetflowObjectEdges.PortEdgeNode
     ) = {
       val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
+
       val newLP = n.localPort.map(AdmPort)
       val newLA = n.localAddress.map(AdmAddress)
       val newRP = n.remotePort.map(AdmPort)

@@ -177,7 +177,7 @@ object PpmComponents {
       case _ =>
         release(None)
     }
-  }.to(Sink.actorRefWithAck(Application.ppmActor.get, InitMsg, Ack, CompleteMsg))
+  }.to(Sink.actorRefWithAck(Application.ppmManagerActor.get, InitMsg, Ack, CompleteMsg))
 
 
   // Load a mutable map from disk
