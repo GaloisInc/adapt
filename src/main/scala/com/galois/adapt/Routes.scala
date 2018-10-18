@@ -120,6 +120,11 @@ object Routes {
             )
           } ~
           pathPrefix("summarize") {
+            parameters('processName, 'pid.as[Int].?) { (processName, pidOpt) =>
+              complete(
+                PpmSummarizer.summarize(processName, pidOpt).map(_.toString)
+              )
+            } ~
             path(Segment / IntNumber) { (processName, pid) =>
               complete(
                 PpmSummarizer.summarize(processName, Some(pid)).map(_.toString)

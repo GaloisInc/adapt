@@ -1450,13 +1450,13 @@ object PpmSummarizer {
           val merged = ts.foldLeft(Set.empty[ExtractedValue] -> TreeRepr.empty){ case (a,b) => (a._1 + b.key) -> b.merge(a._2, ignoreKeys = true)}
           val mergedKey =
             if (merged._1.size == 1) merged._1.head
-            else if (merged._1.size < 10)
+            else if (merged._1.size <= 5)
               Try(merged._1.toList.sorted.mkString("[",", ","]")).getOrElse{
                 println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
               }
             else {
               val items = merged._1.toList.sorted
-              s"${items.size} items like: ${Try(items.take(3).:+("...").++(items.reverse.take(3)).mkString("[",", ","]")).getOrElse{
+              s"${items.size} items like: ${Try(items.take(2).:+("...").++(items.reverse.take(2)).mkString("[",", ","]")).getOrElse{
                 println(s"\n\nWeird failing case with null value?!? => $merged\n\n"); "<weird_null_value!>"
               }}"
             }
@@ -1479,7 +1479,7 @@ object PpmSummarizer {
   def summarizableProcesses: Future[TreeRepr] = {
     implicit val timeout = Timeout(30 seconds)
     (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
-      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr.truncate(1) }
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr.truncate(1).withoutQNodes }
   }
 
 
