@@ -147,7 +147,17 @@ object Application extends App {
   val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
   val shardCount: Array[Int] = Array.fill(uuidRemapperShards)(0)
 
-  val er = EntityResolution(uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdgesMaps, shardCount, log, seenNodes, seenEdges)
+  val er = EntityResolution(
+    config.atKey("adapt").atKey("adm"),
+    uuidRemapperShards,
+    cdm2cdmMaps,
+    cdm2admMaps,
+    blockedEdgesMaps,
+    shardCount,
+    log,
+    seenNodes,
+    seenEdges
+  )
 
   val ppmManagerActor: Option[ActorRef] = runFlow match {
     case "accept" => None
@@ -491,7 +501,7 @@ object CDMSource {
   -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=p1f1
   -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=p2f1 -Dadapt.ingest.data.1.files.1=p2f2
   */
-  def getLoadfiles: List[(Provider, String)] = {
+  private def getLoadfiles: List[(Provider, String)] = {
     //convert to scala
     val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
     val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
@@ -612,15 +622,7 @@ object CDMSource {
         case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
       }
 
-      val isWindows = ta1.toLowerCase match {
-        case "faros" => true
-        case "fivedirections" => true
-        case "cadets" => false
-        case "clearscope" => false
-        case "theia" => false
-        case "trace" => false
-        case _ => false
-      }
+      val isWindows = Ta1Flows.isWindows(ta1)
       Application.addNamespace(topicName, isWindows)
 
       kafkaSource(topicName, kafkaCdm18Parser, limitOpt).map(topicName -> _)
@@ -754,15 +756,7 @@ object CDMSource {
         case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
       }
 
-      val isWindows = ta1.toLowerCase match {
-        case "faros" => true
-        case "fivedirections" => true
-        case "cadets" => false
-        case "clearscope" => false
-        case "theia" => false
-        case "trace" => false
-        case _ => false
-      }
+      val isWindows = Ta1Flows.isWindows(ta1)
       Application.addNamespace(topicName, isWindows)
 
       kafkaSource(topicName, kafkaCdm19Parser, limitOpt).map(topicName -> _)
@@ -991,8 +985,10 @@ object Ta1Flows {
   // Get the name of the instrumentation source
   def getSourceName(a: AnyRef): String = a.toString.split("_").last.toLowerCase
 
-  // Get whether a source is windows of not
-  def isWindows(s: String): Boolean = s match {
+  /// Get whether a source is windows of not
+  ///
+  /// Windows has different logic for path resolution (see `AdmPathNode`)
+  def isWindows(s: String): Boolean = s.toLowerCase match {
     case "fivedirections" => true
     case "faros" => true
     case "marple" => true
