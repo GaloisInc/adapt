@@ -42,7 +42,7 @@ object AdaptConfig {
   case class IngestConfig(data: Set[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
   case class RuntimeConfig(webinterface: String, port: Int, apitimeout: Int, dbkeyspace: String, neo4jkeyspace: String, neo4jfile: String, systemname: String, quitonerror: Boolean, logfile: String)
   case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
-  case class AdmConfig(maxtimejumpsecs: Int, cdmexpiryseconds: Int, cdmexpirycount: Int, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
+  case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
   case class PpmConfigComponents(events: String, everything: String, pathnodes: String, pathnodeuses: String, releasequeue: String)
   case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean)
 
@@ -158,7 +158,18 @@ object Application extends App {
   val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
   val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
 
-  val er = EntityResolution(admConfig.uuidRemapperShards, cdm2cdmMaps, cdm2admMaps, blockedEdgesMaps, shardCount, log, seenNodes, seenEdges)
+
+  val er = EntityResolution(
+    admConfig,
+//    uuidRemapperShards,
+    cdm2cdmMaps,
+    cdm2admMaps,
+    blockedEdgesMaps,
+    shardCount,
+    log,
+    seenNodes,
+    seenEdges
+  )
 
   val ppmManagerActor: Option[ActorRef] = runFlow match {
     case "accept" => None
@@ -471,10 +482,8 @@ object CDMSource {
   import AdaptConfig._
   type Provider = String
 
-  def getLoadfiles: List[(Provider, String)] = {
-//    val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
-//    val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
 
+  private def getLoadfiles: List[(Provider, String)] = {
     for {
       IngestUnit(provider,paths) <- ingestConfig.data.toList  // TODO: Make this a Set for parallel ingest.
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
@@ -591,15 +600,8 @@ object CDMSource {
         case _ => throw new IllegalArgumentException(s"Cannot parse kafka topic list with inputs: $topicNameAndLimit")
       }
 
-      val isWindows = ta1.toLowerCase match {
-        case "marple" => true
-        case "fivedirections" => true
-        case "cadets" => false
-        case "clearscope" => false
-        case "theia" => false
-        case "trace" => false
-        case _ => false
-      }
+
+      val isWindows = Ta1Flows.isWindows(ta1)
       Application.addNamespace(topicName, isWindows)
 
       kafkaSource(topicName, kafkaCdm18Parser, limitOpt).map(topicName -> _)
@@ -733,15 +735,7 @@ object CDMSource {
         case _ => throw new IllegalArgumentException(s"Cannot parse kafka topic list with inputs: $topicNameAndLimit")
       }
 
-      val isWindows = ta1.toLowerCase match {
-        case "faros" => true
-        case "fivedirections" => true
-        case "cadets" => false
-        case "clearscope" => false
-        case "theia" => false
-        case "trace" => false
-        case _ => false
-      }
+      val isWindows = Ta1Flows.isWindows(ta1)
       Application.addNamespace(topicName, isWindows)
 
       kafkaSource(topicName, kafkaCdm19Parser, limitOpt).map(topicName -> _)
@@ -970,8 +964,10 @@ object Ta1Flows {
   // Get the name of the instrumentation source
   def getSourceName(a: AnyRef): String = a.toString.split("_").last.toLowerCase
 
-  // Get whether a source is windows of not
-  def isWindows(s: String): Boolean = s match {
+  /// Get whether a source is windows of not
+  ///
+  /// Windows has different logic for path resolution (see `AdmPathNode`)
+  def isWindows(s: String): Boolean = s.toLowerCase match {
     case "fivedirections" => true
     case "faros" => true
     case "marple" => true
