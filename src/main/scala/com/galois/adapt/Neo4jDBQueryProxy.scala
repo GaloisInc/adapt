@@ -1,16 +1,8 @@
 package com.galois.adapt
 
 import java.util.UUID
-
-import akka.NotUsed
 import akka.actor._
-import akka.pattern.ask
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.{Flow, Keep, Sink}
-import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm18.CDM18
-import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.tinkerpop.gremlin.neo4j.structure.Neo4jGraph
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import org.neo4j.graphdb.factory.GraphDatabaseFactory
@@ -19,20 +11,19 @@ import org.neo4j.graphdb.{ConstraintViolationException, GraphDatabaseService, La
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException
 import org.neo4j.tinkerpop.api.impl.Neo4jGraphAPIImpl
 import spray.json._
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.language.postfixOps
+import AdaptConfig._
+
 
 class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
-  val config: Config = ConfigFactory.load()
-
   val neoGraph: GraphDatabaseService = {
-    val neo4jFile: java.io.File = new java.io.File(config.getString("adapt.runtime.neo4jfile"))
+    val neo4jFile: java.io.File = new java.io.File(runtimeConfig.neo4jfile)
     val graphService = new GraphDatabaseFactory().newEmbeddedDatabase(neo4jFile)
     context.system.registerOnTermination(graphService.shutdown())
 
@@ -95,7 +86,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
     // NOTE: The UI expects a specific format and collection of labels on each node.
     // Making a change to the labels on a node will need to correspond to a change made in the UI javascript code.
 
-    if (config.getBoolean("adapt.ingest.producecdm")) {
+    if (ingestConfig.producecdm) {
 
       createIfNeededIndex(schema, "Subject", "timestampNanos")
       createIfNeededIndex(schema, "Subject", "cid")
@@ -114,7 +105,7 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
     }
 
-    if (config.getBoolean("adapt.ingest.produceadm")) {
+    if (ingestConfig.produceadm) {
 
       createIfNeededIndex(schema, "AdmEvent", "eventType")
       createIfNeededIndex(schema, "AdmEvent", "earliestTimestampNanos")
@@ -142,15 +133,13 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   val graph: Graph = Neo4jGraph.open(new Neo4jGraphAPIImpl(neoGraph))
 
-  val shouldLogDuplicates: Boolean = config.getBoolean("adapt.ingest.logduplicates")
-
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = {
     val transaction = neoGraph.beginTx()
     val verticesInThisTX = MutableMap.empty[UUID, NeoNode]
 
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
-    val cdmToNodeResults = cdms map { cdm =>
+    val cdmToNodeResults: Seq[Try[Option[UUID]]] = cdms map { cdm =>
       Try {
         val cdmTypeName = cdm.getClass.getSimpleName
         val thisNeo4jVertex = verticesInThisTX.getOrElse(cdm.getUuid, {
@@ -187,9 +176,9 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
           }
         }
         Some(cdm.getUuid)
-      }.recoverWith {
+      }.recoverWith[Option[UUID]] {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) log.info(s"Skipping duplicate creation of node: ${cdm.getUuid}")
+          if (ingestConfig.logduplicates) log.info(s"Skipping duplicate creation of node: ${cdm.getUuid}")
           Success(None)
         //  case e: MultipleFoundException => Should never find multiple nodes with a unique constraint on the `uuid` field
         case e =>
@@ -216,9 +205,8 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
     val skipEdgesToThisUuid = new UUID(0L, 0L) //.fromString("00000000-0000-0000-0000-000000000000")
 
     var sawAnError = false
-    val admToNodeResults = adms map {
+    val admToNodeResults: Seq[Try[Option[AdmUUID]]] = adms map {
       case Right(edge) => Try {
-
         if (edge.tgt.uuid != skipEdgesToThisUuid) {
           val source = verticesInThisTX
             .get(edge.src)
@@ -245,10 +233,12 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
           source.createRelationshipTo(target, new RelationshipType() {
             def name: String = edge.label
           })
-        }
+
+          None
+        } else None
       }.recoverWith {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates)
+          if (ingestConfig.logduplicates)
             log.warning(s"Skipping duplicate creation of node when creating $edge (I, Alec, am not sure how this could ever happen)")
           Success(None)
         case e: Throwable =>
@@ -272,9 +262,9 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
         }
 
         Some(adm.uuid)
-      }.recoverWith {
+      }.recoverWith[Option[AdmUUID]] {
         case e: ConstraintViolationException =>
-          if (shouldLogDuplicates) log.warning(s"Skipping duplicate creation of node: ${adm.uuid}")
+          if (ingestConfig.logduplicates) log.warning(s"Skipping duplicate creation of node: ${adm.uuid}")
           Success(None)
         case e: Throwable =>
           sawAnError = true

@@ -11,19 +11,19 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
-
 import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
-
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
+import AdaptConfig._
+
 
 object NoveltyDetection {
   type Event = AdmEvent
@@ -69,29 +69,30 @@ case class PpmDefinition[DataShape](
   alarmActor: ActorRef
 ) extends LazyLogging {
 
-  val inputFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + ".csv").toOption
+
+  val inputFilePath = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + ".csv").toOption
   val outputFilePath =
-    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
-      Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + ".csv").toOption
+    if (ppmConfig.shouldsave)
+      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + ".csv").toOption
     else None
 
   val startingState =
-      if (Application.config.getBoolean("adapt.ppm.shouldload"))
+      if (ppmConfig.shouldload)
         inputFilePath.flatMap { s =>
-          TreeRepr.readFromFile(s).map{ t => println(s"Reading tree $name in from file: $s"); t}
-            .orElse { println(s"Loading no data for tree: $name"); None }
+          TreeRepr.readFromFile(s).map { t => println(s"Reading tree $name in from file: $s"); t }
+            .orElse {println(s"Loading no data for tree: $name"); None}
         }
       else { println(s"Loading no data for tree: $name"); None }
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
-  val inputAlarmFilePath  = Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.loadfilesuffix") + "_alarm.json").toOption
+  val inputAlarmFilePath  = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + "_alarm.json").toOption
   val outputAlarmFilePath =
-    if (Application.config.getBoolean("adapt.ppm.shouldsave"))
-      Try(Application.config.getString("adapt.ppm.basedir") + name + Application.config.getString("adapt.ppm.savefilesuffix") + "_alarm.json").toOption
+    if (ppmConfig.shouldsave)
+      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json").toOption
     else None
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
-    if (Application.config.getBoolean("adapt.ppm.shouldload"))
+    if (ppmConfig.shouldload)
       inputAlarmFilePath.flatMap { fp =>
         Try {
           import spray.json._
@@ -133,7 +134,7 @@ case class PpmDefinition[DataShape](
     (tree ? PpmNodeActorGetAllCounts(List.empty)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity).map(_.results)
   }
 
-  val saveEveryAndNoMoreThan = Try(Application.config.getLong("adapt.ppm.saveintervalseconds")).getOrElse(0L)
+  val saveEveryAndNoMoreThan = ppmConfig.saveintervalseconds.getOrElse(0L)
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
@@ -180,7 +181,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   val discriminators: List[Discriminator[PartialShape]]
   require(discriminators.length == 2)
   implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))]
-  var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, Application.config.getBoolean("adapt.ppm.shouldload")) match {
+  var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, ppmConfig.shouldload) match {
     case (Some(fp), true) =>
       val loadPath = fp + ".partialMap"
       Try {
@@ -942,7 +943,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
 
 //  TODO: consider an (updatable?) alarm filter for every tree?
 
-  val iforestEnabled = Try(Application.config.getBoolean("adapt.ppm.iforestenabled")).getOrElse(false)
+  val iforestEnabled = ppmConfig.iforestenabled
 
 
   val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
@@ -955,7 +956,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
-    val iforestTrainingSaveFile = Try(Application.config.getString("adapt.ppm.iforesttrainingsavefile")).getOrElse("train_iforest-UPDATED.csv")
+    val iforestTrainingSaveFile = ppmConfig.iforesttrainingsavefile
     iForestTree match {
       case Some(tree) => tree.getAllCounts.map( counts =>
         EventTypeModels.EventTypeData.writeToFile(counts, EventTypeModels.modelDirIForest + iforestTrainingSaveFile)
@@ -965,7 +966,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
   }
 
   override def postStop(): Unit = {
-    if ( ! didReceiveComplete && Application.config.getBoolean("adapt.ppm.shouldsave")) {
+    if ( ! didReceiveComplete && ppmConfig.shouldsave) {
       didReceiveComplete = true
       val ppmSaveFutures = ppmList.map(_.saveStateAsync())
       if (iforestEnabled) saveIforestModel()

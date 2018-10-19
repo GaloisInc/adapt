@@ -2,11 +2,8 @@ package com.galois.adapt
 
 import java.io._
 import java.nio.file.Paths
-import java.util
 import java.util.UUID
-import java.util.concurrent.{Executors, TimeUnit}
-
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
 import akka.kafka.scaladsl.Consumer
@@ -18,65 +15,76 @@ import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
 import com.galois.adapt.{cdm17 => cdm17types}
-import com.galois.adapt.cdm18.{CDM18, RawCDM18Type, Cdm17to18}
+import com.galois.adapt.cdm18.{CDM18, Cdm17to18, RawCDM18Type}
 import com.galois.adapt.{cdm18 => cdm18types}
-import com.typesafe.config.ConfigFactory
+//import com.typesafe.config.ConfigFactory
 import org.apache.avro.io.DecoderFactory
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
-import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
-import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
-import org.reactivestreams.Publisher
 import FlowComponents._
-import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
-import bloomfilter.CanGenerateHashFrom
-import bloomfilter.mutable.BloomFilter
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
-import com.galois.adapt.adm.EntityResolution.Timed
 import com.galois.adapt.cdm19._
-import org.mapdb.serializer.SerializerArrayTuple
-
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.language.postfixOps
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
+
+
+object AdaptConfig {
+  import pureconfig._
+
+  case class IngestUnit(provider: String, files: List[String])
+  case class IngestConfig(data: Set[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
+  case class RuntimeConfig(webinterface: String, port: Int, apitimeout: Int, dbkeyspace: String, neo4jkeyspace: String, neo4jfile: String, systemname: String, quitonerror: Boolean, logfile: String)
+  case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
+  case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
+  case class PpmConfigComponents(events: String, everything: String, pathnodes: String, pathnodeuses: String, releasequeue: String)
+  case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean)
+
+  implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
+  implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
+  implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
+
+  val ingestConfig = loadConfigOrThrow[IngestConfig]("adapt.ingest")
+  val runFlow = loadConfigOrThrow[String]("adapt.runflow")
+  val runtimeConfig = loadConfigOrThrow[RuntimeConfig]("adapt.runtime")
+  val envConfig = loadConfigOrThrow[EnvironmentConfig]("adapt.env")
+  val admConfig = loadConfigOrThrow[AdmConfig]("adapt.adm")
+  val ppmConfig = loadConfigOrThrow[PpmConfig]("adapt.ppm")
+  val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
+  val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
+}
 
 
 object Application extends App {
+  org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
 
-  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
-  org.slf4j.LoggerFactory.getILoggerFactory
-  val config = ConfigFactory.load()  //.withFallback(ConfigFactory.load("production"))
-  val runFlow = config.getString("adapt.runflow").toLowerCase
+  import AdaptConfig._
 
-  val interface = config.getString("akka.http.server.interface")
-  val port = config.getInt("akka.http.server.port")
   implicit val system = ActorSystem("production-actor-system")
   val log: LoggingAdapter = Logging.getLogger(system, this)
-  val uuidRemapperShards = config.getInt("adapt.adm.uuidRemapperShards")
 
   // All large maps should be store in `MapProxy`
   val mapProxy: MapProxy = new MapProxy(
-    fileDbPath = Try(config.getString("adapt.adm.mapdb")).filter(_ => runFlow != "accept").toOption,
-    fileDbBypassChecksum = config.getBoolean("adapt.adm.mapdbbypasschecksum"),
-    fileDbTransactions = config.getBoolean("adapt.adm.mapdbtransactions"),
+    fileDbPath = runFlow match { case "accept" => None; case _ => Some(admConfig.mapdb)},
+    fileDbBypassChecksum = admConfig.mapdbbypasschecksum,
+    fileDbTransactions = admConfig.mapdbtransactions,
 
-    uuidRemapperShards,
-    cdm2cdmLruCacheSize = Try(config.getLong("adapt.adm.cdm2cdmlrucachesize")).getOrElse(10000000L),
-    cdm2admLruCacheSize = Try(config.getLong("adapt.adm.cdm2admlrucachesize")).getOrElse(30000000L),
-    dedupEdgeCacheSize = config.getInt("adapt.adm.dedupEdgeCacheSize")
+    admConfig.uuidRemapperShards,
+    cdm2cdmLruCacheSize = admConfig.cdm2cdmlrucachesize,
+    cdm2admLruCacheSize = admConfig.cdm2admlrucachesize,
+    dedupEdgeCacheSize = admConfig.dedupEdgeCacheSize
   )
 
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
 
-  val quitOnError = config.getBoolean("adapt.runtime.quitonerror")
+  val quitOnError = runtimeConfig.quitonerror
   val streamErrorStrategy: Supervision.Decider = {
     case e: Throwable =>
       e.printStackTrace()
@@ -87,11 +95,11 @@ object Application extends App {
   implicit val executionContext = system.dispatcher
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-  val logFile = config.getString("adapt.logfile")
+  val logFile = runtimeConfig.logfile
   val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
   system.registerOnTermination(scheduledLogging.cancel())
 
-  val ppmBaseDirPath = config.getString("adapt.ppm.basedir")
+  val ppmBaseDirPath = ppmConfig.basedir
   val ppmBaseDirFile = new File(ppmBaseDirPath)
   if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
 
@@ -111,7 +119,10 @@ object Application extends App {
   def addNamespace(ns: String, isWindows: Boolean): Unit = Application.namespaces(ns) = isWindows
 
   // Load up all of the namespaces, and then write them back out on shutdown
-  val namespacesFile = new File(config.getString("adapt.runtime.neo4jfile"), "namespaces.txt")
+  val namespacesFile = new File(
+    runtimeConfig.neo4jfile,
+    "namespaces.txt"
+  )
   if (runFlow != "accept") {
     if (namespacesFile.exists && namespacesFile.canRead) {
       import scala.collection.JavaConverters._
@@ -145,11 +156,12 @@ object Application extends App {
 
   val seenEdges: AlmostSet[EdgeAdm2Adm] = mapProxy.seenEdges
   val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
-  val shardCount: Array[Int] = Array.fill(uuidRemapperShards)(0)
+  val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
+
 
   val er = EntityResolution(
-    config.atKey("adapt").atKey("adm"),
-    uuidRemapperShards,
+    admConfig,
+//    uuidRemapperShards,
     cdm2cdmMaps,
     cdm2admMaps,
     blockedEdgesMaps,
@@ -163,8 +175,8 @@ object Application extends App {
     case "accept" => None
     case _ =>
       val ref = system.actorOf(Props(classOf[PpmManager]), "ppm-actor")
-      Try(config.getLong("adapt.ppm.saveintervalseconds")) match {
-        case Success(i) if i > 0L =>
+      ppmConfig.saveintervalseconds match {
+        case Some(i) if i > 0L =>
           println(s"Saving PPM trees every $i seconds")
           val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
           system.registerOnTermination(cancellable.cancel())
@@ -204,16 +216,16 @@ object Application extends App {
     }
 
 
-  var ta1 = config.getString("adapt.env.ta1")  // This gets overwritten with a single value pulled from a file--if it begins as anything other than a TA1 name from the config.  This mutability is probably a very bad idea.
+  var ta1 = envConfig.ta1 // This gets overwritten with a single value pulled from a file--if it begins as anything other than a TA1 name from the config.  This mutability is probably a very bad idea.
 
   // Mutable state that gets updated during ingestion
   var instrumentationSource: String = "(not detected)"
   var failedStatements: List[(Int, String)] = Nil
 
   def startWebServer(): Http.ServerBinding = {
-    println(s"Starting the web server at: http://$interface:$port")
+    println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
     val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActor, cdm2admMaps, cdm2cdmMaps)
-    val httpServer = Http().bindAndHandle(route, interface, port)
+    val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
 
@@ -241,9 +253,12 @@ object Application extends App {
 
 
     case "database" | "db" | "ingest" =>
-      val ingestCdm = config.getBoolean("adapt.ingest.producecdm")
-      val ingestAdm = config.getBoolean("adapt.ingest.produceadm")
-      val completionMsg = if (config.getBoolean("adapt.ingest.quitafteringest")) KillJVM else CompleteMsg
+      val ingestCdm = ingestConfig.producecdm
+      val ingestAdm = ingestConfig.produceadm
+      val completionMsg = if (ingestConfig.quitafteringest) {
+        println("Will terminate after ingest.")
+        KillJVM
+      } else CompleteMsg
       val writeTimeout = Timeout(30.1 seconds)
 
       val (name, sink) = (ingestCdm, ingestAdm) match {
@@ -262,8 +277,6 @@ object Application extends App {
       }
 
       println(s"Running database flow for $name with UI.")
-      if (config.getBoolean("adapt.ingest.quitafteringest")) println("Will terminate after ingest.")
-
       startWebServer()
       CDMSource.cdm19(ta1).buffer(10000, OverflowStrategy.backpressure).via(printCounter(name, statusActor)).runWith(sink)
 
@@ -275,7 +288,7 @@ object Application extends App {
         .via(printCounter("E3 Training", statusActor))
         .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
-        .runWith(PpmComponents.ppmSink)
+        .runWith(PpmFlowComponents.ppmSink)
 
     case "e3" =>
       startWebServer()
@@ -286,7 +299,7 @@ object Application extends App {
         .via(filterFlow)
         .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
-        .via(splitToSink(PpmComponents.ppmSink, 1000))
+        .via(splitToSink(PpmFlowComponents.ppmSink, 1000))
         .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
 
     case "e3-no-db" =>
@@ -299,7 +312,7 @@ object Application extends App {
         .via(filterFlow)
         .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
         .via(er)
-        .runWith(PpmComponents.ppmSink)
+        .runWith(PpmFlowComponents.ppmSink)
 
     case "print-cdm" =>
       var i = 0
@@ -361,30 +374,15 @@ object Application extends App {
             }
         }
 
-    case "ignore" =>
-
-      val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
-      startWebServer()
-      statusActor ! InitMsg
-
-      CDMSource.cdm19(ta1)
-        .via(printCounter("File Input", statusActor))
-        .via(filterFlow)
-        .via(er)
-        .runWith(Sink.ignore)
-
     case "csvmaker" | "csv" =>
+      val odir = pureconfig.loadConfig[String]("adapt.outdir").right.getOrElse(".")
 
-      val forCdm = config.getBoolean("adapt.ingest.producecdm")
-      val forAdm = config.getBoolean("adapt.ingest.produceadm")
-
-      val odir = if(config.hasPath("adapt.outdir")) config.getString("adapt.outdir") else "."
       startWebServer()
       statusActor ! InitMsg
 
-      if (forCdm) {
+      if (ingestConfig.producecdm) {
         println("Producing CSVs from CDM is no longer supported")
-      } else if (!forAdm) {
+      } else if (! ingestConfig.produceadm) {
         println("Generating CSVs for neither CDM not ADM - so... generating nothing!")
       } else {
         RunnableGraph.fromGraph(GraphDSL.create(){ implicit graph =>
@@ -463,12 +461,6 @@ object Application extends App {
         .collect{ case (_, cdm: Event) if cdm.uuid == UUID.fromString("8265bd98-c015-52e9-9361-824e2ade7f4c") => cdm.toMap.toString + s"\n$cdm" }
         .runWith(Sink.foreach(println))
 
-    case "fsox" =>
-      CDMSource.cdm19(ta1)
-        .via(printCounter("Novelty FSOX", statusActor))
-        .via(er)
-        .via(FSOX.apply)
-        .runWith(Sink.foreach(println))
 
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
@@ -476,7 +468,7 @@ object Application extends App {
       CDMSource.cdm19(ta1)
         .via(printCounter("Novelty", statusActor))
         .via(er)
-        .runWith(PpmComponents.ppmSink)
+        .runWith(PpmFlowComponents.ppmSink)
       startWebServer()
 
     case _ =>
@@ -487,27 +479,13 @@ object Application extends App {
 
 
 object CDMSource {
-  private val config = ConfigFactory.load()
-//  val scenario = config.getString("adapt.env.scenario")
-
+  import AdaptConfig._
   type Provider = String
 
-  /*
-  Usage example:
-    load files
-    - files p1f1 by provider p1
-    - and files (p2f1, p2f2) by provider p2
 
-  -Dadapt.ingest.data.0.provider=p1 -Dadapt.ingest.data.0.files.0=p1f1
-  -Dadapt.ingest.data.1.provider=p2 -Dadapt.ingest.data.1.files.0=p2f1 -Dadapt.ingest.data.1.files.1=p2f2
-  */
   private def getLoadfiles: List[(Provider, String)] = {
-    //convert to scala
-    val dataMapList = config.getObjectList("adapt.ingest.data").asScala.toList
-    val data: List[(Provider, List[String])] = dataMapList.map(_.toConfig).map(i=>(i.getString("provider"), i.getStringList("files").asScala.toList))
-
     for {
-      (provider,paths) <- data
+      IngestUnit(provider,paths) <- ingestConfig.data.toList  // TODO: Make this a Set for parallel ingest.
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
           case f if ! f.isHidden => f.getCanonicalPath
@@ -521,45 +499,45 @@ object CDMSource {
     } yield (provider, pathFixed)
   }
 
+  val shouldLimit: Option[Long] = ingestConfig.loadlimit match {
+    case Some(0L) => None
+    case x => x
+  }
+
   //  Make a CDM17 source
   def cdm17(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(Provider, CDM17), _] = {
     println(s"Setting source for: $ta1")
-    val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
-    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
-      case Success(0) => None
-      case Success(i) => Some(i)
-      case _ => None
-    }
+    val start = ingestConfig.startatoffset
     ta1.toLowerCase match {
       case "cadets"         =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("cadets" -> _)
       case "clearscope"     =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("clearscope" -> _)
       case "faros"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("faros" -> _)
       case "fivedirections" =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("fivedirections" -> _)
       case "theia"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
-          .merge(kafkaSource(config.getString("adapt.env.theiaresponsetopic"), kafkaCdm17Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
+          .merge(kafkaSource(envConfig.theiaresponsetopic, kafkaCdm17Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
       case "trace"          =>
-        val src = kafkaSource(config.getString("adapt.env.ta1kafkatopic"), kafkaCdm17Parser, None)
+        val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("trace" -> _)
@@ -603,24 +581,25 @@ object CDMSource {
     }
   }
 
-  val start = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+  val start = ingestConfig.startatoffset
 
   // Make a CDM18 source, possibly falling back on CDM17 for files with that version
   def cdm18(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(String,CDM18), _] = {
     println(s"Setting source for CDM 18 TA1: $ta1")
     if (start > 0L) println(s"Throwing away the first $start statements.")
-    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
-      case Success(0) => None
-      case Success(i) => Some(i)
-      case _ => None
-    }
+//    val shouldLimit = ingestConfig.loadlimit match {
+//      case Some(0L) => None
+//      case Some(i) => Some(i)
+//      case _ => None
+//    }
 
-    val src = config.getStringList("adapt.env.ta1kafkatopics").asScala.map{topicNameAndLimit =>
-      val (topicName, limitOpt) = topicNameAndLimit.split("∫").toList match {
-        case name :: l :: Nil if Try(l.toInt).isSuccess => (name, Some(l.toInt))
+    val src = envConfig.ta1kafkatopics.map{topicNameAndLimit =>
+      val (topicName, limitOpt: Option[Long]) = topicNameAndLimit.split("∫").toList match {
+        case name :: l :: Nil if Try(l.toLong).isSuccess => (name, Some(l.toLong))
         case name :: Nil => (name, None)
-        case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
+        case _ => throw new IllegalArgumentException(s"Cannot parse kafka topic list with inputs: $topicNameAndLimit")
       }
+
 
       val isWindows = Ta1Flows.isWindows(ta1)
       Application.addNamespace(topicName, isWindows)
@@ -636,7 +615,7 @@ object CDMSource {
       case "faros"          => shouldLimit.fold(src)(l => src.take(l))
       case "fivedirections" => shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
-        val queryTopic = config.getString("adapt.env.theiaresponsetopic")
+        val queryTopic = envConfig.theiaresponsetopic
         Application.addNamespace(queryTopic, false)
 
         shouldLimit.fold(src)(l => src.take(l))
@@ -719,7 +698,7 @@ object CDMSource {
 
   // Try to make a CDM18 record from a CDM17 one
   def cdm17ascdm18(c: CDM17, dummyHost: UUID): Option[CDM18] = {
-    implicit val _: UUID = dummyHost
+    implicit val dummy: UUID = dummyHost
     c match {
       case e: cdm17types.Event => Some(Cdm17to18.event(e))
       case f: cdm17types.FileObject => Some(Cdm17to18.fileObject(f))
@@ -743,17 +722,17 @@ object CDMSource {
   def cdm19(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(String,CDM19), _] = {
     println(s"Setting source for CDM 19 TA1: $ta1")
     if (start > 0L) println(s"Throwing away the first $start statements.")
-    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
-      case Success(0) => None
-      case Success(i) => Some(i)
-      case _ => None
-    }
+//    val shouldLimit = Try(config.getLong("adapt.ingest.loadlimit")) match {
+//      case Success(0) => None
+//      case Success(i) => Some(i)
+//      case _ => None
+//    }
 
-    val src = config.getStringList("adapt.env.ta1kafkatopics").asScala.map{topicNameAndLimit =>
-      val (topicName, limitOpt) = topicNameAndLimit.split("∫").toList match {
-        case name :: l :: Nil if Try(l.toInt).isSuccess => (name, Some(l.toInt))
+    val src = envConfig.ta1kafkatopics.map{topicNameAndLimit =>
+      val (topicName, limitOpt: Option[Long]) = topicNameAndLimit.split("∫").toList match {
+        case name :: l :: Nil if Try(l.toLong).isSuccess => (name, Some(l.toLong))
         case name :: Nil => (name, None)
-        case _ => throw new IllegalArgumentException(s"Cannot parse kaka topic list with inputs: $topicNameAndLimit")
+        case _ => throw new IllegalArgumentException(s"Cannot parse kafka topic list with inputs: $topicNameAndLimit")
       }
 
       val isWindows = Ta1Flows.isWindows(ta1)
@@ -770,7 +749,7 @@ object CDMSource {
       case "faros"          => shouldLimit.fold(src)(l => src.take(l))
       case "fivedirections" => shouldLimit.fold(src)(l => src.take(l))
       case "theia"          =>
-        val queryTopic = config.getString("adapt.env.theiaresponsetopic")
+        val queryTopic = envConfig.theiaresponsetopic
         Application.addNamespace(queryTopic, false)
 
         shouldLimit.fold(src)(l => src.take(l))
@@ -889,7 +868,7 @@ object CDMSource {
 
   // Try to make a CDM19 record from a CDM18 one
   def cdm18ascdm19(c: CDM18, dummyHost: UUID): Option[CDM19] = {
-    implicit val _: UUID = dummyHost
+    implicit val dummy: UUID = dummyHost
     c match {
       case e: cdm18types.Event => Some(Cdm18to19.event(e))
       case f: cdm18types.FileObject => Some(Cdm18to19.fileObject(f))
@@ -910,9 +889,9 @@ object CDMSource {
   }
 
   // Make a CDM source from a kafka topic
-  def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C], takeLimit: Option[Int]): Source[C, Consumer.Control] = {
+  def kafkaSource[C](ta1Topic: String, parser: ConsumerRecord[Array[Byte], Array[Byte]] => Try[C], takeLimit: Option[Long]): Source[C, Consumer.Control] = {
     val kafkaConsumer = Consumer.plainSource(
-      ConsumerSettings(config.getConfig("akka.kafka.consumer"), new ByteArrayDeserializer, new ByteArrayDeserializer),
+      ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
       Subscriptions.assignmentWithOffset(new TopicPartition(ta1Topic, 0), offset = 0) // Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L))  // TODO: Why aren't offsets working?
     )
       .statefulMapConcat[ConsumerRecord[Array[Byte], Array[Byte]]] { () =>  // This drops CDMs while counting live.

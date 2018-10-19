@@ -10,11 +10,10 @@ import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
-import com.typesafe.config.Config
-
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import com.galois.adapt.AdaptConfig._
 
 
 object EntityResolution {
@@ -37,8 +36,8 @@ object EntityResolution {
 
 
   def apply(
-    config: Config,                                                 // Config passed in
-    numUuidRemapperShards: Int,                                     // 0 means use the old remapper
+    config: AdmConfig,                                              // Config passed in
+//    numUuidRemapperShards: Int,                                     // 0 means use the old remapper
 
     cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
     cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
@@ -50,30 +49,32 @@ object EntityResolution {
     seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
   ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
+    val numUuidRemapperShards = config.uuidRemapperShards           // 0 means use the old remapper
+
     assert(numUuidRemapperShards >= 0, "Negative number of shards!")
     assert(cdm2cdmMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2cdm maps")
     assert(cdm2admMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2adm maps")
 
-    val maxTimeJump: Long      = (config.getInt("maxtimejumpsecs")  seconds).toNanos
+    val maxTimeJump: Long      = (config.maxtimejumpsecs seconds).toNanos
 
     val uuidExpiryTime: Time   = {
-      val uuidExpiryNanos: Long  = (config.getInt("cdmexpiryseconds") seconds).toNanos
-      val uuidExpiryCount: Long  = config.getLong("cdmexpirycount")
+      val uuidExpiryNanos: Long  = (config.cdmexpiryseconds seconds).toNanos
+      val uuidExpiryCount: Long  = config.cdmexpirycount
       Time(uuidExpiryNanos, uuidExpiryCount)
     }
 
     val eventExpiryTime: Time  = {
-      val eventExpiryNanos: Long = (config.getInt("eventexpirysecs")  seconds).toNanos
-      val eventExpiryCount: Long = config.getLong("eventexpirycount")
+      val eventExpiryNanos: Long = (config.eventexpirysecs seconds).toNanos
+      val eventExpiryCount: Long = config.eventexpirycount
       Time(eventExpiryNanos, eventExpiryCount)
     }
 
-    val maxEventsMerged: Int   = config.getInt("maxeventsmerged")
+    val maxEventsMerged: Int   = config.maxeventsmerged
 
     val maxTimeMarker = ("", Timed(Time.max, EndOfStream))
     val maxTimeRemapper = Timed(Time.max, JustTime)
 
-    val ignoreEventUuids: Boolean = config.getBoolean("ignoreeventremaps")
+    val ignoreEventUuids: Boolean = config.ignoreeventremaps
 
     val remapper: UuidRemapper.UuidRemapperFlow = if (numUuidRemapperShards == 0) {
       UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges(0), ignoreEventUuids, log)
