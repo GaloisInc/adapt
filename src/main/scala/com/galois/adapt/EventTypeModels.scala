@@ -4,21 +4,19 @@ import akka.util.Timeout
 import akka.pattern.ask
 import java.io.{File, PrintWriter}
 import java.util.UUID
-
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.cdm18.EventType
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.sys.process._
 import Application.ppmManagerActor
 import akka.actor.ActorSystem
-import com.galois.adapt.adm.{AdmUUID, NamespacedUuid}
-
+import com.galois.adapt.adm.AdmUUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
+import AdaptConfig._
 
 
 object EventTypeModels {
@@ -30,14 +28,14 @@ object EventTypeModels {
     }
   }
 
-  val modelDirIForest = Application.config.getString("adapt.ppm.eventtypemodelsdir")
+  val modelDirIForest = ppmConfig.eventtypemodelsdir
   val dirIForest = new File(modelDirIForest)
-  val baseDirFile = new File(Application.config.getString("adapt.ppm.basedir"))
+  val baseDirFile = new File(ppmConfig.basedir)
   if ( !dirIForest.exists && baseDirFile.exists && baseDirFile.canWrite && baseDirFile.isDirectory) dirIForest.mkdir()
 
 
 
-  val trainFileIForest = Try(Application.config.getString("adapt.ppm.iforesttrainingfile")).getOrElse("train_iforest.csv")
+  val trainFileIForest = ppmConfig.iforesttrainingfile
   val evalFileIForest = "eval_iforest.csv"
 
   val outputFileIForest = "output_iforest.csv"
@@ -176,7 +174,7 @@ object EventTypeModels {
       }
     }
 
-    val iforestRunEveryMinutes = Try(Application.config.getInt("adapt.ppm.iforestfreqminutes")).getOrElse(15)
+    val iforestRunEveryMinutes = ppmConfig.iforestfreqminutes
     Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system)))
 
   }

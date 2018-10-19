@@ -22,11 +22,11 @@ import scala.util.Try
 
 object FlowComponents {
 
-  val config = ConfigFactory.load()
-
+//  val config = ConfigFactory.load()
+  import AdaptConfig._
 
   def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    val startingCount = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+    val startingCount = ingestConfig.startatoffset
     var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L

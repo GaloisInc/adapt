@@ -1,22 +1,20 @@
 package com.galois.adapt
 
-import java.io.{BufferedWriter, File, FileReader, FileWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.io.{BufferedWriter, File, FileWriter}
+import java.nio.file.{Files, Paths}
 import java.util.function.Consumer
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm19._
-import spray.json.{JsonReader, JsonWriter}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
-object PpmComponents {
+object PpmFlowComponents {
 
   import ApiJsonProtocol._
   import spray.json._
@@ -27,39 +25,30 @@ object PpmComponents {
   type CompletedESO = (NoveltyDetection.Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
 
-  val config = Application.config
+  import AdaptConfig._
 
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext) = Flow[Either[ADM, EdgeAdm2Adm]]
     .statefulMapConcat[CompletedESO]{ () =>
 
-      import ApiJsonProtocol._
-      import spray.json._
-
-      val eventsSavePath: String = Application.config.getString("adapt.ppm.components.events")
-      val everythingSavePath: String = Application.config.getString("adapt.ppm.components.everything")
-      val pathNodesSavePath: String = Application.config.getString("adapt.ppm.components.pathnodes")
-      val pathNodeUsesSavePath: String = Application.config.getString("adapt.ppm.components.pathnodeuses")
-      val releaseQueueSavePath: String = Application.config.getString("adapt.ppm.components.releasequeue")
-
       // Load these maps from disk on startup
-      val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", eventsSavePath)
+      val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", ppmConfig.components.events)
 
-      val everything:   mutable.Map[AdmUUID, ADM]                                  = loadMapFromDisk("everything", everythingSavePath)
-      val pathNodes:    mutable.Map[AdmUUID, AdmPathNode]                          = loadMapFromDisk("pathNodes", pathNodesSavePath)
-      val pathNodeUses: mutable.Map[AdmUUIDReferencingPathNode, Set[AdmUUID]]      = loadMapFromDisk("pathNodeUses", pathNodeUsesSavePath)
+      val everything:   mutable.Map[AdmUUID, ADM]                                  = loadMapFromDisk("everything", ppmConfig.components.everything)
+      val pathNodes:    mutable.Map[AdmUUID, AdmPathNode]                          = loadMapFromDisk("pathNodes", ppmConfig.components.pathnodes)
+      val pathNodeUses: mutable.Map[AdmUUIDReferencingPathNode, Set[AdmUUID]]      = loadMapFromDisk("pathNodeUses", ppmConfig.components.pathnodeuses)
 
-      val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", releaseQueueSavePath)
+      val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", ppmConfig.components.releasequeue)
 
       // Shutdown hook to save the maps above back to disk when we shutdown
       val runnable = new Runnable() {
         override def run(): Unit = {
           println(s"Saving state in PpmComponents...")
 
-          saveMapToDisk("events", events, eventsSavePath)
-          saveMapToDisk("everything", everything, everythingSavePath)
-          saveMapToDisk("pathNodes", pathNodes, pathNodesSavePath)
-          saveMapToDisk("pathNodeUses", pathNodeUses, pathNodeUsesSavePath)
-          saveMapToDisk("releaseQueue", releaseQueue, releaseQueueSavePath)
+          saveMapToDisk("events", events, ppmConfig.components.events)
+          saveMapToDisk("everything", everything, ppmConfig.components.everything)
+          saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
+          saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
+          saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
         }
       }
 
@@ -70,11 +59,10 @@ object PpmComponents {
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
 
       var counter: Long = 0L
-      val ppmPluckingDelay = Try(Application.config.getInt("adapt.ppm.pluckingdelay")).getOrElse(20)
       def release(item: Option[DelayedESO]): List[CompletedESO] = {
         counter += 1
         item.foreach( i =>  // Add to release queue at X items in the future
-          releaseQueue(counter + ppmPluckingDelay) = i
+          releaseQueue(counter + ppmConfig.pluckingdelay) = i
         )
         releaseQueue.remove(counter).map { i =>  // release the item queued for this point, after resolving path node UUIDs seen so far.
           i.copy(
@@ -183,7 +171,7 @@ object PpmComponents {
   // Load a mutable map from disk
   def loadMapFromDisk[T, U](name: String, fp: String)
                            (implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
-    if (Application.config.getBoolean("adapt.ppm.shouldload")) {
+    if (ppmConfig.shouldload) {
       val toReturn = mutable.Map.empty[T, U]
       Try {
         Files.lines(Paths.get(fp)).forEach(new Consumer[String] {
@@ -204,13 +192,13 @@ object PpmComponents {
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
                          (implicit l: JsonWriter[(T,U)]): Unit =
-    if (Application.config.getBoolean("adapt.ppm.shouldsave")) {
+    if (ppmConfig.shouldsave) {
       import sys.process._
       Try {
         val outputFile = new File(fp)
         if ( ! outputFile.exists) outputFile.createNewFile()
         else {
-          val rotateScriptPath = Try(Application.config.getString("adapt.ppm.rotatescriptpath")).getOrElse("")
+          val rotateScriptPath = ppmConfig.rotatescriptpath
           if (rotateScriptPath.nonEmpty) Try( List(rotateScriptPath, fp).! ).getOrElse(println(s"Could not execute rotate script: $rotateScriptPath for file: $fp"))
         }
 

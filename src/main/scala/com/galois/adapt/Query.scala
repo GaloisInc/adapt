@@ -12,7 +12,6 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 import java.util.{Collections, Comparator, Iterator}
 
 import com.carrotsearch.hppc.predicates.BytePredicate
-import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Stream
@@ -145,7 +144,7 @@ import scala.util.matching.Regex
 
 
 object Query {
-
+  import AdaptConfig._
   import QueryLanguage._
 
   // Run a 'Traversal' on a 'Graph'
@@ -154,7 +153,7 @@ object Query {
     Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
 
   // Is this Neo4j or not
-  val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
+  val isNeo4j: Boolean = runFlow != "accept"
 
   // Gross hack to get all of the expected UUID namespaces
   def getNamespaces: List[String] = Application.getNamespaces

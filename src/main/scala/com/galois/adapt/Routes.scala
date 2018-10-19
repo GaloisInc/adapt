@@ -22,7 +22,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import org.apache.tinkerpop.gremlin.structure.{Element => VertexOrEdge}
 import akka.stream.Materializer
-import com.bbn.tc.schema.avro.TheiaQueryType
 import com.typesafe.config.ConfigFactory
 import spray.json.{JsString, JsValue}
 import java.util.UUID
@@ -272,28 +271,28 @@ object Routes {
                 }
               }
             }
-          } ~
-          pathPrefix("makeTheiaQuery") {
-            formFieldMap { fields =>
-              complete {
-                Try(
-                  MakeTheiaQuery(
-                    fields("type").toLowerCase match {
-                      case "backward" | "backwards" => TheiaQueryType.BACKWARD
-                      case "forward" | "forwards" => TheiaQueryType.FORWARD
-                      case "point_to_point" | "pointtopoint" | "ptp" => TheiaQueryType.POINT_TO_POINT
-                    },
-                    fields.get("sourceId").map(UUID.fromString),
-                    fields.get("sinkId").map(UUID.fromString),
-                    fields.get("startTimestamp").map(_.toLong),
-                    fields.get("endTimestamp").map(_.toLong)
-                  )
-                ).map(q =>
-                  // TODO: Come on... fix this.
-                  (ppmActor.get ? q).mapTo[Future[String]].flatMap(identity)
-                )
-              }
-            }
+//          } ~
+//          pathPrefix("makeTheiaQuery") {
+//            formFieldMap { fields =>
+//              complete {
+//                Try(
+//                  MakeTheiaQuery(
+//                    fields("type").toLowerCase match {
+//                      case "backward" | "backwards" => TheiaQueryType.BACKWARD
+//                      case "forward" | "forwards" => TheiaQueryType.FORWARD
+//                      case "point_to_point" | "pointtopoint" | "ptp" => TheiaQueryType.POINT_TO_POINT
+//                    },
+//                    fields.get("sourceId").map(UUID.fromString),
+//                    fields.get("sinkId").map(UUID.fromString),
+//                    fields.get("startTimestamp").map(_.toLong),
+//                    fields.get("endTimestamp").map(_.toLong)
+//                  )
+//                ).map(q =>
+//                  // TODO: Come on... fix this.
+//                  (ppmActor.get ? q).mapTo[Future[String]].flatMap(identity)
+//                )
+//              }
+//            }
           }
         } ~
         pathPrefix("query") {
