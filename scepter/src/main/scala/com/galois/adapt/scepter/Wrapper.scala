@@ -142,6 +142,7 @@ object Wrapper extends App {
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $actualAdaptJarPath
                    |""".stripMargin
+      println("NOTE: paths to files cannot currently include any spaces in the path name. Please rename directories/files to eliminate all spaces.")
       println("Running tests on the data. This could take a moment...")
       cmd ! ProcessLogger(System.out.println, System.err.println)
     }
@@ -188,7 +189,7 @@ object Config {
       .action((s,c) => c.copy(adaptJarPath = Some(s)))
 
     arg[String]("targets...")
-      .text("Either data-files or folders containing data-files")
+      .text("Either data-files or folders containing data-files. (No spaces allowed in path names!)")
       .minOccurs(1)
       .unbounded()
       .action((t,c) => c.copy(targets = c.targets :+ t))

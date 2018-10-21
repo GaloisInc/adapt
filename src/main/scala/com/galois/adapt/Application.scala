@@ -35,32 +35,6 @@ import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 
-object AdaptConfig {
-  import pureconfig._
-
-  case class IngestUnit(provider: String, files: List[String])
-  case class IngestConfig(data: Set[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
-  case class RuntimeConfig(webinterface: String, port: Int, apitimeout: Int, dbkeyspace: String, neo4jkeyspace: String, neo4jfile: String, systemname: String, quitonerror: Boolean, logfile: String)
-  case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
-  case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
-  case class PpmConfigComponents(events: String, everything: String, pathnodes: String, pathnodeuses: String, releasequeue: String)
-  case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean)
-
-  implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
-  implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
-  implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
-
-  val ingestConfig = loadConfigOrThrow[IngestConfig]("adapt.ingest")
-  val runFlow = loadConfigOrThrow[String]("adapt.runflow")
-  val runtimeConfig = loadConfigOrThrow[RuntimeConfig]("adapt.runtime")
-  val envConfig = loadConfigOrThrow[EnvironmentConfig]("adapt.env")
-  val admConfig = loadConfigOrThrow[AdmConfig]("adapt.adm")
-  val ppmConfig = loadConfigOrThrow[PpmConfig]("adapt.ppm")
-  val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
-  val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
-}
-
-
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
 
@@ -161,7 +135,6 @@ object Application extends App {
 
   val er = EntityResolution(
     admConfig,
-//    uuidRemapperShards,
     cdm2cdmMaps,
     cdm2admMaps,
     blockedEdgesMaps,
@@ -483,9 +456,9 @@ object CDMSource {
   type Provider = String
 
 
-  private def getLoadfiles: List[(Provider, String)] = {
+  private def getLoadfiles: Set[List[(Provider, String, Long)]] = ingestConfig.data.map{ sequentialIngestList =>
     for {
-      IngestUnit(provider,paths) <- ingestConfig.data.toList  // TODO: Make this a Set for parallel ingest.
+      IngestUnit(provider, paths, startatoffset) <- sequentialIngestList
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
           case f if ! f.isHidden => f.getCanonicalPath
@@ -496,7 +469,7 @@ object CDMSource {
 
       // TODO: This is an ugly hack to handle paths like ~/Documents/file.avro
       pathFixed = path.replaceFirst("^~", System.getProperty("user.home"))
-    } yield (provider, pathFixed)
+    } yield (provider, pathFixed, startatoffset)
   }
 
   val shouldLimit: Option[Long] = ingestConfig.loadlimit match {
@@ -504,22 +477,27 @@ object CDMSource {
     case x => x
   }
 
+  type FilePath = String
+  type KafkaTopic = String
+  def makeCdmSource[CDM <: CDMVersion](fileofTopic: Either[FilePath, KafkaTopic]): Source[(Provider, CDM), _] = {
+
+  }
+
   //  Make a CDM17 source
   def cdm17(ta1: String, handleError: (Int, Throwable) => Unit = (_,_) => { }): Source[(Provider, CDM17), _] = {
     println(s"Setting source for: $ta1")
-    val start = ingestConfig.startatoffset
     ta1.toLowerCase match {
-      case "cadets"         =>
+      case "cadets" =>
         val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "cadets"
         Application.addNamespace("cadets", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("cadets" -> _)
-      case "clearscope"     =>
+      case "clearscope" =>
         val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "clearscope"
         Application.addNamespace("clearscope", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("clearscope" -> _)
-      case "faros"          =>
+      case "faros" =>
         val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "faros"
         Application.addNamespace("faros", isWindows = true)
@@ -529,55 +507,59 @@ object CDMSource {
         Application.instrumentationSource = "fivedirections"
         Application.addNamespace("fivedirections", isWindows = true)
         shouldLimit.fold(src)(l => src.take(l)).map("fivedirections" -> _)
-      case "theia"          =>
+      case "theia" =>
         val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "theia"
         Application.addNamespace("theia", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l))
           .merge(kafkaSource(envConfig.theiaresponsetopic, kafkaCdm17Parser, None).via(printCounter("Theia Query Response", Application.statusActor, 1)))
           .map("theia" -> _)
-      case "trace"          =>
+      case "trace" =>
         val src = kafkaSource(envConfig.ta1kafkatopic, kafkaCdm17Parser, None)
         Application.instrumentationSource = "trace"
         Application.addNamespace("trace", isWindows = false)
         shouldLimit.fold(src)(l => src.take(l)).map("trace" -> _)
-      case "kafkaTest"      =>
+      case "kafkaTest" =>
         Application.addNamespace("kafkaTest", isWindows = false)
         val src = kafkaSource("kafkaTest", kafkaCdm17Parser, None)  //.throttle(500, 5 seconds, 1000, ThrottleMode.shaping)
         shouldLimit.fold(src)(l => src.take(l)).map("kafkaTest" -> _)
       case _ =>
 
-        val paths: List[(Provider, String)] = getLoadfiles
-        println(s"Setting file sources to: ${paths.mkString(", ")}")
+        val parallelIngestUnits: Set[List[(Provider, String, Long)]] = getLoadfiles
+        println(s"Setting file sources to: ${parallelIngestUnits.map(_.mkString(", ")).mkString("\n")}")
 
-        val startStream = paths.foldLeft(Source.empty[Try[(String,CDM17)]])((a,b) => a.concat{
-          Source.fromIterator[Try[(String,CDM17)]](() => {
-            val read = CDM17.readData(b._2, None)
+        parallelIngestUnits.map { linearIngestUnits =>
+          val startStream = linearIngestUnits.foldLeft(Source.empty[Try[(String, CDM17)]])((a, linearIngestUnit) =>
+            a.concat {
+              Source.fromIterator[Try[(String, CDM17)]]( () => {
+                val read = CDM17.readData(linearIngestUnit._2, None)
 
-            read.map(_._1) match {
-              case Failure(_) => None
-              case Success(s) =>
-                Application.instrumentationSource = Ta1Flows.getSourceName(s)
-                Application.addNamespace(b._1, Ta1Flows.isWindows(Application.instrumentationSource))
+                read.map(_._1) match {
+                  case Failure(_) => None
+                  case Success(s) =>
+                    Application.instrumentationSource = Ta1Flows.getSourceName(s)
+                    Application.addNamespace(linearIngestUnit._1, Ta1Flows.isWindows(Application.instrumentationSource))
+                }
+
+                read.get._2.map(_.map(linearIngestUnit._1 -> _))
+              }).drop()
             }
-
-            read.get._2.map(_.map(b._1 -> _))
-          })
-        }).drop(start)
-        shouldLimit.fold(startStream)(l => startStream.take(l))
-          .statefulMapConcat { () =>
-            var counter = 0
-            cdmTry => {
-              counter = counter + 1
-              cdmTry match {
-                case Success(cdm) => List(cdm)
-                case Failure(err) =>
-                  println(s"Couldn't read binary data at offset: $counter")
-                  handleError(counter, err)
-                  List.empty
+          ).drop(linearIngestUnits.sta)
+          shouldLimit.fold(startStream)(l => startStream.take(l))
+            .statefulMapConcat { () =>
+              var counter = 0
+              cdmTry => {
+                counter = counter + 1
+                cdmTry match {
+                  case Success(cdm) => List(cdm)
+                  case Failure(err) =>
+                    println(s"Couldn't read binary data at offset: $counter")
+                    handleError(counter, err)
+                    List.empty
+                }
               }
             }
-          }
+        }.reduceLeft{ case (a,b) => a.merge(b) } // Parallel ingests will be randomly merged together.
     }
   }
 

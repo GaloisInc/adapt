@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
-import com.galois.adapt.adm.EntityResolution.CDM
+import com.galois.adapt.adm.EntityResolution.LatestCDM
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
@@ -500,7 +500,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
   import NoveltyDetection._
 
   var cdmSanityTrees = List(
-    PpmDefinition[CDM]("CDM-Event",
+    PpmDefinition[LatestCDM]("CDM-Event",
       d => d.isInstanceOf[cdm18.Event],
       List(
         d => List(d.asInstanceOf[cdm18.Event].eventType.toString),
@@ -517,7 +517,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
       _.asInstanceOf[cdm18.Event].timestampNanos
     )(thisActor.context, context.self),
 
-    PpmDefinition[CDM]("CDM-Subject",
+    PpmDefinition[LatestCDM]("CDM-Subject",
       d => d.isInstanceOf[cdm18.Subject],
       List(
         d => List(d.asInstanceOf[cdm18.Subject].subjectType.toString),
@@ -534,7 +534,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
       _ => 0L
     )(thisActor.context, context.self),
 
-    PpmDefinition[CDM]("CDM-Netflow",
+    PpmDefinition[LatestCDM]("CDM-Netflow",
       d => d.isInstanceOf[cdm18.NetFlowObject],
       List(
         d => List({
@@ -550,7 +550,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
       _ => 0L
     )(thisActor.context, context.self)
     ,
-    PpmDefinition[CDM]("CDM-FileObject",
+    PpmDefinition[LatestCDM]("CDM-FileObject",
       d => d.isInstanceOf[cdm18.FileObject],
       List(
         d => List(d.asInstanceOf[cdm18.FileObject].fileObjectType.toString),
@@ -1042,7 +1042,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
       sender() ! Ack
 
 
-    case (_, cdm: CDM) =>
+    case (_, cdm: LatestCDM) =>
       cdmSanityTrees.foreach( ppm =>
         ppm.observe(cdm)
       )

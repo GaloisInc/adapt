@@ -2,22 +2,17 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
-
 import akka.stream.scaladsl._
-
 import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import akka.actor.ActorRef
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
-
 import scala.collection.mutable
 import com.galois.adapt.adm.EntityResolution
 import com.galois.adapt.adm.EntityResolution.sampledTime
 import com.galois.adapt.cdm18._
 import com.typesafe.config.ConfigFactory
-
 import collection.JavaConverters._
-import scala.util.Try
 
 
 object FlowComponents {

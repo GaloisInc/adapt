@@ -16,7 +16,7 @@ object ERStreamComponents {
   import ERRules._
 
   // All flows in this object have this type
-  type TimedCdmToFutureAdm = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], _]
+  type TimedCdmToFutureAdm = Flow[(String,Timed[LatestCDM]), Timed[UuidRemapperInfo], _]
 
 
   def extractPathsAndEdges(pathEdge: Option[(Edge, AdmPathNode)]): List[UuidRemapperInfo] =
@@ -45,7 +45,7 @@ object ERStreamComponents {
       maxEventsMerged: Int,  // maximum number of events to put into an event chain
 
       activeChains: mutable.Map[EventKey, EventMergeState]
-    ): ErFlow = Flow[(String,Timed[CDM])]
+    ): ErFlow = Flow[(String,Timed[LatestCDM])]
 
       .statefulMapConcat { () =>
 
@@ -173,7 +173,7 @@ object ERStreamComponents {
 
   object SubjectResolution {
     def apply: TimedCdmToFutureAdm =
-      Flow[(String,Timed[CDM])]
+      Flow[(String,Timed[LatestCDM])]
         .mapConcat[Timed[UuidRemapperInfo]] {
 
           // We are solely interested in subjects
@@ -207,7 +207,7 @@ object ERStreamComponents {
   object OtherResolution {
     def apply: TimedCdmToFutureAdm = {
 
-      Flow[(String,Timed[CDM])].mapConcat[Timed[UuidRemapperInfo]] {
+      Flow[(String,Timed[LatestCDM])].mapConcat[Timed[UuidRemapperInfo]] {
         case (provider, Timed(t, ptn: ProvenanceTagNode)) =>
 
           val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) = ERRules.resolveProvenanceTagNode(provider, ptn)

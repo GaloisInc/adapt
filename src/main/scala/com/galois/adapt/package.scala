@@ -5,6 +5,9 @@ import java.util.UUID
 
 package object adapt {
 
+  trait CDMVersion
+  type LatestCDM = com.galois.adapt.cdm19.CDM19
+
   // Anything that can be converted into properties on a node
   trait DBWritable {
     // Returns an (even-length) list alternating between the string label of the property and its
