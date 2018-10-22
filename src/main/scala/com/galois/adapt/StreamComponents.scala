@@ -65,8 +65,8 @@ object FlowComponents {
         val cdm2cdmSize = Application.cdm2cdmMaps.map(_.size()).sum
         val cdm2admSize = Application.cdm2admMaps.map(_.size()).sum
 
-        val seenNodesSize = Application.seenNodes.size()
-        val seenEdgesSize = Application.seenEdges.size()
+        val seenNodesSize = Application.seenNodes.map(_.size()).sum
+        val seenEdgesSize = Application.seenEdges.map(_.size()).sum
 
         val shardDistribution: Array[Long] = {
           val totalCount = Application.shardCount.sum

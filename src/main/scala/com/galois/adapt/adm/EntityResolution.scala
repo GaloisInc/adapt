@@ -45,8 +45,8 @@ object EntityResolution {
     shardCount: Array[Int],
     log: LoggingAdapter,
 
-    seenNodesSet: AlmostSet[AdmUUID],                               // Set of nodes seen so far
-    seenEdgesSet: AlmostSet[EdgeAdm2Adm]                            // Set of edges seen so far
+    seenNodesSets: Array[AlmostSet[AdmUUID]],                       // Set of nodes seen so far
+    seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]]                    // Set of edges seen so far
   ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
     val numUuidRemapperShards = config.uuidRemapperShards           // 0 means use the old remapper
@@ -54,6 +54,8 @@ object EntityResolution {
     assert(numUuidRemapperShards >= 0, "Negative number of shards!")
     assert(cdm2cdmMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2cdm maps")
     assert(cdm2admMaps.length == Math.max(numUuidRemapperShards, 1), "Wrong number of cdm2adm maps")
+    assert(seenNodesSets.length == Math.max(numUuidRemapperShards, 1), "Wrong number of seenNodes sets")
+    assert(seenEdgesSets.length == Math.max(numUuidRemapperShards, 1), "Wrong number of seenEdges sets")
 
     val maxTimeJump: Long      = (config.maxtimejumpsecs seconds).toNanos
 
@@ -82,6 +84,12 @@ object EntityResolution {
       UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, shardCount, ignoreEventUuids, log, numUuidRemapperShards)
     }
 
+    val deduplicate: Deduplicate.OrderAndDedupFlow = if (numUuidRemapperShards == 0) {
+      Deduplicate.apply(seenNodesSets(0), seenEdgesSets(0))
+    } else {
+      Deduplicate.sharded(numUuidRemapperShards, seenNodesSets, seenEdgesSets)
+    }
+
     Flow[(String, CDM)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
@@ -91,7 +99,7 @@ object EntityResolution {
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
       .buffer(2000, OverflowStrategy.backpressure)
-      .via(deduplicate(seenNodesSet, seenEdgesSet, MutableMap.empty))         // Order nodes/edges
+      .via(deduplicate)                                                       // Order nodes/edges
   }
 
 
@@ -163,59 +171,4 @@ object EntityResolution {
 
       FlowShape(broadcast.in, merge.out)
     })
-
-
-  private type OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed]
-
-  // Prevents nodes/edges from being emitted twice. Also prevents edges from being emitted before both of their
-  // endpoints have been emitted.
-  private def deduplicate(
-    seenNodes: AlmostSet[AdmUUID],
-    seenEdges: AlmostSet[EdgeAdm2Adm],
-    blockedEdges: MutableMap[UUID, List[EdgeAdm2Adm]]     // Edges blocked by UUIDs that haven't arrived yet
-  ): OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]](() => {
-
-    // Try to emit an edge. If either end of the edge hasn't arrived, add it to the blocked map.
-    def emitEdge(edge: EdgeAdm2Adm): Option[Either[ADM, EdgeAdm2Adm]] = edge match {
-      case EdgeAdm2Adm(_, _, tgt) if !seenNodes.contains(tgt) =>
-        blockedEdges(tgt) = edge :: blockedEdges.getOrElse(tgt, Nil)
-        blockedEdgesCount += 1
-        blockingNodes += tgt
-        None
-
-      case EdgeAdm2Adm(src, _, _) if !seenNodes.contains(src) =>
-        blockedEdges(src) = edge :: blockedEdges.getOrElse(src, Nil)
-        blockedEdgesCount += 1
-        blockingNodes += src
-        None
-
-      case _ =>
-        Some(Right(edge))
-    }
-
-    {
-      case Right(edge) =>
-        if (seenEdges.add(edge)) {
-          // New edge
-          emitEdge(edge).toList
-        } else {
-          // Duplicate edge
-          Nil
-        }
-
-      case Left(adm) =>
-        if (seenNodes.add(adm.uuid)) {
-          // New node
-          blockingNodes -= adm.uuid
-          val emit = blockedEdges.remove(adm.uuid).getOrElse(Nil).flatMap { e =>
-            blockedEdgesCount -= 1
-            emitEdge(e).toList
-          }
-          Left(adm) :: emit
-        } else {
-          // Duplicate node
-          Nil
-        }
-    }
-  })
 }
