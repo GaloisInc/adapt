@@ -39,7 +39,7 @@ object AdaptConfig {
   import pureconfig._
 
   case class IngestUnit(provider: String, files: List[String])
-  case class IngestConfig(data: Set[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
+  case class IngestConfig(data: List[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
   case class RuntimeConfig(webinterface: String, port: Int, apitimeout: Int, dbkeyspace: String, neo4jkeyspace: String, neo4jfile: String, systemname: String, quitonerror: Boolean, logfile: String)
   case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
   case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
