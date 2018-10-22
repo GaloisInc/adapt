@@ -52,8 +52,12 @@ object PpmFlowComponents {
         }
       }
 
-      Runtime.getRuntime.addShutdownHook(new Thread(runnable))
-      system.scheduler.schedule(20.minutes, 20.minutes, runnable)
+      if (ppmConfig.shouldsave) {
+        Runtime.getRuntime.addShutdownHook(new Thread(runnable))
+        ppmConfig.saveintervalseconds.foreach( interval =>
+          system.scheduler.schedule(interval seconds, interval seconds, runnable)
+        )
+      }
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
