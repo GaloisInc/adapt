@@ -11,8 +11,10 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
 import akka.stream.Materializer
 import akka.pattern.ask
 import akka.util.Timeout
+import com.galois.adapt.adm.AdmSubject
 import spray.json.{DefaultJsonProtocol, JsArray, JsNumber, JsString, JsValue}
 import edazdarevic.commons.net.CIDRUtils
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -256,24 +258,101 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   def answerPolicy3(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
 
+    import scala.concurrent.duration._
     implicit val ec = system.dispatcher
+    implicit val timeout: Timeout = 10.minutes
 
     trait Policy3Result
     trait InsufficientData extends Policy3Result
-    trait Pass extends Policy3Result
+    case class Pass(msg:String="") extends Policy3Result
+    case class Fail(msg:String="") extends Policy3Result
 
-    def traceTA1PolicyCheck(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
-      import scala.concurrent.duration._
+    type TimestampNanos = Long
+    trait NodeId
+    case class ProcessNodeId(nodeId:Int) extends NodeId {}
+    case class NetflowNodeId(nodeId:Int) extends NodeId {}
 
+    type TimeInterval = (TimestampNanos,TimestampNanos)
+
+    def toInterval(t:TimestampNanos):TimeInterval = (t,t+1e9.toLong)
+
+    def jsArrayToIntArray(nodesJsArray: Future[JsArray]) = {
+      nodesJsArray.map(_.elements.toList.map(_.toString().replace("v","").replace("[","").replace("]","").toInt))
+    }
+
+    def sendQueryAndTypeResultAsJsonArray(query: String) = {
+      //TODO: Log it?
+      //println(query)
+      val result = dbActor ? StringQuery(query, shouldReturnJson = true)
+      result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
+    }
+
+    //get all process
+    def getProcessWhichTriggeredNetflow(nflowNode: NetflowNodeId,timeInterval:TimeInterval) = {
+      val query = s"""g.V(${nflowNode.nodeId}).in('predicateObject','predicateObject2').out('subject').hasLabel('AdmSubject').has('subjectType', SUBJECT_PROCESS)"""
+      val processNodes = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(query))
+      processNodes
+    }
+
+    def provider = "fiveDirections"
+
+    def getNetFlows(): Future[List[Int]] = {
+    val queryGetNetFlow = s"""g.V().hasLabel('AdmNetFlowObject').has('localAddress', '$localAddress').has('localPort', $localPort).has('remoteAddress', '$remoteAddress').has('remotePort', $remotePort)"""
+    val netFlowIds: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(queryGetNetFlow))
+    netFlowIds
+    }
+
+    def checkPolicy(netflowId: Int):Policy3Result = {
+      provider match {
+        case "fiveDirections" => fived(netflowId)
+        case "trace" => trace(netflowId)
+        case "marple" => marple(netflowId)
+        case "cadets" => ??? //nicholesQuery
+        case default => ???
+      }
+    }
+
+    def trace(netflowId: Int) = {
+      ???
+    }
+
+    case class RelatedSubjects(parent:AdmSubject, children:List[AdmSubject], siblings:List[AdmSubject]){
+
+    }
+    def fived(netflowId: NetflowNodeId) = {
       implicit val _: Timeout = 10.minutes
+
+      def checkPolicy(netflowId: NetflowNodeId):Policy3Result = {
+        val query = s"""g.V(${netflowId.nodeId}).hasLabel('AdmNetFlowObject').in('predicateObject','predicateObject2').as('nflow').out('subject').dedup().as('procs').out('cmdLine','(cmdLine)','exec').values('path').as('paths').select('procs').in('subject').has('eventType', 'EVENT_RECVMSG').out('predicateObject','predicateObject2').hasLabel('AdmSrcSinkObject').has('srcSinkType', 'SRCSINK_USER_INPUT').select('paths').dedup()"""
+
+        val processList = getProcessWhichTriggeredNetflow(netflowId, toInterval(timestampSeconds))
+
+        //for a process, get their connected process [These could be their parent, children or siblings]
+        def getRelatedProcess(p:AdmSubject):RelatedSubjects = {
+          val queryChildren = s""""""
+          ???
+        }
+
+
+        // find the netflow, then get the connected process using AdmEvent, finally get all EVENT_RECVMSG into the process
+        //g.V().hasLabel('AdmNetFlowObject').has('localAddress','128.55.12.81').has('localPort',50956)
+        //x = 2301; g.V(x).in().hasLabel('AdmEvent').has('eventType', 'EVENT_RECVMSG')
+        //confirm that tht EVENT_RECVMSG are connected to SRCSINK_USER_INPUT
+        ???
+      }
+
 
       ???
     }
 
-    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
-      import scala.concurrent.duration._
+    def marple(netflowId: Int) = {???}
 
-      implicit val _: Timeout = 10.minutes
+
+
+
+
+    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
+
 
       // Make this interval bigger?
       val maxTimestampNanos = (timestampSeconds + 1) * 1000000000
@@ -364,6 +443,13 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         val messageOpt: Option[String] = Some("No UI provenance associated with the query parameters.")
         returnPolicyResult(result, messageOpt, responseUri)
         result -> messageOpt
+    }
+
+
+    val result = getNetFlows.map{_ match {
+      case hd::tail => if (tail.isEmpty) checkPolicy(hd) else ??? //ambiguous: use time range to resolve
+      case Nil => Fail("error: requested NetFlow not found") //error: requested NetFlow not found
+    }
     }
 
     policyRequests = policyRequests + (requestId -> resultFuture)
