@@ -44,7 +44,9 @@ object AdaptConfig {
   case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
   case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
   case class PpmConfigComponents(events: String, everything: String, pathnodes: String, pathnodeuses: String, releasequeue: String)
-  case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean)
+  case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean) {
+    require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
+  }
 
   implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
   implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
