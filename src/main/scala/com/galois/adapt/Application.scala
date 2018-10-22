@@ -884,6 +884,7 @@ object CDMSource {
       case t: cdm18types.TimeMarker => Some(Cdm18to19.timeMarker(t))
       case u: cdm18types.UnitDependency => Some(Cdm18to19.unitDependency(u))
       case u: cdm18types.UnnamedPipeObject => Some(Cdm18to19.ipcObject(u))
+      case h: cdm18types.Host => Some(Cdm18to19.host(h))
       case other =>
         println(s"couldn't find a way to convert $other")
         None

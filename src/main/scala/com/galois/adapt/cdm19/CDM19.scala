@@ -306,7 +306,7 @@ case object AUTHENTIHASH extends CryptoHashType
 case object SSDEEP extends CryptoHashType
 case object IMPHASH extends CryptoHashType
 
-// New
+// No change
 sealed trait HostType extends CDM19
 case object HostType extends CustomEnum[HostType] { val values = Seq(HOST_MOBILE, HOST_SERVER, HOST_DESKTOP) }
 case object HOST_MOBILE extends HostType
