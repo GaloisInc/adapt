@@ -45,12 +45,14 @@ object AdaptConfig {
   case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean) {
     require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }
+  case class TestConfig(`web-ui`: String)
 
-  implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
-  implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
-  implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
+  implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
+  implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
+  implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
   implicit val h4: CoproductHint[IngestConfig] = ??? // CoproductHint.default[IngestConfig]
   implicit val h5 = new EnumCoproductHint[DataModelProduction]
+  implicit val h6 = ProductHint[TestConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
 
   val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
   val ingestConfig: IngestConfig = ??? // loadConfigOrThrow[IngestConfig]("adapt.ingest")
@@ -61,7 +63,10 @@ object AdaptConfig {
   val ppmConfig = loadConfigOrThrow[PpmConfig]("adapt.ppm")
   val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
 
-
+  case class AdaptConfig(runflow: String, ingest: IngestConfig, runtime: RuntimeConfig, env: EnvironmentConfig, adm: AdmConfig, ppm: PpmConfig, test: TestConfig)
+  implicit val h7 = ProductHint[AdaptConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
+  private val adaptConfig: AdaptConfig = ??? // loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
+  // TODO: ALEC - this is not compiling, and I think it's because of the earlier `???`s. Once they are resolved, I _think_ this will also compile.
 
 
   trait ErrorHandler {
