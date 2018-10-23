@@ -123,15 +123,15 @@ object DeduplicateNodesAndEdges {
           unblocked
         }
 
-      case Right(a @ NoEndpointsChecked(e)) =>
+      case Right(NoEndpointsChecked(e)) =>
         if (seenNodes.contains(e.src)) {
           List(Right(SrcEndpointChecked(e)))
         } else {
-          blockedEdges(e.src) = a :: blockedEdges.getOrElse(e.src, Nil)
+          blockedEdges(e.src) = SrcEndpointChecked(e) :: blockedEdges.getOrElse(e.src, Nil)
           Nil
         }
 
-      case Right(a @ SrcEndpointChecked(e)) =>
+      case Right(SrcEndpointChecked(e)) =>
         if (seenNodes.contains(e.tgt)) {
           if (seenEdges.add(e)) {
             List(Right(BothEndpointsChecked(e)))
@@ -139,7 +139,7 @@ object DeduplicateNodesAndEdges {
             Nil
           }
         } else {
-          blockedEdges(e.tgt) = a :: blockedEdges.getOrElse(e.tgt, Nil)
+          blockedEdges(e.tgt) = BothEndpointsChecked(e) :: blockedEdges.getOrElse(e.tgt, Nil)
           Nil
         }
 
