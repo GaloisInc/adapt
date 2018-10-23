@@ -37,7 +37,7 @@ object EntityResolution {
 
   def apply(
     config: AdmConfig,                                              // Config passed in
-//    numUuidRemapperShards: Int,                                     // 0 means use the old remapper
+    isWindows: Boolean,
 
     cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
     cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
@@ -86,7 +86,7 @@ object EntityResolution {
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
-      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, activeChains))   // Entity resolution without remaps
+      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, isWindows, activeChains))  // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
@@ -149,6 +149,7 @@ object EntityResolution {
   private def erWithoutRemaps(
     eventExpiryTime: Time,
     maxEventsMerged: Int,
+    isWindows: Boolean,
     activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState]
   ): ErFlow =
     Flow.fromGraph(GraphDSL.create() { implicit b =>
@@ -157,9 +158,9 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
-      broadcast ~> EventResolution(eventExpiryTime, maxEventsMerged, activeChains) ~> merge
-      broadcast ~> SubjectResolution.apply                                         ~> merge
-      broadcast ~> OtherResolution.apply                                           ~> merge
+      broadcast ~> EventResolution(isWindows, eventExpiryTime, maxEventsMerged, activeChains) ~> merge
+      broadcast ~> SubjectResolution(isWindows)                                               ~> merge
+      broadcast ~> OtherResolution(isWindows)                                                 ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })

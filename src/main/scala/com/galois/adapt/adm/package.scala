@@ -232,15 +232,13 @@ package object adm {
   }
 
   case object AdmPathNode {
-    def normalized(path: String, provider: String): Option[AdmPathNode] = {
+    def normalized(path: String, provider: String, isWindows: Boolean): Option[AdmPathNode] = {
 
       var pathFixed: String = path.trim
 
       // Garbage
       if (pathFixed == "" || pathFixed == "<unknown>" || pathFixed == "unknown")
       return None
-
-      var isWindows = Application.isWindows(provider)
 
       val n: Int = pathFixed.length
 

@@ -13,6 +13,7 @@ import org.apache.avro.util.Utf8
 import scala.util.Try
 import scala.collection.JavaConverters._
 import org.neo4j.graphdb.RelationshipType
+import shapeless.Lazy
 
 package object cdm17 {
 
@@ -30,13 +31,13 @@ package object cdm17 {
       }
     }
 
-    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM17]])] = {
+    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Lazy[Try[CDM17]]])] = {
       val fileContents = readAvroFile(filePath)
 
       fileContents map {
         case (source, data) =>
           val croppedData = limit.fold(data)(data take _)
-          (source, croppedData.map(CDM17.parse))
+          (source, croppedData.map(cdm => Lazy(CDM17.parse(cdm))))
       }
     }
 

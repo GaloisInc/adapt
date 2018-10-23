@@ -76,16 +76,16 @@ object ERRules {
 
     type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveFileObject(provider: String, f: FileObject):
+  def resolveFileObject(provider: String, f: FileObject, isWindows: Boolean):
   (
     AdmFileObject,
     FileObjectEdges.LocalPrincipalEdge,
     FileObjectEdges.FilePathEdgeNode
   ) = {
     val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, provider)
-    val pathOpt1: Option[AdmPathNode] = f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider))
-    val pathOpt2: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("filename")).flatMap(p => AdmPathNode.normalized(p, provider))
-    val pathOpt3: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("path")).flatMap(p => AdmPathNode.normalized(p, provider))
+    val pathOpt1: Option[AdmPathNode] = f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
+    val pathOpt2: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("filename")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
+    val pathOpt3: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("path")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
     (
       newFo,
       f.localPrincipal.map(prinicpal => EdgeAdm2Cdm(newFo.uuid, "principal", CdmUUID(prinicpal, provider))),
@@ -99,7 +99,7 @@ object ERRules {
   object RegistryKeyObjectEdges {
     type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveRegistryKeyObject(provider: String, r: RegistryKeyObject):
+  def resolveRegistryKeyObject(provider: String, r: RegistryKeyObject, isWindows: Boolean):
     (
       AdmFileObject,
       RegistryKeyObjectEdges.FilePathEdgeNode
@@ -107,7 +107,7 @@ object ERRules {
       val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, provider)
       (
         newFo,
-        AdmPathNode.normalized(r.key, provider).map(pathNode =>
+        AdmPathNode.normalized(r.key, provider, isWindows).map(pathNode =>
           (EdgeAdm2Adm(newFo.uuid, "path", pathNode.uuid), pathNode)
         )
       )
@@ -133,7 +133,7 @@ object ERRules {
     type ExecSubjectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
     type ExecPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveEventAndPaths(provider: String, e: Event):
+  def resolveEventAndPaths(provider: String, e: Event, isWindows: Boolean):
     (
       AdmEvent,
       EventEdges.Subject,
@@ -161,24 +161,24 @@ object ERRules {
         e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject", CdmUUID(obj, provider))),
         e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject2", CdmUUID(obj, provider))),
 
-        e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
+        e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.predicateObject.map(predicateObject => {
             val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject, provider), label, pathNode.uuid), pathNode)
           })
         }),
-        e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
+        e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.predicateObject2.map(predicateObject2 => {
             val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
             (EdgeCdm2Adm(CdmUUID(predicateObject2, provider), label, pathNode.uuid), pathNode)
           })
         }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider)).flatMap(pathNode => {
+        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.subjectUuid.map(subj =>
             (EdgeCdm2Adm(CdmUUID(subj, provider), "exec", pathNode.uuid), pathNode)
           )
         }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
           (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventExec", pathNode.uuid), pathNode)
         })
       )
@@ -204,7 +204,7 @@ object ERRules {
     type CmdLinePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
     type CmdLineIndirectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveSubject(provider: String, s: Subject): Either[
+  def resolveSubject(provider: String, s: Subject, isWindows: Boolean): Either[
     (
       AdmSubject,
       SubjectEdges.LocalPrincipalEdge,
@@ -218,7 +218,7 @@ object ERRules {
     )] =
     if (s.subjectType != SUBJECT_PROCESS && s.parentSubject.isDefined) {
       Right((
-        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
           (EdgeCdm2Adm(CdmUUID(s.parentSubject.get, provider), "cmdLine", pathNode.uuid), pathNode)
         }),
         UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
@@ -230,7 +230,7 @@ object ERRules {
         newSubj,
         s.localPrincipal.map(principal => EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(principal, provider))),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent, provider))),
-        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider)).map(pathNode => {
+        s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
           (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)
         })
       ))

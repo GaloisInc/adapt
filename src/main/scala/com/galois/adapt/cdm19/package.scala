@@ -8,6 +8,7 @@ import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.avro.util.Utf8
 import org.neo4j.graphdb.RelationshipType
+import shapeless.Lazy
 
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
@@ -29,13 +30,13 @@ package object cdm19 {
       }
     }
 
-    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Try[CDM19]])] = {
+    def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Lazy[Try[CDM19]]])] = {
       val fileContents = readAvroFile(filePath)
 
       fileContents map {
         case (source, data) =>
           val croppedData = limit.fold(data)(data take _)
-          (source, croppedData.map(CDM19.parse))
+          (source, croppedData.map(cdm => Lazy(CDM19.parse(cdm))))
       }
     }
 

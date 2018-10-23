@@ -44,11 +44,11 @@ object NoveltyDetection {
   val readAndWriteTypes = readTypes ++ writeTypes
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.ta1 match {
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.instrumentationSource match {
     case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
     case _                                     => ("""/""" ,   "/")
   }
-  val sudoOrPowershellComparison: String => Boolean = Application.ta1 match {
+  val sudoOrPowershellComparison: String => Boolean = Application.instrumentationSource match {
     case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
     case _                                                    => (s: String) => s.toLowerCase == "sudo"
   }
@@ -513,7 +513,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
       _.asInstanceOf[cdm18.Event].timestampNanos
     )(thisActor.context, context.self),
 
@@ -530,7 +530,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
       _ => 0L
     )(thisActor.context, context.self),
 
@@ -546,7 +546,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
       _ => 0L
     )(thisActor.context, context.self)
     ,
@@ -563,7 +563,7 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.ta1))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
       _ => 0L
     )(thisActor.context, context.self)
   ).par
