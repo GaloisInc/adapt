@@ -4,8 +4,8 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.FlowShape
-import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, Partition}
+import akka.stream.{FlowShape, OverflowStrategy}
+import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, MergePreferred, Partition}
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
 import com.galois.adapt.adm.UuidRemapper.UuidRemapperFlow
@@ -80,12 +80,13 @@ object UuidRemapper {
       log: LoggingAdapter,
 
       numShards: Int
-  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() { implicit b =>
+  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() {
+    implicit b =>
     import GraphDSL.Implicits._
 
     /*
      *
-     *           +---------------------------------------------<--------------------------------------------+
+     *           +------------------[small buffer]-------------<--------------------------------------------+
      *           |                                                                                          |
      *           |                                                                                          |
      *           |                                                                                          |
@@ -112,7 +113,7 @@ object UuidRemapper {
       }
 
     val expandAdm = b.add(Flow[Timed[UuidRemapperInfo]])
-    val loopBack = b.add(Merge[Timed[UuidRemapperInfo]](2))
+    val loopBack = b.add(MergePreferred[Timed[UuidRemapperInfo]](1))
     val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
     val mergeShards = b.add(Merge[Timed[UuidRemapperInfo]](numShards))
     val decider = b.add(Partition[Timed[UuidRemapperInfo]](2, info => if (info.unwrap.remapped) 0 else 1))
@@ -129,7 +130,7 @@ object UuidRemapper {
 
     mergeShards.out ~> decider.in
 
-    decider.out(1) ~> loopBack.in(1)
+    decider.out(1).buffer(1000, OverflowStrategy.backpressure) ~> loopBack.preferred
     decider.out(0).mapConcat[Either[ADM, EdgeAdm2Adm]]((t: Timed[UuidRemapperInfo]) => t.unwrap.extract) ~> ret.in
 
     expandAdm.out.mapConcat[Timed[UuidRemapperInfo]] {
