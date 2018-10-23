@@ -48,6 +48,13 @@ object AdaptConfig {
     require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }
 
+  case class GuiConfig(enabled:Boolean)
+  case class ConsoleConfig(enabled:Boolean)
+  case class LogConfig(enabled:Boolean)
+  case class SplunkConfig(enabled:Boolean, token: String, host:String, port:Int)
+  case class AlarmsConfig(splunk: SplunkConfig, logging: LogConfig, console: ConsoleConfig, gui: GuiConfig)
+
+
   implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
   implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
   implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName})
@@ -60,6 +67,7 @@ object AdaptConfig {
   val ppmConfig = loadConfigOrThrow[PpmConfig]("adapt.ppm")
   val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
   val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
+  val alarmConfig = loadConfigOrThrow[AlarmsConfig]("adapt.alarms")
 }
 
 
@@ -67,6 +75,7 @@ object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
 
   import AdaptConfig._
+  AlarmReporter
 
   implicit val system = ActorSystem("production-actor-system")
   val log: LoggingAdapter = Logging.getLogger(system, this)
