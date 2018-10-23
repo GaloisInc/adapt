@@ -487,7 +487,7 @@ object CDMSource {
 
   private def getLoadfiles: List[(Provider, String)] = {
     for {
-      IngestUnit(provider,paths) <- ingestConfig.data.toList  // TODO: Make this a Set for parallel ingest.
+      IngestUnit(provider,paths) <- ingestConfig.data  // TODO: Make this a Set for parallel ingest.
       pathsPossiblyFromDirectory = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
           case f if ! f.isHidden => f.getCanonicalPath
@@ -884,6 +884,7 @@ object CDMSource {
       case t: cdm18types.TimeMarker => Some(Cdm18to19.timeMarker(t))
       case u: cdm18types.UnitDependency => Some(Cdm18to19.unitDependency(u))
       case u: cdm18types.UnnamedPipeObject => Some(Cdm18to19.ipcObject(u))
+      case h: cdm18types.Host => Some(Cdm18to19.host(h))
       case other =>
         println(s"couldn't find a way to convert $other")
         None
