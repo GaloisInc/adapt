@@ -374,7 +374,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 
     case PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter) =>
       extractedValues match {
-        case Nil => log.warning(s"Tried to start an observation with an empty extractedValues.")
+        case Nil => log.warning(s"Tried to start an observation in tree: $treeName with an empty extractedValues.")
         case extracted :: remainder =>
           /*
           If the first extracted value is new to this tree (at this level)

@@ -135,14 +135,16 @@ class MapProxy(
    * Seen nodes and seen edges                                                           *
    ***************************************************************************************/
 
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = MapSetUtils.lruCacheSet(
-    new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
-      override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean =
-        this.size > dedupEdgeCacheSize
-    }
-  )
+  val seenEdgesShards: Array[AlmostSet[EdgeAdm2Adm]] = Array.tabulate(numShards) { _ =>
+    MapSetUtils.lruCacheSet(
+      new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean =
+          this.size > dedupEdgeCacheSize
+      }
+    )
+  }
 
-  val seenNodes: AlmostSet[AdmUUID] = {
+  val seenNodesShards: Array[AlmostSet[AdmUUID]] = Array.tabulate(numShards) { _ =>
     val seenNodesSet: java.util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
       .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
       .counterEnable()

@@ -96,8 +96,8 @@ object Application extends App {
   // Edges blocked waiting for a target CDM uuid to be remapped.
   val blockedEdgesMaps: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]] = mapProxy.blockedEdgesShards
 
-  val seenEdges: AlmostSet[EdgeAdm2Adm] = mapProxy.seenEdges
-  val seenNodes: AlmostSet[AdmUUID] = mapProxy.seenNodes
+  val seenEdges: Array[AlmostSet[EdgeAdm2Adm]] = mapProxy.seenEdgesShards
+  val seenNodes: Array[AlmostSet[AdmUUID]] = mapProxy.seenNodesShards
   val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
 
   val singleIngestHost = ingestConfig.asSingleHost
