@@ -10,7 +10,7 @@ import com.galois.adapt.adm.EntityResolution.{blockedEdgesCount, blockingNodes}
 
 import scala.collection.mutable.{Map => MutableMap}
 
-object Deduplicate {
+object DeduplicateNodesAndEdges {
 
   type OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed]
 
@@ -21,17 +21,21 @@ object Deduplicate {
 
   // For the sharded variant, we need to keep track of extra info with edges: namely which endpoint have been checked
   // already.
-  case class AnnotatedEdge(edge: EdgeAdm2Adm, fromEmitted: Boolean, toEmitted: Boolean)
+  private sealed trait EdgeEndpointCheck
+  private case class NoEndpointsChecked(edge: EdgeAdm2Adm) extends EdgeEndpointCheck
+  private case class SrcEndpointChecked(edge: EdgeAdm2Adm) extends EdgeEndpointCheck
+  private case class BothEndpointsChecked(edge: EdgeAdm2Adm) extends EdgeEndpointCheck
 
   // Figure out which shard an annotated edge or ADM should be routed to
-  def partitioner(numShards: Int): Either[ADM, AnnotatedEdge] => Int = {
+  private def partitioner(numShards: Int): Either[ADM, EdgeEndpointCheck] => Int = {
     def uuidPartition(u: UUID): Int =
       (Math.abs(u.getLeastSignificantBits * 7 + u.getMostSignificantBits * 31) % numShards).intValue()
 
     {
       case Left(adm) => uuidPartition(adm.uuid.uuid)
-      case Right(AnnotatedEdge(e, false, _)) => uuidPartition(e.src)
-      case Right(AnnotatedEdge(e, _, _)) => uuidPartition(e.tgt)
+      case Right(NoEndpointsChecked(e)) => uuidPartition(e.src)
+      case Right(SrcEndpointChecked(e)) => uuidPartition(e.tgt)
+      case Right(BothEndpointsChecked(e)) => uuidPartition(e.tgt) // should never occur
     }
   }
 
@@ -62,19 +66,19 @@ object Deduplicate {
      *
      */
 
-    val annotate = b.add(Flow.fromFunction[Either[ADM, EdgeAdm2Adm], Either[ADM, AnnotatedEdge]] {
+    val annotate = b.add(Flow.fromFunction[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeEndpointCheck]] {
       case Left(a) => Left(a)
-      case Right(e) => Right(AnnotatedEdge(e, fromEmitted = false, toEmitted = false))
+      case Right(e) => Right(NoEndpointsChecked(e))
     })
 
     def thisPartitioner = partitioner(numShards)
 
-    val loopBack = b.add(MergePreferred[Either[ADM, AnnotatedEdge]](1))
-    val partitionShards = b.add(Partition[Either[ADM, AnnotatedEdge]](numShards, thisPartitioner))
-    val mergeShards = b.add(Merge[Either[ADM, AnnotatedEdge]](numShards))
-    val decider = b.add(Partition[Either[ADM, AnnotatedEdge]](2, {
+    val loopBack = b.add(MergePreferred[Either[ADM, EdgeEndpointCheck]](1))
+    val partitionShards = b.add(Partition[Either[ADM, EdgeEndpointCheck]](numShards, thisPartitioner))
+    val mergeShards = b.add(Merge[Either[ADM, EdgeEndpointCheck]](numShards))
+    val decider = b.add(Partition[Either[ADM, EdgeEndpointCheck]](2, {
       case Left(_) => 0
-      case Right(AnnotatedEdge(_, true, true)) => 0
+      case Right(BothEndpointsChecked(_)) => 0
       case _ => 1
     }))
     val ret = b.add(Flow[Either[ADM, EdgeAdm2Adm]])
@@ -97,7 +101,9 @@ object Deduplicate {
 
     decider.out(0).map {
       case Left(a) => Left(a)
-      case Right(e) => Right(e.edge)
+      case Right(BothEndpointsChecked(e)) => Right(e)
+      case Right(a) =>
+        throw new Exception(s"DeduplicateNodesAndEdges: decider encountered an edge that was not remapped: $a")
     } ~> ret.in
 
     FlowShape(annotate.in, ret.out)
@@ -107,10 +113,8 @@ object Deduplicate {
       seenNodes: AlmostSet[AdmUUID],
       seenEdges: AlmostSet[EdgeAdm2Adm],
 
-      blockedEdges: MutableMap[AdmUUID, List[AnnotatedEdge]]
-  ): Flow[Either[ADM, AnnotatedEdge], Either[ADM, AnnotatedEdge], NotUsed] = Flow[Either[ADM, AnnotatedEdge]].statefulMapConcat { () =>
-
-    {
+      blockedEdges: MutableMap[AdmUUID, List[EdgeEndpointCheck]]
+  ): Flow[Either[ADM, EdgeEndpointCheck], Either[ADM, EdgeEndpointCheck], NotUsed] = Flow[Either[ADM, EdgeEndpointCheck]].mapConcat {
       case l @ Left(adm: ADM) =>
         val unblocked = blockedEdges.getOrElse(adm.uuid, Nil).map(Right(_))
         if (seenNodes.add(adm.uuid)) {
@@ -119,18 +123,18 @@ object Deduplicate {
           unblocked
         }
 
-      case Right(a @ AnnotatedEdge(e, false, false)) =>
+      case Right(a @ NoEndpointsChecked(e)) =>
         if (seenNodes.contains(e.src)) {
-          List(Right(a.copy(fromEmitted = true)))
+          List(Right(SrcEndpointChecked(e)))
         } else {
           blockedEdges(e.src) = a :: blockedEdges.getOrElse(e.src, Nil)
           Nil
         }
 
-      case Right(a @ AnnotatedEdge(e, true, false)) =>
+      case Right(a @ SrcEndpointChecked(e)) =>
         if (seenNodes.contains(e.tgt)) {
           if (seenEdges.add(e)) {
-            List(Right(a.copy(toEmitted = true)))
+            List(Right(BothEndpointsChecked(e)))
           } else {
             Nil
           }
@@ -139,10 +143,9 @@ object Deduplicate {
           Nil
         }
 
-      case Right(a @ AnnotatedEdge(e, true, true)) => throw new Exception("Invalid state: edge is already fully checked")
-      case Right(a @ AnnotatedEdge(e, false, true)) => throw new Exception("Invalid state: right endpoint was checked before left")
+      case Right(BothEndpointsChecked(e)) =>
+        throw new Exception(s"DeduplicateNodesAndEdges: shard encountered an edge that is already fully checked: $e")
     }
-  }
 
 
   /***************************************************************************************
