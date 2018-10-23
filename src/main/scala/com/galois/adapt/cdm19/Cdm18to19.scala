@@ -21,6 +21,7 @@ object Cdm18to19 {
   implicit def integrityTag(i: cdm18.IntegrityTag): cdm19.IntegrityTag = cdm19.IntegrityTag.from(i.toString).get
   implicit def confidentialityTag(c: cdm18.ConfidentialityTag): cdm19.ConfidentialityTag = cdm19.ConfidentialityTag.from(c.toString).get
   implicit def cryptoHashType(c: cdm18.CryptoHashType): cdm19.CryptoHashType = cdm19.CryptoHashType.from(c.toString).get
+  implicit def hostType(c: cdm18.HostType): cdm19.HostType = cdm19.HostType.from(c.toString).get
 
   // Value types
   implicit def fixedShort(f: cdm18.FixedShort): cdm19.FixedShort = cdm19.FixedShort(f.bytes)
@@ -175,6 +176,14 @@ object Cdm18to19 {
     u.sink,
     u.sourceFileDescriptor,
     u.sinkFileDescriptor
+  )
+  implicit def host(h: cdm18.Host)(implicit dummyHost: UUID): cdm19.Host = cdm19.Host(
+    h.uuid,
+    h.hostName,
+    h.hostIdentifiers.map(i => cdm19.HostIdentifier(i.idType, i.idValue)),
+    h.osDetails match { case "" => None; case s => Some(s) },
+    h.hostType,
+    h.interfaces.map(i => cdm19.Interface(i.name, i.macAddress, i.ipAddresses))
   )
   
 }

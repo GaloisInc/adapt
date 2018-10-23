@@ -95,7 +95,7 @@ object DeduplicateNodesAndEdges {
     mergeShards.out ~> decider.in
 
     decider.out(1).buffer(
-      100,
+      1000,
       OverflowStrategy.backpressure
     ) ~> loopBack.preferred
 
