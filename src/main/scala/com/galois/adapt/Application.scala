@@ -103,7 +103,7 @@ object Application extends App {
     seenEdges
   )
 
-  val hostNameForAllHosts = HostName("BetweenHosts")
+  val hostNameForAllHosts = "BetweenHosts"
   val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
     case "accept" => Map.empty
     case _ =>
@@ -118,7 +118,7 @@ object Application extends App {
           case _ => println("Not going to periodically save PPM trees.")
         }
         hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts.hostname), s"ppm-actor-${hostNameForAllHosts.hostname}"))
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts), s"ppm-actor-$hostNameForAllHosts"))
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.

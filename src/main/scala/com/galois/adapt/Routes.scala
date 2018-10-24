@@ -125,12 +125,12 @@ object Routes {
             parameters('processName, 'hostName.as[String].?, 'pid.as[Int].?) { (processName, hostNameOpt, pidOpt) =>
 
               complete(
-                PpmSummarizer.summarize(processName, hostNameOpt.map(HostName.apply), pidOpt).map(_.toString)
+                PpmSummarizer.summarize(processName, hostNameOpt, pidOpt).map(_.toString)
               )
             } ~
             path(Segment / Segment / IntNumber) { (processName, hostName, pid) =>
               complete(
-                PpmSummarizer.summarize(processName, Some(HostName(hostName)), Some(pid)).map(_.toString)
+                PpmSummarizer.summarize(processName, Some(hostName), Some(pid)).map(_.toString)
               )
             } ~
             path(Segment) { processName =>
@@ -146,12 +146,12 @@ object Routes {
             pathPrefix("listTrees") {
               path(Segment) { hostName =>
                 complete(
-                  (ppmActors(HostName(hostName)) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
+                  (ppmActors(hostName) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
                 )
               } ~
               complete(
                 Future.sequence(
-                  ppmActors.map{ case (k,ref) => (ref ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(treeNames => k.hostname -> treeNames.namesAndCounts)) }
+                  ppmActors.map{ case (hostName,ref) => (ref ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(treeNames => hostName -> treeNames.namesAndCounts)) }
                 )
               )
             } ~
@@ -167,7 +167,7 @@ object Routes {
                   import ApiJsonProtocol._
                   parameter('hostName.as[String]) { hostName =>
                     complete {
-                      (ppmActors(HostName(hostName)) ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+                      (ppmActors(hostName) ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
                         .mapTo[PpmTreeAlarmResult]
                         .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                     }
@@ -177,7 +177,7 @@ object Routes {
                       ppmActors.map { case (hostName, ppmRef) =>
                         (ppmRef ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
                         .mapTo[PpmTreeAlarmResult]
-                        .map(t => hostName.hostname -> List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+                        .map(t => hostName -> List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                       }
                     )
                   }
@@ -239,7 +239,7 @@ object Routes {
       post {
         pathPrefix("api") {
           pathPrefix("setCdmFilter") {
-            formField('filter.as[Filter]) { (filter: Filter) =>
+            formField('filter.as[Filter]) { filter: Filter =>
               complete {
                 Future {
                   Application.filterAst = Some(filter)
@@ -267,7 +267,7 @@ object Routes {
               parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt", 'hostName) { (queryString, rating, namespace, hostName) =>
                 complete {
                   val query = queryString.split("∫", -1).toList
-                  (ppmActors(HostName(hostName)) ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
+                  (ppmActors(hostName) ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
                     case Some(l) if l.forall(x => x) => StatusCodes.Created -> s"Rating for $queryString set to: $rating"
                     case Some(l) => StatusCodes.NotFound -> s"Could not find key for $queryString"
                     case None => StatusCodes.BadRequest -> s"Could not find tree: $treeName"
@@ -277,7 +277,7 @@ object Routes {
             } ~
             path("setRatings") {
               formFields('rating.as(validRating), 'namespace ? "adapt", 'hostName, 'pathsPerTree.as[Map[String, List[String]]]) { (rating, namespace, hostName, pathsPerTree) =>
-                setRatings(rating, namespace, HostName(hostName), pathsPerTree)
+                setRatings(rating, namespace, hostName, pathsPerTree)
               }
             } ~
             path("setRatingsMap") {
@@ -292,7 +292,7 @@ object Routes {
                       implicitly[RootJsonFormat[Map[String,List[String]]]].read(json)
                     } match {
                         case Failure(e) => complete { StatusCodes.ImATeapot -> s"No pathsPerTree ${e.getMessage}" }
-                        case Success(pathsPerTree: Map[String,List[String]]) => setRatings(rating, namespace, HostName(hostName), pathsPerTree)
+                        case Success(pathsPerTree: Map[String,List[String]]) => setRatings(rating, namespace, hostName, pathsPerTree)
                     }
                   case r => complete { StatusCodes.ImATeapot -> s"Invalid rating $r" }
                 }
