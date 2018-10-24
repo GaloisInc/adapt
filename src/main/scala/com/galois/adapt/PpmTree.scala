@@ -496,7 +496,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmManager extends Actor with ActorLogging { thisActor =>
+class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor =>
   import NoveltyDetection._
 
   var cdmSanityTrees = List(
@@ -1079,7 +1079,10 @@ class PpmManager extends Actor with ActorLogging { thisActor =>
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
-        if (iforestEnabled) Future { EventTypeModels.evaluateModels(context.system)}
+        if (iforestEnabled)   // TODO: If using iForest again in the future, come back and refactor this to use the right host name!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          Future {
+            Application.ppmManagerActors.keys.foreach(hostName => EventTypeModels.evaluateModels(context.system, hostName))
+          }.recoverWith{ case e => e.printStackTrace(); throw e }
       }
       sender() ! Ack
 
@@ -1471,16 +1474,19 @@ object PpmSummarizer {
     reduceBySameCounts(reduceByAbstraction(tree.withoutQNodes).collapseUnitaryPaths()).collapseUnitaryPaths().renormalizeProbs
   // Consider: repeatedly call `reduceTreeBySameCounts` and `mergeChildrenByAbstraction` until no change
 
-  def summarize(processName: String, pid: Option[Int]): Future[TreeRepr] = {
+  def summarize(processName: String, hostName: Option[HostName], pid: Option[Int]): Future[TreeRepr] = {
     implicit val timeout = Timeout(30 seconds)
-    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+    (Application.ppmManagerActors(hostName.getOrElse(Application.hostNameForAllHosts)) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
       .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
   }
 
-  def summarizableProcesses: Future[TreeRepr] = {
+  def summarizableProcesses: Future[Map[HostName, TreeRepr]] = {
     implicit val timeout = Timeout(30 seconds)
-    (Application.ppmManagerActor.get ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
-      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr.truncate(1).withoutQNodes }
+    Future.sequence(
+      Application.ppmManagerActors.map { case (hostName, ref) => (ref ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
+        .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map {result => hostName -> result.repr.truncate(1).withoutQNodes}
+      }
+    ).map(_.toMap)
   }
 
 

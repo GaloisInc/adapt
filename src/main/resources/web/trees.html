@@ -104,6 +104,8 @@ $(function(){
 
 	$.getJSON(hostPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
 
+		console.log("THIS IS BROKEN RIGHT HERE! 'namesAndCounts' now sometimes returns an object (instead of array)")
+
 		var names = _.keys(namesAndCounts)
 		treeNames = _.filter(treeNames, function(t){ return _.contains(names, t) })
 		if (shouldLoadAllTrees) treeNames = names
@@ -140,6 +142,8 @@ $(function(){
 	function createFancyTree(treeName) {
 		
 		var shouldExpandAll = false
+
+		console.log("THIS IS BROKEN RIGHT NOW! the api at: /api/ppm/'treeName' has changed! It now returns an array or an object depending whether hostName is provided")
 
 		$("#" + treeName).fancytree({
 			extensions: ["filter", "table", "childcounter", "multi"],
