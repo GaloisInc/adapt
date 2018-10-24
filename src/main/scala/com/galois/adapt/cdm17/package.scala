@@ -17,7 +17,7 @@ import shapeless.Lazy
 
 package object cdm17 {
 
-  trait CDM17
+  trait CDM17 extends CdmVersion
 
   object CDM17 {
     val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)

@@ -3,19 +3,19 @@ package com.galois.adapt
 import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.{Files, Paths}
 import java.util.function.Consumer
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm19._
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
+
 object PpmFlowComponents {
+  import AdaptConfig._
 
   import ApiJsonProtocol._
   import spray.json._
@@ -25,8 +25,6 @@ object PpmFlowComponents {
   type DelayedESO = (NoveltyDetection.Event, ADM, SubjectPathNodeKey, ADM, ObjectPathNodeKey)
   type CompletedESO = (NoveltyDetection.Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
-
-  import AdaptConfig._
 
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
     Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
@@ -171,8 +169,7 @@ object PpmFlowComponents {
         release(None)
     }
   }.to(
-      Application.ppmDistributorSink //[(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
-//      Sink.actorRefWithAck(Application.ppmManagerActor.get, InitMsg, Ack, CompleteMsg)
+      Application.ppmObservationDistributorSink //[(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
     )
 
 

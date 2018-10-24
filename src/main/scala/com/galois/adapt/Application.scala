@@ -11,8 +11,8 @@ import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
 import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
-import scala.collection.parallel.ParMap
 import FlowComponents._
+import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -22,12 +22,11 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
+import AdaptConfig._
 
 
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
-
-  import AdaptConfig._
 
   implicit val system = ActorSystem("production-actor-system")
   val log: LoggingAdapter = Logging.getLogger(system, this)
@@ -121,7 +120,9 @@ object Application extends App {
         hostName -> ref
       }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts.hostname), s"ppm-actor-${hostNameForAllHosts.hostname}"))
   }
-  def ppmDistributorSink[T] = Sink.fromGraph(GraphDSL.create() { implicit b =>
+
+  // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
+  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
     import GraphDSL.Implicits._
     val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
     val broadcast = b.add(Broadcast[T](actorList.size))
@@ -158,8 +159,6 @@ object Application extends App {
       case (s, Left(f)) => (s, f.underlying)
       case (s, Right(cdm)) => (s, cdm)
     }
-
-
 
 
   // Mutable state that gets updated during ingestion
@@ -236,7 +235,7 @@ object Application extends App {
 
       singleIngestHost.toCdmSource()
         .via(printCounter("E3 Training", statusActor, startingCount))
-        .via(splitToSink[(String, CDM19)](ppmDistributorSink, 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .runWith(PpmFlowComponents.ppmSink)
 
@@ -247,7 +246,7 @@ object Application extends App {
       singleIngestHost.toCdmSource()
         .via(printCounter("E3", statusActor, startingCount))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](ppmDistributorSink, 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .via(splitToSink(PpmFlowComponents.ppmSink, 1000))
         .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
@@ -260,7 +259,7 @@ object Application extends App {
       // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
         .via(printCounter("E3 (no DB)", statusActor, startingCount))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](ppmDistributorSink, 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .runWith(PpmFlowComponents.ppmSink)
 
