@@ -18,11 +18,33 @@ import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
+import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
 import shapeless.Lazy
 
 import scala.util.{Failure, Success, Try}
 
 object AdaptConfig {
+
+  // Alec: this should exist in Scala 2.12, but doesn't seem to be present in 2.11
+  implicit class EitherOps[A,B](either: Either[A,B]) {
+    def map[B1](f: (B) ⇒ B1): Either[A, B1] = either match {
+      case Left(a) => Left(a)
+      case Right(b) => Right(f(b))
+    }
+
+    def flatMap[A1 >: A, B1](f: (B) ⇒ Either[A1, B1]): Either[A1, B1] = either match {
+      case Left(a) => Left(a)
+      case Right(b) => f(b)
+    }
+  }
+  object EitherOps {
+    def either[A,B](either: Either[A,B]): EitherOps[A,B] = new EitherOps(either)
+    def option[A,B](option: Option[B], err: => A): EitherOps[A,B] = option match {
+      case None => Left(err)
+      case Some(a) => Right(a)
+    }
+  }
+
   import pureconfig._
 
   case class HostName(hostname: String)
@@ -47,15 +69,73 @@ object AdaptConfig {
   }
   case class TestConfig(`web-ui`: String)
 
-  implicit val h1 = ProductHint[RuntimeConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
-  implicit val h2 = ProductHint[EnvironmentConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
-  implicit val h3 = ProductHint[AdmConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
-  implicit val h4: CoproductHint[IngestConfig] = ??? // CoproductHint.default[IngestConfig]
+  val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
+
+  implicit val h1 = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h2 = ProductHint[EnvironmentConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h3 = ProductHint[AdmConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
   implicit val h5 = new EnumCoproductHint[DataModelProduction]
-  implicit val h6 = ProductHint[TestConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
+  implicit val h6 = ProductHint[TestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h7 = CoproductHint.default[IngestUnit]
+  implicit val h8 = ProductHint[LinearIngest](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h9 = ProductHint[Range](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h10 = ProductHint[IngestHost](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  implicit val h11 = ProductHint[IngestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+
+
+  /* This should be deriveable automatically by pureconfig, _but_ there is an issue in Scala < 2.12 which messes with
+   * coproduct derivations:
+   *
+   * ```
+   * knownDirectSubclasses of IngestUnit observed before subclass FileIngestUnit registered
+   * knownDirectSubclasses of IngestUnit observed before subclass KafkaTopicIngestUnit registered
+   * ```
+   *
+   * See https://github.com/pureconfig/pureconfig/issues/205
+   */
+  implicit val ingestUnitConfigReader: ConfigReader[IngestUnit] = new ConfigReader[IngestUnit] {
+    def from(cur: ConfigCursor): Either[ConfigReaderFailures, IngestUnit] = for {
+      typ <- cur.atPath("type").right.flatMap(_.asString)
+      iu  <- typ.toLowerCase match {
+        case "file" =>
+          for {
+            // prevent extra fields
+            _ <- cur.asMap.right.flatMap { kvs =>
+              kvs.keySet.diff(Set("type", "paths", "namespace", "range")).toList match {
+                case Nil => Right(())
+                case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
+              }
+            }
+
+            // expected fields
+            paths     <- cur.atPath("paths").right.flatMap(ConfigReader[List[FilePath]].from)
+            namespace <- cur.atPath("namespace").right.flatMap(ConfigReader[Namespace].from)
+            range     <- cur.atPath("range").right.flatMap(ConfigReader[Range].from)
+          } yield FileIngestUnit(paths, namespace, range)
+
+        case "kafka" | "kafkatopic" =>
+          for {
+            // prevent extra fields
+            _ <- cur.asMap.right.flatMap { kvs =>
+              kvs.keySet.diff(Set("type", "topicName", "namespace", "range")).toList match {
+                case Nil => Right(())
+                case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
+              }
+            }
+
+            // expected fields
+            topicName <- cur.atPath("topicName").right.flatMap(ConfigReader[KakfaTopicName].from)
+            namespace <- cur.atPath("namespace").right.flatMap(ConfigReader[Namespace].from)
+            range     <- cur.atPath("range").right.flatMap(ConfigReader[Range].from)
+          } yield KafkaTopicIngestUnit(topicName, namespace, range)
+
+        case _ => Left(ConfigReaderFailures(ConvertFailure(NoValidCoproductChoiceFound(cur.value), cur)))
+      }
+    } yield iu
+  }
 
   val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
-  val ingestConfig: IngestConfig = ??? // loadConfigOrThrow[IngestConfig]("adapt.ingest")
+  val ingestConfig: IngestConfig = loadConfigOrThrow[IngestConfig]("adapt.ingest")
   val runFlow = loadConfigOrThrow[String]("adapt.runflow")
   val runtimeConfig = loadConfigOrThrow[RuntimeConfig]("adapt.runtime")
   val envConfig = loadConfigOrThrow[EnvironmentConfig]("adapt.env")
@@ -64,9 +144,9 @@ object AdaptConfig {
   val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
 
   case class AdaptConfig(runflow: String, ingest: IngestConfig, runtime: RuntimeConfig, env: EnvironmentConfig, adm: AdmConfig, ppm: PpmConfig, test: TestConfig)
-  implicit val h7 = ProductHint[AdaptConfig](new ConfigFieldMapping {def apply(fieldName: String) = fieldName}, allowUnknownKeys = false)
-  private val adaptConfig: AdaptConfig = ??? // loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
-  // TODO: ALEC - this is not compiling, and I think it's because of the earlier `???`s. Once they are resolved, I _think_ this will also compile.
+  implicit val h90 = ProductHint[AdaptConfig](plainFieldMapping, allowUnknownKeys = false)
+  private val adaptConfig: AdaptConfig = loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
+
 
 
   trait ErrorHandler {
