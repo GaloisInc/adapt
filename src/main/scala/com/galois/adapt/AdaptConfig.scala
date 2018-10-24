@@ -4,50 +4,21 @@ import java.io.{ByteArrayInputStream, File}
 import java.util.UUID
 
 import akka.NotUsed
-import akka.kafka.{ConsumerSettings, Subscriptions}
-import akka.kafka.scaladsl.Consumer
 import akka.stream.scaladsl.Source
-import com.galois.adapt.adm.{ADM, EdgeAdm2Adm}
 import com.galois.adapt.cdm17.CDM17
-import com.galois.adapt.cdm18.{CDM18, Cdm17to18}
-import com.galois.adapt.cdm19.{CDM19, Cdm18to19, InstrumentationSource, RawCDM19Type}
-import com.galois.adapt.{cdm17 => cdm17types}
-import com.galois.adapt.{cdm18 => cdm18types}
-import org.apache.avro.io.DecoderFactory
+import com.galois.adapt.cdm18.CDM18
+import com.galois.adapt.cdm19.{CDM19, InstrumentationSource, RawCDM19Type}
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
 import shapeless.Lazy
 
 import scala.util.{Failure, Success, Try}
 
-object AdaptConfig {
-
-  // Alec: this should exist in Scala 2.12, but doesn't seem to be present in 2.11
-  implicit class EitherOps[A,B](either: Either[A,B]) {
-    def map[B1](f: (B) ⇒ B1): Either[A, B1] = either match {
-      case Left(a) => Left(a)
-      case Right(b) => Right(f(b))
-    }
-
-    def flatMap[A1 >: A, B1](f: (B) ⇒ Either[A1, B1]): Either[A1, B1] = either match {
-      case Left(a) => Left(a)
-      case Right(b) => f(b)
-    }
-  }
-  object EitherOps {
-    def either[A,B](either: Either[A,B]): EitherOps[A,B] = new EitherOps(either)
-    def option[A,B](option: Option[B], err: => A): EitherOps[A,B] = option match {
-      case None => Left(err)
-      case Some(a) => Right(a)
-    }
-  }
-
+object AdaptConfig extends Utils {
   import pureconfig._
 
-  case class HostName(hostname: String)
+  type HostName = String
   type Namespace = String
   type KakfaTopicName = String
   type FilePath = String
@@ -58,30 +29,120 @@ object AdaptConfig {
   case object ProduceCdmAndAdm extends DataModelProduction
 
 
-//  case class IngestUnit(provider: String, files: List[String])
-//  case class IngestConfig(data: List[IngestUnit], startatoffset: Long, loadlimit: Option[Long], quitafteringest: Boolean, logduplicates: Boolean, produceadm: Boolean, producecdm: Boolean)
-  case class RuntimeConfig(webinterface: String, port: Int, apitimeout: Int, dbkeyspace: String, neo4jkeyspace: String, neo4jfile: String, systemname: String, quitonerror: Boolean, logfile: String)
-  case class EnvironmentConfig(ta1: String, ta1kafkatopic: String, ta1kafkatopics: List[String], theiaresponsetopic: String)
-  case class AdmConfig(maxtimejumpsecs: Long, cdmexpiryseconds: Int, cdmexpirycount: Long, maxeventsmerged: Int, eventexpirysecs: Int, eventexpirycount: Int, dedupEdgeCacheSize: Int, uuidRemapperShards: Int, cdm2cdmlrucachesize: Long = 10000000L, cdm2admlrucachesize: Long = 30000000L, ignoreeventremaps: Boolean, mapdb: String, mapdbbypasschecksum: Boolean, mapdbtransactions: Boolean)
-  case class PpmConfigComponents(events: String, everything: String, pathnodes: String, pathnodeuses: String, releasequeue: String)
-  case class PpmConfig(saveintervalseconds: Option[Long], pluckingdelay: Int, basedir: String, eventtypemodelsdir: String, loadfilesuffix: String, savefilesuffix: String, shouldload: Boolean, shouldsave: Boolean, rotatescriptpath: String, components: PpmConfigComponents, iforestfreqminutes: Int, iforesttrainingfile: String, iforesttrainingsavefile: String, iforestenabled: Boolean) {
+  case class AdaptConfig(
+      runflow: String,
+      ingest: IngestConfig,
+      runtime: RuntimeConfig,
+      env: EnvironmentConfig,
+      adm: AdmConfig,
+      ppm: PpmConfig,
+      test: TestConfig
+  )
+
+  case class IngestConfig(
+      hosts: Set[IngestHost],
+      quitafteringest: Boolean,
+      logduplicates: Boolean,
+      produce: DataModelProduction
+  ) {
+    // TODO: phase this out
+    def asSingleHost: IngestHost = if (hosts.size != 1) {
+      throw new Exception(s"Only a single host was expected! Found instead: $hosts")
+    } else {
+      println("WARNING: you used 'asSingleHost' and it is a temporary hack.")
+      hosts.head
+    }
+
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = hosts
+      .toList
+      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, h: IngestHost) => acc.merge(h.toCdmSource(handler)))
+  }
+
+  case class RuntimeConfig(
+    webinterface: String,
+    port: Int,
+    apitimeout: Int,
+    dbkeyspace: String,
+    neo4jkeyspace: String,
+    neo4jfile: String,
+    systemname: String,
+    quitonerror: Boolean,
+    logfile: String
+  )
+
+  case class EnvironmentConfig(
+    kafkabootstrap: String,
+    truststorepath: String,
+    trustpass: String,
+    keystorepath: String,
+    keypass: String,
+    sslkey: String
+  )
+
+  case class AdmConfig(
+    maxtimejumpsecs: Long,
+    cdmexpiryseconds: Int,
+    cdmexpirycount: Long,
+    maxeventsmerged: Int,
+    eventexpirysecs: Int,
+    eventexpirycount: Int,
+    dedupEdgeCacheSize: Int,
+    uuidRemapperShards: Int,
+    cdm2cdmlrucachesize: Long = 10000000L,
+    cdm2admlrucachesize: Long = 30000000L,
+    ignoreeventremaps: Boolean,
+    mapdb: String,
+    mapdbbypasschecksum: Boolean,
+    mapdbtransactions: Boolean
+  )
+
+  case class PpmConfigComponents(
+    events: String,
+    everything: String,
+    pathnodes: String,
+    pathnodeuses: String,
+    releasequeue: String
+  )
+
+  case class PpmConfig(
+    saveintervalseconds: Option[Long],
+    pluckingdelay: Int,
+    basedir: String,
+    eventtypemodelsdir: String,
+    loadfilesuffix: String,
+    savefilesuffix: String,
+    shouldload: Boolean,
+    shouldsave: Boolean,
+    rotatescriptpath: String,
+    components: PpmConfigComponents,
+    iforestfreqminutes: Int,
+    iforesttrainingfile: String,
+    iforesttrainingsavefile: String,
+    iforestenabled: Boolean
+  ) {
     require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }
-  case class TestConfig(`web-ui`: String)
+
+  case class TestConfig(
+    `web-ui`: Boolean
+  )
 
   val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
 
-  implicit val h1 = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h2 = ProductHint[EnvironmentConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h3 = ProductHint[AdmConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h5 = new EnumCoproductHint[DataModelProduction]
-  implicit val h6 = ProductHint[TestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h7 = CoproductHint.default[IngestUnit]
-  implicit val h8 = ProductHint[LinearIngest](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h9 = ProductHint[Range](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h10 = ProductHint[IngestHost](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  implicit val h11 = ProductHint[IngestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-
+  private implicit val _hint1  = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint2  = ProductHint[EnvironmentConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint3  = ProductHint[AdmConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint4  = new EnumCoproductHint[DataModelProduction]
+  private implicit val _hint5  = ProductHint[TestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint6  = CoproductHint.default[IngestUnit]
+  private implicit val _hint7  = ProductHint[LinearIngest](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint8  = ProductHint[Range](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint9  = ProductHint[IngestHost](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint10 = ProductHint[IngestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint11 = ProductHint[AdaptConfig](plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint12 = new EnumCoproductHint[InstrumentationSource] {
+    override def fieldValue(name: String): String = name
+  }
 
   /* This should be deriveable automatically by pureconfig, _but_ there is an issue in Scala < 2.12 which messes with
    * coproduct derivations:
@@ -135,17 +196,19 @@ object AdaptConfig {
   }
 
   val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
-  val ingestConfig: IngestConfig = loadConfigOrThrow[IngestConfig]("adapt.ingest")
-  val runFlow = loadConfigOrThrow[String]("adapt.runflow")
-  val runtimeConfig = loadConfigOrThrow[RuntimeConfig]("adapt.runtime")
-  val envConfig = loadConfigOrThrow[EnvironmentConfig]("adapt.env")
-  val admConfig = loadConfigOrThrow[AdmConfig]("adapt.adm")
-  val ppmConfig = loadConfigOrThrow[PpmConfig]("adapt.ppm")
-  val testWebUi = loadConfigOrThrow[Boolean]("adapt.test.web-ui")
 
-  case class AdaptConfig(runflow: String, ingest: IngestConfig, runtime: RuntimeConfig, env: EnvironmentConfig, adm: AdmConfig, ppm: PpmConfig, test: TestConfig)
-  implicit val h90 = ProductHint[AdaptConfig](plainFieldMapping, allowUnknownKeys = false)
+
+
+
   private val adaptConfig: AdaptConfig = loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
+
+  val ingestConfig: IngestConfig = adaptConfig.ingest
+  val runFlow: String = adaptConfig.runflow
+  val runtimeConfig: RuntimeConfig = adaptConfig.runtime
+  val envConfig: EnvironmentConfig = adaptConfig.env
+  val admConfig: AdmConfig = adaptConfig.adm
+  val ppmConfig: PpmConfig = adaptConfig.ppm
+  val testWebUi: TestConfig = adaptConfig.test
 
 
 
@@ -159,31 +222,12 @@ object AdaptConfig {
     }
   }
 
-  case class IngestConfig(
-      hosts: Set[IngestHost],
-      quitafteringest: Boolean,
-      logduplicates: Boolean,
-      produce: DataModelProduction
-  ) {
-    // TODO: phase this out
-    def asSingleHost: IngestHost = if (hosts.size != 1) {
-      throw new Exception(s"Only a single host was expected! Found instead: $hosts")
-    } else {
-      println("WARNING: you used 'asSingleHost' and it is a temporary hack.")
-      hosts.head
-    }
-
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = hosts
-      .toList
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, h: IngestHost) => acc.merge(h.toCdmSource(handler)))
-  }
-
   case class IngestHost(
       ta1: InstrumentationSource,           // who is producing this data.  TODO do we really need this? we could try to infer from data
       hostName: HostName,
       parallelIngests: Set[LinearIngest],
 
-      loadlimit: Option[Long] = None
+      loadlimit: Option[Long] //  = None
   ) {
     def isWindows: Boolean = ta1.toString.contains("WINDOWS")
     def simpleTa1Name: String = ta1.toString.split('_').last.toLowerCase
@@ -254,9 +298,9 @@ object AdaptConfig {
   }
 
   case class FileIngestUnit(
-      paths: List[FilePath],
-      namespace: Namespace,
-      range: Range
+    paths: List[FilePath],
+    namespace: Namespace,
+    range: Range
   ) extends IngestUnit {
 
     // Falls back on old CDM parsers
@@ -285,10 +329,15 @@ object AdaptConfig {
   }
 
   case class KafkaTopicIngestUnit(
-      topicName: KakfaTopicName,
-      namespace: Namespace,
-      range: Range
+    topicName: KakfaTopicName,
+    namespace: Namespace,
+    range: Range
   ) extends IngestUnit {
+
+    import akka.kafka.scaladsl.Consumer
+    import akka.kafka.{ConsumerSettings, Subscriptions}
+    import org.apache.kafka.common.TopicPartition
+    import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
     // Only tries the newest CDM version
     override def toCdmSourceTry: Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
@@ -297,26 +346,33 @@ object AdaptConfig {
           ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
           Subscriptions.assignmentWithOffset(new TopicPartition(topicName, 0), offset = 0)
         )
-        .map(cr => Lazy { (kafkaCdm19Parser(cr), namespace) })
+        .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm19Parser(cr), namespace) })
       }
   }
+  object KafkaTopicIngestUnit {
 
-  val reader19 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm19.TCCDMDatum])
+    private val reader19 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm19.TCCDMDatum])
 
-  // Parse a `CDM18` from a kafka record
-  def kafkaCdm19Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM19] = Try {
-    val bais = new ByteArrayInputStream(msg.value())  // msg.record.value()
-    val offset = msg.offset()   // msg.record.offset()
-    val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-    val datum = reader19.read(null, decoder)
-    val cdm = new RawCDM19Type(datum.getDatum, Some(datum.getHostId))
-    CDM19.parse(cdm)
-  }.flatten
+    // Parse a `CDM18` from a kafka record
+    def kafkaCdm19Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM19] = Try {
+      import org.apache.avro.io.DecoderFactory
+
+      val bais = new ByteArrayInputStream(msg.value()) // msg.record.value()
+      val offset = msg.offset() // msg.record.offset()
+      val decoder = DecoderFactory.get.binaryDecoder(bais, null)
+      val datum = reader19.read(null, decoder)
+      val cdm = new RawCDM19Type(datum.getDatum, Some(datum.getHostId))
+      CDM19.parse(cdm)
+    }.flatten
+  }
 
   case class CouldNotConvert(cdm: AnyRef, targetCdm: String) extends Exception(s"Could not convert $cdm to $targetCdm")
 
   // Try to make a CDM19 record from a CDM18 one
   def cdm18ascdm19(c: CDM18, dummyHost: UUID): Try[CDM19] = {
+    import com.galois.adapt.cdm19.Cdm18to19
+    import com.galois.adapt.{cdm18 => cdm18types}
+
     implicit val dummy: UUID = dummyHost
     c match {
       case e: cdm18types.Event => Success(Cdm18to19.event(e))
@@ -339,6 +395,9 @@ object AdaptConfig {
 
   // Try to make a CDM18 record from a CDM17 one
   def cdm17ascdm18(c: CDM17, dummyHost: UUID): Try[CDM18] = {
+    import com.galois.adapt.cdm18.Cdm17to18
+    import com.galois.adapt.{cdm17 => cdm17types}
+
     implicit val dummy: UUID = dummyHost
     c match {
       case e: cdm17types.Event => Success(Cdm17to18.event(e))
@@ -376,4 +435,27 @@ object AdaptConfig {
     CDM17.readData(path).map { case (_, iterator) => Source.fromIterator(() => iterator.map { cdm17LazyTry =>
       cdm17LazyTry.map((cdm17Try: Try[CDM17]) => cdm17Try.flatMap(cdm17 => cdm17ascdm18(cdm17, dummyHost).flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost))))
     }) }
+}
+
+trait Utils {
+
+  // Alec: this should exist in Scala 2.12, but doesn't seem to be present in 2.11
+  implicit class EitherOps[A,B](either: Either[A,B]) {
+    def map[B1](f: (B) ⇒ B1): Either[A, B1] = either match {
+      case Left(a) => Left(a)
+      case Right(b) => Right(f(b))
+    }
+
+    def flatMap[A1 >: A, B1](f: (B) ⇒ Either[A1, B1]): Either[A1, B1] = either match {
+      case Left(a) => Left(a)
+      case Right(b) => f(b)
+    }
+  }
+  object EitherOps {
+    def either[A,B](either: Either[A,B]): EitherOps[A,B] = new EitherOps(either)
+    def option[A,B](option: Option[B], err: => A): EitherOps[A,B] = option match {
+      case None => Left(err)
+      case Some(a) => Right(a)
+    }
+  }
 }
