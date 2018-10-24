@@ -67,7 +67,8 @@ case class PpmDefinition[DataShape](
   alarmFilter: PpmNodeActorAlarmDetected => Boolean = _ => true
 )(
   context: ActorContext,
-  alarmActor: ActorRef
+  alarmActor: ActorRef,
+  hostName: HostName
 ) extends LazyLogging {
 
 
@@ -90,7 +91,7 @@ case class PpmDefinition[DataShape](
   val inputAlarmFilePath  = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + "_alarm.json").toOption
   val outputAlarmFilePath =
     if (ppmConfig.shouldsave)
-      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json").toOption
+      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json" + s"_$hostName").toOption
     else None
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldload)
@@ -135,7 +136,7 @@ case class PpmDefinition[DataShape](
     (tree ? PpmNodeActorGetAllCounts(List.empty)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity).map(_.results)
   }
 
-  val saveEveryAndNoMoreThan = ppmConfig.saveintervalseconds.getOrElse(0L)
+  val saveEveryAndNoMoreThan = ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
@@ -150,7 +151,7 @@ case class PpmDefinition[DataShape](
       implicit val timeout = Timeout(593 seconds)
       (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ reprResult =>
         val repr = reprResult.repr
-        outputFilePath.foreach(p => repr.writeToFile(p))
+        outputFilePath.foreach(p => repr.writeToFile(p + s"_$hostName"))
         outputAlarmFilePath.foreach((fp: String) => {
           import spray.json._
           import ApiJsonProtocol._
@@ -161,7 +162,7 @@ case class PpmDefinition[DataShape](
           Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
         })
 
-        if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync()
+        if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
 
         lastSaveCompleteMillis.set(System.currentTimeMillis)
         isCurrentlySaving.set(false)
@@ -232,13 +233,13 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   }
 
 
-  def saveStateSync(): Unit = {
+  def saveStateSync(hostName: HostName): Unit = {
     outputFilePath.foreach { savePath =>
       Try {
         import spray.json._
         import ApiJsonProtocol._
 
-        val outputFile = new File(savePath + ".partialMap")
+        val outputFile = new File(savePath + ".partialMap" + s"_$hostName")
         if (!outputFile.exists) outputFile.createNewFile()
 
         val writer = new BufferedWriter(new FileWriter(outputFile))
@@ -516,7 +517,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
       _.asInstanceOf[cdm18.Event].timestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Subject",
       d => d.isInstanceOf[cdm18.Subject],
@@ -533,7 +534,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
       _ => 0L
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Netflow",
       d => d.isInstanceOf[cdm18.NetFlowObject],
@@ -549,7 +550,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
       _ => 0L
-    )(thisActor.context, context.self)
+    )(thisActor.context, context.self, hostName)
     ,
     PpmDefinition[CDM]("CDM-FileObject",
       d => d.isInstanceOf[cdm18.FileObject],
@@ -566,7 +567,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
       _ => 0L
-    )(thisActor.context, context.self)
+    )(thisActor.context, context.self, hostName)
   ).par
 
 
@@ -580,7 +581,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos,
       _ => false
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",
       d => d._3.nonEmpty,
@@ -590,7 +591,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
       d => d._3.nonEmpty,
@@ -600,7 +601,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self)
+    )(thisActor.context, context.self, hostName)
   ).par
 
 
@@ -617,7 +618,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
       d => readAndWriteTypes.contains(d._1.eventType),
@@ -631,7 +632,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
       d => d._1.eventType == EVENT_EXECUTE,
@@ -645,7 +646,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
       d => d._3._1.isInstanceOf[AdmNetFlowObject],
@@ -662,7 +663,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
       d => d._3._1.isInstanceOf[AdmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
@@ -679,7 +680,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
@@ -693,7 +694,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
       d => d._2._2.exists(p => sudoOrPowershellComparison(p.path)),
@@ -707,7 +708,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
       d => d._1.eventType == PSEUDO_EVENT_PARENT_SUBJECT && d._2._2.isDefined && d._3._2.isDefined,
@@ -721,7 +722,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self),
+    )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]("SummarizedProcessActivity",
       d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
@@ -746,7 +747,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self)
+    )(thisActor.context, context.self, hostName)
 
 //    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
 //      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
@@ -795,7 +796,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self) with PartialPpm[String] {
+    )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
         observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
@@ -829,7 +830,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self) with PartialPpm[String] {
+    )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
         observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
@@ -878,7 +879,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self) with PartialPpm[AdmUUID] {
+    )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
 
@@ -921,9 +922,9 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos
-    )(thisActor.context, context.self) with PartialPpm[AdmUUID] {
+    )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
-      def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)
+      def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
 
       override def arrangeExtracted(extracted: List[ExtractedValue]) = extracted.tail :+ extracted.head
 
@@ -947,8 +948,11 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   val iforestEnabled = ppmConfig.iforestenabled
 
 
-  lazy val admPpmTrees = esoTrees ++ seoesTrees ++ oeseoTrees
-  lazy val iforestTreesToUse = if (iforestEnabled) iforestTrees else Nil
+  lazy val admPpmTrees =
+    if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
+    else esoTrees ++ seoesTrees ++ oeseoTrees
+
+  lazy val iforestTreesToUse = if (iforestEnabled && hostName != hostNameForAllHosts) iforestTrees else Nil
 
   val ppmList =
     if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
@@ -986,14 +990,14 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
     case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
       ppm(treeName).fold(
-        log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp")
+        log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
         ppm(a.treeName)
       ).fold(
-        log.warning(s"Could not find tree named: ${setOfAlarms.headOption} to record many Alarms")
+        log.warning(s"Could not find tree named: ${setOfAlarms.headOption.map(_.treeName)} to record many Alarms from: $sender")
       )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
         tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
       })

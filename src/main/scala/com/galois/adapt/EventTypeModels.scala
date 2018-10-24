@@ -86,7 +86,7 @@ object EventTypeModels {
 
     def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String, modelName: String = "iforest"): Unit = {
       val settings = new CsvWriterSettings
-      val file = new File(filePath)
+      val file = new File(filePath)   // TODO: The hostname is not considered when writing to a file. That may overwrite data for multiple hosts!!!!!!!!!!!!!!!!!!!!
       if (file.exists()) file.createNewFile()
       val pw = new PrintWriter(file)
       val writer = new CsvWriter(pw, settings)
