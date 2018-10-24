@@ -169,7 +169,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
 
-      if (testWebUi) {
+      if (testWebUi.`web-ui`) {
         if (toDisplay.nonEmpty) {
           println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
           Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
