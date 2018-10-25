@@ -8,6 +8,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers._
+import akka.parboiled2.RuleTrace
 import akka.stream.Materializer
 import akka.pattern.ask
 import akka.util.Timeout
@@ -264,8 +265,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     trait Policy3Result
     trait InsufficientData extends Policy3Result
-    case class Pass(msg:String="") extends Policy3Result
-    case class Fail(msg:String="") extends Policy3Result
+    case class Policy3Pass(msg:String="") extends Policy3Result
+    case class Policy3Fail(msg:String="") extends Policy3Result
 
     type TimestampNanos = Long
     trait NodeId
@@ -287,22 +288,27 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
     }
 
+
+    def getProcess(query: String) = {
+      jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(query)).map(_.map(ProcessNodeId))
+    }
+
     //get all process
     def getProcessWhichTriggeredNetflow(nflowNode: NetflowNodeId,timeInterval:TimeInterval) = {
       val query = s"""g.V(${nflowNode.nodeId}).in('predicateObject','predicateObject2').out('subject').hasLabel('AdmSubject').has('subjectType', SUBJECT_PROCESS)"""
-      val processNodes = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(query))
+      val processNodes = getProcess(query)
       processNodes
     }
 
     def provider = "fiveDirections"
 
-    def getNetFlows(): Future[List[Int]] = {
+    def getNetFlows() = {
     val queryGetNetFlow = s"""g.V().hasLabel('AdmNetFlowObject').has('localAddress', '$localAddress').has('localPort', $localPort).has('remoteAddress', '$remoteAddress').has('remotePort', $remotePort)"""
-    val netFlowIds: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(queryGetNetFlow))
+    val netFlowIds = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(queryGetNetFlow)).map(_.map(NetflowNodeId))
     netFlowIds
     }
 
-    def checkPolicy(netflowId: Int):Policy3Result = {
+    def checkPolicy(netflowId: NetflowNodeId):Future[Policy3Result] = {
       provider match {
         case "fiveDirections" => fived(netflowId)
         case "trace" => trace(netflowId)
@@ -312,40 +318,80 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       }
     }
 
-    def trace(netflowId: Int) = {
+    def trace(netflowId: NetflowNodeId) = {
+//      - check for process in parent tree that is connected to: /dev/tty*  e.g. "/dev/tty5" number is between 1 and 7. Connection indicates human activity.
+//        - ensure no ancestor has closed the connection to /dev/tty* in the relevant time window.
+//
+//        CLOSE: process p at t1
+//        NETFLOW: at t2  (t2 > t1)
+//      It is possible that the human-generated activity is read from memory _after_ the CLOSE event. (but we can ignore this condition for the demo).
+
+      getProcessWhichTriggeredNetflow()
+      def didProcessRecvUIEvents(p: ProcessNodeId) = {
+          //filter on types of events? EVENT_CLOSE/EVENT_OPEN
+        val query = s"""g.V($p).in('subject').hasLabel('AdmEvent')."""
+        ???}
+
+
       ???
     }
 
-    case class RelatedSubjects(parent:AdmSubject, children:List[AdmSubject], siblings:List[AdmSubject]){
+    case class RelatedSubjects(ancestors:List[ProcessNodeId], children:List[ProcessNodeId], siblings:List[ProcessNodeId]){
 
     }
     def fived(netflowId: NetflowNodeId) = {
       implicit val _: Timeout = 10.minutes
 
-      def checkPolicy(netflowId: NetflowNodeId):Policy3Result = {
+      def checkPolicy(netflowId: NetflowNodeId):Future[Policy3Result] = {
         val query = s"""g.V(${netflowId.nodeId}).hasLabel('AdmNetFlowObject').in('predicateObject','predicateObject2').as('nflow').out('subject').dedup().as('procs').out('cmdLine','(cmdLine)','exec').values('path').as('paths').select('procs').in('subject').has('eventType', 'EVENT_RECVMSG').out('predicateObject','predicateObject2').hasLabel('AdmSrcSinkObject').has('srcSinkType', 'SRCSINK_USER_INPUT').select('paths').dedup()"""
 
-        val processList = getProcessWhichTriggeredNetflow(netflowId, toInterval(timestampSeconds))
+        val processList: Future[List[ProcessNodeId]] = getProcessWhichTriggeredNetflow(netflowId, toInterval(timestampSeconds))
 
         //for a process, get their connected process [These could be their parent, children or siblings]
-        def getRelatedProcess(p:AdmSubject):RelatedSubjects = {
-          val queryChildren = s""""""
-          ???
-        }
+        def getRelatedProcess(p:ProcessNodeId) = {
+          val maxN = 10
+          val queryChildren = s""".repeat(_.in('parentSubject')).times(${maxN}I).emit().dedup()"""
+          val queryAncestors = s""".repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()"""
+          val querySiblings = s""".out('parentSubject')"""+queryChildren //g.V(2286).out('parentSubject').repeat(_.in('parentSubject')).emit().dedup()
 
+          val children = getProcess(queryChildren)
+          val ancestors = getProcess(queryAncestors)
+          val siblings = getProcess(querySiblings)
+
+          for {a <- ancestors; c <- children; s <- siblings } yield RelatedSubjects(a, c, s)
+        }
 
         // find the netflow, then get the connected process using AdmEvent, finally get all EVENT_RECVMSG into the process
         //g.V().hasLabel('AdmNetFlowObject').has('localAddress','128.55.12.81').has('localPort',50956)
         //x = 2301; g.V(x).in().hasLabel('AdmEvent').has('eventType', 'EVENT_RECVMSG')
+
         //confirm that tht EVENT_RECVMSG are connected to SRCSINK_USER_INPUT
-        ???
+        //x = 2301; g.V(x).in().hasLabel('AdmEvent').has('eventType', 'EVENT_RECVMSG').out('predicateObject', 'predicateObject2').hasLabel('AdmSrcSinkObject').has('srcSinkType', 'SRCSINK_USER_INPUT').dedup()
+
+        val result: Future[Map[ProcessNodeId, Future[RelatedSubjects]]] = processList.map(_.map(p=>p->getRelatedProcess(p)).toMap)
+
+        def didProcessRecvUiMsg(p:ProcessNodeId) = {
+          val query = s"""g.V($ProcessNodeId).in().hasLabel('AdmEvent').has('eventType', 'EVENT_RECVMSG').out('predicateObject', 'predicateObject2').hasLabel('AdmSrcSinkObject').has('srcSinkType', 'SRCSINK_USER_INPUT').dedup()"""
+          sendQueryAndTypeResultAsJsonArray(query).map(! _.elements.isEmpty)
+          //jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(queryGetNetFlow)).map(_.map(NetflowNodeId))
+        }
+
+        def filterProcess(relatedP: Future[Map[ProcessNodeId,Future[RelatedSubjects]]]):Future[List[ProcessNodeId]] = {???}
+
+        //val x: Future[List[Future[Boolean]]] = filterProcess(result).map( _.map(checkProcessRecvdUiMsg))//(_.exists(i=>checkProcessRecvdUiMsg(i)))
+        //val y = x.map(Future.sequence).flatMap(i=>i)
+
+        val didAnyProcessRecvUiMsg: Future[Boolean] = filterProcess(result).map(i=>Future.sequence(i.map(didProcessRecvUiMsg))).flatMap(identity).map(_.exists(_ == true))
+
+        didAnyProcessRecvUiMsg.map(if(_) Policy3Pass() else Policy3Fail())
+        //TODO: FIlter using time stamp!
       }
 
 
-      ???
+      checkPolicy(netflowId)
     }
 
-    def marple(netflowId: Int) = {???}
+    def marple(netflowId: NetflowNodeId) = {???}
 
 
 
@@ -413,11 +459,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
             val srcSinkTypeFut = futQueryGetValue(getSrcSinkTypesAssociatedWithEvent(tagId),"srcSinkType")
 
             srcSinkTypeFut.map {
-              case Some("SRCSINK_UI") => Some(new Pass {})
+              case Some("SRCSINK_UI") => Some(new Policy3Pass {})
               case _ => None
             }
           }
-          
+
           // If any of the provenance tag nodes listed on the event node (in the peTagIds field) are associated with
           // a SRCSINK_UI, then the event was generated from the UI.
           Future.fold(hasUISeqFut)(None:Option[Policy3Result]){(acc,inst) => if (inst.isDefined) inst else acc}
@@ -427,7 +473,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     val resultFuture = nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long).map{
       case Some(s) => s match {
-        case _ : Pass =>
+        case _ : Policy3Pass =>
           val result: Int = 200
           val messageOpt = Some("PASS")
           returnPolicyResult(result, messageOpt, responseUri)
@@ -447,8 +493,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
 
     val result = getNetFlows.map{_ match {
+      case List(x) => checkPolicy(x)//ambiguous: use time range to resolve
       case hd::tail => if (tail.isEmpty) checkPolicy(hd) else ??? //ambiguous: use time range to resolve
-      case Nil => Fail("error: requested NetFlow not found") //error: requested NetFlow not found
+      case Nil => Policy3Fail("error: requested NetFlow not found") //error: requested NetFlow not found
     }
     }
 
