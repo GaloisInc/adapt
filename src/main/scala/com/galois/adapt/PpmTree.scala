@@ -750,7 +750,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
 //    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
