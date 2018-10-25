@@ -3,30 +3,16 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util.UUID
-
-import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
 import akka.util.{ByteString, Timeout}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm17.{CDM17, RawCDM17Type}
-import com.galois.adapt.{cdm17 => cdm17types}
-import com.galois.adapt.cdm18.{CDM18, Cdm17to18, RawCDM18Type}
-import com.galois.adapt.{cdm18 => cdm18types}
-import shapeless.Lazy
-//import com.typesafe.config.ConfigFactory
-import org.apache.avro.io.DecoderFactory
-import org.apache.avro.specific.SpecificDatumReader
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import FlowComponents._
+import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -35,13 +21,12 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
+import AdaptConfig._
 
 
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
-
-  import AdaptConfig._
 
   implicit val system = ActorSystem("production-actor-system")
   val log: LoggingAdapter = Logging.getLogger(system, this)
@@ -118,19 +103,32 @@ object Application extends App {
     seenEdges
   )
 
-  val ppmManagerActor: Option[ActorRef] = runFlow match {
-    case "accept" => None
+  val hostNameForAllHosts = "BetweenHosts"
+  val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
+    case "accept" => Map.empty
     case _ =>
-      val ref = system.actorOf(Props(classOf[PpmManager]), "ppm-actor")
-      ppmConfig.saveintervalseconds match {
-        case Some(i) if i > 0L =>
-          println(s"Saving PPM trees every $i seconds")
-          val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
-          system.registerOnTermination(cancellable.cancel())
-        case _ => println("Not going to periodically save PPM trees.")
-      }
-      Some(ref)
+      val hostNames = ingestConfig.hosts.map(_.hostName)
+      hostNames.map { hostName =>
+        val ref = system.actorOf(Props(classOf[PpmManager], hostName), s"ppm-actor-$hostName")
+        ppmConfig.saveintervalseconds match {
+          case Some(i) if i > 0L =>
+            println(s"Saving PPM trees every $i seconds")
+            val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
+            system.registerOnTermination(cancellable.cancel())
+          case _ => println("Not going to periodically save PPM trees.")
+        }
+        hostName -> ref
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts), s"ppm-actor-$hostNameForAllHosts"))
   }
+
+  // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
+  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
+    import GraphDSL.Implicits._
+    val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
+    val broadcast = b.add(Broadcast[T](actorList.size))
+    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck(ref, InitMsg, Ack, CompleteMsg) }
+    SinkShape(broadcast.in)
+  })
 
   // Coarse grain filtering of the input CDM
   var filter: Option[Filterable => Boolean] = None
@@ -163,14 +161,12 @@ object Application extends App {
     }
 
 
-
-
   // Mutable state that gets updated during ingestion
   var failedStatements: List[(Int, String)] = Nil
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActor, cdm2admMaps, cdm2cdmMaps)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors, cdm2admMaps, cdm2cdmMaps)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
@@ -239,7 +235,7 @@ object Application extends App {
 
       singleIngestHost.toCdmSource()
         .via(printCounter("E3 Training", statusActor, startingCount))
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .runWith(PpmFlowComponents.ppmSink)
 
@@ -250,7 +246,7 @@ object Application extends App {
       singleIngestHost.toCdmSource()
         .via(printCounter("E3", statusActor, startingCount))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .via(splitToSink(PpmFlowComponents.ppmSink, 1000))
         .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
@@ -263,7 +259,7 @@ object Application extends App {
       // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
         .via(printCounter("E3 (no DB)", statusActor, startingCount))
         .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](Sink.actorRefWithAck(ppmManagerActor.get, InitMsg, Ack, CompleteMsg), 1000))
+        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
         .runWith(PpmFlowComponents.ppmSink)
 

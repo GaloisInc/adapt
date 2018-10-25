@@ -17,7 +17,7 @@ import scala.util.{Failure, Try}
 
 package object cdm18 {
 
-  trait CDM18
+  trait CDM18 extends CdmVersion
 
   object CDM18 {
     val values = Seq(Principal, ProvenanceTagNode, TagRunLengthTuple, Value, CryptographicHash, Subject, AbstractObject, FileObject, UnnamedPipeObject, RegistryKeyObject, NetFlowObject, MemoryObject, SrcSinkObject, Event, UnitDependency, TimeMarker)
