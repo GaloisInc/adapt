@@ -11,7 +11,7 @@ object Cdm18to19 {
   implicit def subjectType(st: cdm18.SubjectType): cdm19.SubjectType = cdm19.SubjectType.from(st.toString).get
   implicit def privilegeLevel(pl: cdm18.PrivilegeLevel): cdm19.PrivilegeLevel = cdm19.PrivilegeLevel.from(pl.toString).get
   implicit def srcSinkType(pl: cdm18.SrcSinkType): cdm19.SrcSinkType = cdm19.SrcSinkType.from(pl.toString).get
-  // TODO instrumentation sources
+  implicit def instrumentationSource(is: cdm18.InstrumentationSource): cdm19.InstrumentationSource = cdm19.InstrumentationSource.from(is.toString).get
   implicit def principalType(pt: cdm18.PrincipalType): cdm19.PrincipalType = cdm19.PrincipalType.from(pt.toString).get
   implicit def eventType(e: cdm18.EventType): cdm19.EventType = cdm19.EventType.from(e.toString).get
   implicit def FileObjectType(fo: cdm18.FileObjectType): cdm19.FileObjectType = cdm19.FileObjectType.from(fo.toString).get

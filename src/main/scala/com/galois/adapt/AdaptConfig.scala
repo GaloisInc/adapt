@@ -225,7 +225,10 @@ object AdaptConfig extends Utils {
   }
 
   case class IngestHost(
-      ta1: InstrumentationSource,           // who is producing this data.  TODO do we really need this? we could try to infer from data
+      ta1: InstrumentationSource, /* who is producing this data. We need this because we need to know who is producing
+                                   * data before data actually arrives. That means we can only assert the provider after
+                                   * the fact.
+                                   */
       hostName: HostName,
       parallelIngests: Set[LinearIngest],
 
@@ -236,7 +239,7 @@ object AdaptConfig extends Utils {
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallelIngests
       .toList
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler)))
+      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, ta1)))
       .take(loadlimit.getOrElse(Long.MaxValue))
   }
 
@@ -271,9 +274,9 @@ object AdaptConfig extends Utils {
     range: Range = Range(),
     sequentialUnits: List[IngestUnit]
   ) {
-    def toCdmSource(handler: ErrorHandler): Source[(Namespace,CDM19), NotUsed] = {
+    def toCdmSource(handler: ErrorHandler, checkAgainst: InstrumentationSource): Source[(Namespace,CDM19), NotUsed] = {
       val croppedRange: Source[Lazy[(Try[CDM19], Namespace)], NotUsed] = range.applyToSourceMessage(
-        sequentialUnits.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry))
+        sequentialUnits.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(checkAgainst)))
       )
 
       // Only now do we actually force the parsing of the CDM19 (ie. purge the `Lazy`)
@@ -296,7 +299,7 @@ object AdaptConfig extends Utils {
     val range: Range
 
     // The `Lazy` is so that we can skip past records without actually parsing them.
-    def toCdmSourceTry: Source[Lazy[(Try[CDM19], Namespace)], _]
+    def toCdmSourceTry(checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _]
   }
 
   case class FileIngestUnit(
@@ -306,7 +309,7 @@ object AdaptConfig extends Utils {
   ) extends IngestUnit {
 
     // Falls back on old CDM parsers
-    override def toCdmSourceTry: Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
+    override def toCdmSourceTry(checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
 
       val pathsExpanded: List[FilePath] = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
@@ -323,7 +326,8 @@ object AdaptConfig extends Utils {
             println(s"Failed to read file $path as CDM19, CDM18, or CDM17. Skipping it for now.")
             acc
 
-          case Success(source: Source[Lazy[Try[CDM19]], NotUsed]) =>
+          case Success((is: InstrumentationSource, source: Source[Lazy[Try[CDM19]], NotUsed])) =>
+            assert(is == checkAgainst, "Instrumentation source specified at host does not match source read from file!")
             acc.concat(source.map(lazyTryCdm => lazyTryCdm.map(_ -> namespace)))
         }
       }
@@ -341,14 +345,15 @@ object AdaptConfig extends Utils {
     import org.apache.kafka.common.TopicPartition
     import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
-    // Only tries the newest CDM version
-    override def toCdmSourceTry: Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
-      Consumer
-        .plainSource(
-          ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
-          Subscriptions.assignmentWithOffset(new TopicPartition(topicName, 0), offset = 0)
-        )
-        .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm19Parser(cr), namespace) })
+    // Only tries the newest CDM version, also doesn't check that we were right with the provider
+    override def toCdmSourceTry(_checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _] =
+      range.applyToSource {
+        Consumer
+          .plainSource(
+            ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
+            Subscriptions.assignmentWithOffset(new TopicPartition(topicName, 0), offset = 0)
+          )
+          .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm19Parser(cr), namespace) })
       }
   }
   object KafkaTopicIngestUnit {
@@ -423,20 +428,33 @@ object AdaptConfig extends Utils {
   val dummyHost: UUID = new java.util.UUID(0L,1L)
 
   // Read a CDM19 file in
-  def readCdm19(path: FilePath): Try[Source[Lazy[Try[CDM19]], NotUsed]] =
-    CDM19.readData(path).map { case (_, iterator) => Source.fromIterator(() => iterator) }
+  def readCdm19(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] =
+    CDM19.readData(path).map { case (is, iterator) => (is, Source.fromIterator(() => iterator)) }
 
   // Read a CDM18 file in and, if it works convert it to CDM19
-  def readCdm18(path: FilePath): Try[Source[Lazy[Try[CDM19]], NotUsed]] =
-    CDM18.readData(path).map { case (_, iterator) => Source.fromIterator(() => iterator.map { cdm18LazyTry =>
-      cdm18LazyTry.map((cdm18Try: Try[CDM18]) => cdm18Try.flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost)))
-    }) }
+  def readCdm18(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] = {
+    import com.galois.adapt.cdm19.Cdm18to19
+
+    CDM18.readData(path).map { case (is, iterator) => (
+      Cdm18to19.instrumentationSource(is),
+      Source.fromIterator(() => iterator.map { cdm18LazyTry =>
+        cdm18LazyTry.map((cdm18Try: Try[CDM18]) => cdm18Try.flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost)))
+      })
+    ) }
+  }
 
   // Read a CDM17 file in and, if it works convert it to CDM18 then CDM19
-  def readCdm17(path: FilePath): Try[Source[Lazy[Try[CDM19]], NotUsed]] =
-    CDM17.readData(path).map { case (_, iterator) => Source.fromIterator(() => iterator.map { cdm17LazyTry =>
-      cdm17LazyTry.map((cdm17Try: Try[CDM17]) => cdm17Try.flatMap(cdm17 => cdm17ascdm18(cdm17, dummyHost).flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost))))
-    }) }
+  def readCdm17(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] = {
+    import com.galois.adapt.cdm18.Cdm17to18
+    import com.galois.adapt.cdm19.Cdm18to19
+
+    CDM17.readData(path).map { case (is, iterator) => (
+      Cdm18to19.instrumentationSource(Cdm17to18.instrumentationSource(is)),
+      Source.fromIterator(() => iterator.map { cdm17LazyTry =>
+        cdm17LazyTry.map((cdm17Try: Try[CDM17]) => cdm17Try.flatMap(cdm17 => cdm17ascdm18(cdm17, dummyHost).flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost))))
+      })
+    ) }
+  }
 }
 
 trait Utils {
