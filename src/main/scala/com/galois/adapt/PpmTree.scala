@@ -11,11 +11,13 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
+
 import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
+
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -24,6 +26,8 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
+
+import scala.collection.parallel.ParSeq
 
 
 object NoveltyDetection {
@@ -955,7 +959,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   lazy val iforestTreesToUse = if (iforestEnabled && hostName != hostNameForAllHosts) iforestTrees else Nil
 
   val ppmList =
-    if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
+    if (hostName == hostNameForAllHosts) oeseoTrees    // TODO: What are the right trees to include here????????????????????????????????????????
     else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
 

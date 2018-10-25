@@ -118,9 +118,14 @@ $(function(){
 		localStorage.setItem("renderedTrees", treeNames.join(","))
 		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(treeNames, t) })
 
+
+		var allHostNames = Array.from(new Set(_.map(treeNames, function(n){ return n.split("___")[0] })))
+		_.map(allHostNames, function(hn){ $("#trees").append("<div id='"+hn+"_div'><h2>"+hn+"</h2></div>") })
+
 		_.map(_.sortBy(treeNames), function(name) {
-			$("#trees").append(
-				"<table id=" + name + ">"+
+			var hn = name.split("___")[0]
+			$("#"+hn+"_div").append(
+				"<table id=" + name + ">"+ 
 					"<thead><tr>"+
 					"<th></th> <th></th> <th></th> <th></th> <th></th>"+
 					"</tr></thead>"+
