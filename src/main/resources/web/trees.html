@@ -119,7 +119,7 @@ $(function(){
 		var unrenderedTrees = _.filter(names, function(t){ return ! _.contains(treeNames, t) })
 
 
-		var allHostNames = Array.from(new Set(_.map(treeNames, function(n){ return n.split("___")[0] })))
+		var allHostNames = Array.from(new Set(_.map(treeNames, function(n){ return n.split("___")[0] }))).sort()
 		_.map(allHostNames, function(hn){ $("#trees").append("<div id='"+hn+"_div'><h2>"+hn+"</h2></div>") })
 
 		_.map(_.sortBy(treeNames), function(name) {
