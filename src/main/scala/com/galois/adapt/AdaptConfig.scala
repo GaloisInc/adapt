@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.galois.adapt.cdm17.CDM17
 import com.galois.adapt.cdm18.CDM18
-import com.galois.adapt.cdm19.{CDM19, InstrumentationSource, RawCDM19Type}
+import com.galois.adapt.cdm19.{CDM19, RawCDM19Type}
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
@@ -30,13 +30,13 @@ object AdaptConfig extends Utils {
 
 
   case class AdaptConfig(
-      runflow: String,
-      ingest: IngestConfig,
-      runtime: RuntimeConfig,
-      env: EnvironmentConfig,
-      adm: AdmConfig,
-      ppm: PpmConfig,
-      test: TestConfig
+    runflow: String,
+    ingest: IngestConfig,
+    runtime: RuntimeConfig,
+    env: EnvironmentConfig,
+    adm: AdmConfig,
+    ppm: PpmConfig,
+    test: TestConfig
   )
 
   case class IngestConfig(
@@ -140,7 +140,7 @@ object AdaptConfig extends Utils {
   private implicit val _hint9  = ProductHint[IngestHost](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
   private implicit val _hint10 = ProductHint[IngestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
   private implicit val _hint11 = ProductHint[AdaptConfig](plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint12 = new EnumCoproductHint[InstrumentationSource] {
+  private implicit val _hint12 = new EnumCoproductHint[DataProvider] {
     override def fieldValue(name: String): String = name
   }
 
@@ -204,7 +204,7 @@ object AdaptConfig extends Utils {
 
   private val adaptConfig: AdaptConfig = loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
 
-  val ingestConfig: IngestConfig = adaptConfig.ingest
+  var ingestConfig: IngestConfig = adaptConfig.ingest
   val runFlow: String = adaptConfig.runflow
   val runtimeConfig: RuntimeConfig = adaptConfig.runtime
   val envConfig: EnvironmentConfig = adaptConfig.env
@@ -225,22 +225,37 @@ object AdaptConfig extends Utils {
   }
 
   case class IngestHost(
-      ta1: InstrumentationSource, /* who is producing this data. We need this because we need to know who is producing
-                                   * data before data actually arrives. That means we can only assert the provider after
-                                   * the fact.
-                                   */
+      var ta1: Option[DataProvider] = None,
+        /* who is producing this data. We need this because we need to know who is producing
+         * data before data actually arrives. That means we can only assert the provider after
+         * the fact.
+         */
+
       hostName: HostName,
       parallelIngests: Set[LinearIngest],
 
       loadlimit: Option[Long] = None
   ) {
-    def isWindows: Boolean = ta1.toString.contains("WINDOWS")
-    def simpleTa1Name: String = ta1.toString.split('_').last.toLowerCase
+    def isWindows: Boolean = DataProvider.isWindows(
+      ta1.getOrElse(throw new Exception("No instrumentation source found - make sure `toCdmSource` has mean called first"))
+    )
+
+    def simpleTa1Name: String = ta1
+      .getOrElse(throw new Exception("No instrumentation source found - make sure `toCdmSource` has mean called first"))
+      .toString
+      .toLowerCase
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallelIngests
       .toList
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, ta1)))
+      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       .take(loadlimit.getOrElse(Long.MaxValue))
+
+    def updateHost(is: DataProvider): Unit = ta1 match {
+      case None => ta1 = Some(is)
+      case Some(isOld) => if (is != isOld) {
+        assert(is == isOld, s"Inconsistent instrumentation source $is != $isOld!")
+      }
+    }
   }
 
   case class Range(
@@ -274,9 +289,12 @@ object AdaptConfig extends Utils {
     range: Range = Range(),
     sequentialUnits: List[IngestUnit]
   ) {
-    def toCdmSource(handler: ErrorHandler, checkAgainst: InstrumentationSource): Source[(Namespace,CDM19), NotUsed] = {
+    def toCdmSource(
+        handler: ErrorHandler,
+        check: DataProvider => Unit = { _ => }
+    ): Source[(Namespace,CDM19), NotUsed] = {
       val croppedRange: Source[Lazy[(Try[CDM19], Namespace)], NotUsed] = range.applyToSourceMessage(
-        sequentialUnits.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(checkAgainst)))
+        sequentialUnits.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(check)))
       )
 
       // Only now do we actually force the parsing of the CDM19 (ie. purge the `Lazy`)
@@ -299,7 +317,7 @@ object AdaptConfig extends Utils {
     val range: Range
 
     // The `Lazy` is so that we can skip past records without actually parsing them.
-    def toCdmSourceTry(checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _]
+    def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _]
   }
 
   case class FileIngestUnit(
@@ -309,7 +327,7 @@ object AdaptConfig extends Utils {
   ) extends IngestUnit {
 
     // Falls back on old CDM parsers
-    override def toCdmSourceTry(checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
+    override def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
 
       val pathsExpanded: List[FilePath] = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
@@ -326,8 +344,8 @@ object AdaptConfig extends Utils {
             println(s"Failed to read file $path as CDM19, CDM18, or CDM17. Skipping it for now.")
             acc
 
-          case Success((is: InstrumentationSource, source: Source[Lazy[Try[CDM19]], NotUsed])) =>
-            assert(is == checkAgainst, "Instrumentation source specified at host does not match source read from file!")
+          case Success((is: DataProvider, source: Source[Lazy[Try[CDM19]], NotUsed])) =>
+            check(is)
             acc.concat(source.map(lazyTryCdm => lazyTryCdm.map(_ -> namespace)))
         }
       }
@@ -346,7 +364,7 @@ object AdaptConfig extends Utils {
     import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
     // Only tries the newest CDM version, also doesn't check that we were right with the provider
-    override def toCdmSourceTry(_checkAgainst: InstrumentationSource): Source[Lazy[(Try[CDM19], Namespace)], _] =
+    override def toCdmSourceTry(_check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _] =
       range.applyToSource {
         Consumer
           .plainSource(
@@ -428,15 +446,18 @@ object AdaptConfig extends Utils {
   val dummyHost: UUID = new java.util.UUID(0L,1L)
 
   // Read a CDM19 file in
-  def readCdm19(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] =
-    CDM19.readData(path).map { case (is, iterator) => (is, Source.fromIterator(() => iterator)) }
+  def readCdm19(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] =
+    CDM19.readData(path).map { case (is, iterator) => (
+      DataProvider.fromInstrumentationSource(is),
+      Source.fromIterator(() => iterator)
+    ) }
 
   // Read a CDM18 file in and, if it works convert it to CDM19
-  def readCdm18(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] = {
+  def readCdm18(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] = {
     import com.galois.adapt.cdm19.Cdm18to19
 
     CDM18.readData(path).map { case (is, iterator) => (
-      Cdm18to19.instrumentationSource(is),
+      DataProvider.fromInstrumentationSource(Cdm18to19.instrumentationSource(is)),
       Source.fromIterator(() => iterator.map { cdm18LazyTry =>
         cdm18LazyTry.map((cdm18Try: Try[CDM18]) => cdm18Try.flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost)))
       })
@@ -444,12 +465,12 @@ object AdaptConfig extends Utils {
   }
 
   // Read a CDM17 file in and, if it works convert it to CDM18 then CDM19
-  def readCdm17(path: FilePath): Try[(InstrumentationSource, Source[Lazy[Try[CDM19]], NotUsed])] = {
+  def readCdm17(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] = {
     import com.galois.adapt.cdm18.Cdm17to18
     import com.galois.adapt.cdm19.Cdm18to19
 
     CDM17.readData(path).map { case (is, iterator) => (
-      Cdm18to19.instrumentationSource(Cdm17to18.instrumentationSource(is)),
+      DataProvider.fromInstrumentationSource(Cdm18to19.instrumentationSource(Cdm17to18.instrumentationSource(is))),
       Source.fromIterator(() => iterator.map { cdm17LazyTry =>
         cdm17LazyTry.map((cdm17Try: Try[CDM17]) => cdm17Try.flatMap(cdm17 => cdm17ascdm18(cdm17, dummyHost).flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost))))
       })

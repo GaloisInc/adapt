@@ -86,6 +86,17 @@ object Application extends App {
   val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
 
   val singleIngestHost = ingestConfig.asSingleHost
+
+  val handler: ErrorHandler = runFlow match {
+    case "accept" => new ErrorHandler {
+      override def handleError(offset: Long, error: Throwable): Unit = {
+        failedStatements = (offset.toInt, error.getMessage) :: failedStatements
+      }
+    }
+    case _ => ErrorHandler.print
+  }
+
+  val cdmSource = singleIngestHost.toCdmSource(handler)
   val instrumentationSource: String = singleIngestHost.simpleTa1Name
   val startingCount = {
     val List(li: LinearIngest) = singleIngestHost.parallelIngests.toList
@@ -189,13 +200,7 @@ object Application extends App {
 
       startWebServer()
 
-      val handler = new ErrorHandler {
-        override def handleError(offset: Long, error: Throwable): Unit = {
-          failedStatements = (offset.toInt, error.getMessage) :: failedStatements
-        }
-      }
-
-      singleIngestHost.toCdmSource(handler)
+      cdmSource
         .via(printCounter("CDM events", statusActor, startingCount))
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
@@ -224,7 +229,7 @@ object Application extends App {
 
       println(s"Running database flow for $name with UI.")
       startWebServer()
-      singleIngestHost.toCdmSource()
+      cdmSource
         .buffer(10000, OverflowStrategy.backpressure)
         .via(printCounter(name, statusActor, startingCount))
         .runWith(sink)
@@ -233,7 +238,7 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      singleIngestHost.toCdmSource()
+      cdmSource
         .via(printCounter("E3 Training", statusActor, startingCount))
         .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
         .via(er)
@@ -243,7 +248,7 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      singleIngestHost.toCdmSource()
+      cdmSource
         .via(printCounter("E3", statusActor, startingCount))
         .via(filterFlow)
         .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
@@ -255,7 +260,7 @@ object Application extends App {
       startWebServer()
       statusActor ! InitMsg
 
-      singleIngestHost.toCdmSource()
+      cdmSource
       // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
         .via(printCounter("E3 (no DB)", statusActor, startingCount))
         .via(filterFlow)
@@ -265,7 +270,7 @@ object Application extends App {
 
     case "print-cdm" =>
       var i = 0
-      singleIngestHost.toCdmSource()
+      cdmSource
         .map(cdm => println(s"Record $i: ${cdm.toString}"))
         .runWith(Sink.ignore)
 
@@ -298,7 +303,7 @@ object Application extends App {
       tempFile.deleteOnExit()
       val tempPath: String = tempFile.getPath
 
-      singleIngestHost.toCdmSource()
+      cdmSource
         .via(printCounter("CDM", statusActor, startingCount))
         .collect { case (_, e: Event) => getKeys(e) }
         .map((keysHere: Set[String]) => {
@@ -337,7 +342,7 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[Any](9))
 
-            singleIngestHost.toCdmSource()
+            cdmSource
               .via(printCounter("DB Writer", statusActor, startingCount, 10000))
               .via(er)
               .via(Flow.fromFunction {
@@ -366,7 +371,7 @@ object Application extends App {
     case "valuebytes" =>
       println("NOTE: this will run using CDM")
 
-      singleIngestHost.toCdmSource()
+      cdmSource
         .collect{ case (_, e: Event) if e.parameters.nonEmpty => e}
         .flatMapConcat(
           (e: Event) => Source.fromIterator(
@@ -382,7 +387,7 @@ object Application extends App {
     case "uniqueuuids" =>
       println("Running unique UUID test")
       statusActor ! InitMsg
-      singleIngestHost.toCdmSource()
+      cdmSource
         .via(printCounter("UniqueUUIDs", statusActor, startingCount))
         .statefulMapConcat[(UUID,Boolean)] { () =>
         import scala.collection.mutable.{Map => MutableMap}
@@ -404,7 +409,7 @@ object Application extends App {
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
       statusActor ! InitMsg
-      singleIngestHost.toCdmSource()
+      cdmSource
         .via(printCounter("Novelty", statusActor, startingCount))
         .via(er)
         .runWith(PpmFlowComponents.ppmSink)
