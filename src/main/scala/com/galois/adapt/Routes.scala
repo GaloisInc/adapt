@@ -152,7 +152,7 @@ object Routes {
               complete(
                 Future.sequence(
                   ppmActors.map{ case (hostName,ref) => (ref ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(treeNames => hostName -> treeNames.namesAndCounts)) }
-                )
+                ).map(_.toMap)
               )
             } ~
 //          Not used:
@@ -161,26 +161,29 @@ object Routes {
 //              parameter('rating.as(validRating), 'namespace ? "adapt", 'hostName, 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
 //            } ~
             pathPrefix(Segment) { treeName =>
-              parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
-                (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
-                  val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
-                  import ApiJsonProtocol._
-                  parameter('hostName.as[String]) { hostName =>
-                    complete {
-                      (ppmActors(hostName) ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-                        .mapTo[PpmTreeAlarmResult]
-                        .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
-                    }
-                  } ~
-                  complete {
-                    Future.sequence(
-                      ppmActors.map { case (hostName, ppmRef) =>
-                        (ppmRef ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-                        .mapTo[PpmTreeAlarmResult]
-                        .map(t => hostName -> List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+              path(Segment) { hostName =>
+                parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
+                  (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
+                    val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
+                    import ApiJsonProtocol._
+  //                  parameter('hostName.as[String]) { hostName =>
+                      complete {
+                        (ppmActors(hostName) ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+                          .mapTo[PpmTreeAlarmResult]
+                          .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
                       }
-                    )
-                  }
+  //                  }
+  //                  ~
+  //                  complete {
+  //                    Future.sequence(
+  //                      ppmActors.map { case (hostName, ppmRef) =>
+  //                        (ppmRef ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+  //                        .mapTo[PpmTreeAlarmResult]
+  //                        .map(t => hostName -> List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+  //                      }
+  //                    )
+  //                  }
+                }
               }
             }
           } ~

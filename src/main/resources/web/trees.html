@@ -102,9 +102,15 @@ $(function(){
 	}
 
 
-	$.getJSON(hostPrefix + "/api/ppm/listTrees", function(namesAndCounts) {
+	$.getJSON(hostPrefix + "/api/ppm/listTrees", function(namesAndCountsPerHost) {
 
-		console.log("THIS IS BROKEN RIGHT HERE! 'namesAndCounts' now sometimes returns an object (instead of array)")
+		var namesAndCounts = {}
+		_.mapObject(namesAndCountsPerHost, function(nameCounts, hostName) {
+			_.mapObject(nameCounts, function(count, name) {
+				var nameWithHost = hostName + "___" + name
+				namesAndCounts[nameWithHost] = count
+			})
+		})
 
 		var names = _.keys(namesAndCounts)
 		treeNames = _.filter(treeNames, function(t){ return _.contains(names, t) })
@@ -114,7 +120,7 @@ $(function(){
 
 		_.map(_.sortBy(treeNames), function(name) {
 			$("#trees").append(
-				"<table id=" + name + ">"+ 
+				"<table id=" + name + ">"+
 					"<thead><tr>"+
 					"<th></th> <th></th> <th></th> <th></th> <th></th>"+
 					"</tr></thead>"+
@@ -139,16 +145,16 @@ $(function(){
 	}
 
 
-	function createFancyTree(treeName) {
-		
+	function createFancyTree(treeNameWithHost) {
+		var hostName = treeNameWithHost.split("___")[0]
+		var treeName = treeNameWithHost.split("___")[1]
+
 		var shouldExpandAll = false
 
-		console.log("THIS IS BROKEN RIGHT NOW! the api at: /api/ppm/'treeName' has changed! It now returns an array or an object depending whether hostName is provided")
-
-		$("#" + treeName).fancytree({
+		$("#" + treeNameWithHost).fancytree({
 			extensions: ["filter", "table", "childcounter", "multi"],
 			source: {
-				url: hostPrefix + "/api/ppm/" + treeName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
+				url: hostPrefix + "/api/ppm/" + treeName + "/" + hostName + "?namespace=" + namespace + "&resultSizeLimit=" + 10000 + "&excludeRatingBelow=" + 2,
 				cache: false
 			},
 			quicksearch: true,
@@ -224,7 +230,7 @@ $(function(){
 		    titlesTabbable: false, // Node titles can receive keyboard focus
 		    tooltip: false, // Use title as tooltip (also a callback could be specified)
 		    loadChildren: function(event, data) { 
-		    	var tree = $("#" + treeName)
+		    	var tree = $("#" + treeNameWithHost)
 		    	var sortFunc = function(a, b) {
 					var x = a.title.toLowerCase() + (a.isFolder() ? "1" : "0")
 					var y = b.title.toLowerCase() + (b.isFolder() ? "1" : "0")
@@ -253,8 +259,8 @@ $(function(){
 
 		var ratingComparison = toComparisonFunc($("#ratingComparison").val())
 
-		_.map(treeNames, function(treeName){
-			var tree =  $("#" + treeName).fancytree("getTree")   //$.ui.fancytree.getTree()
+		_.map(treeNames, function(treeNameWithHost){
+			var tree =  $("#" + treeNameWithHost).fancytree("getTree")   //$.ui.fancytree.getTree()
 			var filterOptions = {
 				autoExpand: true, // Expand all branches that contain matches while filtered
 				// counter: true,     // Show a badge with number of matching child nodes near parent icons
@@ -262,7 +268,7 @@ $(function(){
 				hideExpanders: true,       // Hide expanders if all child nodes are hidden by filter
 				highlight: true,   // Highlight matches by wrapping inside <mark> tags
 				leavesOnly: false, // Match end nodes only
-				nodata: treeName + ": No matches.", //true,      // Display a 'no data' status node if result is empty
+				nodata: treeNameWithHost + ": No matches.", //true,      // Display a 'no data' status node if result is empty
 				mode: "hide"       // Grayout unmatched nodes with "dimm" ("hide" to remove empty node)
 			}
 
@@ -314,8 +320,8 @@ $(function(){
 		$("#ratingComparison").val("none")
 		$("#ratingValue").val(0)
 		$("span#matches").text("");
-		_.map(treeNames, function(treeName){
-			$("#" + treeName).fancytree("getTree").clearFilter();
+		_.map(treeNames, function(treeNameWithHost){
+			$("#" + treeNameWithHost).fancytree("getTree").clearFilter();
 		})
 	}).attr("disabled", true)
 
@@ -330,8 +336,8 @@ $(function(){
 				var searchPattern = $("#searchText").val()
 				var all_selected_nodes = []
 				var rating_items = {}
-				_.map(treeNames, function(treeName){
-					var tree = $("#" + treeName)
+				_.map(treeNames, function(treeNameWithHost){
+					var tree = $("#" + treeNameWithHost)
 					var selectedElements = tree.fancytree("getTree").getSelectedNodes()
 					var selectedNodes =  _.filter(selectedElements, function(n){return ! n.folder})
 
@@ -343,7 +349,7 @@ $(function(){
 
 					all_selected_nodes = all_selected_nodes.concat(selectedNodes)
 					if ( ! _.isEmpty(selectedNodes)) {
-						rating_items[treeName] = _.map(selectedNodes, function(n){return n.data.key})
+						rating_items[treeNameWithHost] = _.map(selectedNodes, function(n){return n.data.key})
 					}
 				})
 
@@ -364,6 +370,11 @@ $(function(){
 							"namespace" : namespace
 						}
 						$.post(hostPrefix + "/api/ppm/setRatingsMap", payload, function(data, textStatus, jqXHR){
+							
+
+							console.log("THIS IS PROBLABLY BROKEN IF IT DOESN't USE HOSTNAME")
+
+
 							_.map(all_selected_nodes, function(n){
 								n.data.rating = rating
 							})
