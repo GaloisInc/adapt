@@ -162,7 +162,7 @@ object AdaptConfig extends Utils {
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
-              kvs.keySet.diff(Set("type", "paths", "namespace", "range")).toList match {
+              kvs.keySet.diff(Set("type", "paths", "namespace")).toList match {
                 case Nil => Right(())
                 case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
               }
@@ -171,14 +171,15 @@ object AdaptConfig extends Utils {
             // expected fields
             paths     <- cur.atPath("paths").right.flatMap(ConfigReader[List[FilePath]].from)
             namespace <- cur.atPath("namespace").right.flatMap(ConfigReader[Namespace].from)
-            range     <- cur.atPath("range").right.flatMap(ConfigReader[Range].from)
+            range <- cur.atPath("range").right.toOption
+              .fold[Either[ConfigReaderFailures, Range]](Right(Range()))(ConfigReader[Range].from)
           } yield FileIngestUnit(paths, namespace, range)
 
         case "kafka" | "kafkatopic" =>
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
-              kvs.keySet.diff(Set("type", "topicName", "namespace", "range")).toList match {
+              kvs.keySet.diff(Set("type", "topicName", "namespace")).toList match {
                 case Nil => Right(())
                 case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
               }
@@ -187,7 +188,8 @@ object AdaptConfig extends Utils {
             // expected fields
             topicName <- cur.atPath("topicName").right.flatMap(ConfigReader[KakfaTopicName].from)
             namespace <- cur.atPath("namespace").right.flatMap(ConfigReader[Namespace].from)
-            range     <- cur.atPath("range").right.flatMap(ConfigReader[Range].from)
+            range <- cur.atPath("range").right.toOption
+              .fold[Either[ConfigReaderFailures, Range]](Right(Range()))(ConfigReader[Range].from)
           } yield KafkaTopicIngestUnit(topicName, namespace, range)
 
         case _ => Left(ConfigReaderFailures(ConvertFailure(NoValidCoproductChoiceFound(cur.value), cur)))
@@ -227,7 +229,7 @@ object AdaptConfig extends Utils {
       hostName: HostName,
       parallelIngests: Set[LinearIngest],
 
-      loadlimit: Option[Long] //  = None
+      loadlimit: Option[Long] = None
   ) {
     def isWindows: Boolean = ta1.toString.contains("WINDOWS")
     def simpleTa1Name: String = ta1.toString.split('_').last.toLowerCase
@@ -266,7 +268,7 @@ object AdaptConfig extends Utils {
 
   // Largest sequential ingest
   case class LinearIngest(
-    range: Range,
+    range: Range = Range(),
     sequentialUnits: List[IngestUnit]
   ) {
     def toCdmSource(handler: ErrorHandler): Source[(Namespace,CDM19), NotUsed] = {
@@ -300,7 +302,7 @@ object AdaptConfig extends Utils {
   case class FileIngestUnit(
     paths: List[FilePath],
     namespace: Namespace,
-    range: Range
+    range: Range = Range()
   ) extends IngestUnit {
 
     // Falls back on old CDM parsers
@@ -331,7 +333,7 @@ object AdaptConfig extends Utils {
   case class KafkaTopicIngestUnit(
     topicName: KakfaTopicName,
     namespace: Namespace,
-    range: Range
+    range: Range = Range()
   ) extends IngestUnit {
 
     import akka.kafka.scaladsl.Consumer
