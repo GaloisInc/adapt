@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.sys.process._
-import Application.ppmManagerActor
+import Application.ppmManagerActors
 import akka.actor.ActorSystem
 import com.galois.adapt.adm.AdmUUID
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -48,9 +48,9 @@ object EventTypeModels {
 
   object EventTypeData {
 
-    def query(treeName: String): PpmTreeCountResult = Try {
+    def query(treeName: String, hostName: HostName): PpmTreeCountResult = Try {
       implicit val timeout: Timeout = Timeout(60 seconds)
-      val future: Future[Any] = (ppmManagerActor.get ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+      val future: Future[Any] = (ppmManagerActors(hostName) ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
@@ -86,7 +86,7 @@ object EventTypeModels {
 
     def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String, modelName: String = "iforest"): Unit = {
       val settings = new CsvWriterSettings
-      val file = new File(filePath)
+      val file = new File(filePath)   // TODO: The hostname is not considered when writing to a file. That may overwrite data for multiple hosts!!!!!!!!!!!!!!!!!!!!
       if (file.exists()) file.createNewFile()
       val pw = new PrintWriter(file)
       val writer = new CsvWriter(pw, settings)
@@ -147,8 +147,8 @@ object EventTypeModels {
 
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
-  def evaluateModels(system: ActorSystem): Unit  = {
-    val writeResult = EventTypeData.query("iForestProcessEventType").results match {
+  def evaluateModels(system: ActorSystem, hostName: HostName): Unit  = {
+    val writeResult = EventTypeData.query("iForestProcessEventType", hostName).results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
       case _ => println("Query to IForestProcessEventType returned no data.")
         Failure(new RuntimeException("Query to IForestProcessEventType returned no data.")) //If there is no data, we want a failure (this seems hacky)
@@ -166,7 +166,7 @@ object EventTypeModels {
         case Success(alarms) => if (alarms.nonEmpty) {
           val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
           Try {
-            ppmManagerActor.get ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
+            ppmManagerActors(hostName) ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
         }
         // send alarmsDetectedList to actor
@@ -175,7 +175,7 @@ object EventTypeModels {
     }
 
     val iforestRunEveryMinutes = ppmConfig.iforestfreqminutes
-    Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system)))
+    Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system, hostName)))
 
   }
 

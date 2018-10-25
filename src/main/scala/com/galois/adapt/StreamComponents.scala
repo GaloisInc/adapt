@@ -15,8 +15,7 @@ import com.galois.adapt.cdm18._
 object FlowComponents {
   import AdaptConfig._
 
-  def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    val startingCount = ingestConfig.startatoffset
+  def printCounter[T](counterName: String, statusActor: ActorRef, startingCount: Long = 0, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
