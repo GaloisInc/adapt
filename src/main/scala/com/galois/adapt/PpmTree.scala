@@ -21,7 +21,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.collection.mutable
+import scala.collection.{SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
@@ -952,7 +952,6 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
   val iforestEnabled = ppmConfig.iforestenabled
 
-
   lazy val admPpmTrees =
     if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
     else esoTrees ++ seoesTrees ++ oeseoTrees
@@ -964,6 +963,11 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
     else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
 
+  // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
+  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last._2)).toList)
+
+  // Diagnostic print
+  alarmLpAccumulator.print
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -994,6 +998,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   def receive = {
 
     case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
+      alarmLpAccumulator.insert(alarmData.last._2)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
@@ -1331,4 +1336,29 @@ case object TreeRepr {
     val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
     TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
   }.toOption
+}
+
+
+case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbabilities: List[Float]) {
+
+  var lpAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
+    SortedMap.empty(Ordering[Float]) ++ initialLocalProbabilities.groupBy(identity).mapValues(_.size)
+
+  var count : Int = lpAccumulator.values.sum
+
+  def print : Unit = {
+    println("We've seen this many alarms     ", count)
+    println("The 1 percentile threshold is...", getThreshold(1))
+    println("The lp map looks like ", lpAccumulator.toString())
+  }
+
+  def insert(lp: Float): Unit = {
+    lpAccumulator += (lp -> (lpAccumulator.getOrElse(lp,0) + 1))
+    count += 1
+  }
+
+  def getThreshold(percentile: Float): Float = {
+    val percentileOfTotal = percentile/100 * count
+    lpAccumulator.fold((0F,0))((acc,kv) => if(acc._2 < percentileOfTotal) (kv._1,kv._2+acc._2) else acc)._1
+  }
 }
