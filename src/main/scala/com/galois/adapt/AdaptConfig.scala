@@ -142,10 +142,6 @@ object AdaptConfig extends Utils {
   ){
   }
 
-  //import scala.util.{Failure, Success}
-
-
-
   val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
 
   private implicit val _hint1  = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
@@ -519,4 +515,3 @@ trait Utils {
     }
   }
 }
-

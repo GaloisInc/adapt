@@ -14,25 +14,28 @@ import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import spray.json.{JsObject, JsValue, JsString, JsNumber}
 
-case class Alarm (Key:String, localProbability:Float, globalProbability:Float, count:Int, siblingPop:Int, parentCount:Int, depthOfLocalProbabilityCalculation:Int){
-  def toJson:JsValue = {
-    JsObject(
-      "Key" -> JsString(this.Key),
-      "localProbability" -> JsNumber(this.localProbability),
-      "globalProbability" -> JsNumber(this.globalProbability),
-      "count" -> JsNumber(this.count),
-      "siblingPop" -> JsNumber(this.siblingPop),
-      "parentCount" -> JsNumber(this.parentCount),
-      "depthOfLocalProbabilityCalculation" -> JsNumber(this.depthOfLocalProbabilityCalculation)
-    )
-  }
-}
 
 object AlarmReporter {
+
+  case class AlarmR (Key:String, localProbability:Float, globalProbability:Float, count:Int, siblingPop:Int, parentCount:Int, depthOfLocalProbabilityCalculation:Int){
+    def toJson:JsValue = {
+      JsObject(
+        "Key" -> JsString(this.Key),
+        "localProbability" -> JsNumber(this.localProbability),
+        "globalProbability" -> JsNumber(this.globalProbability),
+        "count" -> JsNumber(this.count),
+        "siblingPop" -> JsNumber(this.siblingPop),
+        "parentCount" -> JsNumber(this.parentCount),
+        "depthOfLocalProbabilityCalculation" -> JsNumber(this.depthOfLocalProbabilityCalculation)
+      )
+    }
+  }
+
+
   implicit val system = ActorSystem()
   val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
   val alarmConfig = AdaptConfig.alarmConfig
-  var allAlarms = List.empty[Alarm]
+  var allAlarms = List.empty[AlarmR]
 
   val splunkHecClient = new SplunkHecClient(alarmConfig.splunk.token, alarmConfig.splunk.host, alarmConfig.splunk.port)
 
@@ -43,26 +46,28 @@ object AlarmReporter {
 //  )
 
 
-  def reportSplunk(a: Alarm) = {
+  def reportSplunk(a: AlarmR) = {
     splunkHecClient.sendEvent(a.toJson)
   }
 
   //type Alarm = List[(String, Float, Float, Int, Int, Int, Int)]
   println(alarmConfig)
 
-  def reportLog(a: Alarm) = {
+  def reportLog(a: AlarmR) = {
     log.info(a.toString)
   }
 
-  def reportConsole(a: Alarm) = {
-    println(a)
+  def reportConsole(a: AlarmR) = {
+    println("ALARM: "+a.toString)
   }
 
-  def collectAlarms(a: Alarm) = {
+  def collectAlarms(a: AlarmR) = {
     allAlarms = a::allAlarms
   }
 
-  def report(alarms: List[Alarm]) = {
+  def reportAlarm(alarm: AlarmR) = report(List(alarm))
+
+  def report(alarms: List[AlarmR]) = {
     //reporters.map(_.apply(alarm))
 
     alarms.map { a =>

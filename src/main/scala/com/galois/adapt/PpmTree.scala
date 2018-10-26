@@ -124,6 +124,9 @@ case class PpmDefinition[DataShape](
     val key = a._1.map(_._1)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
+
+    //report the alarm
+    AlarmReporter.report(a._1.map(AlarmReporter.AlarmR.tupled))
   }
 
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
@@ -750,7 +753,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
 //    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
