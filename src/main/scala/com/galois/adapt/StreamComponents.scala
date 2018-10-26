@@ -15,8 +15,7 @@ import com.galois.adapt.cdm18._
 object FlowComponents {
   import AdaptConfig._
 
-  def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    val startingCount = ingestConfig.startatoffset
+  def printCounter[T](counterName: String, statusActor: ActorRef, startingCount: Long = 0, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
@@ -55,8 +54,8 @@ object FlowComponents {
         val cdm2cdmSize = Application.cdm2cdmMaps.map(_.size()).sum
         val cdm2admSize = Application.cdm2admMaps.map(_.size()).sum
 
-        val seenNodesSize = Application.seenNodes.size()
-        val seenEdgesSize = Application.seenEdges.size()
+        val seenNodesSize = Application.seenNodes.map(_.size()).sum
+        val seenEdgesSize = Application.seenEdges.map(_.size()).sum
 
         val shardDistribution: Array[Long] = {
           val totalCount = Application.shardCount.sum

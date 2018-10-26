@@ -4,8 +4,8 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.FlowShape
-import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, Partition}
+import akka.stream.{FlowShape, OverflowStrategy}
+import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, MergePreferred, Partition}
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
 import com.galois.adapt.adm.UuidRemapper.UuidRemapperFlow
@@ -80,12 +80,13 @@ object UuidRemapper {
       log: LoggingAdapter,
 
       numShards: Int
-  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() { implicit b =>
+  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() {
+    implicit b =>
     import GraphDSL.Implicits._
 
     /*
      *
-     *           +---------------------------------------------<--------------------------------------------+
+     *           +------------------[small buffer]-------------<--------------------------------------------+
      *           |                                                                                          |
      *           |                                                                                          |
      *           |                                                                                          |
@@ -111,7 +112,8 @@ object UuidRemapper {
         }
       }
 
-    val loopBack = b.add(Merge[Timed[UuidRemapperInfo]](2))
+    val expandAdm = b.add(Flow[Timed[UuidRemapperInfo]])
+    val loopBack = b.add(MergePreferred[Timed[UuidRemapperInfo]](1))
     val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
     val mergeShards = b.add(Merge[Timed[UuidRemapperInfo]](numShards))
     val decider = b.add(Partition[Timed[UuidRemapperInfo]](2, info => if (info.unwrap.remapped) 0 else 1))
@@ -122,16 +124,22 @@ object UuidRemapper {
     for (i <- 0 until numShards) {
       splitShards.out(i) ~>
         Flow.fromFunction(filterShard(i)) ~>
-        oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), ignoreEvents, log) ~>
+        oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), log) ~>
         mergeShards.in(i)
     }
 
     mergeShards.out ~> decider.in
 
-    decider.out(1) ~> loopBack.in(1)
+    decider.out(1).buffer(1000, OverflowStrategy.backpressure) ~> loopBack.preferred
     decider.out(0).mapConcat[Either[ADM, EdgeAdm2Adm]]((t: Timed[UuidRemapperInfo]) => t.unwrap.extract) ~> ret.in
 
-    FlowShape(loopBack.in(0), ret.out)
+    expandAdm.out.mapConcat[Timed[UuidRemapperInfo]] {
+      case x @ Timed(t, AnAdm(adm)) if !(adm.isInstanceOf[AdmEvent] && ignoreEvents) =>
+        x :: adm.originalCdmUuids.toList.map(cdmUuuid => Timed(t, Cdm2Adm(cdmUuuid, adm.uuid)))
+      case other => List(other)
+    } ~> loopBack.in(0)
+
+    FlowShape(expandAdm.in, ret.out)
   })
 
   def oneShard(
@@ -144,7 +152,6 @@ object UuidRemapper {
       cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
       blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
-      ignoreEvents: Boolean,
       log: LoggingAdapter
   ): Flow[Timed[UuidRemapperInfo], Timed[UuidRemapperInfo], NotUsed] = Flow[Timed[UuidRemapperInfo]].statefulMapConcat { () =>
 
@@ -234,24 +241,11 @@ object UuidRemapper {
     }
 
     {
-      // Don't do anything with events if `ignoreEvents`
-      case Timed(t, a @ AnAdm(_: AdmEvent)) if ignoreEvents =>
+      // Don't do anything with ADM nodes
+      case Timed(t, a @ AnAdm(_)) =>
         val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
         toReturn += a
-        updateTimeAndExpireOldUuids(t, toReturn)
-
-        toReturn.map(Timed(t,_)).toList
-
-      // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
-      case Timed(t, a @ AnAdm(adm)) =>
-        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
-
-        toReturn += a
-        for (cdmUuid <- adm.originalCdmUuids) {
-          if (!cdm2cdm.contains(cdmUuid))
-            putCdm2Adm(cdmUuid, adm.uuid, toReturn)
-        }
         updateTimeAndExpireOldUuids(t, toReturn)
 
         toReturn.map(Timed(t,_)).toList
@@ -291,6 +285,15 @@ object UuidRemapper {
         val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
 
         putCdm2Cdm(merged, into, toReturn)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Add information about a CDM to ADM mapping
+      case Timed(t, Cdm2Adm(merged, into)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        putCdm2Adm(merged, into, toReturn)
         updateTimeAndExpireOldUuids(t, toReturn)
 
         toReturn.map(Timed(t,_)).toList

@@ -144,17 +144,19 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       var somethingFailed = false
       val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || status }
 
+      val instrumentationSource = Application.singleIngestHost.simpleTa1Name
+
       org.scalatest.run(new General_TA1_Tests(
         Application.failedStatements,
         missingToUuid.toMap,
         graph,
-        Application.instrumentationSource,
+        instrumentationSource,
         toDisplay,
         updateStatus 
       ))
 
       // Provider specific tests
-      val providerSpecificTests = Application.instrumentationSource match {
+      val providerSpecificTests = instrumentationSource match {
         case "clearscope" => Some(new CLEARSCOPE_Specific_Tests(graph, updateStatus))
         case "trace" => Some(new TRACE_Specific_Tests(graph, updateStatus))
         case "cadets" => Some(new CADETS_Specific_Tests(graph, updateStatus))
@@ -169,7 +171,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
 
-      if (testWebUi) {
+      if (testWebUi.`web-ui`) {
         if (toDisplay.nonEmpty) {
           println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
           Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))

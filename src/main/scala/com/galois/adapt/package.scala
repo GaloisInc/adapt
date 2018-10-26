@@ -5,6 +5,41 @@ import java.util.UUID
 
 package object adapt {
 
+  trait CdmVersion
+  type CurrentCdm = cdm19.CDM19
+
+  /// Simple variant of [InstrumentationSource]
+  sealed trait DataProvider
+  case object Clearscope extends DataProvider
+  case object Trace extends DataProvider
+  case object Cadets extends DataProvider
+  case object Theia extends DataProvider
+  case object Faros extends DataProvider
+  case object FiveDirections extends DataProvider
+  case object Marple extends DataProvider
+
+  object DataProvider {
+    def fromInstrumentationSource(src: cdm19.InstrumentationSource): DataProvider = src.toString.split('_').last match {
+      case "CLEARSCOPE" => Clearscope
+      case "TRACE" => Trace
+      case "CADETS" => Cadets
+      case "THEIA" => Theia
+      case "FAROS" => Faros
+      case "FIVEDIRECTIONS" => FiveDirections
+      case "MARPLE" => Marple
+    }
+
+    def isWindows: DataProvider => Boolean = {
+      case Clearscope => false
+      case Trace => false
+      case Cadets => false
+      case Theia => false
+      case Faros => true
+      case FiveDirections => true
+      case Marple => true
+    }
+  }
+
   // Anything that can be converted into properties on a node
   trait DBWritable {
     // Returns an (even-length) list alternating between the string label of the property and its

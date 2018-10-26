@@ -142,7 +142,6 @@ case object SRCSINK_IPC extends SrcSinkType
 case object SRCSINK_UNKNOWN extends SrcSinkType
 case object MEMORY_SRCSINK extends SrcSinkType // ADDED BY US FOR ADM!
 
-// Updated
 sealed trait InstrumentationSource extends CDM19
 case object InstrumentationSource extends CustomEnum[InstrumentationSource] { val values = Seq(SOURCE_ANDROID_JAVA_CLEARSCOPE, SOURCE_ANDROID_NATIVE_CLEARSCOPE, SOURCE_FREEBSD_OPENBSM_TRACE, SOURCE_FREEBSD_DTRACE_CADETS, SOURCE_FREEBSD_TESLA_CADETS, SOURCE_FREEBSD_LOOM_CADETS, SOURCE_FREEBSD_MACIF_CADETS, SOURCE_LINUX_SYSCALL_TRACE, SOURCE_LINUX_NETFILTER_TRACE, SOURCE_LINUX_PROC_TRACE, SOURCE_LINUX_BEEP_TRACE, SOURCE_LINUX_THEIA, SOURCE_WINDOWS_DIFT_FAROS, SOURCE_WINDOWS_PSA_FAROS, SOURCE_WINDOWS_FIVEDIRECTIONS, SOURCE_WINDOWS_MARPLE) }
 case object SOURCE_ANDROID_JAVA_CLEARSCOPE extends InstrumentationSource
@@ -306,7 +305,7 @@ case object AUTHENTIHASH extends CryptoHashType
 case object SSDEEP extends CryptoHashType
 case object IMPHASH extends CryptoHashType
 
-// New
+// No change
 sealed trait HostType extends CDM19
 case object HostType extends CustomEnum[HostType] { val values = Seq(HOST_MOBILE, HOST_SERVER, HOST_DESKTOP) }
 case object HOST_MOBILE extends HostType

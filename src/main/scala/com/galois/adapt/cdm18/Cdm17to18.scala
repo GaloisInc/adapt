@@ -11,7 +11,10 @@ object Cdm17to18 {
   implicit def subjectType(st: cdm17.SubjectType): cdm18.SubjectType = cdm18.SubjectType.from(st.toString).get
   implicit def privilegeLevel(pl: cdm17.PrivilegeLevel): cdm18.PrivilegeLevel = cdm18.PrivilegeLevel.from(pl.toString).get
   implicit def srcSinkType(pl: cdm17.SrcSinkType): cdm18.SrcSinkType = cdm18.SrcSinkType.from(pl.toString).get
-  // TODO instrumentation sources
+  implicit def instrumentationSource(is: cdm17.InstrumentationSource): cdm18.InstrumentationSource = is match {
+    case cdm17.SOURCE_LINUX_AUDIT_TRACE => cdm18.SOURCE_LINUX_SYSCALL_TRACE
+    case _ => cdm18.InstrumentationSource.from(is.toString).get
+  }
   implicit def principalType(pt: cdm17.PrincipalType): cdm18.PrincipalType = cdm18.PrincipalType.from(pt.toString).get
   implicit def eventType(e: cdm17.EventType): cdm18.EventType = e match {
     case cdm17.EVENT_FNCTL => cdm18.EVENT_FCNTL

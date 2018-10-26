@@ -3,18 +3,19 @@ package com.galois.adapt
 import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.{Files, Paths}
 import java.util.function.Consumer
-
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm19._
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
 
+
 object PpmFlowComponents {
+  import AdaptConfig._
 
   import ApiJsonProtocol._
   import spray.json._
@@ -25,10 +26,8 @@ object PpmFlowComponents {
   type CompletedESO = (NoveltyDetection.Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
 
-  import AdaptConfig._
-
-  def ppmSink(implicit system: ActorSystem, ec: ExecutionContext) = Flow[Either[ADM, EdgeAdm2Adm]]
-    .statefulMapConcat[CompletedESO]{ () =>
+  def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
+    Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
 
       // Load these maps from disk on startup
       val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", ppmConfig.components.events)
@@ -169,12 +168,13 @@ object PpmFlowComponents {
       case _ =>
         release(None)
     }
-  }.to(Sink.actorRefWithAck(Application.ppmManagerActor.get, InitMsg, Ack, CompleteMsg))
+  }.to(
+      Application.ppmObservationDistributorSink //[(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
+    )
 
 
   // Load a mutable map from disk
-  def loadMapFromDisk[T, U](name: String, fp: String)
-                           (implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
+  def loadMapFromDisk[T, U](name: String, fp: String)(implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
     if (ppmConfig.shouldload) {
       val toReturn = mutable.Map.empty[T, U]
       Try {
@@ -194,8 +194,7 @@ object PpmFlowComponents {
     } else mutable.Map.empty
 
   // Write a mutable map to disk
-  def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)
-                         (implicit l: JsonWriter[(T,U)]): Unit =
+  def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)(implicit l: JsonWriter[(T,U)]): Unit =
     if (ppmConfig.shouldsave) {
       import sys.process._
       Try {
