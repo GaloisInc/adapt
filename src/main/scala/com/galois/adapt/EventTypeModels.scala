@@ -103,7 +103,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmList(filePath: String):  List[(Alarms, Set[NamespacedUuidDetails])] = {
+    def readToAlarmList(filePath: String):  List[(Alarm, Set[NamespacedUuidDetails])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -123,11 +123,11 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (Alarms, Set[NamespacedUuidDetails]) = {
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (Alarm, Set[NamespacedUuidDetails]) = {
        (
         List(
-          SingleAlarm(extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
-          SingleAlarm(extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
+          PpmTreeNodeAlarm(extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
+          PpmTreeNodeAlarm(extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
         Set[NamespacedUuidDetails](NamespacedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
       )
@@ -179,7 +179,7 @@ object EventTypeModels {
   }
 
 
-  def getAlarms(iforestAlarmFile: String): List[(Alarms, Set[NamespacedUuidDetails])]= {
+  def getAlarms(iforestAlarmFile: String): List[(Alarm, Set[NamespacedUuidDetails])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
