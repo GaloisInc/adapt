@@ -36,7 +36,8 @@ object AdaptConfig extends Utils {
     env: EnvironmentConfig,
     adm: AdmConfig,
     ppm: PpmConfig,
-    test: TestConfig
+    test: TestConfig,
+    alarms: AlarmsConfig
   )
 
   case class IngestConfig(
@@ -127,6 +128,24 @@ object AdaptConfig extends Utils {
     `web-ui`: Boolean
   )
 
+
+
+  case class GuiConfig(enabled:Boolean)
+  case class ConsoleConfig(enabled:Boolean)
+  case class LogConfig(enabled:Boolean)
+  case class SplunkConfig(enabled:Boolean, token: String, host:String, port:Int)
+  case class AlarmsConfig(
+    splunk: SplunkConfig,
+    logging: LogConfig,
+    console: ConsoleConfig,
+    gui: GuiConfig
+  ){
+  }
+
+  //import scala.util.{Failure, Success}
+
+
+
   val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
 
   private implicit val _hint1  = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
@@ -211,7 +230,7 @@ object AdaptConfig extends Utils {
   val admConfig: AdmConfig = adaptConfig.adm
   val ppmConfig: PpmConfig = adaptConfig.ppm
   val testWebUi: TestConfig = adaptConfig.test
-
+  val alarmConfig: AlarmsConfig = adaptConfig.alarms
 
 
   trait ErrorHandler {
@@ -501,15 +520,3 @@ trait Utils {
   }
 }
 
-
-
-  case class GuiConfig(enabled:Boolean)
-  case class ConsoleConfig(enabled:Boolean)
-  case class LogConfig(enabled:Boolean)
-  case class SplunkConfig(enabled:Boolean, token: String, host:String, port:Int)
-  case class AlarmsConfig(splunk: SplunkConfig, logging: LogConfig, console: ConsoleConfig, gui: GuiConfig)
-
-  val alarmConfig = loadConfigOrThrow[AlarmsConfig]("adapt.alarms")
-
-import scala.util.{Failure, Success}
-import AdaptConfig._
