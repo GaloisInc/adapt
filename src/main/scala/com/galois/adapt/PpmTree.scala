@@ -64,6 +64,7 @@ case class PpmDefinition[DataShape](
   discriminators: List[Discriminator[DataShape]],
   uuidCollector: DataShape => Set[NamespacedUuidDetails],
   timestampExtractor: DataShape => Long,
+  shouldApplyThreshold: Boolean,
   alarmFilter: PpmNodeActorAlarmDetected => Boolean = _ => true
 )(
   context: ActorContext,
@@ -211,7 +212,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
 
   def getJoinCondition(observation: PartialShape): Option[JoinType]
   def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue] = extracted
-  val partialFilters: (PartialShape => Boolean, PartialShape => Boolean])
+  val partialFilters: (PartialShape => Boolean, PartialShape => Boolean)
 
   override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
     getJoinCondition(observation).foreach { joinValue =>
@@ -516,7 +517,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
-      _.asInstanceOf[cdm18.Event].timestampNanos
+      _.asInstanceOf[cdm18.Event].timestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Subject",
@@ -533,7 +535,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Netflow",
@@ -549,7 +552,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
     ,
     PpmDefinition[CDM]("CDM-FileObject",
@@ -566,7 +570,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
   ).par
 
@@ -580,6 +585,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos,
+      shouldApplyThreshold = false,
       _ => false
     )(thisActor.context, context.self, hostName),
 
@@ -590,7 +596,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._1.eventType.toString)
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
@@ -600,7 +607,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._1.eventType.toString)
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
   ).par
 
@@ -617,7 +625,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
@@ -631,7 +640,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
@@ -645,7 +655,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
@@ -662,7 +673,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
@@ -679,7 +691,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
@@ -693,7 +706,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
@@ -707,7 +721,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
@@ -721,7 +736,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]("SummarizedProcessActivity",
@@ -747,6 +763,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
+      shouldApplyThreshold = true,
       alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
@@ -796,7 +813,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -830,7 +848,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -879,7 +898,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           )))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
@@ -922,7 +942,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
