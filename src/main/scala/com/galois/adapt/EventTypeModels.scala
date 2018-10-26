@@ -21,7 +21,6 @@ import AdaptConfig._
 
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero
   case class Process(name: String,uuid: String) {
     override def toString() = {
       this.name + "_" + this.uuid.toString
@@ -104,7 +103,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[NamespacedUuidDetails])] = {
+    def readToAlarmList(filePath: String):  List[(Alarms, Set[NamespacedUuidDetails])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -124,11 +123,11 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[NamespacedUuidDetails]) = {
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (Alarms, Set[NamespacedUuidDetails]) = {
        (
         List(
-        (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
-        (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
+          SingleAlarm(extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
+          SingleAlarm(extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
         Set[NamespacedUuidDetails](NamespacedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
       )
@@ -180,7 +179,7 @@ object EventTypeModels {
   }
 
 
-  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[NamespacedUuidDetails])]= {
+  def getAlarms(iforestAlarmFile: String): List[(Alarms, Set[NamespacedUuidDetails])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
