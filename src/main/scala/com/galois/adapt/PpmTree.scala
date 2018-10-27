@@ -11,23 +11,19 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
-
 import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
-
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.collection.mutable
+import scala.collection.{SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
-
-import scala.collection.parallel.ParSeq
 
 
 object NoveltyDetection {
@@ -41,8 +37,8 @@ object NoveltyDetection {
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
   type Filter[DataShape] = DataShape => Boolean
 
-  type Alarm = List[(String, Float, Float, Int, Int, Int, Int)]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
-
+  type Alarm = List[PpmTreeNodeAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
+  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
@@ -61,14 +57,23 @@ object NoveltyDetection {
   case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
 
+case object AlarmExclusions {
+  val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd")
+  val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
+  val all = cadets ++ fivedirections
+  def filter(alarm: PpmNodeActorAlarmDetected): Boolean = // true == allow an alarm to be reported.
+    ! alarm.alarmData.exists(level => AlarmExclusions.all.contains(level.key))
+}
+
 
 case class PpmDefinition[DataShape](
   name: String,
-  filter: Filter[DataShape],
+  incomingFilter: Filter[DataShape],
   discriminators: List[Discriminator[DataShape]],
   uuidCollector: DataShape => Set[NamespacedUuidDetails],
   timestampExtractor: DataShape => Long,
-  alarmFilter: PpmNodeActorAlarmDetected => Boolean = _ => true
+  shouldApplyThreshold: Boolean,
+  alarmFilter: PpmNodeActorAlarmDetected => Boolean = AlarmExclusions.filter
 )(
   context: ActorContext,
   alarmActor: ActorRef,
@@ -116,18 +121,26 @@ case class PpmDefinition[DataShape](
       Map.empty
     }
 
-  def observe(observation: DataShape): Unit = if (filter(observation)) {
+  def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
   def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
-    val key = a._1.map(_._1)
+    val key: List[ExtractedValue] = a._1.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
-    else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
+    else {
+      type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+      val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
+      alarms = alarms + newAlarm
 
+      def thresholdAllows: Boolean = ??? // Nichole to implement
+      def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
+
+//      if (thresholdAllows) reportAlarmToTa5(newAlarm)
     println(name,a)
     //report the alarm
     AlarmReporter.report(name, a._1.map(AlarmReporter.AlarmR.tupled))
+    }
   }
 
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
@@ -219,9 +232,9 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
 
   def getJoinCondition(observation: PartialShape): Option[JoinType]
   def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue] = extracted
-  val partialFilters: Tuple2[PartialShape => Boolean, PartialShape => Boolean]
+  val partialFilters: (PartialShape => Boolean, PartialShape => Boolean)
 
-  override def observe(observation: PartialShape): Unit = if (filter(observation)) {
+  override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
     getJoinCondition(observation).foreach { joinValue =>
       partialMap.get(joinValue) match {
         case None =>
@@ -289,7 +302,7 @@ case class PpmNodeActorManyAlarmsDetected(alarms: Set[PpmNodeActorAlarmDetected]
 class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState: Option[TreeRepr]) extends Actor with ActorLogging {
   var counter = 0
 
-  var children = startingState.fold {
+  var children: Map[ExtractedValue, ActorRef] = startingState.fold {
     Map.empty[ExtractedValue, ActorRef]
   } { thisTreeState =>
     counter = thisTreeState.count
@@ -300,7 +313,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
     }.toMap   // + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the loaded data.
   }
 
-  def childrenPopulation = children.size  // + 1   // `+ 1` for the Q node
+  def childrenPopulation: Int = children.size  // + 1   // `+ 1` for the Q node
 
   def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef =
     context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
@@ -410,11 +423,11 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       val thisLocalProb = localProbOfThisObs(parentCount)
       val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation, parentCount)
       val thisGlobalProb = globalProbOfThisObs(parentGlobalProb, parentCount)
-      val thisAlarmComponent = (thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
+      val thisAlarmComponent = PpmTreeNodeAlarm(thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
       remainingExtractedValues match {
         case Nil if counter == 1 =>
           val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
-          val leafAlarmComponent = (thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
+          val leafAlarmComponent = PpmTreeNodeAlarm(thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
           if (alarmFilter(alarm)) alarmActor ! alarm
         case Nil =>
@@ -524,7 +537,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
-      _.asInstanceOf[cdm18.Event].timestampNanos
+      _.asInstanceOf[cdm18.Event].timestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Subject",
@@ -541,7 +555,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[CDM]("CDM-Netflow",
@@ -557,7 +572,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
     ,
     PpmDefinition[CDM]("CDM-FileObject",
@@ -574,7 +590,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         })
       ),
       d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
-      _ => 0L
+      _ => 0L,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
   ).par
 
@@ -588,6 +605,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
       _._1.latestTimestampNanos,
+      shouldApplyThreshold = false,
       _ => false
     )(thisActor.context, context.self, hostName),
 
@@ -598,7 +616,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._1.eventType.toString)
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
@@ -608,7 +627,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._1.eventType.toString)
       ),
       d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
   ).par
 
@@ -625,7 +645,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
@@ -639,7 +660,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
@@ -653,7 +675,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
@@ -670,7 +693,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
@@ -687,7 +711,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
@@ -701,7 +726,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
@@ -715,7 +741,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
@@ -729,7 +756,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]("SummarizedProcessActivity",
@@ -755,6 +783,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
+      shouldApplyThreshold = true,
       alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
@@ -804,7 +833,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -838,7 +868,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -887,7 +918,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           )))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
@@ -930,7 +962,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
 
       def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
@@ -956,7 +989,6 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
   val iforestEnabled = ppmConfig.iforestenabled
 
-
   lazy val admPpmTrees =
     if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
     else esoTrees ++ seoesTrees ++ oeseoTrees
@@ -968,6 +1000,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
     else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
 
+  // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
+  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -998,6 +1032,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   def receive = {
 
     case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
+      alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
       )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
@@ -1133,8 +1168,8 @@ case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], 
 case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[NamespacedUuidDetails], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
-      val names = b._3.map(_._1)
-      val someUiData = UiDataContainer(b._5, names.mkString("∫"), b._1, b._2, b._3.last._2, b._4.map(_.extendedUuid.rendered))
+      val names = b._3.map(_.key)
+      val someUiData = UiDataContainer(b._5, names.mkString("∫"), b._1, b._2, b._3.last.localProb, b._4.map(_.extendedUuid.rendered))
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
@@ -1335,4 +1370,29 @@ case object TreeRepr {
     val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
     TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
   }.toOption
+}
+
+
+case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbabilities: List[Float]) {
+
+  var lpAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
+    SortedMap.empty(Ordering[Float]) ++ initialLocalProbabilities.groupBy(identity).mapValues(_.size)
+
+  var count : Int = lpAccumulator.values.sum
+
+  def print : Unit = {
+    println("We've seen this many alarms     ", count)
+    println("The 1 percentile threshold is...", getThreshold(1))
+    println("The lp map looks like ", lpAccumulator.toString())
+  }
+
+  def insert(lp: Float): Unit = {
+    lpAccumulator += (lp -> (lpAccumulator.getOrElse(lp,0) + 1))
+    count += 1
+  }
+
+  def getThreshold(percentile: Float): Float = {
+    val percentileOfTotal = percentile/100 * count
+    lpAccumulator.fold((0F,0))((acc,kv) => if(acc._2 < percentileOfTotal) (kv._1,kv._2+acc._2) else acc)._1
+  }
 }
