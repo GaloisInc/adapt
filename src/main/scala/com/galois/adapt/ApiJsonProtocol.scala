@@ -4,7 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import com.galois.adapt.NoveltyDetection.{NamespacedUuidDetails, SingleAlarm}
+import com.galois.adapt.NoveltyDetection.{NamespacedUuidDetails, PpmTreeNodeAlarm}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm19.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -24,7 +24,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
-  implicit val singleAlarm = jsonFormat7(SingleAlarm)
+  implicit val singleAlarm = jsonFormat7(PpmTreeNodeAlarm)
 
   implicit val statusReport = jsonFormat4(StatusReport)
   implicit val populationLog = jsonFormat16(PopulationLog)

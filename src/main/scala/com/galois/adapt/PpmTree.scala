@@ -37,8 +37,8 @@ object NoveltyDetection {
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
   type Filter[DataShape] = DataShape => Boolean
 
-  type Alarms = List[SingleAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
-  case class SingleAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
+  type Alarm = List[PpmTreeNodeAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
+  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
@@ -57,6 +57,19 @@ object NoveltyDetection {
   case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
 
+case object AlarmExclusions {
+  val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite", "head")
+  val clearscope = Set("system_server", "proc", "com.android.email", "com.android.inputmethod.latin", "com.android.browser", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
+  val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
+  val marple= Set()
+  val theia = Set("qt-opensource-linux-x64-5.10.1.run", "/usr/lib/postgresql/9.1/bin/postgres", "whoopsie", "Qt5.10.1", "5.10.1", "/bin/dbus-daemon", "/usr/sbin/console-kit-daemon")
+  val trace = Set()
+  val general = Set("<no_subject_path_node>")
+  val allExclusions = cadets ++ clearscope ++ fivedirections ++ marple ++ theia ++ trace ++ general
+  def filter(alarm: PpmNodeActorAlarmDetected): Boolean = // true == allow an alarm to be reported.
+    ! alarm.alarmData.exists(level => allExclusions.contains(level.key))
+}
+
 
 case class PpmDefinition[DataShape](
   name: String,
@@ -65,7 +78,7 @@ case class PpmDefinition[DataShape](
   uuidCollector: DataShape => Set[NamespacedUuidDetails],
   timestampExtractor: DataShape => Long,
   shouldApplyThreshold: Boolean,
-  alarmFilter: PpmNodeActorAlarmDetected => Boolean = _ => true
+  alarmFilter: PpmNodeActorAlarmDetected => Boolean = AlarmExclusions.filter
 )(
   context: ActorContext,
   alarmActor: ActorRef,
@@ -94,7 +107,7 @@ case class PpmDefinition[DataShape](
     if (ppmConfig.shouldsave)
       Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json" + s"_$hostName").toOption
     else None
-  var alarms: Map[List[ExtractedValue], (Long, Long, Alarms, Set[NamespacedUuidDetails], Map[String, Int])] =
+  var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldload)
       inputAlarmFilePath.flatMap { fp =>
         Try {
@@ -102,12 +115,12 @@ case class PpmDefinition[DataShape](
           import ApiJsonProtocol._
 
           val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarms, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
         }.toOption orElse  {
           println(s"Did not load alarms for tree: $name. Starting with empty tree state.")
           None
         }
-      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarms, Set[NamespacedUuidDetails], Map[String, Int])])
+      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])])
     else {
       println(s"Loading no alarms for tree: $name")
       Map.empty
@@ -117,10 +130,19 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarms, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
-    val key = a._1.map(_.key)
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
+    val key: List[ExtractedValue] = a._1.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
-    else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
+    else {
+      type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+      val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
+      alarms = alarms + newAlarm
+
+      def thresholdAllows: Boolean = ??? // Nichole to implement
+      def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
+
+//      if (thresholdAllows) reportAlarmToTa5(newAlarm)
+    }
   }
 
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
@@ -268,7 +290,7 @@ case object PpmTree {
 
 
 case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
-case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarms, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
+case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
 case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
@@ -276,7 +298,7 @@ case class PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue])
 case class PpmNodeActorGetAllCountsResult(results: Map[List[ExtractedValue], Int])
 case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int)
-case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarms, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long)
+case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long)
 case class PpmNodeActorManyAlarmsDetected(alarms: Set[PpmNodeActorAlarmDetected])
 
 class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState: Option[TreeRepr]) extends Actor with ActorLogging {
@@ -398,16 +420,16 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       }
 
 
-    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentGlobalProb, alarmAcc: Alarms, alarmFilter, passNewLeafProb, depth) =>
+    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentGlobalProb, alarmAcc: Alarm, alarmFilter, passNewLeafProb, depth) =>
       counter += 1
       val thisLocalProb = localProbOfThisObs(parentCount)
       val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation, parentCount)
       val thisGlobalProb = globalProbOfThisObs(parentGlobalProb, parentCount)
-      val thisAlarmComponent = SingleAlarm(thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
+      val thisAlarmComponent = PpmTreeNodeAlarm(thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
       remainingExtractedValues match {
         case Nil if counter == 1 =>
           val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
-          val leafAlarmComponent = SingleAlarm(thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
+          val leafAlarmComponent = PpmTreeNodeAlarm(thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
           val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
           if (alarmFilter(alarm)) alarmActor ! alarm
         case Nil =>
@@ -1018,7 +1040,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
   def receive = {
 
-    case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarms, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
+    case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
@@ -1152,7 +1174,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 case object ListPpmTrees
 case class PpmTreeNames(namesAndCounts: Map[String, Int])
 case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None)
-case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarms, Set[NamespacedUuidDetails], Option[Int])]]) {
+case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[NamespacedUuidDetails], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._3.map(_.key)
