@@ -983,6 +983,13 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
   val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
+  val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
+  if (computeAlarmLpThresholdIntervalMinutes > 0) // Dynamic Threshold
+    Try(context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
+      computeAlarmLpThresholdIntervalMinutes minutes)
+    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile)))
+  else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
+
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
     val iforestTrainingSaveFile = ppmConfig.iforesttrainingsavefile
@@ -1372,15 +1379,21 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
   def insert(lp: Float): Unit = {
     // Since we are only concerned with low lp novelties, we need not track large lps with great precision.
     // This serves to reduce the max size of the lpAccumulator map.
-    val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10 else lp
+    val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10F else lp
     lpAccumulator += (approxLp -> (lpAccumulator.getOrElse(approxLp,0) + 1))
     count += 1
   }
 
   def updateThreshold(percentile: Float): Unit = {
     val percentileOfTotal = percentile/100 * count
-    var acc = 0
-    threshold = lpAccumulator.takeWhile{ case (_, lpcnt) => acc += lpcnt; acc <= percentileOfTotal}.last._1
-    println(threshold)
+
+    var accLPCount = 0
+
+    threshold = lpAccumulator.takeWhile {
+      case (_, thisLPCount) =>
+        accLPCount += thisLPCount
+        accLPCount <= percentileOfTotal
+    }.lastOption.map(_._1).getOrElse(1F)
+
   }
 }
