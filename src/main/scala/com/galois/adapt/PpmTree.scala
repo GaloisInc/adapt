@@ -125,8 +125,9 @@ case class PpmDefinition[DataShape](
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else alarms = alarms + (key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int]))
 
+    println(name,a)
     //report the alarm
-    AlarmReporter.report(a._1.map(AlarmReporter.AlarmR.tupled))
+    AlarmReporter.report(name, a._1.map(AlarmReporter.AlarmR.tupled))
   }
 
   def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>

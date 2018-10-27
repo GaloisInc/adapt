@@ -65,9 +65,9 @@ object AlarmReporter {
     allAlarms = a::allAlarms
   }
 
-  def reportAlarm(alarm: AlarmR) = report(List(alarm))
+  //def reportAlarm(alarm: AlarmR) = report(List(alarm))
 
-  def report(alarms: List[AlarmR]) = {
+  def report(treeName: String, alarms: List[AlarmR]) = {
     //reporters.map(_.apply(alarm))
 
     alarms.map { a =>
@@ -78,3 +78,4 @@ object AlarmReporter {
     }
   }
 }
+//system.scheduler.scheduleOnce
