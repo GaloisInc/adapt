@@ -1360,19 +1360,27 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
 
   var count : Int = lpAccumulator.values.sum
 
+  var threshold: Float = 1
+
+  // A useful function for testing
   def print : Unit = {
     println("We've seen this many alarms     ", count)
-    println("The 1 percentile threshold is...", getThreshold(1))
+    println("The 1 percentile threshold is...", threshold)
     println("The lp map looks like ", lpAccumulator.toString())
   }
 
   def insert(lp: Float): Unit = {
-    lpAccumulator += (lp -> (lpAccumulator.getOrElse(lp,0) + 1))
+    // Since we are only concerned with low lp novelties, we need not track large lps with great precision.
+    // This serves to reduce the max size of the lpAccumulator map.
+    val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10 else lp
+    lpAccumulator += (approxLp -> (lpAccumulator.getOrElse(approxLp,0) + 1))
     count += 1
   }
 
-  def getThreshold(percentile: Float): Float = {
+  def updateThreshold(percentile: Float): Unit = {
     val percentileOfTotal = percentile/100 * count
-    lpAccumulator.fold((0F,0))((acc,kv) => if(acc._2 < percentileOfTotal) (kv._1,kv._2+acc._2) else acc)._1
+    var acc = 0
+    threshold = lpAccumulator.takeWhile{ case (_, lpcnt) => acc += lpcnt; acc <= percentileOfTotal}.last._1
+    println(threshold)
   }
 }
