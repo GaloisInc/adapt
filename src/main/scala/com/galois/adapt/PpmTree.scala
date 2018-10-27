@@ -130,7 +130,7 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
     val key: List[ExtractedValue] = a._1.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
@@ -138,7 +138,7 @@ case class PpmDefinition[DataShape](
       val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
       alarms = alarms + newAlarm
 
-      def thresholdAllows: Boolean = ??? // Nichole to implement
+      def thresholdAllows: Boolean = a._1.last.localProb <= localProbThreshold
       def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
 
 //      if (thresholdAllows) reportAlarmToTa5(newAlarm)
@@ -1044,7 +1044,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
-      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
+      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ), alarmLpAccumulator.threshold)
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
@@ -1052,7 +1052,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ).fold(
         log.warning(s"Could not find tree named: ${setOfAlarms.headOption.map(_.treeName)} to record many Alarms from: $sender")
       )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
-        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
+        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)), alarmLpAccumulator.threshold )
       })
 
     case ListPpmTrees =>
