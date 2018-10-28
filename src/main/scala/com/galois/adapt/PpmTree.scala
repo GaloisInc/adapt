@@ -1006,10 +1006,11 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
-  if (computeAlarmLpThresholdIntervalMinutes > 0) // Dynamic Threshold
-    Try(context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
+  if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
+     context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
       computeAlarmLpThresholdIntervalMinutes minutes)
-    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile)))
+    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
+  }
   else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
 
   def saveIforestModel(): Unit = {
