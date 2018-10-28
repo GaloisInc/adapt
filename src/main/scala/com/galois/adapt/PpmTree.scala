@@ -138,7 +138,7 @@ case class PpmDefinition[DataShape](
       val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
       alarms = alarms + newAlarm
 
-      def thresholdAllows: Boolean = a._1.last.localProb <= localProbThreshold
+      def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
       def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
 
 //      if (thresholdAllows) reportAlarmToTa5(newAlarm)
@@ -1003,7 +1003,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
 
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
-  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
+  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
   if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
