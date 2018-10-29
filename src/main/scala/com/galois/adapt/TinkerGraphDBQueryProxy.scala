@@ -144,7 +144,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       var somethingFailed = false
       val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || status }
 
-      val instrumentationSource = Application.singleIngestHost.simpleTa1Name
+      val instrumentationSource = AdaptConfig.ingestConfig.asSingleHost.simpleTa1Name
 
       org.scalatest.run(new General_TA1_Tests(
         Application.failedStatements,

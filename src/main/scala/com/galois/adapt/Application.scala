@@ -3,6 +3,7 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util.UUID
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
@@ -17,12 +18,14 @@ import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.cdm19._
+
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 import AdaptConfig._
+import com.galois.adapt.PpmFlowComponents.CompletedESO
 
 
 object Application extends App {
@@ -32,12 +35,16 @@ object Application extends App {
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
   // All large maps should be store in `MapProxy`
+  val hostNames: List[HostName] = ingestConfig.hosts.toList.map(_.hostName)
+  val hostNameForAllHosts = "BetweenHosts"
   val mapProxy: MapProxy = new MapProxy(
     fileDbPath = runFlow match { case "accept" => None; case _ => Some(admConfig.mapdb)},
     fileDbBypassChecksum = admConfig.mapdbbypasschecksum,
     fileDbTransactions = admConfig.mapdbtransactions,
 
     admConfig.uuidRemapperShards,
+    hostNames,
+    hostNameForAllHosts,
     cdm2cdmLruCacheSize = admConfig.cdm2cdmlrucachesize,
     cdm2admLruCacheSize = admConfig.cdm2admlrucachesize,
     dedupEdgeCacheSize = admConfig.dedupEdgeCacheSize
@@ -75,17 +82,18 @@ object Application extends App {
   Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
 
   // These are the maps that `UUIDRemapper` will use
-  val cdm2cdmMaps: Array[AlmostMap[CdmUUID,CdmUUID]] = mapProxy.cdm2cdmMapShards
-  val cdm2admMaps: Array[AlmostMap[CdmUUID,AdmUUID]] = mapProxy.cdm2admMapShards
+  val cdm2cdmMaps: Map[HostName, Array[AlmostMap[CdmUUID,CdmUUID]]] = mapProxy.cdm2cdmMapShardsMap
+  val cdm2admMaps: Map[HostName, Array[AlmostMap[CdmUUID,AdmUUID]]] = mapProxy.cdm2admMapShardsMap
 
   // Edges blocked waiting for a target CDM uuid to be remapped.
-  val blockedEdgesMaps: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]] = mapProxy.blockedEdgesShards
+  val blockedEdgesMaps: Map[HostName, Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]]] = mapProxy.blockedEdgesShardsMap
 
-  val seenEdges: Array[AlmostSet[EdgeAdm2Adm]] = mapProxy.seenEdgesShards
-  val seenNodes: Array[AlmostSet[AdmUUID]] = mapProxy.seenNodesShards
+  val seenEdgesMaps: Map[HostName, Array[AlmostSet[EdgeAdm2Adm]]] = mapProxy.seenEdgesShardsMap
+  val seenNodesMaps: Map[HostName, Array[AlmostSet[AdmUUID]]] = mapProxy.seenNodesShardsMap
   val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
 
-  val singleIngestHost = ingestConfig.asSingleHost
+  // Mutable state that gets updated during ingestion
+  var failedStatements: List[(Int, String)] = Nil
 
   val handler: ErrorHandler = runFlow match {
     case "accept" => new ErrorHandler {
@@ -96,31 +104,42 @@ object Application extends App {
     case _ => ErrorHandler.print
   }
 
-  val cdmSource = singleIngestHost.toCdmSource(handler)
-  val instrumentationSource: String = singleIngestHost.simpleTa1Name
-  val startingCount = {
-    val List(li: LinearIngest) = singleIngestHost.parallelIngests.toList
-    li.range.startInclusive
-  }
-  val er = EntityResolution(
-    admConfig,
-    singleIngestHost.isWindows,
-    cdm2cdmMaps,
-    cdm2admMaps,
-    blockedEdgesMaps,
-    shardCount,
-    log,
-    seenNodes,
-    seenEdges
-  )
+  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM19), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
+    host.hostName -> (host, host.toCdmSource(handler))
+  }.toMap
 
-  val hostNameForAllHosts = "BetweenHosts"
+  val erMap: Map[HostName, Flow[(String,CurrentCdm), Either[ADM, EdgeAdm2Adm], NotUsed]] = runFlow match {
+    case "accept" => Map.empty
+    case _ => ingestConfig.hosts.map { host: IngestHost =>
+      host.hostName -> EntityResolution(
+        admConfig,
+        host,
+        cdm2cdmMaps(host.hostName),
+        cdm2admMaps(host.hostName),
+        blockedEdgesMaps(host.hostName),
+        shardCount,
+        log,
+        seenNodesMaps(host.hostName),
+        seenEdgesMaps(host.hostName)
+      )
+    }.toMap
+  }
+  val betweenHostDedup: Flow[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed] = if (hostNames.size <= 1) {
+    Flow.apply[Either[ADM, EdgeAdm2Adm]]
+  } else {
+    DeduplicateNodesAndEdges.apply(
+      admConfig.uuidRemapperShards,
+      seenNodesMaps(hostNameForAllHosts),
+      seenEdgesMaps(hostNameForAllHosts)
+    )
+  }
+
   val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
     case "accept" => Map.empty
     case _ =>
-      val hostNames = ingestConfig.hosts.map(_.hostName)
-      hostNames.map { hostName =>
-        val ref = system.actorOf(Props(classOf[PpmManager], hostName), s"ppm-actor-$hostName")
+      ingestConfig.hosts.map { host: IngestHost =>
+        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows)
+        val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
         ppmConfig.saveintervalseconds match {
           case Some(i) if i > 0L =>
             println(s"Saving PPM trees every $i seconds")
@@ -128,8 +147,9 @@ object Application extends App {
             system.registerOnTermination(cancellable.cancel())
           case _ => println("Not going to periodically save PPM trees.")
         }
-        hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts), s"ppm-actor-$hostNameForAllHosts"))
+        host.hostName -> ref
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
+        // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
@@ -137,7 +157,7 @@ object Application extends App {
     import GraphDSL.Implicits._
     val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
     val broadcast = b.add(Broadcast[T](actorList.size))
-    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck(ref, InitMsg, Ack, CompleteMsg) }
+    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
     SinkShape(broadcast.in)
   })
 
@@ -172,12 +192,10 @@ object Application extends App {
     }
 
 
-  // Mutable state that gets updated during ingestion
-  var failedStatements: List[(Int, String)] = Nil
 
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors, cdm2admMaps, cdm2cdmMaps)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
@@ -200,8 +218,20 @@ object Application extends App {
 
       startWebServer()
 
+      val handler: ErrorHandler = new ErrorHandler {
+        override def handleError(offset: Long, error: Throwable): Unit = {
+          failedStatements = (offset.toInt, error.getMessage) :: failedStatements
+        }
+      }
+
+      assert(cdmSources.size == 1, "Cannot run tests for more than once host at a time")
+      val (host, cdmSource) = cdmSources.head._2
+
+      assert(host.parallelIngests.size == 1, "Cannot run tests for more than one linear ingest stream")
+      val li = host.parallelIngests.head
+
       cdmSource
-        .via(printCounter("CDM events", statusActor, startingCount))
+        .via(printCounter("CDM events", statusActor, li.range.startInclusive))
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
 
@@ -213,66 +243,131 @@ object Application extends App {
       } else CompleteMsg
       val writeTimeout = Timeout(30.1 seconds)
 
-      val (name, sink) = ingestConfig.produce match {
-        case ProduceCdm => "CDM" -> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
-        case ProduceAdm => "ADM" -> er.to(DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg))
-        case ProduceCdmAndAdm => "CDM+ADM" -> Sink.fromGraph(GraphDSL.create() { implicit b =>
-          import GraphDSL.Implicits._
-          val broadcast = b.add(Broadcast[(String,CDM19)](2))
+      println(s"Running database flow to ${ingestConfig.produce} with UI.")
+      startWebServer()
 
-          broadcast ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
-          broadcast ~> er ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
+      ingestConfig.produce match {
+        case ProduceCdm =>
+          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+            import GraphDSL.Implicits._
 
-          SinkShape(broadcast.in)
-        })
+            val sources = cdmSources.values.toSeq
+            val merge = b.add(Merge[(Namespace,CDM19)](sources.size))
+
+            for (((host, source), i) <- sources.zipWithIndex) {
+              source.via(printCounter(host.hostName, statusActor, 0)) ~> merge.in(i)
+            }
+
+            merge.out ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
+
+            ClosedShape
+          }).run()
+
+        case ProduceAdm =>
+          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+            import GraphDSL.Implicits._
+
+            val sources = cdmSources.values.toSeq
+            val merge = b.add(Merge[Either[ADM, EdgeAdm2Adm]](sources.size))
+
+
+            for (((host, source), i) <- sources.zipWithIndex) {
+              source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> merge.in(i)
+            }
+
+            merge.out ~> betweenHostDedup ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
+
+            ClosedShape
+          }).run()
+
+        case ProduceCdmAndAdm =>
+          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+            import GraphDSL.Implicits._
+
+            val sources = cdmSources.values.toSeq
+            val mergeCdm = b.add(Merge[(Namespace, CurrentCdm)](sources.size))
+            val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](sources.size))
+
+
+            for (((host, source), i) <- sources.zipWithIndex) {
+              val broadcast = b.add(Broadcast[(Namespace, CurrentCdm)](2))
+              source.via(printCounter(host.hostName, statusActor, 0)) ~> broadcast.in
+
+              broadcast.out(0)                         ~> mergeCdm.in(i)
+              broadcast.out(1) ~> erMap(host.hostName) ~> mergeAdm.in(i)
+            }
+
+            mergeCdm.out                     ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
+            mergeAdm.out ~> betweenHostDedup ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
+
+            ClosedShape
+          }).run()
       }
 
-      println(s"Running database flow for $name with UI.")
-      startWebServer()
-      cdmSource
-        .buffer(10000, OverflowStrategy.backpressure)
-        .via(printCounter(name, statusActor, startingCount))
-        .runWith(sink)
-
-    case "train" =>
-      startWebServer()
-      statusActor ! InitMsg
-
-      cdmSource
-        .via(printCounter("E3 Training", statusActor, startingCount))
-        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-        .via(er)
-        .runWith(PpmFlowComponents.ppmSink)
-
     case "e3" =>
+      println(s"Unknown runflow argument e3. Quitting. (Did you mean e4?)")
+      Runtime.getRuntime.halt(1)
+
+    case "e4" =>
       startWebServer()
       statusActor ! InitMsg
 
-      cdmSource
-        .via(printCounter("E3", statusActor, startingCount))
-        .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-        .via(er)
-        .via(splitToSink(PpmFlowComponents.ppmSink, 1000))
-        .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
 
-    case "e3-no-db" =>
-      startWebServer()
-      statusActor ! InitMsg
+        val hostSources = cdmSources.values.toSeq
+        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
 
-      cdmSource
-      // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
-        .via(printCounter("E3 (no DB)", statusActor, startingCount))
-        .via(filterFlow)
-        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-        .via(er)
-        .runWith(PpmFlowComponents.ppmSink)
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
+          source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> broadcast.in
+
+          broadcast.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+          broadcast.out(1) ~> mergeAdm.in(i)
+        }
+
+        val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
+        mergeAdm.out ~> betweenHostDedup ~> broadcastAdm.in
+
+        broadcastAdm.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+        broadcastAdm.out(1) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+
+        ClosedShape
+      }).run()
+
+//    case "e4-no-db" =>
+//      startWebServer()
+//      statusActor ! InitMsg
+//
+//      cdmSource
+//      // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
+//        .via(printCounter("E3 (no DB)", statusActor, startingCount))
+//        .via(filterFlow)
+//        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
+//        .via(er)
+//        .runWith(PpmFlowComponents.ppmSink)
 
     case "print-cdm" =>
       var i = 0
-      cdmSource
-        .map(cdm => println(s"Record $i: ${cdm.toString}"))
-        .runWith(Sink.ignore)
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val sources = cdmSources.values.toSeq
+        val merge = b.add(Merge[(Namespace,CDM19)](sources.size))
+        val sink = b.add(Sink.ignore)
+
+        for (((host, source), i) <- sources.zipWithIndex) {
+          source ~> merge.in(i)
+        }
+
+        merge.out.via(Flow.fromFunction { cdm =>
+          println(s"Record $i: ${cdm.toString}")
+          i += 1
+        }) ~> sink
+
+        ClosedShape
+      }).run()
 
     case "event-matrix" =>
       // Produce a CSV of which fields in a CDM event are filled in
@@ -303,8 +398,14 @@ object Application extends App {
       tempFile.deleteOnExit()
       val tempPath: String = tempFile.getPath
 
+      assert(cdmSources.size == 1, "Cannot produce event matrix for more than once host at a time")
+      val (host, cdmSource) = cdmSources.head._2
+
+      assert(host.parallelIngests.size == 1, "Cannot produce event matrix for more than one linear ingest stream")
+      val li = host.parallelIngests.head
+
       cdmSource
-        .via(printCounter("CDM", statusActor, startingCount))
+        .via(printCounter("CDM", statusActor, li.range.startInclusive))
         .collect { case (_, e: Event) => getKeys(e) }
         .map((keysHere: Set[String]) => {
           val newKeys: Set[String] = keysHere.diff(keysSeen)
@@ -342,9 +443,15 @@ object Application extends App {
 
             val broadcast = graph.add(Broadcast[Any](9))
 
+            assert(cdmSources.size == 1, "Cannot produce CSVs for more than once host at a time")
+            val (host, cdmSource) = cdmSources.head._2
+
+            assert(host.parallelIngests.size == 1, "Cannot produce CSVs for more than one linear ingest stream")
+            val li = host.parallelIngests.head
+
             cdmSource
-              .via(printCounter("DB Writer", statusActor, startingCount, 10000))
-              .via(er)
+              .via(printCounter("DB Writer", statusActor, li.range.startInclusive, 10000))
+              .via(erMap(host.hostName))
               .via(Flow.fromFunction {
                 case Left(e) => e
                 case Right(ir) => ir
@@ -371,6 +478,12 @@ object Application extends App {
     case "valuebytes" =>
       println("NOTE: this will run using CDM")
 
+      assert(cdmSources.size == 1, "Cannot get valuebytes for more than once host at a time")
+      val (host, cdmSource) = cdmSources.head._2
+
+      assert(host.parallelIngests.size == 1, "Cannot get valuebytes for more than one linear ingest stream")
+      val li = host.parallelIngests.head
+
       cdmSource
         .collect{ case (_, e: Event) if e.parameters.nonEmpty => e}
         .flatMapConcat(
@@ -387,8 +500,15 @@ object Application extends App {
     case "uniqueuuids" =>
       println("Running unique UUID test")
       statusActor ! InitMsg
+
+      assert(cdmSources.size == 1, "Cannot check for unique UUIDs for more than once host at a time")
+      val (host, cdmSource) = cdmSources.head._2
+
+      assert(host.parallelIngests.size == 1, "Cannot check for unique UUIDs for more than one linear ingest stream")
+      val li = host.parallelIngests.head
+
       cdmSource
-        .via(printCounter("UniqueUUIDs", statusActor, startingCount))
+        .via(printCounter("UniqueUUIDs", statusActor, li.range.startInclusive))
         .statefulMapConcat[(UUID,Boolean)] { () =>
         import scala.collection.mutable.{Map => MutableMap}
         val firstObservation = MutableMap.empty[UUID, CDM19]
@@ -409,14 +529,21 @@ object Application extends App {
     case "novelty" | "novel" | "ppm" | "ppmonly" =>
       println("Running Novelty Detection Flow")
       statusActor ! InitMsg
+
+      assert(cdmSources.size == 1, "Cannot run novelty flow for more than once host at a time")
+      val (host, cdmSource) = cdmSources.head._2
+
+      assert(host.parallelIngests.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
+      val li = host.parallelIngests.head
+
       cdmSource
-        .via(printCounter("Novelty", statusActor, startingCount))
-        .via(er)
+        .via(printCounter("Novelty", statusActor, li.range.startInclusive))
+        .via(erMap(host.hostName))
         .runWith(PpmFlowComponents.ppmSink)
       startWebServer()
 
-    case _ =>
-      println("Unknown runflow argument. Quitting.")
+    case other =>
+      println(s"Unknown runflow argument $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
 }

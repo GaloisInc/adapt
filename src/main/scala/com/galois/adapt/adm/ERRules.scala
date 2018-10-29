@@ -1,5 +1,6 @@
 package com.galois.adapt.adm
 
+import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.adm.UuidRemapper.CdmMerge
 import com.galois.adapt.cdm19._
 
@@ -14,7 +15,7 @@ object ERRules {
     type FlowObject = Option[EdgeAdm2Cdm]
     type PrevTagID = Option[EdgeAdm2Cdm]
   }
-  def resolveProvenanceTagNode(provider: String, p: ProvenanceTagNode):
+  def resolveProvenanceTagNode(provider: String, p: ProvenanceTagNode, hostName: HostName):
     (
       AdmProvenanceTagNode,
       ProvenanceTagNodeEdges.FlowObject,
@@ -22,7 +23,7 @@ object ERRules {
       ProvenanceTagNodeEdges.PrevTagID,
       ProvenanceTagNodeEdges.TagIdEdges
     ) = {
-      val newPtn = AdmProvenanceTagNode(Seq(CdmUUID(p.getUuid, provider)), p.programPoint, provider)
+      val newPtn = AdmProvenanceTagNode(Seq(CdmUUID(p.getUuid, provider)), p.programPoint, hostName, provider)
       (
         newPtn,
         p.flowObject.map(flow => EdgeAdm2Cdm(newPtn.uuid, "flowObject", CdmUUID(flow, provider))),
@@ -33,12 +34,12 @@ object ERRules {
     }
 
   // Resolve a 'Principal'
-  def resolvePrincipal(provider: String, p: Principal): AdmPrincipal
-    = AdmPrincipal(Seq(CdmUUID(p.getUuid, provider)), p.userId, p.groupIds, p.principalType, p.username, provider)
+  def resolvePrincipal(provider: String, p: Principal, hostName: HostName): AdmPrincipal
+    = AdmPrincipal(Seq(CdmUUID(p.getUuid, provider)), p.userId, p.groupIds, p.principalType, p.username, hostName, provider)
 
   // Resolve a 'SrcSinkObject'
-  def resolveSrcSink(provider: String, s: SrcSinkObject): AdmSrcSinkObject
-    = AdmSrcSinkObject(Seq(CdmUUID(s.getUuid, provider)), s.srcSinkType, provider)
+  def resolveSrcSink(provider: String, s: SrcSinkObject, hostName: HostName): AdmSrcSinkObject
+    = AdmSrcSinkObject(Seq(CdmUUID(s.getUuid, provider)), s.srcSinkType, hostName, provider)
 
   // Resolve a 'NetFlowObject'
   object NetflowObjectEdges {
@@ -76,13 +77,13 @@ object ERRules {
 
     type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveFileObject(provider: String, f: FileObject, isWindows: Boolean):
+  def resolveFileObject(provider: String, f: FileObject, isWindows: Boolean, hostName: HostName):
   (
     AdmFileObject,
     FileObjectEdges.LocalPrincipalEdge,
     FileObjectEdges.FilePathEdgeNode
   ) = {
-    val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, provider)
+    val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, hostName, provider)
     val pathOpt1: Option[AdmPathNode] = f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
     val pathOpt2: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("filename")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
     val pathOpt3: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("path")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
@@ -99,12 +100,12 @@ object ERRules {
   object RegistryKeyObjectEdges {
     type FilePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
   }
-  def resolveRegistryKeyObject(provider: String, r: RegistryKeyObject, isWindows: Boolean):
+  def resolveRegistryKeyObject(provider: String, r: RegistryKeyObject, isWindows: Boolean, hostName: HostName):
     (
       AdmFileObject,
       RegistryKeyObjectEdges.FilePathEdgeNode
     ) = {
-      val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, provider)
+      val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, hostName, provider)
       (
         newFo,
         AdmPathNode.normalized(r.key, provider, isWindows).map(pathNode =>
@@ -116,11 +117,11 @@ object ERRules {
   // Resolve an 'UnnamedPipeObject'
   //
   // TODO: sourceUUID, sinkUUID
-  def resolveUnnamedPipeObject(provider: String, u: IpcObject): AdmFileObject
-    = AdmFileObject(Seq(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, provider)
+  def resolveUnnamedPipeObject(provider: String, u: IpcObject, hostName: HostName): AdmFileObject
+    = AdmFileObject(Seq(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, hostName, provider)
 
-  def resolveMemoryObject(provider: String, m: MemoryObject): AdmSrcSinkObject
-    = AdmSrcSinkObject(Seq(CdmUUID(m.uuid, provider)), MEMORY_SRCSINK, provider)
+  def resolveMemoryObject(provider: String, m: MemoryObject, hostName: HostName): AdmSrcSinkObject
+    = AdmSrcSinkObject(Seq(CdmUUID(m.uuid, provider)), MEMORY_SRCSINK, hostName, provider)
 
   // Resolve an 'Event'
   object EventEdges {
@@ -133,7 +134,7 @@ object ERRules {
     type ExecSubjectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
     type ExecPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveEventAndPaths(provider: String, e: Event, isWindows: Boolean):
+  def resolveEventAndPaths(provider: String, e: Event, isWindows: Boolean, hostName: HostName):
     (
       AdmEvent,
       EventEdges.Subject,
@@ -152,6 +153,7 @@ object ERRules {
         latestTimestampNanos = e.timestampNanos,
         deviceType = e.properties.flatMap(_.get("deviceType")),
         inputType = e.properties.flatMap(_.get("inputType")),
+        hostName,
         provider
       )
 
@@ -204,7 +206,7 @@ object ERRules {
     type CmdLinePathEdgeNode = Option[(EdgeAdm2Adm, AdmPathNode)]
     type CmdLineIndirectPathEdgeNode = Option[(EdgeCdm2Adm, AdmPathNode)]
   }
-  def resolveSubject(provider: String, s: Subject, isWindows: Boolean): Either[
+  def resolveSubject(provider: String, s: Subject, isWindows: Boolean, hostName: HostName): Either[
     (
       AdmSubject,
       SubjectEdges.LocalPrincipalEdge,
@@ -224,7 +226,7 @@ object ERRules {
         UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
       ))
     } else {
-      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos.getOrElse(0), provider)
+      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos.getOrElse(0), hostName, provider)
 
       Left((
         newSubj,
