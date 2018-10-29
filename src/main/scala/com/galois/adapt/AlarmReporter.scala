@@ -48,7 +48,7 @@ case class FlushAlarmSummaries()
 
 class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
 
-  var alarmSummaryBuffer = List.empty[AlarmSummary]
+  var alarmSummaryBuffer:List[AlarmSummary] = List.empty[AlarmSummary]
 
   def receive = {
     case FlushAlarmSummaries => flush()
@@ -56,7 +56,9 @@ class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
   }
 
   def flush() = {
+    //todo: retry on failure
     alarmSummaryBuffer.map(reportSplunk)
+    alarmSummaryBuffer = List.empty
   }
   def Add(a:AlarmSummary) = {
     alarmSummaryBuffer = a::alarmSummaryBuffer
