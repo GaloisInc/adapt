@@ -1117,8 +1117,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
   if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
      context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
-      computeAlarmLpThresholdIntervalMinutes minutes)
-    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
+      computeAlarmLpThresholdIntervalMinutes minutes)(alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
   }
   else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
 
