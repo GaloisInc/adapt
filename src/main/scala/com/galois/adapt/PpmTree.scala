@@ -683,7 +683,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
@@ -734,7 +734,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
@@ -841,7 +841,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -876,7 +876,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
