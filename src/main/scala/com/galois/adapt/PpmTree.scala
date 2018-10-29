@@ -25,6 +25,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
 
+//type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
 object NoveltyDetection {
   type Event = AdmEvent
@@ -125,21 +127,33 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
+  //process name and pid/uuid
+  def getProcessDetailsFromAlarm(a:Alarm, setNamespacedUuidDetails:Set[NamespacedUuidDetails], timestamp:Long):ProcessDetails = {
+    name match {
+      case default => ProcessDetails("Unknown Process", Some(0))
+    }
+  }
+
   def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
-    val key: List[ExtractedValue] = a._1.map(_.key)
+    //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
+    //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+
+    val alarm:Alarm = a._1
+    val setNamespacedUuidDetails:Set[NamespacedUuidDetails] = a._2
+    val timestamp:Long = a._3
+    val key: List[ExtractedValue] = alarm.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
-      type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
-      val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
-      alarms = alarms + newAlarm
 
-      def thresholdAllows: Boolean = ??? // Nichole to implement
-      def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
+      val alarmDetails = (timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+      val newAlarm = AnAlarm(key,alarmDetails)
+      alarms = alarms + AnAlarm.unapply(newAlarm).get
 
-//      if (thresholdAllows) reportAlarmToTa5(newAlarm)
-    println(name,a)
-    //report the alarm
-    AlarmReporter.report(name, a._1.map(AlarmReporter.AlarmR.tupled))
+      def thresholdAllows: Boolean = true // Nichole to implement
+
+      val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
+      //report the alarm
+      if (thresholdAllows) AlarmReporter.report(name, newAlarm, processDetails)
     }
   }
 
