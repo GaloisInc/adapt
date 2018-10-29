@@ -24,10 +24,10 @@ import scala.concurrent.Future
 case class ProcessDetails(processName:String, pid:Option[Int])
 
 
-trait AlarmNamespace
-case object DefaultNamespace extends AlarmNamespace
-case object summary extends AlarmNamespace
-case object defaultNamespace extends AlarmNamespace
+//trait AlarmNamespace
+//case object DefaultNamespace extends AlarmNamespace
+//case object summary extends AlarmNamespace
+//case object defaultNamespace extends AlarmNamespace
 
 case class AlarmSummary(
                        treeInfo: String,
@@ -76,7 +76,7 @@ class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
   }
 
   def reportSplunk(a: AlarmSummary) = {
-    splunkHecClient.sendEvent(a.toJson)
+    splunkHecClient.sendEvent(a.toJson)(Application.system.dispatcher)
   }
 
 }
@@ -127,7 +127,7 @@ object AlarmReporter extends LazyLogging {
   println(alarmConfig)
 
   def reportLog(a: AlarmSummary) = {
-    logger.info(a.toString)
+    //log.info(a.toString)
   }
 
   def reportConsole(a: AlarmSummary) = {

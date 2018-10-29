@@ -18,6 +18,7 @@ import akka.event.{Logging, LoggingAdapter}
 
 import spray.json.JsValue
 
+
 //[REF: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html https://doc.akka.io/docs/akka-http/current/common/uri-model.html]
 
 /*
@@ -124,7 +125,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
 
     responseFuture.onComplete {
       case Success(res) => httpReqResponseHandler(res)
-      case Failure(res) => log.error(s"splunk message not sent: ${res}")
+      case Failure(res) => /*log.error*/println(s"splunk message not sent: ${res}")
     }
   }
 
@@ -135,7 +136,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
     // Splunk's reponse for valid data:
     //[INFO] [09/14/2018 23:53:11.348] [default-akka.actor.default-dispatcher-5] [splunkHecClient$(akka://default)] HttpResponse(200 OK,List(Date: Fri, 14 Sep 2018 23:53:11 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"Success","code":0}),HttpProtocol(HTTP/1.1))
 
-        case OK => log.info(response.toString)
-        case _ => log.error(s"splunk message malformed? Failed with: ${response}")
+        case OK => ()//log.info(response.toString)
+        case _ => /*log.error*/println(s"splunk message malformed? Failed with: ${response}")
       }
 }
