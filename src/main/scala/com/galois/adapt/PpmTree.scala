@@ -47,14 +47,6 @@ object NoveltyDetection {
   val netFlowTypes = readAndWriteTypes ++ Set(EVENT_CONNECT, EVENT_ACCEPT)
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
-    case _                                     => ("""/""" ,   "/")
-  }
-  val sudoOrPowershellComparison: String => Boolean = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
-    case _                                                    => (s: String) => s.toLowerCase == "sudo"
-  }
 
   case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
@@ -526,7 +518,18 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor =>
+class PpmManager(host: IngestHost) extends Actor with ActorLogging { thisActor =>
+  val hostName: HostName = host.hostName
+  val source: String = host.simpleTa1Name
+  val isWindows: Boolean = host.isWindows
+
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
+  val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
+    _.toLowerCase.contains("powershell")
+  } else {
+    _.toLowerCase == "sudo"
+  }
+
   import NoveltyDetection._
 
   val cdmSanityTrees = List(
@@ -543,7 +546,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, source))),
       _.asInstanceOf[cdm18.Event].timestampNanos,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -561,7 +564,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -578,7 +581,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
@@ -596,7 +599,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)

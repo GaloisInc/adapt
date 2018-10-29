@@ -4,6 +4,7 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
 
+import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.{AdmUUID, CdmUUID, Edge, EdgeAdm2Adm}
 import org.mapdb.serializer.SerializerArrayTuple
@@ -20,6 +21,9 @@ class MapProxy(
     fileDbTransactions: Boolean,
 
     uuidRemapperShards: Int,
+    numHosts: List[HostName],
+    bewteenHosts: HostName,
+
     cdm2cdmLruCacheSize: Long,
     cdm2admLruCacheSize: Long,
     dedupEdgeCacheSize: Int
@@ -42,8 +46,8 @@ class MapProxy(
       Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
         override def run(): Unit = {
           println("Expiring MapDB contents to disk...")
-          mapdbCdm2AdmShards.foreach(_.clearWithExpire())
-          mapdbCdm2CdmShards.foreach(_.clearWithExpire())
+          mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+          mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
           db.close()
           println("MapDB has been closed.")
         }
@@ -69,82 +73,84 @@ class MapProxy(
 
   private val threadPool = Executors.newScheduledThreadPool(1)
 
-  private val mapdbCdm2CdmOverflowShards = Array.tabulate(numShards) { shardId =>
-    fileDb.hashMap(s"cdm2cdmOverflowShard$shardId")
+  private val mapdbCdm2CdmOverflowShardsMap = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+    fileDb.hashMap(s"cdm2cdmOverflowShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       //      .counterEnable()
       .createOrOpen()
-  }
+  }).toMap
 
-  private val mapdbCdm2CdmShards: Array[HTreeMap[Array[AnyRef],Array[AnyRef]]] = Array.tabulate(numShards) { shardId =>
-    memoryDb.hashMap(s"cdm2cdmShard$shardId")
+  private val mapdbCdm2CdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+    memoryDb.hashMap(s"cdm2cdmShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .counterEnable()
-      .expireOverflow(mapdbCdm2CdmOverflowShards(shardId))
+      .expireOverflow(mapdbCdm2CdmOverflowShardsMap(host)(shardId))
       .expireAfterCreate()
       .expireAfterGet()
       .expireMaxSize(cdm2cdmLruCacheSize)
       .expireExecutor(threadPool)
       .createOrOpen()
-  }
+  }  ).toMap
 
-  val cdm2cdmMapShards: Array[AlmostMap[CdmUUID,CdmUUID]] = Array.tabulate(numShards) { shardId =>
+  val cdm2cdmMapShardsMap: Map[HostName, Array[AlmostMap[CdmUUID,CdmUUID]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     MapSetUtils.hashMap[Array[AnyRef], CdmUUID, Array[AnyRef], CdmUUID](
-      mapdbCdm2CdmShards(shardId),
+      mapdbCdm2CdmShardsMap(host)(shardId),
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) }
     )
-  }
+  }).toMap
 
 
-  private val mapdbCdm2AdmOverflowShards = Array.tabulate(numShards) { shardId =>
-    fileDb.hashMap(s"cdm2admOverflowShard$shardId")
+  private val mapdbCdm2AdmOverflowShardsMap = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+    fileDb.hashMap(s"cdm2admOverflowShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       //      .counterEnable()
       .createOrOpen()
-  }
+  }).toMap
 
-  private val mapdbCdm2AdmShards: Array[HTreeMap[Array[AnyRef],Array[AnyRef]]] = Array.tabulate(numShards) { shardId =>
-    memoryDb.hashMap(s"cdm2admShard$shardId")
+  private val mapdbCdm2AdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+    memoryDb.hashMap(s"cdm2admShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .counterEnable()
-      .expireOverflow(mapdbCdm2AdmOverflowShards(shardId))
+      .expireOverflow(mapdbCdm2AdmOverflowShardsMap(host)(shardId))
       .expireAfterCreate()
       .expireAfterGet()
       .expireMaxSize(cdm2admLruCacheSize)
       .expireExecutor(threadPool)
       .createOrOpen()
-  }
+  }).toMap
 
-  val cdm2admMapShards: Array[AlmostMap[CdmUUID,AdmUUID]] = Array.tabulate(numShards) { shardId =>
+  val cdm2admMapShardsMap: Map[HostName, Array[AlmostMap[CdmUUID,AdmUUID]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     MapSetUtils.hashMap[Array[AnyRef], CdmUUID, Array[AnyRef], AdmUUID](
-      mapdbCdm2AdmShards(shardId),
+      mapdbCdm2AdmShardsMap(host)(shardId),
       { case CdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => CdmUUID(uuid, ns) },
       { case AdmUUID(uuid, ns) => Array(ns, uuid) }, { case Array(ns: String, uuid: UUID) => AdmUUID(uuid, ns) }
     )
-  }
+  }).toMap
 
-  val blockedEdgesShards: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]] =
-    Array.fill(numShards)(mutable.Map.empty)
+  val blockedEdgesShardsMap: Map[HostName, Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]]] =
+    numHosts.map(host => host -> Array.fill(numShards)(mutable.Map.empty[CdmUUID, (List[Edge], Set[CdmUUID])])).toMap
 
   /***************************************************************************************
    * Seen nodes and seen edges                                                           *
    ***************************************************************************************/
 
-  val seenEdgesShards: Array[AlmostSet[EdgeAdm2Adm]] = Array.tabulate(numShards) { _ =>
+  private val dedupHosts: List[HostName] = if (numHosts.size == 1) { numHosts } else { bewteenHosts :: numHosts }
+
+  val seenEdgesShardsMap: Map[HostName, Array[AlmostSet[EdgeAdm2Adm]]] = dedupHosts.map(host => host -> Array.tabulate(numShards) { _ =>
     MapSetUtils.lruCacheSet(
       new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](dedupEdgeCacheSize, 1F, true) {
         override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]): Boolean =
           this.size > dedupEdgeCacheSize
       }
     )
-  }
+  }).toMap
 
-  val seenNodesShards: Array[AlmostSet[AdmUUID]] = Array.tabulate(numShards) { _ =>
+  val seenNodesShardsMap: Map[HostName, Array[AlmostSet[AdmUUID]]] = dedupHosts.map(host => host -> Array.tabulate(numShards) { _ =>
     val seenNodesSet: java.util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
       .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
       .counterEnable()
@@ -155,7 +161,7 @@ class MapProxy(
       seenNodesSet,
       { case AdmUUID(uuid, ns) => Array(uuid, ns) }, { case Array(uuid: UUID, ns: String) => AdmUUID(uuid, ns) }
     )
-  }
+  }).toMap
 
   /* LRU variant
 

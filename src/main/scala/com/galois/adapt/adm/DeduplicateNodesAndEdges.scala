@@ -14,6 +14,18 @@ object DeduplicateNodesAndEdges {
 
   type OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed]
 
+  def apply(
+      numShards: Int,
+
+      seenNodesSets: Array[AlmostSet[AdmUUID]],
+      seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]]
+  ): OrderAndDedupFlow = if (numShards == 0) {
+    DeduplicateNodesAndEdges.unsharded(seenNodesSets(0), seenEdgesSets(0))
+  } else {
+    DeduplicateNodesAndEdges.sharded(numShards, seenNodesSets, seenEdgesSets)
+  }
+
+
 
   /***************************************************************************************
    * Sharded variant                                                                     *
@@ -41,7 +53,7 @@ object DeduplicateNodesAndEdges {
 
   // Prevents nodes/edges from being emitted twice. Also prevents edges from being emitted before both of their
   // endpoints have been emitted.
-  def sharded(
+  private def sharded(
       numShards: Int,
 
       seenNodesMaps: Array[AlmostSet[AdmUUID]],
@@ -152,7 +164,7 @@ object DeduplicateNodesAndEdges {
    * Unsharded variant                                                                   *
    ***************************************************************************************/
 
-  def apply(
+  private def unsharded(
     seenNodes: AlmostSet[AdmUUID],
     seenEdges: AlmostSet[EdgeAdm2Adm]
   ): OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]](() => {
