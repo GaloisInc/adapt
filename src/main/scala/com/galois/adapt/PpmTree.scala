@@ -132,7 +132,7 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
     val key: List[ExtractedValue] = a._1.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
@@ -140,7 +140,7 @@ case class PpmDefinition[DataShape](
       val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
       alarms = alarms + newAlarm
 
-      def thresholdAllows: Boolean = ??? // Nichole to implement
+      def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
       def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
 
 //      if (thresholdAllows) reportAlarmToTa5(newAlarm)
@@ -1112,7 +1112,15 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
 
 
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
-  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
+  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
+
+  val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
+  if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
+     context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
+      computeAlarmLpThresholdIntervalMinutes minutes)
+    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
+  }
+  else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -1146,7 +1154,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
-      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
+      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ), alarmLpAccumulator.threshold)
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
@@ -1154,7 +1162,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ).fold(
         log.warning(s"Could not find tree named: ${setOfAlarms.headOption.map(_.treeName)} to record many Alarms from: $sender")
       )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
-        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
+        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)), alarmLpAccumulator.threshold )
       })
 
     case ListPpmTrees =>
@@ -1491,19 +1499,33 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
 
   var count : Int = lpAccumulator.values.sum
 
+  var threshold: Float = 1
+
+  // A useful function for testing
   def print : Unit = {
     println("We've seen this many alarms     ", count)
-    println("The 1 percentile threshold is...", getThreshold(1))
+    println("The 1 percentile threshold is...", threshold)
     println("The lp map looks like ", lpAccumulator.toString())
   }
 
   def insert(lp: Float): Unit = {
-    lpAccumulator += (lp -> (lpAccumulator.getOrElse(lp,0) + 1))
+    // Since we are only concerned with low lp novelties, we need not track large lps with great precision.
+    // This serves to reduce the max size of the lpAccumulator map.
+    val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10F else lp
+    lpAccumulator += (approxLp -> (lpAccumulator.getOrElse(approxLp,0) + 1))
     count += 1
   }
 
-  def getThreshold(percentile: Float): Float = {
+  def updateThreshold(percentile: Float): Unit = {
     val percentileOfTotal = percentile/100 * count
-    lpAccumulator.fold((0F,0))((acc,kv) => if(acc._2 < percentileOfTotal) (kv._1,kv._2+acc._2) else acc)._1
+
+    var accLPCount = 0
+
+    threshold = lpAccumulator.takeWhile {
+      case (_, thisLPCount) =>
+        accLPCount += thisLPCount
+        accLPCount <= percentileOfTotal
+    }.lastOption.map(_._1).getOrElse(1F)
+
   }
 }
