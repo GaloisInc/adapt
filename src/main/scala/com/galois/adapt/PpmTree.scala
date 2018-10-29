@@ -1131,11 +1131,12 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
   val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
+//  import akka.actor.ActorSystem
+  //implicit val executionContext = ActorSystem().dispatcher
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
   if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
      context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
-      computeAlarmLpThresholdIntervalMinutes minutes)
-    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
+      computeAlarmLpThresholdIntervalMinutes minutes)(alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
   }
   else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
 
@@ -1171,7 +1172,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
-      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ), alarmLpAccumulator.threshold)
+      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)), alarmLpAccumulator.threshold))
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
