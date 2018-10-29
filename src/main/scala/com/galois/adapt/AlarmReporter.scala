@@ -124,7 +124,7 @@ object AlarmReporter extends LazyLogging {
 
 
   //type Alarm = List[(String, Float, Float, Int, Int, Int, Int)]
-  println(alarmConfig)
+  //println(alarmConfig)
 
   def reportLog(a: AlarmSummary) = {
     //log.info(a.toString)
