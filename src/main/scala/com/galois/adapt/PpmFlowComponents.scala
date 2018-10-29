@@ -123,9 +123,10 @@ object PpmFlowComponents {
             everything.get(child).flatMap { c =>
               everything.get(parent).map { p =>
                 val provider = Try(p.asInstanceOf[AdmSubject].provider).getOrElse("")
+                val hostName = Try(p.asInstanceOf[AdmSubject].hostName).getOrElse("")
                 val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
                 val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
-                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, provider), c, c.uuid, p, p.uuid)
+                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
               }
             }
           )

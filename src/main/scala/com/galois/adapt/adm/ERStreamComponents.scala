@@ -1,11 +1,14 @@
 package com.galois.adapt.adm
 
 import java.util.UUID
+
 import akka.stream.scaladsl.Flow
+import com.galois.adapt.AdaptConfig.IngestHost
 import com.galois.adapt.CurrentCdm
 import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -39,7 +42,7 @@ object ERStreamComponents {
     )
 
     def apply(
-      isWindows: Boolean,
+      host: IngestHost,
       eventExpiryTime: Time, // how long to wait before expiring an event chain
       maxEventsMerged: Int,  // maximum number of events to put into an event chain
 
@@ -115,7 +118,9 @@ object ERStreamComponents {
 
                     expireKey(eKey, currentTime, toReturn)
 
-                    val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = ERRules.resolveEventAndPaths(provider, e, isWindows)
+                    val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) =
+                      ERRules.resolveEventAndPaths(provider, e, host.isWindows, host.hostName)
+
                     activeChains(eKey) = EventMergeState(
                       newWipAdmEvent,
                       List.concat(
@@ -136,7 +141,8 @@ object ERStreamComponents {
               case None =>
 
                 // Create a new WIP from e
-                val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = ERRules.resolveEventAndPaths(provider, e, isWindows)
+                val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) =
+                  ERRules.resolveEventAndPaths(provider, e, host.isWindows, host.hostName)
 
                 activeChains(eKey) = EventMergeState(
                   newWipAdmEvent,
@@ -171,13 +177,13 @@ object ERStreamComponents {
 
 
   object SubjectResolution {
-    def apply(isWindows: Boolean): TimedCdmToFutureAdm =
+    def apply(host: IngestHost): TimedCdmToFutureAdm =
       Flow[(String,Timed[CurrentCdm])]
         .mapConcat[Timed[UuidRemapperInfo]] {
 
           // We are solely interested in subjects
           case (provider, Timed(t, s: Subject)) =>
-            ERRules.resolveSubject(provider, s, isWindows) match {
+            ERRules.resolveSubject(provider, s, host.isWindows, host.hostName) match {
 
               // Don't merge the Subject (it isn't a UNIT)
               case Left((irSubject, localPrincipal, parentSubjectOpt, path)) =>
@@ -204,12 +210,13 @@ object ERStreamComponents {
 
 
   object OtherResolution {
-    def apply(isWindows: Boolean): TimedCdmToFutureAdm = {
+    def apply(host: IngestHost): TimedCdmToFutureAdm = {
 
       Flow[(String,Timed[CurrentCdm])].mapConcat[Timed[UuidRemapperInfo]] {
         case (provider, Timed(t, ptn: ProvenanceTagNode)) =>
 
-          val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) = ERRules.resolveProvenanceTagNode(provider, ptn)
+          val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) =
+            ERRules.resolveProvenanceTagNode(provider, ptn, host.hostName)
 
           List.concat(
             Some(AnAdm(irPtn)),
@@ -222,14 +229,14 @@ object ERStreamComponents {
 
         case (provider, Timed(t, p: Principal)) =>
 
-          val irP = ERRules.resolvePrincipal(provider, p)
+          val irP = ERRules.resolvePrincipal(provider, p, host.hostName)
 
           List(AnAdm(irP)).map(elem => Timed(t, elem))
 
 
         case (provider, Timed(t, s: SrcSinkObject)) =>
 
-          val sP = ERRules.resolveSrcSink(provider, s)
+          val sP = ERRules.resolveSrcSink(provider, s, host.hostName)
 
           List(AnAdm(sP)).map(elem => Timed(t, elem))
 
@@ -249,7 +256,8 @@ object ERStreamComponents {
 
         case (provider, Timed(t, fo: FileObject)) =>
 
-          val (irFileObject, localPrincipalOpt, path) = ERRules.resolveFileObject(provider, fo, isWindows)
+          val (irFileObject, localPrincipalOpt, path) =
+            ERRules.resolveFileObject(provider, fo, host.isWindows, host.hostName)
 
           List.concat(
             Some(AnAdm(irFileObject)),
@@ -260,7 +268,8 @@ object ERStreamComponents {
 
         case (provider, Timed(t, rk: RegistryKeyObject)) =>
 
-          val (irFileObject, path) = ERRules.resolveRegistryKeyObject(provider, rk, isWindows)
+          val (irFileObject, path) =
+            ERRules.resolveRegistryKeyObject(provider, rk, host.isWindows, host.hostName)
 
           List.concat(
             Some(AnAdm(irFileObject)),
@@ -269,13 +278,13 @@ object ERStreamComponents {
 
         case (provider, Timed(t, u: IpcObject)) =>
 
-          val irFileObject = ERRules.resolveUnnamedPipeObject(provider, u)
+          val irFileObject = ERRules.resolveUnnamedPipeObject(provider, u, host.hostName)
 
           List(AnAdm(irFileObject)).map(elem => Timed(t, elem))
 
         case (provider, Timed(t, m: MemoryObject)) =>
 
-          val irSrcSink = ERRules.resolveMemoryObject(provider, m)
+          val irSrcSink = ERRules.resolveMemoryObject(provider, m, host.hostName)
 
           List(AnAdm(irSrcSink)).map(elem => Timed(t, elem))
 

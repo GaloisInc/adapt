@@ -112,7 +112,7 @@ object Application extends App {
     case _ => ingestConfig.hosts.map { host: IngestHost =>
       host.hostName -> EntityResolution(
         admConfig,
-        host.isWindows,
+        host,
         cdm2cdmMaps(host.hostName),
         cdm2admMaps(host.hostName),
         blockedEdgesMaps(host.hostName),
