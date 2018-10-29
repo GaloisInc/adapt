@@ -100,11 +100,11 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 */
 
 case class SplunkHecClient(token: String, host:String, port:Int) {
-  
+
   //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
   val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
-  def sendEvent(event:JsValue) = {
+  def sendEvent(event:JsValue)(implicit ec: ExecutionContext) = {
     val time = System.currentTimeMillis
     sendEventHttp(EventMsg(event, time))
   }
