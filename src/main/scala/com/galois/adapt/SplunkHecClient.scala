@@ -6,7 +6,7 @@ import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import spray.json.{JsObject, JsString, JsonWriter}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 //[Ref: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html]
@@ -100,14 +100,7 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 */
 
 case class SplunkHecClient(token: String, host:String, port:Int) {
-
-  implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
-  // needed for the future flatMap/onComplete in the end
-  implicit val executionContext = system.dispatcher
-
-  val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
-
+  
   //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
   val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
@@ -116,7 +109,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
     sendEventHttp(EventMsg(event, time))
   }
 
-  def sendEventHttp(event:EventMsg) = {
+  def sendEventHttp(event:EventMsg)(implicit ec: ExecutionContext) = {
     //log.info("SplunkHttpMessage: " + event.toJson.toString)
     val data = ByteString(event.toJson.toString)
 
