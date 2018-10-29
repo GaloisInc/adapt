@@ -105,7 +105,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
   implicit val materializer = ActorMaterializer()
   // needed for the future flatMap/onComplete in the end
   implicit val executionContext = system.dispatcher
-
+  
   val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
 
   //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
@@ -117,7 +117,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
   }
 
   def sendEventHttp(event:EventMsg) = {
-    log.info("SplunkHttpMessage: " + event.toString)
+    log.info("SplunkHttpMessage: " + event.toJson.toString)
     val data = ByteString(event.toJson.toString)
 
     // customize every detail of HTTP request
