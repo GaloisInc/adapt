@@ -36,7 +36,8 @@ object AdaptConfig extends Utils {
     env: EnvironmentConfig,
     adm: AdmConfig,
     ppm: PpmConfig,
-    test: TestConfig
+    test: TestConfig,
+    alarms: AlarmsConfig
   )
 
   case class IngestConfig(
@@ -118,7 +119,9 @@ object AdaptConfig extends Utils {
     iforestfreqminutes: Int,
     iforesttrainingfile: String,
     iforesttrainingsavefile: String,
-    iforestenabled: Boolean
+    iforestenabled: Boolean,
+    computethresholdintervalminutes: Int = 0,
+    alarmlppercentile: Float = 0.1F
   ) {
     require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }
@@ -126,6 +129,20 @@ object AdaptConfig extends Utils {
   case class TestConfig(
     `web-ui`: Boolean
   )
+
+
+
+  case class GuiConfig(enabled:Boolean)
+  case class ConsoleConfig(enabled:Boolean)
+  case class LogConfig(enabled:Boolean)
+  case class SplunkConfig(enabled:Boolean, token: String, host:String, port:Int, ssl:Boolean, bufferlength:Long)
+  case class AlarmsConfig(
+    splunk: SplunkConfig,
+    logging: LogConfig,
+    console: ConsoleConfig,
+    gui: GuiConfig
+  ){
+  }
 
   val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
 
@@ -211,7 +228,7 @@ object AdaptConfig extends Utils {
   val admConfig: AdmConfig = adaptConfig.adm
   val ppmConfig: PpmConfig = adaptConfig.ppm
   val testWebUi: TestConfig = adaptConfig.test
-
+  val alarmConfig: AlarmsConfig = adaptConfig.alarms
 
 
   trait ErrorHandler {

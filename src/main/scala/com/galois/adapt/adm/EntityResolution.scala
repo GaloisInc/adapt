@@ -126,10 +126,30 @@ object EntityResolution {
       case _ => None
     }
 
+    /// This tries to convert seconds and microseconds to nanoseconds
+    def adjustTimeUnits(x: Long): Long = {
+      if        (x > 1450000000000000000L && x < 1600000000000000000L) {
+        // Probably nanoseconds, since that range corresponds to (December 13, 2015 - September 13, 2020)
+        x
+      } else if (x > 1450000000000000L    && x < 1600000000000000L) {
+        // Probably microseconds, since that range corresponds to (December 13, 2015 - September 13, 2020)
+        x * 1000
+      } else if (x > 1450000000000L       && x < 1600000000000L) {
+        // Probably milliseconds, since that range corresponds to (December 13, 2015 - September 13, 2020)
+        x * 1000000
+      } else if (x > 1450000000L          && x < 1600000000L) {
+        // Probably seconds, since that range corresponds to (December 13, 2015 - September 13, 2020)
+        x * 1000000000
+      } else {
+        // Seriously, WTF TA1.
+        x
+      }
+    }
+
     Flow[(String,CurrentCdm)].map { case (provider, cdm: CurrentCdm) =>
 
       nodeCount += 1
-      for (time <- timestampOf(cdm); _ = { sampledTime = time; () }; if time > monotonicTime) {
+      for (time <- timestampOf(cdm).map(adjustTimeUnits); _ = { sampledTime = time; () }; if time > monotonicTime) {
         cdm match {
           case _: TimeMarker if time > monotonicTime => monotonicTime = time
 

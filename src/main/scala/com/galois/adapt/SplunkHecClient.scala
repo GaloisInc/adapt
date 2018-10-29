@@ -1,14 +1,10 @@
 package com.galois.adapt
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
-import spray.json.{JsObject, JsString, JsonWriter}
-
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
-
+import spray.json.{JsObject, JsString}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 //[Ref: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html]
 import HttpMethods._
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, GenericHttpCredentials}
@@ -21,6 +17,7 @@ import StatusCodes._
 import akka.event.{Logging, LoggingAdapter}
 
 import spray.json.JsValue
+
 
 //[REF: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html https://doc.akka.io/docs/akka-http/current/common/uri-model.html]
 
@@ -99,25 +96,18 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 *
 */
 
-case class splunkHecClient(token: String, host:String, port:Int = 8088) {
-
-  implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
-  // needed for the future flatMap/onComplete in the end
-  implicit val executionContext = system.dispatcher
-
-  val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
+case class SplunkHecClient(token: String, host:String, port:Int) {
 
   //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
   val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
-  def sendEvent(event:JsValue) = {
+  def sendEvent(event:JsValue)(implicit ec: ExecutionContext) = {
     val time = System.currentTimeMillis
     sendEventHttp(EventMsg(event, time))
   }
 
-  def sendEventHttp(event:EventMsg) = {
-
+  def sendEventHttp(event:EventMsg)(implicit ec: ExecutionContext) = {
+    //log.info("SplunkHttpMessage: " + event.toJson.toString)
     val data = ByteString(event.toJson.toString)
 
     // customize every detail of HTTP request
@@ -131,11 +121,11 @@ case class splunkHecClient(token: String, host:String, port:Int = 8088) {
       //protocol = `HTTP/1.0`)
     )
 
-    val responseFuture: Future[HttpResponse] = Http().singleRequest(req)
+    val responseFuture: Future[HttpResponse] = Http()(Application.system).singleRequest(req)
 
     responseFuture.onComplete {
       case Success(res) => httpReqResponseHandler(res)
-      case Failure(res) => log.error(s"splunk message not sent: ${res}")
+      case Failure(res) => /*log.error*/println(s"splunk message not sent: ${res}")
     }
   }
 
@@ -146,7 +136,7 @@ case class splunkHecClient(token: String, host:String, port:Int = 8088) {
     // Splunk's reponse for valid data:
     //[INFO] [09/14/2018 23:53:11.348] [default-akka.actor.default-dispatcher-5] [splunkHecClient$(akka://default)] HttpResponse(200 OK,List(Date: Fri, 14 Sep 2018 23:53:11 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"Success","code":0}),HttpProtocol(HTTP/1.1))
 
-        case OK => log.info(response.toString)
-        case _ => log.error(s"splunk message malformed? Failed with: ${response}")
+        case OK => ()//log.info(response.toString)
+        case _ => /*log.error*/println(s"splunk message malformed? Failed with: ${response}")
       }
 }
