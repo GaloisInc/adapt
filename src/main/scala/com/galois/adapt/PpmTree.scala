@@ -1154,7 +1154,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
-      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ), alarmLpAccumulator.threshold)
+      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)), alarmLpAccumulator.threshold))
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
