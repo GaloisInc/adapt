@@ -10,34 +10,45 @@ package com.galois.adapt
 *   reporting in UI
 *
 */
-import akka.actor.Actor
-import akka.actor.Props
-import scala.concurrent.duration._
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 
-import akka.actor.ActorSystem
+import scala.concurrent.duration._
 import akka.event.{Logging, LoggingAdapter}
 //import com.galois.adapt.Application.system
 //import com.galois.adapt.NoveltyDetection.{Alarm, NamespacedUuidDetails}
 import spray.json.{JsNumber, JsObject, JsString, JsValue}
+import com.typesafe.scalalogging.LazyLogging
 
 import scala.concurrent.Future
 
 case class ProcessDetails(processName:String, pid:Option[Int])
 
+
+trait AlarmNamespace
+case object DefaultNamespace extends AlarmNamespace
+case object summary extends AlarmNamespace
+case object defaultNamespace extends AlarmNamespace
+
 case class AlarmSummary(
                        treeInfo: String,
-                       alarmString: String
+                       alarmString: String,
+                       namespace: String = "default"
                        ) {
 
   def toJson:JsValue = {
     JsObject(
-      "Type" -> JsString(this.treeInfo),
-      "AlarmInfo" -> JsString(this.alarmString)
-//      "globalProbability" -> JsNumber(this.globalProbability),
-//      "count" -> JsNumber(this.count),
-//      "siblingPop" -> JsNumber(this.siblingPop),
-//      "parentCount" -> JsNumber(this.parentCount),
-//      "depthOfLocalProbabilityCalculation" -> JsNumber(this.depthOfLocalProbabilityCalculation)
+      "Metadata" -> JsObject(
+        "Namespace" -> JsString(namespace.toString)
+      ),
+      "Alarm" -> JsObject(
+        "Type" -> JsString(this.treeInfo),
+        "AlarmInfo" -> JsString(this.alarmString)
+        //      "globalProbability" -> JsNumber(this.globalProbability),
+        //      "count" -> JsNumber(this.count),
+        //      "siblingPop" -> JsNumber(this.siblingPop),
+        //      "parentCount" -> JsNumber(this.parentCount),
+        //      "depthOfLocalProbabilityCalculation" -> JsNumber(this.depthOfLocalProbabilityCalculation)
+      )
     )
   }
 
@@ -70,12 +81,22 @@ class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
 
 }
 
-object AlarmReporter {
 
-  implicit val system = ActorSystem()
-  implicit val executionContext = system.dispatcher
 
-  val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
+//topic name
+// hostname
+// alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
+//experiment prefix [run number]
+//summarized for process and summarized for process /\ pid
+// sometimes the processname is <unnamed>, handle that!
+
+
+
+object AlarmReporter extends LazyLogging {
+
+  implicit val executionContext = Application.system.dispatcher
+
+  //val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
   val alarmConfig = AdaptConfig.alarmConfig
   var allAlarms = List.empty[AnAlarm]
 
@@ -87,9 +108,9 @@ object AlarmReporter {
 //    if (alarmConfig.logging.enabled) logSplunk _ else dummyReporter _
 //  )
 
-  val splunkActor = system.actorOf(Props(classOf[SplunkActor], splunkHecClient))
+  val splunkActor = Application.system.actorOf(Props(classOf[SplunkActor], splunkHecClient))
 
-  def splunkFlushTask = system.scheduler.schedule(50 milliseconds, 50 milliseconds, splunkActor, FlushAlarmSummaries)
+  def splunkFlushTask = Application.system.scheduler.schedule(50 milliseconds, 50 milliseconds, splunkActor, FlushAlarmSummaries)
 
   def initialize() = {
     if (alarmConfig.splunk.bufferlength > 0){
@@ -106,7 +127,7 @@ object AlarmReporter {
   println(alarmConfig)
 
   def reportLog(a: AlarmSummary) = {
-    log.info(a.toString)
+    logger.info(a.toString)
   }
 
   def reportConsole(a: AlarmSummary) = {
@@ -119,14 +140,6 @@ object AlarmReporter {
   //  def collectAlarms(a: AlarmSummary) = {
 //    allAlarms = a::AlarmSummary
 //  }
-
-
-
-  //topic name
-  // hostname
-  // alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
-  //experiment prefix [run number]
-  //summarized for process and summarized for process /\ pid
 
 
 
