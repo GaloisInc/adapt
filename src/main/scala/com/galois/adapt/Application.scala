@@ -25,6 +25,7 @@ import scala.concurrent.Await
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 import AdaptConfig._
+import com.galois.adapt.PpmFlowComponents.CompletedESO
 
 
 object Application extends App {
@@ -322,14 +323,14 @@ object Application extends App {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
           source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> broadcast.in
 
-          broadcast.out(0) ~> Sink.actorRefWithAck(ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+          broadcast.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
           broadcast.out(1) ~> mergeAdm.in(i)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
         mergeAdm.out ~> betweenHostDedup ~> broadcastAdm.in
 
-        broadcastAdm.out(0) ~> Sink.actorRefWithAck(ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+        broadcastAdm.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
         broadcastAdm.out(1) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape

@@ -27,8 +27,11 @@ object PpmFlowComponents {
   type AdmUUIDReferencingPathNode = AdmUUID
 
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
-    Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
+    ppmStateAccumulator.to(
+      Application.ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
+    )
 
+  def ppmStateAccumulator(implicit system: ActorSystem, ec: ExecutionContext): Flow[Either[ADM, EdgeAdm2Adm], CompletedESO, NotUsed] = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
       // Load these maps from disk on startup
       val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", ppmConfig.components.events)
       val everything:   mutable.Map[AdmUUID, ADM]                                  = loadMapFromDisk("everything", ppmConfig.components.everything)
@@ -166,9 +169,7 @@ object PpmFlowComponents {
         case _ =>
           release(None)
       }
-    }.to(
-      Application.ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
-    )
+    }
 
 
   // Load a mutable map from disk
