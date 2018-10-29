@@ -119,7 +119,9 @@ object AdaptConfig extends Utils {
     iforestfreqminutes: Int,
     iforesttrainingfile: String,
     iforesttrainingsavefile: String,
-    iforestenabled: Boolean
+    iforestenabled: Boolean,
+    computethresholdintervalminutes: Int = 0,
+    alarmlppercentile: Float = 0.1F
   ) {
     require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }

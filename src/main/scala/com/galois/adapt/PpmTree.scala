@@ -5,13 +5,12 @@ import spray.json._
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm19.{EVENT_CHANGE_PRINCIPAL, EVENT_EXECUTE, EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG, EVENT_SENDMSG, EVENT_SENDTO, EVENT_UNLINK, EVENT_WRITE, EventType, MEMORY_SRCSINK, PSEUDO_EVENT_PARENT_SUBJECT, SUBJECT_PROCESS}
+import com.galois.adapt.cdm19._
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.function.Consumer
-import com.galois.adapt.adm.EntityResolution.CDM
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
@@ -24,6 +23,8 @@ import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
+import spray.json._
+import ApiJsonProtocol._
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
@@ -45,6 +46,7 @@ object NoveltyDetection {
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
   val readAndWriteTypes = readTypes ++ writeTypes
+  val netFlowTypes = readAndWriteTypes ++ Set(EVENT_CONNECT, EVENT_ACCEPT)
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
   val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.instrumentationSource match {
@@ -60,11 +62,16 @@ object NoveltyDetection {
 }
 
 case object AlarmExclusions {
-  val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd")
+  val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite", "head")
+  val clearscope = Set("system_server", "proc", "com.android.email", "com.android.inputmethod.latin", "com.android.browser", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
   val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
-  val all = cadets ++ fivedirections
+  val marple= Set()
+  val theia = Set("qt-opensource-linux-x64-5.10.1.run", "/usr/lib/postgresql/9.1/bin/postgres", "whoopsie", "Qt5.10.1", "5.10.1", "/bin/dbus-daemon", "/usr/sbin/console-kit-daemon")
+  val trace = Set()
+  val general = Set("<no_subject_path_node>")
+  val allExclusions = cadets ++ clearscope ++ fivedirections ++ marple ++ theia ++ trace ++ general
   def filter(alarm: PpmNodeActorAlarmDetected): Boolean = // true == allow an alarm to be reported.
-    ! alarm.alarmData.exists(level => AlarmExclusions.all.contains(level.key))
+    ! alarm.alarmData.exists(level => allExclusions.contains(level.key))
 }
 
 
@@ -134,7 +141,7 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach { a =>
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
     //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
     //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
@@ -149,7 +156,7 @@ case class PpmDefinition[DataShape](
       val newAlarm = AnAlarm(key,alarmDetails)
       alarms = alarms + AnAlarm.unapply(newAlarm).get
 
-      def thresholdAllows: Boolean = true // Nichole to implement
+      def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
 
       val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
       //report the alarm
@@ -216,8 +223,8 @@ case class PpmDefinition[DataShape](
 trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   type PartialShape = DataShape
   val discriminators: List[Discriminator[PartialShape]]
-  require(discriminators.length == 2)
-  implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))]
+  require(discriminators.length == 2, "PartialPpm trees must have a discriminator length of exactly two; the first extracting from the observation written into the partialMap, and the second extracting from the observation that completes the match. NOTE: they can be reordered (mixed) by overriding the `arrangeExtracted` function.")
+  implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))] = implicitly[RootJsonFormat[(JoinType, (List[ExtractedValue], Set[NamespacedUuidDetails]))]]
   var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, ppmConfig.shouldload) match {
     case (Some(fp), true) =>
       val loadPath = fp + ".partialMap"
@@ -246,6 +253,9 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
 
   def getJoinCondition(observation: PartialShape): Option[JoinType]
   def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue] = extracted
+
+  // The first filter defines whether an observation will be saved in the "partialMap" cache (after matching nothing on the joinCondition).
+  // The second filter defines whether we have a successful match from the "partialMap" cache given the join condition.
   val partialFilters: (PartialShape => Boolean, PartialShape => Boolean)
 
   override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
@@ -257,7 +267,7 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
             if (extractedList.nonEmpty) partialMap(joinValue) = extractedList -> myself.uuidCollector(observation)
           }
         case Some((firstExtracted,uuidDetailSet)) =>
-          if (partialFilters._2(observation)) /*  TODO: && (observation._1.earliestTimestampNanos > firstExtracted.timestamp)) */ {
+          if (partialFilters._2(observation)) {
             val newlyExtracted = discriminators(1)(observation)
             if (newlyExtracted.nonEmpty) {
               tree ! PpmNodeActorBeginObservation(name, arrangeExtracted(firstExtracted ++ newlyExtracted), uuidDetailSet ++ uuidCollector(observation), observation._1.latestTimestampNanos, myself.alarmFilter)
@@ -537,7 +547,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   import NoveltyDetection._
 
   val cdmSanityTrees = List(
-    PpmDefinition[CDM]("CDM-Event",
+    PpmDefinition[CurrentCdm]("CDM-Event",
       d => d.isInstanceOf[cdm18.Event],
       List(
         d => List(d.asInstanceOf[cdm18.Event].eventType.toString),
@@ -555,7 +565,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
-    PpmDefinition[CDM]("CDM-Subject",
+    PpmDefinition[CurrentCdm]("CDM-Subject",
       d => d.isInstanceOf[cdm18.Subject],
       List(
         d => List(d.asInstanceOf[cdm18.Subject].subjectType.toString),
@@ -573,7 +583,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
-    PpmDefinition[CDM]("CDM-Netflow",
+    PpmDefinition[CurrentCdm]("CDM-Netflow",
       d => d.isInstanceOf[cdm18.NetFlowObject],
       List(
         d => List({
@@ -590,7 +600,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
     ,
-    PpmDefinition[CDM]("CDM-FileObject",
+    PpmDefinition[CurrentCdm]("CDM-FileObject",
       d => d.isInstanceOf[cdm18.FileObject],
       List(
         d => List(d.asInstanceOf[cdm18.FileObject].fileObjectType.toString),
@@ -946,11 +956,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get)._1.head))  // subject names are distinct
       )
 
-      override def partialMapJson = {
-        import spray.json._
-        import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
-      }
+      override def partialMapJson = implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
     }
   ).par
 
@@ -972,8 +978,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
@@ -989,33 +995,149 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
       )
 
-      override def partialMapJson = {
-        import spray.json._
-        import ApiJsonProtocol._
+      override def partialMapJson =
         implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
+
+    }
+  ).par
+
+
+  sealed trait SendingOrReceiving { def invert: SendingOrReceiving = this match { case Sending => Receiving; case Receiving => Sending } }
+  case object Sending extends SendingOrReceiving
+  case object Receiving extends SendingOrReceiving
+  type LocalAddress = String
+  type RemoteAddress = String
+  type LocalPort = Int
+  type RemotePort = Int
+  type NF = (LocalAddress, LocalPort, RemoteAddress, RemotePort)
+  case class CrossHostNetObs(sendRec: SendingOrReceiving, localAddress: LocalAddress, localPort: LocalPort, remoteAddress: RemoteAddress, remotePort: RemotePort) {
+    def invert = CrossHostNetObs(sendRec.invert, remoteAddress, remotePort, localAddress, localPort)
+  }
+
+  val crossHostTrees = List(
+
+    new PpmDefinition[DataShape]("CrossHostProcessCommunication",
+      d => netFlowTypes.contains(d._1.eventType) && (d._3._1 match {
+        case AdmNetFlowObject(_,Some(_),Some(_),Some(_),Some(_),_) => true   // Ignore raw sockets. ...and other sockets.
+        case _ => false
+      }),
+      List(
+        d => List(
+          d._2._2.map(_.path).getOrElse("<<unknown_process>>")), // Sending process name
+        d => List(
+          d._2._2.map(_.path).getOrElse("<<unknown_process>>"),          // Receiving process name
+          d._3._1.asInstanceOf[AdmNetFlowObject].localPort.get.toString  // Receiving port number
+        )
+      ),
+      d => Set(
+        NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
+      ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
+//        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.
+      _._1.latestTimestampNanos,
+      shouldApplyThreshold = false
+    )(thisActor.context, context.self, hostName) with PartialPpm[CrossHostNetObs] {
+
+//      implicit def partialMapJson: RootJsonFormat[(Set[String], (List[ExtractedValue], Set[NamespacedUuidDetails]))] = ???
+
+      val netFlowReadTypes = writeTypes.+(EVENT_CONNECT)
+      val netFlowWriteTypes = readTypes.+(EVENT_ACCEPT)
+
+      val partialFilters = (
+        (eso: PartialShape) => netFlowReadTypes.contains(eso._1.eventType),
+        (eso: PartialShape) => netFlowWriteTypes.contains(eso._1.eventType)
+      )
+
+      def getJoinCondition(observation: DataShape): Option[CrossHostNetObs] = Try {
+        val nf = observation._3._1.asInstanceOf[AdmNetFlowObject]
+        CrossHostNetObs(
+          observation match {
+            case t if partialFilters._1(t) => Sending
+            case t if partialFilters._2(t) => Receiving
+            case _ => ???
+          },
+          nf.localAddress.get,
+          nf.localPort.get,
+          nf.remoteAddress.get,
+          nf.remotePort.get
+        )
+      }.toOption
+
+      val partialMap2 = mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]
+
+      override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
+        getJoinCondition(observation) match {
+          case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
+          case Some(joinValue) =>
+
+            val previousSameDirObservations = partialMap2.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
+            val observedIds = uuidCollector(observation)
+
+            val sendRecOpt = joinValue.sendRec match {
+              case Sending =>
+                val theseDiscs = discriminators(0)(observation)
+                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
+                val thisSendObs = Map(theseDiscs -> theseIds)
+                val allSendObs = previousSameDirObservations ++ thisSendObs
+                partialMap2(joinValue) = allSendObs
+                partialMap2.get(joinValue.invert).map(thisSendObs -> _)
+              case Receiving =>
+                val theseDiscs = discriminators(1)(observation)
+                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
+                val thisRecObs = Map(theseDiscs -> theseIds)
+                val allRecObs = previousSameDirObservations ++ thisRecObs
+                partialMap2(joinValue) = allRecObs
+                partialMap2.get(joinValue.invert).map(_ -> thisRecObs)
+            }
+
+            sendRecOpt.foreach { obs =>
+              val combinedObs = for {
+                o1 <- obs._1
+                o2 <- obs._2
+              } yield {
+                o1._1 ++ o2._1 -> (o1._2 ++ o2._2)
+              }
+              combinedObs.foreach { case (extracted, ids) =>
+                tree ! PpmNodeActorBeginObservation(
+                  name,
+                  arrangeExtracted(extracted), // Updated first, because Sending discriminators is first.
+                  ids,
+                  observation._1.latestTimestampNanos,
+                  alarmFilter
+                )
+              }
+            }
+        }
       }
     }
   ).par
 
 
 
-//  TODO: consider an (updatable?) alarm filter for every tree?
-
   val iforestEnabled = ppmConfig.iforestenabled
 
   lazy val admPpmTrees =
-    if (hostName == hostNameForAllHosts) Nil    // TODO: What are the right trees to include here????????????????????????????????????????
+    if (hostName == hostNameForAllHosts) crossHostTrees
     else esoTrees ++ seoesTrees ++ oeseoTrees
 
   lazy val iforestTreesToUse = if (iforestEnabled && hostName != hostNameForAllHosts) iforestTrees else Nil
 
   val ppmList =
-    if (hostName == hostNameForAllHosts) oeseoTrees    // TODO: What are the right trees to include here????????????????????????????????????????
+    if (hostName == hostNameForAllHosts) admPpmTrees
     else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
 
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
-  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
+  val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
+
+  val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
+  if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
+     context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
+      computeAlarmLpThresholdIntervalMinutes minutes)
+    (alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile))
+  }
+  else alarmLpAccumulator.updateThreshold(ppmConfig.alarmlppercentile) // Static Threshold
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -1049,7 +1171,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       alarmLpAccumulator.insert(alarmData.last.localProb)
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
-      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ))
+      )( tree => tree.recordAlarm(Some((alarmData, collectedUuids, dataTimestamp)) ), alarmLpAccumulator.threshold)
 
     case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
       setOfAlarms.headOption.flatMap(a =>
@@ -1057,7 +1179,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ).fold(
         log.warning(s"Could not find tree named: ${setOfAlarms.headOption.map(_.treeName)} to record many Alarms from: $sender")
       )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
-        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)) )
+        tree.recordAlarm( Some((alarmData, collectedUuids, dataTimestamp)), alarmLpAccumulator.threshold )
       })
 
     case ListPpmTrees =>
@@ -1106,7 +1228,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       sender() ! Ack
 
 
-    case (_, cdm: CDM) =>
+    case (_, cdm: CurrentCdm) =>
       cdmSanityTrees.foreach( ppm =>
         ppm.observe(cdm)
       )
@@ -1394,19 +1516,33 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
 
   var count : Int = lpAccumulator.values.sum
 
+  var threshold: Float = 1
+
+  // A useful function for testing
   def print : Unit = {
     println("We've seen this many alarms     ", count)
-    println("The 1 percentile threshold is...", getThreshold(1))
+    println("The 1 percentile threshold is...", threshold)
     println("The lp map looks like ", lpAccumulator.toString())
   }
 
   def insert(lp: Float): Unit = {
-    lpAccumulator += (lp -> (lpAccumulator.getOrElse(lp,0) + 1))
+    // Since we are only concerned with low lp novelties, we need not track large lps with great precision.
+    // This serves to reduce the max size of the lpAccumulator map.
+    val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10F else lp
+    lpAccumulator += (approxLp -> (lpAccumulator.getOrElse(approxLp,0) + 1))
     count += 1
   }
 
-  def getThreshold(percentile: Float): Float = {
+  def updateThreshold(percentile: Float): Unit = {
     val percentileOfTotal = percentile/100 * count
-    lpAccumulator.fold((0F,0))((acc,kv) => if(acc._2 < percentileOfTotal) (kv._1,kv._2+acc._2) else acc)._1
+
+    var accLPCount = 0
+
+    threshold = lpAccumulator.takeWhile {
+      case (_, thisLPCount) =>
+        accLPCount += thisLPCount
+        accLPCount <= percentileOfTotal
+    }.lastOption.map(_._1).getOrElse(1F)
+
   }
 }

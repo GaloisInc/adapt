@@ -1,20 +1,20 @@
 package com.galois.adapt.adm
 
 import java.util.UUID
-
 import akka.stream.scaladsl.Flow
+import com.galois.adapt.CurrentCdm
 import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
-
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+
 
 // This object contains all of the logic for resolving individual CDM types into their corresponding ADM ones.
 object ERStreamComponents {
 
   // All flows in this object have this type
-  type TimedCdmToFutureAdm = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], _]
+  type TimedCdmToFutureAdm = Flow[(String,Timed[CurrentCdm]), Timed[UuidRemapperInfo], _]
 
 
   def extractPathsAndEdges(pathEdge: Option[(Edge, AdmPathNode)]): List[UuidRemapperInfo] =
@@ -44,7 +44,7 @@ object ERStreamComponents {
       maxEventsMerged: Int,  // maximum number of events to put into an event chain
 
       activeChains: mutable.Map[EventKey, EventMergeState]
-    ): ErFlow = Flow[(String,Timed[CDM])]
+    ): ErFlow = Flow[(String,Timed[CurrentCdm])]
 
       .statefulMapConcat { () =>
 
@@ -172,7 +172,7 @@ object ERStreamComponents {
 
   object SubjectResolution {
     def apply(isWindows: Boolean): TimedCdmToFutureAdm =
-      Flow[(String,Timed[CDM])]
+      Flow[(String,Timed[CurrentCdm])]
         .mapConcat[Timed[UuidRemapperInfo]] {
 
           // We are solely interested in subjects
@@ -206,7 +206,7 @@ object ERStreamComponents {
   object OtherResolution {
     def apply(isWindows: Boolean): TimedCdmToFutureAdm = {
 
-      Flow[(String,Timed[CDM])].mapConcat[Timed[UuidRemapperInfo]] {
+      Flow[(String,Timed[CurrentCdm])].mapConcat[Timed[UuidRemapperInfo]] {
         case (provider, Timed(t, ptn: ProvenanceTagNode)) =>
 
           val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) = ERRules.resolveProvenanceTagNode(provider, ptn)
