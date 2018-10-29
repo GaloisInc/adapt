@@ -117,7 +117,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
   }
 
   def sendEventHttp(event:EventMsg) = {
-
+    log.info("SplunkHttpMessage: " + event.toString)
     val data = ByteString(event.toJson.toString)
 
     // customize every detail of HTTP request

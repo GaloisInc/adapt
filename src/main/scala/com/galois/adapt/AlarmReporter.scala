@@ -122,7 +122,7 @@ object AlarmReporter {
 
   //topic name
   // hostname
-  // alarm cateogories
+  // alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
   //experiment prefix [run number]
   //summarized for process and summarized for process /\ pid
 
