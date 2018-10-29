@@ -1,14 +1,10 @@
 package com.galois.adapt
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
-import spray.json.{JsObject, JsString, JsonWriter}
-
+import spray.json.{JsObject, JsString}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
-
+import scala.util.{Failure, Success}
 //[Ref: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html]
 import HttpMethods._
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, GenericHttpCredentials}
@@ -124,7 +120,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) {
       //protocol = `HTTP/1.0`)
     )
 
-    val responseFuture: Future[HttpResponse] = Http().singleRequest(req)
+    val responseFuture: Future[HttpResponse] = Http()(Application.system).singleRequest(req)
 
     responseFuture.onComplete {
       case Success(res) => httpReqResponseHandler(res)
