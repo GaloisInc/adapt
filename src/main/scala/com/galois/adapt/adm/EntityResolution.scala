@@ -14,12 +14,12 @@ import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import com.galois.adapt.AdaptConfig._
+import com.galois.adapt.CurrentCdm
 
 
 object EntityResolution {
 
-  type CDM = CDM19
-  case object EndOfStream extends CDM19 // marker used for in-bound signalling
+  case object EndOfStream extends CurrentCdm // marker used for in-band signalling
 
   // We keep these as local variables in the object (as opposed to state closed over in `annotateTime`) because we want
   // easy access to them for logging/debugging purposes.
@@ -47,7 +47,7 @@ object EntityResolution {
 
     seenNodesSets: Array[AlmostSet[AdmUUID]],                       // Set of nodes seen so far
     seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]]                    // Set of edges seen so far
-  ): Flow[(String,CDM), Either[ADM, EdgeAdm2Adm], NotUsed] = {
+  ): Flow[(String, CurrentCdm), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
     val numUuidRemapperShards = config.uuidRemapperShards           // 0 means use the old remapper
 
@@ -90,7 +90,7 @@ object EntityResolution {
       DeduplicateNodesAndEdges.sharded(numUuidRemapperShards, seenNodesSets, seenEdgesSets)
     }
 
-    Flow[(String, CDM)]
+    Flow[(String, CurrentCdm)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
@@ -103,7 +103,7 @@ object EntityResolution {
   }
 
 
-  private type TimeFlow = Flow[(String,CDM), (String,Timed[CDM]), NotUsed]
+  private type TimeFlow = Flow[(String,CurrentCdm), (String,Timed[CurrentCdm]), NotUsed]
 
   // Since TA1s cannot be trusted to have a regularly increasing time value, we can't rely on just this for expiring
   // things. The solution is to thread thorugh a node count - we're pretty sure that will increase proportionally to the
@@ -122,14 +122,14 @@ object EntityResolution {
   private def annotateTime(maxTimeJump: Long): TimeFlow = {
 
     // Map a CDM onto a possible timestamp
-    val timestampOf: CDM => Option[Long] = {
+    val timestampOf: CurrentCdm => Option[Long] = {
       case s: Subject => s.startTimestampNanos
       case e: Event => Some(e.timestampNanos)
       case t: TimeMarker => Some(t.timestampNanos)
       case _ => None
     }
 
-    Flow[(String,CDM)].map { case (provider, cdm: CDM) =>
+    Flow[(String,CurrentCdm)].map { case (provider, cdm: CurrentCdm) =>
 
       nodeCount += 1
       for (time <- timestampOf(cdm); _ = { sampledTime = time; () }; if time > monotonicTime) {
@@ -150,7 +150,7 @@ object EntityResolution {
   }
 
 
-  type ErFlow = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], NotUsed]
+  type ErFlow = Flow[(String,Timed[CurrentCdm]), Timed[UuidRemapperInfo], NotUsed]
 
   // Perform entity resolution on stream of CDMs to convert them into ADMs, Edges, and general information to hand off
   // to the UUID remapping stage.
@@ -163,7 +163,7 @@ object EntityResolution {
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
 
-      val broadcast = b.add(Broadcast[(String,Timed[CDM])](3))
+      val broadcast = b.add(Broadcast[(String,Timed[CurrentCdm])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
       broadcast ~> EventResolution(isWindows, eventExpiryTime, maxEventsMerged, activeChains) ~> merge
