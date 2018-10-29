@@ -148,7 +148,7 @@ object Application extends App {
         }
         host.hostName -> ref
       }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
-        // TODO ryan:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
+        // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
@@ -303,30 +303,38 @@ object Application extends App {
           }).run()
       }
 
-//    case "train" =>
-//      startWebServer()
-//      statusActor ! InitMsg
-//
-//      cdmSource
-//        .via(printCounter("E3 Training", statusActor, startingCount))
-//        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-//        .via(er)
-//        .runWith(PpmFlowComponents.ppmSink)
-//
-//    case "e3" =>
-//      startWebServer()
-//      statusActor ! InitMsg
-//
-//      val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM19), NotUsed])]
-//
-//      cdmSource
-//        .via(printCounter("E3", statusActor, startingCount))
-//        .via(filterFlow)
-//        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-//        .via(er)
-//        .via(splitToSink(PpmFlowComponents.ppmSink, 1000))
-//        .runWith(DBQueryProxyActor.graphActorAdmWriteSink(dbActor))
-//
+    case "e3" =>
+      println(s"Unknown runflow argument e3. Quitting. (Did you mean e4?)")
+      Runtime.getRuntime.halt(1)
+
+    case "e4" =>
+      startWebServer()
+      statusActor ! InitMsg
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
+
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
+          source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> broadcast.in
+
+          broadcast.out(0) ~> Sink.actorRefWithAck(ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+          broadcast.out(1) ~> mergeAdm.in(i)
+        }
+
+        val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
+        mergeAdm.out ~> betweenHostDedup ~> broadcastAdm.in
+
+        broadcastAdm.out(0) ~> Sink.actorRefWithAck(ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+        broadcastAdm.out(1) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+
+        ClosedShape
+      }).run()
+
 //    case "e4-no-db" =>
 //      startWebServer()
 //      statusActor ! InitMsg
