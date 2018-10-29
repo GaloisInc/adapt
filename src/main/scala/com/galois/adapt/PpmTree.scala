@@ -26,6 +26,8 @@ import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
 
+//type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
 object NoveltyDetection {
   type Event = AdmEvent
@@ -132,18 +134,33 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
+  //process name and pid/uuid
+  def getProcessDetailsFromAlarm(a:Alarm, setNamespacedUuidDetails:Set[NamespacedUuidDetails], timestamp:Long):ProcessDetails = {
+    name match {
+      case default => ProcessDetails("Unknown Process", Some(0))
+    }
+  }
+
   def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
-    val key: List[ExtractedValue] = a._1.map(_.key)
+    //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
+    //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+
+    val alarm:Alarm = a._1
+    val setNamespacedUuidDetails:Set[NamespacedUuidDetails] = a._2
+    val timestamp:Long = a._3
+    val key: List[ExtractedValue] = alarm.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
-      type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
-      val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
-      alarms = alarms + newAlarm
+
+      val alarmDetails = (timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+      val newAlarm = AnAlarm(key,alarmDetails)
+      alarms = alarms + AnAlarm.unapply(newAlarm).get
 
       def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
-      def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
 
-//      if (thresholdAllows) reportAlarmToTa5(newAlarm)
+      val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
+      //report the alarm
+      if (thresholdAllows) AlarmReporter.report(name, newAlarm, processDetails)
     }
   }
 
@@ -1114,6 +1131,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
   val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
+//  import akka.actor.ActorSystem
+  //implicit val executionContext = ActorSystem().dispatcher
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
   if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
      context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
