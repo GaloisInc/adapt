@@ -518,10 +518,7 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmManager(host: IngestHost) extends Actor with ActorLogging { thisActor =>
-  val hostName: HostName = host.hostName
-  val source: String = host.simpleTa1Name
-  val isWindows: Boolean = host.isWindows
+class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends Actor with ActorLogging { thisActor =>
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {

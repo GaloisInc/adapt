@@ -139,7 +139,7 @@ class MapProxy(
    * Seen nodes and seen edges                                                           *
    ***************************************************************************************/
 
-  private val dedupHosts: List[HostName] = if (numHosts.size == 1) { numHosts } else { bewteenHosts :: numHosts }
+  private val dedupHosts: List[HostName] = bewteenHosts :: numHosts
 
   val seenEdgesShardsMap: Map[HostName, Array[AlmostSet[EdgeAdm2Adm]]] = dedupHosts.map(host => host -> Array.tabulate(numShards) { _ =>
     MapSetUtils.lruCacheSet(
@@ -150,8 +150,8 @@ class MapProxy(
     )
   }).toMap
 
-  val seenNodesShardsMap: Map[HostName, Array[AlmostSet[AdmUUID]]] = dedupHosts.map(host => host -> Array.tabulate(numShards) { _ =>
-    val seenNodesSet: java.util.NavigableSet[Array[AnyRef]] = fileDb.treeSet("seenNodes")
+  val seenNodesShardsMap: Map[HostName, Array[AlmostSet[AdmUUID]]] = dedupHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+    val seenNodesSet: java.util.NavigableSet[Array[AnyRef]] = fileDb.treeSet(s"seenNodes$host$shardId")
       .serializer(new SerializerArrayTuple(Serializer.UUID, Serializer.STRING))
       .counterEnable()
       .createOrOpen()

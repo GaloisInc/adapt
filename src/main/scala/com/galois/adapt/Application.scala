@@ -91,9 +91,6 @@ object Application extends App {
   val seenNodesMaps: Map[HostName, Array[AlmostSet[AdmUUID]]] = mapProxy.seenNodesShardsMap
   val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
 
-  val singleIngestHost = ingestConfig.asSingleHost
-
-
   // Mutable state that gets updated during ingestion
   var failedStatements: List[(Int, String)] = Nil
 
@@ -109,8 +106,6 @@ object Application extends App {
   val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM19), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
     host.hostName -> (host, host.toCdmSource(handler))
   }.toMap
-
-  val startingCount = ???
 
   val erMap: Map[HostName, Flow[(String,CurrentCdm), Either[ADM, EdgeAdm2Adm], NotUsed]] = runFlow match {
     case "accept" => Map.empty
@@ -142,7 +137,8 @@ object Application extends App {
     case "accept" => Map.empty
     case _ =>
       ingestConfig.hosts.map { host: IngestHost =>
-        val ref = system.actorOf(Props(classOf[PpmManager], host), s"ppm-actor-$host.hostName")
+        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows)
+        val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
         ppmConfig.saveintervalseconds match {
           case Some(i) if i > 0L =>
             println(s"Saving PPM trees every $i seconds")
@@ -151,7 +147,8 @@ object Application extends App {
           case _ => println("Not going to periodically save PPM trees.")
         }
         host.hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts), s"ppm-actor-$hostNameForAllHosts"))
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
+        // TODO ryan:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
@@ -536,8 +533,8 @@ object Application extends App {
         .runWith(PpmFlowComponents.ppmSink)
       startWebServer()
 
-    case _ =>
-      println("Unknown runflow argument. Quitting.")
+    case other =>
+      println(s"Unknown runflow argument $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
 }
