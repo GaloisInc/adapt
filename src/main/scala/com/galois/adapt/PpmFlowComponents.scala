@@ -41,22 +41,22 @@ object PpmFlowComponents {
       val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", ppmConfig.components.releasequeue)
 
       // Shutdown hook to save the maps above back to disk when we shutdown
-      if (ppmConfig.shouldsave) {
-        val runnable = new Runnable() {
-          override def run(): Unit = {
-            println(s"Saving state in PpmComponents...")
-            saveMapToDisk("events", events, ppmConfig.components.events)
-            saveMapToDisk("everything", everything, ppmConfig.components.everything)
-            saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
-            saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
-            saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
-          }
-        }
-        Runtime.getRuntime.addShutdownHook(new Thread(runnable))
-        ppmConfig.saveintervalseconds.foreach( interval =>
-          system.scheduler.schedule(interval seconds, interval seconds, runnable)
-        )
-      }
+//      if (ppmConfig.shouldsave) {
+//        val runnable = new Runnable() {
+//          override def run(): Unit = {
+//            println(s"Saving state in PpmComponents...")
+//            saveMapToDisk("events", events, ppmConfig.components.events)
+//            saveMapToDisk("everything", everything, ppmConfig.components.everything)
+//            saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
+//            saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
+//            saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
+//          }
+//        }
+//        Runtime.getRuntime.addShutdownHook(new Thread(runnable))
+//        ppmConfig.saveintervalseconds.foreach( interval =>
+//          system.scheduler.schedule(interval seconds, interval seconds, runnable)
+//        )
+//      }
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
