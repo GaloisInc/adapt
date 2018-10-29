@@ -134,13 +134,10 @@ object AlarmReporter extends LazyLogging {
     println(a)
   }
 
-
-
-
+  
   //  def collectAlarms(a: AlarmSummary) = {
 //    allAlarms = a::AlarmSummary
 //  }
-
 
 
   def report(treeName:String, a: AnAlarm, processDetails:ProcessDetails) = {
