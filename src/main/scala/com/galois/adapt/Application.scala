@@ -157,7 +157,7 @@ object Application extends App {
     import GraphDSL.Implicits._
     val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
     val broadcast = b.add(Broadcast[T](actorList.size))
-    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck(ref, InitMsg, Ack, CompleteMsg) }
+    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
     SinkShape(broadcast.in)
   })
 
