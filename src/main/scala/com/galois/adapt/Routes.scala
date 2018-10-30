@@ -71,9 +71,7 @@ object Routes {
   def mainRoute(
        dbActor: ActorRef,
        statusActor: ActorRef,
-       ppmActors: Map[HostName, ActorRef],
-       cdm2adms: Array[AlmostMap[CdmUUID,AdmUUID]],
-       cdm2cdms: Array[AlmostMap[CdmUUID,CdmUUID]]
+       ppmActors: Map[HostName, ActorRef]
    )(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
 
     def setRatings(rating: Int, namespace: String, hostName: HostName, pathsPerTree: Map[String, List[String]]) = {
@@ -95,6 +93,7 @@ object Routes {
       }
     }
 
+    /*
     def remapUuid(cdmUUID: CdmUUID)(implicit ec: ExecutionContext): Future[JsValue] = Future {
       var noMoreCdmRemaps = false
       var advancedCdm: CdmUUID = cdmUUID
@@ -110,6 +109,7 @@ object Routes {
         case Some(admUuid) => JsString(admUuid.rendered)
       }
     }
+    */
 
     respondWithHeader(`Access-Control-Allow-Origin`(HttpOriginRange.*)) {
       PolicyEnforcementDemo.route(dbActor) ~
@@ -228,14 +228,14 @@ object Routes {
                 queryResult(CypherQuery(queryString.toString), dbActor)
               )
             }
-          } ~
+          } /* ~
           pathPrefix("remap-uuid") {
             path(RemainingPath) { queryString =>
               complete(
                 remapUuid(CdmUUID.fromRendered(queryString.toString))
               )
             }
-          }
+          } */
         } ~
         serveStaticFilesRoute
       } ~

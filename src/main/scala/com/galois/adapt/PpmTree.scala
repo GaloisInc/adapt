@@ -26,6 +26,8 @@ import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
 
+//type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
 object NoveltyDetection {
   type Event = AdmEvent
@@ -47,14 +49,6 @@ object NoveltyDetection {
   val netFlowTypes = readAndWriteTypes ++ Set(EVENT_CONNECT, EVENT_ACCEPT)
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
-    case _                                     => ("""/""" ,   "/")
-  }
-  val sudoOrPowershellComparison: String => Boolean = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
-    case _                                                    => (s: String) => s.toLowerCase == "sudo"
-  }
 
   case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
 }
@@ -132,18 +126,33 @@ case class PpmDefinition[DataShape](
     tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
   }
 
+  //process name and pid/uuid
+  def getProcessDetailsFromAlarm(a:Alarm, setNamespacedUuidDetails:Set[NamespacedUuidDetails], timestamp:Long):ProcessDetails = {
+    name match {
+      case default => ProcessDetails("Unknown Process", Some(0))
+    }
+  }
+
   def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
-    val key: List[ExtractedValue] = a._1.map(_.key)
+    //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
+    //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+
+    val alarm:Alarm = a._1
+    val setNamespacedUuidDetails:Set[NamespacedUuidDetails] = a._2
+    val timestamp:Long = a._3
+    val key: List[ExtractedValue] = alarm.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
-      type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
-      val newAlarm: AnAlarm = key -> (a._3, System.currentTimeMillis, a._1, a._2, Map.empty[String,Int])
-      alarms = alarms + newAlarm
+
+      val alarmDetails = (timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+      val newAlarm = AnAlarm(key,alarmDetails)
+      alarms = alarms + AnAlarm.unapply(newAlarm).get
 
       def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
-      def reportAlarmToTa5(alarm: AnAlarm): Unit = ??? // Aditya to implement
 
-//      if (thresholdAllows) reportAlarmToTa5(newAlarm)
+      val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
+      //report the alarm
+      if (thresholdAllows) AlarmReporter.report(name, newAlarm, processDetails)
     }
   }
 
@@ -526,7 +535,15 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor =>
+class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends Actor with ActorLogging { thisActor =>
+
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
+  val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
+    _.toLowerCase.contains("powershell")
+  } else {
+    _.toLowerCase == "sudo"
+  }
+
   import NoveltyDetection._
 
   val cdmSanityTrees = List(
@@ -543,7 +560,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, source))),
       _.asInstanceOf[cdm18.Event].timestampNanos,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -561,7 +578,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -578,7 +595,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
@@ -596,7 +613,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
@@ -1050,14 +1067,19 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       }.toOption
 
-      val partialMap2 = mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]
+      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
 
       override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
         getJoinCondition(observation) match {
           case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
           case Some(joinValue) =>
 
-            val previousSameDirObservations = partialMap2.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
+            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
+            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
+            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
+              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
+
+            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
             val observedIds = uuidCollector(observation)
 
             val sendRecOpt = joinValue.sendRec match {
@@ -1066,15 +1088,15 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisSendObs = Map(theseDiscs -> theseIds)
                 val allSendObs = previousSameDirObservations ++ thisSendObs
-                partialMap2(joinValue) = allSendObs
-                partialMap2.get(joinValue.invert).map(thisSendObs -> _)
+                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
               case Receiving =>
                 val theseDiscs = discriminators(1)(observation)
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisRecObs = Map(theseDiscs -> theseIds)
                 val allRecObs = previousSameDirObservations ++ thisRecObs
-                partialMap2(joinValue) = allRecObs
-                partialMap2.get(joinValue.invert).map(_ -> thisRecObs)
+                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
             }
 
             sendRecOpt.foreach { obs =>
@@ -1117,6 +1139,8 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
   // Alarm Local Probabilities for novelty trees (not alarm trees) should be the second input to AlarmLocalProbabilityAccumulator.
   val alarmLpAccumulator = AlarmLocalProbabilityAccumulator(hostName, ppmList.filter(tree => tree.shouldApplyThreshold).flatMap(t => t.alarms.map(_._2._3.last.localProb)).toList)
 
+//  import akka.actor.ActorSystem
+  //implicit val executionContext = ActorSystem().dispatcher
   val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
   if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
      context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,

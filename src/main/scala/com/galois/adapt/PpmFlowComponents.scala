@@ -27,8 +27,11 @@ object PpmFlowComponents {
   type AdmUUIDReferencingPathNode = AdmUUID
 
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
-    Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
+    ppmStateAccumulator.to(
+      Application.ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
+    )
 
+  def ppmStateAccumulator(implicit system: ActorSystem, ec: ExecutionContext): Flow[Either[ADM, EdgeAdm2Adm], CompletedESO, NotUsed] = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
       // Load these maps from disk on startup
       val events:       mutable.Map[AdmUUID, (AdmEvent, Option[ADM], Option[ADM])] = loadMapFromDisk("events", ppmConfig.components.events)
       val everything:   mutable.Map[AdmUUID, ADM]                                  = loadMapFromDisk("everything", ppmConfig.components.everything)
@@ -38,22 +41,22 @@ object PpmFlowComponents {
       val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", ppmConfig.components.releasequeue)
 
       // Shutdown hook to save the maps above back to disk when we shutdown
-      if (ppmConfig.shouldsave) {
-        val runnable = new Runnable() {
-          override def run(): Unit = {
-            println(s"Saving state in PpmComponents...")
-            saveMapToDisk("events", events, ppmConfig.components.events)
-            saveMapToDisk("everything", everything, ppmConfig.components.everything)
-            saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
-            saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
-            saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
-          }
-        }
-        Runtime.getRuntime.addShutdownHook(new Thread(runnable))
-        ppmConfig.saveintervalseconds.foreach( interval =>
-          system.scheduler.schedule(interval seconds, interval seconds, runnable)
-        )
-      }
+//      if (ppmConfig.shouldsave) {
+//        val runnable = new Runnable() {
+//          override def run(): Unit = {
+//            println(s"Saving state in PpmComponents...")
+//            saveMapToDisk("events", events, ppmConfig.components.events)
+//            saveMapToDisk("everything", everything, ppmConfig.components.everything)
+//            saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
+//            saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
+//            saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
+//          }
+//        }
+//        Runtime.getRuntime.addShutdownHook(new Thread(runnable))
+//        ppmConfig.saveintervalseconds.foreach( interval =>
+//          system.scheduler.schedule(interval seconds, interval seconds, runnable)
+//        )
+//      }
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
@@ -123,9 +126,10 @@ object PpmFlowComponents {
             everything.get(child).flatMap { c =>
               everything.get(parent).map { p =>
                 val provider = Try(p.asInstanceOf[AdmSubject].provider).getOrElse("")
+                val hostName = Try(p.asInstanceOf[AdmSubject].hostName).getOrElse("")
                 val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
                 val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
-                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, provider), c, c.uuid, p, p.uuid)
+                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
               }
             }
           )
@@ -165,9 +169,7 @@ object PpmFlowComponents {
         case _ =>
           release(None)
       }
-    }.to(
-      Application.ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
-    )
+    }
 
 
   // Load a mutable map from disk

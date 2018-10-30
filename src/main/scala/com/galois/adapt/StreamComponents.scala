@@ -46,16 +46,16 @@ object FlowComponents {
         val sampledTime = EntityResolution.sampledTime
 
         // UuidRemapper related stats
-        val uuidsBlocking: Int = Application.blockedEdgesMaps.map(_.size).sum
-        val blockedUuidResponses: Int = Application.blockedEdgesMaps.map(_.values.map(x => x._1.length).sum).sum
+        val uuidsBlocking: Int = Application.blockedEdgesMaps.values.map(_.map(_.size).sum).sum
+        val blockedUuidResponses: Int = Application.blockedEdgesMaps.values.map(_.map(_.values.map(x => x._1.length).sum).sum).sum
 
         val activeEventChains = EntityResolution.activeChains.size
 
-        val cdm2cdmSize = Application.cdm2cdmMaps.map(_.size()).sum
-        val cdm2admSize = Application.cdm2admMaps.map(_.size()).sum
+        val cdm2cdmSize = Application.cdm2cdmMaps.values.map(_.map(_.size()).sum).sum
+        val cdm2admSize = Application.cdm2admMaps.values.map(_.map(_.size()).sum).sum
 
-        val seenNodesSize = Application.seenNodes.map(_.size()).sum
-        val seenEdgesSize = Application.seenEdges.map(_.size()).sum
+        val seenNodesSize = Application.seenNodesMaps.values.map(_.map(_.size()).sum).sum
+        val seenEdgesSize = Application.seenEdgesMaps.values.map(_.map(_.size()).sum).sum
 
         val shardDistribution: Array[Long] = {
           val totalCount = Application.shardCount.sum
