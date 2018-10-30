@@ -759,8 +759,11 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path), d._3._1 match {
+          case o: AdmSubject => Some(o.cid.toString)
+          case _ => None
+        })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
