@@ -624,7 +624,7 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
         override def accept(key: String, count: Long): Unit = listBuffer += (key -> count)
       })
       println(listBuffer
-        .sortBy(_._2)
+        .sortBy(_._1)
         .toList
         .map { case (stage, count) => s"$prefix $stage: $count" }
         .mkString(s"$prefix ==== START OF DEBUG REPORT ====\n", "\n", s"\n$prefix ==== END OF DEBUG REPORT ====\n")
