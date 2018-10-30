@@ -348,7 +348,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       startWebServer()
       statusActor ! InitMsg
 
-      val debug = new StreamDebugger("e4-debug", 20 seconds, 10 seconds)
+      // Write out debug states
+      val debug = new StreamDebugger("e4|", 30 seconds, 10 seconds)
 
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
@@ -356,20 +357,31 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         val hostSources = cdmSources.values.toSeq
         val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
 
-
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          source.via(printCounter(host.hostName, statusActor, 0)).via(debug.debugBuffer(s"before ER for ${host.hostName}")) ~> erMap(host.hostName).via(debug.debugBuffer(s"after ER for ${host.hostName}")) ~> broadcast.in
+          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] before ER")) ~>
+            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] after ER")) ~>
+            broadcast.in
 
-          broadcast.out(0).via(debug.debugBuffer(s"before PPM state accum for ${host.hostName}")) ~> PpmFlowComponents.ppmStateAccumulator.via(debug.debugBuffer(s"before PPM actor for ${host.hostName}")) ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
-          broadcast.out(1).via(debug.debugBuffer(s"before ADM merge for ${host.hostName}")) ~> mergeAdm.in(i)
+          (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] before PPM state accumulator")) ~>
+            (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] before PPM sink")) ~>
+            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+
+          (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] before ADM merge")) ~>
+            mergeAdm.in(i)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-        mergeAdm.out.via(debug.debugBuffer(s"before between-host dedup")) ~> betweenHostDedup.via(debug.debugBuffer(s"after between host dedup")) ~> broadcastAdm.in
+        (mergeAdm.out via debug.debugBuffer(s"after ADM merge")) ~>
+          (betweenHostDedup via debug.debugBuffer(s"after cross-host deduplicate")) ~>
+          broadcastAdm.in
 
-        broadcastAdm.out(0).via(debug.debugBuffer(s"before between host PPM state accum")) ~> PpmFlowComponents.ppmStateAccumulator.via(debug.debugBuffer(s"before PPM actor for between-host")) ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
-        broadcastAdm.out(1).via(debug.debugBuffer(s"before ADM DB actor")) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+        (broadcastAdm.out(0) via debug.debugBuffer(s"before cross-host PPM state accumulator")) ~>
+          (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"before cross-host PPM sink")) ~>
+          Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+
+        (broadcastAdm.out(1) via debug.debugBuffer(s"before DB sink")) ~>
+          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
       }).run()
@@ -587,6 +599,15 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 }
 
 
+/**
+  * Utility for debugging which components are bottlenecks in a backpressured stream system. Instantiate one of these
+  * per stream system, then place [[debugBuffer]] between stages to find out whether the bottleneck is upstream (in
+  * which case the buffer will end up empty) or downstream (in which case the buffer will end up full).
+  *
+  * @param prefix prompt with which to start status update lines
+  * @param printEvery how frequently to print out status updates
+  * @param reportEvery how frequently should the debug buffers report their status to the [[StreamDebugger]]
+  */
 class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: FiniteDuration)
                     (implicit system: ActorSystem, ec: ExecutionContext) {
 
@@ -611,6 +632,16 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
     }
   })
 
+  /**
+    * Create a new debug buffer flow. This is just like a (backpressured) buffer flow, but it keeps track of how many
+    * items are in the buffer (possibly plus one) and reports this number periodically to the object on which this
+    * method is called.
+    *
+    * @param name what label to associate with this debug buffer (should be unique per [[StreamDebugger]]
+    * @param bufferSize size of the buffer being created
+    * @tparam T type of thing flowing through the buffer
+    * @return a buffer flow which periodically reports stats about how full its buffer is
+    */
   def debugBuffer[T](name: String, bufferSize: Int = 10000): Flow[T,T,NotUsed] =
     Flow.fromGraph(GraphDSL.create() {
       implicit graph =>
