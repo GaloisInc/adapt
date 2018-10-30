@@ -21,7 +21,7 @@ import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 import AdaptConfig._
@@ -348,6 +348,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       startWebServer()
       statusActor ! InitMsg
 
+      val debug = new StreamDebugger("e4-debug", 20 seconds, 10 seconds)
+
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
 
@@ -357,17 +359,17 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> broadcast.in
+          source.via(printCounter(host.hostName, statusActor, 0)).via(debug.debugBuffer(s"before ER for ${host.hostName}")) ~> erMap(host.hostName).via(debug.debugBuffer(s"after ER for ${host.hostName}")) ~> broadcast.in
 
-          broadcast.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
-          broadcast.out(1) ~> mergeAdm.in(i)
+          broadcast.out(0).via(debug.debugBuffer(s"before PPM state accum for ${host.hostName}")) ~> PpmFlowComponents.ppmStateAccumulator.via(debug.debugBuffer(s"before PPM actor for ${host.hostName}")) ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+          broadcast.out(1).via(debug.debugBuffer(s"before ADM merge for ${host.hostName}")) ~> mergeAdm.in(i)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-        mergeAdm.out ~> betweenHostDedup ~> broadcastAdm.in
+        mergeAdm.out.via(debug.debugBuffer(s"before between-host dedup")) ~> betweenHostDedup.via(debug.debugBuffer(s"after between host dedup")) ~> broadcastAdm.in
 
-        broadcastAdm.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
-        broadcastAdm.out(1) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+        broadcastAdm.out(0).via(debug.debugBuffer(s"before between host PPM state accum")) ~> PpmFlowComponents.ppmStateAccumulator.via(debug.debugBuffer(s"before PPM actor for between-host")) ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+        broadcastAdm.out(1).via(debug.debugBuffer(s"before ADM DB actor")) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
       }).run()
@@ -582,4 +584,53 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       println(s"Unknown runflow argument $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
+}
+
+
+class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: FiniteDuration)
+                    (implicit system: ActorSystem, ec: ExecutionContext) {
+
+  import java.util.concurrent.ConcurrentHashMap
+  import java.util.concurrent.atomic.AtomicInteger
+  import java.util.function.BiConsumer
+
+  val bufferCounts: ConcurrentHashMap[String, Long] = new ConcurrentHashMap()
+
+  system.scheduler.schedule(printEvery, printEvery, new Runnable {
+    override def run(): Unit = {
+      val listBuffer = mutable.ListBuffer.empty[(String, Long)]
+      bufferCounts.forEach(new BiConsumer[String, Long] {
+        override def accept(key: String, count: Long): Unit = listBuffer += (key -> count)
+      })
+      println(listBuffer
+        .sortBy(_._2)
+        .toList
+        .map { case (stage, count) => s"$prefix $stage: $count" }
+        .mkString(s"$prefix ==== START OF DEBUG REPORT ====\n", "\n", s"\n$prefix ==== END OF DEBUG REPORT ====\n")
+      )
+    }
+  })
+
+  def debugBuffer[T](name: String, bufferSize: Int = 10000): Flow[T,T,NotUsed] =
+    Flow.fromGraph(GraphDSL.create() {
+      implicit graph =>
+
+        import GraphDSL.Implicits._
+
+        val bufferCount: AtomicInteger = new AtomicInteger(0)
+
+        // Write the count out to the buffer count map regularly
+        system.scheduler.schedule(reportEvery, reportEvery, new Runnable {
+          override def run(): Unit = bufferCounts.put(name, bufferCount.get())
+        })
+
+        // Increment the count when entering the buffer, decrement it when exiting
+        val incrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.incrementAndGet(); x }))
+        val buffer = graph.add(Flow[T].buffer(bufferSize, OverflowStrategy.backpressure))
+        val decrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.decrementAndGet(); x }))
+
+        incrementCount.out ~> buffer ~> decrementCount
+
+        FlowShape(incrementCount.in, decrementCount.out)
+    })
 }
